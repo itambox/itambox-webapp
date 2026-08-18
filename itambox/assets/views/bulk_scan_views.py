@@ -26,13 +26,13 @@ from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import TemplateView
 
-from core.managers import get_current_tenant
 from core.models import Job
 from core.tenant_scope import accessible_tenant_ids
 from itambox.views.generic.utils import safe_return_url
 
 from .. import forms
 from ..depreciation import compute_book_value
+from ..forms.bulk_scan_forms import bulk_tenant_for_request, bulk_tenant_queryset, validate_bulk_tenant
 from ..models import Asset, AssetDisposal
 from ..scanning import resolve_scanned_asset
 
@@ -102,7 +102,7 @@ class AssetScanActionResolveView(View):
 
         mode = request.GET.get("mode", "checkin")
         action_perm = DISPOSE_PERM if mode == "dispose" else CHECKIN_PERM
-        target_tenant = forms.bulk_tenant_for_request(request, request.GET.get("tenant"))
+        target_tenant = bulk_tenant_for_request(request, request.GET.get("tenant"))
         if getattr(request, "active_all_accessible", False) and target_tenant is None:
             return JsonResponse({"found": False, "tenant_required": True}, status=400)
 
@@ -149,14 +149,14 @@ class _BaseBulkScanView(LoginRequiredMixin, PermissionRequiredMixin, TemplateVie
 
         required = self.get_permission_required()
         raw_tenant = self.request.POST.get("tenant") if self.request.method == "POST" else None
-        target_tenant = forms.bulk_tenant_for_request(self.request, raw_tenant) if raw_tenant else None
+        target_tenant = bulk_tenant_for_request(self.request, raw_tenant) if raw_tenant else None
         if target_tenant is not None:
             return all(self.request.user.has_perm(permission, obj=target_tenant) for permission in required)
 
         # GET must be reachable so the user can make the required tenant choice.
         return any(
             all(self.request.user.has_perm(permission, obj=tenant) for permission in required)
-            for tenant in forms.bulk_tenant_queryset(self.request)
+            for tenant in bulk_tenant_queryset(self.request)
         )
 
     def _seed_assets(self):
@@ -231,7 +231,7 @@ def _enqueue(job, task_path, *task_args):
 
 def _submission_tenant(request, form_class, permission):
     """Resolve and authorize the tenant selected for a bulk mutation."""
-    tenant, error = forms.validate_bulk_tenant(request, form_class)
+    tenant, error = validate_bulk_tenant(request, form_class)
     if tenant is None:
         if getattr(request, "active_all_accessible", False):
             return None, "redirect", error or _("Select a target tenant first.")
