@@ -482,6 +482,8 @@ and Django-settings fallback for the canonical setting below.
 | `ITAMBOX_SESSION_COOKIE_AGE` | Session lifetime |
 | `ITAMBOX_DOCS_ROOT` | Filesystem path of the compiled documentation |
 | `ITAMBOX_CACHE_BACKEND` | Shared-cache selection; rate limiting and SAML replay protection depend on it |
+| `ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR` | Explicit opt-in to trust the client IP forwarded by a trusted reverse proxy |
+| `ITAMBOX_RATELIMIT_NUM_PROXIES` | Number of trusted proxy hops used when resolving the forwarded client IP |
 | `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Field-encryption key set; value never published |
 | `ITAMBOX_API_TOKEN_PEPPERS` | API-token pepper set; value never published |
 | `ITAMBOX_REQUIRE_MFA` | TOTP enforcement for privileged local logins |
