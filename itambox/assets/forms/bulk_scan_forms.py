@@ -10,11 +10,81 @@ import datetime
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Fieldset, Layout
 from django import forms
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetDisposal, StatusLabel
 from core.managers import get_current_tenant
-from organization.models import AssetHolder, Location
+from core.tenant_scope import accessible_tenant_ids
+from organization.models import AssetHolder, Location, Tenant
+
+
+def bulk_tenant_queryset(request):
+    """Return active tenants the request user may explicitly target."""
+    user = getattr(request, "user", None)
+    if user is None or not user.is_authenticated:
+        return Tenant._base_manager.none()
+    return Tenant._base_manager.filter(
+        pk__in=accessible_tenant_ids(user),
+        deleted_at__isnull=True,
+    ).order_by("name")
+
+
+def bulk_tenant_for_request(request, raw_value=None):
+    """Resolve the tenant bound to a bulk action without widening scope.
+
+    In a concrete tenant scope, the request context is authoritative and the
+    posted hidden field is ignored. In the aggregate scope, the submitted value
+    must be one of the user's accessible tenants.
+    """
+    if not getattr(request, "active_all_accessible", False):
+        return getattr(request, "active_tenant", None) or get_current_tenant()
+    if raw_value is None:
+        raw_value = request.POST.get("tenant")
+    if not raw_value:
+        return None
+    return bulk_tenant_queryset(request).filter(pk=raw_value).first()
+
+
+def validate_bulk_tenant(request, form_class):
+    """Return ``(tenant, error_message)`` for a bulk submission."""
+    if not getattr(request, "active_all_accessible", False):
+        tenant = bulk_tenant_for_request(request)
+        return tenant, None
+
+    field = form_class(request=request).fields["tenant"]
+    try:
+        return field.clean(request.POST.get("tenant")), None
+    except ValidationError:
+        return None, _("Select an accessible target tenant before starting this bulk action.")
+
+
+class BulkTenantSelectionMixin:
+    """Add the explicit target tenant required by aggregate bulk actions."""
+
+    def __init__(self, *args, request=None, **kwargs):
+        self.request = request
+        super().__init__(*args, **kwargs)
+        self.fields["tenant"] = forms.ModelChoiceField(
+            queryset=Tenant._base_manager.none(),
+            required=False,
+            widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            label=_("Target tenant"),
+            help_text=_("Required when the current scope contains more than one tenant."),
+        )
+
+        all_accessible = bool(getattr(request, "active_all_accessible", False))
+        current_tenant = getattr(request, "active_tenant", None) or get_current_tenant()
+        self.fields["tenant"].queryset = (
+            bulk_tenant_queryset(request)
+            if all_accessible
+            else (Tenant._base_manager.filter(pk=current_tenant.pk) if current_tenant else Tenant._base_manager.none())
+        )
+        self.fields["tenant"].required = all_accessible
+        if not all_accessible:
+            self.fields["tenant"].widget = forms.HiddenInput()
+            if current_tenant:
+                self.fields["tenant"].initial = current_tenant.pk
 
 
 def _tenant_locations():
@@ -26,7 +96,7 @@ def _tenant_locations():
     return qs
 
 
-class AssetBulkCheckInForm(forms.Form):
+class AssetBulkCheckInForm(BulkTenantSelectionMixin, forms.Form):
     """Batch-wide check-in options applied to every scanned asset."""
 
     status = forms.ModelChoiceField(
@@ -63,6 +133,7 @@ class AssetBulkCheckInForm(forms.Form):
         self.helper.form_tag = False
         self.helper.disable_csrf = True
         self.helper.layout = Layout(
+            "tenant",
             Div(
                 Div("status", css_class="col-md-6"),
                 Div("location", css_class="col-md-6"),
@@ -76,7 +147,7 @@ class AssetBulkCheckInForm(forms.Form):
         )
 
 
-class AssetBulkDisposeForm(forms.ModelForm):
+class AssetBulkDisposeForm(BulkTenantSelectionMixin, forms.ModelForm):
     """Batch-wide disposal options. ``proceeds`` is captured per-row in the UI."""
 
     disposal_date = forms.DateField(
@@ -117,6 +188,7 @@ class AssetBulkDisposeForm(forms.ModelForm):
         self.helper.form_tag = False
         self.helper.disable_csrf = True
         self.helper.layout = Layout(
+            "tenant",
             Fieldset(
                 _("Disposal Details"),
                 Div(
@@ -163,7 +235,7 @@ def _tenant_target_assets():
     return qs
 
 
-class AssetBulkCheckOutForm(forms.Form):
+class AssetBulkCheckOutForm(BulkTenantSelectionMixin, forms.Form):
     """Batch-wide check-out target + options applied to every scanned asset.
 
     Exactly one target (holder / location / parent asset) is required; the
@@ -223,6 +295,7 @@ class AssetBulkCheckOutForm(forms.Form):
         self.helper.form_tag = False
         self.helper.disable_csrf = True
         self.helper.layout = Layout(
+            "tenant",
             HTML(
                 '<p class="text-muted small mb-2">%s</p>'
                 % _("Choose exactly one target — a holder, a location, or a parent asset.")

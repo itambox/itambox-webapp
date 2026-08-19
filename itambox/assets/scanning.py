@@ -43,7 +43,7 @@ def strip_itambox_prefix(code: str) -> str:
     return raw
 
 
-def _accessible_model_queryset(model, user):
+def _accessible_model_queryset(model, user, tenant=None):
     """Return the queryset a scan should search for ``model``.
 
     - ``user is None`` (audit / bulk flows): the tenant-scoped manager, so the
@@ -55,10 +55,11 @@ def _accessible_model_queryset(model, user):
 
     Returns ``None`` when the user has no accessible tenants (fail closed).
     """
-    if user is None:
+    if tenant is not None:
+        qs = model._base_manager.filter(tenant_id=tenant.pk)
+    elif user is None:
         return model.objects
-
-    if user.is_superuser:
+    elif user.is_superuser:
         qs = model._base_manager.all()
     else:
         tenant_ids = accessible_tenant_ids(user)
@@ -120,7 +121,7 @@ def _resolve_ean(raw, qs, match_ean):
     return None, False
 
 
-def resolve_scanned_asset(code, user=None, match_ean=True):
+def resolve_scanned_asset(code, user=None, match_ean=True, tenant=None):
     """Resolve a scanned code to an Asset, with ambiguity information.
 
     Returns ``(asset, ambiguous)``:
@@ -140,7 +141,7 @@ def resolve_scanned_asset(code, user=None, match_ean=True):
     if not raw:
         return None, False
 
-    qs = _accessible_model_queryset(Asset, user)
+    qs = _accessible_model_queryset(Asset, user, tenant=tenant)
     if qs is None:
         return None, False
 
@@ -165,7 +166,7 @@ def resolve_scanned_asset(code, user=None, match_ean=True):
     return _resolve_ean(raw, qs, match_ean)
 
 
-def resolve_scanned_code(code, user=None, match_ean=True):
+def resolve_scanned_code(code, user=None, match_ean=True, tenant=None):
     """Resolve a scanned code to an Asset, or ``None``.
 
     An AssetType EAN that matches several assets in scope returns ``None`` so
@@ -176,7 +177,7 @@ def resolve_scanned_code(code, user=None, match_ean=True):
     flow uses this so an EAN redirects to the filtered asset list (its
     existing behavior) instead of jumping to a single asset detail page.
     """
-    asset, _ambiguous = resolve_scanned_asset(code, user=user, match_ean=match_ean)
+    asset, _ambiguous = resolve_scanned_asset(code, user=user, match_ean=match_ean, tenant=tenant)
     return asset
 
 

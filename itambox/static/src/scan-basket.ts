@@ -107,8 +107,11 @@ function initScanBasket(): void {
   const emptyEl = document.getElementById('scan-basket-empty');
   const clearBtn = document.getElementById('scan-basket-clear') as HTMLButtonElement | null;
   const submitBtn = document.getElementById('scan-basket-submit') as HTMLButtonElement | null;
-
   if (!form || !tbody || !template) return;
+
+  const tenantField = form.querySelector<HTMLSelectElement | HTMLInputElement>('[name="tenant"]');
+  const tenantRequired = !!tenantField && tenantField.type !== 'hidden';
+  const cameraBtn = document.getElementById('basket-open-scanner-btn') as HTMLButtonElement | null;
 
   const basket = new Set<number>();
 
@@ -119,7 +122,10 @@ function initScanBasket(): void {
     if (overlayCount) overlayCount.textContent = String(count);
     if (emptyEl) emptyEl.classList.toggle('d-none', count !== 0);
     if (clearBtn) clearBtn.disabled = count === 0;
-    if (submitBtn) submitBtn.disabled = count === 0;
+    const tenantSelected = !tenantRequired || !!tenantField?.value;
+    if (input) input.disabled = !tenantSelected;
+    if (cameraBtn) cameraBtn.disabled = !tenantSelected;
+    if (submitBtn) submitBtn.disabled = count === 0 || !tenantSelected;
     document.querySelectorAll<HTMLElement>('.scan-basket-confirm-count').forEach((el) => {
       el.textContent = String(count);
     });
@@ -187,7 +193,15 @@ function initScanBasket(): void {
     const cleaned = (code || '').trim();
     if (!cleaned) return Promise.resolve();
 
-    const url = `${resolveUrl}?code=${encodeURIComponent(cleaned)}&mode=${encodeURIComponent(mode)}`;
+    if (tenantRequired && !tenantField?.value) {
+      notify(gettext('Select a target tenant before scanning.'), 'warn');
+      return Promise.resolve();
+    }
+
+    const tenantQuery = tenantRequired || tenantField?.value
+      ? `&tenant=${encodeURIComponent(tenantField?.value || '')}`
+      : '';
+    const url = `${resolveUrl}?code=${encodeURIComponent(cleaned)}&mode=${encodeURIComponent(mode)}${tenantQuery}`;
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then((res) => {
         if (res.status === 403) throw new Error('forbidden');
@@ -234,6 +248,17 @@ function initScanBasket(): void {
       const value = input.value;
       input.value = '';
       addByCode(value);
+    });
+  }
+
+  if (tenantField && tenantRequired) {
+    tenantField.addEventListener('change', () => {
+      // Never carry assets scanned for a previous target tenant into a new
+      // tenant-bound batch.
+      basket.clear();
+      tbody.innerHTML = '';
+      updateState();
+      input?.focus();
     });
   }
 

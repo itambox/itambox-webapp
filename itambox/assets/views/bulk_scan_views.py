@@ -26,13 +26,13 @@ from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import TemplateView
 
-from core.managers import get_current_tenant
 from core.models import Job
 from core.tenant_scope import accessible_tenant_ids
 from itambox.views.generic.utils import safe_return_url
 
 from .. import forms
 from ..depreciation import compute_book_value
+from ..forms.bulk_scan_forms import bulk_tenant_for_request, bulk_tenant_queryset, validate_bulk_tenant
 from ..models import Asset, AssetDisposal
 from ..scanning import resolve_scanned_asset
 
@@ -102,14 +102,24 @@ class AssetScanActionResolveView(View):
 
         mode = request.GET.get("mode", "checkin")
         action_perm = DISPOSE_PERM if mode == "dispose" else CHECKIN_PERM
-        if not request.user.has_perm("assets.view_asset") or not request.user.has_perm(action_perm):
+        target_tenant = bulk_tenant_for_request(request, request.GET.get("tenant"))
+        if getattr(request, "active_all_accessible", False) and target_tenant is None:
+            return JsonResponse({"found": False, "tenant_required": True}, status=400)
+
+        if target_tenant is not None:
+            has_view = request.user.has_perm("assets.view_asset", obj=target_tenant)
+            has_action = request.user.has_perm(action_perm, obj=target_tenant)
+        else:
+            has_view = request.user.has_perm("assets.view_asset")
+            has_action = request.user.has_perm(action_perm)
+        if not has_view or not has_action:
             return JsonResponse({"found": False}, status=403)
 
         code = request.GET.get("code", "").strip()
         if not code:
             return JsonResponse({"found": False}, status=400)
 
-        asset, ambiguous = resolve_scanned_asset(code)
+        asset, ambiguous = resolve_scanned_asset(code, tenant=target_tenant)
         if asset is None:
             # An EAN matching several assets is reported distinctly so the UI
             # never treats an ambiguous scan as a plain miss (or worse, picks
@@ -132,6 +142,23 @@ class _BaseBulkScanView(LoginRequiredMixin, PermissionRequiredMixin, TemplateVie
     page_title = ""
     page_pretitle = _("Bulk Actions")
 
+    def has_permission(self):
+        """Allow the page in aggregate scope, but bind mutations to its tenant field."""
+        if not getattr(self.request, "active_all_accessible", False):
+            return super().has_permission()
+
+        required = self.get_permission_required()
+        raw_tenant = self.request.POST.get("tenant") if self.request.method == "POST" else None
+        target_tenant = bulk_tenant_for_request(self.request, raw_tenant) if raw_tenant else None
+        if target_tenant is not None:
+            return all(self.request.user.has_perm(permission, obj=target_tenant) for permission in required)
+
+        # GET must be reachable so the user can make the required tenant choice.
+        return any(
+            all(self.request.user.has_perm(permission, obj=tenant) for permission in required)
+            for tenant in bulk_tenant_queryset(self.request)
+        )
+
     def _seed_assets(self):
         pks = [p for p in self.request.GET.getlist("pk") if p.isdigit()]
         if not pks:
@@ -144,7 +171,7 @@ class _BaseBulkScanView(LoginRequiredMixin, PermissionRequiredMixin, TemplateVie
         context.update(
             {
                 "mode": self.mode,
-                "form": self.form_class(),
+                "form": self.form_class(request=self.request),
                 "submit_url": reverse(self.submit_url_name),
                 "resolve_url": reverse("assets:asset_scan_resolve_action"),
                 "seed_payloads": self._seed_assets(),
@@ -202,25 +229,40 @@ def _enqueue(job, task_path, *task_args):
         transaction.on_commit(lambda: async_task(task_path, *task_args))
 
 
+def _submission_tenant(request, form_class, permission):
+    """Resolve and authorize the tenant selected for a bulk mutation."""
+    tenant, error = validate_bulk_tenant(request, form_class)
+    if tenant is None:
+        if getattr(request, "active_all_accessible", False):
+            return None, "redirect", error or _("Select a target tenant first.")
+        return None, "forbidden", None
+    if not request.user.has_perm(permission, obj=tenant):
+        return None, "forbidden", None
+    return tenant, "ok", None
+
+
 @login_required
 def bulk_checkin_assets(request):
-    if not request.user.has_perm(CHECKIN_PERM):
-        return HttpResponse(status=403)
     if request.method != "POST":
         return HttpResponse(status=405)
 
     object_pks = request.POST.getlist("pk")
     fallback = reverse("assets:asset_bulk_checkin_scan")
+    target_tenant, outcome, error = _submission_tenant(request, forms.AssetBulkCheckInForm, CHECKIN_PERM)
+    if outcome == "forbidden":
+        return HttpResponse(status=403)
+    if outcome == "redirect":
+        messages.error(request, error)
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     if not object_pks:
         messages.error(request, _("No assets selected for check-in."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
 
-    current_tenant = get_current_tenant()
-    tenant_id = current_tenant.pk if current_tenant else None
+    tenant_id = target_tenant.pk
 
     job = Job.objects.create(
         name=f"Bulk Check-in: {len(object_pks)} Assets",
-        tenant=current_tenant,
+        tenant=target_tenant,
         model=ContentType.objects.get_for_model(Asset),
         status=Job.STATUS_PENDING,
     )
@@ -247,13 +289,17 @@ def bulk_checkin_assets(request):
 
 @login_required
 def bulk_dispose_assets(request):
-    if not request.user.has_perm(DISPOSE_PERM):
-        return HttpResponse(status=403)
     if request.method != "POST":
         return HttpResponse(status=405)
 
     object_pks = request.POST.getlist("pk")
     fallback = reverse("assets:asset_bulk_dispose_scan")
+    target_tenant, outcome, error = _submission_tenant(request, forms.AssetBulkDisposeForm, DISPOSE_PERM)
+    if outcome == "forbidden":
+        return HttpResponse(status=403)
+    if outcome == "redirect":
+        messages.error(request, error)
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     if not object_pks:
         messages.error(request, _("No assets selected for disposal."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
@@ -276,12 +322,11 @@ def bulk_dispose_assets(request):
     }
     proceeds_map = {pk: (request.POST.get(f"proceeds_{pk}") or None) for pk in object_pks}
 
-    current_tenant = get_current_tenant()
-    tenant_id = current_tenant.pk if current_tenant else None
+    tenant_id = target_tenant.pk
 
     job = Job.objects.create(
         name=f"Bulk Disposal: {len(object_pks)} Assets",
-        tenant=current_tenant,
+        tenant=target_tenant,
         model=ContentType.objects.get_for_model(Asset),
         status=Job.STATUS_PENDING,
     )
@@ -306,13 +351,17 @@ def bulk_dispose_assets(request):
 
 @login_required
 def bulk_checkout_assets(request):
-    if not request.user.has_perm(CHECKOUT_PERM):
-        return HttpResponse(status=403)
     if request.method != "POST":
         return HttpResponse(status=405)
 
     object_pks = request.POST.getlist("pk")
     fallback = reverse("assets:asset_bulk_checkout_scan")
+    target_tenant, outcome, error = _submission_tenant(request, forms.AssetBulkCheckOutForm, CHECKOUT_PERM)
+    if outcome == "forbidden":
+        return HttpResponse(status=403)
+    if outcome == "redirect":
+        messages.error(request, error)
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     if not object_pks:
         messages.error(request, _("No assets selected for check-out."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
@@ -328,12 +377,11 @@ def bulk_checkout_assets(request):
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     target_type_str, target_pk = chosen[0]
 
-    current_tenant = get_current_tenant()
-    tenant_id = current_tenant.pk if current_tenant else None
+    tenant_id = target_tenant.pk
 
     job = Job.objects.create(
         name=f"Bulk Check-out: {len(object_pks)} Assets",
-        tenant=current_tenant,
+        tenant=target_tenant,
         model=ContentType.objects.get_for_model(Asset),
         status=Job.STATUS_PENDING,
     )
