@@ -39,6 +39,21 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Cloudflare Tunnel is the only trusted proxy in the demo deployment. Keep
+# forwarded-client-IP handling disabled by default so directly reachable
+# deployments cannot be bypassed with a forged X-Forwarded-For header.
+RATELIMIT_USE_X_FORWARDED_FOR = os.environ.get("ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR", "False").lower() in (
+    "true",
+    "1",
+    "t",
+)
+try:
+    RATELIMIT_NUM_PROXIES = int(os.environ.get("ITAMBOX_RATELIMIT_NUM_PROXIES", "1"))
+except ValueError as exc:
+    raise ValueError("ITAMBOX_RATELIMIT_NUM_PROXIES must be a positive integer") from exc
+if RATELIMIT_NUM_PROXIES < 1:
+    raise ValueError("ITAMBOX_RATELIMIT_NUM_PROXIES must be a positive integer")
+
 # Cap idle session lifetime in production (default 8h) — the 2-week Django
 # default is too long for a multi-tenant asset system. Override via env.
 SESSION_COOKIE_AGE = int(os.environ.get("ITAMBOX_SESSION_COOKIE_AGE", "28800"))
