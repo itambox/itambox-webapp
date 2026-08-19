@@ -81,29 +81,53 @@ jobs:
           cache-dependency-glob: uv.lock
 
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
-      # source builds on Ubuntu runners.
+      # source builds. Bound every network operation so a slow hosted-runner
+      # mirror cannot consume the whole job timeout; retry once against Ubuntu's
+      # primary archive when the runner's Azure mirror is unavailable.
       - name: Install system deps for python-ldap
         run: |
+          set -Eeuo pipefail
           if command -v apt-get >/dev/null; then
             if [ "$(id -u)" -eq 0 ]; then
-              apt-get update
-              apt-get install -y --no-install-recommends \
-                gcc \
-                libmagic1 \
-                libldap2-dev \
-                libsasl2-dev \
-                libssl-dev \
-                xmlsec1
+              APT=(apt-get)
+              EDIT=(sed)
             else
-              sudo apt-get update
-              sudo apt-get install -y --no-install-recommends \
-                gcc \
-                libmagic1 \
-                libldap2-dev \
-                libsasl2-dev \
-                libssl-dev \
-                xmlsec1
+              APT=(sudo apt-get)
+              EDIT=(sudo sed)
             fi
+            apt_options=(
+              -o Acquire::Retries=3
+              -o Acquire::http::Timeout=15
+              -o Acquire::https::Timeout=15
+            )
+            update_packages() {
+              timeout --kill-after=10s 180s "${APT[@]}" "${apt_options[@]}" update
+            }
+            if ! update_packages; then
+              echo "Azure Ubuntu mirror failed; retrying against archive.ubuntu.com." >&2
+              mirror_replaced=false
+              for source in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+                if [ -f "$source" ] && grep -Fq 'azure.archive.ubuntu.com/ubuntu' "$source"; then
+                  "${EDIT[@]}" -i \
+                    -e 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' \
+                    -e 's|https://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+                    "$source"
+                  mirror_replaced=true
+                fi
+              done
+              if [ "$mirror_replaced" != true ]; then
+                echo "APT update failed and no Azure Ubuntu mirror was configured." >&2
+                exit 1
+              fi
+              update_packages
+            fi
+            timeout --kill-after=10s 300s "${APT[@]}" "${apt_options[@]}" install -y --no-install-recommends \
+              gcc \
+              libmagic1 \
+              libldap2-dev \
+              libsasl2-dev \
+              libssl-dev \
+              xmlsec1
           fi
 
       - name: Install Python dependencies
