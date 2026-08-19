@@ -53,6 +53,9 @@ def _load_prod(extra_env):
     }
     env.update(extra_env)
     with mock.patch.dict(os.environ, env, clear=False):
+        for key in ("ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR", "ITAMBOX_RATELIMIT_NUM_PROXIES"):
+            if key not in extra_env:
+                os.environ.pop(key, None)
         sys.modules.pop("core.settings.prod", None)
         base = importlib.import_module("core.settings.base")
         with warnings.catch_warnings():
@@ -89,6 +92,29 @@ class TestProdSettingsPosture:
     def test_ssl_redirect_enabled(self):
         prod = _load_prod({})
         assert prod.SECURE_SSL_REDIRECT is True
+
+    def test_forwarded_for_trust_is_disabled_by_default(self):
+        prod = _load_prod({})
+        assert prod.RATELIMIT_USE_X_FORWARDED_FOR is False
+        assert prod.RATELIMIT_NUM_PROXIES == 1
+
+    def test_forwarded_for_trust_can_be_enabled_explicitly(self):
+        prod = _load_prod(
+            {
+                "ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR": "true",
+                "ITAMBOX_RATELIMIT_NUM_PROXIES": "1",
+            }
+        )
+        assert prod.RATELIMIT_USE_X_FORWARDED_FOR is True
+        assert prod.RATELIMIT_NUM_PROXIES == 1
+
+    def test_forwarded_for_proxy_count_must_be_positive(self):
+        with pytest.raises(ValueError, match="ITAMBOX_RATELIMIT_NUM_PROXIES"):
+            _load_prod({"ITAMBOX_RATELIMIT_NUM_PROXIES": "0"})
+
+    def test_forwarded_for_proxy_count_must_be_numeric(self):
+        with pytest.raises(ValueError, match="ITAMBOX_RATELIMIT_NUM_PROXIES"):
+            _load_prod({"ITAMBOX_RATELIMIT_NUM_PROXIES": "not-a-number"})
 
     def test_hsts_configured(self):
         prod = _load_prod({})
