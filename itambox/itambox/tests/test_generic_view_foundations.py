@@ -33,13 +33,14 @@ from django.urls import reverse
 
 from assets.filters import StatusLabelFilterSet
 from assets.forms.filter_forms import AssetFilterForm
-from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
+from assets.tables import AssetTable
 from assets.views.asset_views import AssetListView
 from core.tests.mixins import TenantTestMixin
 from extras.models import SavedFilter
 from itambox.views.generic.detail import ObjectDetailView
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
-from organization.models import Role, Tenant
+from organization.models import Location, Role, Site, Tenant, TenantGroup
 
 User = get_user_model()
 
@@ -658,6 +659,129 @@ class ListContextCharacterizationTests(_CatalogFixtureMixin, TenantTestMixin, Te
         response = self.client.get(self.url)
         # Authenticated + unauthorized -> PermissionDenied -> 403 (not a login redirect).
         self.assertEqual(response.status_code, 403)
+
+
+class AssigneePaginationRegressionTests(_CatalogFixtureMixin, TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context(
+            name="Assignee Page Tenant A GVF",
+            slug="assignee-page-a-gvf",
+            permissions=["assets.view_asset"],
+        )
+        self.setup_catalog()
+        self.group = TenantGroup.objects.create(name="Assignee Page Group GVF", slug="assignee-page-group-gvf")
+        self.tenant.group = self.group
+        self.tenant.save(update_fields=["group"])
+        self.tenant_b = Tenant.objects.create(
+            name="Assignee Page Tenant B GVF",
+            slug="assignee-page-b-gvf",
+            group=self.group,
+        )
+        self.tenant_c = Tenant.objects.create(
+            name="Assignee Page Tenant C GVF",
+            slug="assignee-page-c-gvf",
+        )
+        for tenant in (self.tenant_b, self.tenant_c):
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Assignee Page Role {tenant.slug}",
+                permissions=["assets.view_asset"],
+            )
+            self.grant(self.tenant_user, tenant, role)
+
+        locations = {}
+        for tenant in (self.tenant, self.tenant_b, self.tenant_c):
+            site = Site.objects.create(
+                name=f"Assignee Page Site {tenant.slug}",
+                slug=f"assignee-page-site-{tenant.slug}",
+                tenant=tenant,
+            )
+            locations[tenant.pk] = Location.objects.create(
+                name=f"Assignee Page Location {tenant.slug}",
+                slug=f"assignee-page-location-{tenant.slug}",
+                site=site,
+                tenant=tenant,
+            )
+
+        tenants = [self.tenant] * 31 + [self.tenant_b] * 2 + [self.tenant_c] * 2
+        for index, tenant in enumerate(tenants):
+            asset = self.make_asset(
+                f"Assignee Page Asset {index:02d} GVF",
+                f"ASSIGNEE-PAGE-{index:02d}-GVF",
+                tenant,
+            )
+            AssetAssignment.objects.create(
+                asset=asset,
+                assigned_location=locations[tenant.pk],
+                checked_out_by=self.tenant_user,
+            )
+
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        self.url = reverse("assets:asset_list")
+
+    def _render_assignee_page(self, params):
+        response = self.client.get(
+            self.url,
+            {**params, "per_page": "25"},
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        table = response.context["table"]
+        visible_pks = {row.record.pk for row in table.page.object_list}
+        cache_names = [name for name in table.__dict__ if name.startswith("_assignee_cache_")]
+        self.assertEqual(len(cache_names), 1)
+        return response, visible_pks, set(getattr(table, cache_names[0]))
+
+    def test_all_accessible_assignee_cache_contains_only_the_current_page(self):
+        _response, visible_pks, cached_pks = self._render_assignee_page({"switch_all_accessible": "1"})
+
+        self.assertEqual(len(visible_pks), 25)
+        self.assertEqual(cached_pks, visible_pks)
+
+    def test_single_and_group_assignee_caches_contain_only_the_current_page(self):
+        scopes = (
+            {"switch_tenant": self.tenant.pk},
+            {"switch_tenant_group": self.group.pk},
+        )
+
+        for params in scopes:
+            with self.subTest(params=params):
+                _response, visible_pks, cached_pks = self._render_assignee_page(params)
+                self.assertEqual(len(visible_pks), 25)
+                self.assertEqual(cached_pks, visible_pks)
+
+    def test_all_accessible_assignee_cache_follows_the_second_page(self):
+        response, visible_pks, cached_pks = self._render_assignee_page({"switch_all_accessible": "1", "page": "2"})
+
+        self.assertEqual(response.context["table"].page.number, 2)
+        self.assertEqual(len(visible_pks), 10)
+        self.assertEqual(cached_pks, visible_pks)
+
+    def test_paginated_assignee_cache_does_not_advance_rendered_row_counters(self):
+        request = RequestFactory().get("/", {"per_page": "25"})
+        request.user = self.tenant_user
+        table = AssetTable(Asset.objects.order_by("name"))
+        table.configure(request)
+        page_rows = iter(table.page.object_list)
+        first_row = next(page_rows)
+        column = table.columns["assignee"].column
+
+        column._build_cache(table, Asset, "_assignee_cache_counter_regression")
+        second_row = next(page_rows)
+
+        self.assertEqual(first_row.row_counter, 0)
+        self.assertEqual(second_row.row_counter, 1)
+
+    def test_unpaginated_assignee_cache_uses_every_table_record(self):
+        assets = list(Asset.objects.filter(name__startswith="Assignee Page Asset").order_by("name")[:3])
+        table = AssetTable(Asset.objects.filter(pk__in=[asset.pk for asset in assets]))
+        column = table.columns["assignee"].column
+        cache_attr = "_assignee_cache_unpaginated"
+
+        column._build_cache(table, Asset, cache_attr)
+
+        self.assertEqual(set(getattr(table, cache_attr)), {asset.pk for asset in assets})
 
 
 class ListHtmxCharacterizationTests(_CatalogFixtureMixin, TenantTestMixin, TestCase):

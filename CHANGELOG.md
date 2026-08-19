@@ -13,6 +13,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- Asset list pagination now limits assignee resolution and tenant-scoped related-manager work to the rendered page instead of evaluating every asset in the active scope (issue #416).
 - Asset edits no longer clear purchase and in-service dates when localized HTML5 date controls are submitted after changing the tenant, location, or another field (issue #391).
 - Managed-tenant onboarding now gives the creating provider administrator explicit administrator reach and switches directly into the new tenant without adding a customer membership.
 - Tenant creation now exposes only object-authorized live provider tenants to eligible non-superusers, requires an explicit provider when one is available, and uses the same onboarding projection for normal and managed-tenant routes (issue #405).

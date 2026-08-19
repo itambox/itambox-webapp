@@ -405,7 +405,11 @@ class AssigneeColumn(tables.Column):
         from django.contrib.contenttypes.models import ContentType
 
         AssignmentModel = self._get_assignment_model()
-        pks = [row.pk for row in table.data]
+        page = getattr(table, "page", None)
+        # page.object_list is a BoundRows wrapper whose data is already sliced.
+        # Iterating the wrapper would create new rows and advance table._counter.
+        records = page.object_list.data if page is not None else table.data
+        pks = [record.pk for record in records]
         if not pks:
             setattr(table, cache_attr, {})
             return
