@@ -155,20 +155,23 @@ class SystemDependencyBootstrapTests(unittest.TestCase):
     """A slow hosted-runner mirror must not consume the whole CI job timeout."""
 
     def test_apt_update_is_bounded_and_falls_back_from_the_azure_mirror(self):
-        run = step_named(load_steps(), "Install system deps for python-ldap").get("run", "")
+        for workflow_path in (WORKFLOW_PATH, E2E_WORKFLOW_PATH):
+            with self.subTest(workflow=workflow_path.name):
+                steps = parse_steps(workflow_path.read_text(encoding="utf-8"))
+                run = step_named(steps, "Install system deps for python-ldap").get("run", "")
 
-        for required in (
-            "set -Eeuo pipefail",
-            "Acquire::Retries=3",
-            "Acquire::http::Timeout=15",
-            "Acquire::https::Timeout=15",
-            "timeout --kill-after=10s 180s",
-            "timeout --kill-after=10s 300s",
-            "azure.archive.ubuntu.com/ubuntu",
-            "archive.ubuntu.com/ubuntu",
-        ):
-            with self.subTest(required=required):
-                self.assertIn(required, run)
+                for required in (
+                    "set -Eeuo pipefail",
+                    "Acquire::Retries=3",
+                    "Acquire::http::Timeout=15",
+                    "Acquire::https::Timeout=15",
+                    "timeout --kill-after=10s 180s",
+                    "timeout --kill-after=10s 300s",
+                    "azure.archive.ubuntu.com/ubuntu",
+                    "archive.ubuntu.com/ubuntu",
+                ):
+                    with self.subTest(required=required):
+                        self.assertIn(required, run)
 
 
 class PostSuiteGateIndependenceTests(unittest.TestCase):
