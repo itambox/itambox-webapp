@@ -9249,6 +9249,15 @@ msgstr "(Gruppe)"
 msgid "Active Workspace"
 msgstr "Aktiver Arbeitsbereich"
 
+msgid "Automatic"
+msgstr "Automatisch"
+
+msgid "Default workspace"
+msgstr "Standard-Workspace"
+
+msgid "Workspace selected automatically when you sign in. You can still switch workspaces at any time."
+msgstr "Workspace, der bei der Anmeldung automatisch ausgewählt wird. Sie können den Workspace jederzeit wechseln."
+
 msgid "Invite Member"
 msgstr "Mitglied einladen"
 

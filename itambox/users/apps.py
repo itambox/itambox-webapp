@@ -48,6 +48,11 @@ class UsersConfig(AppConfig):
         import users.search  # noqa
         import users.signals  # noqa
 
+        # inline imports: app-registry: register the user-owned workspace resolver after models load.
+        from core.tenant_scope import register_tenant_scope_provider
+        from users.services import resolve_default_workspace
+
+        register_tenant_scope_provider(resolve_default_workspace=resolve_default_workspace)
         self._register_capabilities()
 
     def _register_capabilities(self):

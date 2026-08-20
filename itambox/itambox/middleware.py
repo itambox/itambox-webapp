@@ -30,7 +30,11 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     set_current_tenant_group,
     set_current_user,
 )
-from core.tenant_scope import _descendant_group_ids_cache, get_descendant_tenant_group_ids
+from core.tenant_scope import (
+    _descendant_group_ids_cache,
+    get_descendant_tenant_group_ids,
+    resolve_default_workspace,
+)
 
 from .ratelimit import RateLimitMiddleware
 
@@ -179,6 +183,23 @@ class TenantMiddleware:
         return self.process_response(request, response, prev)
 
     @staticmethod
+    def _apply_default_workspace(request):
+        selection = resolve_default_workspace(request.user)
+        if selection is None:
+            return False
+
+        request.session.pop("active_tenant_id", None)
+        request.session.pop("active_tenant_group_id", None)
+        request.session.pop("active_all_accessible", None)
+        if selection.tenant is not None:
+            request.session["active_tenant_id"] = selection.tenant.pk
+        elif selection.group is not None:
+            request.session["active_tenant_group_id"] = selection.group.pk
+        elif selection.all_accessible:
+            request.session["active_all_accessible"] = True
+        return True
+
+    @staticmethod
     def _resolve_switch_params(request, session_tenant_id, session_group_id, session_all_accessible):
         """Apply a switch_tenant / switch_tenant_group / switch_all_accessible
         query param to the session-derived scope. Selecting a single tenant or
@@ -223,6 +244,23 @@ class TenantMiddleware:
             request.session["active_all_accessible"] = True
             request.session.pop("active_tenant_id", None)
             request.session.pop("active_tenant_group_id", None)
+
+        if (
+            query_tenant_id is None
+            and query_group_id is None
+            and query_all_accessible is None
+            and not request.META.get("HTTP_AUTHORIZATION")
+            and not any(
+                key in request.session
+                for key in ("active_tenant_id", "active_tenant_group_id", "active_all_accessible")
+            )
+        ):
+            # A saved default is only a bootstrap preference. An explicit query or
+            # existing session selection always wins.
+            TenantMiddleware._apply_default_workspace(request)
+            session_tenant_id = request.session.get("active_tenant_id")
+            session_group_id = request.session.get("active_tenant_group_id")
+            session_all_accessible = bool(request.session.get("active_all_accessible"))
 
         return session_tenant_id, session_group_id, session_all_accessible
 

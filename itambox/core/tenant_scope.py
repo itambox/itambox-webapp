@@ -114,3 +114,7 @@ def resolve_effective_permissions_with_expiry(user, tenant):
 
 def build_accessible_tenant_permissions_map(user, grants=None):
     return _call("build_accessible_tenant_permissions_map", user, grants=grants)
+
+
+def resolve_default_workspace(user):
+    return _call("resolve_default_workspace", user)

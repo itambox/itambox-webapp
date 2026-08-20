@@ -224,11 +224,15 @@ The tenant selector in the top navigation bar supports switching between:
 - **Tenant Group** — aggregates all tenants within a group (and its descendant
   subgroups). Lists, filters, and exports combine data across the group's
   subtree.
-- **All Accessible Tenants** — combines every tenant you have a membership in
-  (plus managed reach).
+- **All Tenants** — combines every tenant in the user's current access scope. For
+  standard users this is the union of all accessible tenants; superusers see the
+  global tenant set.
 
-This scoping determines which data the list views, dashboard widgets, and
-report generators include.
+Users can choose a **Default workspace** in their Preferences. The choice may be a
+single tenant, a tenant group, or **All Tenants**. It is used when a new session has
+no workspace selected; an outdated or no-longer-authorized choice is ignored and the
+normal first-accessible-tenant fallback remains in place.
+
 
 ### Tenant Groups and RBAC
 

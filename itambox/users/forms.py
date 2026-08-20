@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 
 # Import UserPreference from this app's models
 from .models import UserPreference
+from .services import DEFAULT_WORKSPACE_KEY, workspace_choices
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -145,11 +146,20 @@ class UserPreferencesForm(forms.Form):
         help_text=_("Interface language. Applies across the whole application."),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+    default_workspace = forms.ChoiceField(
+        choices=(),
+        required=False,
+        label=_("Default workspace"),
+        help_text=_("Workspace selected automatically when you sign in. You can still switch workspaces at any time."),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
 
     def __init__(self, user, *args, **kwargs):
         """Load initial data from UserPreference."""
         super().__init__(*args, **kwargs)
         self.user = user
+        self.fields["default_workspace"].choices = workspace_choices(self.user)
+        self.fields["default_workspace"].initial = ""
         try:
             # Use filter().first() to avoid DoesNotExist exception
             prefs = UserPreference.objects.filter(user=self.user).first()
@@ -173,6 +183,12 @@ class UserPreferencesForm(forms.Form):
                 else:
                     # Fallback if stored pref is invalid
                     self.fields["theme"].initial = UserPreference.THEME_LIGHT
+
+                initial_workspace = prefs.data.get(DEFAULT_WORKSPACE_KEY, "")
+                valid_workspaces = {value for value, _label in self.fields["default_workspace"].choices}
+                self.fields["default_workspace"].initial = (
+                    initial_workspace if initial_workspace in valid_workspaces else ""
+                )
 
             else:
                 # Set defaults if no preferences exist
@@ -225,6 +241,12 @@ class UserPreferencesForm(forms.Form):
         language = self.cleaned_data.get("language")
         if language and language in dict(settings.LANGUAGES):
             prefs.data["language"] = language
+
+        default_workspace = self.cleaned_data.get("default_workspace", "")
+        if default_workspace:
+            prefs.data[DEFAULT_WORKSPACE_KEY] = default_workspace
+        else:
+            prefs.data.pop(DEFAULT_WORKSPACE_KEY, None)
 
         prefs.save()
 
