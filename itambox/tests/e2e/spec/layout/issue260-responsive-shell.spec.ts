@@ -11,7 +11,7 @@ async function loadAppStyles(page: import('@playwright/test').Page): Promise<voi
   await page.addStyleTag({ path: appCssPath });
 }
 
-test('mobile footer reserves the fixed action bar and exposes GraphQL', async ({ page }) => {
+test('mobile footer is hidden while the desktop footer remains available', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 740 });
   await page.setContent(`
     <div class="page">
@@ -33,10 +33,12 @@ test('mobile footer reserves the fixed action bar and exposes GraphQL', async ({
   await loadAppStyles(page);
 
   const footer = page.locator('footer.footer');
-  const graphqlLink = footer.locator('a[href="/graphql/"]');
-  await expect(graphqlLink).toBeVisible();
-  const paddingBottom = await footer.evaluate((element) => parseFloat(getComputedStyle(element).paddingBottom));
-  expect(paddingBottom).toBeGreaterThanOrEqual(60);
+  await expect(footer).toBeHidden();
+  expect(await footer.evaluate((element) => getComputedStyle(element).display)).toBe('none');
+
+  await page.setViewportSize({ width: 1280, height: 740 });
+  await expect(footer).toBeVisible();
+  await expect(footer.locator('a[href="/graphql/"]')).toBeVisible();
 });
 
 test('mobile topbar clears transient hover but preserves focus and expanded state', async ({ page }) => {
