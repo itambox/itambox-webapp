@@ -64,6 +64,10 @@
         }
         .skip-link:focus { top: 0.75rem; }
     </style>
+    {# Purge tenant-scoped DOM snapshots created before history caching was disabled below. #}
+    <script nonce="{{ request.csp_nonce }}">
+      (function(){try{sessionStorage.removeItem('htmx-history-cache');}catch(e){}})();
+    </script>
     {# htmx config — must precede htmx.min.js so it's read at init. #}
     {# scrollIntoViewOnBoost off: a boosted navigation must NOT auto-scroll the swapped #}
     {# target into view — on mobile that jolts the persistent topbar out of view. Keep it fixed. #}
