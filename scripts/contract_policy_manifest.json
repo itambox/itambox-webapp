@@ -1,0 +1,711 @@
+{
+  "capabilities": {
+    "alerting.inbox": {
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
+      "scope": "Notification and alert-log records"
+    },
+    "alerting.rules": {
+      "activation": "enabled",
+      "contract_class": "beta-enabled",
+      "exclusions": "Evaluation is daily, not on write; channel delivery failures are logged, not retried",
+      "scope": "Alert rules and notification channels"
+    },
+    "automation.webhooks": {
+      "activation": "opt-in",
+      "contract_class": "beta-opt-in",
+      "exclusions": "Payload schema is not frozen; deliveries are fire-and-forget with no delivery log or replay",
+      "scope": "Event rules and webhook endpoints"
+    },
+    "organization.resource_grants": {
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
+      "scope": "Tenant resource grants; security-critical cross-tenant stock boundary"
+    },
+    "organization.role_grants": {
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
+      "scope": "Role grants; security-critical authorization boundary"
+    },
+    "platform.plugins": {
+      "activation": "opt-in",
+      "contract_class": "experimental",
+      "exclusions": "Lifecycle hooks are still being defined, so a plugin that loads today may need changes; plugin code runs in-process with full database access and is not sandboxed",
+      "scope": "Plugin loading and plugin API"
+    },
+    "procurement.core": {
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
+      "scope": "Purchase orders, order lines, contracts"
+    },
+    "procurement.requisition_seam": {
+      "activation": "enabled",
+      "contract_class": "beta-enabled",
+      "exclusions": "The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant.",
+      "scope": "Asset Request fulfillment links"
+    },
+    "reporting.curated": {
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
+      "scope": "Curated report catalogue"
+    },
+    "reporting.designer": {
+      "activation": "opt-in",
+      "contract_class": "beta-opt-in",
+      "exclusions": "Column, filter, and grouping model is expected to change; saved templates may need rebuilding",
+      "scope": "Saved report templates"
+    },
+    "reporting.scheduled": {
+      "activation": "opt-in",
+      "contract_class": "beta-opt-in",
+      "exclusions": "Requires `ITAMBOX_FEATURE_REPORT_DESIGNER=True` and at least one enabled schedule row; when false, the schedule surfaces are hidden/closed and delivery is skipped for non-grandfathered templates while the migration-managed bounded grandfathered set may continue; saved schedules are retained and grandfathered templates are read-only; delivery also depends on a running worker",
+      "scope": "Scheduled reports and generation archive"
+    },
+    "subscriptions.tracking": {
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
+      "scope": "Providers, subscriptions, assignments"
+    },
+    "users.scim_provisioning": {
+      "activation": "opt-in",
+      "contract_class": "beta-opt-in",
+      "exclusions": "PATCH semantics and filtering are partial; the tenant mount provisions Users and exposes Groups read-only, only provider mounts provision Groups",
+      "scope": "Tenant- and provider-scoped SCIM mounts"
+    }
+  },
+  "contract_policy_version": 1,
+  "entry_routes": [
+    "dashboard",
+    "login",
+    "search",
+    "scan_resolve",
+    "health",
+    "graphql"
+  ],
+  "enums": {
+    "core.EventActionChoices": [
+      "create",
+      "update",
+      "delete"
+    ],
+    "core.ObjectChangeActionChoices": [
+      "create",
+      "update",
+      "delete",
+      "checkout",
+      "checkin",
+      "audit"
+    ],
+    "extras.AlertRule.ALERT_TYPE_CHOICES": [
+      "low_stock",
+      "upcoming_eol",
+      "license_expiry",
+      "renewal_due",
+      "warranty_expiry",
+      "audit_overdue"
+    ],
+    "extras.AlertRule.SEVERITY_CHOICES": [
+      "info",
+      "warning",
+      "critical"
+    ],
+    "extras.ReportTemplate.REPORT_TYPE_CHOICES": [
+      "asset_summary",
+      "license_utilization",
+      "subscription_renewals",
+      "asset_maintenance",
+      "asset_depreciation",
+      "software_inventory",
+      "contract_renewals",
+      "warranty_expiration",
+      "asset_disposal_eol",
+      "hardware_inventory",
+      "custody_compliance"
+    ],
+    "extras.ReportTemplateForm.COLUMN_CHOICES": [
+      "asset_tag",
+      "name",
+      "manufacturer",
+      "model",
+      "serial_number",
+      "status",
+      "location",
+      "assigned_to",
+      "purchase_cost",
+      "purchase_date",
+      "warranty_months",
+      "license_name",
+      "software",
+      "seats",
+      "assigned_seats",
+      "available_seats",
+      "utilization_rate",
+      "subscription_name",
+      "provider",
+      "billing_cycle",
+      "cost",
+      "end_date",
+      "maintenance_asset",
+      "maintenance_type",
+      "maintenance_status",
+      "maintenance_cost",
+      "maintenance_start_date",
+      "maintenance_completion_date",
+      "maintenance_downtime",
+      "salvage_value",
+      "depreciation_months",
+      "current_value",
+      "software_name",
+      "version",
+      "category",
+      "license_type",
+      "installed_count",
+      "contract_number",
+      "contract_name",
+      "contract_type",
+      "contract_status",
+      "contract_supplier",
+      "contract_start_date",
+      "contract_end_date",
+      "contract_renewal_date",
+      "contract_days_until_expiry",
+      "contract_cost",
+      "contract_billing_cycle",
+      "contract_auto_renew",
+      "contract_covered_assets",
+      "contract_sla_response_time",
+      "contract_sla_resolution_time",
+      "contract_coverage_hours",
+      "warranty_asset",
+      "warranty_type",
+      "warranty_provider",
+      "warranty_start_date",
+      "warranty_end_date",
+      "warranty_days_remaining",
+      "warranty_status",
+      "warranty_cost",
+      "warranty_reference",
+      "disposal_asset",
+      "disposal_date",
+      "disposal_method",
+      "disposal_sanitization_method",
+      "disposal_sanitization_certificate",
+      "disposal_sanitized_by",
+      "disposal_recipient",
+      "disposal_proceeds",
+      "disposal_weee_compliant",
+      "disposal_notes",
+      "hw_item_type",
+      "hw_name",
+      "hw_manufacturer",
+      "hw_category",
+      "hw_part_number",
+      "hw_total_stock",
+      "hw_available",
+      "hw_min_qty",
+      "hw_status",
+      "custody_asset",
+      "custody_holder",
+      "custody_status",
+      "custody_accepted_date",
+      "custody_eula_version",
+      "custody_signature_provider",
+      "custody_qms_reference",
+      "custody_ip_address",
+      "custody_created_date",
+      "license_count"
+    ],
+    "extras.ScheduledReport.FORMAT_CHOICES": [
+      "html",
+      "csv",
+      "pdf",
+      "xlsx"
+    ],
+    "extras.ScheduledReport.FREQUENCY_CHOICES": [
+      "once",
+      "hourly",
+      "daily",
+      "weekly",
+      "biweekly",
+      "monthly",
+      "quarterly",
+      "yearly",
+      "cron"
+    ],
+    "procurement.PurchaseOrder.STATUS_CHOICES": [
+      "draft",
+      "approved",
+      "ordered",
+      "partial",
+      "received",
+      "cancelled"
+    ],
+    "subscriptions.BillingCycleChoices": [
+      "monthly",
+      "quarterly",
+      "annual",
+      "biannual",
+      "multi_year",
+      "onetime"
+    ],
+    "subscriptions.SubscriptionStatusChoices": [
+      "active",
+      "suspended",
+      "cancelled",
+      "expired"
+    ]
+  },
+  "permissions": [
+    "assets.dispose_asset",
+    "assets.add_delegated_assetrequest",
+    "assets.approve_assetrequest",
+    "assets.fulfill_assetrequest",
+    "compliance.prepare_custodyreceipt",
+    "compliance.export_custodyreceipt",
+    "core.view_recyclebin",
+    "core.change_recyclebin",
+    "core.delete_recyclebin",
+    "procurement.receive_purchaseorder",
+    "procurement.approve_purchaseorder"
+  ],
+  "required_statements": [
+    {
+      "document": "policy",
+      "identifier": "P-API-V1",
+      "text": "`/api/` is the version 1 compatibility convention for the whole of 1.x"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-API-NO-SEAM",
+      "text": "no version segment, no negotiation header, and no runtime version seam"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-API-V2",
+      "text": "would have to be mounted separately as `/api/v2/`"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-STABLE-ADDITIVE",
+      "text": "additive-only for the whole of 1.x"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-STABLE-FROZEN",
+      "text": "names, types, closed enum values, primary-key URLs"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-STABLE-NOTICE",
+      "text": "two minor releases of removal notice"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-STABLE-PATCH",
+      "text": "never removed in a patch release"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-STABLE-NO-WEAKENING",
+      "text": "cannot be weakened within 1.x"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-STABLE-ROLLBACK",
+      "text": "S5 realistic rollback"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-ENABLED-LABELLING",
+      "text": "a release obligation on Beta enabled work, not a claim that every surface already carries it"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-ENABLED-DATA",
+      "text": "preserves the data an operator already recorded"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-ENABLED-MINOR",
+      "text": "only in a minor release, never in a patch"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-ENABLED-NOTICE",
+      "text": "one minor release of notice and an export"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-ENABLED-INACTIVE",
+      "text": "a real inactive state"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-OPT-IN-INERT",
+      "text": "inert on a fresh deployment"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-OPT-IN-ACTIVATION",
+      "text": "activation surface itself is held to the Stable standard"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-BETA-OPT-IN-WIRE",
+      "text": "must carry its own independent wire version"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-WIRE-TODAY",
+      "text": "carries no wire version, no event identifier, and no idempotency key"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-WIRE-NOT-CONTRACT-VERSION",
+      "text": "`contract_version` versions the registry declaration"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-EXPERIMENTAL-OPT-IN",
+      "text": "reached only through an explicit configuration opt-in"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-EXPERIMENTAL-CHANGE",
+      "text": "may change in any release, including a patch"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-EXPERIMENTAL-SUPPORT",
+      "text": "security fixes only"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-EXPERIMENTAL-PINNING",
+      "text": "pin the exact revision"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-SAFETY-FLOOR",
+      "text": "N1-N11 and X1-X6 safety floors"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-SECURITY-CRITICAL",
+      "text": "security-critical marker"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-TENANT-ISOLATION",
+      "text": "tenant B cannot read, write, list, filter, export, or reference"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-SERVICE-LAYER-PARITY",
+      "text": "service and data layers enforce the same authorization"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-SCHEDULED-NINE",
+      "text": "nine `ScheduledReport` frequency values"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-CONFIG-RENAME",
+      "text": "compatibility read and a startup warning"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-N9-OBSERVABILITY",
+      "text": "N9 and S6"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-N9-DEPLOYMENT",
+      "text": "no in-product actor"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-N9-SYNTHETIC",
+      "text": "synthetic request identifier and a `None` user"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-N9-NEVER-HUMAN",
+      "text": "never presented as a human action"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-IDEMPOTENCY",
+      "text": "idempotency, retry, and durable-outcome"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-X2-X4-OBLIGATION",
+      "text": "X2-X4 are obligations on capability work, not claims about today"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-N11-REHEARSAL",
+      "text": "N11 reverse-or-export rehearsal"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-DEFERRED-SUBSCRIPTION",
+      "text": "`vendor_contract_auto_renews`"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-DEFERRED-SUBSCRIPTION-2",
+      "text": "removed no earlier than 2.0"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-DEFERRED-REQUISITION",
+      "text": "`REQUISITION_AUTO_APPROVAL_THRESHOLDS`"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-DEFERRED-SCIM",
+      "text": "integer-keyed SCIM detail routes remain supported for the whole of 1.x"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-RESOURCE-GRANT",
+      "text": "no baseline escape"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-RESOURCE-GRANT-REVIEW",
+      "text": "adversarial review"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-RESOURCE-GRANT-THREAT",
+      "text": "threat-model duty"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-DENY",
+      "text": "Failure of any condition denies access. A grant authorizes a tenant, never a user."
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-ACTORLESS",
+      "text": "a bare `user=None` is denied"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-CANONICAL",
+      "text": "`organization.access.resolve_stock_access()` is the decision primitive"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-CANONICAL-REEXPORT",
+      "text": "`organization.services.resolve_stock_access` is its compatibility re-export"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-PRECEDENCE",
+      "text": "Direct tenant grants take deterministic precedence over ancestor-group grants."
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-MATRIX",
+      "text": "inventory/tests/test_tenant_resource_grant_security.py"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-DIRECT-WRITES",
+      "text": "inventory/tests/test_direct_assignment_writes.py"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-SYSTEM-PROVENANCE-SUITE",
+      "text": "inventory/tests/test_assignment_system_authorization_provenance.py"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-ALLOWLIST-CLOSED",
+      "text": "The approved resource allowlist is closed:"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-ACCESSORY-STOCK",
+      "text": "`inventory.AccessoryStock`"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-COMPONENT-STOCK",
+      "text": "`inventory.ComponentStock`"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-CONSUMABLE-STOCK",
+      "text": "`inventory.ConsumableStock`"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-PERSISTED-DERIVATION",
+      "text": "caller-held relation caches never define `source_tenant`, `target_tenant`, or the covering grant."
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-INDEPENDENT-RBAC",
+      "text": "must independently pass RBAC in the active tenant."
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-TOPOLOGY-FAIL-CLOSED",
+      "text": "live-only ancestry walk; no coverage through the broken chain"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-UNSCOPED-MANAGER",
+      "text": "`TenantResourceGrant.objects` is deliberately unscoped"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-SYSTEM-PROVENANCE",
+      "text": "Actorless assignments persist the exact authorized system operation and reason."
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-IMMUTABLE-PROVENANCE",
+      "text": "Those values are immutable historical evidence"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-CONTAINER-VISIBILITY",
+      "text": "`visible_to_containers()` or fail closed"
+    },
+    {
+      "document": "resource-grant",
+      "identifier": "P-RESOURCE-GRANT-LIFECYCLE-ATTRIBUTION",
+      "text": "Future grant expiry or revocation workflows must preserve durable attribution"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-SCOPE-EXCLUSIONS",
+      "text": "What this policy deliberately does not cover"
+    },
+    {
+      "document": "policy",
+      "identifier": "P-URL-BOUNDARY",
+      "text": "individual UI route names are not frozen"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-BOUNDED",
+      "text": "bounded inventory"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-ENUM-OPENNESS",
+      "text": "every inventoried enum is marked explicitly open or closed"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-SIGNATURE",
+      "text": "X-Hub-Signature-256"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-ROLE-FIELD",
+      "text": "`organization.Role.permissions`"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-ROLE-CONCEPT",
+      "text": "Tenant Role is the user-facing name"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-API-VERSION",
+      "text": "unversioned `/api/` prefix is the version 1 convention"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-URL-BOUNDARY",
+      "text": "namespaces are inventoried; individual route names are not"
+    },
+    {
+      "document": "inventory",
+      "identifier": "P-INVENTORY-EXCLUSIONS-PINNED",
+      "text": "records the exact declared limitation text each cell was written against"
+    }
+  ],
+  "schema_version": 1,
+  "scim_routes": [
+    "scim:ServiceProviderConfig",
+    "scim:Users",
+    "scim:Users/<str:pk>",
+    "scim:Groups",
+    "scim:Groups/<str:pk>",
+    "provider_scim:ServiceProviderConfig",
+    "provider_scim:Users",
+    "provider_scim:Users/<str:pk>",
+    "provider_scim:Groups",
+    "provider_scim:Groups/<str:pk>"
+  ],
+  "settings": [
+    "ITAMBOX_ENV",
+    "ITAMBOX_BASE_URL",
+    "ITAMBOX_SEED_PASSWORD",
+    "ITAMBOX_DEFAULT_CURRENCY",
+    "ITAMBOX_PAGINATOR_COUNT_CAP",
+    "ITAMBOX_SESSION_COOKIE_AGE",
+    "ITAMBOX_DOCS_ROOT",
+    "ITAMBOX_CACHE_BACKEND",
+    "ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR",
+    "ITAMBOX_RATELIMIT_NUM_PROXIES",
+    "ITAMBOX_FIELD_ENCRYPTION_KEYS",
+    "ITAMBOX_API_TOKEN_PEPPERS",
+    "ITAMBOX_REQUIRE_MFA",
+    "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS",
+    "ITAMBOX_REQUIRE_CUSTODY_SIGNIN",
+    "ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES",
+    "ITAMBOX_FEATURE_REPORT_DESIGNER",
+    "ITAMBOX_PLUGINS",
+    "ITAMBOX_TENANT_LDAP_CONFIGS",
+    "ITAMBOX_TENANT_SAML_CONFIGS",
+    "ITAMBOX_TENANT_OIDC_CONFIGS",
+    "ITAMBOX_TENANT_INTUNE_CONFIGS",
+    "ITAMBOX_SSO_AUTOCREATE_PRIVILEGED_ROLES",
+    "ITAMBOX_CHANGELOG_RETENTION_DAYS",
+    "ITAMBOX_ALERTLOG_RETENTION_DAYS",
+    "ITAMBOX_NOTIFICATION_RETENTION_DAYS",
+    "ITAMBOX_EVENT_RETENTION_DAYS",
+    "ITAMBOX_QTASK_FAILED_RETENTION_DAYS"
+  ],
+  "ui_namespaces": [
+    "assets",
+    "compliance",
+    "extras",
+    "inventory",
+    "licenses",
+    "organization",
+    "procurement",
+    "software",
+    "subscriptions",
+    "users"
+  ],
+  "webhook_fields": [
+    "schema_version",
+    "event_id",
+    "delivery_id",
+    "attempt",
+    "tenant",
+    "event",
+    "model",
+    "object_id",
+    "timestamp",
+    "data"
+  ]
+}

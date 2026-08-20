@@ -6,6 +6,7 @@ from django.conf import settings
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
+    CAPABILITY_REGISTRY_DOC_URL,
     CONTRACT_VERSION,
     ENABLED,
     SOURCE_ALWAYS,
@@ -66,7 +67,7 @@ class ProcurementConfig(AppConfig):
                     "procurement.PurchaseOrder",
                     "procurement.PurchaseOrderLine",
                 ),
-                docs_url="development/capability-registry.md",
+                docs_url=CAPABILITY_REGISTRY_DOC_URL,
                 limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
@@ -80,7 +81,7 @@ class ProcurementConfig(AppConfig):
                 activation_probe=_asset_request_procurement_probe,
                 activation_source=SOURCE_CONFIGURED,
                 owns=("procurement.FulfillmentLink",),
-                docs_url="development/capability-registry.md",
+                docs_url=CAPABILITY_REGISTRY_DOC_URL,
                 limitations=(
                     "The asset-request to purchase-order-line reservation flow is incomplete; "
                     "partial fulfilment may need manual reconciliation.",

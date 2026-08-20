@@ -1,7 +1,15 @@
 from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
-from itambox.capabilities import ALWAYS_ON, CONTRACT_VERSION, SOURCE_ALWAYS, STABLE, Capability, registry
+from itambox.capabilities import (
+    ALWAYS_ON,
+    CAPABILITY_REGISTRY_DOC_URL,
+    CONTRACT_VERSION,
+    SOURCE_ALWAYS,
+    STABLE,
+    Capability,
+    registry,
+)
 
 
 class SubscriptionsConfig(AppConfig):
@@ -38,7 +46,7 @@ class SubscriptionsConfig(AppConfig):
                     "subscriptions.Subscription",
                     "subscriptions.SubscriptionAssignment",
                 ),
-                docs_url="development/capability-registry.md",
+                docs_url=CAPABILITY_REGISTRY_DOC_URL,
                 limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),

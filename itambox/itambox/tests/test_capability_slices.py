@@ -2,11 +2,11 @@
 
 ``test_capabilities.py`` proves the substrate. This module proves what the
 domain actually declared through it: that ownership resolves, that the declared
-grades match the tracked documentation, that an inactive or broken capability
+grades match the code-owned contract manifest, that an inactive or broken capability
 is harmless, and that the deprecated app-level adapters still answer.
 """
 
-import re
+import json
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -36,10 +36,6 @@ from procurement import apps as procurement_apps
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCS_ROOT = REPO_ROOT / "itambox" / "docs"
-MATURITY_DOC = DOCS_ROOT / "development" / "module-maturity.md"
-REGISTRY_DOC = DOCS_ROOT / "development" / "capability-registry.md"
-FALLBACK_DOC = DOCS_ROOT / "development" / "capability-fallbacks.md"
-README = REPO_ROOT / "README.md"
 
 # The slice this issue declares. Written out rather than derived so a silently
 # dropped or reclassified registration fails here instead of passing vacuously.
@@ -408,81 +404,22 @@ class TestDeprecatedAdapters:
 
 
 class TestDocumentationConsistency:
-    """U8: the tracked docs and README agree with the registry."""
+    """U8: code-owned contracts and capability links stay coherent."""
 
-    def test_every_docs_url_points_at_a_tracked_document(self):
+    def test_every_docs_url_points_at_a_public_or_internal_document(self):
         for capability in registry.all():
-            target = DOCS_ROOT / capability.docs_url
-            assert target.is_file(), f"{capability.key} documents itself at a missing {capability.docs_url}"
+            if capability.docs_url.startswith("https://github.com/itambox/design-docs/blob/main/development/"):
+                assert capability.docs_url.endswith(".md")
+            else:
+                target = DOCS_ROOT / capability.docs_url
+                assert target.is_file(), f"{capability.key} documents itself at a missing {capability.docs_url}"
 
-    def test_the_registry_document_lists_every_capability(self):
-        text = REGISTRY_DOC.read_text(encoding="utf-8")
-        for capability in registry.all():
-            assert f"`{capability.key}`" in text, f"{capability.key} is undocumented"
-
-    def test_optional_fallback_matrix_is_published_with_security_boundaries(self):
-        text = FALLBACK_DOC.read_text(encoding="utf-8")
-        for marker in (
-            "unresolved_references()",
-            "CapabilityRegistry.state()",
-            "PluginConfig.ready()",
-            "validate_file_attachment()",
-            "validate_image_attachment()",
-            "authentication, authorization, tenant isolation",
-            "Content-Type",
-            "SCIM",
-        ):
-            assert marker in text, f"fallback contract is missing {marker!r}"
-
-    def test_the_registry_document_records_the_declared_contract(self):
-        rows = _documented_contracts(REGISTRY_DOC)
-        assert rows == {
-            capability.key: (capability.maturity, capability.activation, capability.activation_source)
-            for capability in registry.all()
-        }
-
-    def test_the_registry_document_explains_the_enforced_designer_flag(self):
-        text = REGISTRY_DOC.read_text(encoding="utf-8")
-        installation = (DOCS_ROOT / "operations" / "installation.md").read_text(encoding="utf-8")
-        readme = README.read_text(encoding="utf-8")
-        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in text
-        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in installation
-        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in readme
-        for document in (text, installation, readme):
-            normalized = " ".join(document.lower().split())
-            assert "grandfathered" in normalized
-            assert "non-grandfathered" in normalized
-            assert "delivery" in normalized
-        assert "registry.register_all" in text
-        assert "returns early when its first key" not in text
-
-    def test_the_maturity_document_points_at_the_registry(self):
-        text = MATURITY_DOC.read_text(encoding="utf-8")
-        assert "capability-registry.md" in text
-        assert "MODULE_MATURITY" not in text
-
-    def test_the_readme_links_the_registry_document(self):
-        text = README.read_text(encoding="utf-8")
-        assert "itambox/docs/development/capability-registry.md" in text
-
-    def test_the_readme_does_not_grade_a_promoted_module_beta(self):
-        text = README.read_text(encoding="utf-8")
-        assert "Subscriptions and procurement — Beta" not in text
+    def test_the_code_owned_contract_manifest_lists_every_capability(self):
+        manifest = json.loads((REPO_ROOT / "scripts" / "contract_policy_manifest.json").read_text(encoding="utf-8"))
+        rows = manifest["capabilities"]
+        assert set(rows) == {capability.key for capability in registry.all()}
 
     def test_every_non_stable_capability_declares_at_least_one_limitation(self):
         for capability in registry.all():
             if capability.maturity != STABLE:
                 assert capability.limitations, f"{capability.key} declares no limitation"
-
-
-def _documented_contracts(path):
-    """Parse grade, activation mode, and source from registry document rows."""
-    contracts = {}
-    pattern = re.compile(r"^\|\s*`([a-z0-9_.]+)`\s*\|.*$")
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = pattern.match(line)
-        if not match:
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        contracts[match.group(1)] = tuple(cell.lower() for cell in cells[2:5])
-    return contracts

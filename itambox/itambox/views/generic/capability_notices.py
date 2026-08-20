@@ -13,7 +13,7 @@ nothing here consults :meth:`~itambox.capabilities.CapabilityRegistry.state`.
 """
 
 from core.features import STABLE, module_maturity
-from itambox.capabilities import registry
+from itambox.capabilities import CAPABILITY_REGISTRY_DOC_URL, registry
 
 #: Only these keys reach a template. The probe, the owning area, and the owned
 #: references are deliberately absent: a page renders a grade, not an inventory.
@@ -56,6 +56,6 @@ def _legacy_notice(app_label):
         "title": app_label.replace("_", " ").title(),
         "maturity": maturity,
         "activation": "",
-        "docs_url": "development/capability-registry.md",
+        "docs_url": CAPABILITY_REGISTRY_DOC_URL,
         "limitations": (),
     }

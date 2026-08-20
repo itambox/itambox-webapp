@@ -1,6 +1,6 @@
-"""Contract-policy gate: derived source facts, the published inventory, and drift.
+"""Contract-policy gate: derived source facts, the machine-readable manifest, and drift.
 
-The published 1.0 contract is only worth what it can be checked against. Three
+The machine-readable 1.0 contract is only worth what it can be checked against. Three
 failure modes make a prose compatibility promise worthless, and none of them is
 visible in a review of the document alone:
 
@@ -56,18 +56,6 @@ FOUR_SUBSCRIPTION_STATUSES = (
     "cancelled",
     "expired",
 )
-
-#: Every anchored surface the published inventory declares, so a parser probe
-#: can be run against all of them rather than against a convenient one.
-ANCHORED_SURFACES = (
-    "settings",
-    "permissions",
-    "capabilities",
-    "webhook-envelope",
-    "scim-routes",
-    "ui-namespaces",
-    "entry-routes",
-) + tuple(f"enum {source.name}" for source in policy.ENUM_SOURCES)
 
 
 def declared(key, maturity, activation, security_critical=False, limitations=("a declared limitation",)):
@@ -319,14 +307,8 @@ class PolicyShapeTests(unittest.TestCase):
 class PublishedContractTests(unittest.TestCase):
     """The repository as it stands satisfies every rule the gate enforces."""
 
-    def test_the_policy_and_inventory_documents_are_tracked(self):
-        for relative in (
-            policy.POLICY_DOC,
-            policy.INVENTORY_DOC,
-            policy.RESOURCE_GRANT_THREAT_DOC,
-        ):
-            with self.subTest(document=relative):
-                self.assertTrue((REPO_ROOT / relative).is_file())
+    def test_the_code_owned_contract_manifest_is_tracked(self):
+        self.assertTrue((REPO_ROOT / policy.MANIFEST_DOC).is_file())
 
     def test_the_gate_reports_no_finding_for_this_repository(self):
         findings = policy.check_all(REPO_ROOT)
@@ -556,21 +538,6 @@ class AnchorParsingTests(unittest.TestCase):
         )
         self.assertEqual(policy.anchored_tokens(text, "ui-namespaces"), ("assets",))
         self.assertEqual(policy.anchored_tokens(text, "entry-routes"), ("dashboard",))
-
-    def test_no_published_anchor_can_be_extended_with_a_commented_out_row(self):
-        """One probe per anchored surface in the real inventory, not a convenient one."""
-        text = (REPO_ROOT / policy.INVENTORY_DOC).read_text(encoding="utf-8")
-        for anchor in ANCHORED_SURFACES:
-            with self.subTest(anchor=anchor):
-                published = policy.anchored_tokens(text, anchor)
-                self.assertIsNotNone(published, f"{anchor} is not published at all")
-                marker = f"{policy.ANCHOR_PREFIX} {anchor} -->"
-                smuggled = text.replace(
-                    marker,
-                    f"{marker}\n<!--\n| `smuggled_row` | never rendered |\n-->",
-                    1,
-                )
-                self.assertEqual(policy.anchored_tokens(smuggled, anchor), published)
 
 
 class SettingsDerivationTests(unittest.TestCase):

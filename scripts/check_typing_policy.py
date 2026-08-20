@@ -1259,7 +1259,7 @@ def main(argv=None):
             print(f"  {finding.rule} {finding.detail}")
         print(
             f"\nAdmission and withdrawal are reviewed edits of {RECORD_FILE}; this gate has no write "
-            "mode. See itambox/docs/development/typing-policy.md.\n"
+            "mode. See the private design-docs typing-policy.md.\n"
         )
         return 1
 

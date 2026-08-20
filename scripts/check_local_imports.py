@@ -4,7 +4,7 @@
 ITAMbox keeps imports at module top. A function-body import is justified only
 when a module-top import would break, and the repository records that reason
 next to the import as ``# inline import: <category>: <reason>`` (see
-``itambox/docs/development/python-import-policy.md``).
+the private design-docs repository's development/python-import-policy.md).
 
 This gate is deterministic and AST-based. It scans production Python, treats
 every annotated function-body import as reviewed, and holds every unannotated

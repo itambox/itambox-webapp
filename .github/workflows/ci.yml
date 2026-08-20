@@ -30,11 +30,11 @@ on:
       - "itambox/package.json"
       - "itambox/package-lock.json"
       - "itambox/schema.yaml"
-      - "itambox/docs/development/**"
       - "itambox/docs/plugins/api_reference.md"
       - "itambox/mkdocs.yml"
       - "scripts/**/*.py"
       - "scripts/architecture_baseline.json"
+      - "scripts/contract_policy_manifest.json"
       - "scripts/migration_audit.json"
       - "scripts/exception_baseline.json"
       - "scripts/local_import_baseline.json"
@@ -431,8 +431,8 @@ jobs:
       # Blocking over both graphs from the first run: a cycle or a cross-layer
       # edge that only exists once function-body imports are counted is still a
       # real runtime coupling. A model importing presentation is the one finding
-      # with no baseline representation at any severity (see
-      # itambox/docs/development/architecture-policy.md).
+      # with no baseline representation at any severity (see the private
+      # itambox/design-docs repository's architecture policy).
       #
       # The suite backing this gate runs by discovery in the `test` job above.
       - name: Check the architecture boundary gate

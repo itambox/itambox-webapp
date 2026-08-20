@@ -86,7 +86,7 @@ coverage-diff:
 
 # Records the measured rates as the reviewed baseline. Recording a DECLINE
 # additionally requires --allow-decline --reason "..." (see
-# itambox/docs/development/test-coverage-policy.md).
+# the private design-docs test-coverage-policy.md).
 coverage-baseline:
 	$(UV_DEV) python scripts/check_coverage_baseline.py --coverage-json itambox/coverage.json --write-baseline
 
@@ -111,7 +111,7 @@ architecture-check:
 
 # Normalises ordering and re-stamps the fingerprint. Drops rows that are no
 # longer observed and refuses newly observed ones; see
-# itambox/docs/development/architecture-policy.md for the bootstrap sequence.
+# the private design-docs architecture-policy.md for the bootstrap sequence.
 architecture-baseline:
 	PYTHONPATH= $(UV_DEV) python scripts/check_architecture.py --write-baseline
 

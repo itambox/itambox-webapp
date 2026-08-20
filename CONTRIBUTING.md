@@ -1,6 +1,6 @@
 # Contributing to ITAMbox
 
-ITAMbox accepts focused changes through pull requests. This guide describes the repository's development and review gates; deeper implementation notes live in [DEVELOPMENT.md](DEVELOPMENT.md), and the layering that authorization and tenancy code sits inside is recorded in the [architecture boundaries ADR](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md).
+ITAMbox accepts focused changes through pull requests. This guide describes the repository's development and review gates; deeper implementation notes live in [DEVELOPMENT.md](DEVELOPMENT.md), and the layering that authorization and tenancy code sits inside is recorded in the [architecture boundaries ADR](https://github.com/itambox/design-docs/blob/main/development/adr-0001-architecture-boundaries-and-layering.md).
 
 ## Before you start
 
@@ -8,7 +8,7 @@ ITAMbox accepts focused changes through pull requests. This guide describes the 
 - Discuss large features, schema changes, and compatibility breaks in an issue before implementation.
 - Keep each pull request to one concern. Separate cleanup from behavioral changes unless the cleanup is required for the fix.
 - Report vulnerabilities privately through [SECURITY.md](SECURITY.md), never in a public issue.
-- Follow the [security scanning and suppression policy](itambox/docs/development/security-scanning.md) for dependency, secret, or scanner-policy changes.
+- Follow the [security scanning and suppression policy](https://github.com/itambox/design-docs/blob/main/development/security-scanning.md) for dependency, secret, or scanner-policy changes.
 
 ## Prerequisites
 
@@ -121,7 +121,7 @@ Use `!` or a `BREAKING CHANGE:` footer when a change breaks an API, route, confi
 
 - Follow the neighboring Django app instead of introducing a new local pattern. Standard app layout and cross-layer wiring are documented in [DEVELOPMENT.md](DEVELOPMENT.md).
 - Generate migrations with `makemigrations`; do not hand-write them unless the migration cannot be expressed safely by Django and the pull request explains why.
-- Preserve tenant scoping and object-level permissions in UI, REST, GraphQL, background jobs, imports, and bulk actions. Cross-tenant access must use explicit `RoleGrant` and `RoleGrantScope` records, written through the single service entry point described in [view patterns](itambox/docs/development/view-patterns.md).
+- Preserve tenant scoping and object-level permissions in UI, REST, GraphQL, background jobs, imports, and bulk actions. Cross-tenant access must use explicit `RoleGrant` and `RoleGrantScope` records, written through the single service entry point described in [view patterns](https://github.com/itambox/design-docs/blob/main/development/view-patterns.md).
 - Use scoped managers and established tenant-aware service boundaries rather than unscoped model queries. Add regression tests for fixes and tests for new behavior; tenant-aware tests should use `TenantTestMixin`.
 - Build shared API behavior on `itambox.api`, keep generic object detail/edit/delete routes primary-key based, and retain slugs only where an integration contract explicitly requires them.
 - Follow the existing HTMX partial/modal/toast conventions, and propagate `TaskContext` through django-q2 jobs so tenant and actor attribution is preserved.
@@ -154,7 +154,7 @@ The fourth command is the import-placement gate. Imports belong at module top; a
 function-body import needs an explicit `# inline import: <category>: <reason>`
 annotation, and everything not yet triaged is frozen in
 `scripts/local_import_baseline.json` so new untriaged imports fail review. Read
-the [Python import policy](itambox/docs/development/python-import-policy.md)
+the [Python import policy](https://github.com/itambox/design-docs/blob/main/development/python-import-policy.md)
 before adding one or paying down baselined debt.
 
 The last command is the architecture boundary gate. It builds the first-party
@@ -165,8 +165,8 @@ layer boundary the policy forbids. Accepted debt is recorded in
 and a stated removal direction, so the baseline is a work list rather than a
 suppression file. A model that imports a form, a table, or a view is the one
 finding with no baseline representation at any severity. Read the
-[architecture policy](itambox/docs/development/architecture-policy.md) and the
-[architecture boundaries ADR](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md)
+[architecture policy](https://github.com/itambox/design-docs/blob/main/development/architecture-policy.md) and the
+[architecture boundaries ADR](https://github.com/itambox/design-docs/blob/main/development/adr-0001-architecture-boundaries-and-layering.md)
 before adding an entry.
 
 From `itambox/`:
@@ -194,9 +194,9 @@ make coverage-diff   # differential coverage of your branch against origin/main
 be covered, counting a line as covered only when it was executed and is not the
 origin of an untaken branch. A changed production file the run never measured is
 a failure, not a pass. Read the
-[test coverage policy](itambox/docs/development/test-coverage-policy.md) before
+[test coverage policy](https://github.com/itambox/design-docs/blob/main/development/test-coverage-policy.md) before
 changing a baseline or adding an exemption, and the
-[security test expectations](itambox/docs/development/security-test-expectations.md)
+[security test expectations](https://github.com/itambox/design-docs/blob/main/development/security-test-expectations.md)
 before writing tests for tenancy, RBAC, tokens, encryption, imports, SCIM, task
 context, or destructive operations — coverage proves a line ran, not that the
 test asserted anything about the boundary it crosses.

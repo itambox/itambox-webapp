@@ -671,7 +671,7 @@ class RecordIntegrityTests(FixtureTestCase):
         consult git history. What the ledger buys is that hiding a withdrawal
         takes three coordinated edits to a reviewed file, all of them visible in
         the diff -- not that it is impossible. See
-        itambox/docs/development/typing-policy.md, "Monotonicity".
+        the private design-docs typing-policy.md, "Monotonicity".
         """
         self._with_two_checked_modules()
         self._keep_only({1}, next_sequence=2)

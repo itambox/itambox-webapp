@@ -127,10 +127,9 @@ def path_filters(workflow_text):
 def _filter_matcher(pattern):
     """Compile one path filter the way GitHub matches it.
 
-    ``**`` crosses directory separators and ``*`` does not, so a filter naming
-    ``itambox/docs/development/*.md`` would not cover a future subdirectory
-    while ``**/*.md`` does. Translating rather than reaching for ``fnmatch``
-    keeps that distinction, which is the whole point of the assertion below.
+    ``**`` crosses directory separators and ``*`` does not. Internal development
+    prose is maintained in the private design-docs repository, so the path-filter
+    tests cover only public documentation and source paths.
     """
     compiled = []
     for token in re.split(r"(\*\*/|\*\*|\*|\?)", pattern):
@@ -260,7 +259,7 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
 
     def test_exception_policy_changes_trigger_ci_and_run_the_gate(self):
         self.assertIn('- "scripts/exception_baseline.json"', self.workflow_text)
-        self.assertTrue(triggers_ci(self.workflow_text, "itambox/docs/development/exception-policy.md"))
+        self.assertTrue(triggers_ci(self.workflow_text, "scripts/check_exception_policy.py"))
         gate = step_named(load_steps(), "Check the exception policy gate")
         self.assertIn("scripts/check_exception_policy.py", gate.get("run", ""))
 
@@ -287,11 +286,9 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
 
     def test_architecture_policy_changes_trigger_ci_and_run_the_gate(self):
         self.assertIn('- "scripts/architecture_baseline.json"', self.workflow_text)
-        for document in (
-            "itambox/docs/development/architecture-policy.md",
-            "itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md",
-            "itambox/docs/plugins/api_reference.md",
-        ):
+        self.assertIn('- "scripts/contract_policy_manifest.json"', self.workflow_text)
+        self.assertTrue(triggers_ci(self.workflow_text, "scripts/contract_policy_manifest.json"))
+        for document in ("scripts/check_architecture.py", "itambox/docs/plugins/api_reference.md"):
             with self.subTest(document=document):
                 self.assertTrue(triggers_ci(self.workflow_text, document))
         gate = step_named(load_steps(), "Check the architecture boundary gate")
@@ -346,14 +343,10 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
                     f"{relative} is read by R-DOC1 but matches no on.pull_request.paths filter",
                 )
 
-    def test_a_development_document_that_does_not_exist_yet_is_already_covered(self):
-        """The filter has to cover the rule's glob, not today's file listing."""
-        for future in (
-            "itambox/docs/development/adr-9999-not-yet-written.md",
-            "itambox/docs/development/nested/deeper-note.md",
-        ):
-            with self.subTest(document=future):
-                self.assertTrue(triggers_ci(self.workflow_text, future))
+    def test_internal_development_documents_are_not_public_ci_inputs(self):
+        """Internal prose is reviewed in design-docs; the manifest is the CI input."""
+        self.assertFalse(triggers_ci(self.workflow_text, "private-development/architecture-policy.md"))
+        self.assertTrue(triggers_ci(self.workflow_text, "scripts/contract_policy_manifest.json"))
 
     def test_the_path_filter_reader_distinguishes_star_from_double_star(self):
         """Guards the assertions above: a matcher that ignores `**` proves nothing."""
@@ -363,23 +356,12 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         self.assertEqual(path_filters('paths:\n  - "a/*.md"\n  - "b.py"\n'), ["a/*.md", "b.py"])
         self.assertEqual(path_filters('paths:\n  # note\n  - "a.md"\nother:\n  - "b"\n'), ["a.md"])
 
-    def test_the_new_docs_are_reachable_in_the_mkdocs_nav(self):
+    def test_internal_development_docs_are_not_in_the_mkdocs_nav(self):
         navigation = (REPO_ROOT / "itambox" / "mkdocs.yml").read_text(encoding="utf-8")
 
-        self.assertIn("'development/architecture-policy.md'", navigation)
-        self.assertIn("'development/adr-0001-architecture-boundaries-and-layering.md'", navigation)
+        self.assertNotIn("\n  - Development:", navigation)
+        self.assertNotIn("'development/architecture-policy.md'", navigation)
         self.assertIn("omitted_files: warn", navigation)
-
-    def test_no_policy_text_implies_plugin_support_for_internal_modules(self):
-        """Layer membership describes ITAMbox's structure; it promises nothing."""
-        policy_doc = REPO_ROOT / "itambox" / "docs" / "development" / "architecture-policy.md"
-        text = policy_doc.read_text(encoding="utf-8")
-
-        self.assertIn("scans first-party code under `itambox/`", text)
-        for layer in ("framework", "kernel", "platform-service"):
-            for promise in ("public API", "supported API", "stable API"):
-                with self.subTest(layer=layer, promise=promise):
-                    self.assertNotIn(f"{layer} {promise}", text)
 
     def test_the_discovery_invocation_reaches_every_suite_on_disk(self):
         """The arguments CI passes must actually load every suite that exists."""
@@ -453,7 +435,7 @@ class TypingPolicyWiringTests(unittest.TestCase):
         for path in (
             "scripts/typing_checked_modules.json",
             "scripts/check_typing_policy.py",
-            "itambox/docs/development/typing-policy.md",
+            "scripts/contract_policy_manifest.json",
             "pyproject.toml",
             "uv.lock",
         ):
@@ -475,10 +457,10 @@ class TypingPolicyWiringTests(unittest.TestCase):
         self.assertIn("\ntypecheck:\n", makefile)
         self.assertIn("make typecheck", makefile)
 
-    def test_the_typing_policy_document_is_reachable_in_the_mkdocs_nav(self):
+    def test_the_typing_policy_is_not_in_the_public_mkdocs_nav(self):
         navigation = (REPO_ROOT / "itambox" / "mkdocs.yml").read_text(encoding="utf-8")
 
-        self.assertIn("'development/typing-policy.md'", navigation)
+        self.assertNotIn("'development/typing-policy.md'", navigation)
 
 
 def _flatten(suite):

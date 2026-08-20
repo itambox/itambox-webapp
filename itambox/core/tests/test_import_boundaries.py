@@ -941,22 +941,12 @@ class TenantResourceGrantBoundaryTests(SimpleTestCase):
                 ]
                 self.assertEqual(raw_grant_bypasses, [], path.relative_to(PROJECT_ROOT))
 
-    def test_documented_mandatory_selector_matches_complete_manifest(self):
-        document = (PROJECT_ROOT / "docs" / "development" / "tenant-resource-grant-security.md").read_text(
-            encoding="utf-8"
-        )
-        selector = document.split("Run the Django selector from the repository root:", 1)[1].split("```", 2)[1]
-        documented = tuple(
-            line.strip().removesuffix(" \\")
-            for line in selector.splitlines()
-            if line.strip().endswith(".py") or line.strip().endswith(".py \\")
-        )
-        self.assertEqual(documented, MANDATORY_RESOURCE_GRANT_TESTS)
-        self.assertTrue(all((REPO_ROOT / relative).is_file() for relative in documented))
+    def test_manifest_mandatory_selector_matches_complete_manifest(self):
+        self.assertTrue(all((REPO_ROOT / relative).is_file() for relative in MANDATORY_RESOURCE_GRANT_TESTS))
         manifest_coverage = set(RESOURCE_GRANT_TEST_MANIFEST["changed_tests"]) | set(
             RESOURCE_GRANT_TEST_MANIFEST["baseline_tests"]
         )
-        self.assertEqual(set(documented), manifest_coverage)
+        self.assertEqual(set(MANDATORY_RESOURCE_GRANT_TESTS), manifest_coverage)
         self.assertTrue(
             all((REPO_ROOT / relative).is_file() for relative in RESOURCE_GRANT_TEST_MANIFEST["supporting_files"])
         )

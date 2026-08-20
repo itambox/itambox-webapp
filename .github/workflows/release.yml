@@ -13,7 +13,6 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "itambox/itambox/release.py"
-      - "itambox/docs/development/release-checklist.md"
       - "scripts/release_policy.py"
       - "scripts/security_gate.py"
       - "scripts/install_security_tools.sh"
