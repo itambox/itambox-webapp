@@ -54,10 +54,13 @@ class DjangoTables2TemplateCompatibilityTests(unittest.TestCase):
                 template,
             )
 
-    def test_mobile_footer_puts_action_links_above_the_footer_stamp(self):
+    def test_mobile_footer_is_hidden_and_tabler_credit_is_removed(self):
         template_root = Path(__file__).resolve().parents[2]
         layout = (template_root / "templates" / "layout.html").read_text(encoding="utf-8")
+        mobile_styles = (template_root / "static" / "src" / "styles" / "_mobile.scss").read_text(encoding="utf-8")
 
+        self.assertNotIn("Theme by", layout)
+        self.assertNotIn("https://tabler.io", layout)
         self.assertIn(
             '<div class="container-fluid d-flex flex-column flex-lg-row '
             "justify-content-between align-items-stretch align-items-lg-center "
@@ -65,11 +68,8 @@ class DjangoTables2TemplateCompatibilityTests(unittest.TestCase):
             layout,
         )
         self.assertIn('<ul class="list-inline mb-0 fs-2 text-end">', layout)
-        self.assertIn(
-            '<ul class="list-inline list-inline-dots fs-5 mb-0 text-center text-lg-end"\n'
-            '              id="footer-stamp">',
-            layout,
-        )
+        self.assertIn("footer.footer {", mobile_styles)
+        self.assertIn("display: none !important;", mobile_styles)
 
     def test_issue260_responsive_shell_contract_is_declared(self):
         template_root = Path(__file__).resolve().parents[2]
