@@ -1,4 +1,6 @@
 from importlib import import_module
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -16,6 +18,7 @@ from itambox.middleware import CurrentUserMiddleware, TenantMiddleware
 from organization.models import Role, Tenant, TenantGroup
 from users.forms import UserPreferencesForm
 from users.models import UserPreference
+from users.services import parse_workspace_key, resolve_workspace_selection
 
 User = get_user_model()
 
@@ -154,6 +157,66 @@ class DefaultWorkspaceTests(TestCase):
             self.assertEqual(request.session["active_tenant_id"], self.home.pk)
         finally:
             self._finish_middleware(request, current_user, tokens, tenant, previous_scope)
+
+    def test_workspace_key_parser_rejects_malformed_values(self):
+        for value in (None, 7, "unknown", "tenant:", "tenant:0", "group:-1", "group:not-an-id"):
+            with self.subTest(value=value):
+                self.assertIsNone(parse_workspace_key(value))
+        self.assertEqual(parse_workspace_key("tenant:12"), ("tenant", 12))
+        self.assertEqual(parse_workspace_key("group:12"), ("group", 12))
+
+    def test_no_access_user_gets_only_automatic_workspace_choice(self):
+        stranger = User.objects.create_user(username="default-ws-stranger", password="pw")
+        choices = dict(UserPreferencesForm(user=stranger).fields["default_workspace"].choices)
+        self.assertEqual(choices, {"": "Automatic"})
+
+    def test_superuser_can_resolve_global_and_group_defaults(self):
+        superuser = User.objects.create_superuser(
+            username="default-ws-superuser",
+            email="default-ws-superuser@example.com",
+            password="pw",
+        )
+        self.assertFalse(resolve_workspace_selection(superuser, "all").all_accessible)
+        self.assertEqual(resolve_workspace_selection(superuser, f"group:{self.group.pk}").group, self.group)
+
+    def test_inaccessible_or_unknown_group_default_is_rejected(self):
+        other_group = TenantGroup.objects.create(name="Other Group", slug="default-ws-other-group")
+        other_tenant = Tenant.objects.create(
+            name="Other Tenant",
+            slug="default-ws-other",
+            group=other_group,
+        )
+        self.assertIsNone(resolve_workspace_selection(self.user, f"group:{other_group.pk}"))
+        self.assertIsNone(resolve_workspace_selection(self.user, f"group:{other_tenant.pk + 100000}"))
+        self.assertIsNone(resolve_workspace_selection(self.user, "unknown"))
+
+    def test_apply_default_workspace_handles_aggregate_selection(self):
+        request = self._request()
+        selection = SimpleNamespace(tenant=None, group=None, all_accessible=True)
+        with patch("itambox.middleware.resolve_default_workspace", return_value=selection):
+            self.assertTrue(TenantMiddleware._apply_default_workspace(request))
+        self.assertTrue(request.session["active_all_accessible"])
+        self.assertNotIn("active_tenant_id", request.session)
+        self.assertNotIn("active_tenant_group_id", request.session)
+
+    def test_saving_automatic_workspace_clears_existing_default(self):
+        UserPreference.objects.create(
+            user=self.user,
+            data={"default_workspace": f"tenant:{self.customer.pk}"},
+        )
+        form = UserPreferencesForm(user=self.user, data={})
+        form.data = form.data.copy()
+        form.data.update(
+            {
+                "pagination_per_page": form.fields["pagination_per_page"].choices[0][0],
+                "theme": "light",
+                "language": form.fields["language"].choices[0][0],
+                "default_workspace": "",
+            }
+        )
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.assertNotIn("default_workspace", UserPreference.objects.get(user=self.user).data)
 
     def test_saving_default_workspace_applies_it_after_preferences_redirect(self):
         self.client.force_login(self.user)
