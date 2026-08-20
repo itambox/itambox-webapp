@@ -2,6 +2,7 @@ import datetime
 import json
 import re
 from decimal import Decimal
+from html.parser import HTMLParser
 
 from django import forms
 from django.contrib.auth import get_user_model
@@ -1387,6 +1388,102 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
         for placeholder in ("%(name)s", "%(tag)s", "%(serial)s", "%(url)s"):
             self.assertEqual(translated_custody.count(placeholder), 1)
         self.assertEqual(translated_bulk_receive.count("%(count)s"), 1)
+
+
+class _ElementAttributesParser(HTMLParser):
+    def __init__(self, element_id):
+        super().__init__()
+        self.element_id = element_id
+        self.attributes = None
+        self.match_count = 0
+
+    def handle_starttag(self, _tag, attrs):
+        attributes = dict(attrs)
+        if attributes.get("id") == self.element_id:
+            self.match_count += 1
+            self.attributes = attributes
+
+
+class Issue419AssetDeleteTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context(
+            name="Issue 419 Tenant",
+            slug="issue-419",
+            permissions=["assets.view_asset", "assets.delete_asset"],
+        )
+        self.other_tenant = Tenant.objects.create(name="Issue 419 Other", slug="issue-419-other")
+        self.asset = Asset.objects.create(name="Issue 419 Laptop", asset_tag="ISSUE-419", tenant=self.tenant)
+        self.other_asset = Asset.objects.create(
+            name="Issue 419 Foreign Laptop",
+            asset_tag="ISSUE-419-FOREIGN",
+            tenant=self.other_tenant,
+        )
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        self.delete_url = reverse("assets:asset_delete", kwargs={"pk": self.asset.pk})
+
+    def test_asset_list_renders_the_registered_delete_url(self):
+        self.assertEqual(self.delete_url, f"/assets/assets/{self.asset.pk}/delete/")
+
+        response = self.client.get(reverse("assets:asset_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.delete_url)
+
+    def test_authorized_delete_confirmation_supports_normal_boosted_and_history_restore_get(self):
+        response = self.client.get(self.delete_url)
+        boosted_response = self.client.get(
+            self.delete_url,
+            HTTP_HX_REQUEST="true",
+            HTTP_HX_BOOSTED="true",
+            HTTP_HX_TARGET="page-content-wrapper",
+        )
+        history_response = self.client.get(
+            self.delete_url,
+            HTTP_HX_REQUEST="true",
+            HTTP_HX_HISTORY_RESTORE_REQUEST="true",
+        )
+
+        for candidate in (response, boosted_response, history_response):
+            with self.subTest(response_type=candidate):
+                self.assertEqual(candidate.status_code, 200)
+                self.assertTemplateUsed(candidate, "generic/object_confirm_delete.html")
+                self.assertContains(candidate, "Confirm Deletion")
+        self.assertContains(history_response, 'id="page-header-block"')
+        self.assertContains(history_response, 'id="page-body-main"')
+        purge_call = "sessionStorage.removeItem('htmx-history-cache')"
+        self.assertContains(response, purge_call)
+        self.assertNotContains(boosted_response, purge_call)
+        self.assertNotContains(history_response, purge_call)
+
+    def test_confirming_asset_delete_soft_deletes_and_redirects_to_list(self):
+        response = self.client.post(self.delete_url)
+
+        self.assertRedirects(response, reverse("assets:asset_list"), fetch_redirect_response=False)
+        self.assertFalse(Asset.objects.filter(pk=self.asset.pk).exists())
+        self.assertIsNotNone(Asset.all_objects.get(pk=self.asset.pk).deleted_at)
+
+    def test_unknown_and_cross_tenant_assets_remain_hidden(self):
+        unknown_pk = max(self.asset.pk, self.other_asset.pk) + 1
+        denied_urls = (
+            reverse("assets:asset_delete", kwargs={"pk": self.other_asset.pk}),
+            reverse("assets:asset_delete", kwargs={"pk": unknown_pk}),
+        )
+
+        for url in denied_urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+                self.assertEqual(self.client.post(url).status_code, 404)
+
+    def test_tenant_scoped_shell_is_not_saved_in_htmx_history_cache(self):
+        response = self.client.get(reverse("assets:asset_list"))
+        parser = _ElementAttributesParser("page-content-wrapper")
+        parser.feed(response.content.decode())
+        parser.close()
+
+        self.assertIsNotNone(parser.attributes)
+        self.assertEqual(parser.match_count, 1)
+        self.assertIn("hx-history-elt", parser.attributes)
+        self.assertEqual(parser.attributes.get("hx-history"), "false")
 
 
 PURCHASE_DATE = datetime.date(2024, 1, 15)
