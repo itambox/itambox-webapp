@@ -24,7 +24,7 @@ repos:
   # Managed, pinned environment so missing Bugbear or diagnostic dependency
   # drift cannot silently weaken the policy relative to Linux CI.
   - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
+    rev: 7.3.0
     hooks:
       - id: flake8
         alias: flake8-baseline
