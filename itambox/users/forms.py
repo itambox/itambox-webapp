@@ -159,6 +159,7 @@ class UserPreferencesForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.user = user
         self.fields["default_workspace"].choices = workspace_choices(self.user)
+        self.fields["default_workspace"].initial = ""
         try:
             # Use filter().first() to avoid DoesNotExist exception
             prefs = UserPreference.objects.filter(user=self.user).first()
@@ -194,14 +195,12 @@ class UserPreferencesForm(forms.Form):
                 self.fields["pagination_per_page"].initial = settings.DEFAULT_PAGINATE_COUNT
                 # Use THEME_LIGHT as the default
                 self.fields["theme"].initial = UserPreference.THEME_LIGHT
-                self.fields["default_workspace"].initial = ""
 
         except Exception:
             # Fallback to defaults on any error loading preferences
             self.fields["pagination_per_page"].initial = settings.DEFAULT_PAGINATE_COUNT
             # Use THEME_LIGHT as the default
             self.fields["theme"].initial = UserPreference.THEME_LIGHT
-            self.fields["default_workspace"].initial = ""
 
         # Language initial: stored preference first, else the active language
         from django.utils import translation

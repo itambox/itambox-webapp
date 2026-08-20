@@ -245,6 +245,22 @@ class TenantMiddleware:
             request.session.pop("active_tenant_id", None)
             request.session.pop("active_tenant_group_id", None)
 
+        if (
+            query_tenant_id is None
+            and query_group_id is None
+            and query_all_accessible is None
+            and not any(
+                key in request.session
+                for key in ("active_tenant_id", "active_tenant_group_id", "active_all_accessible")
+            )
+        ):
+            # A saved default is only a bootstrap preference. An explicit query or
+            # existing session selection always wins.
+            TenantMiddleware._apply_default_workspace(request)
+            session_tenant_id = request.session.get("active_tenant_id")
+            session_group_id = request.session.get("active_tenant_group_id")
+            session_all_accessible = bool(request.session.get("active_all_accessible"))
+
         return session_tenant_id, session_group_id, session_all_accessible
 
     @staticmethod
@@ -290,13 +306,6 @@ class TenantMiddleware:
         # "All accessible tenants" is a distinct scope state for a non-superuser:
         # no single tenant/group is selected, yet the request is NOT global.
         session_all_accessible = bool(request.session.get("active_all_accessible"))
-        query_scope_requested = any(
-            request.GET.get(parameter) is not None
-            for parameter in ("switch_tenant", "switch_tenant_group", "switch_all_accessible")
-        )
-        session_has_scope = any(
-            key in request.session for key in ("active_tenant_id", "active_tenant_group_id", "active_all_accessible")
-        )
 
         # inline import: cycle: itambox.middleware <-> organization.models at module load.
         from organization.models import Membership, Tenant, TenantGroup
@@ -309,15 +318,6 @@ class TenantMiddleware:
             session_group_id,
             session_all_accessible,
         )
-
-        # A saved default is only a bootstrap preference. An explicit query or an
-        # existing session selection always wins, so temporary manual switches stay
-        # intact until the session is replaced or the preference is changed.
-        if not query_scope_requested and not session_has_scope:
-            self._apply_default_workspace(request)
-            session_tenant_id = request.session.get("active_tenant_id")
-            session_group_id = request.session.get("active_tenant_group_id")
-            session_all_accessible = bool(request.session.get("active_all_accessible"))
 
         active_tenant = None
         active_tenant_group = None

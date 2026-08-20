@@ -233,50 +233,64 @@ def workspace_choices(user):
     return choices
 
 
-def resolve_workspace_selection(user, value):
-    """Resolve a stored workspace key only when it is currently authorized."""
+def _resolve_all_workspace(accessible_ids):
+    if accessible_ids is None:
+        return WorkspaceSelection()
+    if accessible_ids:
+        return WorkspaceSelection(all_accessible=True)
+    return None
+
+
+def _resolve_tenant_workspace(object_id, accessible_ids):
+    # inline imports: app-registry: resolve organization models after Django apps load
+    from organization.models import Tenant
+
+    if accessible_ids is not None and object_id not in accessible_ids:
+        return None
+    tenant = Tenant._base_manager.filter(
+        pk=object_id,
+        deleted_at__isnull=True,
+    ).first()
+    return WorkspaceSelection(tenant=tenant) if tenant is not None else None
+
+
+def _resolve_group_workspace(object_id, accessible_ids):
     # inline imports: app-registry: resolve organization models after Django apps load
     from organization.access import get_descendant_tenant_group_ids
     from organization.models import Tenant, TenantGroup
 
+    group = TenantGroup._base_manager.filter(
+        pk=object_id,
+        deleted_at__isnull=True,
+    ).first()
+    if group is None:
+        return None
+    if accessible_ids is None:
+        return WorkspaceSelection(group=group)
+
+    descendant_group_ids = get_descendant_tenant_group_ids(group.pk, live_only=True)
+    group_tenant_ids = set(
+        Tenant._base_manager.filter(
+            group_id__in=descendant_group_ids,
+            deleted_at__isnull=True,
+        ).values_list("pk", flat=True)
+    )
+    if accessible_ids & group_tenant_ids:
+        return WorkspaceSelection(group=group)
+    return None
+
+
+def resolve_workspace_selection(user, value):
+    """Resolve a stored workspace key only when it is currently authorized."""
     parsed = parse_workspace_key(value)
     if parsed is None:
         return None
     kind, object_id = parsed
     accessible_ids = _accessible_tenant_ids(user)
-
     if kind == WORKSPACE_ALL:
-        if accessible_ids is None:
-            return WorkspaceSelection()
-        if accessible_ids:
-            return WorkspaceSelection(all_accessible=True)
-        return None
-
+        return _resolve_all_workspace(accessible_ids)
     if kind == "tenant":
-        if accessible_ids is not None and object_id not in accessible_ids:
-            return None
-        tenant = Tenant._base_manager.filter(
-            pk=object_id,
-            deleted_at__isnull=True,
-        ).first()
-        return WorkspaceSelection(tenant=tenant) if tenant is not None else None
-
+        return _resolve_tenant_workspace(object_id, accessible_ids)
     if kind == "group":
-        group = TenantGroup._base_manager.filter(
-            pk=object_id,
-            deleted_at__isnull=True,
-        ).first()
-        if group is None:
-            return None
-        if accessible_ids is None:
-            return WorkspaceSelection(group=group)
-        descendant_group_ids = get_descendant_tenant_group_ids(group.pk, live_only=True)
-        group_tenant_ids = set(
-            Tenant._base_manager.filter(
-                group_id__in=descendant_group_ids,
-                deleted_at__isnull=True,
-            ).values_list("pk", flat=True)
-        )
-        if accessible_ids & group_tenant_ids:
-            return WorkspaceSelection(group=group)
+        return _resolve_group_workspace(object_id, accessible_ids)
     return None

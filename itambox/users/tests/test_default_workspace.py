@@ -6,10 +6,6 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from core.managers import (
-    get_current_all_accessible,
-    get_current_membership,
-    get_current_tenant,
-    get_current_tenant_group,
     set_current_all_accessible,
     set_current_membership,
     set_current_tenant,
