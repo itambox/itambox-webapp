@@ -11,7 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import translation
 
-from core.tests.mixins import grant
+from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Role, Tenant
 
 User = get_user_model()
@@ -72,3 +72,78 @@ class ResourceGrantLocalizationTests(TestCase):
         response = self._list_response("en")
         self.assertContains(response, "No Resource Grants found")
         self.assertNotContains(response, "Keine")
+
+
+class RoleSurfaceLocalizationTests(TenantTestMixin, TestCase):
+    """DE/EN render contracts for the role form, role assign-users, and
+    membership form surfaces (issue #386 organization slice).
+
+    The tightened English source copy must render in EN, the reviewed German
+    catalog entries in DE, and the old wordy source strings must not leak in
+    either language.
+    """
+
+    def setUp(self):
+        self.clear_tenant_context()
+        self.setup_tenant_context()
+        self.client.force_login(self.tenant_admin)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    def _get(self, url, language):
+        with translation.override(language):
+            return self.client.get(url, HTTP_ACCEPT_LANGUAGE=language)
+
+    def test_english_role_form_uses_tightened_copy(self):
+        response = self._get(reverse("organization:role_create"), "en")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Set this role's permissions below. Granular permissions can separate Create and Edit access.",
+        )
+        self.assertNotContains(response, "Configure role-specific access")
+        self.assertContains(response, "A role belongs to the tenant it was created in and cannot be moved.")
+        self.assertNotContains(response, "it is created in and cannot be moved afterwards")
+        self.assertContains(response, "Read-only (no changes)")
+        self.assertNotContains(response, "Read-Only (view only)")
+
+    def test_german_role_form_uses_localized_copy(self):
+        response = self._get(reverse("organization:role_create"), "de")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Legen Sie unten die Berechtigungen dieser Rolle fest")
+        self.assertNotContains(response, "Konfigurieren Sie den rollenspezifischen Zugriff")
+        self.assertNotContains(response, "Set this role's permissions below")
+
+    def test_english_role_assign_users_uses_tightened_copy(self):
+        role = Role.objects.create(tenant=self.tenant, name="Assign target role")
+        response = self._get(reverse("organization:role_assign_users", kwargs={"pk": role.pk}), "en")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f"Select users to assign to this role in tenant <strong>{self.tenant.name}</strong>.",
+        )
+        self.assertNotContains(response, "with a different role will be reassigned")
+
+    def test_german_role_assign_users_is_localized(self):
+        role = Role.objects.create(tenant=self.tenant, name="Assign target role")
+        response = self._get(reverse("organization:role_assign_users", kwargs={"pk": role.pk}), "de")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f"Wählen Sie Benutzer für diese Rolle im Mandanten <strong>{self.tenant.name}</strong> aus.",
+        )
+        self.assertNotContains(response, "Select users to assign to this role in tenant")
+        self.assertNotContains(response, "mit einer anderen Rolle vorhanden sind")
+
+    def test_english_membership_form_uses_tightened_copy(self):
+        response = self._get(reverse("organization:membership_create"), "en")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Pick who joins: an existing user or a new one created by email.",
+        )
+        self.assertNotContains(response, "Pick who joins (an existing user, or a new one created by email)")

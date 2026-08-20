@@ -700,7 +700,7 @@ class RoleForm(forms.ModelForm):
             ("blank", _("Blank (start from scratch)")),
             ("administrator", _("Administrator (full access)")),
             ("technician", _("Technician (all except delete)")),
-            ("readonly", _("Read-Only (view only)")),
+            ("readonly", _("Read-only (no changes)")),
         ]
 
     @property

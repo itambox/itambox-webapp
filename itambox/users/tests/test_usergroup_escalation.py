@@ -297,3 +297,56 @@ class AssignMembershipEscalationTests(TestCase):
         )
         self.assertEqual(row.source, GroupMembership.SOURCE_MANUAL)
         self.assertEqual(row.added_by, self.actor)
+
+
+class AllManagedScopeConflictTests(TestCase):
+    """The managed-grant formset rejects a role that both targets all managed
+    tenants and carries an additional narrower row (issue #386 grammar path:
+    the duplicate-coverage validation error must stay reachable)."""
+
+    def setUp(self):
+        self.provider = tenant("Provider", provider=True)
+        self.customer = tenant("Customer", managed_by=self.provider)
+        self.role = Role.objects.create(
+            tenant=self.provider,
+            name="Shared Reader",
+            permissions=["assets.view_asset"],
+            shared_with_managed=True,
+        )
+        self.actor = user("provider-admin", superuser=True)
+
+    def _form_data(self):
+        return {
+            "name": "Provider Readers",
+            "tenant": self.provider.pk,
+            "roles": [],
+            "members": [],
+            "is_active": True,
+            "managed-TOTAL_FORMS": "2",
+            "managed-INITIAL_FORMS": "0",
+            "managed-MIN_NUM_FORMS": "0",
+            "managed-MAX_NUM_FORMS": "1000",
+            "managed-0-role": self.role.pk,
+            "managed-0-managed_scope": RoleGrantScope.SCOPE_ALL_MANAGED,
+            "managed-0-scope_group": "",
+            "managed-0-assigned_tenants": [],
+            "managed-0-DELETE": "",
+            "managed-1-role": self.role.pk,
+            "managed-1-managed_scope": GroupManagedRoleGrantForm.SCOPE_EXPLICIT,
+            "managed-1-scope_group": "",
+            "managed-1-assigned_tenants": [self.customer.pk],
+            "managed-1-DELETE": "",
+        }
+
+    def test_all_managed_plus_narrower_same_role_row_is_rejected(self):
+        form = UserGroupForm(
+            data=self._form_data(),
+            user=self.actor,
+            tenant=self.provider,
+        )
+        self.assertFalse(form.is_valid())
+        errors = " ".join(form.managed_formset.non_form_errors())
+        self.assertIn(
+            "All managed tenants already cover every narrower scope for that role.",
+            errors,
+        )
