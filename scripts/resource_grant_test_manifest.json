@@ -135,6 +135,7 @@
   "itambox/procurement/tests/test_localization.py",
   "itambox/subscriptions/tests/test_migrations.py",
   "itambox/subscriptions/tests/test_models.py",
+  "itambox/users/tests/test_default_workspace.py",
   "itambox/users/tests/test_provider_patch.py",
   "itambox/users/tests/test_provider_services.py",
   "itambox/users/tests/test_release_blockers_scim.py",

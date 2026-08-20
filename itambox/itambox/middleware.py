@@ -249,6 +249,7 @@ class TenantMiddleware:
             query_tenant_id is None
             and query_group_id is None
             and query_all_accessible is None
+            and not request.META.get("HTTP_AUTHORIZATION")
             and not any(
                 key in request.session
                 for key in ("active_tenant_id", "active_tenant_group_id", "active_all_accessible")
