@@ -1003,7 +1003,7 @@ class AllAccessibleSelectorUITests(TestCase):
     def test_non_superuser_sees_all_accessible_link(self):
         html = self._render(self.member)
         self.assertIsNotNone(self._all_accessible_line(html))
-        self.assertIn("All accessible tenants", html)
+        self.assertIn("All Tenants", html)
 
     def test_all_accessible_link_marked_active_under_scope(self):
         line = self._all_accessible_line(
@@ -1023,6 +1023,11 @@ class AllAccessibleSelectorUITests(TestCase):
         html = self._render(self.superuser)
         # Superusers keep the distinct global entry, never the member scope link.
         self.assertIsNone(self._all_accessible_line(html))
+
+    def test_superuser_global_entry_uses_all_tenants_label(self):
+        html = self._render(self.superuser)
+        self.assertIn("All Tenants", html)
+        self.assertNotIn("All Tenants (Global)", html)
         self.assertIn("switch_tenant=", html)
 
     def test_user_without_access_has_no_all_accessible_link(self):

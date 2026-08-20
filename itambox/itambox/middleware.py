@@ -30,7 +30,11 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     set_current_tenant_group,
     set_current_user,
 )
-from core.tenant_scope import _descendant_group_ids_cache, get_descendant_tenant_group_ids
+from core.tenant_scope import (
+    _descendant_group_ids_cache,
+    get_descendant_tenant_group_ids,
+    resolve_default_workspace,
+)
 
 from .ratelimit import RateLimitMiddleware
 
@@ -179,6 +183,23 @@ class TenantMiddleware:
         return self.process_response(request, response, prev)
 
     @staticmethod
+    def _apply_default_workspace(request):
+        selection = resolve_default_workspace(request.user)
+        if selection is None:
+            return False
+
+        request.session.pop("active_tenant_id", None)
+        request.session.pop("active_tenant_group_id", None)
+        request.session.pop("active_all_accessible", None)
+        if selection.tenant is not None:
+            request.session["active_tenant_id"] = selection.tenant.pk
+        elif selection.group is not None:
+            request.session["active_tenant_group_id"] = selection.group.pk
+        elif selection.all_accessible:
+            request.session["active_all_accessible"] = True
+        return True
+
+    @staticmethod
     def _resolve_switch_params(request, session_tenant_id, session_group_id, session_all_accessible):
         """Apply a switch_tenant / switch_tenant_group / switch_all_accessible
         query param to the session-derived scope. Selecting a single tenant or
@@ -269,6 +290,13 @@ class TenantMiddleware:
         # "All accessible tenants" is a distinct scope state for a non-superuser:
         # no single tenant/group is selected, yet the request is NOT global.
         session_all_accessible = bool(request.session.get("active_all_accessible"))
+        query_scope_requested = any(
+            request.GET.get(parameter) is not None
+            for parameter in ("switch_tenant", "switch_tenant_group", "switch_all_accessible")
+        )
+        session_has_scope = any(
+            key in request.session for key in ("active_tenant_id", "active_tenant_group_id", "active_all_accessible")
+        )
 
         # inline import: cycle: itambox.middleware <-> organization.models at module load.
         from organization.models import Membership, Tenant, TenantGroup
@@ -281,6 +309,15 @@ class TenantMiddleware:
             session_group_id,
             session_all_accessible,
         )
+
+        # A saved default is only a bootstrap preference. An explicit query or an
+        # existing session selection always wins, so temporary manual switches stay
+        # intact until the session is replaced or the preference is changed.
+        if not query_scope_requested and not session_has_scope:
+            self._apply_default_workspace(request)
+            session_tenant_id = request.session.get("active_tenant_id")
+            session_group_id = request.session.get("active_tenant_group_id")
+            session_all_accessible = bool(request.session.get("active_all_accessible"))
 
         active_tenant = None
         active_tenant_group = None

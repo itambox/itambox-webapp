@@ -27,6 +27,7 @@ from organization.models import RoleGrant, Tenant
 
 from .forms import UserPreferencesForm, UserProfileForm
 from .models import UserPreference
+from .services import clear_workspace_session
 
 User = get_user_model()
 
@@ -125,7 +126,12 @@ class UserPreferencesView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixi
     def post(self, request, *args, **kwargs):
         form = self.form_class(request.user, request.POST)
         if form.is_valid():
+            default_workspace_changed = "default_workspace" in form.changed_data
             form.save()
+            if default_workspace_changed:
+                # Re-resolve the new preference on the redirect, instead of keeping
+                # a previously selected workspace in the current session.
+                clear_workspace_session(request.session)
             messages.success(request, _("Preferences saved successfully."))
             response = redirect("users:user_preferences")
             # Apply the chosen interface language app-wide via the standard
