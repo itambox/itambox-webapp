@@ -91,7 +91,7 @@ REST/OpenAPI, scoped GraphQL, SCIM, identity-provider integrations, imports, exp
 ITAMbox is licensed under Apache 2.0 and designed to run on infrastructure you control. Your deployment, data, integrations, retention policies, and upgrade decisions remain under your administration.
 
 > [!IMPORTANT]
-> ITAMbox is currently in public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability registry](itambox/docs/development/capability-registry.md) before relying on pre-release functionality.
+> This repository is pre-release. `1.0.0-beta.1` is current version metadata for the public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability registry](itambox/docs/development/capability-registry.md) before relying on pre-release functionality.
 
 Maturity is declared per capability rather than per module. The [capability registry](itambox/docs/development/capability-registry.md) is authoritative for activation mode, stability, and known limitations; the [module maturity guide](itambox/docs/development/module-maturity.md) provides a shorter overview. Tenant Resource Grants are a Stable, security-critical capability with a dedicated [threat model](itambox/docs/development/tenant-resource-grant-security.md). SCIM is Beta, and the plugin system is Experimental.
 
