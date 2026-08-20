@@ -19,6 +19,7 @@ the view layer rather than a test that needs adjusting.
 """
 
 import json
+from html.parser import HTMLParser
 from unittest.mock import patch
 
 from django import forms
@@ -1078,3 +1079,161 @@ class SecuredActionResponseShapeTests(_ActionViewTestBase):
             context = view.get_context_data(form=None)
 
         self.assertEqual(context["object"], self.asset)
+
+
+# ---------------------------------------------------------------------------
+# 4. HTMX OOB filter-count target parity (issue #421)
+# ---------------------------------------------------------------------------
+
+
+class OobFilterCountTargetParityTests(_CatalogFixtureMixin, TenantTestMixin, TestCase):
+    """Regression for #421: the ``list_page_wrapper.html`` out-of-band emitter
+    for ``#filters-applied-count`` must have exactly one matching target in the
+    rendered list page.
+
+    The target is the visible badge inside the filter-toggle control rendered by
+    ``list_toolbar.html``, which previously carried no ``id``. The OOB swap in
+    ``list_page_wrapper.html`` therefore targeted an element that did not exist,
+    so filtered list updates reported ``htmx:oobErrorNoTarget`` in the browser.
+    """
+
+    def setUp(self):
+        self.setup_tenant_context(
+            name="Oob Count Tenant GVF",
+            slug="oob-count-tenant-gvf",
+            permissions=["assets.view_asset"],
+        )
+        self.setup_catalog()
+        self.asset_a = self.make_asset("OOB Asset A GVF", "OOB-A-001-GVF", self.tenant)
+        self.asset_b = self.make_asset("OOB Asset B GVF", "OOB-B-002-GVF", self.tenant)
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        self.url = reverse("assets:asset_list")
+
+    @staticmethod
+    def _collect_id_nodes(html_text):
+        """Return every element carrying an ``id`` attribute as a list of
+        ``{"id", "attrs", "text"}`` dicts. ``attrs`` includes ``hx-swap-oob``
+        when the element is an out-of-band emitter."""
+
+        class _IdCollector(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.nodes = []
+                self._stack = []
+
+            def handle_starttag(self, tag, attrs):
+                attrs_d = dict(attrs)
+                node = {
+                    "tag": tag,
+                    "attrs": attrs_d,
+                    "text": "",
+                    "id": attrs_d.get("id"),
+                }
+                self._stack.append(node)
+                self.nodes.append(node)
+
+            def handle_startendtag(self, tag, attrs):
+                attrs_d = dict(attrs)
+                self.nodes.append({"tag": tag, "attrs": attrs_d, "text": "", "id": attrs_d.get("id")})
+
+            def handle_endtag(self, tag):
+                if self._stack:
+                    self._stack.pop()
+
+            def handle_data(self, data):
+                if self._stack:
+                    self._stack[-1]["text"] += data
+
+        parser = _IdCollector()
+        parser.feed(html_text)
+        # Only elements that actually carry an ``id`` attribute are relevant.
+        return [n for n in parser.nodes if n.get("id")]
+
+    @staticmethod
+    def _target_nodes(nodes):
+        return [n for n in nodes if n.get("id") == "filters-applied-count" and "hx-swap-oob" not in n["attrs"]]
+
+    def test_full_page_renders_exactly_one_non_oob_target(self):
+        """AC 1/2: the full list page renders exactly one
+        ``#filters-applied-count`` node that is not an OOB emitter."""
+        response = self.client.get(self.url, {"q": self.asset_a.name})
+        self.assertEqual(response.status_code, 200)
+        targets = self._target_nodes(self._collect_id_nodes(response.content.decode()))
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0]["tag"], "span")
+
+    def test_target_lives_inside_the_filter_toggle_button(self):
+        """AC 2: the target badge stays inside the visible filter-toggle control."""
+        response = self.client.get(self.url)
+        html_text = response.content.decode()
+        start = html_text.index('id="toggle-filters-btn"')
+        open_tag_end = html_text.index(">", start)
+        button_close = html_text.index("</button>", open_tag_end)
+        self.assertIn('id="filters-applied-count"', html_text[open_tag_end:button_close])
+
+    def test_badge_preserves_hidden_state_without_filters(self):
+        """AC 2: with no applied filter the badge stays hidden and shows 0."""
+        response = self.client.get(self.url)
+        nodes = self._collect_id_nodes(response.content.decode())
+        target = next(n for n in self._target_nodes(nodes))
+        self.assertIn("d-none", target["attrs"].get("class", ""))
+        self.assertEqual(target["text"].strip(), "0")
+
+    def test_badge_preserves_count_with_applied_filter(self):
+        """AC 2: with an applied filter the badge is visible and shows the same
+        count the view context reports."""
+        # ``applied_filters`` deliberately ignores the quick-search ``q`` param
+        # (see core.forms.mixins.applied_filters), so drive visibility through a
+        # real filter field.
+        response = self.client.get(self.url, {"status": str(self.status.pk)})
+        nodes = self._collect_id_nodes(response.content.decode())
+        target = next(n for n in self._target_nodes(nodes))
+        self.assertNotIn("d-none", target["attrs"].get("class", ""))
+        expected = str(len(response.context["filter_form"].applied_filters))
+        self.assertEqual(target["text"].strip(), expected)
+
+    def test_htmx_partial_emits_single_oob_emitter(self):
+        """The HTMX partial renders ``list_page_wrapper.html`` and emits exactly
+        one OOB node for ``filters-applied-count``."""
+        response = self.client.get(self.url, {"q": self.asset_a.name}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        template_names = [t.name for t in response.templates]
+        self.assertIn("htmx/list_page_wrapper.html", template_names)
+        emitters = [
+            n
+            for n in self._collect_id_nodes(response.content.decode())
+            if n.get("id") == "filters-applied-count" and n["attrs"].get("hx-swap-oob") == "true"
+        ]
+        self.assertEqual(len(emitters), 1)
+
+    # ``page-header-block`` is emitted out-of-band by ``list_oob_header.html``
+    # but has no full-page target in the plain list shell. That is a separate
+    # frontend finding (out of #421 scope); it is excluded here so this test
+    # pins the filter-UI target/emitter parity this change is responsible for.
+    _SCOPE_EXCLUDED_EMITTERS = {"page-header-block"}
+
+    def test_every_oob_emitter_has_a_matching_full_page_target(self):
+        """AC 3/4: every out-of-band emitter id in the HTMX partial (filter-UI
+        scope) has a non-OOB target in the full page, so filtered list updates
+        emit no ``htmx:oobErrorNoTarget`` for these selectors."""
+        partial = self.client.get(self.url, {"q": self.asset_a.name}, HTTP_HX_REQUEST="true")
+        full = self.client.get(self.url, {"q": self.asset_a.name})
+        self.assertEqual(partial.status_code, 200)
+        self.assertEqual(full.status_code, 200)
+
+        partial_ids = {
+            n.get("id")
+            for n in self._collect_id_nodes(partial.content.decode())
+            if n["attrs"].get("hx-swap-oob") == "true" and n.get("id")
+        }
+        full_ids = {
+            n.get("id")
+            for n in self._collect_id_nodes(full.content.decode())
+            if "hx-swap-oob" not in n["attrs"] and n.get("id")
+        }
+        missing = (partial_ids - full_ids) - self._SCOPE_EXCLUDED_EMITTERS
+        self.assertEqual(
+            missing,
+            set(),
+            "Filter-UI OOB emitter(s) without a full-page target: %r" % (sorted(missing),),
+        )

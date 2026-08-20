@@ -27,7 +27,8 @@
               title="{% translate 'Toggle Filters' %}">
         <i class="mdi mdi-filter-outline"></i>
         <span class="d-none d-md-inline ms-1">{% translate "Filters" %}</span>
-        <span class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
+        <span id="filters-applied-count"
+              class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
           {{ filter_form.applied_filters|length|default:"0" }}
         </span>
       </button>
