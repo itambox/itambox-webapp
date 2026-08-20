@@ -10,6 +10,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - The first German asset UI text chunk uses the established glossary terms and clearer labels for asset types, locations, custody receipts, and warranties.
 - Tightened the first English asset/request text slice: selection errors, request labels, custody notifications, disposal guidance, and bulk receiving copy are shorter and more direct without changing behavior.
+- The tenant switcher now uses **All Tenants** consistently, and users can choose a personal default workspace for a tenant, tenant group, or aggregate tenant view.
 
 ### Fixed
 
