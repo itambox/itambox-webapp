@@ -15,8 +15,8 @@ from django.views.generic import View
 
 from core.managers import get_current_tenant
 from core.models import Job
-from core.tenant_scope import accessible_tenant_ids
 from core.tables import JobTable
+from core.tenant_scope import accessible_tenant_ids
 from itambox.views.generic import ObjectDetailView, ObjectListView
 
 logger = logging.getLogger(__name__)
