@@ -1,12 +1,13 @@
 # Data Retention
 
-ITAMbox does not keep operational/audit data forever by default. Four data classes are pruned on an age-based schedule by the `prune_changelog` management command:
+ITAMbox prunes operational/audit data on an age-based schedule via the `prune_changelog` management command. Four of the five data classes below are pruned by default; the **event stream is retained indefinitely by default** (`0`) and pruning starts only when an operator explicitly configures a positive window.
 
 | Data class | Model | Timestamp field | Setting | Default |
 |---|---|---|---|---|
 | Object changelog | `core.ObjectChange` | `time` | `ITAMBOX_CHANGELOG_RETENTION_DAYS` | 365 days |
 | Alert log | `extras.AlertLog` | `created_at` | `ITAMBOX_ALERTLOG_RETENTION_DAYS` | 180 days |
 | Notifications | `core.Notification` | `created_at` | `ITAMBOX_NOTIFICATION_RETENTION_DAYS` | 90 days |
+| Event stream | `extras.Event` | `timestamp` | `ITAMBOX_EVENT_RETENTION_DAYS` | 0 — retain indefinitely |
 | Failed background tasks | django-q2 `Failure` | `stopped` | `ITAMBOX_QTASK_FAILED_RETENTION_DAYS` | 90 days |
 
 For every setting above, **`0` means unlimited — that data class is never pruned by age.**
@@ -35,9 +36,10 @@ python manage.py prune_changelog [options]
 | `--changelog-days N` | Override `ITAMBOX_CHANGELOG_RETENTION_DAYS` for this run (`0` = unlimited). |
 | `--alertlog-days N` | Override `ITAMBOX_ALERTLOG_RETENTION_DAYS` for this run. |
 | `--notification-days N` | Override `ITAMBOX_NOTIFICATION_RETENTION_DAYS` for this run. |
+| `--event-days N` | Override `ITAMBOX_EVENT_RETENTION_DAYS` for this run (`0` = unlimited). |
 | `--qtask-days N` | Override `ITAMBOX_QTASK_FAILED_RETENTION_DAYS` for this run. |
-| `--tenant SLUG` | Restrict **changelog** pruning to one tenant (its `changelog_retention_days` override applies). Global rows and other tenants are left untouched. Has no effect on the other three classes. |
-| `--classes a,b,c` | Comma-separated subset of `changelog,alertlog,notification,qtask` to prune (default: all four). |
+| `--tenant SLUG` | Restrict **changelog** pruning to one tenant (its `changelog_retention_days` override applies). Global rows and other tenants are left untouched. Has no effect on the other classes. |
+| `--classes a,b,c` | Comma-separated subset of `changelog,alertlog,notification,event,qtask` to prune (default: all five). |
 | `--batch-size N` | Rows deleted per batch (default `10000`). Deletes are pk-chunked so a multi-million-row backlog doesn't hold one giant transaction/lock. |
 | `--dry-run` | Report counts only; nothing is deleted or archived. |
 | `--archive-dir DIR` | Stream pruned rows to JSONL (one file per class per run: `<class>_<timestamp>.jsonl`) before deleting them. |
@@ -56,7 +58,30 @@ python manage.py prune_changelog --archive-dir /var/backups/itambox/retention
 
 # Only prune one tenant's changelog, with a tighter window than the global default
 python manage.py prune_changelog --classes changelog --tenant acme-corp --changelog-days 90
+
+# Prune only the event stream with an explicit window (fresh deployments often
+# leave ITAMBOX_EVENT_RETENTION_DAYS unset, i.e. 0 = retain indefinitely)
+python manage.py prune_changelog --classes event --event-days 365 --dry-run
 ```
+
+!!! danger "Pruning is irreversible"
+    `prune_changelog` **deletes** rows. There is no undo and no recycle bin for
+    pruned operational data. Before the first real run, verify what would be
+    deleted with `--dry-run` and decide whether you need the data later:
+
+    - Archive the rows you delete with `--archive-dir` (JSONL, one file per
+      class per run). The archive is a best-effort export (see below), not an
+      atomic backup — treat it as compliance-friendly evidence, not the primary
+      backup of your data.
+    - The primary safety net for retention decisions remains your regular
+      [database backup](backup-restore.md). Retention and backup are separate
+      controls: pruning removes rows from the live database, so a backup taken
+      *before* a pruning run can still recover rows pruned after that backup
+      point.
+    - Setting a retention window does **not** immediately reset the clock on an
+      endless default: the window is measured against each row's timestamp, so
+      lowering `ITAMBOX_EVENT_RETENTION_DAYS` from `0` to a positive value
+      prunes everything older than that window on the next scheduled run.
 
 !!! warning "Archiving is not transactional across batches"
     `--archive-dir` writes each batch to its JSONL file, flushes, and only then deletes that batch — as two separate operations, not one transaction. A process crash between the two can leave a batch archived-but-not-yet-deleted (harmless: the next run deletes it, at worst duplicating that batch across two archive files) or, far more rarely, deleted with an incomplete archive write if the process dies mid-write. Treat the archive directory as a best-effort export, not a guaranteed atomic backup — verify file integrity if you rely on it for compliance retention.

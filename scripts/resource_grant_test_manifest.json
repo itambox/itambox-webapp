@@ -1,6 +1,6 @@
 {
  "base_commit": "04b4085a853863366c0c7f53b98449a9c225aefe",
- "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), the Snipe-IT importer stage decomposition (#85), and the scanner tenant-scope + EAN/GTIN resolution work (#367) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests. This follow-up also updates stale internal-document references in three existing authorization test modules.",
+ "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), the Snipe-IT importer stage decomposition (#85), and the scanner tenant-scope + EAN/GTIN resolution work (#367) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests. This follow-up also updates stale internal-document references in three existing authorization test modules, and the operator-documentation rebuild adds the new documentation policy gate test module.",
  "changed_tests": [
   "itambox/assets/tests/test_assignments.py",
   "itambox/assets/tests/test_audit_ws6_10.py",
@@ -156,6 +156,7 @@
   "scripts/tests/test_check_xdist_matrix.py",
   "scripts/tests/test_ci_workflow_policy.py",
   "scripts/tests/test_contract_policy.py",
+  "scripts/tests/test_documentation_policy.py",
   "scripts/tests/test_inline_style_workflow_policy.py",
   "scripts/tests/test_inline_styles.py",
   "scripts/tests/test_migration_audit.py",
@@ -286,6 +287,7 @@
   "itambox/users/tests/test_usergroup_escalation.py",
   "scripts/tests/test_ci_workflow_policy.py",
   "scripts/tests/test_contract_policy.py",
+  "scripts/tests/test_documentation_policy.py",
   "scripts/tests/test_inline_style_workflow_policy.py",
   "scripts/tests/test_inline_styles.py",
   "scripts/tests/test_migration_audit.py",

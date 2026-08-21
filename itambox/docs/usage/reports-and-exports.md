@@ -143,6 +143,33 @@ external resources, unsafe CSS, and model/dunder access are not supported.
 system reports. They are used both for on-demand report generation and as
 the basis for scheduled reports.
 
+### Operator activation (Beta feature flag)
+
+The report designer is an **operator-level Beta feature flag**,
+`ITAMBOX_FEATURE_REPORT_DESIGNER`, **disabled by default**. The curated report
+catalogue is Stable and unaffected by the flag; the flag gates the designer
+authoring surfaces and scheduled delivery:
+
+- **Disabled (default):** designer and schedule navigation is hidden and their
+  routes return 404. Delivery is skipped for non-grandfathered templates. The
+  migration-managed bounded grandfathered set may continue rendering and
+  delivery while those templates remain **read-only**. Saved schedules are
+  retained, never deleted.
+- **Enabled:** authoring, editing, and scheduled delivery work normally.
+
+Before changing the flag, verify:
+
+1. The deployment is on a reviewed revision and the [backup and
+   restore](../operations/backup-restore.md) process is tested — templates and schedules are
+   database rows.
+2. The background worker (`qcluster`) is healthy: scheduled delivery depends on
+   a running worker, and a stopped worker silently skips runs.
+3. A flag change takes effect on application restart; test the change in a
+   non-production deployment first.
+4. The [capability contract](../operations/capability-maturity.md) grade: the designer is
+   **Beta** — its column, filter, and grouping model is expected to change, and
+   saved templates may need to be rebuilt after an upgrade.
+
 ### Creating a Report Template
 
 Navigate to **Extras → Report Templates** and click **Add**:

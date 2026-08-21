@@ -20,8 +20,11 @@ Plugins are Experimental, trusted, in-process code. This runbook is for a deploy
    plugin's routes, middleware, API router, GraphQL contribution, menu, and
    template hooks are absent.
 
-The failure boundaries and their security rationale are listed in [Optional
-Capability Fallbacks](https://github.com/itambox/design-docs/blob/main/development/capability-fallbacks.md).
+This intentional degradation is a supported operator contract: a plugin that
+cannot be imported, is malformed, fails compatibility checks, or raises during
+startup is disabled without blocking Stable core, and the diagnostic reports
+the failure class and stage. Removing the plugin from `ITAMBOX_PLUGINS` and
+restarting restores the previous state.
 
 ## Disable or remove a plugin
 

@@ -86,7 +86,7 @@ class TestBannerTemplate:
         )
         assert "Beta" in html
         assert "Webhook" in html
-        assert "capability-registry" in html or "development/" in html
+        assert "capability-maturity" in html
 
     def test_the_contract_link_is_excluded_from_boost(self):
         """The docs link points outside the app shell: it must never be a

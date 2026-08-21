@@ -64,4 +64,7 @@ are process-wide rather than tenant-specific, so this seam remains Beta.
 
 The legacy `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name remains a deprecated 1.x
 fallback and emits a startup warning. If neither name is configured, requests
-remain pending and the Asset Request procurement seam is inactive.
+remain pending and the Asset Request procurement seam is inactive. Invalid
+JSON, unknown keys, or boolean/negative thresholds do **not** fail soft: they
+abort startup with a configuration error, so verify the JSON syntax before
+deploying a change.

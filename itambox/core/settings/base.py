@@ -528,11 +528,11 @@ _configure_test_environment(_TEST_INVOCATION)
 # prune_changelog.py), scheduled to run daily via the Schedule CoreConfig
 # registers in core/apps.py. Each is a day count measured against the row's
 # own timestamp (ObjectChange.time / AlertLog.created_at /
-# Notification.created_at / django-q2 Failure.stopped). 0 means unlimited:
-# that data class is never pruned by age. The changelog also supports a
-# per-tenant override -- Tenant.changelog_retention_days (organization/
-# models.py; null = use this setting, 0 = unlimited/legal hold) -- which
-# always wins over this setting for that tenant's rows.
+# Notification.created_at / Event.timestamp / django-q2 Failure.stopped). 0
+# means unlimited: that data class is never pruned by age. The changelog also
+# supports a per-tenant override -- Tenant.changelog_retention_days
+# (organization/models.py; null = use this setting, 0 = unlimited/legal hold)
+# -- which always wins over this setting for that tenant's rows.
 ITAMBOX_CHANGELOG_RETENTION_DAYS = int(os.environ.get("ITAMBOX_CHANGELOG_RETENTION_DAYS", "365"))
 ITAMBOX_ALERTLOG_RETENTION_DAYS = int(os.environ.get("ITAMBOX_ALERTLOG_RETENTION_DAYS", "180"))
 ITAMBOX_NOTIFICATION_RETENTION_DAYS = int(os.environ.get("ITAMBOX_NOTIFICATION_RETENTION_DAYS", "90"))

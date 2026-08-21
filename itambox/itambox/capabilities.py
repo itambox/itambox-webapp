@@ -34,9 +34,13 @@ import re
 
 from django.apps import apps
 
-INTERNAL_DEVELOPMENT_DOCS_BASE_URL = "https://github.com/itambox/design-docs/blob/main/development"
-CAPABILITY_REGISTRY_DOC_URL = f"{INTERNAL_DEVELOPMENT_DOCS_BASE_URL}/capability-registry.md"
-RESOURCE_GRANT_SECURITY_DOC_URL = f"{INTERNAL_DEVELOPMENT_DOCS_BASE_URL}/tenant-resource-grant-security.md"
+# Public operator-facing documentation for the capability contract. These are
+# relative MkDocs paths beneath the compiled docs site; the banner template
+# renders them against {% static 'docs/' %}. They must remain end-user,
+# operator-, integration-, or security-facing pages -- never contributor or
+# maintainer documentation.
+CAPABILITY_REGISTRY_DOC_URL = "operations/capability-maturity.md"
+RESOURCE_GRANT_SECURITY_DOC_URL = "operations/resource-grant-expiry.md"
 
 STABLE = "stable"
 BETA = "beta"
