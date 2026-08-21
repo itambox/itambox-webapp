@@ -69,7 +69,7 @@ class _ArchiveWriter:
 class Command(BaseCommand):
     help = (
         "Prune aged changelog/operational-data rows: ObjectChange, AlertLog, "
-        "Notification, and failed django-q2 tasks -- each against its own "
+        "Notification, Event, and failed django-q2 tasks -- each against its own "
         "ITAMBOX_*_RETENTION_DAYS setting (0 = unlimited/never pruned)."
     )
 

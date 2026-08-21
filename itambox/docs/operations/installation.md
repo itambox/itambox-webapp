@@ -27,17 +27,17 @@ The Compose file forces `ITAMBOX_ENV=prod` for the application and worker. Edit 
 
 ### 2.1 Critical production variables
 
-These must be set before the application can start in production:
+These must be reviewed before the application can be operated safely in production. The classification distinguishes **startup-blocking** (the app refuses to start), **strongly recommended with a fallback** (the app starts, but on a development-grade default you must not keep), and **required for external access**.
 
-| Variable | Production requirement |
+| Variable | Classification |
 |---|---|
-| `ITAMBOX_SECRET_KEY` | Long random Django secret; production refuses the development fallback |
-| `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Dedicated comma-separated Fernet keyring; the first key encrypts and all listed keys decrypt |
-| `ITAMBOX_API_TOKEN_PEPPERS` | JSON object mapping numeric rotation IDs to dedicated secrets of at least 50 characters |
-| `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD` | PostgreSQL database credentials |
-| `ITAMBOX_ALLOWED_HOSTS` | External host names plus `127.0.0.1` for the container health probe |
-| `ITAMBOX_CSRF_TRUSTED_ORIGINS` | Scheme-qualified external HTTPS origins |
-| `ITAMBOX_EMAIL_*` | Working SMTP settings for resets, alerts, and reports |
+| `ITAMBOX_SECRET_KEY` | Required — startup-blocking. Production refuses the development fallback key. |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Strongly recommended — fallback-supported. When unset, the key is derived from `ITAMBOX_SECRET_KEY` (development convenience; rotating the secret then makes encrypted fields unreadable). |
+| `ITAMBOX_API_TOKEN_PEPPERS` | Strongly recommended — fallback-supported. When unset or malformed, token hashing falls back to a `SECRET_KEY`-derived pepper. |
+| `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD` | Required for external access — PostgreSQL credentials; change the shipped defaults. |
+| `ITAMBOX_ALLOWED_HOSTS` | Required for external access — unrecognized hosts receive HTTP 400. |
+| `ITAMBOX_CSRF_TRUSTED_ORIGINS` | Required for cross-origin POST/PUT/PATCH/DELETE (scheme-qualified external origins). |
+| `ITAMBOX_EMAIL_*` | Working SMTP settings for resets, alerts, and reports. Failure degrades notification delivery, not startup. |
 
 Generate independent values rather than reusing one secret:
 
@@ -91,8 +91,8 @@ The tables below document every variable available in `.env.example`, organized 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `ITAMBOX_SECRET_KEY` ⚠️ | **Required** (prod) | *(insecure dev fallback)* | Django secret key used for cryptographic signing (sessions, CSRF tokens, password reset tokens). Generate with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. The app refuses to boot in production with the fallback. |
-| `ITAMBOX_FIELD_ENCRYPTION_KEYS` ⚠️ | **Required** (prod) | *(derived from SECRET_KEY)* | Valid Fernet key(s) that encrypt sensitive stored values (license keys, SMTP passwords, webhook secrets). Comma-separated; the **first** key encrypts, **all** keys decrypt. Append the old key when rotating. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Arbitrary passphrases are rejected; follow the legacy-passphrase upgrade procedure above before deploying over an older installation. When unset, the key is derived from `ITAMBOX_SECRET_KEY` as a dev convenience — then rotating `SECRET_KEY` makes every encrypted field **permanently unreadable**. Set a dedicated value and back it up with every database dump. |
-| `ITAMBOX_API_TOKEN_PEPPERS` ⚠️ | **Required** (prod) | *(derived from SECRET_KEY)* | Server-side peppers used to HMAC-hash API tokens at rest. Must be a JSON object whose numeric keys are rotation IDs and values are dedicated secrets of ≥50 characters. The highest ID peppers new tokens; older IDs keep existing tokens valid. Example: `{"1":"replace-with-a-random-secret-of-at-least-50-characters"}`. When unset or malformed, falls back to a `SECRET_KEY`-derived pepper — acceptable for development only. |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` ⚠️ | **Strongly recommended** (prod) | *(derived from SECRET_KEY)* | Valid Fernet key(s) that encrypt sensitive stored values (license keys, SMTP passwords, webhook secrets). Comma-separated; the **first** key encrypts, **all** keys decrypt. Append the old key when rotating. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Arbitrary passphrases are rejected; follow the legacy-passphrase upgrade procedure above before deploying over an older installation. When unset, the key is derived from `ITAMBOX_SECRET_KEY` as a dev convenience — then rotating `SECRET_KEY` makes every encrypted field **permanently unreadable**. Set a dedicated value and back it up with every database dump. |
+| `ITAMBOX_API_TOKEN_PEPPERS` ⚠️ | **Strongly recommended** (prod) | *(derived from SECRET_KEY)* | Server-side peppers used to HMAC-hash API tokens at rest. Must be a JSON object whose numeric keys are rotation IDs and values are dedicated secrets of ≥50 characters. The highest ID peppers new tokens; older IDs keep existing tokens valid. Example: `{"1":"replace-with-a-random-secret-of-at-least-50-characters"}`. When unset or malformed, falls back to a `SECRET_KEY`-derived pepper — acceptable for development only; the application starts either way, so this is not startup-blocking. |
 | `ITAMBOX_ALLOWED_HOSTS` ⚠️ | **Required** (prod) | `localhost,127.0.0.1` | Comma-separated host/domain names the site may serve. Django's `ALLOWED_HOSTS` — requests with unrecognized `Host` headers receive HTTP 400. Always include `127.0.0.1` so the container health probe works. |
 | `ITAMBOX_CSRF_TRUSTED_ORIGINS` ⚠️ | **Required** (prod) | *(empty)* | Origins trusted for cross-origin POST/PUT/PATCH/DELETE. Scheme-qualified (e.g. `https://itam.example.com`). Must match the external URL users access the site through. |
 
@@ -132,7 +132,7 @@ PostgreSQL 15+ is required. The `btree_gist` extension must be available (see [s
 | `ITAMBOX_DB_HOST` ⚠️ | **Required** (prod) | `localhost` | PostgreSQL host. Use the Compose service name (`db`) when using the bundled PostgreSQL container. |
 | `ITAMBOX_DB_PORT` | Optional | `5432` | PostgreSQL port. |
 | `ITAMBOX_DB_CONN_MAX_AGE` | Optional | `300` | Persistent connection lifetime in seconds. `0` closes connections after each request (not recommended for production). |
-| `ITAMBOX_DB_SSLMODE` | Recommended | `prefer` | PostgreSQL SSL mode. Valid values: `prefer`, `require`, `verify-full`. Use `require` or `verify-full` for managed/remote PostgreSQL. |
+| `ITAMBOX_DB_SSLMODE` | Recommended | `require` when unset; `.env.example` ships `prefer` | PostgreSQL SSL mode. Valid values: `prefer`, `require`, `verify-full`. Use `require` or `verify-full` for managed/remote PostgreSQL; `prefer` (the shipped template default) is only suitable for a trusted private database network. |
 
 ---
 
@@ -172,10 +172,11 @@ In development, the app uses a local SMTP catcher automatically. In production, 
 |---|---|---|---|
 | `ITAMBOX_DEFAULT_CURRENCY` | Optional | `EUR` | ISO 4217 currency code used as the fallback for money display. Each tenant can override its own currency. |
 | `ITAMBOX_PAGINATOR_COUNT_CAP` | Optional | `100000` | Upper bound for list-view row counters. Below the cap, exact counts are shown; above, displays `100000+`. Set to `0` for unbounded `COUNT(*)` on every list view — slow at large scale. |
-| `ITAMBOX_SESSION_COOKIE_AGE` | Optional | `1209600` (2 weeks) | Interactive session lifetime in seconds. After this duration of inactivity, users must re-authenticate. |
+| `ITAMBOX_SESSION_COOKIE_AGE` | Optional | `28800` (8 h) in prod; `1209600` (2 weeks) in dev | Interactive session lifetime in seconds. Production overrides the Django default to 8 hours; after this duration of inactivity, users must re-authenticate. |
 | `ITAMBOX_DOCS_ROOT` | Optional | `BASE_DIR/docs` | Filesystem path to compiled MkDocs output. Override to serve documentation from an external volume. |
 | `ITAMBOX_REQUIRE_MFA` | Optional | `True` (in prod) | Enforce TOTP multi-factor authentication for local-password logins by superusers and owner-admin roles. SSO/LDAP/SAML/OIDC logins always delegate MFA to the identity provider regardless of this setting. Set to `False` to disable for local accounts. |
 | `ITAMBOX_FEATURE_REPORT_DESIGNER` | Optional | `False` | Enable the Beta report-template designer and scheduled reports. When `False`, designer and schedule navigation is hidden, their routes return 404, and delivery is skipped for non-grandfathered report templates. The migration-managed bounded grandfathered set may continue rendering and delivery; saved schedules are retained and those templates are read-only. The curated catalogue is unaffected. |
+| `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` | Optional | *(unset)* | Opt-in auto-approval for low-risk asset requests. JSON object with the supported keys `accessory` and/or `consumable`; each value is a non-negative integer quantity threshold. Example: `{"accessory": 3, "consumable": 5}`. When unset, no request is auto-approved and requests remain pending for manual approval. Invalid JSON, unknown keys, or non-integer/bool thresholds abort startup with an error; the deprecated `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name is still accepted through 1.x with a startup deprecation warning and is removed in ITAMbox 2.0. |
 
 ---
 
@@ -197,6 +198,7 @@ Set to `0` to keep records forever. See [data-retention.md](data-retention.md) f
 | `ITAMBOX_CHANGELOG_RETENTION_DAYS` | Optional | `365` | Days to retain object change history (`ObjectChange` records). Pruned daily by the `prune_changelog` scheduled task. Per-tenant overrides and legal holds are set via `Tenant.changelog_retention_days`. |
 | `ITAMBOX_ALERTLOG_RETENTION_DAYS` | Optional | `180` | Days to retain alert log entries. |
 | `ITAMBOX_NOTIFICATION_RETENTION_DAYS` | Optional | `90` | Days to retain notification history. |
+| `ITAMBOX_EVENT_RETENTION_DAYS` | Optional | `0` (retain indefinitely) | Days to retain event-stream rows (`extras.Event`). The event stream is **not** pruned by default; pruning starts only when a positive value is configured. |
 | `ITAMBOX_QTASK_FAILED_RETENTION_DAYS` | Optional | `90` | Days to retain failed background task records. |
 
 ---
