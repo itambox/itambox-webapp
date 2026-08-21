@@ -97,13 +97,17 @@ accessory and consumable requests at or below their quantity thresholds are
 Set `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` to a JSON object such as
 `{"accessory": 3, "consumable": 5}`. Omit a category or set its threshold to
 `0` to prevent positive-quantity requests in that category from being approved
-automatically. The legacy `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name is accepted
-through 1.x with a startup deprecation warning.
+automatically. When the setting itself is unset (the default), **no request is
+auto-approved and all requests remain pending** for manual approval. The legacy
+`REQUISITION_AUTO_APPROVAL_THRESHOLDS` name is accepted through 1.x with a
+startup deprecation warning.
 
 > [!IMPORTANT]
-> Auto-approval is **advisory only** — it reserves no stock. Capacity is
-> enforced at fulfilment time, so a generous threshold can only over-approve,
-> never over-allocate.
+> Configuration errors do not fail soft. Invalid JSON, unsupported keys, or
+> boolean/negative thresholds abort startup — validate the JSON syntax before
+> deploying a change. Auto-approval is **advisory only** — it reserves no
+> stock. Capacity is enforced at fulfilment time, so a generous threshold can
+> only over-approve, never over-allocate.
 
 ### Bulk Requests (Group Requests)
 
