@@ -170,7 +170,6 @@ class PublicLinkPolicyTest(unittest.TestCase):
                 if not target or target.startswith(("http://", "https://", "mailto:", "tel:")):
                     continue
                 resolved = (path.parent / target).resolve()
-                expected = REPOSITORY_ROOT / "itambox" / "docs"
                 # Links may reach out of docs/ (e.g. root README assets, CHANGELOG).
                 try:
                     resolved.relative_to(REPOSITORY_ROOT)
@@ -192,7 +191,9 @@ class OperatorConfigurationPolicyTest(unittest.TestCase):
                 continue
             sources.append(path.read_text(encoding="utf-8"))
         corpus = "\n".join(sources)
-        missing = [setting for setting in CONTRACT_SETTINGS if f'"{setting}"' not in corpus]
+        # Plain concatenation (not an f-string): the double quotes are the
+        # literal search needle — settings appear as "NAME" in source.
+        missing = [setting for setting in CONTRACT_SETTINGS if '"' + setting + '"' not in corpus]
         self.assertEqual(missing, [], "contract settings not found in core sources")
 
     def test_settings_are_in_the_canonical_configuration_reference(self):
