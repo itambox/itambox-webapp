@@ -33,8 +33,9 @@ class FakeClassList {
 }
 
 class FakeElement {
-  constructor(id) {
+  constructor(id, tagName = id) {
     this.id = id;
+    this.tagName = String(tagName).toUpperCase();
     this.classList = new FakeClassList();
     this.dataset = {};
     this.listeners = new Map();
@@ -42,8 +43,32 @@ class FakeElement {
     this.attributes = new Map();
     this.textContent = '';
     this.value = '';
+    this.type = '';
+    this.name = '';
+    this.placeholder = '';
+    this.hidden = false;
     this.disabled = false;
     this.parentNode = null;
+    this._className = '';
+    this._innerHTML = '';
+  }
+
+  set className(value) {
+    this._className = value;
+    this.classList.values = new Set(String(value).split(/\s+/).filter(Boolean));
+  }
+
+  get className() {
+    return this._className;
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = value;
+    if (value === '') this.children = [];
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
   }
 
   addEventListener(name, handler) {
@@ -64,6 +89,14 @@ class FakeElement {
     return child;
   }
 
+  insertBefore(child, reference) {
+    const index = this.children.indexOf(reference);
+    if (index === -1) return this.appendChild(child);
+    this.children.splice(index, 0, child);
+    child.parentNode = this;
+    return child;
+  }
+
   removeChild(child) {
     this.children = this.children.filter((candidate) => candidate !== child);
   }
@@ -72,15 +105,62 @@ class FakeElement {
     this.parentNode?.removeChild(this);
   }
 
-  querySelector() {
+  matches(selector) {
+    if (selector.startsWith('#')) return this.id === selector.slice(1);
+    if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
+
+    const tagAndClass = selector.match(/^([a-z]+)\.([\w-]+)$/i);
+    if (tagAndClass) {
+      return this.tagName === tagAndClass[1].toUpperCase() && this.classList.contains(tagAndClass[2]);
+    }
+
+    const attribute = selector.match(/^([a-z]+)?\[(name|type|data-field|data-pk)="([^"]+)"\]$/i);
+    if (attribute) {
+      const [, tag, name, value] = attribute;
+      if (tag && this.tagName !== tag.toUpperCase()) return false;
+      if (name === 'data-field') return this.dataset.field === value;
+      if (name === 'data-pk') return this.dataset.pk === value;
+      return this[name] === value;
+    }
+
+    return this.tagName === selector.toUpperCase();
+  }
+
+  querySelector(selector) {
+    for (const child of this.children) {
+      if (child.matches(selector)) return child;
+      const match = child.querySelector(selector);
+      if (match) return match;
+    }
     return null;
   }
 
-  querySelectorAll() {
-    return [];
+  querySelectorAll(selector) {
+    const matches = [];
+    for (const child of this.children) {
+      if (child.matches(selector)) matches.push(child);
+      matches.push(...child.querySelectorAll(selector));
+    }
+    return matches;
   }
 
-  focus() {}
+  closest(selector) {
+    let candidate = this;
+    while (candidate) {
+      if (candidate.matches(selector)) return candidate;
+      candidate = candidate.parentNode;
+    }
+    return null;
+  }
+
+  dispatchEvent(event) {
+    this.listeners.get(event.type)?.(event);
+    return true;
+  }
+
+  focus() {
+    this.focused = true;
+  }
 }
 
 class FakeDocument {
@@ -92,15 +172,15 @@ class FakeDocument {
   }
 
   getElementById(id) {
-    return this.elements.get(id) || null;
+    return this.elements.get(id) || this.body.querySelector(`#${id}`);
   }
 
   createElement(tagName) {
-    return new FakeElement(tagName);
+    return new FakeElement('', tagName);
   }
 
-  querySelectorAll() {
-    return [];
+  querySelectorAll(selector) {
+    return this.body.querySelectorAll(selector);
   }
 
   addEventListener(name, handler) {
@@ -115,7 +195,41 @@ class FakeDocument {
   }
 }
 
-function makeDom(kind) {
+function makeTemplateClone(kind) {
+  const tr = new FakeElement('', 'tr');
+  tr.className = kind === 'audit' ? 'audit-basket-row' : 'scan-basket-row';
+
+  const inputFields = new Set(['pk', 'proceeds']);
+  const fields = [
+    'pk',
+    'asset_tag',
+    'label',
+    'status',
+    'assigned_to',
+    'book_value',
+    'proceeds',
+    'warning',
+    'classification',
+    'observed_location',
+  ];
+  for (const field of fields) {
+    const element = new FakeElement('', inputFields.has(field) ? 'input' : 'span');
+    element.dataset.field = field;
+    if (field === 'pk') {
+      element.type = 'hidden';
+      element.name = 'pk';
+    }
+    if (field === 'warning') element.hidden = true;
+    tr.appendChild(element);
+  }
+
+  const remove = new FakeElement('', 'button');
+  remove.className = kind === 'audit' ? 'audit-basket-remove' : 'scan-basket-remove';
+  tr.appendChild(remove);
+  return { querySelector: (selector) => tr.matches(selector) ? tr : tr.querySelector(selector) };
+}
+
+function makeDom(kind, options = {}) {
   const rootId = kind === 'audit' ? 'audit-basket-root' : 'scan-basket-root';
   const inputId = kind === 'audit' ? 'audit-basket-input' : 'scan-basket-input';
   const formId = kind === 'audit' ? 'audit-basket-form' : 'scan-basket-form';
@@ -152,19 +266,57 @@ function makeDom(kind) {
     torchId,
     errorId,
     'django-messages',
+    'scan-seed-data',
   ];
   const document = new FakeDocument(ids);
   const root = document.getElementById(rootId);
   root.dataset.validateUrl = '/validate';
   root.dataset.resolveUrl = '/resolve';
-  root.dataset.mode = 'checkin';
+  root.dataset.mode = options.mode || 'checkin';
   document.getElementById(templateId).content = {
-    cloneNode: () => ({
-      querySelector: (selector) => selector === 'tr' ? new FakeElement('tr') : null,
-    }),
+    cloneNode: () => makeTemplateClone(kind),
   };
-  document.getElementById(formId).submit = () => {};
-  return { document, ids: { inputId, modalId, openId, readerId, feedbackId, overlayCountId, closeId } };
+  const form = document.getElementById(formId);
+  form.submitCount = 0;
+  form.submit = () => { form.submitCount += 1; };
+
+  let tenantField = null;
+  const tenantType = options.tenantType ?? (kind === 'bulk' ? 'select' : null);
+  if (tenantType) {
+    tenantField = new FakeElement('tenant-field', tenantType === 'select' ? 'select' : 'input');
+    tenantField.type = tenantType;
+    tenantField.name = 'tenant';
+    tenantField.value = options.tenantValue || '';
+    tenantField.tomselect = options.tomSelect;
+    document.elements.set(tenantField.id, tenantField);
+    form.appendChild(tenantField);
+  }
+
+  root.appendChild(document.getElementById(inputId));
+  root.appendChild(form);
+  form.appendChild(document.getElementById(rowsId));
+  document.body.appendChild(root);
+
+  const seed = document.getElementById('scan-seed-data');
+  seed.textContent = options.seeds ? JSON.stringify(options.seeds) : '';
+
+  return {
+    document,
+    tenantField,
+    ids: {
+      rootId,
+      inputId,
+      formId,
+      rowsId,
+      countId,
+      modalId,
+      openId,
+      readerId,
+      feedbackId,
+      overlayCountId,
+      closeId,
+    },
+  };
 }
 
 function installGlobals(dom, readers, fetchImpl) {
@@ -222,6 +374,231 @@ async function flush() {
   await new Promise((resolvePromise) => setImmediate(resolvePromise));
 }
 
+function bulkPayload(pk, tenantId, overrides = {}) {
+  return {
+    found: true,
+    pk,
+    tenant_id: tenantId,
+    label: `Bulk asset ${pk}`,
+    asset_tag: `BULK-${pk}`,
+    serial: `SERIAL-${pk}`,
+    status: 'deployed',
+    assigned_to: '',
+    book_value: null,
+    eligible: true,
+    warning: null,
+    ...overrides,
+  };
+}
+
+async function loadBulkDom(options = {}, fetchImpl = () => Promise.resolve({ ok: false, status: 404 })) {
+  const dom = makeDom('bulk', options);
+  const readers = [];
+  installGlobals(dom, readers, fetchImpl);
+  const bundleUrl = pathToFileURL(resolve(itamboxRoot, 'tests/js/.build/scan-basket.mjs')).href;
+  await import(`${bundleUrl}?tenant-baskets=${Date.now()}-${Math.random()}`);
+  dom.document.dispatchEvent({ type: 'DOMContentLoaded' });
+  return { dom, readers };
+}
+
+function visiblePks(dom) {
+  return dom.document.getElementById(dom.ids.rowsId).children.map((row) => Number(row.dataset.pk));
+}
+
+test('initial target selection keeps same-tenant seeded rows, counts, and pk inputs', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  try {
+    const seeds = [bulkPayload(1, 11), bulkPayload(2, 11)];
+    const { dom } = await loadBulkDom({ seeds });
+    const rows = dom.document.getElementById(dom.ids.rowsId);
+    const count = dom.document.getElementById(dom.ids.countId);
+
+    assert.equal(dom.tenantField.value, '11');
+    assert.equal(count.textContent, '2');
+    assert.deepEqual(visiblePks(dom), [1, 2]);
+    assert.deepEqual(rows.children.map((row) => row.dataset.tenantId), ['11', '11']);
+
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+
+    assert.equal(count.textContent, '2');
+    assert.deepEqual(visiblePks(dom), [1, 2]);
+    assert.deepEqual(rows.querySelectorAll('input[name="pk"]').map((input) => input.value), ['1', '2']);
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('single-tenant seeds preselect and render without user interaction', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  try {
+    const tomSelectValues = [];
+    const { dom } = await loadBulkDom({
+      seeds: [bulkPayload(7, 22), bulkPayload(8, 22)],
+      tomSelect: { setValue: (value) => tomSelectValues.push(value) },
+    });
+
+    assert.equal(dom.tenantField.value, '22');
+    assert.deepEqual(tomSelectValues, ['22']);
+    assert.equal(dom.document.getElementById(dom.ids.countId).textContent, '2');
+    assert.deepEqual(visiblePks(dom), [7, 8]);
+    assert.equal(dom.document.getElementById('scan-basket-submit').disabled, false);
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('mixed-tenant seeds switch losslessly and report rows kept aside', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  try {
+    const seeds = [bulkPayload(1, 11), bulkPayload(2, 11), bulkPayload(3, 22)];
+    const { dom } = await loadBulkDom({ seeds });
+    const root = dom.document.getElementById(dom.ids.rootId);
+    const notice = root.querySelector('#scan-basket-kept-aside');
+
+    assert.equal(dom.tenantField.value, '');
+    assert.deepEqual(visiblePks(dom), []);
+    assert.equal(notice.hidden, true);
+
+    dom.tenantField.value = '11';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    assert.deepEqual(visiblePks(dom), [1, 2]);
+    assert.equal(notice.hidden, false);
+    assert.match(notice.textContent, /^1 assets from another tenant/);
+
+    dom.tenantField.value = '22';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    assert.deepEqual(visiblePks(dom), [3]);
+    assert.match(notice.textContent, /^2 assets from another tenant/);
+
+    dom.tenantField.value = '11';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    assert.deepEqual(visiblePks(dom), [1, 2]);
+
+    dom.document.getElementById('scan-basket-clear').listeners.get('click')();
+    assert.deepEqual(visiblePks(dom), []);
+    assert.equal(notice.hidden, false);
+    dom.tenantField.value = '22';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    assert.deepEqual(visiblePks(dom), [3]);
+    assert.equal(notice.hidden, true);
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('dispose proceeds survive tenant switches', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  try {
+    const seeds = [bulkPayload(1, 11, { book_value: '250.00' }), bulkPayload(2, 22)];
+    const { dom } = await loadBulkDom({ mode: 'dispose', seeds });
+
+    dom.tenantField.value = '11';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    const firstProceeds = dom.document
+      .getElementById(dom.ids.rowsId)
+      .querySelector('input[data-field="proceeds"]');
+    firstProceeds.value = '125.50';
+    firstProceeds.dispatchEvent({ type: 'input', target: firstProceeds });
+
+    dom.tenantField.value = '22';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    dom.tenantField.value = '11';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+
+    const restoredProceeds = dom.document
+      .getElementById(dom.ids.rowsId)
+      .querySelector('input[data-field="proceeds"]');
+    assert.equal(restoredProceeds.name, 'proceeds_1');
+    assert.equal(restoredProceeds.value, '125.50');
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('concrete hidden-tenant scope scans immediately and never clears on change', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  const pending = [];
+  try {
+    const { dom } = await loadBulkDom(
+      { tenantType: 'hidden', tenantValue: '11' },
+      (url) => new Promise((resolvePromise) => pending.push({ url, resolvePromise })),
+    );
+    const input = dom.document.getElementById(dom.ids.inputId);
+
+    assert.equal(input.disabled, false);
+    assert.equal(dom.tenantField.listeners.has('change'), false);
+    input.value = 'CONCRETE-ASSET';
+    input.listeners.get('keydown')({ key: 'Enter', preventDefault() {} });
+    assert.equal(pending.length, 1);
+    assert.match(pending[0].url, /[?&]tenant=11/);
+
+    pending[0].resolvePromise({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(bulkPayload(9, 11)),
+    });
+    await flush();
+    assert.deepEqual(visiblePks(dom), [9]);
+
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    assert.deepEqual(visiblePks(dom), [9]);
+    assert.equal(dom.document.getElementById(dom.ids.countId).textContent, '1');
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('aggregate submit and scanner controls require a selected tenant and active rows', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  const pending = [];
+  try {
+    const { dom } = await loadBulkDom(
+      {},
+      (url) => new Promise((resolvePromise) => pending.push({ url, resolvePromise })),
+    );
+    const input = dom.document.getElementById(dom.ids.inputId);
+    const camera = dom.document.getElementById(dom.ids.openId);
+    const submit = dom.document.getElementById('scan-basket-submit');
+    const clear = dom.document.getElementById('scan-basket-clear');
+
+    assert.equal(input.disabled, true);
+    assert.equal(camera.disabled, true);
+    assert.equal(submit.disabled, true);
+
+    input.value = 'BLOCKED-WITHOUT-TENANT';
+    input.listeners.get('keydown')({ key: 'Enter', preventDefault() {} });
+    assert.equal(pending.length, 0);
+
+    dom.tenantField.value = '11';
+    dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+    assert.equal(input.disabled, false);
+    assert.equal(camera.disabled, false);
+    assert.equal(submit.disabled, true);
+
+    input.value = 'ACTIVE-TENANT-ASSET';
+    input.listeners.get('keydown')({ key: 'Enter', preventDefault() {} });
+    pending[0].resolvePromise({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(bulkPayload(10, 11)),
+    });
+    await flush();
+    assert.equal(submit.disabled, false);
+
+    clear.listeners.get('click')();
+    assert.equal(submit.disabled, true);
+    assert.deepEqual(visiblePks(dom), []);
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
 test('real bulk and audit entrypoints keep manual input ungated and camera feedback in the overlay', async () => {
   const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
   const bundleNames = { audit: 'audit-basket.mjs', bulk: 'scan-basket.mjs' };
@@ -235,6 +612,10 @@ test('real bulk and audit entrypoints keep manual input ungated and camera feedb
       const bundleUrl = pathToFileURL(resolve(itamboxRoot, `tests/js/.build/${bundleNames[kind]}`)).href;
       await import(`${bundleUrl}?runtime=${kind}-${Date.now()}`);
       dom.document.dispatchEvent({ type: 'DOMContentLoaded' });
+      if (kind === 'bulk') {
+        dom.tenantField.value = '11';
+        dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+      }
 
       const input = dom.document.getElementById(dom.ids.inputId);
       const openButton = dom.document.getElementById(dom.ids.openId);
@@ -298,6 +679,7 @@ test('stale camera promise settlement cannot mutate the replacement bulk or audi
       status: 'deployed',
       assigned_to: '',
       book_value: null,
+      tenant_id: 11,
       eligible: true,
       warning: null,
     };
@@ -311,6 +693,10 @@ test('stale camera promise settlement cannot mutate the replacement bulk or audi
       const bundleUrl = pathToFileURL(resolve(itamboxRoot, `tests/js/.build/${bundleNames[kind]}`)).href;
       await import(`${bundleUrl}?stale-session=${kind}-${Date.now()}`);
       dom.document.dispatchEvent({ type: 'DOMContentLoaded' });
+      if (kind === 'bulk') {
+        dom.tenantField.value = '11';
+        dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+      }
 
       const openButton = dom.document.getElementById(dom.ids.openId);
       const closeButton = dom.document.getElementById(dom.ids.closeId);

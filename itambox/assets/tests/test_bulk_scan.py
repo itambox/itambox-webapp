@@ -8,12 +8,14 @@ Covers:
 """
 
 import json
+import re
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.messages import get_messages
 from django.db import OperationalError
 from django.test import TestCase
 from django.urls import reverse
@@ -80,6 +82,13 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
         # Not checked out → eligible False with a warning (still resolvable).
         self.assertFalse(data["eligible"])
         self.assertTrue(data["warning"])
+
+    def test_payload_carries_tenant_identity(self):
+        """Every resolved row names its own tenant so the basket can key state by it."""
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.get(self.url, {"code": "RES-001", "mode": "checkin"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.content)["tenant_id"], self.tenant.pk)
 
     def test_no_accessible_tenants_fails_closed(self):
         """A member with no accessible tenants gets the fail-closed 404."""
@@ -646,6 +655,12 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "PG-001")
 
+    def test_seed_payloads_carry_tenant_identity(self):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.get(reverse("assets:asset_bulk_checkin_scan"), {"pk": self.asset.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual([p["tenant_id"] for p in resp.context["seed_payloads"]], [self.tenant.pk])
+
     def test_page_permission_denied(self):
         self.tenant_role.permissions = ["assets.view_asset"]
         self.tenant_role.save()
@@ -1093,3 +1108,240 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         resp = self.client.get(reverse("assets:asset_bulk_checkout_scan"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "scan-basket-root")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-Job batch validation — every submitted PK must belong to the bound tenant
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class BulkSubmissionBatchTests(TenantTestMixin, TestCase):
+    """A mismatched or tampered batch is rejected before a Job exists.
+
+    The background tasks keep their own per-item tenant checks; these tests
+    assert the request-time boundary, so a rejected batch leaves no Job row,
+    no enqueue and no cross-tenant mutation.
+    """
+
+    def setUp(self):
+        self.setup_tenant_context(slug="batch")
+        self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-bt")
+        self.tenant_role.permissions = [
+            "assets.view_asset",
+            "assets.change_asset",
+            "assets.add_assetdisposal",
+        ]
+        self.tenant_role.save()
+
+        # A second accessible tenant, plus one the user can never reach.
+        self.other = Tenant.objects.create(name="Batch Other", slug="batch-other")
+        other_role = self.tenant_role.__class__.objects.create(
+            tenant=self.other,
+            name="Batch Other Role",
+            permissions=["assets.view_asset", "assets.change_asset", "assets.add_assetdisposal"],
+        )
+        self.grant(self.tenant_user, self.other, other_role)
+        self.foreign = Tenant.objects.create(name="Batch Foreign", slug="batch-foreign")
+
+        self.set_active_tenant(self.tenant, self.tenant_membership)
+        self.asset_a = self._asset("BT-A", self.tenant)
+        self.asset_b = self._asset("BT-B", self.other)
+        self.asset_foreign = self._asset("BT-F", self.foreign)
+        self.holder = AssetHolder.objects.create(
+            first_name="Bat", last_name="Ch", upn="bt@x.io", email="bt@x.io", tenant=self.tenant
+        )
+
+    def _asset(self, tag, tenant):
+        return Asset.objects.create(
+            name=tag,
+            asset_tag=tag,
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=tenant,
+        )
+
+    def _login_all_accessible(self):
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+    def _assert_sanitized_rejection(self, resp, rejected_count, *hidden_assets):
+        """The error carries counts only — never a foreign asset's label or PK."""
+        stored = [str(m) for m in get_messages(resp.wsgi_request)]
+        self.assertEqual(len(stored), 1)
+        message = stored[0]
+        for asset in hidden_assets:
+            self.assertNotIn(asset.asset_tag, message)
+            self.assertNotIn(asset.name, message)
+        self.assertEqual(set(re.findall(r"\d+", message)), {str(rejected_count)})
+
+    # ── seed identity ──
+    def test_mixed_tenant_seed_entries_carry_their_own_tenant(self):
+        self._login_all_accessible()
+
+        resp = self.client.get(
+            reverse("assets:asset_bulk_checkin_scan"),
+            {"pk": [self.asset_a.pk, self.asset_b.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        seeded = {p["pk"]: p["tenant_id"] for p in resp.context["seed_payloads"]}
+        self.assertEqual(seeded, {self.asset_a.pk: self.tenant.pk, self.asset_b.pk: self.other.pk})
+
+    # ── valid batches keep today's behaviour ──
+    @patch("django_q.tasks.async_task")
+    def test_same_tenant_submit_still_enqueues(self, mock_async):
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset_a.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        job = Job.objects.get(name__contains="Bulk Check-in")
+        self.assertEqual(job.tenant_id, self.tenant.pk)
+        mock_async.assert_called_once()
+
+    # ── mixed-tenant batches ──
+    @patch("django_q.tasks.async_task")
+    def test_mixed_tenant_checkin_is_rejected_before_job(self, mock_async):
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset_a.pk, self.asset_b.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+        self._assert_sanitized_rejection(resp, 1, self.asset_b)
+
+    @patch("django_q.tasks.async_task")
+    def test_mixed_tenant_dispose_is_rejected_before_job(self, mock_async):
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_dispose"),
+            {
+                "tenant": self.tenant.pk,
+                "pk": [self.asset_a.pk, self.asset_b.pk],
+                "disposal_method": "recycle",
+                "disposal_date": "2026-08-20",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        self.assertFalse(AssetDisposal.all_objects.filter(asset=self.asset_b).exists())
+        mock_async.assert_not_called()
+        self._assert_sanitized_rejection(resp, 1, self.asset_b)
+
+    @patch("django_q.tasks.async_task")
+    def test_mixed_tenant_checkout_is_rejected_before_job(self, mock_async):
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkout"),
+            {
+                "tenant": self.tenant.pk,
+                "pk": [self.asset_a.pk, self.asset_b.pk],
+                "asset_holder": self.holder.pk,
+            },
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+        self._assert_sanitized_rejection(resp, 1, self.asset_b)
+
+    # ── unreachable, unknown, malformed and deleted PKs ──
+    @patch("django_q.tasks.async_task")
+    def test_inaccessible_tenant_pk_is_rejected(self, mock_async):
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset_a.pk, self.asset_foreign.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+        self._assert_sanitized_rejection(resp, 1, self.asset_foreign)
+
+    @patch("django_q.tasks.async_task")
+    def test_unknown_pk_is_rejected(self, mock_async):
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset_a.pk, self.asset_foreign.pk + 10_000]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+
+    @patch("django_q.tasks.async_task")
+    def test_non_numeric_pk_is_rejected(self, mock_async):
+        """Garbage fails the same existence check instead of reaching the ORM."""
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset_a.pk, "not-a-pk"]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+
+    @patch("django_q.tasks.async_task")
+    def test_soft_deleted_pk_is_rejected(self, mock_async):
+        self.asset_a.delete()
+        self._login_all_accessible()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset_a.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertIsNotNone(Asset.all_objects.filter(pk=self.asset_a.pk).first())
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+
+    # ── concrete tenant scope stays server-authoritative ──
+    @patch("django_q.tasks.async_task")
+    def test_concrete_scope_ignores_tampered_hidden_tenant(self, mock_async):
+        """A posted foreign tenant id cannot rebind the Job away from the scope tenant."""
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.other.pk, "pk": [self.asset_a.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        job = Job.objects.get(name__contains="Bulk Check-in")
+        self.assertEqual(job.tenant_id, self.tenant.pk)
+        self.assertEqual(mock_async.call_args[0][4], self.tenant.pk)
+
+    @patch("django_q.tasks.async_task")
+    def test_concrete_scope_rejects_foreign_pk(self, mock_async):
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.other.pk, "pk": [self.asset_b.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+        mock_async.assert_not_called()
+        self._assert_sanitized_rejection(resp, 1, self.asset_b)

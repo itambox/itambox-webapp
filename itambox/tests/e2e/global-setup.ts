@@ -28,6 +28,36 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+async function saveAggregateOperatorState(browser: Browser, baseURL: string) {
+  const username = process.env.E2E_AGGREGATE_USERNAME;
+  const password = process.env.E2E_AGGREGATE_PASSWORD;
+  if (!username) {
+    console.log('  E2E_AGGREGATE_USERNAME not set — skipping aggregate operator storage state.');
+    return;
+  }
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseURL}/accounts/login/`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('input[name="username"]', { timeout: 10000 });
+    await page.fill('input[name="username"]', username);
+    await page.fill('input[name="password"]', password || '');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle' }),
+      page.click('button[type="submit"]'),
+    ]);
+    const errorEl = await page.$('.alert-danger, .errorlist, [data-testid="login-error"]');
+    if (errorEl) {
+      throw new Error(`Aggregate operator login failed for ${username} — check E2E_AGGREGATE_USERNAME / E2E_AGGREGATE_PASSWORD.`);
+    }
+    const storageStatePath = path.resolve(__dirname, 'aggregateStorageState.json');
+    await context.storageState({ path: storageStatePath });
+    console.log(`  E2E aggregate operator auth state saved → ${storageStatePath}`);
+  } finally {
+    await context.close();
+  }
+}
+
 async function globalSetup(config: FullConfig) {
   const baseURL = process.env.E2E_BASE_URL || 'http://localhost:8000';
   const username = requiredEnv('E2E_USERNAME');
@@ -56,6 +86,7 @@ async function globalSetup(config: FullConfig) {
     const storageStatePath = path.resolve(__dirname, 'storageState.json');
     await page.context().storageState({ path: storageStatePath });
     console.log(`  E2E auth state saved → ${storageStatePath}`);
+    await saveAggregateOperatorState(browser, baseURL);
   } catch (e) {
     const screenshotPath = path.resolve(__dirname, 'storageStateError.png');
     await page.screenshot({ path: screenshotPath, fullPage: true });

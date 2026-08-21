@@ -18,6 +18,7 @@ import { AssetScanner } from './scanner';
 interface ScanPayload {
   found: boolean;
   pk: number;
+  tenant_id: number;
   label: string;
   asset_tag: string;
   serial: string;
@@ -26,6 +27,11 @@ interface ScanPayload {
   book_value: string | null;
   eligible: boolean;
   warning: string | null;
+}
+
+interface BasketEntry {
+  payload: ScanPayload;
+  proceeds: string;
 }
 
 function beepOk(): void {
@@ -113,10 +119,73 @@ function initScanBasket(): void {
   const tenantRequired = !!tenantField && tenantField.type !== 'hidden';
   const cameraBtn = document.getElementById('basket-open-scanner-btn') as HTMLButtonElement | null;
 
-  const basket = new Set<number>();
+  const baskets = new Map<number, Map<number, BasketEntry>>();
+  let concreteTenantId = tenantRequired ? 0 : normalizeTenantId(tenantField?.value);
+
+  const keptAsideNotice = document.createElement('div');
+  keptAsideNotice.id = 'scan-basket-kept-aside';
+  keptAsideNotice.className = 'alert alert-info small mb-3 d-none';
+  keptAsideNotice.setAttribute('role', 'status');
+  keptAsideNotice.hidden = true;
+  root.insertBefore(keptAsideNotice, form);
+
+  function normalizeTenantId(value: unknown): number {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  }
+
+  function selectTenant(tenantId: number): void {
+    if (!tenantField) return;
+    const value = String(tenantId);
+    tenantField.value = value;
+    const tomSelect = (tenantField as HTMLSelectElement & {
+      tomselect?: { setValue: (selected: string) => void };
+    }).tomselect;
+    tomSelect?.setValue(value);
+  }
+
+  function activeTenantId(): number {
+    return tenantRequired ? normalizeTenantId(tenantField?.value) : concreteTenantId;
+  }
+
+  function basketFor(tenantId: number, create = false): Map<number, BasketEntry> | undefined {
+    let basket = baskets.get(tenantId);
+    if (!basket && create) {
+      basket = new Map<number, BasketEntry>();
+      baskets.set(tenantId, basket);
+    }
+    return basket;
+  }
+
+  function activeBasket(): Map<number, BasketEntry> | undefined {
+    const tenantId = activeTenantId();
+    if (tenantRequired && tenantId === 0) return undefined;
+    return basketFor(tenantId);
+  }
+
+  function updateKeptAsideNotice(): void {
+    const tenantId = activeTenantId();
+    let keptAsideCount = 0;
+    if (tenantRequired && tenantId !== 0) {
+      baskets.forEach((basket, basketTenantId) => {
+        if (basketTenantId !== tenantId) keptAsideCount += basket.size;
+      });
+    }
+
+    const visible = keptAsideCount > 0;
+    keptAsideNotice.hidden = !visible;
+    keptAsideNotice.classList.toggle('d-none', !visible);
+    keptAsideNotice.textContent = visible
+      ? interpolate(
+        gettext('%(count)s assets from another tenant are kept aside — switching the target tenant shows them.'),
+        { count: keptAsideCount },
+        true,
+      )
+      : '';
+  }
 
   function updateState(): void {
-    const count = basket.size;
+    const count = activeBasket()?.size || 0;
     if (countEl) countEl.textContent = String(count);
     const overlayCount = document.getElementById('basket-scanner-count');
     if (overlayCount) overlayCount.textContent = String(count);
@@ -129,6 +198,7 @@ function initScanBasket(): void {
     document.querySelectorAll<HTMLElement>('.scan-basket-confirm-count').forEach((el) => {
       el.textContent = String(count);
     });
+    updateKeptAsideNotice();
   }
 
   function flashRow(pk: number): void {
@@ -138,10 +208,12 @@ function initScanBasket(): void {
     setTimeout(() => existing.classList.remove('table-active'), 700);
   }
 
-  function renderRow(p: ScanPayload): void {
+  function renderRow(entry: BasketEntry): void {
+    const p = entry.payload;
     const frag = template!.content.cloneNode(true) as DocumentFragment;
     const tr = frag.querySelector('tr') as HTMLElement;
     tr.dataset.pk = String(p.pk);
+    tr.dataset.tenantId = String(normalizeTenantId(p.tenant_id));
 
     const set = (field: string, value: string) => {
       const el = tr.querySelector<HTMLElement>(`[data-field="${field}"]`);
@@ -160,6 +232,10 @@ function initScanBasket(): void {
     const proceeds = tr.querySelector<HTMLInputElement>('input[data-field="proceeds"]');
     if (proceeds) {
       proceeds.name = `proceeds_${p.pk}`;
+      proceeds.value = entry.proceeds;
+      proceeds.addEventListener('input', () => {
+        entry.proceeds = proceeds.value;
+      });
       // Book value is the depreciated accounting residual, NOT money received.
       // Show it only as a placeholder hint — never as the submitted value — so a
       // blank field correctly means "no proceeds" and dispose_asset() freezes the
@@ -175,6 +251,11 @@ function initScanBasket(): void {
     }
 
     tbody!.appendChild(tr);
+  }
+
+  function renderActiveBasket(): void {
+    tbody!.innerHTML = '';
+    activeBasket()?.forEach((entry) => renderRow(entry));
   }
 
   let cameraScanner: AssetScanner | null = null;
@@ -211,14 +292,18 @@ function initScanBasket(): void {
       .then((data: ScanPayload) => {
         if (!isCurrentCameraAction(sessionGeneration)) return;
         if (!data.found) throw new Error('not_found');
+        const tenantId = normalizeTenantId(data.tenant_id);
+        if (!tenantRequired && concreteTenantId === 0) concreteTenantId = tenantId;
+        const basket = basketFor(tenantId, true)!;
         if (basket.has(data.pk)) {
           beepFail();
           flashRow(data.pk);
           notify(interpolate(gettext('Already in basket: %(code)s'), { code: cleaned }, true), 'warn');
           return;
         }
-        basket.add(data.pk);
-        renderRow(data);
+        const entry = { payload: data, proceeds: '' };
+        basket.set(data.pk, entry);
+        if (tenantId === activeTenantId()) renderRow(entry);
         updateState();
         beepOk();
         notify(
@@ -253,10 +338,7 @@ function initScanBasket(): void {
 
   if (tenantField && tenantRequired) {
     tenantField.addEventListener('change', () => {
-      // Never carry assets scanned for a previous target tenant into a new
-      // tenant-bound batch.
-      basket.clear();
-      tbody.innerHTML = '';
+      renderActiveBasket();
       updateState();
       input?.focus();
     });
@@ -284,7 +366,8 @@ function initScanBasket(): void {
     const tr = btn.closest<HTMLElement>('tr.scan-basket-row');
     if (!tr) return;
     const pk = Number(tr.dataset.pk);
-    basket.delete(pk);
+    const tenantId = normalizeTenantId(tr.dataset.tenantId);
+    basketFor(tenantId)?.delete(pk);
     tr.remove();
     updateState();
   });
@@ -292,7 +375,7 @@ function initScanBasket(): void {
   // ── Clear all ──
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      basket.clear();
+      activeBasket()?.clear();
       tbody.innerHTML = '';
       updateState();
       if (input) input.focus();
@@ -303,7 +386,7 @@ function initScanBasket(): void {
   const confirmSubmit = document.getElementById('scan-basket-confirm-submit');
   if (confirmSubmit) {
     confirmSubmit.addEventListener('click', () => {
-      if (basket.size > 0) form.submit();
+      if ((activeBasket()?.size || 0) > 0) form.submit();
     });
   }
 
@@ -313,16 +396,27 @@ function initScanBasket(): void {
     try {
       const seeds = JSON.parse(seedEl.textContent) as ScanPayload[];
       seeds.forEach((p) => {
-        if (p && p.pk && !basket.has(p.pk)) {
-          basket.add(p.pk);
-          renderRow(p);
+        if (p && p.pk) {
+          const tenantId = normalizeTenantId(p.tenant_id);
+          const basket = basketFor(tenantId, true)!;
+          if (!basket.has(p.pk)) basket.set(p.pk, { payload: p, proceeds: '' });
         }
       });
+
+      const seededTenantIds = [...baskets.keys()];
+      if (seededTenantIds.length === 1 && seededTenantIds[0] !== 0) {
+        if (tenantRequired && tenantField && !tenantField.value) {
+          selectTenant(seededTenantIds[0]);
+        } else if (!tenantRequired && concreteTenantId === 0) {
+          concreteTenantId = seededTenantIds[0];
+        }
+      }
     } catch (_e) {
       // malformed seed data — ignore, start with an empty basket
     }
   }
 
+  renderActiveBasket();
   updateState();
   if (input) input.focus();
 }

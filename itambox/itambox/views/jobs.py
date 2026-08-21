@@ -16,6 +16,7 @@ from django.views.generic import View
 from core.managers import get_current_tenant
 from core.models import Job
 from core.tables import JobTable
+from core.tenant_scope import accessible_tenant_ids
 from itambox.views.generic import ObjectDetailView, ObjectListView
 
 logger = logging.getLogger(__name__)
@@ -25,14 +26,19 @@ def scoped_jobs(user):
     """
     Jobs visible to a user. Job has no tenant-scoping manager, so scope
     explicitly: superusers see everything (including system jobs without a
-    tenant); everyone else only sees the active tenant's jobs.
+    tenant); everyone else sees the active tenant's jobs — or, in the
+    aggregate "all accessible tenants" scope, every accessible tenant's jobs,
+    so a bulk job created there redirects to a page its creator can open.
     """
     if user.is_superuser:
         return Job.objects.all()
     tenant = get_current_tenant()
-    if tenant is None:
+    if tenant is not None:
+        return Job.objects.filter(tenant=tenant)
+    tenant_ids = accessible_tenant_ids(user)
+    if not tenant_ids:
         return Job.objects.none()
-    return Job.objects.filter(tenant=tenant)
+    return Job.objects.filter(tenant_id__in=tenant_ids)
 
 
 class JobListView(ObjectListView):
@@ -90,11 +96,22 @@ class JobCancelView(LoginRequiredMixin, View):
     """
 
     def post(self, request, pk):
-        if not request.user.has_perm("core.change_job"):
+        # In the aggregate scope the permission check is tenant-bound: the RBAC
+        # backend cannot resolve an object-less has_perm there, so resolve the
+        # job first and check against its tenant. Concrete scope keeps the
+        # original object-less check so view-only members still get the friendly
+        # redirect instead of a 404.
+        tenant = get_current_tenant()
+        if tenant is None:
+            job = get_object_or_404(scoped_jobs(request.user), pk=pk)
+            if not request.user.has_perm("core.change_job", obj=job.tenant):
+                messages.error(request, _("You do not have permission to cancel jobs."))
+                return redirect("job_list")
+        elif not request.user.has_perm("core.change_job"):
             messages.error(request, _("You do not have permission to cancel jobs."))
             return redirect("job_list")
-
-        job = get_object_or_404(scoped_jobs(request.user), pk=pk)
+        else:
+            job = get_object_or_404(scoped_jobs(request.user), pk=pk)
 
         if job.cancel(_("Cancelled by %(user)s before execution.") % {"user": request.user}):
             messages.success(request, _('Job "%(name)s" cancelled.') % {"name": job.name})
