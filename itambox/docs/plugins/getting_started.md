@@ -1,7 +1,25 @@
 # Getting Started with ITAMbox Plugins
 
-!!! warning "Status: Experimental"
-    Plugins are opt-in and trusted in-process Python code. They are not covered by the Stable 1.0 compatibility promise. Pin both ITAMbox and plugin revisions, and test each combination in a non-production environment before deployment.
+!!! warning "Trust model: plugins are trusted, unsandboxed application code"
+    Plugins are **Experimental**, opt-in, and run as **trusted, unsandboxed,
+    in-process Python/Django code** in the application process. Enabling a
+    plugin is equivalent to installing trusted application code: it can access
+    the application process, the database, stored secrets, and any network
+    reachable from the host. Only install plugins from sources you trust, and
+    pin both ITAMbox and the plugin revision together.
+
+    Compatibility must be checked **before** deployment: verify the plugin's
+    declared `min_version`/`max_version` and plugin API version against the
+    deployed ITAMbox revision, and test the combination in a non-production
+    environment first. Plugins are not covered by the Stable 1.0 compatibility
+    promise; Experimental interfaces may change in any release.
+
+    Installation, upgrade, disablement, and removal are **operator
+    responsibilities**: activation happens through `ITAMBOX_PLUGINS` (see the
+    [plugin removal and recovery runbook](../operations/plugin-runbook.md)).
+    Removal does **not** clean up automatically — a plugin's database tables,
+    Django `ContentType` rows, changelog rows, and configuration entries remain
+    after the package is removed from `ITAMBOX_PLUGINS`.
 
 ITAMbox has a bounded Experimental plugin system modeled after **NetBox**. The supported API is intentionally small; read the [API Reference](api_reference.md) before writing a plugin. Anything not listed there is private/unstable.
 

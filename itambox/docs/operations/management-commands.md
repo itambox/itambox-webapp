@@ -20,6 +20,41 @@ The command reference below shows the inner `python manage.py ...` portion for b
 
 ## Command Reference
 
+### `capabilities`
+
+Report every declared capability — its grade (Stable/Beta/Experimental),
+activation mode, **current** state, and the kind of source that decides it.
+This is the operator's answer to "is this thing on, and what would turn it
+on?". It never prints a configured value, and a failing probe is reported by
+exception *type* only.
+
+| | |
+|---|---|
+| **Usage** | `python manage.py capabilities [--format table\|json]` |
+| **Production-safe** | Yes (read-only registry inspection; no database writes) |
+| **When to use** | Verifying whether an optional capability is active, or diagnosing why a Beta/Experimental surface is missing or off. |
+
+**Options**
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--format` | `table` | Output format: `table` or `json`. |
+
+**Example**
+
+```text
+$ python manage.py capabilities
+CAPABILITY                          CLASS   MODE        STATE    SOURCE          VALUE
+reporting.designer                  beta    opt-in      inactive operator-flag   absent
+organization.resource_grants *      stable  always-on   active   always          present
+```
+
+A `*` marks security-critical capabilities, which cannot be deactivated.
+See [Capability Maturity](capability-maturity.md) for the public contract
+behind the grades.
+
+---
+
 ### `capture_recovery_evidence`
 
 Emit comparable, non-plaintext evidence for explicit synthetic recovery
