@@ -131,11 +131,11 @@ PLACEHOLDER_DIRECTIONS = frozenset({"tbd", "todo", "n/a", "na", "none", "unknown
 
 REPORT_ONLY_BANNER = "REPORT ONLY — NOT A PASS"
 
-# Documentation the gate holds to R-DOC1. MkDocs cannot see the repository-root
-# files -- ``docs_dir`` is ``itambox/docs`` -- which is exactly why two dead ADR
-# links survived in CONTRIBUTING.md indefinitely.
+# Documentation the gate holds to R-DOC1. The public tree only contains the
+# root maintainer docs listed here; the internal development prose lives in the
+# private itambox/design-docs repository and is not part of this link gate.
 LINKED_DOC_FILES = ("AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "DEVELOPMENT.md", "README.md", "SECURITY.md")
-LINKED_DOC_GLOBS = ("itambox/docs/development/*.md",)
+LINKED_DOC_GLOBS = ()
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 SKIPPED_LINK_PREFIXES = ("http://", "https://", "mailto:", "#", "tel:")
 

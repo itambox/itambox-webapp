@@ -1,13 +1,12 @@
 """The declared 1.0 external-contract policy and the source facts it binds to.
 
-ITAMbox publishes two documents for the 1.0 compatibility contract: the promise
-(`itambox/docs/development/compatibility-policy.md`) and the bounded inventory
-of what the promise applies to
-(`itambox/docs/development/external-contract-inventory.md`). A promise about a
-surface nobody enumerated is unfalsifiable, and an enumeration that drifts from
-source is worse than none -- so this module derives the surfaces from source and
-the gate in ``check_contract_policy.py`` compares them against what was
-published.
+The 1.0 compatibility contract has human-readable policy and inventory
+documents in the private ``itambox/design-docs`` repository. The public
+repository keeps the reviewed machine-readable projection in
+``scripts/contract_policy_manifest.json``. A promise about a surface nobody
+enumerated is unfalsifiable, and an enumeration that drifts from source is worse
+than none -- so this module derives the surfaces from source and the gate in
+``check_contract_policy.py`` compares them against that manifest.
 
 Three design choices make the result trustworthy rather than decorative:
 
@@ -30,25 +29,30 @@ Three design choices make the result trustworthy rather than decorative:
 
 This module deliberately does **not** re-check what the capability registry
 already proves. ``itambox/tests/test_capability_slices.py`` compares the live
-registry against ``docs/development/capability-registry.md``; that runs under
-Django and owns grade/activation/limitation drift. What is added here is the
-one thing the registry does not publish: the *contract class* each capability
-is sold under, and the exclusions attached to it.
+registry against the capability rows in the machine-readable manifest; that
+runs under Django and owns grade/activation/limitation drift. What is added
+here is the one thing the registry does not publish: the *contract class* each
+capability is sold under, and the exclusions attached to it.
 
-The gate never writes a tracked document. Publication is a reviewed edit.
+The gate never writes the manifest. Updating it is a reviewed edit alongside the human-readable private policy documents.
 """
 
 import argparse
 import ast
 import collections
+import json
 import re
 from pathlib import Path
 
 CONTRACT_POLICY_VERSION = 1
 
-POLICY_DOC = "itambox/docs/development/compatibility-policy.md"
-INVENTORY_DOC = "itambox/docs/development/external-contract-inventory.md"
-RESOURCE_GRANT_THREAT_DOC = "itambox/docs/development/tenant-resource-grant-security.md"
+# These are logical sections in the code-owned manifest, not paths to prose
+# documents. The reviewed human-readable versions live in the private
+# itambox/design-docs repository.
+MANIFEST_DOC = "scripts/contract_policy_manifest.json"
+POLICY_DOC = "policy"
+INVENTORY_DOC = "inventory"
+RESOURCE_GRANT_THREAT_DOC = "resource-grant"
 CHANGELOG_DOC = "CHANGELOG.md"
 
 #: The four classes every external surface is sold under. Closed vocabulary.
@@ -1089,51 +1093,51 @@ def anchored_tokens(text, anchor):
     return tuple(tokens)
 
 
-def _inventory_text(root):
-    return (Path(root) / INVENTORY_DOC).read_text(encoding="utf-8")
+def _manifest(root):
+    """Load the reviewed machine-readable contract manifest."""
+    return json.loads((Path(root) / MANIFEST_DOC).read_text(encoding="utf-8"))
 
 
 def documented_enum(root, name):
-    return anchored_tokens(_inventory_text(root), f"enum {name}")
+    values = _manifest(root).get("enums", {})
+    return tuple(values[name]) if name in values else None
 
 
 def documented_settings(root):
-    return anchored_tokens(_inventory_text(root), ANCHOR_SETTINGS) or ()
+    return tuple(_manifest(root).get("settings", ()))
 
 
 def documented_permissions(root):
-    return anchored_tokens(_inventory_text(root), ANCHOR_PERMISSIONS) or ()
+    return tuple(_manifest(root).get("permissions", ()))
 
 
 def documented_webhook_fields(root):
-    return anchored_tokens(_inventory_text(root), ANCHOR_WEBHOOK) or ()
+    return tuple(_manifest(root).get("webhook_fields", ()))
 
 
 def documented_scim_routes(root):
-    return anchored_tokens(_inventory_text(root), ANCHOR_SCIM) or ()
+    return tuple(_manifest(root).get("scim_routes", ()))
 
 
 def documented_ui_namespaces(root):
-    return anchored_tokens(_inventory_text(root), ANCHOR_UI_NAMESPACES) or ()
+    return tuple(_manifest(root).get("ui_namespaces", ()))
 
 
 def documented_entry_routes(root):
-    return anchored_tokens(_inventory_text(root), ANCHOR_ENTRY_ROUTES) or ()
+    return tuple(_manifest(root).get("entry_routes", ()))
 
 
 def documented_capabilities(root):
     """Capability rows: key -> (class, activation, scope, exclusions)."""
-    lines = _anchored_lines(_inventory_text(root), ANCHOR_CAPABILITIES)
-    rows = {}
-    for line in lines or []:
-        cells = _row_cells(line)
-        if len(cells) < 5:
-            continue
-        key = _code_span(cells[0])
-        contract_class = _code_span(cells[1])
-        if key and contract_class:
-            rows[key] = CapabilityRow(contract_class, cells[2], cells[3], cells[4])
-    return rows
+    return {
+        key: CapabilityRow(
+            row["contract_class"],
+            row["activation"],
+            row["scope"],
+            row["exclusions"],
+        )
+        for key, row in _manifest(root).get("capabilities", {}).items()
+    }
 
 
 # --------------------------------------------------------------------------
@@ -1444,19 +1448,43 @@ def forbidden_wording_in(text, relative):
 
 
 def forbidden_wording_sources(root):
-    """Everything the wording rule reads, keyed by how a finding names it.
+    """Everything the wording rule reads, keyed by manifest section.
 
-    Narrowing the rule to the two policy documents would leave the published
-    claim about its reach false, and would leave the two places a shortfall is
-    actually written down -- the release notes and a capability's declared
-    limitations -- unchecked.
+    The prose documents moved to the private repository, so the public gate
+    scans the same reviewed assertions from the code-owned manifest instead.
+    Release notes and capability limitations remain local source-controlled
+    surfaces and continue to be checked independently.
     """
     root = Path(root)
+    manifest = _manifest(root)
+    grouped = {POLICY_DOC: [], INVENTORY_DOC: [], RESOURCE_GRANT_THREAT_DOC: []}
+    for statement in manifest.get("required_statements", ()):
+        grouped.setdefault(statement["document"], []).append(statement["text"])
+    grouped[INVENTORY_DOC].append(
+        json.dumps(
+            {
+                key: manifest.get(key)
+                for key in (
+                    "enums",
+                    "settings",
+                    "capabilities",
+                    "permissions",
+                    "webhook_fields",
+                    "scim_routes",
+                    "ui_namespaces",
+                    "entry_routes",
+                )
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
     sources = {}
-    for relative in (POLICY_DOC, INVENTORY_DOC, RESOURCE_GRANT_THREAT_DOC, CHANGELOG_DOC):
-        path = root / relative
-        if path.is_file():
-            sources[relative] = path.read_text(encoding="utf-8")
+    for section, texts in grouped.items():
+        sources[section] = "\n".join(texts)
+    changelog = root / CHANGELOG_DOC
+    if changelog.is_file():
+        sources[CHANGELOG_DOC] = changelog.read_text(encoding="utf-8")
     for relative, capability in _capability_declarations(root):
         if capability.limitations:
             sources[f"{relative}: {capability.key} limitations"] = " ".join(capability.limitations)
@@ -1476,15 +1504,21 @@ def check_forbidden_wording(root):
 
 
 def _documents(root):
-    texts = {}
-    missing = []
-    for relative in (POLICY_DOC, INVENTORY_DOC, RESOURCE_GRANT_THREAT_DOC):
-        path = Path(root) / relative
-        if path.is_file():
-            texts[relative] = path.read_text(encoding="utf-8")
-        else:
-            missing.append(Finding("C-DOC3", f"{relative} is missing; the 1.0 contract has no published record"))
-    return texts, tuple(missing)
+    path = Path(root) / MANIFEST_DOC
+    if not path.is_file():
+        return {}, (Finding("C-DOC3", f"{MANIFEST_DOC} is missing; the 1.0 contract has no reviewed record"),)
+    try:
+        manifest = _manifest(root)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return {}, (Finding("C-DOC3", f"{MANIFEST_DOC} is invalid: {exc}"),)
+    if manifest.get("schema_version") != 1 or manifest.get("contract_policy_version") != CONTRACT_POLICY_VERSION:
+        return {}, (Finding("C-DOC3", f"{MANIFEST_DOC} has an unsupported schema or contract-policy version"),)
+    grouped = {POLICY_DOC: [], INVENTORY_DOC: [], RESOURCE_GRANT_THREAT_DOC: []}
+    for statement in manifest.get("required_statements", ()):
+        if not isinstance(statement, dict) or not isinstance(statement.get("text"), str):
+            return {}, (Finding("C-DOC3", f"{MANIFEST_DOC} contains an invalid required statement"),)
+        grouped.setdefault(statement.get("document"), []).append(statement["text"])
+    return {section: "\n".join(texts) for section, texts in grouped.items()}, ()
 
 
 def check_all(root):

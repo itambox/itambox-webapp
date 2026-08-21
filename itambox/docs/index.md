@@ -59,4 +59,4 @@ stateDiagram-v2
 Every list, detail, and editing view in ITAMbox features an embedded help icon (`mdi-help-circle`) on the breadcrumb header. Clicking it opens a context-specific static page explaining that specific model's fields, business logic rules, and import/export layouts.
 
 ### Module Maturity
-Modules marked ***(Beta)*** are functional and in active use, but their data model, API shape, or feature set may change between revisions. See the [Module Maturity](development/module-maturity.md) page for the current grade definitions.
+Modules marked ***(Beta)*** are functional and in active use, but their data model, API shape, or feature set may change between revisions. Maintainer-only grade definitions live in the private [Module Maturity](https://github.com/itambox/design-docs/blob/main/development/module-maturity.md) document.

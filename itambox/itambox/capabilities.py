@@ -9,8 +9,8 @@ That blindness is the whole design. The registry stores dotted strings and
 opaque callables the domain hands it, and resolves neither at registration
 time, so ``itambox.capabilities`` imports no application, no model, and no
 presentation code. The architecture gate classifies it as ``framework``, where
-naming a domain application is a hard error -- see
-``docs/development/adr-0001-architecture-boundaries-and-layering.md``.
+naming a domain application is a hard error -- see the private
+``itambox/design-docs`` repository for the architecture policy.
 
 Three rules make the declarations trustworthy rather than decorative:
 
@@ -33,6 +33,10 @@ import importlib.util
 import re
 
 from django.apps import apps
+
+INTERNAL_DEVELOPMENT_DOCS_BASE_URL = "https://github.com/itambox/design-docs/blob/main/development"
+CAPABILITY_REGISTRY_DOC_URL = f"{INTERNAL_DEVELOPMENT_DOCS_BASE_URL}/capability-registry.md"
+RESOURCE_GRANT_SECURITY_DOC_URL = f"{INTERNAL_DEVELOPMENT_DOCS_BASE_URL}/tenant-resource-grant-security.md"
 
 STABLE = "stable"
 BETA = "beta"

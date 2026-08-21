@@ -9,11 +9,11 @@ Run from the repository root::
 ``--list`` prints the surfaces the gate derives so a reviewer can see what the
 inventory is being compared against; it checks nothing and always exits 0.
 
-There is deliberately **no write mode**. Both published documents are reviewed
-prose with tables a human maintains; generating them at run time would turn the
+There is deliberately **no write mode**. The manifest is a reviewed,
+machine-readable contract surface; generating it at run time would turn the
 contract into a mirror of whatever the code happens to say this week, which is
-the opposite of a promise. When this gate fails, the fix is either to restore
-the surface or to edit the document -- both of which are review events.
+the opposite of a promise. The human-readable policy documents live in the
+private ``itambox/design-docs`` repository.
 
 The gate imports no Django and touches no database, so it runs on a bare
 interpreter alongside the other repository gate suites.
@@ -66,9 +66,8 @@ def main(argv=None):
     for finding in findings:
         print(f"  {finding.rule} {finding.detail}")
     print(
-        "\nRestore the surface, or publish the change in "
-        "itambox/docs/development/external-contract-inventory.md and "
-        "itambox/docs/development/compatibility-policy.md. This gate never edits either document.\n"
+        "\nUpdate the reviewed surface in scripts/contract_policy_manifest.json "
+        "and the corresponding private design document. This gate never edits either surface.\n"
     )
     return 1
 

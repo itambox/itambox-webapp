@@ -84,7 +84,7 @@ dev = [
     # triple below is part of the typing policy fingerprint recorded in
     # scripts/typing_checked_modules.json. The `compatible-mypy` extras keep the
     # stubs and the checker resolvable as one set rather than three independent
-    # pins that drift apart. See itambox/docs/development/typing-policy.md.
+    # pins that drift apart. See the private design-docs typing-policy.md.
     "mypy==2.3.0",
     "django-stubs[compatible-mypy]==6.0.7",
     "djangorestframework-stubs[compatible-mypy]==3.17.1",
@@ -244,7 +244,7 @@ disallow_untyped_decorators = false
 # current annotation coverage it would pull the entire first-party callee
 # closure of every checked module into scope. It is a named later ratchet step,
 # taken once the checked set has enough typed callees (see
-# itambox/docs/development/typing-policy.md).
+# the private design-docs typing-policy.md).
 #
 # `redundant-expr` is deliberately NOT enabled. Its judgement is made against
 # mypy's inferred type, which for a parser reading untrusted JSON is narrower

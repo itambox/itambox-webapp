@@ -15,7 +15,7 @@ still fails, so it can never mask a partial implementation.
 ``ServiceWorldMixin`` builds the provider/customer topology every suite shares and
 owns :meth:`ServiceWorldMixin.assert_writes_nothing`, the context manager the
 security cases use. Per
-``itambox/docs/development/security-test-expectations.md`` a rejection is only
+the private design-docs security-test-expectations.md a rejection is only
 proved by the state afterwards, so the fingerprint compares full row tuples —
 not counts — for ``Membership``, ``RoleGrant``, ``RoleGrantScope``, ``User`` and
 ``ObjectChange``. Counts alone would pass an in-place mutation.
@@ -268,7 +268,7 @@ class ServiceWorldMixin:
 
         Rejecting is half the contract; the other half is that nothing was
         persisted before the rejection. Both halves are required by
-        ``docs/development/security-test-expectations.md``.
+        the private design-docs security-test-expectations.md.
         """
         before = state_fingerprint()
         yield

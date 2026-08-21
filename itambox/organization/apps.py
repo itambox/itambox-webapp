@@ -1,7 +1,16 @@
 from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
-from itambox.capabilities import ALWAYS_ON, CONTRACT_VERSION, SOURCE_ALWAYS, STABLE, Capability, registry
+from itambox.capabilities import (
+    ALWAYS_ON,
+    CAPABILITY_REGISTRY_DOC_URL,
+    CONTRACT_VERSION,
+    RESOURCE_GRANT_SECURITY_DOC_URL,
+    SOURCE_ALWAYS,
+    STABLE,
+    Capability,
+    registry,
+)
 
 
 class OrganizationConfig(AppConfig):
@@ -72,7 +81,7 @@ class OrganizationConfig(AppConfig):
                 activation_probe=None,
                 activation_source=SOURCE_ALWAYS,
                 owns=("organization.RoleGrant",),
-                docs_url="development/capability-registry.md",
+                docs_url=CAPABILITY_REGISTRY_DOC_URL,
                 limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
@@ -90,7 +99,7 @@ class OrganizationConfig(AppConfig):
                     "organization.TenantResourceGrantExpiryRun",
                     "organization.TenantResourceGrantExpiryRevocation",
                 ),
-                docs_url="development/tenant-resource-grant-security.md",
+                docs_url=RESOURCE_GRANT_SECURITY_DOC_URL,
                 limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),

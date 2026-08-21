@@ -29,7 +29,7 @@ Experimental capabilities are announced but deliberately cannot be dismissed.
           </ul>
         {% endif %}
         <a class="small"
-           href="{% static 'docs/' %}{{ capability_notice.docs_url|cut:'.md' }}.html"
+           {% if capability_notice.docs_url|slice:":4" == "http" %} href="{{ capability_notice.docs_url }}" {% else %} href="{% static 'docs/' %}{{ capability_notice.docs_url|cut:'.md' }}.html" {% endif %}
            hx-boost="false">{% translate "Read the capability contract" %}</a>
       </div>
     </div>

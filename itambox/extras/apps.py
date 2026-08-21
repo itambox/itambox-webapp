@@ -4,6 +4,7 @@ from core.features import object_enabled_probe, report_designer_probe
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
+    CAPABILITY_REGISTRY_DOC_URL,
     CONTRACT_VERSION,
     ENABLED,
     OPT_IN,
@@ -16,7 +17,7 @@ from itambox.capabilities import (
     registry,
 )
 
-DOCS = "development/capability-registry.md"
+DOCS = CAPABILITY_REGISTRY_DOC_URL
 
 
 def _scheduled_reports_probe():

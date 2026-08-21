@@ -80,7 +80,7 @@ EXCLUDE_ALSO_PATTERNS = (
 # Differential target for changed production code. A changed executable line
 # counts as covered only when it was executed *and* is not the origin of an
 # untaken branch -- a half-taken conditional on new code is exactly the case
-# line coverage flatters (see docs/development/test-coverage-policy.md).
+# line coverage flatters (see the private design-docs test-coverage-policy.md).
 DIFF_COVERAGE_TARGET = 85.0
 
 # Changed files that the Django pytest run structurally cannot measure. Each

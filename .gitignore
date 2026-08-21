@@ -79,7 +79,7 @@ node_modules/
 
 # mypy incremental cache. The gate writes it under the repository root so there
 # is one ignored location rather than one per working directory; nothing in it
-# is a source artifact (see itambox/docs/development/typing-policy.md).
+# is a source artifact (see the private design-docs typing policy).
 .mypy_cache/
 
 # Generated OpenAPI gate output. The reviewed snapshot (`itambox/schema.yaml`)

@@ -123,7 +123,7 @@ make coverage-diff   # differential coverage of the branch against origin/main
 | Differential | `scripts/check_diff_coverage.py` | 85% of the executable lines a change touches must be covered — executed **and** not the origin of an untaken branch. An unmeasured changed production file fails closed. |
 | Run certification | `scripts/check_test_report.py` | No failures, no errors, no skipped tests (`MAX_SKIPPED_TESTS = 0`), and no shrink below `scripts/suite_baseline.json`. Durations are published, never gated. |
 
-The measurement policy is declared once in `scripts/coverage_policy.py` and mirrored in `pyproject.toml`; the gates refuse to run when the two disagree, so an `omit` entry cannot be added silently. pytest-xdist stays disabled — the complete serial suite is the correctness source of truth until #21 proves safe parallel execution. Full policy: `itambox/docs/development/test-coverage-policy.md`; what boundary tests must assert: `itambox/docs/development/security-test-expectations.md`.
+The measurement policy is declared once in `scripts/coverage_policy.py` and mirrored in `pyproject.toml`; the gates refuse to run when the two disagree, so an `omit` entry cannot be added silently. pytest-xdist stays disabled — the complete serial suite is the correctness source of truth until #21 proves safe parallel execution. Full policy: `https://github.com/itambox/design-docs/blob/main/development/test-coverage-policy.md`; what boundary tests must assert: `https://github.com/itambox/design-docs/blob/main/development/security-test-expectations.md`.
 
 ### Frontend
 ```bash
@@ -251,9 +251,9 @@ representation at any severity and cannot be written even by
 first. `--report-only` is a triage inventory, prints `REPORT ONLY -- NOT A PASS`,
 and must never be wired into CI. The gate refuses to run outside canonical
 Python 3.12 and scans `itambox/` only. Full policy:
-[architecture-policy.md](itambox/docs/development/architecture-policy.md); the
+[architecture-policy.md](https://github.com/itambox/design-docs/blob/main/development/architecture-policy.md); the
 layer definitions and the matrix:
-[adr-0001-architecture-boundaries-and-layering.md](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md).
+[adr-0001-architecture-boundaries-and-layering.md](https://github.com/itambox/design-docs/blob/main/development/adr-0001-architecture-boundaries-and-layering.md).
 
 ### Published 1.0 contract (AST policy gate)
 ```bash
@@ -268,9 +268,9 @@ uv run --locked --only-group dev python scripts/check_contract_policy.py --list
 uv run --locked --only-group dev python -m unittest scripts.tests.test_contract_policy
 ```
 The 1.x compatibility promise
-([compatibility-policy.md](itambox/docs/development/compatibility-policy.md)) and
+([compatibility-policy.md](https://github.com/itambox/design-docs/blob/main/development/compatibility-policy.md)) and
 the bounded enumeration it applies to
-([external-contract-inventory.md](itambox/docs/development/external-contract-inventory.md))
+([external-contract-inventory.md](https://github.com/itambox/design-docs/blob/main/development/external-contract-inventory.md))
 are checked against source rather than kept in step by hand. The gate derives
 persisted choice values, `ITAMBOX_*` settings reads, capability declarations and
 their limitation text, custom permission codenames, the webhook envelope and its
@@ -347,7 +347,7 @@ A justified inline import is annotated in place as `# inline import: <category>:
 from itambox.middleware import get_current_user
 ```
 
-`scripts/check_local_imports.py` enforces this as a blocking, AST-based gate (see "Lint: local imports" above). The full policy — grammar, scope, ratchet semantics, and how to pay down baselined debt — is in [python-import-policy.md](itambox/docs/development/python-import-policy.md).
+`scripts/check_local_imports.py` enforces this as a blocking, AST-based gate (see "Lint: local imports" above). The full policy — grammar, scope, ratchet semantics, and how to pay down baselined debt — is in [python-import-policy.md](https://github.com/itambox/design-docs/blob/main/development/python-import-policy.md).
 
 ## Architecture: layers and dependency direction
 

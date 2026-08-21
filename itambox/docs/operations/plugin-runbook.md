@@ -21,7 +21,7 @@ Plugins are Experimental, trusted, in-process code. This runbook is for a deploy
    template hooks are absent.
 
 The failure boundaries and their security rationale are listed in [Optional
-Capability Fallbacks](../development/capability-fallbacks.md).
+Capability Fallbacks](https://github.com/itambox/design-docs/blob/main/development/capability-fallbacks.md).
 
 ## Disable or remove a plugin
 

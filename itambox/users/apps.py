@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from itambox.capabilities import (
     BETA,
+    CAPABILITY_REGISTRY_DOC_URL,
     CONTRACT_VERSION,
     OPT_IN,
     SOURCE_OBJECT_ENABLED,
@@ -74,7 +75,7 @@ class UsersConfig(AppConfig):
                 activation_probe=scim_credential_probe,
                 activation_source=SOURCE_OBJECT_ENABLED,
                 owns=("users.api.scim",),
-                docs_url="development/capability-registry.md",
+                docs_url=CAPABILITY_REGISTRY_DOC_URL,
                 limitations=(
                     "Spec compliance gaps remain: PATCH semantics and filtering are partial.",
                     "Tenant endpoints provision Users and expose Groups read-only; "

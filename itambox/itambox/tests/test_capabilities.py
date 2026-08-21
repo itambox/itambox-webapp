@@ -15,6 +15,7 @@ from itambox.capabilities import (
     ACTIVATION_SOURCES,
     ALWAYS_ON,
     BETA,
+    CAPABILITY_REGISTRY_DOC_URL,
     ENABLED,
     EXPERIMENTAL,
     MATURITIES,
@@ -45,7 +46,7 @@ def make_capability(**overrides):
         "activation_source": SOURCE_ALWAYS,
         "activation_probe": None,
         "owns": ("extras.Tag",),
-        "docs_url": "development/capability-registry.md",
+        "docs_url": CAPABILITY_REGISTRY_DOC_URL,
         "limitations": (),
         "contract_version": 1,
     }
