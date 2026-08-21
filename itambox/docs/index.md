@@ -33,8 +33,8 @@ Extend ITAMbox with custom fields, alert rules, webhooks, event-driven automatio
 ### Users & Authentication
 Manage Django user accounts, API tokens, role-based access control (RBAC), tenant memberships, and SSO integrations (LDAP, SAML, OIDC). SCIM 2.0 provisioning is available for identity-provider-driven user lifecycle management ***(Beta)***.
 
-### Plugins ***(Beta)***
-Extend ITAMbox with custom Django apps — add models, REST/GraphQL endpoints, sidebar menus, and template injections without modifying core code. The plugin system follows the NetBox plugin model.
+### Plugins ***(Experimental)***
+Extend ITAMbox with custom Django apps — add models, REST/GraphQL endpoints, sidebar menus, and template injections without modifying core code. The plugin system follows the NetBox plugin model and is opt-in through `ITAMBOX_PLUGINS`; plugins run as trusted, unsandboxed in-process code (see the [plugin guide](plugins/getting_started.md)).
 
 ---
 
@@ -59,4 +59,4 @@ stateDiagram-v2
 Every list, detail, and editing view in ITAMbox features an embedded help icon (`mdi-help-circle`) on the breadcrumb header. Clicking it opens a context-specific static page explaining that specific model's fields, business logic rules, and import/export layouts.
 
 ### Module Maturity
-Modules marked ***(Beta)*** are functional and in active use, but their data model, API shape, or feature set may change between revisions. Maintainer-only grade definitions live in the private [Module Maturity](https://github.com/itambox/design-docs/blob/main/development/module-maturity.md) document.
+Capabilities marked ***(Beta)*** are functional and in active use, but their data model, API shape, or feature set may change between revisions. The public grades — Stable, Beta, Experimental — and the activation modes of every capability are defined in the [Capability Maturity](operations/capability-maturity.md) guide.

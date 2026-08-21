@@ -91,11 +91,11 @@ REST/OpenAPI, scoped GraphQL, SCIM, identity-provider integrations, imports, exp
 ITAMbox is licensed under Apache 2.0 and designed to run on infrastructure you control. Your deployment, data, integrations, retention policies, and upgrade decisions remain under your administration.
 
 > [!IMPORTANT]
-> This repository is pre-release. `1.0.0-beta.1` is current version metadata for the public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability registry](https://github.com/itambox/design-docs/blob/main/development/capability-registry.md) before relying on pre-release functionality.
+> This repository is pre-release. `1.0.0-beta.1` is current version metadata for the public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability maturity guide](itambox/docs/operations/capability-maturity.md) before relying on pre-release functionality.
 
 The Beta report-template designer is opt-in. Set `ITAMBOX_FEATURE_REPORT_DESIGNER=True` before enabling authoring or scheduled delivery; with the flag disabled, designer and schedule surfaces remain closed, delivery is skipped for non-grandfathered templates, and the migration-managed grandfathered set may continue rendering and delivery while grandfathered templates remain read-only. Saved schedules and the curated catalogue are preserved.
 
-Maturity is declared per capability rather than per module. The [capability registry](https://github.com/itambox/design-docs/blob/main/development/capability-registry.md) is authoritative for activation mode, stability, and known limitations; the [module maturity guide](https://github.com/itambox/design-docs/blob/main/development/module-maturity.md) provides a shorter overview. Tenant Resource Grants are a Stable, security-critical capability with a dedicated [threat model](https://github.com/itambox/design-docs/blob/main/development/tenant-resource-grant-security.md). SCIM is Beta, and the plugin system is Experimental.
+Maturity is declared per capability rather than per module — see the [capability maturity guide](itambox/docs/operations/capability-maturity.md) for the public grades, activation modes, and known limitations. Tenant Resource Grants are a Stable, security-critical capability whose expiry and recovery behavior is documented in the [resource grant expiry runbook](itambox/docs/operations/resource-grant-expiry.md). SCIM is Beta, and the plugin system is Experimental.
 
 ## Try the live demo
 
@@ -114,7 +114,7 @@ A public demo is available at [demo.itambox.dev](https://demo.itambox.dev). It c
 - **Plan recoverability:** read [backup and restore](itambox/docs/operations/backup-restore.md) before storing important data.
 - **Prepare an upgrade:** follow the [upgrade guide](itambox/docs/operations/upgrades.md) and test against a copy of your own data.
 - **Run from source or contribute:** begin with [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md).
-- **Evaluate maturity:** review the [capability registry](https://github.com/itambox/design-docs/blob/main/development/capability-registry.md).
+- **Evaluate maturity:** read the [capability maturity guide](itambox/docs/operations/capability-maturity.md).
 
 > [!NOTE]
 > ITAMbox currently supports deployment from a repository checkout or a locally built container image. It does not yet publish a Python package or prebuilt container image.
@@ -168,8 +168,7 @@ Useful starting points:
 - [SCIM provisioning](itambox/docs/integration/scim.md)
 - [REST and GraphQL integration](itambox/docs/integration/developer_guide.md)
 - [Plugin development](itambox/docs/plugins/getting_started.md)
-- [Capability registry](https://github.com/itambox/design-docs/blob/main/development/capability-registry.md)
-- [Module maturity](https://github.com/itambox/design-docs/blob/main/development/module-maturity.md)
+- [Capability maturity](itambox/docs/operations/capability-maturity.md)
 
 ## Get involved
 

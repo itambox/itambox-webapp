@@ -9,9 +9,7 @@ This page is normative. A symbol, attribute, module, or hook not listed here is 
 
 Only deployment operators activate plugins by placing an importable package name in `settings.PLUGINS` (normally through the comma-separated `ITAMBOX_PLUGINS` environment variable). Per-plugin values belong in `settings.PLUGINS_CONFIG` and are deep-merged with `default_settings`.
 
-A plugin that cannot be imported, is malformed, fails compatibility checks, or raises during startup is disabled. ITAMbox continues starting and publishes a diagnostic; the failed plugin contributes no middleware, URL, REST router, GraphQL schema, menu, or template hook.
-
-The safety boundary and test matrix for this intentional degradation are documented in the private [Optional Capability Fallbacks](https://github.com/itambox/design-docs/blob/main/development/capability-fallbacks.md) document.
+A plugin that cannot be imported, is malformed, fails compatibility checks, or raises during startup is disabled. ITAMbox continues starting and publishes a diagnostic; the failed plugin contributes no middleware, URL, REST router, GraphQL schema, menu, or template hook. This intentional degradation is a supported operator contract — see the [plugin removal and recovery runbook](../operations/plugin-runbook.md) for the operational response.
 
 ## `PluginConfig`
 
