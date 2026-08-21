@@ -96,11 +96,22 @@ class JobCancelView(LoginRequiredMixin, View):
     """
 
     def post(self, request, pk):
-        if not request.user.has_perm("core.change_job"):
+        # In the aggregate scope the permission check is tenant-bound: the RBAC
+        # backend cannot resolve an object-less has_perm there, so resolve the
+        # job first and check against its tenant. Concrete scope keeps the
+        # original object-less check so view-only members still get the friendly
+        # redirect instead of a 404.
+        tenant = get_current_tenant()
+        if tenant is None:
+            job = get_object_or_404(scoped_jobs(request.user), pk=pk)
+            if not request.user.has_perm("core.change_job", obj=job.tenant):
+                messages.error(request, _("You do not have permission to cancel jobs."))
+                return redirect("job_list")
+        elif not request.user.has_perm("core.change_job"):
             messages.error(request, _("You do not have permission to cancel jobs."))
             return redirect("job_list")
-
-        job = get_object_or_404(scoped_jobs(request.user), pk=pk)
+        else:
+            job = get_object_or_404(scoped_jobs(request.user), pk=pk)
 
         if job.cancel(_("Cancelled by %(user)s before execution.") % {"user": request.user}):
             messages.success(request, _('Job "%(name)s" cancelled.') % {"name": job.name})
