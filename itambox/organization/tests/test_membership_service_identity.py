@@ -6,7 +6,7 @@ independently of ``MembershipForm``: the service takes an actor and model
 instances, so the boundary holds for a directly-built form, a tampered POST, and
 any future API caller alike.
 
-Per ``docs/development/security-test-expectations.md`` every boundary case
+Per the private design-docs security-test-expectations.md every boundary case
 asserts BOTH the rejection and that nothing was written.
 """
 

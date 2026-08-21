@@ -5,7 +5,7 @@ no form, no widget queryset, no ``cleaned_data``. That is the point of the
 extraction — the boundary has to hold for a tampered POST, a directly-built
 form, and any future API caller alike.
 
-Per ``docs/development/security-test-expectations.md`` each rejection asserts
+Per the private design-docs security-test-expectations.md each rejection asserts
 BOTH the typed refusal AND that nothing was written.
 """
 

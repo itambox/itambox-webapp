@@ -8,7 +8,7 @@ form widgets/querysets".
 
 The matrix rows referenced in the class docstrings are §5 of the issue #86 design
 (`A1`–`A15`) and the invariants are §2 (`INV-1`…`INV-16`). Per
-``itambox/docs/development/security-test-expectations.md`` every rejection asserts
+the private design-docs security-test-expectations.md every rejection asserts
 both the exception *and* that no row moved — ``assert_writes_nothing`` compares
 full ``Membership`` / ``RoleGrant`` / ``RoleGrantScope`` / ``User`` /
 ``ObjectChange`` row tuples, so an in-place mutation cannot hide behind an
