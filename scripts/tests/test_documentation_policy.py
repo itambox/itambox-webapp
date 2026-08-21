@@ -39,9 +39,11 @@ INSTALLATION = DOCS_ROOT / "operations" / "installation.md"
 INTERNAL_REFERENCE_PATTERNS = (
     re.compile(r"github\.com/itambox/design-docs"),
     re.compile(r"docs/development/"),
-    re.compile(r"development/(?:capability-registry|module-maturity|compatibility-policy|"
-               r"external-contract-inventory|architecture-policy|capability-fallbacks|"
-               r"tenant-resource-grant-security)\.md"),
+    re.compile(
+        r"development/(?:capability-registry|module-maturity|compatibility-policy|"
+        r"external-contract-inventory|architecture-policy|capability-fallbacks|"
+        r"tenant-resource-grant-security)\.md"
+    ),
 )
 
 #: Public surfaces scanned for internal references.
@@ -96,9 +98,7 @@ class InternalReferencePolicyTest(unittest.TestCase):
         surfaces = [REPO_README, ENV_EXAMPLE, MKDOCS_YML]
         surfaces += sorted(DOCS_ROOT.rglob("*.md"))
         templates_root = REPOSITORY_ROOT / "itambox"
-        surfaces += sorted(
-            path for path in templates_root.rglob("*.html") if "templates" in path.parts
-        )
+        surfaces += sorted(path for path in templates_root.rglob("*.html") if "templates" in path.parts)
         for surface in surfaces:
             if not surface.is_file():
                 continue
@@ -138,8 +138,18 @@ class NavigationPolicyTest(unittest.TestCase):
                 f"navigation points at internal-only document {target!r}",
             )
             self.assertTrue(
-                target.startswith(("index.md", "dashboard.md", "operations/", "usage/", "models/",
-                                   "integration/", "plugins/", "security/")),
+                target.startswith(
+                    (
+                        "index.md",
+                        "dashboard.md",
+                        "operations/",
+                        "usage/",
+                        "models/",
+                        "integration/",
+                        "plugins/",
+                        "security/",
+                    )
+                ),
                 f"navigation target {target!r} is outside the public documentation tree",
             )
             self.assertTrue(
@@ -189,8 +199,7 @@ class OperatorConfigurationPolicyTest(unittest.TestCase):
         env_example = ENV_EXAMPLE.read_text(encoding="utf-8")
         installation = INSTALLATION.read_text(encoding="utf-8")
         missing = [
-            setting for setting in CONTRACT_SETTINGS
-            if setting not in env_example or setting not in installation
+            setting for setting in CONTRACT_SETTINGS if setting not in env_example or setting not in installation
         ]
         self.assertEqual(
             missing,
@@ -205,7 +214,7 @@ class RetentionVocabularyPolicyTest(unittest.TestCase):
     def test_documented_classes_match_the_command(self):
         source = PRUNE_CHANGELOG.read_text(encoding="utf-8")
         documented = DATA_RETENTION.read_text(encoding="utf-8")
-        match = re.search(r'CLASS_CHOICES = \((.*?)\)', source, re.S)
+        match = re.search(r"CLASS_CHOICES = \((.*?)\)", source, re.S)
         self.assertIsNotNone(match, "CLASS_CHOICES not found in prune_changelog")
         classes = re.findall(r'"(\w+)"', match.group(1))
         self.assertTrue(classes)
