@@ -32,7 +32,7 @@
                      disabled
                      readonly>
               <small class="form-hint text-muted mt-1 csp-style-6131b67a6494">
-                {% translate "A role belongs to the tenant it is created in and cannot be moved afterwards." %}
+                {% translate "A role belongs to the tenant it was created in and cannot be moved." %}
               </small>
             </div>
             <div class="col-md-4 mb-3">{{ form.description|as_crispy_field }}</div>
@@ -55,7 +55,7 @@
           <hr class="my-4">
           <h4 class="card-title text-primary mb-3">{% translate "Permissions Matrix" %}</h4>
           <p class="text-muted mb-4 small">
-            {% translate "Configure role-specific access by checking permissions below. Granular permissions allow separation of Create and Edit capabilities." %}
+            {% translate "Set this role's permissions below. Granular permissions can separate Create and Edit access." %}
           </p>
           {{ form.preset_field_map|json_script:"role-preset-field-map" }}
           <div class="row mb-4">

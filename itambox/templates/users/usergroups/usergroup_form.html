@@ -47,7 +47,7 @@ the generic managed-row add/remove and coverage toggles.
               <fieldset class="mb-4" id="managed-grants" data-managed-formset>
                 <legend class="fs-4 text-primary">{% translate "Managed tenant projections" %}</legend>
                 <p class="text-muted small">
-                  {% translate "Add one or more additive scope rows per role. Group grants may be permanent; direct-grant reason and expiration rules do not apply." %}
+                  {% translate "Add one or more scope rows per role. Group grants can be permanent; direct-grant reason and expiration rules do not apply." %}
                 </p>
                 {{ managed_formset.management_form }}
                 {% if managed_formset.non_form_errors %}

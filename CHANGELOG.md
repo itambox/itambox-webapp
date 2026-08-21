@@ -8,6 +8,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Tightened the first organization/membership English copy: role-form guidance, the assign-users explanation, member-selection help, role presets, and user-group help are shorter and more direct; the role assignment page and the permissions-matrix help now render reviewed German translations (part of issue #386).
 - The first German asset UI text chunk uses the established glossary terms and clearer labels for asset types, locations, custody receipts, and warranties.
 - Tightened the first English asset/request text slice: selection errors, request labels, custody notifications, disposal guidance, and bulk receiving copy are shorter and more direct without changing behavior.
 - The tenant switcher now uses **All Tenants** consistently, and users can choose a personal default workspace for a tenant, tenant group, or aggregate tenant view.

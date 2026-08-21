@@ -127,7 +127,7 @@ class ManagedRoleGrantForm(forms.Form):
             format="%Y-%m-%dT%H:%M",
             attrs={"type": "datetime-local"},
         ),
-        help_text=_("Required and must be in the future for elevated direct grants."),
+        help_text=_("Required; must be in the future for elevated direct grants."),
     )
 
     def __init__(self, *args, membership_tenant=None, **kwargs):
@@ -284,7 +284,7 @@ class MembershipForm(forms.ModelForm):
             format="%Y-%m-%dT%H:%M",
             attrs={"type": "datetime-local"},
         ),
-        help_text=_("Required and must be in the future for new elevated direct grants."),
+        help_text=_("Required; must be in the future for new elevated direct grants."),
     )
 
     class Meta:

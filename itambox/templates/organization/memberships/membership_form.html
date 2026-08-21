@@ -40,7 +40,7 @@ management form + nonce-free bundle behaviour predictable (mirrors bulk_receive)
             {% endif %}
           </h4>
           <p class="text-muted mb-4 small">
-            {% translate "Pick who joins (an existing user, or a new one created by email), what they may do inside this organization (roles), and — on a managing (MSP) tenant — any roles that reach into its managed tenants (one grant per row)." %}
+            {% translate "Pick who joins: an existing user or a new one created by email. Define what they may do in this organization (roles) and — on a managing (MSP) tenant — which roles reach into its managed tenants (one grant per row)." %}
           </p>
           <form method="post" hx-boost="false" novalidate>
             {% csrf_token %}

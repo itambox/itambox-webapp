@@ -659,7 +659,7 @@ class BaseGroupManagedRoleGrantFormSet(forms.BaseFormSet):
             if signature is not None:
                 signatures.add(signature)
         if any(row_count_by_role[role_id] > 1 for role_id in all_managed_roles):
-            raise forms.ValidationError(_("All managed tenants already covers every narrower scope for that role."))
+            raise forms.ValidationError(_("All managed tenants already cover every narrower scope for that role."))
 
 
 GroupManagedRoleGrantFormSet = forms.formset_factory(

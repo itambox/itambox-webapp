@@ -457,7 +457,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
             messages.warning(
                 self.request,
                 _(
-                    "%(user)s is now a member of %(tenant)s but has NO permissions "
+                    "%(user)s is now a member of %(tenant)s but has no permissions "
                     "yet — edit the membership to assign a role."
                 )
                 % {"user": membership.user, "tenant": membership.tenant},
