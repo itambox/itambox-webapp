@@ -23,6 +23,7 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import NoReverseMatch, reverse
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views import View
 from django.views.generic import TemplateView
 
@@ -76,6 +77,9 @@ def asset_action_payload(asset, mode):
 
     return {
         "pk": asset.pk,
+        # Immutable tenant identity travels with every row so the basket can keep
+        # per-tenant state across a target-tenant change without re-resolving.
+        "tenant_id": asset.tenant_id,
         "label": str(asset),
         "asset_tag": asset.asset_tag or "",
         "serial": asset.serial_number or "",
@@ -241,6 +245,35 @@ def _submission_tenant(request, form_class, permission):
     return tenant, "ok", None
 
 
+def _submission_batch_error(target_tenant, object_pks):
+    """Return an error message unless every submitted PK is a live asset of ``target_tenant``.
+
+    The batch boundary is enforced here, before a ``Job`` exists: a tampered,
+    unknown, soft-deleted or foreign-tenant PK rejects the whole submission
+    instead of being skipped item-by-item by the background task (which keeps
+    its own checks as defence in depth).
+
+    The message is deliberately count-only — naming or counting the *matched*
+    foreign assets would leak their existence across the tenant boundary.
+    """
+    submitted = set(object_pks)
+    # Junk can never match a PK; excluding it keeps the query valid and routes it
+    # through the same rejection path. ``isdigit`` alone would admit non-ASCII
+    # digits ("²") that raise on int conversion.
+    candidates = {pk for pk in submitted if pk.isascii() and pk.isdigit()}
+    known = {
+        str(pk) for pk in Asset.objects.filter(pk__in=candidates, tenant=target_tenant).values_list("pk", flat=True)
+    }
+    rejected = len(submitted - known)
+    if not rejected:
+        return None
+    return ngettext(
+        "%(count)d selected asset is not available in the target tenant. Nothing was submitted.",
+        "%(count)d selected assets are not available in the target tenant. Nothing was submitted.",
+        rejected,
+    ) % {"count": rejected}
+
+
 @login_required
 def bulk_checkin_assets(request):
     if request.method != "POST":
@@ -256,6 +289,11 @@ def bulk_checkin_assets(request):
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     if not object_pks:
         messages.error(request, _("No assets selected for check-in."))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
+
+    batch_error = _submission_batch_error(target_tenant, object_pks)
+    if batch_error:
+        messages.error(request, batch_error)
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
 
     tenant_id = target_tenant.pk
@@ -302,6 +340,11 @@ def bulk_dispose_assets(request):
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     if not object_pks:
         messages.error(request, _("No assets selected for disposal."))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
+
+    batch_error = _submission_batch_error(target_tenant, object_pks)
+    if batch_error:
+        messages.error(request, batch_error)
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
 
     disposal_date = request.POST.get("disposal_date") or None
@@ -364,6 +407,11 @@ def bulk_checkout_assets(request):
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
     if not object_pks:
         messages.error(request, _("No assets selected for check-out."))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
+
+    batch_error = _submission_batch_error(target_tenant, object_pks)
+    if batch_error:
+        messages.error(request, batch_error)
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
 
     targets = (
