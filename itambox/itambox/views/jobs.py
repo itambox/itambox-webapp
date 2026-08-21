@@ -15,6 +15,7 @@ from django.views.generic import View
 
 from core.managers import get_current_tenant
 from core.models import Job
+from core.tenant_scope import accessible_tenant_ids
 from core.tables import JobTable
 from itambox.views.generic import ObjectDetailView, ObjectListView
 
@@ -25,14 +26,19 @@ def scoped_jobs(user):
     """
     Jobs visible to a user. Job has no tenant-scoping manager, so scope
     explicitly: superusers see everything (including system jobs without a
-    tenant); everyone else only sees the active tenant's jobs.
+    tenant); everyone else sees the active tenant's jobs — or, in the
+    aggregate "all accessible tenants" scope, every accessible tenant's jobs,
+    so a bulk job created there redirects to a page its creator can open.
     """
     if user.is_superuser:
         return Job.objects.all()
     tenant = get_current_tenant()
-    if tenant is None:
+    if tenant is not None:
+        return Job.objects.filter(tenant=tenant)
+    tenant_ids = accessible_tenant_ids(user)
+    if not tenant_ids:
         return Job.objects.none()
-    return Job.objects.filter(tenant=tenant)
+    return Job.objects.filter(tenant_id__in=tenant_ids)
 
 
 class JobListView(ObjectListView):

@@ -56,6 +56,59 @@ class JobScopingTests(TenantTestMixin, TestCase):
         )
         self.assertTrue(response.context["has_active_jobs"])
 
+    # ── aggregate ("all accessible tenants") scope ──
+    def _login_all_accessible(self):
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+    def _grant_other_tenant(self):
+        role = self.tenant_role.__class__.objects.create(
+            tenant=self.other_tenant,
+            name="Other Role",
+            permissions=["core.view_job", "core.change_job"],
+        )
+        self.grant(self.tenant_user, self.other_tenant, role)
+
+    def test_aggregate_scope_lists_jobs_of_accessible_tenants(self):
+        """A bulk job bound to any accessible tenant stays visible in aggregate scope."""
+        self._grant_other_tenant()
+        self._login_all_accessible()
+        response = self.client.get(reverse("job_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "own-tenant-job")
+        self.assertContains(response, "foreign-tenant-job")
+        self.assertNotContains(response, "system-job")
+
+    def test_aggregate_scope_opens_accessible_job_detail(self):
+        """The redirect after an aggregate bulk submit must land on a readable page."""
+        self._grant_other_tenant()
+        self._login_all_accessible()
+        response = self.client.get(reverse("job_detail", kwargs={"pk": self.foreign_job.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "foreign-tenant-job")
+
+    def test_aggregate_scope_hides_unreachable_tenant_job(self):
+        """A job of a tenant the user cannot access stays hidden even in aggregate scope."""
+        unreachable = Tenant.objects.create(name="Unreachable Tenant", slug="unreachable-tenant")
+        hidden_job = Job.objects.create(name="unreachable-job", tenant=unreachable)
+        self._login_all_accessible()
+        response = self.client.get(reverse("job_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "unreachable-job")
+        response = self.client.get(reverse("job_detail", kwargs={"pk": hidden_job.pk}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_aggregate_scope_can_cancel_accessible_job(self):
+        self._grant_other_tenant()
+        self._login_all_accessible()
+        response = self.client.post(reverse("job_cancel", kwargs={"pk": self.foreign_job.pk}))
+        self.assertRedirects(response, reverse("job_detail", kwargs={"pk": self.foreign_job.pk}))
+        self.foreign_job.refresh_from_db()
+        self.assertEqual(self.foreign_job.status, Job.STATUS_FAILED)
+
 
 class JobCancelTests(TenantTestMixin, TestCase):
     def setUp(self):
