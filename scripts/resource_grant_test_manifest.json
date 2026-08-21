@@ -196,6 +196,7 @@
   "itambox/core/tests/test_e2e_workflow.py",
   "itambox/core/tests/test_delivery_contracts.py",
   "itambox/core/tests/test_events.py",
+  "itambox/core/tests/test_jobs.py",
   "itambox/core/tests/test_global_label_template_permissions.py",
   "itambox/core/tests/test_html_sanitizer.py",
   "itambox/core/tests/test_html_styles.py",
