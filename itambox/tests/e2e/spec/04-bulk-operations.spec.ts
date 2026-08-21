@@ -1,23 +1,7 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Browser } from '@playwright/test';
+import * as path from 'path';
 
-const aggregateOperatorUsername = process.env.E2E_AGGREGATE_USERNAME || 'lars.eklund';
-const aggregateOperatorPassword = process.env.ITAMBOX_SEED_PASSWORD || 'itambox2026';
-
-async function loginAsAggregateOperator(page: Page) {
-  await page.context().clearCookies();
-  await page.goto('/accounts/login/', { waitUntil: 'domcontentloaded' });
-  // Only drive the form when the login page actually rendered — a session that
-  // survived the cookie wipe redirects away immediately.
-  if (new URL(page.url()).pathname.endsWith('/login/')) {
-    await page.fill('input[name="username"]', aggregateOperatorUsername);
-    await page.fill('input[name="password"]', aggregateOperatorPassword);
-    await Promise.all([
-      page.waitForURL((url) => !url.pathname.endsWith('/login/')),
-      page.click('button[type="submit"]'),
-    ]);
-  }
-  await expect(page.locator('.alert-danger, .errorlist, [data-testid="login-error"]')).toHaveCount(0);
-}
+const aggregateStorageState = path.resolve(__dirname, '../aggregateStorageState.json');
 
 test.describe('The Bulk Operation Workflow Matrix', () => {
 
@@ -88,12 +72,16 @@ test.describe('The Bulk Operation Workflow Matrix', () => {
        await modal.locator('button[data-bs-dismiss="modal"]').first().click();
     }
   });
+});
+
+test.describe('The Aggregate Bulk Basket Journey (issue #424)', () => {
+  test.use({ storageState: aggregateStorageState });
 
   test('All accessible tenants keeps a seeded check-in basket through tenant selection and creates a job', async ({ page }) => {
-    // The full demo seed gives this non-superuser administrator access to multiple
-    // managed tenants. The global E2E storage state is a superuser, whose All
-    // Tenants scope intentionally does not render the aggregate target selector.
-    await loginAsAggregateOperator(page);
+    // The aggregate operator session comes from global-setup (E2E_AGGREGATE_USERNAME,
+    // default demo seed user lars.eklund) — a non-superuser whose All Tenants
+    // scope renders the aggregate target selector (the superuser's All Tenants
+    // scope intentionally does not).
     await page.goto('/assets/assets/?switch_all_accessible=1', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('a[href*="switch_all_accessible=1"].active').first()).toHaveCount(1);
 

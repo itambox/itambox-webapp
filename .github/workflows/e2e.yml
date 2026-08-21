@@ -52,6 +52,12 @@ jobs:
       DJANGO_SUPERUSER_USERNAME: e2e-admin
       DJANGO_SUPERUSER_EMAIL: e2e@itambox.local
       E2E_USERNAME: e2e-admin
+      # Aggregate-scope operator for the bulk basket journey (issue #424): a
+      # seeded non-superuser with grants across the managed demo tenants. The
+      # demo seed sets its password to ITAMBOX_SEED_PASSWORD (default in
+      # settings: "itambox2026").
+      E2E_AGGREGATE_USERNAME: lars.eklund
+      E2E_AGGREGATE_PASSWORD: itambox2026
       E2E_TENANT_SLUG: helix-rnd
       E2E_ISOLATION_TENANT_SLUG: e2e-isolation-tenant
       E2E_TENANT_GROUP_NAME: E2E Tenant Read-Only Group
