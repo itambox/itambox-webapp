@@ -5,13 +5,17 @@ const aggregateOperatorPassword = process.env.ITAMBOX_SEED_PASSWORD || 'itambox2
 
 async function loginAsAggregateOperator(page: Page) {
   await page.context().clearCookies();
-  await page.goto('/accounts/login/', { waitUntil: 'networkidle' });
-  await page.fill('input[name="username"]', aggregateOperatorUsername);
-  await page.fill('input[name="password"]', aggregateOperatorPassword);
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle' }),
-    page.click('button[type="submit"]'),
-  ]);
+  await page.goto('/accounts/login/', { waitUntil: 'domcontentloaded' });
+  // Only drive the form when the login page actually rendered — a session that
+  // survived the cookie wipe redirects away immediately.
+  if (new URL(page.url()).pathname.endsWith('/login/')) {
+    await page.fill('input[name="username"]', aggregateOperatorUsername);
+    await page.fill('input[name="password"]', aggregateOperatorPassword);
+    await Promise.all([
+      page.waitForURL((url) => !url.pathname.endsWith('/login/')),
+      page.click('button[type="submit"]'),
+    ]);
+  }
   await expect(page.locator('.alert-danger, .errorlist, [data-testid="login-error"]')).toHaveCount(0);
 }
 
@@ -90,7 +94,7 @@ test.describe('The Bulk Operation Workflow Matrix', () => {
     // managed tenants. The global E2E storage state is a superuser, whose All
     // Tenants scope intentionally does not render the aggregate target selector.
     await loginAsAggregateOperator(page);
-    await page.goto('/assets/assets/?switch_all_accessible=1', { waitUntil: 'networkidle' });
+    await page.goto('/assets/assets/?switch_all_accessible=1', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('a[href*="switch_all_accessible=1"].active').first()).toHaveCount(1);
 
     const rows = page.locator('#object-list-table-container table tbody tr');
@@ -136,7 +140,7 @@ test.describe('The Bulk Operation Workflow Matrix', () => {
     await expect(basketRows).toHaveCount(2);
     await expect(page.locator('#scan-basket-count')).toHaveText('2');
     await expect(page.locator('#basket-scanner-count')).toHaveText('2');
-    expect((await basketPks.allInputValues()).sort()).toEqual(selectedPks.sort());
+    expect((await basketPks.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).sort()).toEqual(selectedPks.sort());
 
     // Re-selecting the automatically chosen compatible target exercises the
     // same change handler that caused #424 without discarding any seeded rows.
