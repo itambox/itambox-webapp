@@ -161,10 +161,15 @@ The last command is the architecture boundary gate. It builds the first-party
 import graph twice — once from module-top imports and once including
 function-body imports — and blocks on import cycles and on edges that cross a
 layer boundary the policy forbids. Accepted debt is recorded in
-`scripts/architecture_baseline.json` with an owning area label, a removal issue,
-and a stated removal direction, so the baseline is a work list rather than a
-suppression file. A model that imports a form, a table, or a view is the one
-finding with no baseline representation at any severity. Read the
+`scripts/architecture_baseline.json` with an owning area label and a
+machine-readable `disposition`: `debt` rows also name the open tracking issue
+that will remove them — recorded in the reviewed
+`scripts/architecture_issue_states.json` snapshot (refresh with `python
+scripts/check_architecture.py --refresh-issue-states`) — and a stated removal
+direction, while `accepted` rows carry a stable rationale and no removal
+promise, so the baseline is a work list rather than a suppression file. A model
+that imports a form, a table, or a view is the one finding with no baseline
+representation at any severity. Read the
 [architecture policy](https://github.com/itambox/design-docs/blob/main/development/architecture-policy.md) and the
 [architecture boundaries ADR](https://github.com/itambox/design-docs/blob/main/development/adr-0001-architecture-boundaries-and-layering.md)
 before adding an entry.

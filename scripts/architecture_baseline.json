@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "canonical_python": "3.12",
-  "policy_sha256": "487a494db92930c86da365153876ef7e1f2283decde5febd9de697460a8f1999",
+  "policy_sha256": "1569a1029906ba3d47b8ca0b643368306f1c255b6837a33be3d96b5ff3026c07",
   "cycles": [],
   "layer_exceptions": [
     {
@@ -14,7 +14,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:api",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside itambox.api.authentication, or accept the instance as an argument, so the framework layer carries no import edge into organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -28,7 +29,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:api",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the users model through apps.get_model() inside itambox.api.authentication, or accept the instance as an argument, so the framework layer carries no import edge into users.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -42,7 +44,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:api",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the assets model through apps.get_model() inside itambox.api.nested_serializers, or accept the instance as an argument, so the framework layer carries no import edge into assets.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -56,7 +59,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside itambox.middleware, or accept the instance as an argument, so the framework layer carries no import edge into organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -70,7 +74,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:api",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Publish the behaviour itambox.api.authentication needs from organization.access as a registry hook the framework owns, so the framework depends on its own interface rather than on organization.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -84,7 +89,8 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:api",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Publish the behaviour itambox.api.permissions needs from organization.access as a registry hook the framework owns, so the framework depends on its own interface rather than on organization.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -98,7 +104,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:api",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Publish the behaviour itambox.api.views needs from users.api.serializers as a registry hook the framework owns, so the framework depends on its own interface rather than on users.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -112,7 +119,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Publish the behaviour itambox.middleware needs from organization.access as a registry hook the framework owns, so the framework depends on its own interface rather than on organization.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -126,7 +134,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.guards, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -140,7 +149,8 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.ldap, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -154,7 +164,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.oidc, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -168,7 +179,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.oidc, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -182,7 +194,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.providers, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -196,7 +209,8 @@
       "kind": "function-body",
       "count": 4,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.provisioning, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -210,7 +224,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.saml, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -224,7 +239,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.saml, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -238,7 +254,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Relocate the constant/helper core.auth.ldap imports out of organization.forms into a non-presentation module, so the integration layer never imports a form.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -252,7 +269,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Relocate the constant/helper core.auth.ldap imports out of organization.forms.role_form into a non-presentation module, so the integration layer never imports a form.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -266,7 +284,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Relocate the constant/helper core.auth.oidc imports out of organization.forms into a non-presentation module, so the integration layer never imports a form.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -280,7 +299,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Relocate the constant/helper core.auth.oidc imports out of organization.forms.role_form into a non-presentation module, so the integration layer never imports a form.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -294,7 +314,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Relocate the constant/helper core.auth.saml imports out of organization.forms into a non-presentation module, so the integration layer never imports a form.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -308,7 +329,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Relocate the constant/helper core.auth.saml imports out of organization.forms.role_form into a non-presentation module, so the integration layer never imports a form.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -322,7 +344,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Reach the organization authorisation helpers core.auth.guards needs through an interface the platform owns, rather than importing organization.rbac from an integration module.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -336,7 +359,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -350,7 +374,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:organization",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve organization.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -364,7 +389,8 @@
       "kind": "function-body",
       "count": 3,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve organization.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -378,7 +404,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve organization.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -392,7 +419,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -406,7 +434,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve organization.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -420,7 +449,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -434,7 +464,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -448,7 +479,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve subscriptions.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -462,7 +494,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -476,7 +509,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve users.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -490,7 +524,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models through apps.get_model(), or hand the object in from the calling domain view, so generic presentation names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -504,7 +539,8 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Consult the feature registry the generic view already reads instead of importing organization.access directly, so generic presentation stops naming a domain service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -518,7 +554,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Consult the feature registry the generic view already reads instead of importing organization.access directly, so generic presentation stops naming a domain service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -532,7 +569,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Consult the feature registry the generic view already reads instead of importing organization.services directly, so generic presentation stops naming a domain service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -546,7 +584,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Consult the feature registry the generic view already reads instead of importing extras.customfields directly, so generic presentation stops naming a domain service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -560,7 +599,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Consult the feature registry the generic view already reads instead of importing extras.customfields directly, so generic presentation stops naming a domain service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -574,7 +614,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Consult the feature registry the generic view already reads instead of importing assets.scanning directly, so generic presentation stops naming a domain service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -588,7 +629,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.events carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -602,7 +644,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.signals carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -616,7 +659,8 @@
       "kind": "function-body",
       "count": 3,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.alerts carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -630,7 +674,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.alerts carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -644,7 +689,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve inventory.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.alerts carries no import edge into the inventory domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -658,7 +704,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve licenses.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.alerts carries no import edge into the licenses domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -672,7 +719,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve subscriptions.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.alerts carries no import edge into the subscriptions domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -686,7 +734,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.checkin carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -700,7 +749,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve organization.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.checkin carries no import edge into the organization domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -714,7 +764,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.checkout carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -728,7 +779,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.depreciation carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -742,7 +794,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.disposal carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -756,7 +809,8 @@
       "kind": "function-body",
       "count": 3,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.intune_sync carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -770,7 +824,8 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve organization.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.intune_sync carries no import edge into the organization domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -784,7 +839,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve software.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.intune_sync carries no import edge into the software domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -798,7 +854,8 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve assets.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.labels carries no import edge into the assets domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -812,7 +869,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.labels carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -826,7 +884,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.labels carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -840,7 +899,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.reports carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -854,7 +914,8 @@
       "kind": "function-body",
       "count": 6,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.webhooks carries no import edge into the extras domain.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -868,8 +929,9 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:operations",
-      "removal_issue": 83,
-      "removal_direction": "Move currency formatting behind a non-presentation report formatting service during the remaining provider extraction.",
+      "disposition": "debt",
+      "removal_issue": 440,
+      "removal_direction": "Move the shared money template filter behind a platform-owned, non-presentation formatting boundary so platform report formatting stops importing extras.templatetags.money.",
       "accepted_reason": "Currency formatting remains a deliberate platform-to-presentation dependency until the shared money template filter is moved behind a platform-owned formatting boundary."
     },
     {
@@ -882,7 +944,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Expose the assets entry point core.tasks.checkin calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -896,7 +959,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Expose the assets entry point core.tasks.checkout calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -910,7 +974,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Expose the organization entry point core.tasks.context calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -924,7 +989,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Expose the assets entry point core.tasks.depreciation calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -938,7 +1004,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:operations",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Expose the assets entry point core.tasks.disposal calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -952,7 +1019,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:inventory",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Split itambox/inventory/mixins.py: move CheckoutActionsColumn and CheckableInventoryTableMixin into inventory/tables.py, which already imports core.tables and is the only consumer, leaving mixins.py holding model behaviour only.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced; itambox/inventory/mixins.py holds an abstract model mixin and two django-tables2 classes in one module, so it crosses the boundary in both directions."
     },
@@ -966,7 +1034,8 @@
       "kind": "function-body",
       "count": 2,
       "owner": "area:assets",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Move the helper assets.models.asset calls out of assets.depreciation into the model module itself, or invert the call so assets depends on the model rather than the model on the service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -980,7 +1049,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:inventory",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Split itambox/inventory/mixins.py: move CheckoutActionsColumn and CheckableInventoryTableMixin into inventory/tables.py, which already imports core.tables and is the only consumer, leaving mixins.py holding model behaviour only.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced; itambox/inventory/mixins.py holds an abstract model mixin and two django-tables2 classes in one module, so it crosses the boundary in both directions."
     },
@@ -994,7 +1064,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:inventory",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Move the helper inventory.models calls out of inventory.kit_checkout into the model module itself, or invert the call so inventory depends on the model rather than the model on the service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -1008,7 +1079,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:inventory",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Move the helper inventory.models calls out of inventory.stock into the model module itself, or invert the call so inventory depends on the model rather than the model on the service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -1022,7 +1094,8 @@
       "kind": "module-top",
       "count": 1,
       "owner": "area:licenses",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Move the helper software.models calls out of licenses.reconciliation into the model module itself, or invert the call so licenses depends on the model rather than the model on the service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -1036,7 +1109,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:assets",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Either declare (compliance, assets) in CROSS_DOMAIN_MODEL_EDGES with an ADR note explaining the coupling, or resolve assets.models through apps.get_model() inside compliance.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
@@ -1050,7 +1124,8 @@
       "kind": "function-body",
       "count": 1,
       "owner": "area:subscriptions",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Either declare (subscriptions, licenses) in CROSS_DOMAIN_MODEL_EDGES with an ADR note explaining the coupling, or resolve licenses.models through apps.get_model() inside subscriptions.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     }
@@ -1067,7 +1142,8 @@
         "organization.rbac"
       ],
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Hoist `from organization.models import RoleGrantScope, Tenant` to module top in itambox/core/auth/guards.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.models, organization.rbac shares no strongly connected component with this module in either graph."
     },
     {
@@ -1080,7 +1156,8 @@
         "itambox.middleware"
       ],
       "owner": "area:organization",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Hoist `from itambox.middleware import get_current_user` to module top in itambox/core/forms/tenant.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: itambox.middleware shares no strongly connected component with this module in either graph."
     },
     {
@@ -1093,7 +1170,8 @@
         "organization.models"
       ],
       "owner": "area:frontend",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Hoist `from organization.models import Tenant` to module top in itambox/extras/dashboard/widgets.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.models shares no strongly connected component with this module in either graph."
     },
     {
@@ -1106,7 +1184,8 @@
         "core.managers"
       ],
       "owner": "area:inventory",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Hoist `from core.managers import get_current_tenant` to module top in itambox/inventory/services.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.managers shares no strongly connected component with this module in either graph."
     },
     {
@@ -1119,7 +1198,8 @@
         "organization.models"
       ],
       "owner": "area:auth-rbac",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Hoist `from organization.models import Membership, Tenant, TenantGroup` to module top in itambox/itambox/middleware.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.models shares no strongly connected component with this module in either graph."
     },
     {
@@ -1132,7 +1212,8 @@
         "organization.access"
       ],
       "owner": "area:organization",
-      "removal_issue": 100,
+      "disposition": "debt",
+      "removal_issue": 440,
       "removal_direction": "Hoist `from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids` to module top in itambox/organization/views/membership_views.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access shares no strongly connected component with this module in either graph."
     }
   ]

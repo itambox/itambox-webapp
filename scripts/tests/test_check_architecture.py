@@ -13,6 +13,7 @@ import json
 import sys
 import tempfile
 import textwrap
+import types
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -25,10 +26,13 @@ from scripts.architecture_policy import (
 )
 from scripts.check_architecture import (
     BASELINE_SECTIONS,
+    DEBT_DISPOSITION,
+    ISSUE_STATES_SCHEMA_VERSION,
     REPORT_ONLY_BANNER,
     PolicyError,
     load_baseline,
     main,
+    refresh_issue_states,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -60,6 +64,11 @@ class GateTestCase(unittest.TestCase):
         self.root = Path(directory.name)
         self.baseline = self.root / "scripts" / "architecture_baseline.json"
         self.baseline.parent.mkdir(parents=True, exist_ok=True)
+        self.issue_states = self.root / "scripts" / "architecture_issue_states.json"
+        # Every hand-built debt fixture below references issue 100; record it as
+        # open so the liveness check starts from pass, exactly like the checked-in
+        # repository snapshot does for the real baseline.
+        self.write_issue_states({100: "open"})
         self.write_tree(CLEAN_TREE)
 
     def write_tree(self, files):
@@ -67,7 +76,15 @@ class GateTestCase(unittest.TestCase):
             write(self.root, relative, body)
 
     def run_gate(self, *extra):
-        return self.run_main("--cwd", str(self.root), "--baseline", str(self.baseline), *extra)
+        return self.run_main(
+            "--cwd",
+            str(self.root),
+            "--baseline",
+            str(self.baseline),
+            "--issue-states",
+            str(self.issue_states),
+            *extra,
+        )
 
     def run_main(self, *arguments):
         """``main()`` with the argument vector spelled out, both streams captured."""
@@ -82,6 +99,7 @@ class GateTestCase(unittest.TestCase):
         for section in BASELINE_SECTIONS:
             for row in document[section]:
                 row["removal_issue"] = 100
+                row["disposition"] = DEBT_DISPOSITION
                 row["removal_direction"] = TRIAGED_DIRECTION
                 if "accepted_reason" in row:
                     row["accepted_reason"] = "Pre-existing when the boundary gate was introduced."
@@ -90,8 +108,62 @@ class GateTestCase(unittest.TestCase):
         self.baseline.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
         return document
 
+    def write_issue_states(self, states):
+        """Write the reviewed issue-state snapshot a debt baseline depends on."""
+        document = {
+            "schema_version": ISSUE_STATES_SCHEMA_VERSION,
+            "refreshed_at": "2026-01-01T00:00:00+00:00",
+            "issues": {str(number): state for number, state in sorted(states.items())},
+        }
+        self.issue_states.parent.mkdir(parents=True, exist_ok=True)
+        self.issue_states.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+
     def empty_baseline(self):
         self.write_baseline({section: [] for section in BASELINE_SECTIONS})
+
+    def scaffold_sections(self, extra_stale=False):
+        """A reviewed, triaged layer-exception row plus an optional stale sibling."""
+        rows = [
+            {
+                "id": "R-S1|core.tasks.context|assets.models.asset|module-top",
+                "rule": "R-S1",
+                "source": "core.tasks.context",
+                "source_layer": "platform-service",
+                "target": "assets.models.asset",
+                "target_layer": "domain-model",
+                "kind": "module-top",
+                "count": 1,
+                "owner": "area:operations",
+                "removal_issue": 100,
+                "disposition": DEBT_DISPOSITION,
+                "removal_direction": TRIAGED_DIRECTION,
+                "accepted_reason": "Pre-existing when the boundary gate was introduced.",
+            }
+        ]
+        if extra_stale:
+            rows.append(
+                {
+                    "id": "R-S3|core.tasks.context|assets.services|function-body",
+                    "rule": "R-S3",
+                    "source": "core.tasks.context",
+                    "source_layer": "platform-service",
+                    "target": "assets.services",
+                    "target_layer": "domain-service",
+                    "kind": "function-body",
+                    "count": 1,
+                    "owner": "area:operations",
+                    "removal_issue": 100,
+                    "disposition": DEBT_DISPOSITION,
+                    "removal_direction": TRIAGED_DIRECTION,
+                    "accepted_reason": "Pre-existing when the boundary gate was introduced.",
+                }
+            )
+            rows[-1]["rule"] = "R-S3"
+            rows[-1]["id"] = "R-S3|core.tasks.context|assets.services|function-body"
+            rows.sort(key=lambda row: row["id"])
+        sections = {section: [] for section in BASELINE_SECTIONS}
+        sections["layer_exceptions"] = rows
+        return sections
 
     def write_baseline(self, sections, **header):
         document = {
@@ -327,47 +399,6 @@ class ForbiddenEdgeTests(GateTestCase):
         self.assertEqual(rows[0]["removal_direction"], TRIAGED_DIRECTION)
         self.assertEqual(rows[0]["removal_issue"], 100)
 
-    def scaffold_sections(self, extra_stale=False):
-        rows = [
-            {
-                "id": "R-S1|core.tasks.context|assets.models.asset|module-top",
-                "rule": "R-S1",
-                "source": "core.tasks.context",
-                "source_layer": "platform-service",
-                "target": "assets.models.asset",
-                "target_layer": "domain-model",
-                "kind": "module-top",
-                "count": 1,
-                "owner": "area:operations",
-                "removal_issue": 100,
-                "removal_direction": TRIAGED_DIRECTION,
-                "accepted_reason": "Pre-existing when the boundary gate was introduced.",
-            }
-        ]
-        if extra_stale:
-            rows.append(
-                {
-                    "id": "R-S1|core.tasks.context|assets.services|function-body",
-                    "rule": "R-S1",
-                    "source": "core.tasks.context",
-                    "source_layer": "platform-service",
-                    "target": "assets.services",
-                    "target_layer": "domain-service",
-                    "kind": "function-body",
-                    "count": 1,
-                    "owner": "area:operations",
-                    "removal_issue": 100,
-                    "removal_direction": TRIAGED_DIRECTION,
-                    "accepted_reason": "Pre-existing when the boundary gate was introduced.",
-                }
-            )
-            rows[-1]["rule"] = "R-S3"
-            rows[-1]["id"] = "R-S3|core.tasks.context|assets.services|function-body"
-            rows.sort(key=lambda row: row["id"])
-        sections = {section: [] for section in BASELINE_SECTIONS}
-        sections["layer_exceptions"] = rows
-        return sections
-
 
 TRIAGED_DIRECTION = "Move the tenant lookup behind a service boundary owned by the domain application."
 
@@ -423,6 +454,7 @@ class AbsoluteRuleTests(GateTestCase):
                 "count": 1,
                 "owner": "area:assets",
                 "removal_issue": 100,
+                "disposition": DEBT_DISPOSITION,
                 "removal_direction": TRIAGED_DIRECTION,
                 "accepted_reason": "recorded",
             }
@@ -567,6 +599,7 @@ class CycleTests(GateTestCase):
             ],
             "owner": "area:assets",
             "removal_issue": 100,
+            "disposition": DEBT_DISPOSITION,
             "removal_direction": TRIAGED_DIRECTION,
             "accepted_reason": "Pre-existing when the boundary gate was introduced.",
         }
@@ -630,6 +663,7 @@ class CycleClaimTests(GateTestCase):
                 ],
                 "owner": "area:assets",
                 "removal_issue": 100,
+                "disposition": DEBT_DISPOSITION,
                 "removal_direction": TRIAGED_DIRECTION,
                 "accepted_reason": "Pre-existing when the boundary gate was introduced.",
             }
@@ -707,6 +741,7 @@ class CycleClaimTests(GateTestCase):
         """Otherwise the owner is derived from provenance nobody checked."""
         self.write_tree({"itambox/assets/services.py": self.ANNOTATED})
         self.run_gate("--write-baseline")
+        self.triage()
         document = self.load()
         row = document["unsupported_cycle_claims"][0]
         row["source"] = "core.auth.guards"
@@ -882,6 +917,8 @@ class BaselineSchemaTests(GateTestCase):
             "removal_direction ": {"removal_direction": "TODO"},
             "removal_direction  ": {"removal_direction": "too short"},
             "accepted_reason": {"accepted_reason": ""},
+            "disposition": {"disposition": "maybe"},
+            "disposition ": {"disposition": ""},
             "count": {"count": 0},
             "count ": {"count": True},
             "rule": {"rule": "R-C4"},
@@ -945,6 +982,7 @@ class BaselineSchemaTests(GateTestCase):
                 ],
                 "owner": "area:assets",
                 "removal_issue": 100,
+                "disposition": DEBT_DISPOSITION,
                 "removal_direction": TRIAGED_DIRECTION,
                 "accepted_reason": "recorded",
             }
@@ -963,6 +1001,7 @@ class BaselineSchemaTests(GateTestCase):
                 "edges": [{"source": "assets.services", "target": "core.models", "kind": "module-top"}],
                 "owner": "area:assets",
                 "removal_issue": 100,
+                "disposition": DEBT_DISPOSITION,
                 "removal_direction": TRIAGED_DIRECTION,
                 "accepted_reason": "recorded",
             }
@@ -1033,9 +1072,267 @@ class BaselineSchemaTests(GateTestCase):
             "count": 1,
             "owner": "area:operations",
             "removal_issue": 100,
+            "disposition": DEBT_DISPOSITION,
             "removal_direction": TRIAGED_DIRECTION,
             "accepted_reason": "Pre-existing when the boundary gate was introduced.",
         }
+
+
+class IssueStateSnapshotTests(GateTestCase):
+    """A debt row may only reference an open issue the reviewed snapshot records."""
+
+    def seed_platform_service_violation(self):
+        self.write_tree({"itambox/core/tasks/context.py": "from assets.models.asset import Asset\n"})
+
+    def test_an_open_tracked_issue_passes(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+
+        code, out, err = self.run_gate()
+
+        self.assertEqual(code, 0, out + err)
+
+    def test_a_closed_tracked_issue_is_untrustworthy(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.write_issue_states({100: "closed"})
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("#100", err)
+        self.assertIn("closed", err)
+
+    def test_a_tracked_issue_missing_from_the_snapshot_is_untrustworthy(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.write_issue_states({})
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("#100", err)
+
+    def test_a_snapshot_with_issues_nobody_references_is_untrustworthy(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.write_issue_states({100: "open", 999: "open"})
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("#999", err)
+
+    def test_a_missing_snapshot_is_untrustworthy_when_debt_exists(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.issue_states.unlink()
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("issue-state snapshot", err)
+
+    def test_an_unparseable_snapshot_is_untrustworthy(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.issue_states.write_text("{not json", encoding="utf-8")
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("issue-state snapshot", err)
+
+    def test_a_snapshot_with_a_non_numeric_issue_key_is_untrustworthy(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.issue_states.write_text(
+            json.dumps(
+                {"schema_version": ISSUE_STATES_SCHEMA_VERSION, "refreshed_at": "now", "issues": {"ten": "open"}}
+            ),
+            encoding="utf-8",
+        )
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("non-numeric", err)
+
+
+class AcceptedDispositionTests(GateTestCase):
+    """``accepted`` rows are intentional architecture, not hidden debt."""
+
+    def seed_platform_service_violation(self):
+        self.write_tree({"itambox/core/tasks/context.py": "from assets.models.asset import Asset\n"})
+
+    def accepted_row(self, **mutation):
+        row = {
+            "id": "R-S1|core.tasks.context|assets.models.asset|module-top",
+            "rule": "R-S1",
+            "source": "core.tasks.context",
+            "source_layer": "platform-service",
+            "target": "assets.models.asset",
+            "target_layer": "domain-model",
+            "kind": "module-top",
+            "count": 1,
+            "owner": "area:operations",
+            "accepted_reason": "The platform owns the tenant lookup contract; reviewed acceptance, not removal debt.",
+            "disposition": "accepted",
+        }
+        row.update(mutation)
+        return row
+
+    def test_a_policy_permitted_accepted_row_passes_without_a_snapshot(self):
+        self.seed_platform_service_violation()
+        sections = {section: [] for section in BASELINE_SECTIONS}
+        sections["layer_exceptions"] = [self.accepted_row()]
+        self.write_baseline(sections)
+        self.issue_states.unlink()
+
+        code, out, err = self.run_gate()
+
+        self.assertEqual(code, 0, out + err)
+
+    def test_an_accepted_row_cannot_record_a_removal_issue(self):
+        self.seed_platform_service_violation()
+        sections = {section: [] for section in BASELINE_SECTIONS}
+        sections["layer_exceptions"] = [
+            dict(self.accepted_row(), removal_issue=100, removal_direction=TRIAGED_DIRECTION)
+        ]
+        self.write_baseline(sections)
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("accepted", err)
+
+    def test_an_accepted_row_requires_a_stable_rationale(self):
+        self.seed_platform_service_violation()
+        sections = {section: [] for section in BASELINE_SECTIONS}
+        sections["layer_exceptions"] = [dict(self.accepted_row(), accepted_reason="")]
+        self.write_baseline(sections)
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("accepted_reason", err)
+
+    def test_an_absolutely_forbidden_rule_cannot_be_accepted(self):
+        sections = {section: [] for section in BASELINE_SECTIONS}
+        sections["layer_exceptions"] = [
+            {
+                "id": "R-M1|assets.models.asset|assets.forms.asset_form|module-top",
+                "rule": "R-M1",
+                "source": "assets.models.asset",
+                "source_layer": "domain-model",
+                "target": "assets.forms.asset_form",
+                "target_layer": "presentation",
+                "kind": "module-top",
+                "count": 1,
+                "owner": "area:assets",
+                "accepted_reason": "Deliberate coupling, permanently allowed.",
+                "disposition": "accepted",
+            }
+        ]
+        self.write_baseline(sections)
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("R-M1", err)
+
+    def test_a_cycle_row_cannot_be_accepted(self):
+        sections = {section: [] for section in BASELINE_SECTIONS}
+        sections["cycles"] = [
+            {
+                "id": "module-top|assets.depreciation|assets.services",
+                "graph": "module-top",
+                "modules": ["assets.depreciation", "assets.services"],
+                "edges": [
+                    {"source": "assets.depreciation", "target": "assets.services", "kind": "module-top"},
+                    {"source": "assets.services", "target": "assets.depreciation", "kind": "module-top"},
+                ],
+                "owner": "area:assets",
+                "removal_issue": 100,
+                "removal_direction": TRIAGED_DIRECTION,
+                "accepted_reason": "recorded",
+                "disposition": "accepted",
+            }
+        ]
+        self.write_baseline(sections)
+
+        code, _out, err = self.run_gate()
+
+        self.assertEqual(code, 2)
+        self.assertIn("always debt", err)
+
+
+class IssueStateRefreshTests(GateTestCase):
+    """``refresh_issue_states`` freezes reviewed states through an injected runner."""
+
+    def seed_platform_service_violation(self):
+        self.write_tree({"itambox/core/tasks/context.py": "from assets.models.asset import Asset\n"})
+
+    def fake_runner(self, states):
+        def runner(command, **kwargs):
+            number = int(command[2].rsplit("/", 1)[1])
+            if number in states:
+                return types.SimpleNamespace(returncode=0, stdout=states[number], stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Not Found")
+
+        return runner
+
+    def test_refresh_records_the_fetched_states(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        self.write_issue_states({100: "closed"})
+        fingerprint = compute_policy_fingerprint(("itambox",))
+
+        changed = refresh_issue_states(
+            self.baseline, self.issue_states, fingerprint, runner=self.fake_runner({100: "open"})
+        )
+
+        self.assertTrue(changed)
+        states = json.loads(self.issue_states.read_text(encoding="utf-8"))
+        self.assertEqual(states["issues"], {"100": "open"})
+
+    def test_refresh_is_deterministic_when_nothing_changed(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        fingerprint = compute_policy_fingerprint(("itambox",))
+        runner = self.fake_runner({100: "open"})
+
+        refresh_issue_states(self.baseline, self.issue_states, fingerprint, runner=runner)
+        before = self.issue_states.read_bytes()
+
+        changed = refresh_issue_states(self.baseline, self.issue_states, fingerprint, runner=runner)
+
+        self.assertFalse(changed)
+        self.assertEqual(self.issue_states.read_bytes(), before)
+
+    def test_refresh_fails_on_a_missing_issue(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        fingerprint = compute_policy_fingerprint(("itambox",))
+
+        with self.assertRaises(PolicyError) as caught:
+            refresh_issue_states(self.baseline, self.issue_states, fingerprint, runner=self.fake_runner({}))
+
+        self.assertIn("#100", str(caught.exception))
+        self.assertIn("Not Found", str(caught.exception))
+
+    def test_refresh_fails_when_the_gh_cli_is_unavailable(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        fingerprint = compute_policy_fingerprint(("itambox",))
+
+        def missing(command, **kwargs):
+            raise FileNotFoundError("gh")
+
+        with self.assertRaises(PolicyError) as caught:
+            refresh_issue_states(self.baseline, self.issue_states, fingerprint, runner=missing)
+
+        self.assertIn("gh CLI", str(caught.exception))
 
 
 class BootstrapTests(GateTestCase):
@@ -1052,6 +1349,7 @@ class BootstrapTests(GateTestCase):
         rows = self.load()["layer_exceptions"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["removal_issue"], 0)
+        self.assertEqual(rows[0]["disposition"], "TODO")
         self.assertEqual(rows[0]["removal_direction"], "TODO")
         self.assertEqual(rows[0]["owner"], "area:operations")
 
@@ -1062,7 +1360,7 @@ class BootstrapTests(GateTestCase):
         code, _out, err = self.run_gate()
 
         self.assertEqual(code, 2)
-        self.assertIn("removal", err)
+        self.assertIn("disposition", err)
 
 
 class ReportOnlyTests(GateTestCase):
