@@ -35,6 +35,9 @@ from unittest import mock
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.test import override_settings
+
+from core import checks as production_checks
 
 # A compliant secret key for the positive baseline cases (52 chars, many
 # distinct, no forbidden prefix) — any value passing the W009-equivalent
@@ -343,6 +346,80 @@ class TestProdSettingsPosture:
         records, prod = _prod_log_records({})
         assert records == [], f"Unexpected prod warnings: {records}"
         assert prod.DEBUG is False
+
+
+class TestProductionChecks:
+    """The tagged check surface (core/checks.py, tag 'prod') must classify the
+    same tri-states it reports: warnings for unset/blank, errors for malformed,
+    silence for valid and for development settings."""
+
+    @staticmethod
+    def _messages(check_fn, **settings_overrides):
+        with override_settings(DEBUG=False, **settings_overrides):
+            return check_fn(None)
+
+    def test_pepper_unset_warns(self):
+        messages = self._messages(
+            production_checks.check_production_api_token_peppers,
+            API_TOKEN_PEPPERS_STATE="unset",
+        )
+        assert len(messages) == 1 and messages[0].id == "core.W001"
+
+    def test_pepper_malformed_errors(self):
+        messages = self._messages(
+            production_checks.check_production_api_token_peppers,
+            API_TOKEN_PEPPERS_STATE="malformed",
+            API_TOKEN_PEPPERS_ERROR="must be valid JSON",
+        )
+        assert len(messages) == 1 and messages[0].id == "core.E001"
+
+    def test_pepper_valid_silent(self):
+        assert (
+            self._messages(
+                production_checks.check_production_api_token_peppers,
+                API_TOKEN_PEPPERS_STATE="valid",
+                API_TOKEN_PEPPERS_ERROR=None,
+            )
+            == []
+        )
+
+    def test_pepper_unsupported_state_warns(self):
+        messages = self._messages(
+            production_checks.check_production_api_token_peppers,
+            API_TOKEN_PEPPERS_STATE="unsupported",
+        )
+        assert len(messages) == 1 and messages[0].id == "core.W003"
+
+    def test_field_keys_malformed_errors(self):
+        messages = self._messages(
+            production_checks.check_production_field_encryption_keys,
+            FIELD_ENCRYPTION_KEYS_STATE="malformed",
+            FIELD_ENCRYPTION_KEYS_ERROR="invalid Fernet key at index 1",
+        )
+        assert len(messages) == 1 and messages[0].id == "core.E002"
+
+    def test_field_keys_unset_warns(self):
+        messages = self._messages(
+            production_checks.check_production_field_encryption_keys,
+            FIELD_ENCRYPTION_KEYS_STATE="unset",
+        )
+        assert len(messages) == 1 and messages[0].id == "core.W002"
+
+    def test_field_keys_valid_silent(self):
+        assert (
+            self._messages(
+                production_checks.check_production_field_encryption_keys,
+                FIELD_ENCRYPTION_KEYS_STATE="valid",
+                FIELD_ENCRYPTION_KEYS_ERROR=None,
+            )
+            == []
+        )
+
+    def test_checks_are_silent_in_dev(self):
+        """DEBUG=True (development) must never report the check surface."""
+        with override_settings(DEBUG=True):
+            assert production_checks.check_production_api_token_peppers(None) == []
+            assert production_checks.check_production_field_encryption_keys(None) == []
 
 
 class TestProductionEntryPaths:
