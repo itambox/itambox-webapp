@@ -1,12 +1,12 @@
 """
-Production settings-posture assertions (WS7-4).
+Production settings-posture assertions (WS7-4, issue #439).
 
 The whole pytest run executes under ``core.settings`` which resolves to the
 *dev* settings module (the loader forces ENV='dev' for test runs), so
 ``core/settings/prod.py`` is otherwise never imported and its hardening is never
 verified. A regression here — a secure cookie flipped off, HSTS dropped,
-BasicAuthentication re-added, the sentinel-key guard removed — would ship
-silently.
+BasicAuthentication re-added, the sentinel-key guard removed, a malformed
+production secret accepted — would ship silently.
 
 These tests import the prod settings module *in isolation*, independent of
 ``sys.argv``: the environment is patched and ``core.settings.base`` +
@@ -16,23 +16,51 @@ copied the dev names into its own namespace at startup and reloading the source
 modules here does not re-mutate it. An autouse fixture restores ``sys.modules``
 and reloads ``base`` against the real environment after each test so no polluted
 module leaks into the rest of the suite.
+
+Entry-path tests (issue #439) additionally spawn bounded subprocesses so the
+rejection is proven through the *real* startup commands (settings import,
+Gunicorn/WSGI import, management commands, qcluster), not just through a helper.
 """
 
 import importlib
+import json
 import logging
 import os
+import subprocess
 import sys
 import warnings
+from pathlib import Path
 from unittest import mock
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
-# A non-sentinel secret key so the prod guard does not raise in the positive
-# cases. Any value other than the insecure dev fallback works.
+# A compliant secret key for the positive baseline cases (54 chars, many
+# distinct, no forbidden prefix) — any value passing the W009-equivalent
+# contract works.
 SECURE_KEY = "prod-posture-test-stable-secret-key-0123456789abcdef"
 # 32 url-safe-base64-decodable bytes -> a valid Fernet key, so the encryption
 # layer treats ITAMBOX_FIELD_ENCRYPTION_KEYS as configured (not derived).
 FERNET_KEY = "a" * 43 + "="
+# An explicitly configured, compliant database password for the baseline.
+DB_PASSWORD = "prod-posture-test-db-password"
+# A compliant pepper mapping (50-char secret) for the baseline.
+PEPPER_SECRET = "p" * 50
+PEPPERS_JSON = json.dumps({"1": PEPPER_SECRET})
+
+# The itambox/ project root, used to launch entry-path subprocesses.
+ITAMBOX_DIR = Path(__file__).resolve().parents[2]
+
+# A malformed-configuration marker that must never leak into any diagnostic.
+SECRET_MARKER = "s3cr3t-marker-that-must-never-leak-into-diagnostics"
+
+BASELINE_ENV = {
+    "ITAMBOX_SECRET_KEY": SECURE_KEY,
+    "ITAMBOX_CACHE_BACKEND": "redis",
+    "ITAMBOX_FIELD_ENCRYPTION_KEYS": FERNET_KEY,
+    "ITAMBOX_DB_PASSWORD": DB_PASSWORD,
+    "ITAMBOX_API_TOKEN_PEPPERS": PEPPERS_JSON,
+}
 
 
 def _load_prod(extra_env):
@@ -40,19 +68,20 @@ def _load_prod(extra_env):
     Re-import core.settings.prod under a patched environment and return the
     freshly evaluated module.
 
-    Baseline env pins the security-relevant inputs (secret key set, redis cache,
-    explicit encryption key) so each test starts from a clean, deterministic
-    posture and only flips what it asserts on. ``base`` is reloaded first because
+    Baseline env pins the security-relevant inputs (compliant secret key,
+    redis cache, explicit encryption key, explicit DB password, explicit
+    peppers) so each test starts from a clean, deterministic posture and only
+    flips what it asserts on. A ``None`` value in ``extra_env`` removes the
+    variable entirely (the "unset" state). ``base`` is reloaded first because
     ``prod`` does ``from .base import *`` and otherwise re-uses the cached
     (startup-time) base namespace instead of re-reading the patched env.
     """
-    env = {
-        "ITAMBOX_SECRET_KEY": SECURE_KEY,
-        "ITAMBOX_CACHE_BACKEND": "redis",
-        "ITAMBOX_FIELD_ENCRYPTION_KEYS": FERNET_KEY,
-    }
-    env.update(extra_env)
+    env = dict(BASELINE_ENV)
+    env.update({k: v for k, v in extra_env.items() if v is not None})
     with mock.patch.dict(os.environ, env, clear=False):
+        for key, value in extra_env.items():
+            if value is None:
+                os.environ.pop(key, None)
         for key in ("ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR", "ITAMBOX_RATELIMIT_NUM_PROXIES"):
             if key not in extra_env:
                 os.environ.pop(key, None)
@@ -79,6 +108,20 @@ def _restore_settings_modules():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         importlib.reload(base)
+
+
+def _prod_log_records(extra_env):
+    """Load prod with a logging handler attached; return captured messages."""
+    records = []
+    handler = logging.Handler()
+    handler.emit = lambda record: records.append(record.getMessage())
+    logger = logging.getLogger("core.settings.prod")
+    logger.addHandler(handler)
+    try:
+        prod = _load_prod(extra_env)
+    finally:
+        logger.removeHandler(handler)
+    return records, prod
 
 
 class TestProdSettingsPosture:
@@ -149,49 +192,237 @@ class TestProdSettingsPosture:
         assert _load_prod({"ITAMBOX_DEBUG": "true"}).DEBUG is False
         assert _load_prod({"ITAMBOX_DEBUG": "1"}).DEBUG is False
 
+    # ------------------------------------------------------------------
+    # SECRET_KEY — full security.W009-equivalent contract
+    # ------------------------------------------------------------------
+
     def test_sentinel_secret_key_raises(self):
         """An unset (sentinel) SECRET_KEY must refuse to boot in prod."""
-        with pytest.raises(RuntimeError, match="ITAMBOX_SECRET_KEY"):
+        with pytest.raises(ImproperlyConfigured, match="ITAMBOX_SECRET_KEY"):
             _load_prod({"ITAMBOX_SECRET_KEY": ""})
 
-    def test_locmem_cache_warns_in_prod(self):
-        """locmem cache in prod must emit a loud warning (per-worker counters)."""
-        records = []
-        handler = logging.Handler()
-        handler.emit = lambda record: records.append(record.getMessage())
-        logger = logging.getLogger("core.settings.prod")
-        logger.addHandler(handler)
-        try:
-            _load_prod({"ITAMBOX_CACHE_BACKEND": "locmem"})
-        finally:
-            logger.removeHandler(handler)
-        assert any("locmem" in msg for msg in records), "Expected a startup warning about locmem cache in production."
+    def test_secret_key_w009_equivalence_matrix(self):
+        """Every W009-rejected key must fail at import, identifying the rule."""
+        cases = [
+            # (label, value, expected diagnostic fragment)
+            # A missing/empty key materializes as the base-settings dev fallback,
+            # so the honest diagnostic is the forbidden-prefix rule.
+            ("missing", None, "django-insecure-"),
+            ("49-char", "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM", "at least 50 characters"),
+            ("few-distinct", "abcd" * 14, "at least 5 distinct characters"),
+            ("forbidden-prefix", "django-insecure-" + "abcdefghij" * 5, "django-insecure-"),
+        ]
+        for label, value, fragment in cases:
+            with pytest.raises(ImproperlyConfigured) as exc_info:
+                _load_prod({"ITAMBOX_SECRET_KEY": value})
+            message = str(exc_info.value)
+            assert "ITAMBOX_SECRET_KEY" in message, label
+            assert fragment in message, label
+            if value is not None:
+                assert value not in message, f"{label}: diagnostic leaked the key"
+
+    def test_valid_secret_key_accepted(self):
+        """A 50+ character key with >= 5 distinct chars and no prefix passes."""
+        prod = _load_prod({})
+        assert prod.SECRET_KEY == SECURE_KEY
+
+    # ------------------------------------------------------------------
+    # Database password — explicitly configured contract
+    # ------------------------------------------------------------------
+
+    def test_missing_db_password_raises(self):
+        with pytest.raises(ImproperlyConfigured, match="ITAMBOX_DB_PASSWORD"):
+            _load_prod({"ITAMBOX_DB_PASSWORD": None})
+
+    def test_blank_db_password_raises(self):
+        with pytest.raises(ImproperlyConfigured, match="ITAMBOX_DB_PASSWORD"):
+            _load_prod({"ITAMBOX_DB_PASSWORD": "   "})
+
+    def test_explicit_db_password_accepted(self):
+        """'explicitly configured' is the contract — the literal value is not banned."""
+        prod = _load_prod({"ITAMBOX_DB_PASSWORD": "itambox"})
+        assert prod.DATABASES["default"]["PASSWORD"] == "itambox"
+
+    # ------------------------------------------------------------------
+    # API-token peppers — unset vs malformed
+    # ------------------------------------------------------------------
+
+    def test_missing_peppers_warn_in_prod(self):
+        """Unset peppers keep the warned SECRET_KEY-derived fallback in prod."""
+        records, _ = _prod_log_records({"ITAMBOX_API_TOKEN_PEPPERS": None})
+        assert any("ITAMBOX_API_TOKEN_PEPPERS" in msg and "SECRET_KEY" in msg for msg in records), (
+            "Expected a startup warning about the missing peppers fallback in production."
+        )
+
+    def test_malformed_peppers_raise_in_prod(self):
+        for raw in ("{not-json", "[1,2]", "{}", json.dumps({"1": "short"}), SECRET_MARKER):
+            with pytest.raises(ImproperlyConfigured) as exc_info:
+                _load_prod({"ITAMBOX_API_TOKEN_PEPPERS": raw})
+            message = str(exc_info.value)
+            assert "ITAMBOX_API_TOKEN_PEPPERS" in message
+            assert SECRET_MARKER not in message
+            assert "short" not in message
+
+    def test_malformed_peppers_never_downgrade_to_empty(self):
+        """An explicitly malformed mapping must fail, not silently become {}."""
+        with pytest.raises(ImproperlyConfigured):
+            _load_prod({"ITAMBOX_API_TOKEN_PEPPERS": "not-json"})
+
+    def test_valid_peppers_produce_no_warning(self):
+        records, prod = _prod_log_records({})
+        assert prod.API_TOKEN_PEPPERS == {1: PEPPER_SECRET}
+        assert not any("ITAMBOX_API_TOKEN_PEPPERS" in msg for msg in records)
+
+    # ------------------------------------------------------------------
+    # Field-encryption keyring — unset vs malformed
+    # ------------------------------------------------------------------
 
     def test_derived_encryption_key_warns_in_prod(self):
         """No ITAMBOX_FIELD_ENCRYPTION_KEYS in prod must emit a loud warning."""
-        records = []
-        handler = logging.Handler()
-        handler.emit = lambda record: records.append(record.getMessage())
-        logger = logging.getLogger("core.settings.prod")
-        logger.addHandler(handler)
-        try:
-            _load_prod({"ITAMBOX_FIELD_ENCRYPTION_KEYS": ""})
-        finally:
-            logger.removeHandler(handler)
+        records, _ = _prod_log_records({"ITAMBOX_FIELD_ENCRYPTION_KEYS": ""})
         assert any("ITAMBOX_FIELD_ENCRYPTION_KEYS" in msg for msg in records), (
             "Expected a startup warning about the derived field-encryption key in production."
         )
 
+    def test_malformed_encryption_keys_raise_in_prod(self):
+        bad = SECRET_MARKER
+        with pytest.raises(ImproperlyConfigured) as exc_info:
+            _load_prod({"ITAMBOX_FIELD_ENCRYPTION_KEYS": bad})
+        message = str(exc_info.value)
+        assert "ITAMBOX_FIELD_ENCRYPTION_KEYS" in message
+        assert "index 1" in message
+        assert bad not in message
+
+    def test_separator_only_encryption_keys_raise_in_prod(self):
+        """Whitespace/separator-only material is explicit malformed config."""
+        with pytest.raises(ImproperlyConfigured, match="ITAMBOX_FIELD_ENCRYPTION_KEYS"):
+            _load_prod({"ITAMBOX_FIELD_ENCRYPTION_KEYS": "  ,  "})
+
+    def test_invalid_key_at_later_position_identified(self):
+        with pytest.raises(ImproperlyConfigured) as exc_info:
+            _load_prod({"ITAMBOX_FIELD_ENCRYPTION_KEYS": f"{FERNET_KEY},{SECRET_MARKER}"})
+        message = str(exc_info.value)
+        assert "index 2" in message
+        assert SECRET_MARKER not in message
+
+    # ------------------------------------------------------------------
+    # Cache and warnings posture
+    # ------------------------------------------------------------------
+
+    def test_locmem_cache_warns_in_prod(self):
+        """locmem cache in prod must emit a loud warning (per-worker counters)."""
+        records, _ = _prod_log_records({"ITAMBOX_CACHE_BACKEND": "locmem"})
+        assert any("locmem" in msg for msg in records), "Expected a startup warning about locmem cache in production."
+
     def test_no_spurious_warnings_when_hardened(self):
         """A fully hardened prod config (redis + explicit keys) must be quiet."""
-        records = []
-        handler = logging.Handler()
-        handler.emit = lambda record: records.append(record.getMessage())
-        logger = logging.getLogger("core.settings.prod")
-        logger.addHandler(handler)
-        try:
-            prod = _load_prod({})
-        finally:
-            logger.removeHandler(handler)
+        records, prod = _prod_log_records({})
         assert records == [], f"Unexpected prod warnings: {records}"
         assert prod.DEBUG is False
+
+
+class TestProductionEntryPaths:
+    """
+    Rejected configurations must fail through the real startup entry points,
+    not only through a helper (issue #439 design contract).
+
+    Each case spawns a bounded subprocess that imports ``core.settings.prod``
+    exactly as Gunicorn, qcluster, and management commands do. The settings
+    import itself is the enforcement point, so every command fails before it
+    can serve or process work.
+    """
+
+    @staticmethod
+    def _run(code, extra_env, timeout=90):
+        env = os.environ.copy()
+        env.update(BASELINE_ENV)
+        env.update({k: v for k, v in extra_env.items() if v is not None})
+        for key, value in extra_env.items():
+            if value is None:
+                env.pop(key, None)
+        env["DJANGO_SETTINGS_MODULE"] = "core.settings.prod"
+        return subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=ITAMBOX_DIR,
+            env=env,
+        )
+
+    _IMPORT_CODE = "import core.settings.prod"  # settings-import entry path
+    _WSGI_CODE = "import core.wsgi"  # Gunicorn app-import entry path
+    _CHECK_CODE = (
+        "from django.core.management import execute_from_command_line; "
+        "execute_from_command_line(['manage.py', 'check'])"
+    )  # management-command/preflight entry path
+    _QCLUSTER_CODE = (
+        "from django.core.management import execute_from_command_line; "
+        "execute_from_command_line(['manage.py', 'qcluster'])"
+    )  # worker entry path
+
+    @pytest.mark.parametrize(
+        "label,code",
+        [
+            ("settings-import", _IMPORT_CODE),
+            ("wsgi", _WSGI_CODE),
+            ("management-command", _CHECK_CODE),
+        ],
+    )
+    def test_malformed_peppers_fail_before_entry(self, label, code):
+        result = self._run(code, {"ITAMBOX_API_TOKEN_PEPPERS": SECRET_MARKER})
+        assert result.returncode != 0, f"{label}: malformed peppers were accepted"
+        combined = result.stderr + result.stdout
+        assert "ITAMBOX_API_TOKEN_PEPPERS" in combined, f"{label}: missing diagnostic"
+        assert SECRET_MARKER not in combined, f"{label}: diagnostic leaked the secret"
+
+    @pytest.mark.parametrize(
+        "label,code",
+        [
+            ("settings-import", _IMPORT_CODE),
+            ("wsgi", _WSGI_CODE),
+            ("management-command", _CHECK_CODE),
+        ],
+    )
+    def test_malformed_encryption_keys_fail_before_entry(self, label, code):
+        result = self._run(code, {"ITAMBOX_FIELD_ENCRYPTION_KEYS": SECRET_MARKER})
+        assert result.returncode != 0, f"{label}: malformed keyring was accepted"
+        combined = result.stderr + result.stdout
+        assert "ITAMBOX_FIELD_ENCRYPTION_KEYS" in combined, f"{label}: missing diagnostic"
+        assert SECRET_MARKER not in combined, f"{label}: diagnostic leaked the secret"
+
+    @pytest.mark.parametrize(
+        "label,code",
+        [
+            ("settings-import", _IMPORT_CODE),
+            ("wsgi", _WSGI_CODE),
+            ("management-command", _CHECK_CODE),
+        ],
+    )
+    def test_missing_db_password_fails_before_entry(self, label, code):
+        result = self._run(code, {"ITAMBOX_DB_PASSWORD": None})
+        assert result.returncode != 0, f"{label}: missing DB password was accepted"
+        combined = result.stderr + result.stdout
+        assert "ITAMBOX_DB_PASSWORD" in combined, f"{label}: missing diagnostic"
+
+    @pytest.mark.parametrize("code", [_IMPORT_CODE, _WSGI_CODE])
+    def test_compliant_config_survives_settings_import(self, code):
+        """A fully hardened config must import cleanly through both entry paths."""
+        result = self._run(code, {})
+        assert result.returncode == 0, f"compliant config rejected: {result.stderr[-2000:]}"
+
+    @pytest.mark.serial_only
+    def test_malformed_config_exits_qcluster_promptly(self):
+        """A malformed config must stop the worker before it processes work."""
+        result = self._run(self._QCLUSTER_CODE, {"ITAMBOX_API_TOKEN_PEPPERS": SECRET_MARKER}, timeout=60)
+        assert result.returncode != 0, "qcluster accepted malformed peppers"
+        combined = result.stderr + result.stdout
+        assert "ITAMBOX_API_TOKEN_PEPPERS" in combined
+        assert SECRET_MARKER not in combined
+
+    @pytest.mark.serial_only
+    def test_compliant_config_keeps_qcluster_running(self):
+        """A compliant config must keep the worker process alive (bounded run)."""
+        with pytest.raises(subprocess.TimeoutExpired):
+            self._run(self._QCLUSTER_CODE, {}, timeout=12)
+        # TimeoutExpired means the worker was still running when the bound hit.

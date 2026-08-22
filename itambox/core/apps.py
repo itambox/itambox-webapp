@@ -19,6 +19,9 @@ class CoreConfig(AppConfig):
 
         import core.signals  # noqa: F401
 
+        # inline import: app-registry: register the production configuration checks after app loading
+        from core import checks  # noqa: F401
+
         original_queryset_getter = ModelChoiceField.queryset.fget
 
         def scoped_queryset_getter(self):

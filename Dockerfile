@@ -117,8 +117,11 @@ RUN set -eu; \
     done
 
 # Collect static assets at build time. No database access is required, but prod
-# settings reject missing secrets, so use a throwaway build-only value.
-RUN ITAMBOX_SECRET_KEY=build-time-collectstatic-only-not-a-real-secret \
+# settings reject missing secrets, so use throwaway build-only values that
+# satisfy the production configuration contract (>= 50 chars, explicit DB
+# password). These never enter the runtime environment.
+RUN ITAMBOX_SECRET_KEY=build-time-collectstatic-only-not-a-real-secret-0123456789abc \
+    ITAMBOX_DB_PASSWORD=build-time-only-collectstatic-password \
     python manage.py collectstatic --noinput
 
 # Drop privileges.

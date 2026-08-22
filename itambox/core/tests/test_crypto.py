@@ -49,6 +49,55 @@ class CoreCryptoTestCase(TestCase):
         if "ITAMBOX_FIELD_ENCRYPTION_KEYS" in os.environ:
             del os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"]
 
+    def test_old_ciphertext_decrypts_when_new_key_is_primary_and_old_retained(self):
+        """Rotation contract: old ciphertext stays readable while the old key remains in the ring."""
+        old_key = Fernet.generate_key().decode("ascii")
+        new_key = Fernet.generate_key().decode("ascii")
+        plain = "rotation-compat-plaintext"
+
+        os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"] = old_key
+        try:
+            legacy_cipher = encrypt_string(plain)
+
+            # New key first, old key retained: old ciphertext decrypts, new
+            # ciphertext is produced under the primary (new) key.
+            os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"] = f"{new_key},{old_key}"
+            self.assertEqual(decrypt_string(legacy_cipher), plain)
+
+            new_cipher = encrypt_string(plain)
+            self.assertNotEqual(new_cipher, legacy_cipher)
+
+            # The new ciphertext is bound to the primary key alone.
+            os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"] = new_key
+            self.assertEqual(decrypt_string(new_cipher), plain)
+        finally:
+            if "ITAMBOX_FIELD_ENCRYPTION_KEYS" in os.environ:
+                del os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"]
+
+    def test_decryption_never_rewrites_stored_ciphertext(self):
+        """Reading a value must not silently re-encrypt it (no automatic data rewrite)."""
+        old_key = Fernet.generate_key().decode("ascii")
+        new_key = Fernet.generate_key().decode("ascii")
+        mfr = Manufacturer.objects.create(name="Microsoft", slug="microsoft")
+        software = Software.objects.create(name="Office 365", version="v2026", manufacturer=mfr)
+
+        os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"] = old_key
+        try:
+            raw_product_key = "NO-REWRITE-PRODUCT-KEY-2026"
+            license_obj = License.objects.create(
+                name="Office Suite", software=software, seats=10, product_key=encrypt_string(raw_product_key)
+            )
+            stored_before = license_obj.product_key
+
+            os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"] = f"{new_key},{old_key}"
+            # Decryption through the model property must not touch the row.
+            self.assertEqual(license_obj.decrypted_product_key, raw_product_key)
+            license_obj.refresh_from_db()
+            self.assertEqual(license_obj.product_key, stored_before)
+        finally:
+            if "ITAMBOX_FIELD_ENCRYPTION_KEYS" in os.environ:
+                del os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"]
+
     def test_rotate_encryption_keys_command(self):
         """Test that the rotate_encryption_keys management command successfully decrypts with old key and re-encrypts with new primary key."""
         mfr = Manufacturer.objects.create(name="Microsoft", slug="microsoft")
