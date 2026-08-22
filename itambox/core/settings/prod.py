@@ -5,7 +5,27 @@ To use: set DJANGO_SETTINGS_MODULE=core.settings.prod or ITAMBOX_ENV=prod
 
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
+from core.config_contract import (
+    SECRET_KEY_RULE_DIAGNOSTICS,
+    ConfigState,
+    validate_db_password,
+    validate_secret_key,
+)
+
 from .base import *
+
+# The production configuration contract reads the tri-state parse results from
+# ``base``. They are re-imported explicitly so flake8 can resolve them instead
+# of reporting star-import F405 identities for the new names.
+from .base import (
+    API_TOKEN_PEPPERS_ERROR,
+    API_TOKEN_PEPPERS_STATE,
+    FIELD_ENCRYPTION_KEYS_ERROR,
+    FIELD_ENCRYPTION_KEYS_STATE,
+    SECRET_KEY,
+)
 
 # Hardcoded, not env-toggleable — unlike every other flag in this file, DEBUG
 # has no legitimate production use. A leftover/templated .env with
@@ -14,11 +34,55 @@ from .base import *
 # who needs DEBUG=True should run core.settings.dev instead.
 DEBUG = False
 
-if SECRET_KEY == "django-insecure-dev-only-change-me-in-production":
-    raise RuntimeError(
-        "ITAMBOX_SECRET_KEY environment variable must be set to a secure random "
-        "value in production. Refusing to start with the insecure fallback key."
+# ---- Production configuration contract (issue #439) ------------------------
+# Each check below runs during settings import — the earliest guaranteed point
+# before Gunicorn, qcluster, or a management command can serve or process work.
+# All diagnostics are secret-free.
+
+# SECRET_KEY: full Django security.W009 parity (>= 50 chars, >= 5 distinct
+# characters, no 'django-insecure-' prefix). A missing/empty key materializes
+# as the base-settings development fallback and is rejected by the
+# forbidden-prefix rule. The rule is named, never the key.
+_secret_key_result = validate_secret_key(SECRET_KEY)
+if not _secret_key_result.valid:
+    rule = _secret_key_result.failed_rule
+    raise ImproperlyConfigured(
+        f"ITAMBOX_SECRET_KEY {SECRET_KEY_RULE_DIAGNOSTICS[rule]}. "
+        'Generate a value with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
     )
+
+# Database password: the implicit development default is gone; production
+# requires an explicitly configured, non-empty value. "Explicitly configured"
+# is the contract — the literal value is deliberately not inspected.
+if not validate_db_password(os.environ.get("ITAMBOX_DB_PASSWORD")):
+    raise ImproperlyConfigured(
+        "ITAMBOX_DB_PASSWORD must be explicitly configured in production. "
+        "The bundled Compose stack refuses to start without it (see docker-compose.yml)."
+    )
+
+# API-token peppers: only unset/blank may use the warned SECRET_KEY-derived
+# fallback; explicitly malformed material is a startup failure and must never
+# silently downgrade to {}.
+if API_TOKEN_PEPPERS_STATE == ConfigState.MALFORMED.value:
+    raise ImproperlyConfigured(
+        f"ITAMBOX_API_TOKEN_PEPPERS is malformed: {API_TOKEN_PEPPERS_ERROR}. "
+        'Configure a JSON object such as {"1": "<>=50-char secret>"}.'
+    )
+if API_TOKEN_PEPPERS_STATE == ConfigState.UNSET.value:
+    import logging
+
+    logging.getLogger(__name__).warning(
+        "ITAMBOX_API_TOKEN_PEPPERS is not set in production: API-token hashing "
+        "falls back to a SECRET_KEY-derived pepper. Tokens hashed under the "
+        "fallback stop validating once a dedicated mapping is configured — "
+        "re-issue them. Set a dedicated pepper mapping and back it up."
+    )
+
+# Field-encryption keyring: only unset/blank may use the warned
+# SECRET_KEY-derived fallback; explicitly malformed key material (including
+# separator/whitespace-only values) fails before traffic.
+if FIELD_ENCRYPTION_KEYS_STATE == ConfigState.MALFORMED.value:
+    raise ImproperlyConfigured(f"ITAMBOX_FIELD_ENCRYPTION_KEYS is malformed: {FIELD_ENCRYPTION_KEYS_ERROR}.")
 
 ALLOWED_HOSTS = os.environ.get("ITAMBOX_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
