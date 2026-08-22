@@ -167,10 +167,16 @@ class TestParseApiTokenPeppers:
         assert result.error is not None
 
     def test_wrong_json_type(self):
-        for raw in ('["a"]', '"a-string"', "42", "null", "true"):
+        for raw in ('["a"]', '"a-string"', "42", "null", "true", "[]"):
             result = parse_api_token_peppers(raw)
             assert result.state is ConfigState.MALFORMED, raw
             assert result.peppers == {}
+
+    def test_empty_array_reports_object_requirement(self):
+        """An empty array is 'not a JSON object', not 'an empty mapping'."""
+        result = parse_api_token_peppers("[]")
+        assert result.state is ConfigState.MALFORMED
+        assert "JSON object" in result.error
 
     def test_empty_object_rejected_when_explicitly_supplied(self):
         result = parse_api_token_peppers("{}")
@@ -187,6 +193,20 @@ class TestParseApiTokenPeppers:
 
     def test_non_numeric_id_rejected(self):
         assert parse_api_token_peppers(json.dumps({"one": self.PEPPER})).state is ConfigState.MALFORMED
+
+    def test_unicode_digit_id_rejected_without_raising(self):
+        """\"²\".isdecimal() is False — int() must never see an unguarded value."""
+        result = parse_api_token_peppers(json.dumps({"²": self.PEPPER}))
+        assert result.state is ConfigState.MALFORMED
+        assert result.error is not None
+        assert "positive integer" in result.error
+
+    def test_deeply_nested_json_rejected_without_raising(self):
+        """RecursionError from the JSON decoder is malformed configuration, not a crash."""
+        raw = "[" * 5000 + "]" * 5000
+        result = parse_api_token_peppers(raw)
+        assert result.state is ConfigState.MALFORMED
+        assert result.error is not None
 
     def test_non_positive_id_rejected(self):
         assert parse_api_token_peppers(json.dumps({"0": self.PEPPER})).state is ConfigState.MALFORMED
