@@ -46,6 +46,10 @@ DEBUG = False
 _secret_key_result = validate_secret_key(SECRET_KEY)
 if not _secret_key_result.valid:
     rule = _secret_key_result.failed_rule
+    # A missing/empty configuration materializes as the base-settings dev
+    # fallback; report the honest "missing" rule instead of a prefix rule.
+    if rule == "forbidden_prefix" and not os.environ.get("ITAMBOX_SECRET_KEY"):
+        rule = "missing"
     # Rotating a rejected operator-provided key is NOT a safe remediation on
     # its own when the SECRET_KEY-derived fallbacks are in use: the operator
     # would silently lose every encrypted field and fallback-hashed API token.

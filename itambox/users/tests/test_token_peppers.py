@@ -16,6 +16,8 @@ No plaintext token or pepper value is ever asserted into a diagnostic; the
 final test proves failed lookups stay silent.
 """
 
+import logging
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
@@ -97,8 +99,28 @@ class TokenPepperRotationTests(TestCase):
             token = Token.objects.create(user=self.user, description="soon-stale")
             plaintext = token.key
         with override_settings(API_TOKEN_PEPPERS={2: PEPPER_2}):
-            # No exception, no plaintext or pepper material in any diagnostic.
-            self.assertIsNone(Token.find_by_key(plaintext))
-            self.assertIsNone(Token.find_by_key("deadbeef" * 5))
-            self.assertNotIn(plaintext, str(token.pepper))
-            self.assertNotIn(PEPPER_1, PEPPER_2)
+            # No exception, and no log record may carry the plaintext or any
+            # pepper material (token code never logs, so this locks it in).
+            with self.assertNoLogs(logging.getLogger("users.models"), logging.WARNING):
+                self.assertIsNone(Token.find_by_key(plaintext))
+                self.assertIsNone(Token.find_by_key("deadbeef" * 5))
+
+    def test_fallback_token_stops_validating_once_dedicated_mapping_configured(self):
+        """Approved contract: fallback->dedicated migration is NOT seamless.
+
+        A token created while ITAMBOX_API_TOKEN_PEPPERS was unset is hashed
+        under the SECRET_KEY-derived fallback pepper. Once a dedicated mapping
+        is configured it must stop validating — the derived pepper is never
+        merged into the dedicated ring.
+        """
+        with override_settings(API_TOKEN_PEPPERS={}):  # unset state: derived fallback
+            fallback_peppers = token_peppers()
+            assert set(fallback_peppers) == {1}
+            legacy = Token.objects.create(user=self.user, description="fallback-hashed")
+            legacy_key = legacy.key
+
+        with override_settings(API_TOKEN_PEPPERS={1: PEPPER_1}):
+            # The dedicated ring contains no derived entry.
+            assert token_peppers() == {1: PEPPER_1}
+            # The fallback-hashed token can no longer be looked up.
+            self.assertIsNone(Token.find_by_key(legacy_key))
