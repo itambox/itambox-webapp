@@ -630,9 +630,7 @@ def _fetch_issue_states(numbers, runner=subprocess.run):
         try:
             payload = json.loads(completed.stdout)
         except json.JSONDecodeError as exc:
-            raise PolicyError(
-                f"cannot parse issue-state response for issue #{number}: {exc}"
-            ) from exc
+            raise PolicyError(f"cannot parse issue-state response for issue #{number}: {exc}") from exc
         if payload.get("pull_request") is not None:
             raise PolicyError(
                 f"tracking reference #{number} is a pull request, not an issue; "
