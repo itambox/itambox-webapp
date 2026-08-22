@@ -251,6 +251,18 @@ class TestProdSettingsPosture:
         assert "Keep the current key" not in message
         assert short_key not in message
 
+    def test_prefixed_operator_key_warns_about_preservation(self):
+        """An operator-supplied django-insecure-* key may underpin derived state
+        (earlier releases accepted any non-sentinel key) — the preservation
+        precondition must apply whenever the fallbacks are unset."""
+        prefixed_key = "django-insecure-" + "abcdefghij" * 5  # 66 chars, prefix rule
+        with pytest.raises(ImproperlyConfigured) as exc_info:
+            _load_prod({"ITAMBOX_SECRET_KEY": prefixed_key, "ITAMBOX_FIELD_ENCRYPTION_KEYS": None})
+        message = str(exc_info.value)
+        assert "django-insecure-" in message
+        assert "Keep the current key" in message
+        assert prefixed_key not in message
+
     # ------------------------------------------------------------------
     # Database password — explicitly configured contract
     # ------------------------------------------------------------------
@@ -414,6 +426,13 @@ class TestProductionChecks:
             )
             == []
         )
+
+    def test_field_keys_unsupported_state_warns(self):
+        messages = self._messages(
+            production_checks.check_production_field_encryption_keys,
+            FIELD_ENCRYPTION_KEYS_STATE="unsupported",
+        )
+        assert len(messages) == 1 and messages[0].id == "core.W004"
 
     def test_checks_are_silent_in_dev(self):
         """DEBUG=True (development) must never report the check surface."""

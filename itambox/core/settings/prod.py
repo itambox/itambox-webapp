@@ -53,11 +53,13 @@ if not _secret_key_result.valid:
     # Rotating a rejected operator-provided key is NOT a safe remediation on
     # its own when the SECRET_KEY-derived fallbacks are in use: the operator
     # would silently lose every encrypted field and fallback-hashed API token.
-    # State the preservation precondition instead of blindly telling them to
-    # rotate. (A missing/empty key or a 'django-insecure-' prefix has nothing
-    # worth preserving — those states carry no operator secret.)
+    # Earlier releases accepted any key except the exact dev sentinel, so even
+    # a 'django-insecure-' prefixed operator key may underpin derived state —
+    # every rejected non-missing rule gets the preservation precondition. Only
+    # the absent/empty-development-fallback state (normalized to "missing")
+    # carries no operator secret worth preserving.
     preservation_hint = ""
-    if _secret_key_result.failed_rule in ("too_short", "too_few_distinct_chars") and (
+    if rule in ("too_short", "too_few_distinct_chars", "forbidden_prefix") and (
         FIELD_ENCRYPTION_KEYS_STATE == ConfigState.UNSET.value or API_TOKEN_PEPPERS_STATE == ConfigState.UNSET.value
     ):
         preservation_hint = (
