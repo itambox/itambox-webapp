@@ -3870,14 +3870,6 @@
     {
       "path": "itambox/core/settings/dev.py",
       "code": "F405",
-      "message": "'DATABASES' may be undefined, or defined from star imports: .base",
-      "source": "    DATABASES[\"default\"][\"OPTIONS\"][\"sslmode\"] = \"disable\"",
-      "context": "Module:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Attribute(value=Name(id='_os', ctx=Load()), attr='environ', ctx=Load()), attr='get', ctx=Load()), args=[Constant(value='ITAMBOX_DB_SSLMODE')], keywords=[])):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/dev.py",
-      "code": "F405",
       "message": "'INSTALLED_APPS' may be undefined, or defined from star imports: .base",
       "source": "    INSTALLED_APPS.append(\"debug_toolbar\")",
       "context": "Module:body/If:Compare(left=Constant(value='debug_toolbar'), ops=[NotIn()], comparators=[Name(id='INSTALLED_APPS', ctx=Load())]):body",
@@ -3961,14 +3953,6 @@
       "message": "'REST_FRAMEWORK' may be undefined, or defined from star imports: .base",
       "source": "    **REST_FRAMEWORK,",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/prod.py",
-      "code": "F405",
-      "message": "'SECRET_KEY' may be undefined, or defined from star imports: .base",
-      "source": "if SECRET_KEY == \"django-insecure-dev-only-change-me-in-production\":",
-      "context": "Module:body/If:Compare(left=Name(id='SECRET_KEY', ctx=Load()), ops=[Eq()], comparators=[Constant(value='django-insecure-dev-only-change-me-in-production')]):self",
       "count": 1
     },
     {

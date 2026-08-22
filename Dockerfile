@@ -117,8 +117,12 @@ RUN set -eu; \
     done
 
 # Collect static assets at build time. No database access is required, but prod
-# settings reject missing secrets, so use a throwaway build-only value.
-RUN ITAMBOX_SECRET_KEY=build-time-collectstatic-only-not-a-real-secret \
+# settings reject missing secrets, so generate throwaway build-only values per
+# build: a source-known literal would be readable via `docker history` AND would
+# satisfy the structural contract, which must never legitimize a published key.
+# These values never enter the runtime environment (RUN-scope only).
+RUN ITAMBOX_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" \
+    ITAMBOX_DB_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
     python manage.py collectstatic --noinput
 
 # Drop privileges.

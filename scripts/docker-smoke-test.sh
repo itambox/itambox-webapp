@@ -12,6 +12,15 @@
 #   - the app can round-trip a value through the Valkey cache
 #   - the worker process stays up with no restarts/tracebacks
 #
+# Negative production-configuration cases (issue #439) run before the happy
+# path and must each fail for the intended reason:
+#   - missing ITAMBOX_DB_PASSWORD -> `compose config` fails before start;
+#   - malformed ITAMBOX_API_TOKEN_PEPPERS -> app and worker refuse startup;
+#   - malformed ITAMBOX_FIELD_ENCRYPTION_KEYS -> app and worker refuse startup;
+#   - weak ITAMBOX_SECRET_KEY -> app and worker refuse startup.
+# Every negative case asserts the expected secret-free diagnostic — a bare
+# "container exited" is never accepted.
+#
 # All state (generated secrets, compose project, containers, volumes) is
 # ephemeral and torn down on exit. Nothing here touches a real deployment.
 #
@@ -179,6 +188,122 @@ compose() {
     "$@"
 }
 
+# Compose invocation for negative cases: the four production secret variables
+# are stripped from the shell so a developer's exported environment can never
+# satisfy (or poison) the case being tested.
+compose_clean() {
+  env -u ITAMBOX_SECRET_KEY -u ITAMBOX_DB_PASSWORD \
+    -u ITAMBOX_API_TOKEN_PEPPERS -u ITAMBOX_FIELD_ENCRYPTION_KEYS \
+    docker compose "$@"
+}
+
+# ------------------------------------------------------------------------------
+# Negative production-configuration cases (issue #439)
+# ------------------------------------------------------------------------------
+# Every negative case must fail for the intended reason and assert a
+# secret-free diagnostic — "container exited" alone is never accepted.
+
+write_case_env_file() {
+  # Derive a disposable env file from the valid one. An EMPTY value writes the
+  # variable as a blank assignment (the state .env.example ships); pass a
+  # non-empty value to replace it, or omit the variable entirely by passing
+  # the special sentinel "__missing__".
+  local path="$1" var="$2" value="$3"
+  grep -v "^${var}=" "$ENV_FILE" > "$path"
+  if [[ "$value" != "__missing__" ]]; then
+    printf '%s=%s\n' "$var" "${value:-}"
+  fi >> "$path"
+  chmod 600 "$path"
+}
+
+teardown_negative_projects() {
+  # Negative cases run under their own Compose projects so their containers,
+  # networks, named volumes, and project-scoped images never leak.
+  local p
+  for p in "$PROJECT_NAME-negdb" "$PROJECT_NAME-neg-peppers" \
+           "$PROJECT_NAME-neg-fernet" "$PROJECT_NAME-neg-secretkey" \
+           "$PROJECT_NAME-neg-secretkey-entropy" "$PROJECT_NAME-neg-secretkey-prefix"; do
+    docker compose -p "$p" \
+      -f "$(to_native_path "$COMPOSE_FILE")" \
+      -f "$(to_native_path "$OVERRIDE_FILE")" \
+      down -v --remove-orphans --timeout 10 >/dev/null 2>&1 || true
+    docker image rm -f "$p-app" "$p-worker" >/dev/null 2>&1 || true
+  done
+}
+
+run_negative_db_password_case() {
+  # 1. DB password fail-closed: `compose config` must fail BEFORE any
+  #    container starts, for BOTH the blank value the template ships
+  #    (ITAMBOX_DB_PASSWORD=) and the fully missing variable. Each assert
+  #    targets Compose's interpolation-abort wording, not merely the variable
+  #    name the abort message repeats.
+  local neg_env out exit_code
+  for state in blank missing; do
+    log "Negative case: $state ITAMBOX_DB_PASSWORD must fail compose config..."
+    neg_env="$WORKDIR/smoke-neg-db-$state.env"
+    local value=""
+    [[ "$state" == "missing" ]] && value="__missing__"
+    write_case_env_file "$neg_env" ITAMBOX_DB_PASSWORD "$value"
+    out=""
+    exit_code=0
+    out="$(compose_clean -p "$PROJECT_NAME-negdb" \
+      -f "$(to_native_path "$COMPOSE_FILE")" \
+      -f "$(to_native_path "$OVERRIDE_FILE")" \
+      --env-file "$(to_native_path "$neg_env")" \
+      config 2>&1)" || exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+      die "negative case ($state): compose config accepted ITAMBOX_DB_PASSWORD"
+    fi
+    grep -Fq "ITAMBOX_DB_PASSWORD" <<<"$out" \
+      || die "negative case ($state): missing-DB-password error lacks ITAMBOX_DB_PASSWORD (got: $(tail -5 <<<"$out"))"
+    grep -Eq "required|missing a value" <<<"$out" \
+      || die "negative case ($state): error is not the fail-closed interpolation abort (got: $(tail -5 <<<"$out"))"
+    log "Negative case OK ($state): compose config aborts before start"
+  done
+}
+
+run_negative_startup_case() {
+  # Malformed secret material: app AND worker must refuse startup through the
+  # management-command/preflight path, with a secret-free diagnostic.
+  # usage: run_negative_startup_case <name> <var> <malformed-value> <fragment> <marker>
+  local name="$1" var="$2" value="$3" fragment="$4" marker="$5"
+  local neg_env="$WORKDIR/smoke-neg-$name.env"
+  local neg_override="$WORKDIR/docker-compose.smoke-neg-$name.yml"
+  local env_file_native out exit_code svc
+
+  write_case_env_file "$neg_env" "$var" "$value"
+  env_file_native="$(to_native_path "$neg_env")"
+  cat > "$neg_override" <<EOF
+services:
+  app:
+    env_file: !override
+      - $env_file_native
+  worker:
+    env_file: !override
+      - $env_file_native
+EOF
+
+  for svc in app worker; do
+    log "Negative case: $var malformed ($name) — $svc must refuse startup..."
+    out=""
+    exit_code=0
+    out="$(compose_clean -p "$PROJECT_NAME-neg-$name" \
+      -f "$(to_native_path "$COMPOSE_FILE")" \
+      -f "$(to_native_path "$neg_override")" \
+      --env-file "$(to_native_path "$neg_env")" \
+      run --rm --no-deps "$svc" python manage.py check 2>&1)" || exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+      die "negative case ($name/$svc): malformed $var was accepted (exit 0)"
+    fi
+    if [[ -n "$marker" ]] && grep -Fq "$marker" <<<"$out"; then
+      die "negative case ($name/$svc): diagnostic leaked the secret marker '$marker'"
+    fi
+    grep -Fq "$fragment" <<<"$out" \
+      || die "negative case ($name/$svc): missing expected diagnostic '$fragment' (got: $(tail -5 <<<"$out"))"
+    log "Negative case OK ($name/$svc): refused startup, secret-free diagnostic"
+  done
+}
+
 # ------------------------------------------------------------------------------
 # Setup / teardown
 # ------------------------------------------------------------------------------
@@ -232,8 +357,13 @@ cleanup() {
     fi
   fi
 
-  # Never leave generated secrets on disk, regardless of outcome.
+  # Never leave generated secrets on disk, regardless of outcome — this
+  # includes the derived negative-case env files, which carry the remaining
+  # live secrets. Negative-case Compose projects are torn down separately
+  # because they run under their own project names.
   rm -f "$ENV_FILE" "$OVERRIDE_FILE" 2>/dev/null || true
+  rm -f "$WORKDIR"/smoke-neg-* "$WORKDIR"/docker-compose.smoke-neg-* 2>/dev/null || true
+  teardown_negative_projects
 
   if [[ $ec -ne 0 ]]; then
     log "Diagnostics preserved at: $LOG_DIR"
@@ -423,6 +553,24 @@ main() {
 
   log "Building images from a clean checkout ($REPO_ROOT)..."
   compose build
+
+  # Negative production-configuration cases (issue #439): each must fail for
+  # the intended reason with a secret-free diagnostic.
+  run_negative_db_password_case
+  run_negative_startup_case peppers ITAMBOX_API_TOKEN_PEPPERS "{not-json" \
+    "ITAMBOX_API_TOKEN_PEPPERS" "{not-json"
+  run_negative_startup_case fernet ITAMBOX_FIELD_ENCRYPTION_KEYS \
+    "smoke-invalid-fernet-marker-439" "ITAMBOX_FIELD_ENCRYPTION_KEYS" \
+    "smoke-invalid-fernet-marker-439"
+  run_negative_startup_case secretkey ITAMBOX_SECRET_KEY \
+    "smoke-weak-secret-key-439" "at least 50 characters" \
+    "smoke-weak-secret-key-439"
+  run_negative_startup_case secretkey-entropy ITAMBOX_SECRET_KEY \
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    "at least 5 distinct characters" "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  run_negative_startup_case secretkey-prefix ITAMBOX_SECRET_KEY \
+    "django-insecure-abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij" \
+    "django-insecure-" "django-insecure-abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
 
   log "Starting PostgreSQL and Valkey..."
   compose up -d db valkey

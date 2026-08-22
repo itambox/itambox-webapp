@@ -1,6 +1,6 @@
 {
  "base_commit": "04b4085a853863366c0c7f53b98449a9c225aefe",
- "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), the Snipe-IT importer stage decomposition (#85), and the scanner tenant-scope + EAN/GTIN resolution work (#367) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests. This follow-up also updates stale internal-document references in three existing authorization test modules, and the operator-documentation rebuild adds the new documentation policy gate test module, and the architecture-debt ownership governance work (#440, PR #441), which extends the architecture gate test module. This entry is a diff-recordings-only addition: the module is not a resource-grant test.",
+ "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), the Snipe-IT importer stage decomposition (#85), and the scanner tenant-scope + EAN/GTIN resolution work (#367) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests. This follow-up also updates stale internal-document references in three existing authorization test modules, and the operator-documentation rebuild adds the new documentation policy gate test module, and the architecture-debt ownership governance work (#440, PR #441), which extends the architecture gate test module. This entry is a diff-recordings-only addition: the module is not a resource-grant test. The production configuration contract (#439) adds the config-contract and token-pepper-rotation test modules, extends the crypto, token, and production-settings posture modules, and updates this diff recording.",
  "changed_tests": [
   "itambox/assets/tests/test_assignments.py",
   "itambox/assets/tests/test_audit_ws6_10.py",
@@ -22,8 +22,10 @@
   "itambox/compliance/tests/test_views.py",
   "itambox/core/tests/test_alert_views.py",
   "itambox/core/tests/test_authorization_cache_sync.py",
+  "itambox/core/tests/test_config_contract.py",
   "itambox/core/tests/test_context_isolation.py",
   "itambox/core/tests/test_csp_nonce_context.py",
+  "itambox/core/tests/test_crypto.py",
   "itambox/core/tests/test_csv_import_error_contracts.py",
   "itambox/core/tests/test_delivery_contracts.py",
   "itambox/core/tests/test_e2e_workflow.py",
@@ -150,6 +152,7 @@
   "itambox/users/tests/test_scim_stress.py",
   "itambox/users/tests/test_scim_tenant_group_read_permissions.py",
   "itambox/users/tests/test_token_api.py",
+  "itambox/users/tests/test_token_peppers.py",
   "itambox/users/tests/test_user_config_api.py",
   "itambox/users/tests/test_user_groups.py",
   "itambox/users/tests/test_usergroup_escalation.py",
@@ -334,7 +337,10 @@
   "itambox/core/tests/test_pdf_renderer.py",
   "itambox/organization/tests/test_resource_grant_audit_api.py",
   "itambox/organization/tests/test_resource_grant_expiry.py",
-  "itambox/organization/tests/test_resource_grant_migrations.py"
+  "itambox/organization/tests/test_resource_grant_migrations.py",
+  "itambox/core/tests/test_config_contract.py",
+  "itambox/core/tests/test_crypto.py",
+  "itambox/users/tests/test_token_peppers.py"
  ],
  "supporting_files": [
   "itambox/inventory/tests/factories.py",

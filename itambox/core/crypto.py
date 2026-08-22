@@ -7,37 +7,43 @@ from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+from core.config_contract import ConfigState, parse_field_encryption_keys
+
 logger = logging.getLogger(__name__)
+
+
+def _configured_keys_str():
+    """The configured keyring value: the environment is the single source of truth.
+
+    ``core.settings.base`` derives the tri-state from the same environment, so
+    enforcement (production settings import), key resolution (here), and the
+    tagged check surface always agree. The value is deliberately never read
+    from a Django setting attribute.
+    """
+    return os.environ.get("ITAMBOX_FIELD_ENCRYPTION_KEYS")
 
 
 def get_fernet():
     """
     Get a Fernet or MultiFernet instance.
-    Supports a MultiFernet keyring derived from the comma-separated
-    ITAMBOX_FIELD_ENCRYPTION_KEYS environment variable or Django settings.
-    Falls back to SECRET_KEY hashing in debug/dev environments.
+
+    Uses the comma-separated ITAMBOX_FIELD_ENCRYPTION_KEYS keyring parsed by
+    ``core.config_contract.parse_field_encryption_keys`` — the same validation
+    production settings enforce at import. Unset/blank falls back to SECRET_KEY
+    hashing (development convenience, loudly warned in production). Explicitly
+    malformed key material fails closed with a secret-free diagnostic naming
+    only the failing key index.
     """
-    keys_str = os.environ.get("ITAMBOX_FIELD_ENCRYPTION_KEYS") or getattr(
-        settings, "ITAMBOX_FIELD_ENCRYPTION_KEYS", None
-    )
+    result = parse_field_encryption_keys(_configured_keys_str())
 
-    if keys_str:
-        keys = [k.strip() for k in keys_str.split(",") if k.strip()]
-        if keys:
-            fernet_instances = []
-            for index, k in enumerate(keys, start=1):
-                try:
-                    fernet_instances.append(Fernet(k))
-                except (TypeError, ValueError) as exc:
-                    raise ImproperlyConfigured(
-                        "ITAMBOX_FIELD_ENCRYPTION_KEYS contains an invalid Fernet key "
-                        f"at index {index}; configured keys must be urlsafe base64-encoded 32-byte keys."
-                    ) from exc
+    if result.state == ConfigState.VALID:
+        fernet_instances = [Fernet(key) for key in result.keys]
+        if len(fernet_instances) > 1:
+            return MultiFernet(fernet_instances)
+        return fernet_instances[0]
 
-            if len(fernet_instances) > 1:
-                return MultiFernet(fernet_instances)
-            elif fernet_instances:
-                return fernet_instances[0]
+    if result.state == ConfigState.MALFORMED:
+        raise ImproperlyConfigured(f"ITAMBOX_FIELD_ENCRYPTION_KEYS is malformed: {result.error}.")
 
     key_bytes = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
     fernet_key = base64.urlsafe_b64encode(key_bytes)
@@ -46,21 +52,16 @@ def get_fernet():
 
 def is_using_derived_encryption_key() -> bool:
     """
-    True when no usable ITAMBOX_FIELD_ENCRYPTION_KEYS is configured, meaning
-    get_fernet() falls back to deriving the field-encryption key from SECRET_KEY.
+    True exactly when the field-encryption keyring is unset/blank, meaning
+    get_fernet() falls back to deriving the key from SECRET_KEY.
 
-    Mirrors the key resolution in get_fernet() exactly: reads the same env var
-    (falling back to the Django setting), strips and splits on commas, and treats
-    the value as usable only if at least one non-empty key remains. When this
-    returns True, rotating SECRET_KEY makes all encrypted fields unrecoverable.
+    Mirrors the parsing in get_fernet() via the same helper: explicitly
+    malformed material is NOT an accidental fallback — production settings
+    refuse to import it and get_fernet() raises. When this returns True,
+    rotating SECRET_KEY makes all encrypted fields unrecoverable.
     """
-    keys_str = os.environ.get("ITAMBOX_FIELD_ENCRYPTION_KEYS") or getattr(
-        settings, "ITAMBOX_FIELD_ENCRYPTION_KEYS", None
-    )
-    if not keys_str:
-        return True
-    keys = [k.strip() for k in keys_str.split(",") if k.strip()]
-    return not keys
+    result = parse_field_encryption_keys(_configured_keys_str())
+    return result.state is ConfigState.UNSET
 
 
 def encrypt_string(plain_text: str) -> str:
