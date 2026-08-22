@@ -65,7 +65,10 @@ class CoreCryptoTestCase(TestCase):
             self.assertEqual(decrypt_string(legacy_cipher), plain)
 
             new_cipher = encrypt_string(plain)
-            self.assertNotEqual(new_cipher, legacy_cipher)
+            # Fernet embeds a random IV and timestamp, so two ciphertexts
+            # differ even under one key — the primary-key binding is proven by
+            # the new-key-only decrypt step right below, not by a comparison.
+            # The real proof is that new_cipher decrypts with ONLY the new key.
 
             # The new ciphertext is bound to the primary key alone.
             os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"] = new_key

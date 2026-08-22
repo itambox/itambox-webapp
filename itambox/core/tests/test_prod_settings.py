@@ -26,6 +26,7 @@ import importlib
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 import warnings
@@ -35,7 +36,7 @@ from unittest import mock
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-# A compliant secret key for the positive baseline cases (54 chars, many
+# A compliant secret key for the positive baseline cases (52 chars, many
 # distinct, no forbidden prefix) — any value passing the W009-equivalent
 # contract works.
 SECURE_KEY = "prod-posture-test-stable-secret-key-0123456789abcdef"
@@ -205,9 +206,9 @@ class TestProdSettingsPosture:
         """Every W009-rejected key must fail at import, identifying the rule."""
         cases = [
             # (label, value, expected diagnostic fragment)
-            # A missing/empty key materializes as the base-settings dev fallback,
-            # so the honest diagnostic is the forbidden-prefix rule.
-            ("missing", None, "django-insecure-"),
+            # A missing/empty key materializes as the base-settings dev fallback;
+            # prod reports the honest "missing" rule in that case.
+            ("missing", None, "missing"),
             ("49-char", "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM", "at least 50 characters"),
             ("few-distinct", "abcd" * 14, "at least 5 distinct characters"),
             ("forbidden-prefix", "django-insecure-" + "abcdefghij" * 5, "django-insecure-"),
@@ -226,7 +227,7 @@ class TestProdSettingsPosture:
         prod = _load_prod({})
         assert prod.SECRET_KEY == SECURE_KEY
 
-    def test_rejected_key_with_unset_fallbacks_warms_about_preservation(self):
+    def test_rejected_key_with_unset_fallbacks_warns_about_preservation(self):
         """A short operator key must warn against blindly rotating when the
         SECRET_KEY-derived fallbacks are in use (data-loss precondition)."""
         short_key = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM"  # 49 chars
@@ -276,13 +277,14 @@ class TestProdSettingsPosture:
         )
 
     def test_malformed_peppers_raise_in_prod(self):
-        for raw in ("{not-json", "[1,2]", "{}", json.dumps({"1": "short"}), SECRET_MARKER):
+        too_short_marker = "tooshort-marker-439"
+        for raw in ("{not-json", "[1,2]", "{}", json.dumps({"1": too_short_marker}), SECRET_MARKER):
             with pytest.raises(ImproperlyConfigured) as exc_info:
                 _load_prod({"ITAMBOX_API_TOKEN_PEPPERS": raw})
             message = str(exc_info.value)
             assert "ITAMBOX_API_TOKEN_PEPPERS" in message
             assert SECRET_MARKER not in message
-            assert "short" not in message
+            assert too_short_marker not in message
 
     def test_malformed_peppers_never_downgrade_to_empty(self):
         """An explicitly malformed mapping must fail, not silently become {}."""
@@ -355,13 +357,22 @@ class TestProductionEntryPaths:
 
     @staticmethod
     def _run(code, extra_env, timeout=90):
-        env = os.environ.copy()
+        # The child environment is an explicit allowlist, NOT the operator's
+        # environment: real secrets on the runner must never reach the child
+        # (or its error output). Only what Django needs to boot is inherited.
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+            "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+            "TEMP": os.environ.get("TEMP", ""),
+            "PYTHONUNBUFFERED": "1",
+            "DJANGO_SETTINGS_MODULE": "core.settings.prod",
+        }
         env.update(BASELINE_ENV)
         env.update({k: v for k, v in extra_env.items() if v is not None})
         for key, value in extra_env.items():
             if value is None:
                 env.pop(key, None)
-        env["DJANGO_SETTINGS_MODULE"] = "core.settings.prod"
         return subprocess.run(
             [sys.executable, "-c", code],
             capture_output=True,
@@ -434,16 +445,51 @@ class TestProductionEntryPaths:
 
     @pytest.mark.serial_only
     def test_malformed_config_exits_qcluster_promptly(self):
-        """A malformed config must stop the worker before it processes work."""
-        result = self._run(self._QCLUSTER_CODE, {"ITAMBOX_API_TOKEN_PEPPERS": SECRET_MARKER}, timeout=60)
-        assert result.returncode != 0, "qcluster accepted malformed peppers"
-        combined = result.stderr + result.stdout
+        """A malformed config must stop the worker before it processes work.
+
+        The compliant-worker liveness proof lives in the Docker smoke test
+        (scripts/docker-smoke-test.sh -> verify_worker_stable): an ephemeral
+        stack with generated secrets keeps the real qcluster container running.
+        Starting a live worker inside pytest would dequeue real tasks from the
+        shared database, so only the prompt-exit property is proven here.
+        """
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+            "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+            "TEMP": os.environ.get("TEMP", ""),
+            "PYTHONUNBUFFERED": "1",
+            "DJANGO_SETTINGS_MODULE": "core.settings.prod",
+        }
+        env.update(BASELINE_ENV)
+        env["ITAMBOX_API_TOKEN_PEPPERS"] = SECRET_MARKER
+        proc = subprocess.Popen(
+            [sys.executable, "-c", self._QCLUSTER_CODE],
+            cwd=ITAMBOX_DIR,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+        )
+        try:
+            try:
+                out, err = proc.communicate(timeout=60)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                pytest.fail("qcluster did not exit promptly for malformed peppers")
+        finally:
+            # Kill the whole process tree so a hypothetical survivor can never
+            # orphan django-q workers against a database.
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, check=False)
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+        assert proc.returncode != 0, "qcluster accepted malformed peppers"
+        combined = out + err
         assert "ITAMBOX_API_TOKEN_PEPPERS" in combined
         assert SECRET_MARKER not in combined
-
-    @pytest.mark.serial_only
-    def test_compliant_config_keeps_qcluster_running(self):
-        """A compliant config must keep the worker process alive (bounded run)."""
-        with pytest.raises(subprocess.TimeoutExpired):
-            self._run(self._QCLUSTER_CODE, {}, timeout=12)
-        # TimeoutExpired means the worker was still running when the bound hit.
