@@ -59,11 +59,11 @@ To rotate:
 Validation falls back to a `SECRET_KEY`-derived pepper only when the setting
 is unset/blank — production starts with a loud warning in that state, and
 tokens hashed under the fallback stop validating once a dedicated mapping is
-configured (re-issue them). An explicitly supplied value that is not a valid
-mapping **aborts production startup** with a secret-free diagnostic; malformed
-configuration never silently falls back (see
-[Installation](../operations/installation.md)). For development only, the
-fallback is accepted.
+configured (re-issue them after the cutover). An explicitly supplied
+**non-blank** value that is not a valid mapping **aborts production startup**
+with a secret-free diagnostic; malformed configuration never silently falls
+back (see [Installation](../operations/installation.md)). The fallback is only
+appropriate for development.
 
 ## Trusted proxies and forwarded client IPs
 

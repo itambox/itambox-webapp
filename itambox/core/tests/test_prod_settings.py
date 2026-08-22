@@ -270,11 +270,12 @@ class TestProdSettingsPosture:
     # ------------------------------------------------------------------
 
     def test_missing_peppers_warn_in_prod(self):
-        """Unset peppers keep the warned SECRET_KEY-derived fallback in prod."""
-        records, _ = _prod_log_records({"ITAMBOX_API_TOKEN_PEPPERS": None})
-        assert any("ITAMBOX_API_TOKEN_PEPPERS" in msg and "SECRET_KEY" in msg for msg in records), (
-            "Expected a startup warning about the missing peppers fallback in production."
-        )
+        """Unset or blank peppers keep the warned SECRET_KEY-derived fallback in prod."""
+        for value in (None, "", "   "):
+            records, _ = _prod_log_records({"ITAMBOX_API_TOKEN_PEPPERS": value})
+            assert any("ITAMBOX_API_TOKEN_PEPPERS" in msg and "SECRET_KEY" in msg for msg in records), (
+                f"Expected a startup warning about the missing peppers fallback (value={value!r})."
+            )
 
     def test_malformed_peppers_raise_in_prod(self):
         too_short_marker = "tooshort-marker-439"
