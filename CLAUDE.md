@@ -242,9 +242,16 @@ direction" below). The gate builds the first-party import graph twice -- once
 from module-top imports, once including function-body imports -- and both graphs
 block, so moving an import into a function changes which rule fails and nothing
 else. `if TYPE_CHECKING:` imports are in neither graph. Accepted debt is frozen
-in `scripts/architecture_baseline.json`, a schema-v1 identity baseline whose rows
-each carry a derived `area:*` owner, a removal issue, and a removal direction of
-at least 40 characters; a SHA-256 fingerprint binds it to the effective policy.
+in `scripts/architecture_baseline.json` (schema v2) with an owning `area:*` label
+and a machine-readable `disposition`: `debt` rows also name the open tracking
+issue that will remove them — recorded in the reviewed
+`scripts/architecture_issue_states.json` snapshot, refreshed with `python
+scripts/check_architecture.py --refresh-issue-states` — and a removal direction
+of at least 40 characters; `accepted` rows carry a stable rationale and no
+removal promise. The offline gate never reaches the network; CI refreshes the
+snapshot live and rejects any reference that is a pull request rather than a
+real, open issue. Cycles and cycle claims are always `debt`. A SHA-256
+fingerprint binds the baseline to the effective policy.
 A model importing a form, a table, or a view (`R-M1`) has no baseline
 representation at any severity and cannot be written even by
 `--write-baseline`. New identities are never absorbed: hand-review the row in

@@ -61,7 +61,7 @@ except ModuleNotFoundError:  # direct execution puts scripts/ on sys.path, not t
         _statement_comment,
     )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 CANONICAL_PYTHON = (3, 12)
 
 # The Django project directory is both the scanned tree and the dotted-name

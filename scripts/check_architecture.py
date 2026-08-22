@@ -14,11 +14,17 @@ imports are in neither graph; they never execute, and a typing-only back edge is
 the sanctioned fix for a real cycle.
 
 Accepted debt lives in ``scripts/architecture_baseline.json``. Every row carries
-an owning ``area:*`` label, a removal issue, and a stated removal direction, so
-the baseline is a work list rather than a suppression file. Two things can never
-enter it: a ``domain-model -> presentation`` edge, which has no representation at
-any severity, and a newly observed identity, which has to be hand-reviewed into
-the file rather than absorbed by ``--write-baseline``.
+an owning ``area:*`` label and a machine-readable ``disposition``: ``debt`` rows
+also record the tracking issue that will remove them and a stated removal
+direction, so the baseline is a work list rather than a suppression file, while
+``accepted`` rows record a stable rationale and no false removal promise. The
+removal issues of every ``debt`` row must be the open ones recorded in the
+reviewed ``scripts/architecture_issue_states.json`` snapshot, refreshed with
+``--refresh-issue-states``; the gate itself never reaches the network. Two
+things can never enter the baseline: a ``domain-model -> presentation`` edge,
+which has no representation at any severity, and a newly observed identity,
+which has to be hand-reviewed into the file rather than absorbed by
+``--write-baseline``.
 
 Three exit codes, and they mean different things. ``0`` is a clean graph. ``1``
 is a policy regression a contributor fixes. ``2`` is a result nobody should
@@ -29,8 +35,10 @@ module, a source file that will not parse, or the wrong interpreter.
 import argparse
 import collections
 import contextlib
+import datetime
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -89,11 +97,33 @@ except ModuleNotFoundError:  # direct execution puts scripts/ on sys.path, not t
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BASELINE_PATH = REPO_ROOT / "scripts" / "architecture_baseline.json"
+ISSUE_STATES_PATH = REPO_ROOT / "scripts" / "architecture_issue_states.json"
 
 BASELINE_SECTIONS = ("cycles", "layer_exceptions", "unsupported_cycle_claims")
 HEADER_FIELDS = ("schema_version", "canonical_python", "policy_sha256")
 
-CYCLE_FIELDS = ("id", "graph", "modules", "edges", "owner", "removal_issue", "removal_direction", "accepted_reason")
+ISSUE_STATES_SCHEMA_VERSION = 1
+
+# Every row declares how the gate may treat it. ``debt`` promises removal
+# through a live tracking issue; ``accepted`` records intentional architecture
+# with a stable rationale and no removal promise. Cycles and unsupported cycle
+# claims can never be accepted: they are findings, not policy cells.
+DISPOSITIONS = frozenset({"debt", "accepted"})
+DEBT_DISPOSITION = "debt"
+ACCEPTED_DISPOSITION = "accepted"
+SCAFFOLD_DISPOSITION = "TODO"
+
+CYCLE_FIELDS = (
+    "id",
+    "graph",
+    "modules",
+    "edges",
+    "owner",
+    "disposition",
+    "removal_issue",
+    "removal_direction",
+    "accepted_reason",
+)
 OPTIONAL_CYCLE_FIELDS = ("notes",)
 EXCEPTION_FIELDS = (
     "id",
@@ -105,9 +135,13 @@ EXCEPTION_FIELDS = (
     "kind",
     "count",
     "owner",
+    "disposition",
     "removal_issue",
     "removal_direction",
     "accepted_reason",
+)
+EXCEPTION_FIELDS_ACCEPTED = tuple(
+    field for field in EXCEPTION_FIELDS if field not in ("removal_issue", "removal_direction")
 )
 CLAIM_FIELDS = (
     "id",
@@ -117,13 +151,14 @@ CLAIM_FIELDS = (
     "statement",
     "targets",
     "owner",
+    "disposition",
     "removal_issue",
     "removal_direction",
 )
 
 # Fields a machine must never author. ``--write-baseline`` carries them forward
 # verbatim and the scaffold writes sentinels the loader refuses.
-HUMAN_FIELDS = ("removal_issue", "removal_direction", "accepted_reason", "notes")
+HUMAN_FIELDS = ("removal_issue", "removal_direction", "accepted_reason", "notes", "disposition")
 SCAFFOLD_ISSUE = 0
 SCAFFOLD_DIRECTION = "TODO"
 MINIMUM_REMOVAL_DIRECTION = 40
@@ -297,6 +332,10 @@ def _validate_cycle_row(row, index):
         set(CYCLE_FIELDS) <= set(row) <= set(CYCLE_FIELDS) | set(OPTIONAL_CYCLE_FIELDS),
         f"cycles row {index} has invalid fields",
     )
+    _require(
+        row["disposition"] == DEBT_DISPOSITION,
+        f"cycles row {index} records disposition {row['disposition']!r}; a cycle is always debt",
+    )
     _require(row["graph"] in GRAPH_NAMES, f"cycles row {index} names an unknown graph {row['graph']!r}")
     modules = row["modules"]
     _require(isinstance(modules, list) and len(modules) >= 2, f"cycles row {index} needs at least two modules")
@@ -329,7 +368,21 @@ def _validate_cycle_edges(row, index, members):
 
 
 def _validate_exception_row(row, index):
-    _require(isinstance(row, dict) and set(row) == set(EXCEPTION_FIELDS), f"layer_exceptions row {index} fields")
+    _require(isinstance(row, dict), f"layer_exceptions row {index} is not an object")
+    disposition = row.get("disposition")
+    _require(
+        disposition in DISPOSITIONS,
+        f"layer_exceptions row {index} records an invalid disposition {disposition!r}; "
+        "triage the row as debt or accepted",
+    )
+    if disposition == ACCEPTED_DISPOSITION:
+        _require(
+            set(row) == set(EXCEPTION_FIELDS_ACCEPTED),
+            f"layer_exceptions row {index} has invalid fields for disposition 'accepted'; "
+            "an accepted exception records no removal_issue or removal_direction",
+        )
+    else:
+        _require(set(row) == set(EXCEPTION_FIELDS), f"layer_exceptions row {index} fields")
     rule = row["rule"]
     _require(rule in MATRIX_RULES, f"layer_exceptions row {index} names an unknown rule {rule!r}")
     _require(
@@ -345,7 +398,8 @@ def _validate_exception_row(row, index):
     _validate_exception_layers(row, index)
     _require(str(row["accepted_reason"]).strip(), f"layer_exceptions row {index} has an empty accepted_reason")
     _validate_owner(row, (row["source"], row["target"]), index, "layer_exceptions")
-    _validate_removal_metadata(row, index, "layer_exceptions")
+    if disposition == DEBT_DISPOSITION:
+        _validate_removal_metadata(row, index, "layer_exceptions")
     identity = exception_id(rule, row["source"], row["target"], row["kind"])
     _require(row["id"] == identity, f"layer_exceptions row {index} has a hand-edited identity")
     return identity
@@ -363,6 +417,11 @@ def _validate_exception_layers(row, index):
 
 def _validate_claim_row(row, index):
     _require(isinstance(row, dict) and set(row) == set(CLAIM_FIELDS), f"unsupported_cycle_claims row {index} fields")
+    _require(
+        row["disposition"] == DEBT_DISPOSITION,
+        f"unsupported_cycle_claims row {index} records disposition {row['disposition']!r}; "
+        "a cycle claim is always debt",
+    )
     targets = row["targets"]
     _require(isinstance(targets, list), f"unsupported_cycle_claims row {index} has invalid targets")
     _require(targets == sorted(targets), f"unsupported_cycle_claims row {index} has unsorted targets")
@@ -445,6 +504,179 @@ def write_baseline(rows, baseline_path, fingerprint):
 
 
 # --------------------------------------------------------------------------
+# Issue-state snapshot
+# --------------------------------------------------------------------------
+
+SNAPSHOT_KEYS = frozenset({"schema_version", "refreshed_at", "issues"})
+
+
+def _validate_issue_states(raw, path):
+    """The snapshot is numbers and states only -- no titles, no bodies, no tokens."""
+    _require(
+        isinstance(raw, dict) and set(raw) == SNAPSHOT_KEYS,
+        f"issue-state snapshot {path} has invalid top-level fields",
+    )
+    _require(
+        raw["schema_version"] == ISSUE_STATES_SCHEMA_VERSION,
+        f"expected issue-state snapshot schema {ISSUE_STATES_SCHEMA_VERSION}",
+    )
+    _require(
+        isinstance(raw["refreshed_at"], str) and raw["refreshed_at"],
+        f"issue-state snapshot {path} has no refreshed_at",
+    )
+    issues = raw["issues"]
+    _require(isinstance(issues, dict), f"issue-state snapshot {path} issues must be an object")
+    parsed = {}
+    for key, state in issues.items():
+        try:
+            number = int(key)
+        except (TypeError, ValueError) as exc:
+            raise PolicyError(f"issue-state snapshot {path} has a non-numeric issue key {key!r}") from exc
+        _require(number > 0, f"issue-state snapshot {path} records invalid issue number {number}")
+        _require(
+            state in ("open", "closed"),
+            f"issue-state snapshot {path} records invalid state {state!r} for issue {number}",
+        )
+        parsed[number] = state
+    return parsed
+
+
+def load_issue_states(path):
+    """The parsed snapshot, or ``None`` when the file does not exist yet."""
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise PolicyError(f"cannot read issue-state snapshot {path}: {exc}") from exc
+    return _validate_issue_states(raw, path)
+
+
+def _debt_rows(recorded):
+    for section in BASELINE_SECTIONS:
+        for row in recorded[section].values():
+            if row.get("disposition", DEBT_DISPOSITION) == DEBT_DISPOSITION:
+                yield section, row
+
+
+def _validate_liveness(recorded, states, snapshot_path):
+    """A debt row may only reference an issue the snapshot records as open.
+
+    The snapshot is reviewed and checked in, never fetched here: local and
+    offline runs stay deterministic and network-free.
+    """
+    referenced = {}
+    for section, row in _debt_rows(recorded):
+        referenced.setdefault(row["removal_issue"], []).append(f"{section}:{row['id']}")
+    if not referenced:
+        return
+    if states is None:
+        raise PolicyError(
+            f"no issue-state snapshot at {snapshot_path}; active-debt rows reference "
+            "tracking issues -- run `python scripts/check_architecture.py "
+            "--refresh-issue-states` and commit the reviewed snapshot"
+        )
+    missing = sorted(number for number in referenced if number not in states)
+    if missing:
+        raise PolicyError(
+            "issue-state snapshot does not record tracked issue(s) "
+            + ", ".join(f"#{number}" for number in missing)
+            + "; refresh it with --refresh-issue-states"
+        )
+    extra = sorted(set(states) - set(referenced))
+    if extra:
+        raise PolicyError(
+            "issue-state snapshot records issue(s) no baseline row references: "
+            + ", ".join(f"#{number}" for number in extra)
+            + "; refresh it with --refresh-issue-states"
+        )
+    closed = sorted(number for number, state in states.items() if state != "open")
+    if closed:
+        example = referenced[closed[0]][0]
+        raise PolicyError(
+            "active-debt baseline row(s) reference closed or non-open issue(s) "
+            + ", ".join(f"#{number}" for number in closed)
+            + f" (e.g. {example}); re-track the debt on an open issue, or refresh the snapshot"
+        )
+
+
+def _fetch_issue_states(numbers, runner=subprocess.run):
+    """Query the gh CLI for one state per referenced issue; never stores a token.
+
+    The GitHub issues endpoint also serves pull requests, so this verifies the
+    reference is a real issue (no ``pull_request`` key), exists (non-zero gh
+    exit), and reports an open/closed state -- a PR is never an acceptable
+    removal tracker.
+    """
+    states = {}
+    for number in sorted(numbers):
+        command = [
+            "gh",
+            "api",
+            f"repos/itambox/itambox-webapp/issues/{number}",
+            "--jq",
+            "{state, pull_request}",
+        ]
+        try:
+            completed = runner(command, capture_output=True, text=True)
+        except FileNotFoundError as exc:
+            raise PolicyError(
+                "cannot run the gh CLI; install GitHub CLI and authenticate, or record "
+                "reviewed issue states in the snapshot by hand"
+            ) from exc
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "unknown error").strip()
+            raise PolicyError(f"cannot read state for issue #{number}: {detail[:200]}")
+        try:
+            payload = json.loads(completed.stdout)
+        except json.JSONDecodeError as exc:
+            raise PolicyError(f"cannot parse issue-state response for issue #{number}: {exc}") from exc
+        if payload.get("pull_request") is not None:
+            raise PolicyError(
+                f"tracking reference #{number} is a pull request, not an issue; "
+                "active-debt rows must reference a real open issue"
+            )
+        state = payload.get("state")
+        _require(state in ("open", "closed"), f"unexpected state {state!r} for issue #{number}")
+        states[number] = state
+    return states
+
+
+def write_issue_states(path, states):
+    document = {
+        "schema_version": ISSUE_STATES_SCHEMA_VERSION,
+        "refreshed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "issues": {str(number): states[number] for number in sorted(states)},
+    }
+    try:
+        Path(path).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+    except OSError as exc:
+        raise PolicyError(f"cannot write issue-state snapshot {path}: {exc}") from exc
+    return len(states)
+
+
+def refresh_issue_states(baseline_path, snapshot_path, fingerprint, runner=subprocess.run):
+    """Freeze the state of every referenced tracking issue into the snapshot.
+
+    Deterministic when nothing changed: an identical issues map leaves the file
+    untouched, so a CI drift check that runs this command and then ``git diff``
+    only fails on real drift. Returns True when the snapshot was rewritten.
+    """
+    recorded = load_baseline(baseline_path, fingerprint, allow_policy_drift=False)
+    referenced = {row["removal_issue"] for _section, row in _debt_rows(recorded)}
+    states = _fetch_issue_states(referenced, runner=runner)
+    existing = load_issue_states(snapshot_path)
+    if existing == states:
+        print(f"Issue-state snapshot {snapshot_path} is already current.")
+        return False
+    written = write_issue_states(snapshot_path, states)
+    print(f"Wrote issue-state snapshot for {written} issue(s) to {snapshot_path}.")
+    if not referenced:
+        print("No baseline row references a tracking issue; the snapshot is empty.")
+    return True
+
+
+# --------------------------------------------------------------------------
 # Row construction
 # --------------------------------------------------------------------------
 
@@ -456,6 +688,7 @@ def _cycle_row(component, recorded):
         "modules": list(component.modules),
         "edges": [{"source": source, "target": target, "kind": kind} for source, target, kind in component.edges],
         "owner": owner_for_modules(component.modules),
+        "disposition": SCAFFOLD_DISPOSITION,
         "removal_issue": SCAFFOLD_ISSUE,
         "removal_direction": SCAFFOLD_DIRECTION,
         "accepted_reason": SCAFFOLD_DIRECTION,
@@ -477,6 +710,7 @@ def _exception_row(identity, count, recorded):
         "kind": kind,
         "count": count,
         "owner": owner_for_modules((source, target)),
+        "disposition": SCAFFOLD_DISPOSITION,
         "removal_issue": SCAFFOLD_ISSUE,
         "removal_direction": SCAFFOLD_DIRECTION,
         "accepted_reason": SCAFFOLD_DIRECTION,
@@ -500,6 +734,7 @@ def _claim_row(claim, offenders, recorded):
         "statement": claim.statement,
         "targets": sorted(offenders),
         "owner": owner_for_modules((claim.source, *sorted(offenders))),
+        "disposition": SCAFFOLD_DISPOSITION,
         "removal_issue": SCAFFOLD_ISSUE,
         "removal_direction": SCAFFOLD_DIRECTION,
     }
@@ -513,6 +748,11 @@ def _carry_forward(row, recorded):
     for field in HUMAN_FIELDS:
         if field in row and field in recorded:
             row[field] = recorded[field]
+    if row.get("disposition") == ACCEPTED_DISPOSITION:
+        # An accepted exception records no removal promise. The debt-shaped
+        # scaffold fields must not reappear on a regeneration.
+        row.pop("removal_issue", None)
+        row.pop("removal_direction", None)
     return row
 
 
@@ -664,7 +904,8 @@ def _print_regeneration_hint(baseline_path):
         f"{CANONICAL_PYTHON[0]}.{CANONICAL_PYTHON[1]} with "
         "`python scripts/check_architecture.py --write-baseline` and review the "
         f"{baseline_path} diff. New debt is never absorbed: hand-review the row "
-        "into the file first, with an owner, a removal issue, and a removal direction."
+        "into the file first, with an owner, a disposition, a removal issue, and a "
+        "removal direction."
     )
 
 
@@ -912,10 +1153,10 @@ def _run_write(args, graph, observed, recorded, bootstrapping):
     print(f"Wrote {written} baseline row(s) to {args.baseline}")
     if bootstrapping:
         print(
-            "\nThis is a scaffold, not a pass. Every row carries removal_issue 0 and "
-            'removal_direction "TODO", which the loader refuses, so the gate stays red '
-            "until each row is triaged by hand with the issue that will remove it and a "
-            "concrete removal_direction of at least "
+            "\nThis is a scaffold, not a pass. Every row carries removal_issue 0, "
+            'removal_direction "TODO", and disposition "TODO", which the loader '
+            "refuses, so the gate stays red until each row is triaged by hand with "
+            "the issue that will remove it, a concrete removal_direction of at least "
             f"{MINIMUM_REMOVAL_DIRECTION} characters."
         )
         return 1
@@ -946,6 +1187,18 @@ def parse_args(argv):
     )
     parser.add_argument("targets", nargs="*", default=list(DEFAULT_TARGETS))
     parser.add_argument("--baseline", type=Path, default=BASELINE_PATH, help="Path to the baseline JSON file.")
+    parser.add_argument(
+        "--issue-states",
+        type=Path,
+        default=ISSUE_STATES_PATH,
+        help="Path to the issue-state snapshot JSON file.",
+    )
+    parser.add_argument(
+        "--refresh-issue-states",
+        action="store_true",
+        help="Query the gh CLI for every referenced tracking issue and freeze its state "
+        "in the reviewed issue-state snapshot.",
+    )
     parser.add_argument("--cwd", type=Path, default=REPO_ROOT, help="Repository root the targets resolve against.")
     parser.add_argument("--format", choices=("text", "json"), default="text", help="Output format.")
     parser.add_argument(
@@ -997,6 +1250,7 @@ def _decide(args, graph, observed, fingerprint):
         if bootstrapping or report_only
         else load_baseline(args.baseline, fingerprint, allow_policy_drift=args.write_baseline)
     )
+    _validate_liveness(recorded, load_issue_states(args.issue_states), args.issue_states)
 
     _refuse_downgraded_components(observed, recorded)
     if args.write_baseline:
@@ -1035,6 +1289,12 @@ def main(argv=None):
     if args.report_only:
         print(REPORT_ONLY_BANNER, file=sys.stderr)
     try:
+        if args.refresh_issue_states:
+            if args.format == "json":
+                raise PolicyError("cannot combine --refresh-issue-states with --format json")
+            fingerprint = compute_policy_fingerprint(args.targets)
+            refresh_issue_states(args.baseline, args.issue_states, fingerprint)
+            return 0
         return _run_gate(args)
     except PolicyError as exc:
         print(f"architecture gate failed: {exc}", file=sys.stderr)

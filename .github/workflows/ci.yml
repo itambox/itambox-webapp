@@ -34,6 +34,7 @@ on:
       - "itambox/mkdocs.yml"
       - "scripts/**/*.py"
       - "scripts/architecture_baseline.json"
+      - "scripts/architecture_issue_states.json"
       - "scripts/contract_policy_manifest.json"
       - "scripts/migration_audit.json"
       - "scripts/exception_baseline.json"
@@ -391,6 +392,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # ``--refresh-issue-states`` reads issue state through the GitHub API; the
+    # workflow-level ``contents: read`` does not cover that scope.
+    permissions:
+      contents: read
+      issues: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -438,6 +444,18 @@ jobs:
       - name: Check the architecture boundary gate
         run: |
           uv run --locked --no-sync python scripts/check_architecture.py
+
+      # The issue-state snapshot freezes which tracking issues the baseline may
+      # reference. Refresh it from the API and fail when the refreshed document
+      # differs: a closed or re-tracked issue stops CI until the snapshot is
+      # re-reviewed and committed. The refresh is deterministic when nothing
+      # changed, so this step does not rewrite the file on every run.
+      - name: Refresh the architecture issue-state snapshot
+        run: |
+          uv run --locked --no-sync python scripts/check_architecture.py --refresh-issue-states
+          git diff --exit-code -- scripts/architecture_issue_states.json
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # Two independent checks in one step: an identity ratchet over broad and
       # pass-only handlers, and a hard refusal of silent failures in crypto,
