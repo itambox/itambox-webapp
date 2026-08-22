@@ -91,4 +91,12 @@ def check_production_field_encryption_keys(app_configs, **kwargs):
                 id="core.E002",
             )
         ]
+    if state == "unsupported":
+        return [
+            Warning(
+                "The field-encryption keyring configuration state is unavailable in "
+                "this settings module; enforcement may be bypassed.",
+                id="core.W004",
+            )
+        ]
     return []
