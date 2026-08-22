@@ -601,10 +601,22 @@ def _validate_liveness(recorded, states, snapshot_path):
 
 
 def _fetch_issue_states(numbers, runner=subprocess.run):
-    """Query the gh CLI for one state per referenced issue; never stores a token."""
+    """Query the gh CLI for one state per referenced issue; never stores a token.
+
+    The GitHub issues endpoint also serves pull requests, so this verifies the
+    reference is a real issue (no ``pull_request`` key), exists (non-zero gh
+    exit), and reports an open/closed state -- a PR is never an acceptable
+    removal tracker.
+    """
     states = {}
     for number in sorted(numbers):
-        command = ["gh", "api", f"repos/itambox/itambox-webapp/issues/{number}", "--jq", ".state"]
+        command = [
+            "gh",
+            "api",
+            f"repos/itambox/itambox-webapp/issues/{number}",
+            "--jq",
+            "{state, pull_request}",
+        ]
         try:
             completed = runner(command, capture_output=True, text=True)
         except FileNotFoundError as exc:
@@ -615,7 +627,18 @@ def _fetch_issue_states(numbers, runner=subprocess.run):
         if completed.returncode != 0:
             detail = (completed.stderr or completed.stdout or "unknown error").strip()
             raise PolicyError(f"cannot read state for issue #{number}: {detail[:200]}")
-        state = completed.stdout.strip()
+        try:
+            payload = json.loads(completed.stdout)
+        except json.JSONDecodeError as exc:
+            raise PolicyError(
+                f"cannot parse issue-state response for issue #{number}: {exc}"
+            ) from exc
+        if payload.get("pull_request") is not None:
+            raise PolicyError(
+                f"tracking reference #{number} is a pull request, not an issue; "
+                "active-debt rows must reference a real open issue"
+            )
+        state = payload.get("state")
         _require(state in ("open", "closed"), f"unexpected state {state!r} for issue #{number}")
         states[number] = state
     return states

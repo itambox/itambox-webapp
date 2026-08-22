@@ -1273,11 +1273,17 @@ class IssueStateRefreshTests(GateTestCase):
     def seed_platform_service_violation(self):
         self.write_tree({"itambox/core/tasks/context.py": "from assets.models.asset import Asset\n"})
 
-    def fake_runner(self, states):
+    def fake_runner(self, states, pull_request=False):
         def runner(command, **kwargs):
             number = int(command[2].rsplit("/", 1)[1])
             if number in states:
-                return types.SimpleNamespace(returncode=0, stdout=states[number], stderr="")
+                payload = json.dumps(
+                    {
+                        "state": states[number],
+                        "pull_request": {"number": number} if pull_request else None,
+                    }
+                )
+                return types.SimpleNamespace(returncode=0, stdout=payload, stderr="")
             return types.SimpleNamespace(returncode=1, stdout="", stderr="Not Found")
 
         return runner
@@ -1333,6 +1339,38 @@ class IssueStateRefreshTests(GateTestCase):
             refresh_issue_states(self.baseline, self.issue_states, fingerprint, runner=missing)
 
         self.assertIn("gh CLI", str(caught.exception))
+
+    def test_refresh_rejects_a_pull_request_reference(self):
+        # The GitHub issues endpoint also serves pull requests; a removal
+        # tracker must be a real issue, so a PR payload is never accepted.
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        fingerprint = compute_policy_fingerprint(("itambox",))
+
+        with self.assertRaises(PolicyError) as caught:
+            refresh_issue_states(
+                self.baseline,
+                self.issue_states,
+                fingerprint,
+                runner=self.fake_runner({100: "open"}, pull_request=True),
+            )
+
+        self.assertIn("#100", str(caught.exception))
+        self.assertIn("pull request", str(caught.exception))
+
+    def test_refresh_rejects_an_unparseable_response(self):
+        self.seed_platform_service_violation()
+        self.write_baseline(self.scaffold_sections())
+        fingerprint = compute_policy_fingerprint(("itambox",))
+
+        def broken(command, **kwargs):
+            return types.SimpleNamespace(returncode=0, stdout="{not json", stderr="")
+
+        with self.assertRaises(PolicyError) as caught:
+            refresh_issue_states(self.baseline, self.issue_states, fingerprint, runner=broken)
+
+        self.assertIn("#100", str(caught.exception))
+        self.assertIn("cannot parse", str(caught.exception))
 
 
 class BootstrapTests(GateTestCase):
