@@ -226,6 +226,27 @@ class TestProdSettingsPosture:
         prod = _load_prod({})
         assert prod.SECRET_KEY == SECURE_KEY
 
+    def test_rejected_key_with_unset_fallbacks_warms_about_preservation(self):
+        """A short operator key must warn against blindly rotating when the
+        SECRET_KEY-derived fallbacks are in use (data-loss precondition)."""
+        short_key = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM"  # 49 chars
+        with pytest.raises(ImproperlyConfigured) as exc_info:
+            _load_prod({"ITAMBOX_SECRET_KEY": short_key, "ITAMBOX_FIELD_ENCRYPTION_KEYS": None})
+        message = str(exc_info.value)
+        assert "ITAMBOX_FIELD_ENCRYPTION_KEYS" in message  # preservation precondition named
+        assert "Keep the current key" in message
+        assert short_key not in message
+
+    def test_rejected_key_with_pinned_fallbacks_has_no_preservation_warning(self):
+        """With a pinned keyring and peppers the operator can rotate freely."""
+        short_key = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM"  # 49 chars
+        with pytest.raises(ImproperlyConfigured) as exc_info:
+            _load_prod({"ITAMBOX_SECRET_KEY": short_key})
+        message = str(exc_info.value)
+        assert "at least 50 characters" in message
+        assert "Keep the current key" not in message
+        assert short_key not in message
+
     # ------------------------------------------------------------------
     # Database password — explicitly configured contract
     # ------------------------------------------------------------------

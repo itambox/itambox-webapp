@@ -13,8 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 def _configured_keys_str():
-    """The configured keyring value: environment variable, then Django setting."""
-    return os.environ.get("ITAMBOX_FIELD_ENCRYPTION_KEYS") or getattr(settings, "ITAMBOX_FIELD_ENCRYPTION_KEYS", None)
+    """The configured keyring value: the environment is the single source of truth.
+
+    ``core.settings.base`` derives the tri-state from the same environment, so
+    enforcement (production settings import), key resolution (here), and the
+    tagged check surface always agree. The value is deliberately never read
+    from a Django setting attribute.
+    """
+    return os.environ.get("ITAMBOX_FIELD_ENCRYPTION_KEYS")
 
 
 def get_fernet():

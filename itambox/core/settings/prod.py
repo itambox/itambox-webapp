@@ -46,9 +46,27 @@ DEBUG = False
 _secret_key_result = validate_secret_key(SECRET_KEY)
 if not _secret_key_result.valid:
     rule = _secret_key_result.failed_rule
+    # Rotating a rejected operator-provided key is NOT a safe remediation on
+    # its own when the SECRET_KEY-derived fallbacks are in use: the operator
+    # would silently lose every encrypted field and fallback-hashed API token.
+    # State the preservation precondition instead of blindly telling them to
+    # rotate. (A missing/empty key or a 'django-insecure-' prefix has nothing
+    # worth preserving — those states carry no operator secret.)
+    preservation_hint = ""
+    if _secret_key_result.failed_rule in ("too_short", "too_few_distinct_chars") and (
+        FIELD_ENCRYPTION_KEYS_STATE == ConfigState.UNSET.value or API_TOKEN_PEPPERS_STATE == ConfigState.UNSET.value
+    ):
+        preservation_hint = (
+            " Keep the current key until you have pinned "
+            "ITAMBOX_FIELD_ENCRYPTION_KEYS to the Fernet key derived from it "
+            "(see the installation upgrade notes) and re-issued API tokens; "
+            "rotating SECRET_KEY destroys encrypted fields and invalidates "
+            "fallback-hashed tokens."
+        )
     raise ImproperlyConfigured(
         f"ITAMBOX_SECRET_KEY {SECRET_KEY_RULE_DIAGNOSTICS[rule]}. "
         'Generate a value with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
+        f"{preservation_hint}"
     )
 
 # Database password: the implicit development default is gone; production

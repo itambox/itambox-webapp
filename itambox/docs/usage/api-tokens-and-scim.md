@@ -118,6 +118,15 @@ ITAMBOX_API_TOKEN_PEPPERS='{"1":"a-50-plus-character-random-secret-here-xxxxxxxx
 > tokens **before** configuring the mapping, update consumers, then delete the
 > old tokens. Rotation *within* an existing dedicated mapping (adding ID 2
 > while ID 1 remains) keeps existing tokens valid.
+>
+> **Short legacy pepper values also require a planned re-issue.** The
+> documented minimum secret length of 50 characters is now enforced at
+> production startup. A pre-existing mapping with shorter secrets (e.g. a
+> 43-character `token_urlsafe(32)` value) refuses to boot, and extending the
+> value in place would invalidate every token hashed under it because the
+> digest changes. Replace such rotations as part of the same planned
+> re-issuance: create new tokens before removing the short pepper, update
+> consumers, then remove the old ID.
 
 ### Using a Token
 

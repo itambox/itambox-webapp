@@ -60,6 +60,20 @@ The last value can be placed in a pepper mapping such as `{"1":"<generated-value
 
     Store the printed value as the corresponding entry in `ITAMBOX_FIELD_ENCRYPTION_KEYS`, then discard terminal scrollback according to your secrets-handling policy. Do **not** generate a replacement key for this migration: changing the key would make existing encrypted SMTP passwords, license keys, and webhook secrets unreadable. For a later controlled rotation, keep the converted old key in the comma-separated keyring until all values have been re-encrypted.
 
+!!! danger "Upgrade a short legacy SECRET_KEY without losing data"
+    Production now enforces Django's full deployment-check contract on `ITAMBOX_SECRET_KEY` (at least 50 characters, at least 5 distinct characters, no `django-insecure-` prefix). An existing deployment that predates the contract may run a shorter random key. **Do not rotate that key blindly**: while `ITAMBOX_FIELD_ENCRYPTION_KEYS` is unset, the field-encryption key is derived from `SECRET_KEY`, and while `ITAMBOX_API_TOKEN_PEPPERS` is unset, API tokens are hashed under a `SECRET_KEY`-derived pepper. Replacing the key destroys every encrypted field and invalidates every fallback-hashed token.
+
+    To migrate data-preservingly:
+
+    1. Pin the Fernet key derived from the current `SECRET_KEY` into `ITAMBOX_FIELD_ENCRYPTION_KEYS` first — the same one-liner as the legacy-passphrase conversion above, run with the current key in the environment:
+       ```bash
+       read -rsp 'Current ITAMBOX_SECRET_KEY: ' LEGACY_SECRET_KEY && printf '\n'
+       LEGACY_FIELD_KEY="$LEGACY_SECRET_KEY" python -c "import base64, hashlib, os; print(base64.urlsafe_b64encode(hashlib.sha256(os.environ['LEGACY_FIELD_KEY'].encode()).digest()).decode())"
+       unset LEGACY_SECRET_KEY
+       ```
+    2. Re-issue every API token (they are hashed under the fallback pepper; a dedicated mapping cannot verify them).
+    3. Only then rotate `ITAMBOX_SECRET_KEY` to a compliant value and configure dedicated `ITAMBOX_API_TOKEN_PEPPERS` + a dedicated `ITAMBOX_FIELD_ENCRYPTION_KEYS` keyring (or keep the pinned key forever).
+
 !!! danger "Back up the complete secret set"
     Back up `.env`, especially `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS`, with the database and media. Losing the field-encryption keyring makes encrypted SMTP passwords, license keys, and webhook secrets unreadable. Losing token peppers invalidates existing API tokens.
 

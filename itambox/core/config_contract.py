@@ -174,22 +174,28 @@ def _decode_pepper_object(raw: str) -> list[tuple[str, Any]] | None:
 
     ``json.loads`` with ``object_pairs_hook`` returns a list of key/value pairs
     for JSON objects; lists, strings, numbers, booleans, and null stay as-is.
-    Returns ``None`` when the value is not a JSON object.
+    The object root token is used to discriminate an empty object from an
+    empty array (both decode to ``[]``). Returns ``None`` when the value is
+    not a JSON object.
     """
     try:
         parsed = json.loads(raw, object_pairs_hook=_object_pairs)
-    except json.JSONDecodeError:
+    except (ValueError, RecursionError):
+        # JSONDecodeError subclasses ValueError; deeply nested input raises
+        # RecursionError. Both are malformed configuration, never a crash.
         return None
-    if not isinstance(parsed, list) or (
-        parsed and not all(isinstance(pair, tuple) and len(pair) == 2 for pair in parsed)
-    ):
+    if not isinstance(parsed, list):
+        return None
+    if not raw.lstrip().startswith("{"):
+        return None
+    if parsed and not all(isinstance(pair, tuple) and len(pair) == 2 for pair in parsed):
         return None
     return parsed
 
 
 def _validate_pepper_id(raw_id: Any) -> int | None:
     """The canonical positive-integer rotation id, or None when malformed."""
-    if not isinstance(raw_id, str) or not raw_id.isdigit():
+    if not isinstance(raw_id, str) or not raw_id.isdecimal():
         return None
     rotation_id = int(raw_id)
     if rotation_id <= 0 or str(rotation_id) != raw_id:
@@ -198,13 +204,13 @@ def _validate_pepper_id(raw_id: Any) -> int | None:
 
 
 def _pepper_id_error(raw_id: Any) -> str:
-    """Secret-free diagnostic for a rejected rotation id."""
-    if not isinstance(raw_id, str) or not raw_id.isdigit():
+    """Secret-free diagnostic for a rejected rotation id (echo capped)."""
+    if not isinstance(raw_id, str) or not raw_id.isdecimal():
         return "every rotation id must be a positive integer string"
     rotation_id = int(raw_id)
     if rotation_id <= 0:
-        return f"rotation id {raw_id!r} must be a positive integer"
-    return f"rotation id {raw_id!r} must be written without leading zeros"
+        return f"rotation id {str(rotation_id)!r} must be a positive integer"
+    return f"rotation id {str(rotation_id)!r} must be written without leading zeros"
 
 
 def _validate_pepper_secret(rotation_id: int, secret: Any) -> str | None:
