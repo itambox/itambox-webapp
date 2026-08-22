@@ -93,7 +93,7 @@ ITAMBOX_API_TOKEN_PEPPERS='{"1":"a-50-plus-character-random-secret-here-xxxxxxxx
 | **Highest ID** | Peppers new tokens. When you add a new pepper with a higher ID, newly created tokens use it. |
 | **All IDs** | Decrypt existing tokens. Never remove old pepper IDs while tokens hashed with them still exist — doing so makes those tokens unusable. |
 | **Secret length** | At least 50 characters, random. Generate with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. |
-| **Fallback** | If unset, falls back to `SECRET_KEY` as a single pepper (acceptable for development; set dedicated peppers in production). |
+| **Fallback** | If unset/blank, falls back to `SECRET_KEY` as a single pepper (acceptable for development; production starts with a loud warning). An explicitly supplied **non-blank** value that is not a valid mapping **aborts production startup** — malformed configuration never silently falls back. Tokens hashed under the fallback stop validating once a dedicated mapping is configured; re-issue them after the cutover. |
 
 ### Token Rotation Best Practices
 
@@ -107,6 +107,33 @@ ITAMBOX_API_TOKEN_PEPPERS='{"1":"a-50-plus-character-random-secret-here-xxxxxxxx
 5. **Rotate peppers periodically** — append a new pepper ID to
    `ITAMBOX_API_TOKEN_PEPPERS` (new tokens use it automatically). Remove old
    peppers only after migrating or revoking all tokens hashed under them.
+
+> [!IMPORTANT]
+> **Migrating from the fallback to a dedicated mapping is not seamless.**
+> Tokens created while `ITAMBOX_API_TOKEN_PEPPERS` was unset/blank are hashed
+> under the `SECRET_KEY`-derived fallback pepper. The moment a dedicated mapping
+> is configured, those tokens stop validating (validation only tries configured
+> peppers). There is no automatic re-hash — plaintext tokens are not stored.
+> Plan the migration around a deliberate cutover:
+>
+> 1. **Configure the dedicated mapping first** (in the same change that
+>    rotates a short legacy `SECRET_KEY`, if applicable — see the installation
+>    upgrade note). From this moment, fallback-hashed tokens are invalid;
+>    accept that.
+> 2. **After** the cutover, create replacement tokens — they are hashed under
+>    the dedicated mapping and survive it.
+> 3. Update consumers and delete the old-scheme tokens.
+>
+> Rotation *within* an existing dedicated mapping (adding ID 2 while ID 1
+> remains) keeps existing tokens valid.
+>
+> **Short legacy pepper values block startup and must be removed first.** The
+> documented minimum secret length of 50 characters is enforced at production
+> startup, so a mapping containing a short value (e.g. a 43-character
+> `token_urlsafe(32)` secret) refuses to boot — replacement tokens cannot be
+> created in that state. Replace the short pepper (accepting the invalidation
+> of every token hashed under it, since the digest changes), boot, then issue
+> replacements as part of the same planned re-issuance.
 
 ### Using a Token
 

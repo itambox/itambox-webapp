@@ -79,7 +79,11 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${ITAMBOX_DB_USER:-itambox}
-      POSTGRES_PASSWORD: ${ITAMBOX_DB_PASSWORD:-itambox}
+      # Fail closed: a source-built production stack must never start with a
+      # source-known credential. An unset/empty password aborts `compose
+      # config`/`compose up` before any container starts. "Explicitly
+      # configured" is the contract - the literal value is not banned.
+      POSTGRES_PASSWORD: ${ITAMBOX_DB_PASSWORD:?set ITAMBOX_DB_PASSWORD in .env}
       POSTGRES_DB: ${ITAMBOX_DB_NAME:-itambox}
     volumes:
       - pgdata:/var/lib/postgresql/data

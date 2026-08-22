@@ -31,10 +31,10 @@ These must be reviewed before the application can be operated safely in producti
 
 | Variable | Classification |
 |---|---|
-| `ITAMBOX_SECRET_KEY` | Required — startup-blocking. Production refuses the development fallback key. |
-| `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Strongly recommended — fallback-supported. When unset, the key is derived from `ITAMBOX_SECRET_KEY` (development convenience; rotating the secret then makes encrypted fields unreadable). |
-| `ITAMBOX_API_TOKEN_PEPPERS` | Strongly recommended — fallback-supported. When unset or malformed, token hashing falls back to a `SECRET_KEY`-derived pepper. |
-| `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD` | Required for external access — PostgreSQL credentials; change the shipped defaults. |
+| `ITAMBOX_SECRET_KEY` | Required — startup-blocking. Production enforces the full Django deployment-check contract: at least 50 characters, at least 5 distinct characters, and no `django-insecure-` prefix. |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Strongly recommended — fallback-supported when unset or blank. When unset/blank, the key is derived from `ITAMBOX_SECRET_KEY` (development convenience; rotating the secret then makes encrypted fields unreadable). An explicitly supplied **non-blank** value that is not a valid keyring **is startup-blocking**. |
+| `ITAMBOX_API_TOKEN_PEPPERS` | Strongly recommended — fallback-supported when unset or blank. When unset/blank, token hashing falls back to a `SECRET_KEY`-derived pepper (loudly warned). An explicitly supplied **non-blank** value that is not a valid mapping **is startup-blocking** — malformed configuration never silently falls back. |
+| `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD` | Required — PostgreSQL credentials. The production application requires an explicitly configured `ITAMBOX_DB_PASSWORD` (startup-blocking), and the bundled Compose stack fails closed before any container starts without one. |
 | `ITAMBOX_ALLOWED_HOSTS` | Required for external access — unrecognized hosts receive HTTP 400. |
 | `ITAMBOX_CSRF_TRUSTED_ORIGINS` | Required for cross-origin POST/PUT/PATCH/DELETE (scheme-qualified external origins). |
 | `ITAMBOX_EMAIL_*` | Working SMTP settings for resets, alerts, and reports. Failure degrades notification delivery, not startup. |
@@ -47,7 +47,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-The last value can be placed in a pepper mapping such as `{"1":"<generated-value>"}`. Invalid JSON is ignored and falls back to a `SECRET_KEY`-derived pepper, so verify the syntax before admitting users.
+The last value can be placed in a pepper mapping such as `{"1":"<generated-value>"}`. Verify the JSON syntax before admitting users: an explicitly supplied value that is not a valid mapping aborts production startup instead of silently falling back to a `SECRET_KEY`-derived pepper.
 
 !!! warning "Upgrade legacy field-encryption passphrases before deployment"
     Older revisions accepted arbitrary strings in `ITAMBOX_FIELD_ENCRYPTION_KEYS` and silently derived a Fernet key from each string. Current revisions fail closed unless every configured entry is already a valid Fernet key. Before upgrading an installation that used a passphrase, convert each existing entry to the exact key the older revision derived:
@@ -59,6 +59,21 @@ The last value can be placed in a pepper mapping such as `{"1":"<generated-value
     ```
 
     Store the printed value as the corresponding entry in `ITAMBOX_FIELD_ENCRYPTION_KEYS`, then discard terminal scrollback according to your secrets-handling policy. Do **not** generate a replacement key for this migration: changing the key would make existing encrypted SMTP passwords, license keys, and webhook secrets unreadable. For a later controlled rotation, keep the converted old key in the comma-separated keyring until all values have been re-encrypted.
+
+!!! danger "Upgrade a short legacy SECRET_KEY without losing data"
+    Production now enforces Django's full deployment-check contract on `ITAMBOX_SECRET_KEY` (at least 50 characters, at least 5 distinct characters, no `django-insecure-` prefix). An existing deployment that predates the contract may run a shorter random key. **Do not rotate that key blindly**: while `ITAMBOX_FIELD_ENCRYPTION_KEYS` is unset, the field-encryption key is derived from `SECRET_KEY`, and while `ITAMBOX_API_TOKEN_PEPPERS` is unset, API tokens are hashed under a `SECRET_KEY`-derived pepper. Replacing the key destroys every encrypted field and invalidates every fallback-hashed token.
+
+    To migrate data-preservingly:
+
+    1. Pin the Fernet key derived from the current `SECRET_KEY` into `ITAMBOX_FIELD_ENCRYPTION_KEYS` first — the same one-liner as the legacy-passphrase conversion above, run with the current key in the environment:
+       ```bash
+       read -rsp 'Current ITAMBOX_SECRET_KEY: ' LEGACY_SECRET_KEY && printf '\n'
+       LEGACY_FIELD_KEY="$LEGACY_SECRET_KEY" python -c "import base64, hashlib, os; print(base64.urlsafe_b64encode(hashlib.sha256(os.environ['LEGACY_FIELD_KEY'].encode()).digest()).decode())"
+       unset LEGACY_SECRET_KEY
+       ```
+    2. Accept the cutover: rotate `ITAMBOX_SECRET_KEY` to a compliant value and configure a dedicated `ITAMBOX_API_TOKEN_PEPPERS` mapping in the same change. From this moment every token hashed under the old fallback pepper is invalid — that is expected and unavoidable (there is no automatic re-hash).
+    3. Only **after** the cutover, issue replacement API tokens under the dedicated mapping, update consumers, and delete the old-scheme tokens. (Tokens created before the cutover would themselves be fallback-hashed and die with it, so replacements must come after.)
+    4. Keep the pinned `ITAMBOX_FIELD_ENCRYPTION_KEYS` keyring forever (or rotate it separately and deliberately afterwards — never together with `SECRET_KEY`).
 
 !!! danger "Back up the complete secret set"
     Back up `.env`, especially `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS`, with the database and media. Losing the field-encryption keyring makes encrypted SMTP passwords, license keys, and webhook secrets unreadable. Losing token peppers invalidates existing API tokens.
@@ -90,9 +105,9 @@ The tables below document every variable available in `.env.example`, organized 
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `ITAMBOX_SECRET_KEY` ⚠️ | **Required** (prod) | *(insecure dev fallback)* | Django secret key used for cryptographic signing (sessions, CSRF tokens, password reset tokens). Generate with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. The app refuses to boot in production with the fallback. |
-| `ITAMBOX_FIELD_ENCRYPTION_KEYS` ⚠️ | **Strongly recommended** (prod) | *(derived from SECRET_KEY)* | Valid Fernet key(s) that encrypt sensitive stored values (license keys, SMTP passwords, webhook secrets). Comma-separated; the **first** key encrypts, **all** keys decrypt. Append the old key when rotating. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Arbitrary passphrases are rejected; follow the legacy-passphrase upgrade procedure above before deploying over an older installation. When unset, the key is derived from `ITAMBOX_SECRET_KEY` as a dev convenience — then rotating `SECRET_KEY` makes every encrypted field **permanently unreadable**. Set a dedicated value and back it up with every database dump. |
-| `ITAMBOX_API_TOKEN_PEPPERS` ⚠️ | **Strongly recommended** (prod) | *(derived from SECRET_KEY)* | Server-side peppers used to HMAC-hash API tokens at rest. Must be a JSON object whose numeric keys are rotation IDs and values are dedicated secrets of ≥50 characters. The highest ID peppers new tokens; older IDs keep existing tokens valid. Example: `{"1":"replace-with-a-random-secret-of-at-least-50-characters"}`. When unset or malformed, falls back to a `SECRET_KEY`-derived pepper — acceptable for development only; the application starts either way, so this is not startup-blocking. |
+| `ITAMBOX_SECRET_KEY` ⚠️ | **Required** (prod) | *(insecure dev fallback)* | Django secret key used for cryptographic signing (sessions, CSRF tokens, password reset tokens). Generate with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. Production startup rejects keys shorter than 50 characters, keys with fewer than 5 distinct characters, and any key starting with `django-insecure-`, with a secret-free diagnostic naming the failed rule. |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` ⚠️ | **Strongly recommended** (prod) | *(derived from SECRET_KEY)* | Valid Fernet key(s) that encrypt sensitive stored values (license keys, SMTP passwords, webhook secrets). Comma-separated; the **first** key encrypts, **all** keys decrypt. Append the old key when rotating. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Arbitrary passphrases are rejected; follow the legacy-passphrase upgrade procedure above before deploying over an older installation. When unset **or blank**, the key is derived from `ITAMBOX_SECRET_KEY` as a dev convenience — then rotating `SECRET_KEY` makes every encrypted field **permanently unreadable**. An explicitly supplied **non-blank** value that is not a valid keyring (including whitespace/separators only) **aborts production startup** naming the failing key index. Set a dedicated value and back it up with every database dump. |
+| `ITAMBOX_API_TOKEN_PEPPERS` ⚠️ | **Strongly recommended** (prod) | *(derived from SECRET_KEY)* | Server-side peppers used to HMAC-hash API tokens at rest. Must be a JSON object whose numeric keys are rotation IDs and values are dedicated secrets of ≥50 characters. The highest ID peppers new tokens; older IDs keep existing tokens valid. Example: `{"1":"replace-with-a-random-secret-of-at-least-50-characters"}`. When **unset or blank**, falls back to a `SECRET_KEY`-derived pepper with a loud production warning — acceptable for development only; tokens hashed under the fallback stop validating once a dedicated mapping is configured (re-issue them **after** the cutover). An explicitly supplied **non-blank** value that is not a valid mapping **aborts production startup**; malformed configuration never silently falls back. |
 | `ITAMBOX_ALLOWED_HOSTS` ⚠️ | **Required** (prod) | `localhost,127.0.0.1` | Comma-separated host/domain names the site may serve. Django's `ALLOWED_HOSTS` — requests with unrecognized `Host` headers receive HTTP 400. Always include `127.0.0.1` so the container health probe works. |
 | `ITAMBOX_CSRF_TRUSTED_ORIGINS` ⚠️ | **Required** (prod) | *(empty)* | Origins trusted for cross-origin POST/PUT/PATCH/DELETE. Scheme-qualified (e.g. `https://itam.example.com`). Must match the external URL users access the site through. |
 
@@ -128,7 +143,7 @@ PostgreSQL 15+ is required. The `btree_gist` extension must be available (see [s
 | `ITAMBOX_DB_ENGINE` | Optional | `django.db.backends.postgresql` | Django database backend. Only PostgreSQL is supported in production. |
 | `ITAMBOX_DB_NAME` ⚠️ | **Required** (prod) | `itambox` | PostgreSQL database name. |
 | `ITAMBOX_DB_USER` ⚠️ | **Required** (prod) | `itambox` | PostgreSQL user with full DDL/DML privileges on the database. |
-| `ITAMBOX_DB_PASSWORD` ⚠️ | **Required** (prod) | `itambox` | Password for the database user. Change from the default immediately. |
+| `ITAMBOX_DB_PASSWORD` ⚠️ | **Required** (prod) | *(none — explicitly configured)* | Password for the database user. Production startup fails without an explicitly configured, non-empty value (the old `itambox` default is a development-only convenience of the dev settings). The bundled Compose stack interpolates fail-closed: `compose config`/`compose up` abort before any container starts when `ITAMBOX_DB_PASSWORD` is unset **or blank** (both states are covered by the smoke suite). For the bundled stack, set it **in `.env`** — the template ships a blank `ITAMBOX_DB_PASSWORD=` line that would otherwise shadow a shell-exported value in the app/worker containers. Externally managed PostgreSQL may deliberately use any value — "explicitly configured" is the contract, not a string comparison. |
 | `ITAMBOX_DB_HOST` ⚠️ | **Required** (prod) | `localhost` | PostgreSQL host. Use the Compose service name (`db`) when using the bundled PostgreSQL container. |
 | `ITAMBOX_DB_PORT` | Optional | `5432` | PostgreSQL port. |
 | `ITAMBOX_DB_CONN_MAX_AGE` | Optional | `300` | Persistent connection lifetime in seconds. `0` closes connections after each request (not recommended for production). |

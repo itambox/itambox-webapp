@@ -4,6 +4,7 @@ To use: set DJANGO_SETTINGS_MODULE=core.settings.dev or ITAMBOX_ENV=dev
 """
 
 from .base import *
+from .base import DATABASES  # explicit: the password fallback must resolve without new star-import F405 identities
 
 DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.50.54"]
@@ -22,6 +23,12 @@ EMAIL_HOST = "127.0.0.1"
 EMAIL_PORT = 1025
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = False
+
+# The implicit ``itambox`` database password is a development-only convenience
+# fallback. Production requires an explicitly configured ITAMBOX_DB_PASSWORD
+# (see prod.py); the bundled Compose stack fails closed without one.
+if not DATABASES["default"]["PASSWORD"]:
+    DATABASES["default"]["PASSWORD"] = "itambox"
 
 # Add debug_toolbar dynamically for development
 if "debug_toolbar" not in INSTALLED_APPS:

@@ -12,6 +12,10 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy as _
 
+from core.config_contract import (
+    parse_api_token_peppers,
+    parse_field_encryption_keys,
+)
 from itambox.release import VERSION
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -185,7 +189,11 @@ DATABASES = {
         "ENGINE": DB_ENGINE,
         "NAME": os.environ.get("ITAMBOX_DB_NAME", "itambox"),
         "USER": os.environ.get("ITAMBOX_DB_USER", "itambox"),
-        "PASSWORD": os.environ.get("ITAMBOX_DB_PASSWORD", "itambox"),
+        # The implicit ``itambox`` password is development-only: dev.py applies
+        # it as a local convenience fallback, while production requires an
+        # explicitly configured ITAMBOX_DB_PASSWORD (see prod.py) and the
+        # bundled Compose stack fails closed without one.
+        "PASSWORD": os.environ.get("ITAMBOX_DB_PASSWORD", ""),
         "HOST": os.environ.get("ITAMBOX_DB_HOST", "localhost"),
         "PORT": os.environ.get("ITAMBOX_DB_PORT", "5432"),
         "CONN_MAX_AGE": int(os.environ.get("ITAMBOX_DB_CONN_MAX_AGE", "300")),
@@ -561,14 +569,21 @@ REPORT_DESIGNER_ENABLED = FEATURE_REPORT_DESIGNER
 # new tokens, older ids remain valid so peppers can be rotated. When unset, the
 # token model falls back to a SECRET_KEY-derived pepper (fine for dev/tests);
 # production should set ITAMBOX_API_TOKEN_PEPPERS to a dedicated, secret value.
-_raw_api_token_peppers = os.environ.get("ITAMBOX_API_TOKEN_PEPPERS", "")
-if _raw_api_token_peppers:
-    try:
-        API_TOKEN_PEPPERS = {int(k): v for k, v in json.loads(_raw_api_token_peppers).items()}
-    except (ValueError, AttributeError, json.JSONDecodeError):
-        API_TOKEN_PEPPERS = {}
-else:
-    API_TOKEN_PEPPERS = {}
+#
+# The parse result is tri-state (unset | valid | malformed) and retained on the
+# module so production settings can warn on unset and refuse to import on
+# explicitly malformed material instead of silently downgrading to {}.
+_pepper_keyring = parse_api_token_peppers(os.environ.get("ITAMBOX_API_TOKEN_PEPPERS"))
+API_TOKEN_PEPPERS = _pepper_keyring.peppers
+API_TOKEN_PEPPERS_STATE = _pepper_keyring.state.value
+API_TOKEN_PEPPERS_ERROR = _pepper_keyring.error
+
+# Field-encryption keyring parse state (core.crypto owns the key resolution and
+# derives the SECRET_KEY fallback; production settings use these two states to
+# warn on unset and refuse to import on malformed keyring material).
+_field_keyring = parse_field_encryption_keys(os.environ.get("ITAMBOX_FIELD_ENCRYPTION_KEYS"))
+FIELD_ENCRYPTION_KEYS_STATE = _field_keyring.state.value
+FIELD_ENCRYPTION_KEYS_ERROR = _field_keyring.error
 
 # ==============================================================================
 # Plugins Configuration
