@@ -5,6 +5,7 @@ import threading
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import connections
 from django.http import Http404
 from django.test import TransactionTestCase
@@ -127,3 +128,61 @@ class ConcurrentCheckinTests(TransactionTestCase):
         set_current_tenant(None)
         self.assertIsInstance(assignment, ComponentAllocation)
         self._race(checkin_component, assignment, stock)
+
+    def test_two_component_checkouts_cannot_overdraw_one_source_pool(self):
+        category = Category.objects.create(
+            name="Concurrent Checkout Component",
+            slug="concurrent-checkout-component",
+            applies_to={"component": True},
+        )
+        item = Component.objects.create(
+            name="Concurrent Checkout RAM",
+            manufacturer=self.manufacturer,
+            category=category,
+            tenant=self.tenant,
+        )
+        stock = ComponentStock.objects.create(component=item, location=self.location, qty=5)
+        barrier = threading.Barrier(2)
+        results = queue.Queue()
+
+        def worker():
+            connections.close_all()
+            tenant = Tenant._base_manager.get(pk=self.tenant.pk)
+            user = User.objects.get(pk=self.user.pk)
+            component = Component._base_manager.get(pk=item.pk)
+            holder = AssetHolder._base_manager.get(pk=self.holder.pk)
+            location = Location._base_manager.get(pk=self.location.pk)
+            set_current_tenant(tenant)
+            barrier.wait(timeout=10)
+            try:
+                checkout_inventory_item(
+                    component,
+                    4,
+                    holder=holder,
+                    source_location=location,
+                    user=user,
+                )
+            except ValidationError:
+                results.put("denied")
+            else:
+                results.put("success")
+            finally:
+                set_current_tenant(None)
+                connections.close_all()
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=20)
+            self.assertFalse(thread.is_alive(), "concurrent checkout thread did not finish")
+
+        outcomes = sorted(results.get_nowait() for _ in range(2))
+        self.assertEqual(outcomes, ["denied", "success"])
+        stock.refresh_from_db()
+        self.assertEqual(stock.qty, 1)
+        self.assertEqual(ComponentAllocation._base_manager.filter(component=item, deleted_at__isnull=True).count(), 1)
+        self.assertEqual(
+            ComponentAllocation._base_manager.get(component=item, deleted_at__isnull=True).qty,
+            4,
+        )

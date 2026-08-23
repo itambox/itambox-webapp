@@ -58,12 +58,11 @@ Production always runs in Docker/Linux with the full dependency set.
 ### Demo inventory consistency
 
 The full demo seed keeps one stock identity across components, accessories, and
-consumables. Stock rows contain current on-hand units. For a component,
-`available = total_stock - active_allocations`. For an accessory or consumable,
+consumables. Stock rows contain current on-hand units. For every inventory item,
 `available = total_stock - active_assignments_without_from_location`; a
 source-backed checkout has already deducted its quantity from the source stock
 row, so it is not deducted a second time from the item total. In equivalent
-form, for those two item types:
+form:
 
 ```text
 available = total_stock + source_backed_assignments - all_active_assignments
@@ -76,7 +75,7 @@ allocation total in every tenant-facing component pool.
 
 The accessory/consumable model clamps its displayed availability at zero, but
 this seed self-check validates the raw balance before any display clamp. The
-seed creates component allocations and accessory/consumable checkouts
+seed creates target-only component allocations and source-backed inventory checkouts
 through the authorized inventory services. It prepares enough stock for planned
 component allocations and deducts source-backed checkouts from their stock
 rows. The full command runs an unconditional inventory self-check at the end;

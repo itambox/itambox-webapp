@@ -193,6 +193,24 @@ class ComponentAllocationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        is_update = self.instance.pk is not None
+        source_key = self.add_prefix("from_location")
+        source_values = self.data.getlist(source_key) if hasattr(self.data, "getlist") else [self.data.get(source_key)]
+        self._submitted_create_source = bool(
+            not is_update and self.is_bound and any(value not in (None, "") for value in source_values)
+        )
+        if not is_update:
+            self.fields.pop("from_location")
+        else:
+            for field_name in (
+                "component",
+                "assigned_holder",
+                "assigned_location",
+                "assigned_asset",
+                "from_location",
+            ):
+                self.fields[field_name].disabled = True
+
         # Rescope every tenant-owned FK queryset per request (import-frozen unscoped).
         self.fields["component"].queryset = Component.objects.all()
         self.fields["assigned_holder"].queryset = AssetHolder.objects.all().order_by("last_name", "first_name")
@@ -200,7 +218,12 @@ class ComponentAllocationForm(forms.ModelForm):
             Location.objects.all().select_related("site").order_by("site__name", "name")
         )
         self.fields["assigned_asset"].queryset = Asset.objects.all().order_by("asset_tag")
-        self.fields["from_location"].queryset = Location.objects.all().select_related("site").order_by("name")
+        if is_update:
+            self.fields["from_location"].queryset = (
+                Location._base_manager.filter(pk=self.instance.from_location_id)
+                if self.instance.from_location_id is not None
+                else Location._base_manager.none()
+            )
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
@@ -223,9 +246,39 @@ class ComponentAllocationForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML("</div>"),
         )
+        if not is_update:
+            self.helper.layout.fields[0] = Row(Column("component", css_class="col-md-12"))
+
+    def _has_immutable_update_error(self):
+        if self.instance.pk is None or not self.is_bound:
+            return False
+        immutable_values = {
+            "component": self.instance.component_id,
+            "assigned_holder": self.instance.assigned_holder_id,
+            "assigned_location": self.instance.assigned_location_id,
+            "assigned_asset": self.instance.assigned_asset_id,
+            "from_location": self.instance.from_location_id,
+        }
+        immutable_error = False
+        for field_name, persisted_id in immutable_values.items():
+            field_key = self.add_prefix(field_name)
+            raw_values = self.data.getlist(field_key) if hasattr(self.data, "getlist") else [self.data.get(field_key)]
+            raw_values = [value for value in raw_values if value is not None]
+            if not raw_values:
+                continue
+            expected_value = "" if persisted_id is None else str(persisted_id)
+            if any(str(value) != expected_value for value in raw_values):
+                self.add_error(field_name, _("Component allocation item, source, and destination are immutable."))
+                immutable_error = True
+        return immutable_error
 
     def clean(self):
         cleaned_data = super().clean()
+        if self._submitted_create_source:
+            raise ValidationError(_("Source location is only available through component checkout."))
+        if self._has_immutable_update_error():
+            return cleaned_data
+
         holder = cleaned_data.get("assigned_holder")
         location = cleaned_data.get("assigned_location")
         asset = cleaned_data.get("assigned_asset")

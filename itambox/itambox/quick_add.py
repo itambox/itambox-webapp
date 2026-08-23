@@ -11,7 +11,10 @@ Usage on a CreateView:
 import json
 
 from django.http import HttpResponse
+from django.shortcuts import render
 from django.template.loader import render_to_string
+
+from itambox.views.generic.htmx_responses import is_htmx_request
 
 
 class QuickAddMixin:
@@ -58,27 +61,38 @@ class QuickAddMixin:
             context["quick_add_form"] = form
         return context
 
+    def get_quick_add_success_response(self):
+        if getattr(self, "quick_add_reload", False):
+            response = HttpResponse(status=204)
+            response["HX-Redirect"] = self.get_quick_add_redirect_url()
+            return response
+        target = getattr(self, "quick_add_target", None) or ""
+        value = str(self.object)
+        pk = self.object.pk
+
+        response = HttpResponse("Object created successfully")
+        response["HX-Trigger"] = json.dumps(
+            {
+                "quickAddSuccess": {
+                    "target_id": target,
+                    "value": value,
+                    "pk": str(pk),
+                }
+            }
+        )
+        return response
+
     def form_valid(self, form):
         if self.is_quick_add():
             self.object = form.save()
-            if getattr(self, "quick_add_reload", False):
-                response = HttpResponse(status=204)
-                response["HX-Redirect"] = self.get_quick_add_redirect_url()
-                return response
-            target = getattr(self, "quick_add_target", None) or ""
-            value = str(self.object)
-            pk = self.object.pk
-
-            response = HttpResponse("Object created successfully")
-            response["HX-Trigger"] = json.dumps(
-                {
-                    "quickAddSuccess": {
-                        "target_id": target,
-                        "value": value,
-                        "pk": str(pk),
-                    }
-                }
-            )
-            return response
+            return self.get_quick_add_success_response()
 
         return super().form_valid(form)
+
+    def form_invalid(self, form):
+        if self.is_quick_add() and is_htmx_request(self.request):
+            context = self.get_context_data(form=form)
+            response = render(self.request, "generic/includes/quick_add_form.html", context)
+            response.status_code = 422
+            return response
+        return super().form_invalid(form)

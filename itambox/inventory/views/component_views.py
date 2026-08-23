@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -186,30 +187,38 @@ class ComponentAllocationEditView(QuickAddMixin, ObjectEditView):
     quick_add_reload = True
 
     def form_valid(self, form):
-        if self.object is not None and self.object.pk is not None:
-            cleaned = form.cleaned_data
-            self.object = update_component_allocation(
-                self.object.pk,
-                cleaned["component"],
-                cleaned["qty"],
-                holder=cleaned.get("assigned_holder"),
-                location=cleaned.get("assigned_location"),
-                asset=cleaned.get("assigned_asset"),
-                source_location=cleaned.get("from_location"),
-                user=self.request.user,
-                notes=cleaned.get("notes", ""),
-            )
-            return redirect(self.get_success_url())
-        cleaned = form.cleaned_data
-        self.object = create_component_allocation(
-            cleaned["component"],
-            cleaned["qty"],
-            holder=cleaned.get("assigned_holder"),
-            location=cleaned.get("assigned_location"),
-            asset=cleaned.get("assigned_asset"),
-            user=self.request.user,
-            notes=cleaned.get("notes", ""),
-        )
+        try:
+            if self.object is not None and self.object.pk is not None:
+                cleaned = form.cleaned_data
+                self.object = update_component_allocation(
+                    self.object.pk,
+                    cleaned["component"],
+                    cleaned["qty"],
+                    holder=cleaned.get("assigned_holder"),
+                    location=cleaned.get("assigned_location"),
+                    asset=cleaned.get("assigned_asset"),
+                    source_location=cleaned.get("from_location"),
+                    user=self.request.user,
+                    notes=cleaned.get("notes", ""),
+                )
+            else:
+                cleaned = form.cleaned_data
+                self.object = create_component_allocation(
+                    cleaned["component"],
+                    cleaned["qty"],
+                    holder=cleaned.get("assigned_holder"),
+                    location=cleaned.get("assigned_location"),
+                    asset=cleaned.get("assigned_asset"),
+                    user=self.request.user,
+                    notes=cleaned.get("notes", ""),
+                )
+        except ValidationError as exc:
+            for message in exc.messages:
+                form.add_error(None, message)
+            return self.form_invalid(form)
+
+        if self.is_quick_add():
+            return self.get_quick_add_success_response()
         return redirect(self.get_success_url())
 
     def get_initial(self):

@@ -1,6 +1,6 @@
 {
  "base_commit": "04b4085a853863366c0c7f53b98449a9c225aefe",
- "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), the Snipe-IT importer stage decomposition (#85), and the scanner tenant-scope + EAN/GTIN resolution work (#367) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests. This follow-up also updates stale internal-document references in three existing authorization test modules, and the operator-documentation rebuild adds the new documentation policy gate test module, and the architecture-debt ownership governance work (#440, PR #441), which extends the architecture gate test module. This entry is a diff-recordings-only addition: the module is not a resource-grant test. The production configuration contract (#439) adds the config-contract and token-pepper-rotation test modules, extends the crypto, token, and production-settings posture modules, and updates this diff recording. The djangojs catalogue parity gate (#437) adds the compile_locales command test module.",
+ "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), the Snipe-IT importer stage decomposition (#85), and the scanner tenant-scope + EAN/GTIN resolution work (#367) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests. This follow-up also updates stale internal-document references in three existing authorization test modules, and the operator-documentation rebuild adds the new documentation policy gate test module, and the architecture-debt ownership governance work (#440, PR #441), which extends the architecture gate test module. This entry is a diff-recordings-only addition: the module is not a resource-grant test. The production configuration contract (#439) adds the config-contract and token-pepper-rotation test modules, extends the crypto, token, and production-settings posture modules, and updates this diff recording. The djangojs catalogue parity gate (#437) adds the compile_locales command test module. Issue #393 updates the component-allocation form FK-scoping contract for target-only create and immutable-source update.",
  "changed_tests": [
   "itambox/assets/tests/test_assignments.py",
   "itambox/assets/tests/test_audit_ws6_10.py",
@@ -110,6 +110,7 @@
   "itambox/inventory/tests/test_consumables.py",
   "itambox/inventory/tests/test_cross_tenant_checkout.py",
   "itambox/inventory/tests/test_direct_assignment_writes.py",
+  "itambox/inventory/tests/test_form_fk_scoping.py",
   "itambox/inventory/tests/test_kits.py",
   "itambox/inventory/tests/test_scoping.py",
   "itambox/inventory/tests/test_shared_stock_surfaces.py",
@@ -265,6 +266,7 @@
   "itambox/inventory/tests/test_consumables.py",
   "itambox/inventory/tests/test_cross_tenant_checkout.py",
   "itambox/inventory/tests/test_direct_assignment_writes.py",
+  "itambox/inventory/tests/test_form_fk_scoping.py",
   "itambox/inventory/tests/test_kits.py",
   "itambox/inventory/tests/test_scoping.py",
   "itambox/inventory/tests/test_shared_stock_surfaces.py",
