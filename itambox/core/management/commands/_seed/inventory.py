@@ -95,11 +95,12 @@ def _check_component_balances():
             _check_assignment_shape(allocation, "component allocation")
             _check_source_stock(allocation, ComponentStock, "component", "component allocation")
         total_stock = _sum_quantities(ComponentStock._base_manager.filter(component_id=item.pk))
-        total_allocated = _sum_quantities(allocations)
-        if total_allocated > total_stock:
+        target_only_qty = _sum_quantities(allocations.filter(from_location__isnull=True))
+        available = total_stock - target_only_qty
+        if available < 0:
             raise CommandError(
-                f"Seed inventory invariant failed: component {item.pk} allocates {total_allocated} "
-                f"from {total_stock} total stock."
+                f"Seed inventory invariant failed: component {item.pk} allocates {target_only_qty} target-only units "
+                f"from {total_stock} on-hand (raw availability {available})."
             )
 
 
@@ -124,12 +125,10 @@ def _check_item_balances(item, assignment_model, stock_model, item_field, label)
 def check_seed_inventory_invariants():
     """Fail closed when seeded inventory cannot represent a coherent stock balance.
 
-    Stock rows contain current on-hand quantities. A source-backed accessory or
-    consumable checkout has already deducted its quantity from that row, while a
-    target-only checkout is accounted for by the item's available calculation.
-    Component allocations are target-only and therefore remain part of the
-    component-level deduction. The check intentionally validates raw balances
-    instead of accepting the accessory/consumable ``max(0, ...)`` display clamp.
+    Stock rows contain current on-hand quantities. A source-backed checkout has
+    already deducted its quantity from that row, while a target-only assignment
+    is accounted for by the item's available calculation. The check intentionally
+    validates raw balances instead of accepting display clamps.
     """
     _check_stock_rows()
     _check_component_balances()
@@ -215,10 +214,10 @@ class SeedInventoryStockMixin:
     def _seed_component_allocation_pools(self, planned_component_qty):
         comp_count = 0
         # Components are global catalogue rows, so a tenant-scoped
-        # ``component.available`` sees every allocation of the shared component
-        # while only seeing the active tenant's stock. Every tenant-facing pool
-        # therefore needs the global planned total; otherwise a tenant with no
-        # allocation of its own could still render a negative availability.
+        # ``component.available`` sees every target-only allocation of the shared
+        # component while only seeing the active tenant's stock. Every tenant-facing
+        # pool therefore needs the global planned target-only total; source-backed
+        # allocations are already reflected in their deducted stock row.
         for tenant_slug, _tenant in self._tenants.items():
             location = self._infra_location(tenant_slug) or (self._tenant_locations.get(tenant_slug) or [None])[0]
             if location is None:
@@ -227,13 +226,17 @@ class SeedInventoryStockMixin:
                 )
             for comp_slug, planned_qty in planned_component_qty.items():
                 comp = self._components[comp_slug]
-                existing_allocated_qty = _sum_quantities(
-                    ComponentAllocation._base_manager.filter(component=comp, deleted_at__isnull=True)
+                existing_target_only_qty = _sum_quantities(
+                    ComponentAllocation._base_manager.filter(
+                        component=comp,
+                        deleted_at__isnull=True,
+                        from_location__isnull=True,
+                    )
                 )
                 self._ensure_seed_stock(
                     ComponentStock,
                     {"component": comp, "location": location},
-                    2 + max(planned_qty, existing_allocated_qty),
+                    2 + max(planned_qty, existing_target_only_qty),
                 )
                 comp_count += 1
         return comp_count
@@ -255,8 +258,12 @@ class SeedInventoryStockMixin:
         for comp_slug, qty, _asset in getattr(self, "_component_allocation_plan", ()):
             planned_component_qty[comp_slug] += qty
         for comp_slug, comp in self._components.items():
-            existing_allocated_qty = _sum_quantities(
-                ComponentAllocation._base_manager.filter(component=comp, deleted_at__isnull=True)
+            existing_target_only_qty = _sum_quantities(
+                ComponentAllocation._base_manager.filter(
+                    component=comp,
+                    deleted_at__isnull=True,
+                    from_location__isnull=True,
+                )
             )
             # Keep zero as a low-stock signal for components without allocations;
             # planned allocations are floored above zero by the required quantity.
@@ -264,7 +271,7 @@ class SeedInventoryStockMixin:
             self._ensure_seed_stock(
                 ComponentStock,
                 {"component": comp, "location": msp_loc},
-                available_seed_qty + max(planned_component_qty[comp_slug], existing_allocated_qty),
+                available_seed_qty + max(planned_component_qty[comp_slug], existing_target_only_qty),
             )
             comp_count += 1
 

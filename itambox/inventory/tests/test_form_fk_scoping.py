@@ -19,7 +19,8 @@ from inventory.forms import (
     ConsumableStockForm,
     KitItemForm,
 )
-from inventory.models import Accessory, Component, Consumable, Kit
+from inventory.models import Accessory, Component, ComponentAllocation, Consumable, Kit
+from inventory.tests.factories import create_assignment_fixture
 from licenses.models import License
 from organization.models import AssetHolder, Location, Site, Tenant
 
@@ -64,15 +65,24 @@ class InventoryFormFkScopingTests(TenantTestMixin, TestCase):
 
     def test_component_allocation_form(self):
         form = ComponentAllocationForm()
+        self.assertNotIn("from_location", form.fields)
         cases = [
             ("component", self.component_b.pk),
             ("assigned_holder", self.holder_b.pk),
             ("assigned_location", self.loc_b.pk),
             ("assigned_asset", self.asset_b.pk),
-            ("from_location", self.loc_b.pk),
         ]
         for field, pk in cases:
             self.assertNotIn(pk, self._pks(form, field), field)
+
+        allocation = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component_a,
+            assigned_location=self.loc_a,
+        )
+        update_form = ComponentAllocationForm(instance=allocation)
+        self.assertTrue(update_form.fields["from_location"].disabled)
+        self.assertEqual(self._pks(update_form, "from_location"), set())
 
     def test_component_stock_modal_form(self):
         self.assertNotIn(self.loc_b.pk, self._pks(ComponentStockModalForm(), "location"))

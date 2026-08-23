@@ -354,14 +354,17 @@ def shared_stock_union(queryset, stock_model):
         return queryset
     user = get_current_user()
     perm = f"{stock_model._meta.app_label}.view_{stock_model._meta.model_name}"
-    return queryset | stock_model._base_manager.filter(
-        pk__in=resolved_shared_stock_ids(
-            stock_model,
-            tenant,
-            user,
-            TenantResourceGrant.ACCESS_VIEW,
-            perm,
-        ),
+    return (
+        queryset.distinct()
+        | stock_model._base_manager.filter(
+            pk__in=resolved_shared_stock_ids(
+                stock_model,
+                tenant,
+                user,
+                TenantResourceGrant.ACCESS_VIEW,
+                perm,
+            ),
+        ).distinct()
     )
 
 
@@ -375,9 +378,12 @@ def recipient_assignment_union(queryset, assignment_model):
     tenant = get_current_tenant()
     if tenant is None:
         return queryset
-    return queryset | assignment_model._base_manager.filter(
-        target_tenant=tenant,
-        deleted_at__isnull=True,
+    return (
+        queryset.distinct()
+        | assignment_model._base_manager.filter(
+            target_tenant=tenant,
+            deleted_at__isnull=True,
+        ).distinct()
     )
 
 

@@ -207,10 +207,25 @@ class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
             .annotate(total=Sum("qty"))
             .values("total")
         )
+        target_only_allocated_subquery = (
+            ComponentAllocation.objects.filter(
+                component=OuterRef("pk"),
+                deleted_at__isnull=True,
+                from_location__isnull=True,
+            )
+            .order_by()
+            .values("component")
+            .annotate(total=Sum("qty"))
+            .values("total")
+        )
 
         return self.annotate(
             _total_stock=Coalesce(Subquery(total_stock_subquery, output_field=IntegerField()), 0),
             _allocated_stock=Coalesce(Subquery(allocated_stock_subquery, output_field=IntegerField()), 0),
+            _target_only_allocated=Coalesce(
+                Subquery(target_only_allocated_subquery, output_field=IntegerField()),
+                0,
+            ),
         )
 
 
@@ -270,8 +285,20 @@ class Component(AbstractInventoryItem):
         return self.allocations.filter(deleted_at__isnull=True).aggregate(total=models.Sum("qty"))["total"] or 0
 
     @property
+    def target_only_allocated(self):
+        if hasattr(self, "_target_only_allocated"):
+            return self._target_only_allocated
+        return (
+            self.allocations.filter(
+                deleted_at__isnull=True,
+                from_location__isnull=True,
+            ).aggregate(total=models.Sum("qty"))["total"]
+            or 0
+        )
+
+    @property
     def available_stock(self):
-        return self.total_stock - self.total_allocated
+        return self.total_stock - self.target_only_allocated
 
     @property
     def available(self):

@@ -235,8 +235,8 @@ The component detail page shows:
 | Metric | Formula | Description |
 |---|---|---|
 | **Total Stock** | `SUM(stocks.qty)` | All stock across all locations |
-| **Allocated** | `SUM(allocations.qty WHERE deleted_at IS NULL)` | Currently installed in assets |
-| **Available** | `total_stock - total_allocated` | Ready to be installed |
+| **Allocated** | `SUM(allocations.qty WHERE deleted_at IS NULL)` | Tracking total for all active allocations; source-backed rows are already reflected in stock |
+| **Available** | `total_stock - target_only_allocated` | On-hand stock minus allocations that did not already deduct a source pool |
 
 The `available_stock` property is computed from these aggregates and updated
 automatically as allocations change.
@@ -253,7 +253,6 @@ Navigate to **Inventory → Component Allocations → Add**:
 | **Component** | Yes | The component model being installed |
 | **Qty** | Yes | How many units (e.g. `2` for a dual-rank RAM kit) |
 | **Assigned Asset** | No* | The parent asset receiving the component |
-| **From Location** | No | Source warehouse (stock is deducted from here) |
 | **Assigned Holder** | No* | The holder if allocated directly to a person |
 | **Assigned Location** | No* | The location if allocated to a room |
 | **Notes** | No | Slot position, installation notes |
@@ -264,7 +263,7 @@ Navigate to **Inventory → Component Allocations → Add**:
 
 ```mermaid
 graph TD
-    A[Create Allocation<br/>qty=2, from_location=Warehouse A] --> B[Stock Deduction]
+    A[Component Check-out<br/>qty=2, from_location=Warehouse A] --> B[Stock Deduction]
     B --> C{Sufficient stock?}
     C -->|No| D[ValidationError<br/>Allocation rejected]
     C -->|Yes| E[Warehouse A stock<br/>decremented by 2]
@@ -278,10 +277,12 @@ graph TD
     style I fill:#2f855a,stroke:#68d391,color:#fff
 ```
 
-- **On creation**: The component's stock at `from_location` is decremented by
-  the allocated quantity.
-- **On deletion (soft or hard)**: The stock is restored to `from_location`,
-  maintaining count integrity.
+- **Target-only Allocation create / asset quick-add**: No source warehouse is
+  accepted. The active allocation reduces availability without mutating stock.
+- **Component Check-out**: Selecting a concrete stock row deducts its location
+  atomically and records the source (plus Resource Grant provenance when cross-tenant).
+- **On deletion (soft or hard)**: A source-backed check-out restores stock to
+  `from_location`; target-only allocations have no stock row to restore.
 - The stock adjustment is handled by `adjust_inventory_stock()` in
   `inventory/services.py`, called from both `save()` and `delete()`.
 

@@ -1,14 +1,21 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.http import QueryDict
 from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, Category, Manufacturer
 from core.tests.mixins import TenantTestMixin
+from inventory.forms import ComponentAllocationForm
 from inventory.models import Component, ComponentAllocation, ComponentStock
 from inventory.models_assignment_write import authorized_assignment_write
+from inventory.services import checkout_inventory_item, create_component_allocation
 from inventory.tests.factories import create_assignment_fixture
-from organization.models import Location, Site, Tenant
+from organization.models import AssetHolder, Location, Site, Tenant, TenantResourceGrant
 
 User = get_user_model()
 
@@ -365,6 +372,297 @@ class ComponentAllocationViewTests(TenantTestMixin, TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
+
+
+class Issue393ComponentAllocationContractTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="issue393-admin", password="x")
+        self.tenant = Tenant.objects.create(name="Issue 393 Tenant", slug="issue-393-tenant")
+        self.client_login_to_tenant(self.user, self.tenant)
+        self.manufacturer = Manufacturer.objects.create(name="Issue 393 Mfg", slug="issue-393-mfg")
+        self.category = Category.objects.create(
+            name="Issue 393 Component",
+            slug="issue-393-component",
+            applies_to={"component": True},
+        )
+        self.site = Site.objects.create(name="Issue 393 Site", slug="issue-393-site", tenant=self.tenant)
+        self.source_a = Location.objects.create(
+            name="Issue 393 Source A",
+            slug="issue-393-source-a",
+            site=self.site,
+            tenant=self.tenant,
+        )
+        self.source_b = Location.objects.create(
+            name="Issue 393 Source B",
+            slug="issue-393-source-b",
+            site=self.site,
+            tenant=self.tenant,
+        )
+        self.holder = AssetHolder.objects.create(
+            first_name="Issue",
+            last_name="Holder",
+            upn="issue393-holder@example.test",
+            tenant=self.tenant,
+        )
+        role = AssetRole.objects.create(name="Issue 393 Server", slug="issue-393-server", allows_components=True)
+        self.asset = Asset.objects.create(
+            name="Issue 393 Asset",
+            asset_tag="ISSUE-393-ASSET",
+            asset_role=role,
+            tenant=self.tenant,
+        )
+        self.component = Component.objects.create(
+            name="Issue 393 RAM",
+            manufacturer=self.manufacturer,
+            category=self.category,
+            tenant=self.tenant,
+        )
+        self.stock_a = ComponentStock.objects.create(component=self.component, location=self.source_a, qty=5)
+        self.stock_b = ComponentStock.objects.create(component=self.component, location=self.source_b, qty=3)
+        self.create_url = reverse("inventory:componentallocation_create")
+
+    def _target_only_payload(self, **overrides):
+        payload = {
+            "component": self.component.pk,
+            "assigned_holder": self.holder.pk,
+            "qty": 2,
+            "notes": "Issue 393 target-only allocation",
+        }
+        payload.update(overrides)
+        return payload
+
+    def _source_backed_allocation(self):
+        return checkout_inventory_item(
+            self.component,
+            2,
+            asset=self.asset,
+            source_location=self.source_a,
+            user=self.user,
+            notes="Issue 393 source-backed allocation",
+        )
+
+    def test_create_form_hides_source_and_rejects_tampered_source(self):
+        form = ComponentAllocationForm()
+        self.assertNotIn("from_location", form.fields)
+
+        bound = ComponentAllocationForm(data=self._target_only_payload(from_location=self.source_a.pk))
+        self.assertFalse(bound.is_valid())
+        self.assertIn("only available through component checkout", str(bound.errors))
+
+    def test_create_form_rejects_duplicate_source_when_last_value_is_empty(self):
+        data = QueryDict("", mutable=True)
+        for field_name, value in self._target_only_payload().items():
+            data[field_name] = value
+        data.setlist("from_location", [str(self.source_a.pk), ""])
+
+        form = ComponentAllocationForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("only available through component checkout", str(form.errors))
+
+    def test_update_form_rejects_duplicate_source_when_last_value_matches_persisted(self):
+        allocation = self._source_backed_allocation()
+        data = QueryDict("", mutable=True)
+        data["qty"] = str(allocation.qty)
+        data["notes"] = allocation.notes
+        data.setlist("from_location", [str(self.source_b.pk), str(self.source_a.pk)])
+
+        form = ComponentAllocationForm(data=data, instance=allocation)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("immutable", str(form.errors))
+
+    def test_update_form_preserves_source_read_only_and_rejects_tampering(self):
+        allocation = self._source_backed_allocation()
+        form = ComponentAllocationForm(instance=allocation)
+        self.assertIn("from_location", form.fields)
+        self.assertTrue(form.fields["from_location"].disabled)
+
+        bound = ComponentAllocationForm(
+            data={
+                "component": self.component.pk,
+                "assigned_asset": self.asset.pk,
+                "from_location": self.source_b.pk,
+                "qty": allocation.qty,
+                "notes": allocation.notes,
+            },
+            instance=allocation,
+        )
+        self.assertFalse(bound.is_valid())
+        self.assertIn("immutable", str(bound.errors))
+
+    def test_update_form_preserves_granted_cross_tenant_source(self):
+        owner = Tenant.objects.create(name="Issue 393 Source Owner", slug="issue-393-source-owner")
+        owner_site = Site.objects.create(name="Issue 393 Owner Site", slug="issue-393-owner-site", tenant=owner)
+        owner_location = Location.objects.create(
+            name="Issue 393 Owner Source",
+            slug="issue-393-owner-source",
+            site=owner_site,
+            tenant=owner,
+        )
+        owner_stock = ComponentStock.objects.create(component=self.component, location=owner_location, qty=5)
+        TenantResourceGrant.objects.create(
+            tenant=owner,
+            grantee_tenant=self.tenant,
+            resource_type=ContentType.objects.get_for_model(ComponentStock),
+            resource_id=owner_stock.pk,
+            access_level=TenantResourceGrant.ACCESS_USE,
+        )
+        allocation = checkout_inventory_item(
+            self.component,
+            1,
+            asset=self.asset,
+            source_location=owner_location,
+            user=self.user,
+        )
+
+        form = ComponentAllocationForm(
+            data={"qty": 2, "notes": "Issue 393 cross-tenant update"},
+            instance=allocation,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["from_location"].pk, owner_location.pk)
+
+    def test_full_page_create_rejects_explicit_source_without_mutation(self):
+        response = self.client.post(self.create_url, self._target_only_payload(from_location=self.source_a.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "only available through component checkout")
+        self.assertEqual(ComponentAllocation._base_manager.count(), 0)
+        self.stock_a.refresh_from_db()
+        self.assertEqual(self.stock_a.qty, 5)
+
+    def test_target_only_create_persists_exactly_one_and_reads_back(self):
+        response = self.client.post(self.create_url, self._target_only_payload())
+
+        self.assertEqual(response.status_code, 302, response.content)
+        allocation = ComponentAllocation._base_manager.get()
+        self.assertIsNone(allocation.from_location_id)
+        self.assertEqual(allocation.assigned_holder_id, self.holder.pk)
+        self.assertEqual(allocation.qty, 2)
+        self.stock_a.refresh_from_db()
+        self.assertEqual(self.stock_a.qty, 5)
+        detail = self.client.get(self.component.get_absolute_url())
+        self.assertEqual([row.record.pk for row in detail.context["allocations_table"].rows], [allocation.pk])
+
+    def test_filtered_allocation_list_reads_back_without_distinct_union_500(self):
+        allocation = create_component_allocation(
+            self.component,
+            1,
+            holder=self.holder,
+            user=self.user,
+            notes="Issue 393 filtered readback",
+        )
+        self.client.raise_request_exception = False
+
+        response = self.client.get(reverse("inventory:componentallocation_list"), {"q": "filtered readback"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row.record.pk for row in response.context["table"].rows], [allocation.pk])
+
+    def test_filtered_component_stock_list_does_not_mix_distinct_querysets(self):
+        self.client.raise_request_exception = False
+
+        response = self.client.get(reverse("inventory:componentstock_list"), {"q": "Issue 393 Source A"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row.record.pk for row in response.context["table"].rows], [self.stock_a.pk])
+
+    def test_asset_quick_add_uses_service_then_returns_hx_redirect(self):
+        quick_add_url = f"{self.create_url}?asset={self.asset.pk}&_quickadd=1"
+        response = self.client.post(
+            quick_add_url,
+            {
+                "component": self.component.pk,
+                "assigned_asset": self.asset.pk,
+                "qty": 2,
+                "notes": "Issue 393 asset quick-add",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.headers["HX-Redirect"], self.asset.get_absolute_url())
+        allocation = ComponentAllocation._base_manager.get()
+        self.assertEqual(allocation.assigned_asset_id, self.asset.pk)
+        self.assertIsNone(allocation.from_location_id)
+
+    def test_asset_quick_add_rejects_explicit_source_as_visible_422(self):
+        quick_add_url = f"{self.create_url}?asset={self.asset.pk}&_quickadd=1"
+        response = self.client.post(
+            quick_add_url,
+            {
+                "component": self.component.pk,
+                "assigned_asset": self.asset.pk,
+                "from_location": self.source_a.pk,
+                "qty": 2,
+            },
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, "only available through component checkout", status_code=422)
+        self.assertEqual(ComponentAllocation._base_manager.count(), 0)
+        self.stock_a.refresh_from_db()
+        self.assertEqual(self.stock_a.qty, 5)
+
+    def test_update_source_tamper_is_bound_error_not_500(self):
+        allocation = self._source_backed_allocation()
+        before = (
+            allocation.component_id,
+            allocation.assigned_asset_id,
+            allocation.from_location_id,
+            allocation.qty,
+            allocation.notes,
+        )
+        self.client.raise_request_exception = False
+        response = self.client.post(
+            reverse("inventory:componentallocation_update", kwargs={"pk": allocation.pk}),
+            {
+                "component": self.component.pk,
+                "assigned_asset": self.asset.pk,
+                "from_location": self.source_b.pk,
+                "qty": allocation.qty,
+                "notes": allocation.notes,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "immutable")
+        allocation.refresh_from_db()
+        after = (
+            allocation.component_id,
+            allocation.assigned_asset_id,
+            allocation.from_location_id,
+            allocation.qty,
+            allocation.notes,
+        )
+        self.assertEqual(after, before)
+
+    def test_post_validation_service_error_is_bound_without_mutation(self):
+        allocation = create_component_allocation(
+            self.component,
+            1,
+            holder=self.holder,
+            user=self.user,
+            notes="Issue 393 service-error baseline",
+        )
+        self.client.raise_request_exception = False
+        with patch(
+            "inventory.views.component_views.update_component_allocation",
+            side_effect=ValidationError("Injected issue 393 service error"),
+        ):
+            response = self.client.post(
+                reverse("inventory:componentallocation_update", kwargs={"pk": allocation.pk}),
+                self._target_only_payload(qty=1, notes=allocation.notes),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Injected issue 393 service error")
+        allocation.refresh_from_db()
+        self.assertEqual(allocation.qty, 1)
+        self.assertEqual(allocation.notes, "Issue 393 service-error baseline")
 
 
 class ComponentStockAdjustViewTests(TestCase):

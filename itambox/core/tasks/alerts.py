@@ -541,6 +541,7 @@ def _match_low_stock(rule):
     comp_allocs_sub = ComponentAllocation.objects.filter(
         component=OuterRef("pk"),
         deleted_at__isnull=True,
+        from_location__isnull=True,
     )
     if rule.tenant:
         comp_allocs_sub = comp_allocs_sub.filter(assigned_asset__tenant=rule.tenant)
@@ -548,7 +549,7 @@ def _match_low_stock(rule):
         annotated_total_stock=Coalesce(
             Subquery(comp_stocks_sub.values("component").annotate(t=Sum("qty")).values("t")), 0
         ),
-        annotated_allocated_stock=Coalesce(
+        annotated_target_only_allocated=Coalesce(
             Subquery(comp_allocs_sub.values("component").annotate(t=Sum("qty")).values("t")), 0
         ),
     )
@@ -556,7 +557,7 @@ def _match_low_stock(rule):
         comp_qs = comp_qs.filter(tenant=rule.tenant)
 
     for comp in comp_qs:
-        available = max(0, comp.annotated_total_stock - comp.annotated_allocated_stock)
+        available = max(0, comp.annotated_total_stock - comp.annotated_target_only_allocated)
         threshold = comp.min_qty if (comp.min_qty and comp.min_qty > 0) else rule.threshold_value
         if available <= threshold:
             matches.append(

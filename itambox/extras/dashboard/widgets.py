@@ -1105,16 +1105,21 @@ class LowStockWidget(DashboardWidget):
         allocation_sub = ComponentAllocation.objects.filter(component=OuterRef("pk"), deleted_at__isnull=True)
         if target_id:
             allocation_sub = allocation_sub.filter(assigned_asset__tenant_id=target_id)
+        target_only_allocation_sub = allocation_sub.filter(from_location__isnull=True)
         allocation_sub = allocation_sub.values("component").annotate(sum_qty=Sum("qty")).values("sum_qty")
+        target_only_allocation_sub = (
+            target_only_allocation_sub.values("component").annotate(sum_qty=Sum("qty")).values("sum_qty")
+        )
 
         comp_qs = comp_qs.annotate(
             _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
             _total_allocated_annotated=Coalesce(Subquery(allocation_sub), 0),
+            _target_only_allocated_annotated=Coalesce(Subquery(target_only_allocation_sub), 0),
         )
 
         low_components = []
         for comp in comp_qs:
-            available = comp._total_stock_annotated - comp._total_allocated_annotated
+            available = comp._total_stock_annotated - comp._target_only_allocated_annotated
             if available < comp.min_qty:
                 low_components.append(
                     {
