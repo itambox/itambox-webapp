@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 
 const allocationCreatePath = '/inventory/component-allocations/add/';
 const allocationListPath = '/inventory/component-allocations/';
+let configuredTenantId: string | undefined;
 
 async function hideDebugToolbar(page: Page): Promise<void> {
   const hide = page.getByText('Hide »', { exact: true });
@@ -12,34 +13,56 @@ async function responseRows(
   request: APIRequestContext,
   path: string,
 ): Promise<Record<string, any>[]> {
-  const response = await request.get(path);
+  const scopedPath = new URL(path, 'http://itambox.local');
+  if (configuredTenantId) scopedPath.searchParams.set('switch_tenant', configuredTenantId);
+  const response = await request.get(`${scopedPath.pathname}${scopedPath.search}`);
   expect(response.status(), await response.text()).toBe(200);
   const payload = await response.json();
-  return Array.isArray(payload) ? payload : payload.results;
+  return Array.isArray(payload) ? payload : payload.results || [];
+}
+
+async function activateConfiguredTenant(page: Page, request: APIRequestContext): Promise<void> {
+  const tenantSlug = process.env.E2E_TENANT_SLUG;
+  if (!tenantSlug) return;
+  const tenants = await responseRows(request, '/api/organization/tenants/?limit=100');
+  const tenant = tenants.find((row) => row.slug === tenantSlug);
+  expect(
+    tenant,
+    `E2E tenant ${tenantSlug} must be visible to the authenticated operator`,
+  ).toBeDefined();
+  configuredTenantId = String(tenant!.id);
+  const apiSwitch = await request.get(`/?switch_tenant=${tenant!.id}`);
+  expect(apiSwitch.status(), await apiSwitch.text()).toBe(200);
+  await page.goto(`/?switch_tenant=${tenant!.id}`, { waitUntil: 'networkidle' });
 }
 
 async function allocationByNote(
   request: APIRequestContext,
   note: string,
 ): Promise<Record<string, any> | undefined> {
-  const rows = await responseRows(
-    request,
-    `/api/inventory/component-allocations/?q=${encodeURIComponent(note)}`,
-  );
+  const rows = await responseRows(request, '/api/inventory/component-allocations/?q=E2E-ISSUE393-');
   return rows.find((row) => row.notes === note);
 }
 
 async function availableComponentValue(page: Page, request: APIRequestContext): Promise<string> {
+  const options = await page.locator('select[name="component"] option').evaluateAll((elements) =>
+    elements
+      .map((element) => ({
+        value: (element as HTMLOptionElement).value,
+        label: (element.textContent || '').trim(),
+      }))
+      .filter((option) => option.value),
+  );
+  if (process.env.E2E_TENANT_SLUG) {
+    const seeded = options.find((option) => option.label.includes('Seagate IronWolf Pro 12TB'));
+    if (seeded) return seeded.value;
+  }
+
   const rows = await responseRows(request, '/api/inventory/components/?limit=100');
   const availableIds = new Set(
     rows.filter((row) => Number(row.available_stock) > 0).map((row) => String(row.id)),
   );
-  const optionValues = await page
-    .locator('select[name="component"] option')
-    .evaluateAll((options) =>
-      options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
-    );
-  const value = optionValues.find((candidate) => availableIds.has(candidate));
+  const value = options.find((option) => availableIds.has(option.value))?.value;
   if (!value)
     throw new Error('The E2E seed must expose an available Component in the active tenant.');
   return value;
@@ -101,18 +124,22 @@ async function cleanupAllocation(
 }
 
 async function firstModularAsset(page: Page): Promise<string> {
-  await page.goto('/assets/assets/', { waitUntil: 'networkidle' });
+  await page.goto('/assets/assets/?per_page=100', { waitUntil: 'networkidle' });
   await hideDebugToolbar(page);
   const hrefs = await page
     .locator('a[href^="/assets/assets/"]')
     .evaluateAll((links) => [
       ...new Set(
-        links.map((link) => (link as HTMLAnchorElement).getAttribute('href')).filter(Boolean),
+        links
+          .map((link) => (link as HTMLAnchorElement).getAttribute('href'))
+          .filter((href): href is string =>
+            Boolean(href && /^\/assets\/assets\/\d+\/$/.test(href)),
+          ),
       ),
     ]);
-  for (const href of hrefs.slice(0, 20)) {
-    const componentsPath = `${href!}?tab=components`;
-    await page.goto(componentsPath, { waitUntil: 'networkidle' });
+  for (const href of hrefs) {
+    const componentsPath = `${href}?tab=components`;
+    await page.goto(componentsPath, { waitUntil: 'domcontentloaded' });
     const button = page.locator(
       'button[hx-get*="component-allocations/add"][hx-get*="_quickadd=1"]',
     );
@@ -172,6 +199,7 @@ test.describe('Issue #393 Component Allocation observability', () => {
     const invalidNote = `E2E-ISSUE393-invalid-${Date.now()}`;
     const successNote = `E2E-ISSUE393-success-${Date.now()}`;
 
+    await activateConfiguredTenant(page, request);
     await page.goto(allocationCreatePath, { waitUntil: 'networkidle' });
     await hideDebugToolbar(page);
     await expect(page.locator('select[name="from_location"]')).toHaveCount(0);
@@ -239,6 +267,7 @@ test.describe('Issue #393 Component Allocation observability', () => {
   }) => {
     const errors = errorRecorder(page);
     const note = `E2E-ISSUE393-quickadd-${Date.now()}`;
+    await activateConfiguredTenant(page, request);
     const componentsPath = await firstModularAsset(page);
     const assetPath = new URL(componentsPath, 'http://localhost').pathname;
     const button = page.locator(
@@ -266,8 +295,10 @@ test.describe('Issue #393 Component Allocation observability', () => {
     await page.waitForURL((url) => url.pathname === assetPath, { timeout: 15000 });
     await expect(modal).not.toBeVisible();
 
+    await expect
+      .poll(async () => (await allocationByNote(request, note))?.id, { timeout: 15000 })
+      .toBeTruthy();
     const allocation = await allocationByNote(request, note);
-    expect(allocation).toBeDefined();
     expect(allocation!.from_location).toBeNull();
     await cleanupAllocation(page, request, String(allocation!.id), note);
     await expectNoUnexpectedErrors(page, errors);
