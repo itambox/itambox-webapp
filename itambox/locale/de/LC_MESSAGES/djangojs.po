@@ -597,3 +597,11 @@ msgstr "Hardware-Bestand nach Typ"
 
 msgid "Annual Spend by Supplier"
 msgstr "Jährliche Ausgaben nach Lieferant"
+
+#: .\static\dist\itambox.js:1
+msgid "%(count)s assets from another tenant are kept aside — switching the target tenant shows them."
+msgstr "Assets aus einem anderen Mandanten werden zurückgehalten (%(count)s) — beim Wechsel des Ziel-Mandanten werden sie angezeigt."
+
+#: .\static\dist\itambox.js:1
+msgid "Select a target tenant before scanning."
+msgstr "Wählen Sie vor dem Scannen einen Ziel-Mandanten aus."

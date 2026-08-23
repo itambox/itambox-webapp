@@ -1731,6 +1731,17 @@ class Issue391AssetEditTests(TenantTestMixin, TestCase):
 
 
 class JavaScriptCatalogLocalizationTest(SimpleTestCase):
+    # Bulk-basket tenant strings introduced by #413/#424 and translated under
+    # #437. Kept in a separate mapping so the English parity test can iterate
+    # the same identities.
+    BULK_BASKET_GERMAN = {
+        "Select a target tenant before scanning.": "Wählen Sie vor dem Scannen einen Ziel-Mandanten aus.",
+        ("%(count)s assets from another tenant are kept aside — switching the target tenant shows them."): (
+            "Assets aus einem anderen Mandanten werden zurückgehalten (%(count)s) — "
+            "beim Wechsel des Ziel-Mandanten werden sie angezeigt."
+        ),
+    }
+
     EXPECTED_GERMAN = {
         "Supplier": "Lieferant",
         "Start Date": "Startdatum",
@@ -1762,22 +1773,42 @@ class JavaScriptCatalogLocalizationTest(SimpleTestCase):
         "no_results": "Keine Ergebnisse gefunden",
         "not_loading": "Keine weiteren Ergebnisse",
         "option_create": "Option erstellen",
+        **BULK_BASKET_GERMAN,
     }
 
-    def test_german_javascript_catalog_translates_reviewed_entries(self):
-        with translation.override("de"):
+    def _catalog_for(self, language):
+        with translation.override(language):
             response = self.client.get(
                 reverse("javascript-catalog"),
-                HTTP_ACCEPT_LANGUAGE="de",
+                HTTP_ACCEPT_LANGUAGE=language,
                 HTTP_HOST="localhost",
             )
         self.assertEqual(response.status_code, 200)
         body = response.content.decode("utf-8")
         marker = "const newcatalog = "
+        if marker not in body:
+            # Django omits the assignment for empty catalogues (e.g. English,
+            # which has no locale directory): the served JS falls back to the
+            # gettext identity function and renders source strings unchanged.
+            return {}
         start = body.index(marker) + len(marker)
         end = body.index(";\n", start)
-        catalog = json.loads(body[start:end])
+        return json.loads(body[start:end])
+
+    def test_german_javascript_catalog_translates_reviewed_entries(self):
+        catalog = self._catalog_for("de")
 
         for source, expected in self.EXPECTED_GERMAN.items():
             with self.subTest(source=source):
                 self.assertEqual(catalog[source], expected)
+
+    def test_english_javascript_catalog_keeps_bulk_basket_sources_untranslated(self):
+        # The English sessions have no catalogue of their own: the JS gettext
+        # identity fallback renders the English source strings unchanged. The
+        # served catalog must therefore either omit the bulk-basket messages
+        # or map them to their English source — never to a German value.
+        catalog = self._catalog_for("en")
+
+        for source in self.BULK_BASKET_GERMAN:
+            with self.subTest(source=source):
+                self.assertIn(catalog.get(source), (None, source))
