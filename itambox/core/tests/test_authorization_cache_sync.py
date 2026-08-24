@@ -252,7 +252,6 @@ class GraphQLTokenAuthorizationContextTests(SimpleTestCase):
                     "core.views.graphql.TokenAuthentication.authenticate",
                     return_value=(authenticated_user, object()),
                 ),
-                mock.patch("core.views.graphql.TenantMiddleware.process_request"),
                 mock.patch(
                     "rest_framework.throttling.AnonRateThrottle.allow_request",
                     return_value=True,

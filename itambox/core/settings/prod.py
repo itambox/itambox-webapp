@@ -192,7 +192,7 @@ SERVER_EMAIL = os.environ.get("ITAMBOX_SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "itambox.api.authentication.TokenAuthentication",
+        "users.api.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
 }

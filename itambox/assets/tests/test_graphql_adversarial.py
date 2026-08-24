@@ -455,7 +455,6 @@ class GraphQLAdversarialTestCase(TestCase):
         """A GraphQL token request stays pinned to tenant B after session middleware selected A."""
         grant(self.staff_a, self.tenant_b, self.role_admin_b)
         token_b = Token.objects.create(user=self.staff_a, tenant=self.tenant_b)
-        self.client.force_login(self.staff_a)
         session = self.client.session
         session["active_tenant_id"] = self.tenant_a.pk
         session.save()

@@ -9,8 +9,8 @@ from core.managers import (
     get_current_tenant,
     set_current_all_accessible,
 )
-from itambox.api.authentication import TokenAuthentication
 from organization.models import Membership, Tenant
+from users.api.authentication import TokenAuthentication
 from users.models import Token
 
 User = get_user_model()

@@ -2422,36 +2422,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from core.managers import set_current_all_accessible, set_current_membership, set_current_tenant, set_current_tenant_group",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from itambox.ratelimit import get_client_ip",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from organization.models import Membership",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from users.models import Token",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/fields.py",
       "context": "FunctionDef:validate_gfk_target_tenant",
       "statement": "from core.managers import get_current_tenant",

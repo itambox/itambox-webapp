@@ -5,36 +5,6 @@
   "cycles": [],
   "layer_exceptions": [
     {
-      "id": "R-F1|itambox.api.authentication|organization.models|function-body",
-      "rule": "R-F1",
-      "source": "itambox.api.authentication",
-      "source_layer": "framework",
-      "target": "organization.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:api",
-      "disposition": "debt",
-      "removal_issue": 442,
-      "removal_direction": "Resolve the organization model through apps.get_model() inside itambox.api.authentication, or accept the instance as an argument, so the framework layer carries no import edge into organization.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-F1|itambox.api.authentication|users.models|function-body",
-      "rule": "R-F1",
-      "source": "itambox.api.authentication",
-      "source_layer": "framework",
-      "target": "users.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:api",
-      "disposition": "debt",
-      "removal_issue": 442,
-      "removal_direction": "Resolve the users model through apps.get_model() inside itambox.api.authentication, or accept the instance as an argument, so the framework layer carries no import edge into users.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-F1|itambox.api.nested_serializers|assets.models.__init__|module-top",
       "rule": "R-F1",
       "source": "itambox.api.nested_serializers",
@@ -62,21 +32,6 @@
       "disposition": "debt",
       "removal_issue": 442,
       "removal_direction": "Resolve the organization model through apps.get_model() inside itambox.middleware, or accept the instance as an argument, so the framework layer carries no import edge into organization.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-F3|itambox.api.authentication|organization.access|function-body",
-      "rule": "R-F3",
-      "source": "itambox.api.authentication",
-      "source_layer": "framework",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:api",
-      "disposition": "debt",
-      "removal_issue": 442,
-      "removal_direction": "Publish the behaviour itambox.api.authentication needs from organization.access as a registry hook the framework owns, so the framework depends on its own interface rather than on organization.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {

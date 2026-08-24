@@ -6644,22 +6644,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/api/authentication.py",
-      "code": "C901",
-      "message": "'TokenAuthentication.authenticate_credentials' is too complex (12)",
-      "source": "    def authenticate_credentials(self, key, request=None):",
-      "context": "Module:body/ClassDef:TokenAuthentication:body/FunctionDef:authenticate_credentials:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "code": "F401",
-      "message": "'django.conf.settings' imported but unused",
-      "source": "from django.conf import settings",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/base.py",
       "code": "F401",
       "message": "'itambox.api.exceptions.SerializerNotFound' imported but unused",

@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 47,
-  "policy_sha256": "0a0c9f108b251f2d658fb250ae8ddd2d09fa5260b2bc5452d3013129cb0ba8ed",
+  "next_sequence": 48,
+  "policy_sha256": "dfe4eb619953dcd4bbe96a7a4620ddc271c0550034e90b2f8b798de102981f33",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -541,6 +541,18 @@
       "scope": "symbols",
       "symbols": [
         "SubscriptionStatusCompatibilitySerializer"
+      ]
+    },
+    {
+      "sequence": 47,
+      "path": "itambox/users/api/authentication.py",
+      "module": "users.api.authentication",
+      "issue": "#442",
+      "note": "Users-owned token authenticator and TokenAuth OpenAPI extension with typed helper seams preserving token validation and tenant binding.",
+      "scope": "symbols",
+      "symbols": [
+        "TokenAuthentication",
+        "TokenAuthenticationScheme"
       ]
     },
     {

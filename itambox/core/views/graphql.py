@@ -1,6 +1,7 @@
 from urllib.parse import quote
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
@@ -10,8 +11,8 @@ from graphene_django.views import GraphQLView
 from graphql.validation import specified_rules
 from rest_framework import exceptions
 
-from itambox.api.authentication import TokenAuthentication
-from itambox.middleware import TenantMiddleware, set_current_user
+from core.context import set_current_user
+from users.api.authentication import TokenAuthentication
 
 
 def field_count_limit_validator(max_fields=500, max_aliases=50):
@@ -222,12 +223,10 @@ class PrivateGraphQLView(GraphQLView):
         pass
 
     def dispatch(self, request, *args, **kwargs):
-        if request.method == "GET":
-            if not request.user.is_authenticated:
-                from django.shortcuts import resolve_url
+        if request.method == "GET" and not request.user.is_authenticated:
+            from django.shortcuts import resolve_url
 
-                return redirect(f"{resolve_url(settings.LOGIN_URL)}?next={quote(request.get_full_path())}")
-
+            return redirect(f"{resolve_url(settings.LOGIN_URL)}?next={quote(request.get_full_path())}")
         elif request.method == "POST":
             if request.user.is_authenticated:
                 from django.middleware.csrf import CsrfViewMiddleware
@@ -243,13 +242,11 @@ class PrivateGraphQLView(GraphQLView):
                         user, token = auth_result
                         request.user = user
                         request.auth = token
-                        # Token auth runs after middleware; bind the authenticated
-                        # principal without starting a second request lifecycle.
                         set_current_user(user)
-                        # Re-run tenant middleware to set tenant context
-                        TenantMiddleware().process_request(request)
                     else:
                         return HttpResponse(_("Unauthorized"), status=401)
+                except ImproperlyConfigured:
+                    raise
                 except exceptions.AuthenticationFailed:
                     # Return a generic message; the specific failure reason must not
                     # leak to the client (aligns with the broad-except branch below).
