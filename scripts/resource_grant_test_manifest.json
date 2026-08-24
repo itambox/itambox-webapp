@@ -173,6 +173,7 @@
   "itambox/assets/tests/test_graphql_adversarial.py",
   "itambox/assets/tests/test_nested_serializers.py",
   "itambox/core/tests/test_provider_slot.py",
+  "itambox/itambox/tests/test_issue134_api_scope.py",
   "itambox/organization/tests/test_tenant_access_policy.py",
   "itambox/users/tests/test_can_login.py",
   "itambox/users/tests/test_token_ip_auth.py"
@@ -354,6 +355,7 @@
   "itambox/assets/tests/test_graphql_adversarial.py",
   "itambox/assets/tests/test_nested_serializers.py",
   "itambox/core/tests/test_provider_slot.py",
+  "itambox/itambox/tests/test_issue134_api_scope.py",
   "itambox/organization/tests/test_tenant_access_policy.py",
   "itambox/users/tests/test_can_login.py",
   "itambox/users/tests/test_token_ip_auth.py"

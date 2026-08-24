@@ -4,6 +4,7 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework import exceptions
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 from core.managers import (
@@ -39,10 +40,16 @@ class TokenIPRestrictionAuthTests(TestCase):
     def _token(self, **kwargs):
         return Token.objects.create(user=self.user, tenant=self.tenant, **kwargs)
 
-    def _request(self, token, remote_addr):
-        request = self.factory.get("/api/", HTTP_AUTHORIZATION=f"Token {token.key}")
+    def _request(self, token, remote_addr, method="GET"):
+        request = getattr(self.factory, method.lower())(
+            "/api/",
+            HTTP_AUTHORIZATION=f"Token {token.key}",
+        )
         request.META["REMOTE_ADDR"] = remote_addr
         return request
+
+    def _drf_request(self, token, remote_addr, method="GET"):
+        return Request(self._request(token, remote_addr, method))
 
     def test_no_restriction_allows_any_ip(self):
         token = self._token()
@@ -55,12 +62,39 @@ class TokenIPRestrictionAuthTests(TestCase):
         user, _ = self.auth.authenticate(self._request(token, "192.168.1.42"))
         self.assertEqual(user, self.user)
 
+    def test_allowed_ipv6_cidr_passes_at_authentication_layer(self):
+        token = self._token(allowed_ips=["2001:db8:1234::/48"])
+        user, authed = self.auth.authenticate(self._drf_request(token, "2001:db8:1234::42"))
+        self.assertEqual(user, self.user)
+        self.assertEqual(authed.pk, token.pk)
+
     def test_disallowed_ip_is_rejected(self):
         token = self._token(allowed_ips=["192.168.1.0/24"])
         assert_authentication_failure(
             self,
             self.auth,
             self._request(token, "10.9.9.9"),
+            "Source IP address is not permitted to use this token.",
+        )
+
+    def test_disallowed_ipv6_source_is_rejected_at_authentication_layer(self):
+        token = self._token(allowed_ips=["2001:db8:1234::/48"])
+        assert_authentication_failure(
+            self,
+            self.auth,
+            self._drf_request(token, "2001:db8:5678::42"),
+            "Source IP address is not permitted to use this token.",
+        )
+
+    def test_disallowed_ip_precedes_read_only_write_check(self):
+        token = self._token(
+            allowed_ips=["192.168.1.0/24"],
+            write_enabled=False,
+        )
+        assert_authentication_failure(
+            self,
+            self.auth,
+            self._drf_request(token, "10.9.9.9", method="POST"),
             "Source IP address is not permitted to use this token.",
         )
 
