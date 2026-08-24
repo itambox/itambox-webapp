@@ -155,17 +155,22 @@ class MitigationsPhase3Tests(TestCase):
         )
 
         # The key assertion is the single JOIN'd Asset query (select_related works — no
-        # N+1 on asset relations). The remaining queries are auth/tenant/permission
-        # overhead: token + last_used, tenant, TenantGroup, the membership lookup,
-        # additive RoleGrant resolution (grant + prefetched scopes), a bounded
-        # own-tenant coverage lookup, and session read/write. Managed projection is
-        # skipped because this tenant is not managed by a provider. The all-accessible
-        # scope caching from #29 (82f1cf5) avoids the extra token revocation re-
-        # validation queries that were present in the pre-#29 baseline (cf774f2).
-        # build_accessible_tenant_permissions_map (phase 3 for issue #56) folds the
-        # per-tenant scoped-tenant-id/coverage walk into the one bounded Tenant lookup
-        # above instead of re-deriving it per grant, dropping 2 queries from this path.
-        with self.assertNumQueries(16):
+        # N+1 on asset relations). The remaining queries are the users-owned token
+        # authenticator and GraphQL permission/query path: token lookup, canonical
+        # accessible-tenant and RoleGrant/scope resolution, bounded own-tenant
+        # coverage, last_used update, the token's direct-membership lookup,
+        # TenantGroup/descendant resolution, and the software relation query.
+        # Managed projection is skipped because this tenant is not managed by a
+        # provider. The all-accessible scope caching from #29 (82f1cf5) avoids the
+        # extra token revocation re-validation queries that were present in the
+        # pre-#29 baseline (cf774f2). build_accessible_tenant_permissions_map
+        # (phase 3 for issue #56) folds the per-tenant scoped-tenant-id/coverage walk
+        # into the one bounded Tenant lookup above instead of re-deriving it per grant.
+        # GraphQL token authentication already binds the token tenant and membership;
+        # #442 intentionally does not run a second TenantMiddleware.process_request()
+        # session-resolution pass. The BASE control's five additional queries were
+        # that pass's fallback membership lookup plus its session read/save sequence.
+        with self.assertNumQueries(11):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({"query": query}),
