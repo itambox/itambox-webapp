@@ -23,9 +23,9 @@ class OrganizationConfig(AppConfig):
         import organization.signals
 
         # inline imports: app-registry: domain modules load only after the app registry is ready.
+        from core.tenant_access import configure_tenant_access_policy
         from core.tenant_scope import register_tenant_scope_provider
         from organization.access import (
-            accessible_tenant_ids,
             accessible_tenant_ids_with_expiry,
             managed_accessible_tenant_ids,
         )
@@ -34,9 +34,10 @@ class OrganizationConfig(AppConfig):
             build_accessible_tenant_permissions_map,
             effective_permissions_with_expiry,
         )
+        from organization.services.tenant_access import organization_tenant_access_policy
 
+        configure_tenant_access_policy(organization_tenant_access_policy)
         register_tenant_scope_provider(
-            accessible_tenant_ids=accessible_tenant_ids,
             accessible_tenant_ids_with_expiry=accessible_tenant_ids_with_expiry,
             managed_accessible_tenant_ids=managed_accessible_tenant_ids,
             applicable_grants=applicable_grants,

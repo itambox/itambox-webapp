@@ -11,6 +11,8 @@ from collections.abc import Callable
 
 from django.apps import apps
 
+from core.tenant_access import accessible_tenant_ids as _typed_accessible_tenant_ids
+
 _provider_modules: dict[str, str] = {}
 
 _descendant_group_ids_cache = contextvars.ContextVar(
@@ -93,7 +95,7 @@ def get_ancestor_tenant_group_ids(group_id: int | None, live_only: bool = False)
 
 
 def accessible_tenant_ids(user):
-    return _call("accessible_tenant_ids", user)
+    return _typed_accessible_tenant_ids(user)
 
 
 def accessible_tenant_ids_with_expiry(user):

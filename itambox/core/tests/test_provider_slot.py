@@ -71,7 +71,7 @@ class SingleProviderSlotTests(SimpleTestCase):
             barrier.wait()
             try:
                 slot.register(provider)
-            except BaseException as exc:  # noqa: BLE001 - test captures the exact loser
+            except Exception as exc:  # test captures the exact loser
                 return exc
             return None
 

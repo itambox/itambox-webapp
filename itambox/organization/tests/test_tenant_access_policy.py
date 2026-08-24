@@ -1,5 +1,6 @@
 """Contract tests for the organization tenant-access provider."""
 
+from importlib import import_module
 from unittest import mock
 
 from django.core.exceptions import ImproperlyConfigured
@@ -68,8 +69,8 @@ class OrganizationTenantAccessPolicyTests(TestCase):
             mock.patch.object(organization_tenant_access_policy, "shared_stock_read_allowed") as shared,
         ):
             with self.assertNumQueries(0):
-                OrganizationConfig("organization", "organization").ready()
-                OrganizationConfig("organization", "organization").ready()
+                OrganizationConfig("organization", import_module("organization")).ready()
+                OrganizationConfig("organization", import_module("organization")).ready()
 
         accessible.assert_not_called()
         active.assert_not_called()
