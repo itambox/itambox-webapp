@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from core.managers import (
     set_current_all_accessible,
@@ -15,7 +16,7 @@ from core.managers import (
 )
 from core.tests.mixins import grant
 from itambox.middleware import CurrentUserMiddleware, TenantMiddleware
-from organization.models import Role, Tenant, TenantGroup
+from organization.models import Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from users.forms import UserPreferencesForm
 from users.models import UserPreference
 from users.services import parse_workspace_key, resolve_workspace_selection
@@ -51,17 +52,17 @@ class DefaultWorkspaceTests(TestCase):
         set_current_membership(None)
         set_current_all_accessible(False)
 
-    def _request(self, session=None):
+    def _request(self, session=None, user=None):
         store = import_module(settings.SESSION_ENGINE).SessionStore
         request = self.factory.get("/")
-        request.user = self.user
+        request.user = user or self.user
         request.session = store()
         for key, value in (session or {}).items():
             request.session[key] = value
         return request
 
-    def _run_middleware(self, session=None):
-        request = self._request(session)
+    def _run_middleware(self, session=None, user=None):
+        request = self._request(session, user=user)
         current_user = CurrentUserMiddleware(get_response=lambda inner: None)
         current_user_tokens = current_user.process_request(request)
         tenant = TenantMiddleware(get_response=lambda inner: None)
@@ -155,6 +156,36 @@ class DefaultWorkspaceTests(TestCase):
             self.assertNotEqual(request.active_tenant, self.foreign)
             self.assertFalse(request.active_all_accessible)
             self.assertEqual(request.session["active_tenant_id"], self.home.pk)
+        finally:
+            self._finish_middleware(request, current_user, tokens, tenant, previous_scope)
+
+    def test_automatic_fallback_ignores_soft_deleted_membership_tenant(self):
+        deleted = Tenant.objects.create(name="Deleted fallback tenant", slug="default-ws-deleted")
+        provider = Tenant.objects.create(name="Fallback provider", slug="default-ws-provider", is_provider=True)
+        managed = Tenant.objects.create(
+            name="Fallback managed tenant",
+            slug="default-ws-managed",
+            managed_by=provider,
+        )
+        deleted_role = Role.objects.create(tenant=deleted, name="Deleted role", permissions=[])
+        provider_role = Role.objects.create(tenant=provider, name="Provider role", permissions=[])
+        user = User.objects.create_user(username="default-ws-soft-deleted", password="pw")
+        grant(user, deleted, deleted_role)
+        grant(
+            user,
+            provider,
+            provider_role,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
+            assigned_tenants=[managed],
+        )
+        Tenant._base_manager.filter(pk=deleted.pk).update(deleted_at=timezone.now())
+
+        request, current_user, tokens, tenant, previous_scope = self._run_middleware(user=user)
+        try:
+            self.assertIn(request.active_tenant.pk, {provider.pk, managed.pk})
+            self.assertNotEqual(request.active_tenant.pk, deleted.pk)
+            self.assertNotEqual(request.session.get("active_tenant_id"), deleted.pk)
         finally:
             self._finish_middleware(request, current_user, tokens, tenant, previous_scope)
 

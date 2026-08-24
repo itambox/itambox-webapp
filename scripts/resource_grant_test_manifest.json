@@ -169,7 +169,11 @@
   "scripts/tests/test_migration_audit.py",
   "scripts/tests/test_release_policy.py",
   "scripts/tests/test_security_gate.py",
-  "scripts/tests/test_typing_policy.py"
+  "scripts/tests/test_typing_policy.py",
+  "itambox/assets/tests/test_graphql_adversarial.py",
+  "itambox/assets/tests/test_nested_serializers.py",
+  "itambox/core/tests/test_provider_slot.py",
+  "itambox/organization/tests/test_tenant_access_policy.py"
  ],
  "baseline_tests": [
   "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -344,7 +348,11 @@
   "itambox/core/tests/test_compile_locales.py",
   "itambox/core/tests/test_config_contract.py",
   "itambox/core/tests/test_crypto.py",
-  "itambox/users/tests/test_token_peppers.py"
+  "itambox/users/tests/test_token_peppers.py",
+  "itambox/assets/tests/test_graphql_adversarial.py",
+  "itambox/assets/tests/test_nested_serializers.py",
+  "itambox/core/tests/test_provider_slot.py",
+  "itambox/organization/tests/test_tenant_access_policy.py"
  ],
  "supporting_files": [
   "itambox/inventory/tests/factories.py",

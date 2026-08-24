@@ -451,6 +451,27 @@ class GraphQLAdversarialTestCase(TestCase):
     # Family 7 — Cross-tenant read (query) probes with token auth
     # =========================================================================
 
+    def test_graphql_token_tenant_wins_over_same_user_session_tenant(self):
+        """A GraphQL token request stays pinned to tenant B after session middleware selected A."""
+        grant(self.staff_a, self.tenant_b, self.role_admin_b)
+        token_b = Token.objects.create(user=self.staff_a, tenant=self.tenant_b)
+        self.client.force_login(self.staff_a)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_a.pk
+        session.save()
+
+        response = self.client.post(
+            self.graphql_url,
+            data=json.dumps({"query": "{ assets { name } }"}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token_b.key}",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertNotIn("errors", payload)
+        self.assertEqual({asset["name"] for asset in payload["data"]["assets"]}, {"Laptop B"})
+
     def test_cross_tenant_query_asset_by_id_not_leaked(self):
         """Querying tenant B's asset by pk while authenticated as tenant A returns null."""
         # Pass switch_tenant so TenantMiddleware sets active_tenant = tenant_a
