@@ -1,10 +1,10 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from assets.api.nested_serializers import NestedAssetSerializer, NestedManufacturerSerializer
 from assets.models import Asset, Manufacturer
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
-from itambox.api.nested_serializers import NestedAssetSerializer, NestedManufacturerSerializer
 from organization.api.serializers import NestedTenantSerializer
 from organization.models import Tenant
 from software.models import InstalledSoftware, Software

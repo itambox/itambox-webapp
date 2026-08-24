@@ -2,10 +2,10 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from assets.api.nested_serializers import NestedAssetSerializer
 from assets.models import Asset
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
-from itambox.api.nested_serializers import NestedAssetSerializer, NestedManufacturerSerializer
 from licenses.models import License, LicenseSeatAssignment
 from licenses.services import checkout_license, transfer_license_seat
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer

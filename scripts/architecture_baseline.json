@@ -5,21 +5,6 @@
   "cycles": [],
   "layer_exceptions": [
     {
-      "id": "R-F1|itambox.api.nested_serializers|assets.models.__init__|module-top",
-      "rule": "R-F1",
-      "source": "itambox.api.nested_serializers",
-      "source_layer": "framework",
-      "target": "assets.models.__init__",
-      "target_layer": "domain-model",
-      "kind": "module-top",
-      "count": 1,
-      "owner": "area:api",
-      "disposition": "debt",
-      "removal_issue": 442,
-      "removal_direction": "Resolve the assets model through apps.get_model() inside itambox.api.nested_serializers, or accept the instance as an argument, so the framework layer carries no import edge into assets.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-F1|itambox.middleware|organization.models|function-body",
       "rule": "R-F1",
       "source": "itambox.middleware",

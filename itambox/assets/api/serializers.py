@@ -7,6 +7,12 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
+from assets.api.nested_serializers import (
+    NestedAssetRoleSerializer,
+    NestedAssetSerializer,
+    NestedAssetTypeSerializer,
+    NestedManufacturerSerializer,
+)
 from assets.models import (
     Asset,
     AssetAssignment,
@@ -26,12 +32,6 @@ from assets.models import (
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from itambox.api.fields import RelatedObjectCountField
-from itambox.api.nested_serializers import (
-    NestedAssetRoleSerializer,
-    NestedAssetSerializer,
-    NestedAssetTypeSerializer,
-    NestedManufacturerSerializer,
-)
 from organization.api.serializers import (
     AssetHolderSerializer,
     ContactAssignmentSerializer,

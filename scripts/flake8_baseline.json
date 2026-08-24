@@ -5807,14 +5807,6 @@
       "path": "itambox/inventory/api/serializers.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from itambox.api.nested_serializers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/api/serializers.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
       "source": "from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer, NestedTenantSerializer",
       "context": "Module:body",
       "count": 1
@@ -7264,14 +7256,6 @@
       "code": "F401",
       "message": "'django.utils.translation.gettext_lazy as _' imported but unused",
       "source": "from django.utils.translation import gettext_lazy as _",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/api/serializers.py",
-      "code": "F401",
-      "message": "'itambox.api.nested_serializers.NestedManufacturerSerializer' imported but unused",
-      "source": "from itambox.api.nested_serializers import NestedAssetSerializer, NestedManufacturerSerializer",
       "context": "Module:body",
       "count": 1
     },

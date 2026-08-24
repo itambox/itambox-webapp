@@ -2,6 +2,7 @@ import re
 
 from rest_framework import serializers
 
+from assets.api.nested_serializers import NestedAssetSerializer, NestedAssetTypeSerializer
 from assets.models import Asset, AssetType, Supplier
 from inventory.api.serializers import (
     NestedAccessorySerializer,
@@ -10,7 +11,6 @@ from inventory.api.serializers import (
 )
 from inventory.models import Accessory, Component, Consumable
 from itambox.api.base import BaseModelSerializer
-from itambox.api.nested_serializers import NestedAssetSerializer, NestedAssetTypeSerializer
 from licenses.models import License
 from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
 from organization.models import CostCenter, Location, Tenant
