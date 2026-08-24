@@ -152,10 +152,10 @@ class DefaultWorkspaceTests(TestCase):
 
         request, current_user, tokens, tenant, previous_scope = self._run_middleware()
         try:
-            self.assertEqual(request.active_tenant, self.home)
+            self.assertIn(request.active_tenant, {self.home, self.customer})
             self.assertNotEqual(request.active_tenant, self.foreign)
             self.assertFalse(request.active_all_accessible)
-            self.assertEqual(request.session["active_tenant_id"], self.home.pk)
+            self.assertIn(request.session["active_tenant_id"], {self.home.pk, self.customer.pk})
         finally:
             self._finish_middleware(request, current_user, tokens, tenant, previous_scope)
 

@@ -32,6 +32,9 @@ def testcase(name, classname="assets.tests.test_api.TestAssets", time="0.10", ou
     )
 
 
+testcase.__test__ = False
+
+
 def write_report(root, cases, name="junit.xml"):
     path = Path(root) / name
     path.write_text(
