@@ -6717,14 +6717,6 @@
     },
     {
       "path": "itambox/itambox/middleware.py",
-      "code": "C901",
-      "message": "'TenantMiddleware.process_request' is too complex (27)",
-      "source": "    def process_request(self, request):",
-      "context": "Module:body/ClassDef:TenantMiddleware:body/FunctionDef:process_request:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
       "code": "F401",
       "message": "'.ratelimit.RateLimitMiddleware' imported but unused",
       "source": "from .ratelimit import RateLimitMiddleware",

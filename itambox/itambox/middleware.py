@@ -2,6 +2,10 @@ import base64
 import os
 import re
 import uuid
+from typing import Any
+
+from django.apps import apps
+from django.http import HttpRequest
 
 from core.authorization_cache import begin_authorization_request, end_authorization_request
 
@@ -29,6 +33,12 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     set_current_tenant,
     set_current_tenant_group,
     set_current_user,
+)
+from core.tenant_access import (
+    accessible_tenant_ids,
+    active_membership,
+    first_active_membership_in,
+    get_tenant_access_policy,
 )
 from core.tenant_scope import (
     _descendant_group_ids_cache,
@@ -171,6 +181,10 @@ class TenantMiddleware:
     """
 
     def __init__(self, get_response=None):
+        # Fail loudly during handler construction when the composition root did
+        # not register the organization policy. The policy is deliberately not
+        # cached: request/test ContextVar overrides must remain visible per call.
+        get_tenant_access_policy()
         self.get_response = get_response
 
     def __call__(self, request):
@@ -276,14 +290,176 @@ class TenantMiddleware:
         request.session.pop("active_all_accessible", None)
         return False, False
 
-    def process_request(self, request):
-        # Reset the per-request descendant-group-ids cache so a reused WSGI
-        # worker thread can never serve stale results from a prior request.
-        _descendant_group_ids_cache.set(None)
+    @staticmethod
+    def _clear_request_scope(request: HttpRequest) -> None:
+        request.active_tenant = None
+        request.active_tenant_group = None
+        request.active_membership = None
+        request.active_all_accessible = False
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_membership(None)
+        set_current_all_accessible(False)
 
-        # Snapshot the context active on entry so process_response can restore it
-        # rather than clobbering it to None (the setters also clear the descendant
-        # cache, so restore goes through them too).
+    @staticmethod
+    def _parse_id(value: object) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _clear_tenant_session_selection(request: HttpRequest) -> None:
+        request.session.pop("active_tenant_id", None)
+        request.session.pop("active_tenant_group_id", None)
+
+    @staticmethod
+    def _resolve_superuser_scope(
+        request: HttpRequest,
+        tenant_model: Any,
+        tenant_group_model: Any,
+        session_tenant_id: object,
+        session_group_id: object,
+    ) -> tuple[Any | None, Any | None]:
+        request.session.pop("active_all_accessible", None)
+        if session_tenant_id:
+            try:
+                return tenant_model._base_manager.get(pk=session_tenant_id), None
+            except tenant_model.DoesNotExist:
+                request.session.pop("active_tenant_id", None)
+                return None, None
+        if session_group_id:
+            try:
+                return None, tenant_group_model._base_manager.get(pk=session_group_id)
+            except tenant_group_model.DoesNotExist:
+                request.session.pop("active_tenant_group_id", None)
+        return None, None
+
+    @staticmethod
+    def _resolve_selected_tenant(
+        request: HttpRequest,
+        tenant_model: Any,
+        selected_tenant_id: object,
+        accessible: set[int],
+    ) -> tuple[Any | None, Any | None]:
+        tenant_id = TenantMiddleware._parse_id(selected_tenant_id)
+        if tenant_id is None or tenant_id not in accessible:
+            return None, None
+        membership = active_membership(request.user, tenant_id)
+        if membership is not None:
+            return membership.tenant, membership
+        tenant = tenant_model._base_manager.filter(pk=tenant_id, deleted_at__isnull=True).first()
+        return tenant, None
+
+    @staticmethod
+    def _resolve_selected_group(
+        request: HttpRequest,
+        tenant_model: Any,
+        tenant_group_model: Any,
+        selected_group_id: object,
+        accessible: set[int],
+    ) -> tuple[Any | None, Any | None, bool]:
+        group_id = TenantMiddleware._parse_id(selected_group_id)
+        group_tenant_ids = set(
+            tenant_model._base_manager.filter(
+                group_id__in=get_descendant_tenant_group_ids(group_id, live_only=True),
+                deleted_at__isnull=True,
+            ).values_list("pk", flat=True)
+        )
+        authorized_group_tenant_ids = accessible & group_tenant_ids
+        if not authorized_group_tenant_ids or group_id is None:
+            return None, None, False
+        group = tenant_group_model._base_manager.get(pk=group_id)
+        membership = first_active_membership_in(request.user, authorized_group_tenant_ids)
+        return group, membership, True
+
+    @staticmethod
+    def _resolve_default_scope(
+        request: HttpRequest,
+        tenant_model: Any,
+        accessible: set[int],
+    ) -> tuple[Any | None, Any | None]:
+        membership = first_active_membership_in(request.user, accessible)
+        if membership is not None:
+            return membership.tenant, membership
+        if not accessible:
+            return None, None
+        return (
+            tenant_model._base_manager.filter(
+                pk__in=accessible,
+                deleted_at__isnull=True,
+            )
+            .order_by("name")
+            .first(),
+            None,
+        )
+
+    @staticmethod
+    def _bind_request_scope(
+        request: HttpRequest,
+        active_tenant: Any | None,
+        active_tenant_group: Any | None,
+        active_membership: Any | None,
+        active_all_accessible: bool,
+    ) -> None:
+        request.active_tenant = active_tenant
+        request.active_tenant_group = active_tenant_group
+        request.active_membership = active_membership
+        request.active_all_accessible = active_all_accessible
+        set_current_tenant(active_tenant)
+        set_current_tenant_group(active_tenant_group)
+        set_current_membership(active_membership)
+        set_current_all_accessible(active_all_accessible)
+
+    def _resolve_standard_scope(
+        self,
+        request: HttpRequest,
+        tenant_model: Any,
+        tenant_group_model: Any,
+        session_tenant_id: object,
+        session_group_id: object,
+        session_all_accessible: bool,
+        accessible: set[int],
+    ) -> tuple[Any | None, Any | None, Any | None, bool]:
+        active_tenant = None
+        active_tenant_group = None
+        active_membership = None
+        active_all_accessible = False
+
+        if session_all_accessible:
+            active_all_accessible, _ = self._resolve_all_accessible(request, accessible, session_all_accessible)
+        elif session_tenant_id:
+            active_tenant, active_membership = self._resolve_selected_tenant(
+                request,
+                tenant_model,
+                session_tenant_id,
+                accessible,
+            )
+            if active_tenant is None:
+                request.session.pop("active_tenant_id", None)
+        elif session_group_id:
+            active_tenant_group, active_membership, resolved = self._resolve_selected_group(
+                request,
+                tenant_model,
+                tenant_group_model,
+                session_group_id,
+                accessible,
+            )
+            if not resolved:
+                request.session.pop("active_tenant_group_id", None)
+
+        if not active_tenant and not active_tenant_group and not active_all_accessible:
+            active_tenant, active_membership = self._resolve_default_scope(request, tenant_model, accessible)
+            if active_tenant is not None:
+                request.session["active_tenant_id"] = active_tenant.pk
+                request.session.pop("active_tenant_group_id", None)
+            else:
+                self._clear_tenant_session_selection(request)
+
+        return active_tenant, active_tenant_group, active_membership, active_all_accessible
+
+    def process_request(self, request: HttpRequest):
+        _descendant_group_ids_cache.set(None)
         prev = (
             get_current_tenant(),
             get_current_tenant_group(),
@@ -291,168 +467,50 @@ class TenantMiddleware:
             get_current_all_accessible(),
         )
         if not hasattr(request, "user") or not request.user.is_authenticated:
-            request.active_tenant = None
-            request.active_tenant_group = None
-            request.active_membership = None
-            request.active_all_accessible = False
-            set_current_tenant(None)
-            set_current_tenant_group(None)
-            set_current_membership(None)
-            set_current_all_accessible(False)
+            self._clear_request_scope(request)
             return prev
 
-        # 1. Resolve selected tenant or group from Session or URL Query Parameter
         session_tenant_id = request.session.get("active_tenant_id")
         session_group_id = request.session.get("active_tenant_group_id")
-        # "All accessible tenants" is a distinct scope state for a non-superuser:
-        # no single tenant/group is selected, yet the request is NOT global.
         session_all_accessible = bool(request.session.get("active_all_accessible"))
-
-        # inline import: cycle: itambox.middleware <-> organization.models at module load.
-        from organization.models import Membership, Tenant, TenantGroup
-
-        # If query parameters are provided to switch, update them. Selecting a
-        # single tenant or a group always leaves the all-accessible scope.
         session_tenant_id, session_group_id, session_all_accessible = self._resolve_switch_params(
             request,
             session_tenant_id,
             session_group_id,
             session_all_accessible,
         )
-
-        active_tenant = None
-        active_tenant_group = None
-        active_membership = None
-        active_all_accessible = False
+        tenant_model = apps.get_model("organization", "Tenant")
+        tenant_group_model = apps.get_model("organization", "TenantGroup")
 
         if request.user.is_superuser:
-            # A superuser already has the global scope; they are never placed into
-            # the member-only all-accessible state. Drop any stale session flag.
-            session_all_accessible = False
-            request.session.pop("active_all_accessible", None)
-            # Superusers can access any tenant or group
-            if session_tenant_id:
-                try:
-                    active_tenant = Tenant._base_manager.get(pk=session_tenant_id)
-                except Tenant.DoesNotExist:
-                    session_tenant_id = None
-                    if "active_tenant_id" in request.session:
-                        del request.session["active_tenant_id"]
-            elif session_group_id:
-                try:
-                    # _base_manager: resolve the active group unscoped (bootstrap —
-                    # the scope isn't established yet; membership access is checked
-                    # separately above for standard users).
-                    active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
-                except TenantGroup.DoesNotExist:
-                    session_group_id = None
-                    if "active_tenant_group_id" in request.session:
-                        del request.session["active_tenant_group_id"]
+            active_tenant, active_tenant_group = self._resolve_superuser_scope(
+                request,
+                tenant_model,
+                tenant_group_model,
+                session_tenant_id,
+                session_group_id,
+            )
+            active_membership = None
+            active_all_accessible = False
         else:
-            # Standard (non-superuser) users. Accessible tenants = active direct
-            # memberships UNION tenants granted via active cross-tenant user groups.
-            from organization.access import accessible_tenant_ids
-
             accessible = accessible_tenant_ids(request.user)
+            active_tenant, active_tenant_group, active_membership, active_all_accessible = self._resolve_standard_scope(
+                request,
+                tenant_model,
+                tenant_group_model,
+                session_tenant_id,
+                session_group_id,
+                session_all_accessible,
+                accessible,
+            )
 
-            def _as_int(value):
-                try:
-                    return int(value)
-                except (TypeError, ValueError):
-                    return None
-
-            if session_all_accessible:
-                active_all_accessible, session_all_accessible = self._resolve_all_accessible(
-                    request,
-                    accessible,
-                    session_all_accessible,
-                )
-
-            elif session_tenant_id:
-                if _as_int(session_tenant_id) in accessible:
-                    active_tenant = Tenant._base_manager.filter(pk=session_tenant_id).first()
-                    # May be None when access is via a group grant (no direct membership).
-                    active_membership = (
-                        Membership.objects.filter(
-                            user=request.user,
-                            tenant_id=session_tenant_id,
-                            is_active=True,
-                        )
-                        .select_related("tenant")
-                        .first()
-                    )
-                if active_tenant is None:
-                    session_tenant_id = None
-
-            elif session_group_id:
-                # Standard user may scope to a tenant-group only if they can access at
-                # least one tenant in its SUBTREE (via membership, a group grant, or
-                # managed reach). The descendant walk (pruned at soft-deleted nodes)
-                # matches filter_by_tenant and the auth backend's group gate — a member
-                # whose tenants all sit in a child group may still activate the parent.
-                group_tenant_ids = set(
-                    Tenant._base_manager.filter(
-                        group_id__in=get_descendant_tenant_group_ids(
-                            _as_int(session_group_id),
-                            live_only=True,
-                        ),
-                    ).values_list("pk", flat=True)
-                )
-                if accessible & group_tenant_ids:
-                    # _base_manager: resolve the active group unscoped (bootstrap —
-                    # the scope isn't established yet).
-                    active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
-                    active_membership = (
-                        Membership.objects.filter(
-                            user=request.user,
-                            tenant_id__in=group_tenant_ids,
-                            is_active=True,
-                        )
-                        .select_related("tenant", "tenant__group")
-                        .first()
-                    )
-                else:
-                    session_group_id = None
-
-            # If nothing resolved, default to the first accessible tenant (a direct
-            # membership first, else a group-granted tenant). The all-accessible
-            # scope is a resolved state, so it suppresses this single-tenant default.
-            if not active_tenant and not active_tenant_group and not active_all_accessible:
-                active_membership = (
-                    Membership.objects.filter(
-                        user=request.user,
-                        is_active=True,
-                    )
-                    .select_related("tenant")
-                    .first()
-                )
-                if active_membership:
-                    active_tenant = active_membership.tenant
-                elif accessible:
-                    active_tenant = Tenant._base_manager.filter(pk__in=accessible).order_by("name").first()
-
-                if active_tenant:
-                    request.session["active_tenant_id"] = active_tenant.id
-                    if "active_tenant_group_id" in request.session:
-                        del request.session["active_tenant_group_id"]
-                else:
-                    if "active_tenant_id" in request.session:
-                        del request.session["active_tenant_id"]
-                    if "active_tenant_group_id" in request.session:
-                        del request.session["active_tenant_group_id"]
-
-        # Bind to request
-        request.active_tenant = active_tenant
-        request.active_tenant_group = active_tenant_group
-        request.active_membership = active_membership
-        request.active_all_accessible = active_all_accessible
-
-        # Call core manager thread context setter
-        set_current_tenant(active_tenant)
-        set_current_tenant_group(active_tenant_group)
-        set_current_membership(active_membership)
-        set_current_all_accessible(active_all_accessible)
-
+        self._bind_request_scope(
+            request,
+            active_tenant,
+            active_tenant_group,
+            active_membership,
+            active_all_accessible,
+        )
         return prev
 
     def process_response(self, request, response, prev=None):

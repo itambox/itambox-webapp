@@ -2500,12 +2500,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/middleware.py",
-      "context": "ClassDef:TenantMiddleware/FunctionDef:process_request",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/quick_add.py",
       "context": "ClassDef:QuickAddMixin/FunctionDef:get_context_data",
       "statement": "from crispy_forms.helper import FormHelper",
