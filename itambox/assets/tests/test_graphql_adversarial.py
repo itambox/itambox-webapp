@@ -1,20 +1,32 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from assets import schema as assets_schema
 from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel, Supplier
+from core.context import get_current_membership, get_current_tenant
+from core.tenant_access import override_tenant_access_policy
 from core.tests.mixins import grant
 from licenses.models import License
-from organization.models import Location, Role, Site, Tenant, TenantGroup
+from organization.models import Location, Membership, Role, Site, Tenant, TenantGroup
 from software.models import Software
 from users.models import Token
 
 User = get_user_model()
+EXPECTED_AUTHENTICATION_FAILURE = {"errors": [{"message": "Authentication failed"}]}
+
+
+class _FailingTenantAccessPolicy:
+    @staticmethod
+    def accessible_tenant_ids(_user):
+        raise ImproperlyConfigured("tenant access policy provider is not configured")
 
 
 class GraphQLAdversarialTestCase(TestCase):
@@ -283,6 +295,7 @@ class GraphQLAdversarialTestCase(TestCase):
             HTTP_AUTHORIZATION="Token",
         )
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), EXPECTED_AUTHENTICATION_FAILURE)
 
         # Test case: Too many values (space in key)
         response = self.client.post(
@@ -292,6 +305,7 @@ class GraphQLAdversarialTestCase(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token_a.key} extra",
         )
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), EXPECTED_AUTHENTICATION_FAILURE)
 
         # Test case: Wrong authentication scheme prefix
         response = self.client.post(
@@ -312,6 +326,7 @@ class GraphQLAdversarialTestCase(TestCase):
             HTTP_AUTHORIZATION=f"Token {expired_token.key}",
         )
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), EXPECTED_AUTHENTICATION_FAILURE)
 
     def test_token_forgery_fake_or_nonexistent_token(self):
         query = "{ assets { name } }"
@@ -322,6 +337,22 @@ class GraphQLAdversarialTestCase(TestCase):
             HTTP_AUTHORIZATION="Token fakekey123456789012345678901234567890",
         )
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), EXPECTED_AUTHENTICATION_FAILURE)
+
+    def test_tenant_access_configuration_failure_escapes_graphql_auth_boundary(self):
+        query = "{ assets { name } }"
+
+        with override_tenant_access_policy(_FailingTenantAccessPolicy()):
+            with self.assertRaisesMessage(
+                ImproperlyConfigured,
+                "tenant access policy provider is not configured",
+            ):
+                self.client.post(
+                    self.graphql_url,
+                    data=json.dumps({"query": query}),
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
+                )
 
     # =========================================================================
     # 4. Cross-Tenant Data Modification (attempting mutations with foreign keys of other tenants, deleting other tenants' objects)
@@ -453,23 +484,43 @@ class GraphQLAdversarialTestCase(TestCase):
 
     def test_graphql_token_tenant_wins_over_same_user_session_tenant(self):
         """A GraphQL token request stays pinned to tenant B after session middleware selected A."""
-        grant(self.staff_a, self.tenant_b, self.role_admin_b)
+        membership_b = grant(self.staff_a, self.tenant_b, self.role_admin_b).membership
         token_b = Token.objects.create(user=self.staff_a, tenant=self.tenant_b)
         session = self.client.session
         session["active_tenant_id"] = self.tenant_a.pk
         session.save()
 
-        response = self.client.post(
-            self.graphql_url,
-            data=json.dumps({"query": "{ assets { name } }"}),
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {token_b.key}",
-        )
+        observed = {}
+        original_check_permission = assets_schema.check_permission
+
+        def capture_context(info, permission, *args, **kwargs):
+            observed["request_active_tenant"] = info.context.active_tenant
+            observed["tenant_context"] = get_current_tenant()
+            observed["request_active_membership"] = info.context.active_membership
+            observed["membership_context"] = get_current_membership()
+            observed["resolver_permission_boundary_reached"] = True
+            return original_check_permission(info, permission, *args, **kwargs)
+
+        with patch.object(assets_schema, "check_permission", capture_context):
+            response = self.client.post(
+                self.graphql_url,
+                data=json.dumps({"query": "{ assets { name } }"}),
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Token {token_b.key}",
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertNotIn("errors", payload)
         self.assertEqual({asset["name"] for asset in payload["data"]["assets"]}, {"Laptop B"})
+        self.assertTrue(observed["resolver_permission_boundary_reached"])
+        self.assertIs(observed["request_active_tenant"], observed["tenant_context"])
+        self.assertEqual(observed["request_active_tenant"].pk, self.tenant_b.pk)
+        self.assertEqual(observed["tenant_context"].pk, self.tenant_b.pk)
+        self.assertIs(observed["request_active_membership"], observed["membership_context"])
+        self.assertIsInstance(observed["request_active_membership"], Membership)
+        self.assertEqual(observed["request_active_membership"].pk, membership_b.pk)
+        self.assertEqual(observed["request_active_membership"].tenant_id, self.tenant_b.pk)
 
     def test_cross_tenant_query_asset_by_id_not_leaked(self):
         """Querying tenant B's asset by pk while authenticated as tenant A returns null."""
