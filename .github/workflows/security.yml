@@ -98,7 +98,7 @@ jobs:
           always() && steps.dependency-gate.outputs.sarif == 'true' &&
           github.actor != 'dependabot[bot]' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         with:
           sarif_file: ${{ runner.temp }}/trivy-dependencies.sarif
           category: trivy-dependencies
