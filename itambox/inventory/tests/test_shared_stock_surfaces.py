@@ -230,6 +230,29 @@ class SharedStockApiTests(SharedStockWorld):
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 10)
 
+    def test_tenant_bound_superuser_cannot_mutate_shared_pool_with_current_etag(self):
+        superuser = User.objects.create_superuser(username="fourb-bound-superuser", password="x")
+        self._grant()
+        self.client_login_to_tenant(superuser, self.grantee)
+        url = reverse("api:inventory_api:accessorystock-detail", kwargs={"pk": self.stock.pk})
+
+        detail = self.client.get(url)
+        self.assertEqual(detail.status_code, 200)
+        etag = detail["ETag"]
+        before = {field.attname: getattr(self.stock, field.attname) for field in self.stock._meta.concrete_fields}
+
+        response = self.client.patch(
+            url,
+            {"qty": 999},
+            content_type="application/json",
+            HTTP_IF_MATCH=etag,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.stock.refresh_from_db()
+        after = {field.attname: getattr(self.stock, field.attname) for field in self.stock._meta.concrete_fields}
+        self.assertEqual(after, before)
+
     def test_unrelated_tenant_cannot_retrieve_pool(self):
         self._grant()
         self._api_login(self.third, "fourb-api3")

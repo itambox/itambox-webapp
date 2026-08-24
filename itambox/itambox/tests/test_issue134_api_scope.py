@@ -18,6 +18,8 @@ superuser behaviour is unchanged. The exercised users hold NO AssetHolder profil
 so the obsolete fallback cannot mask a regression.
 """
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -25,6 +27,10 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.managers import (
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_tenant,
+    get_current_tenant_group,
     set_current_all_accessible,
     set_current_membership,
     set_current_tenant,
@@ -32,6 +38,7 @@ from core.managers import (
 )
 from core.tests.mixins import grant
 from extras.models import AlertRule, NotificationChannel
+from itambox.api.permissions import TokenPermissions
 from itambox.middleware import _current_user
 from organization.models import (
     AssetHolder,
@@ -381,7 +388,8 @@ class TokenSingleTenantTests(APITestCase):
 
     def setUp(self):
         _reset_scope()
-        self.tenant_a = Tenant.objects.create(name="TA", slug="i134t-a")
+        self.ambient_group = TenantGroup.objects.create(name="Ambient A group", slug="i134t-ambient-a")
+        self.tenant_a = Tenant.objects.create(name="TA", slug="i134t-a", group=self.ambient_group)
         self.tenant_b = Tenant.objects.create(name="TB", slug="i134t-b")
         self.role_a = Role.objects.create(
             tenant=self.tenant_a,
@@ -399,6 +407,7 @@ class TokenSingleTenantTests(APITestCase):
         self.ch_a = _channel("T CH A", self.tenant_a)
         self.ch_b = _channel("T CH B", self.tenant_b)
         self.token = Token.objects.create(user=self.member, tenant=self.tenant_a)
+        self.token_b = Token.objects.create(user=self.member, tenant=self.tenant_b)
 
     def tearDown(self):
         _reset_scope()
@@ -415,6 +424,53 @@ class TokenSingleTenantTests(APITestCase):
         ids = {row["id"] for row in rows}
         self.assertIn(self.ch_a.pk, ids)
         self.assertNotIn(self.ch_b.pk, ids)
+
+    def test_token_b_wins_over_conflicting_rest_ambient_scope(self):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_a.pk
+        session["active_tenant_group_id"] = self.ambient_group.pk
+        session["active_all_accessible"] = True
+        session.save()
+
+        ambient_membership = Membership.objects.get(user=self.member, tenant=self.tenant_a)
+        set_current_tenant(self.tenant_a)
+        set_current_tenant_group(self.ambient_group)
+        set_current_membership(ambient_membership)
+        set_current_all_accessible(True)
+        _current_user.set(self.member)
+
+        self.assertEqual(session["active_tenant_id"], self.tenant_a.pk)
+        self.assertEqual(session["active_tenant_group_id"], self.ambient_group.pk)
+        self.assertTrue(session["active_all_accessible"])
+
+        observed = {}
+        original_has_permission = TokenPermissions.has_permission
+
+        def observe_permission(permission, request, view):
+            self.assertEqual(request.active_tenant.pk, self.tenant_b.pk)
+            self.assertIs(request.active_tenant, get_current_tenant())
+            self.assertIsInstance(request.active_membership, Membership)
+            self.assertEqual(request.active_membership.tenant_id, self.tenant_b.pk)
+            self.assertIs(request.active_membership, get_current_membership())
+            self.assertIsNone(request.active_tenant_group)
+            self.assertIsNone(get_current_tenant_group())
+            self.assertFalse(request.active_all_accessible)
+            self.assertFalse(get_current_all_accessible())
+            self.assertEqual(request.auth.tenant_id, self.tenant_b.pk)
+            observed["request"] = request
+            return original_has_permission(permission, request, view)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token_b.key}")
+        url = reverse("api:extras_api:notificationchannel-list") + f"?switch_tenant={self.tenant_a.pk}"
+        with mock.patch.object(TokenPermissions, "has_permission", new=observe_permission):
+            resp = self.client.get(url)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertIn("request", observed)
+        data = resp.data
+        rows = data["results"] if isinstance(data, dict) and "results" in data else data
+        self.assertEqual({row["id"] for row in rows}, {self.ch_b.pk})
 
     def test_token_cannot_reach_other_tenant_detail(self):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")

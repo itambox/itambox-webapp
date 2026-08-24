@@ -73,17 +73,6 @@ class StatusView(APIView):
         )
 
 
-class AuthenticationCheckView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(responses={200: OpenApiTypes.OBJECT})
-    def get(self, request):
-        from users.api.serializers import UserSerializer
-
-        serializer = UserSerializer(request.user, context={"request": request})
-        return Response(serializer.data)
-
-
 class ObjectChangeViewSet(ITAMBoxReadOnlyModelViewSet):
     queryset = ObjectChange.objects.select_related("user", "changed_object_type").all()
     serializer_class = ObjectChangeSerializer

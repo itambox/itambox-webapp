@@ -1015,6 +1015,7 @@ class CommittedRecordTests(unittest.TestCase):
             [
                 "itambox/assets/api/serializers.py",
                 "itambox/core/context.py",
+                "itambox/core/provider_slot.py",
                 "itambox/core/reports/contracts.py",
                 "itambox/core/reports/orchestration.py",
                 "itambox/core/reports/registry.py",
@@ -1032,6 +1033,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/retention.py",
                 "itambox/core/tasks/utils.py",
                 "itambox/core/tasks/webhooks.py",
+                "itambox/core/tenant_access.py",
                 "itambox/extras/api/serializers.py",
                 "itambox/inventory/api/serializers.py",
                 "itambox/itambox/api/base.py",
@@ -1045,9 +1047,11 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/organization/services/membership.py",
                 "itambox/organization/services/resource_access.py",
                 "itambox/organization/services/rolegrants.py",
+                "itambox/organization/services/tenant_access.py",
                 "itambox/procurement/api/serializers.py",
                 "itambox/subscriptions/api/serializers.py",
                 "itambox/subscriptions/api/views.py",
+                "itambox/users/api/authentication.py",
                 "itambox/users/api/scim/authentication.py",
                 "itambox/users/api/scim/filters.py",
                 "itambox/users/api/scim/identifiers.py",
@@ -1071,6 +1075,7 @@ class CommittedRecordTests(unittest.TestCase):
                     ],
                 ),
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
+                "itambox/core/provider_slot.py": ("module", []),
                 "itambox/core/reports/contracts.py": (
                     "symbols",
                     ["ReportDefinition", "ReportRequest", "ReportResult"],
@@ -1138,6 +1143,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/retention.py": ("symbols", ["prune_changelog_task"]),
                 "itambox/core/tasks/utils.py": ("symbols", ["reverse_job_detail"]),
                 "itambox/core/tasks/webhooks.py": ("symbols", ["send_webhook_task"]),
+                "itambox/core/tenant_access.py": ("module", []),
                 "itambox/extras/api/serializers.py": (
                     "symbols",
                     [
@@ -1251,6 +1257,7 @@ class CommittedRecordTests(unittest.TestCase):
                         "validate_grant_plan",
                     ],
                 ),
+                "itambox/organization/services/tenant_access.py": ("module", []),
                 "itambox/procurement/api/serializers.py": (
                     "symbols",
                     [
@@ -1264,6 +1271,10 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/subscriptions/api/serializers.py": (
                     "symbols",
                     ["ProviderSerializer", "SubscriptionAssignmentSerializer", "SubscriptionSerializer"],
+                ),
+                "itambox/users/api/authentication.py": (
+                    "symbols",
+                    ["TokenAuthentication", "TokenAuthenticationScheme"],
                 ),
                 "itambox/users/api/scim/authentication.py": (
                     "symbols",

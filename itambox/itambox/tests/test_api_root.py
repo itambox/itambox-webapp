@@ -71,6 +71,34 @@ class APIRootDiscoveryTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_auth_check_route_and_payload_are_owned_by_users_api(self) -> None:
+        route = reverse("api:auth-check")
+        self.assertEqual(route, "/api/auth-check/")
+        self.assertEqual(resolve(route).url_name, "auth-check")
+        self.assertEqual(resolve(route).func.view_class.__module__, "users.api.views")
+
+        anonymous = self.client.get(route)
+        self.assertEqual(anonymous.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(user=self.superuser)
+        response = self.client.get(route)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(
+            set(response.data),
+            {
+                "id",
+                "url",
+                "username",
+                "first_name",
+                "last_name",
+                "email",
+                "is_staff",
+                "is_active",
+                "can_login",
+                "date_joined",
+            },
+        )
+
     def test_root_includes_compliance_inventory_procurement(self) -> None:
         response = self._get_root()
 

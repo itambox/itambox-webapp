@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 44,
-  "policy_sha256": "f1bcda3a364fa9e0e1d9b2fd0ecc5f96f949b37270d0c05c6a4ad3476375dcae",
+  "next_sequence": 48,
+  "policy_sha256": "dfe4eb619953dcd4bbe96a7a4620ddc271c0550034e90b2f8b798de102981f33",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -62,6 +62,15 @@
       "symbols": [
         "SystemAuthorizationContext"
       ]
+    },
+    {
+      "sequence": 44,
+      "path": "itambox/core/provider_slot.py",
+      "module": "core.provider_slot",
+      "issue": "#442",
+      "note": "Public domain-blind single-provider lifecycle primitive with identity-safe registration and ContextVar-local overrides.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 39,
@@ -280,6 +289,15 @@
       ]
     },
     {
+      "sequence": 45,
+      "path": "itambox/core/tenant_access.py",
+      "module": "core.tenant_access",
+      "issue": "#442",
+      "note": "Typed, domain-blind tenant access protocol and one explicit provider-slot port for framework and kernel callers.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
       "sequence": 23,
       "path": "itambox/extras/api/serializers.py",
       "module": "extras.api.serializers",
@@ -478,6 +496,15 @@
       ]
     },
     {
+      "sequence": 46,
+      "path": "itambox/organization/services/tenant_access.py",
+      "module": "organization.services.tenant_access",
+      "issue": "#442",
+      "note": "Organization-owned typed tenant access adapter returning concrete live membership rows and delegating canonical access decisions.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
       "sequence": 27,
       "path": "itambox/procurement/api/serializers.py",
       "module": "procurement.api.serializers",
@@ -514,6 +541,18 @@
       "scope": "symbols",
       "symbols": [
         "SubscriptionStatusCompatibilitySerializer"
+      ]
+    },
+    {
+      "sequence": 47,
+      "path": "itambox/users/api/authentication.py",
+      "module": "users.api.authentication",
+      "issue": "#442",
+      "note": "Users-owned token authenticator and TokenAuth OpenAPI extension with typed helper seams preserving token validation and tenant binding.",
+      "scope": "symbols",
+      "symbols": [
+        "TokenAuthentication",
+        "TokenAuthenticationScheme"
       ]
     },
     {

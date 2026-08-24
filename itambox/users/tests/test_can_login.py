@@ -10,8 +10,8 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 
 from core.auth import PasswordLoginOnlyBackend
-from itambox.api.authentication import TokenAuthentication
 from organization.models import Membership, Tenant
+from users.api.authentication import TokenAuthentication
 from users.models import Token
 
 User = get_user_model()

@@ -273,7 +273,7 @@ REST_FRAMEWORK = {
     # generated client can see which endpoints are still settling (issue #171).
     "DEFAULT_SCHEMA_CLASS": "itambox.api.openapi.CapabilityAwareAutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "itambox.api.authentication.TokenAuthentication",
+        "users.api.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],

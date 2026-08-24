@@ -2,6 +2,11 @@ from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from assets.api.nested_serializers import (
+    NestedAssetSerializer,
+    NestedAssetTypeSerializer,
+    NestedManufacturerSerializer,
+)
 from itambox.api.base import BaseModelSerializer
 
 
@@ -97,11 +102,6 @@ from inventory.models import (
     ConsumableStock,
     Kit,
     KitItem,
-)
-from itambox.api.nested_serializers import (
-    NestedAssetSerializer,
-    NestedAssetTypeSerializer,
-    NestedManufacturerSerializer,
 )
 from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer, NestedTenantSerializer
 

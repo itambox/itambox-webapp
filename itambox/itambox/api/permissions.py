@@ -1,6 +1,8 @@
 from django.conf import settings
 from rest_framework.permissions import SAFE_METHODS, BasePermission, DjangoObjectPermissions
 
+from core.tenant_access import accessible_tenant_ids, shared_stock_read_allowed
+
 
 class IsSuperuser(BasePermission):
     def has_permission(self, request, view):
@@ -218,20 +220,12 @@ class StrictTenantPermission(BasePermission):
             if request.method not in SAFE_METHODS:
                 raise Http404()
             return True
-        # Deferred to keep the API layer decoupled from organization at load. Not a
-        # module-level cycle -- tracked as local-import debt, not a policy justification.
-        from organization.access import accessible_tenant_ids
-
         if obj_tenant.pk in accessible_tenant_ids(request.user):
             return True
         raise Http404()
 
     @staticmethod
     def _shared_read_allowed(obj, user_tenant, user, perm=None):
-        # Deferred to keep the generic API framework decoupled from domain
-        # services at module load. This is tracked local-import debt.
-        from organization.access import shared_stock_read_allowed
-
         if shared_stock_read_allowed(obj, user_tenant, user, perm):
             return True
         target_tenant_id = getattr(obj, "target_tenant_id", None)

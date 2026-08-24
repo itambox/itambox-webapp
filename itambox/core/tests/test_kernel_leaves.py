@@ -283,7 +283,6 @@ class TenantScopeContractTests(SimpleTestCase):
             function.__name__ = name
             setattr(provider, name, function)
 
-        provider_function("accessible_tenant_ids", "accessible")
         provider_function("accessible_tenant_ids_with_expiry", "expiry")
         provider_function("managed_accessible_tenant_ids", "managed")
         provider_function("applicable_grants", "grants")
@@ -293,14 +292,12 @@ class TenantScopeContractTests(SimpleTestCase):
         try:
             with mock.patch.dict(tenant_scope_module.sys.modules, {provider.__name__: provider}):
                 tenant_scope_module.register_tenant_scope_provider(
-                    accessible_tenant_ids=provider.accessible_tenant_ids,
                     accessible_tenant_ids_with_expiry=provider.accessible_tenant_ids_with_expiry,
                     managed_accessible_tenant_ids=provider.managed_accessible_tenant_ids,
                     applicable_grants=provider.applicable_grants,
                     resolve_effective_permissions_with_expiry=provider.resolve_effective_permissions_with_expiry,
                     build_accessible_tenant_permissions_map=provider.build_accessible_tenant_permissions_map,
                 )
-                self.assertEqual(tenant_scope_module.accessible_tenant_ids("u"), ("accessible", "u"))
                 self.assertEqual(tenant_scope_module.accessible_tenant_ids_with_expiry("u"), ("expiry", "u"))
                 self.assertEqual(tenant_scope_module.managed_accessible_tenant_ids("u"), ("managed", "u"))
                 self.assertEqual(tenant_scope_module.applicable_grants("u"), ("grants", "u"))
@@ -327,10 +324,14 @@ class TenantScopeContractTests(SimpleTestCase):
 
     def test_accessible_wrappers_delegate_to_registered_provider(self):
         sentinel = object()
-        with mock.patch.object(tenant_scope_module, "_call", return_value=sentinel) as call:
+        with (
+            mock.patch.object(tenant_scope_module, "_typed_accessible_tenant_ids", return_value=sentinel) as typed,
+            mock.patch.object(tenant_scope_module, "_call", return_value=sentinel) as call,
+        ):
             self.assertIs(tenant_scope_module.accessible_tenant_ids("u"), sentinel)
             self.assertIs(tenant_scope_module.managed_accessible_tenant_ids("u"), sentinel)
-        self.assertEqual(call.call_count, 2)
+        typed.assert_called_once_with("u")
+        self.assertEqual(call.call_count, 1)
 
 
 class KernelImportLeafTests(SimpleTestCase):

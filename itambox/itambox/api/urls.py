@@ -7,7 +7,8 @@ from drf_spectacular.views import (
 )
 
 from itambox.api.routers import ITAMBoxRouter
-from itambox.api.views import APIRootView, AuthenticationCheckView, ObjectChangeViewSet, StatusView
+from itambox.api.views import APIRootView, ObjectChangeViewSet, StatusView
+from users.api.views import AuthenticationCheckView
 
 _core_router = ITAMBoxRouter()
 _core_router.register(r"object-changes", ObjectChangeViewSet, basename="objectchange")

@@ -2422,36 +2422,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from core.managers import set_current_all_accessible, set_current_membership, set_current_tenant, set_current_tenant_group",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from itambox.ratelimit import get_client_ip",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from organization.models import Membership",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "context": "ClassDef:TokenAuthentication/FunctionDef:authenticate_credentials",
-      "statement": "from users.models import Token",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/fields.py",
       "context": "FunctionDef:validate_gfk_target_tenant",
       "statement": "from core.managers import get_current_tenant",
@@ -2461,18 +2431,6 @@
       "path": "itambox/itambox/api/permissions.py",
       "context": "ClassDef:StrictTenantPermission/FunctionDef:_has_multi_tenant_object_permission",
       "statement": "from django.http import Http404",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/permissions.py",
-      "context": "ClassDef:StrictTenantPermission/FunctionDef:_has_multi_tenant_object_permission",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/permissions.py",
-      "context": "ClassDef:StrictTenantPermission/FunctionDef:_shared_read_allowed",
-      "statement": "from organization.access import shared_stock_read_allowed",
       "count": 1
     },
     {
@@ -2503,12 +2461,6 @@
       "path": "itambox/itambox/api/permissions.py",
       "context": "ClassDef:TokenPermissions/FunctionDef:has_permission",
       "statement": "from core.managers import get_current_all_accessible, get_current_tenant, get_current_tenant_group",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/views.py",
-      "context": "ClassDef:AuthenticationCheckView/FunctionDef:get",
-      "statement": "from users.api.serializers import UserSerializer",
       "count": 1
     },
     {
@@ -2544,12 +2496,6 @@
     {
       "path": "itambox/itambox/context_processors.py",
       "context": "FunctionDef:tenant_switcher_processor/FunctionDef:get_grouped_managed_tenants",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
-      "context": "ClassDef:TenantMiddleware/FunctionDef:process_request",
       "statement": "from organization.access import accessible_tenant_ids",
       "count": 1
     },

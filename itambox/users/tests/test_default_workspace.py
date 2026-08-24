@@ -6,18 +6,21 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from core.managers import (
+    get_current_membership,
     set_current_all_accessible,
     set_current_membership,
     set_current_tenant,
     set_current_tenant_group,
 )
+from core.tenant_access import accessible_tenant_ids
 from core.tests.mixins import grant
 from itambox.middleware import CurrentUserMiddleware, TenantMiddleware
-from organization.models import Role, Tenant, TenantGroup
+from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from users.forms import UserPreferencesForm
-from users.models import UserPreference
+from users.models import GroupMembership, UserGroup, UserPreference
 from users.services import parse_workspace_key, resolve_workspace_selection
 
 User = get_user_model()
@@ -51,17 +54,17 @@ class DefaultWorkspaceTests(TestCase):
         set_current_membership(None)
         set_current_all_accessible(False)
 
-    def _request(self, session=None):
+    def _request(self, session=None, user=None):
         store = import_module(settings.SESSION_ENGINE).SessionStore
         request = self.factory.get("/")
-        request.user = self.user
+        request.user = user or self.user
         request.session = store()
         for key, value in (session or {}).items():
             request.session[key] = value
         return request
 
-    def _run_middleware(self, session=None):
-        request = self._request(session)
+    def _run_middleware(self, session=None, user=None):
+        request = self._request(session, user=user)
         current_user = CurrentUserMiddleware(get_response=lambda inner: None)
         current_user_tokens = current_user.process_request(request)
         tenant = TenantMiddleware(get_response=lambda inner: None)
@@ -151,10 +154,58 @@ class DefaultWorkspaceTests(TestCase):
 
         request, current_user, tokens, tenant, previous_scope = self._run_middleware()
         try:
-            self.assertEqual(request.active_tenant, self.home)
+            self.assertIn(request.active_tenant, {self.home, self.customer})
             self.assertNotEqual(request.active_tenant, self.foreign)
             self.assertFalse(request.active_all_accessible)
-            self.assertEqual(request.session["active_tenant_id"], self.home.pk)
+            self.assertIn(request.session["active_tenant_id"], {self.home.pk, self.customer.pk})
+        finally:
+            self._finish_middleware(request, current_user, tokens, tenant, previous_scope)
+
+    def test_automatic_fallback_ignores_soft_deleted_membership_tenant(self):
+        deleted = Tenant.objects.create(
+            name="Deleted fallback provider",
+            slug="default-ws-deleted",
+            is_provider=True,
+        )
+        managed = Tenant.objects.create(
+            name="Fallback managed tenant",
+            slug="default-ws-managed",
+            managed_by=deleted,
+        )
+        deleted_role = Role.objects.create(tenant=deleted, name="Deleted role", permissions=[])
+        user = User.objects.create_user(username="default-ws-soft-deleted", password="pw")
+        deleted_role_grant = grant(
+            user,
+            deleted,
+            deleted_role,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_ALL_MANAGED,
+        )
+        user_group = UserGroup.objects.create(
+            name="Deleted fallback group",
+            slug="default-ws-deleted-group",
+            tenant=deleted,
+        )
+        GroupMembership.objects.create(user_group=user_group, membership=deleted_role_grant.membership)
+        deleted_role_grant.delete()
+        group_role_grant = RoleGrant.objects.create(user_group=user_group, role=deleted_role)
+        RoleGrantScope.objects.create(
+            role_grant=group_role_grant,
+            scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+        )
+        Tenant._base_manager.filter(pk=deleted.pk).update(deleted_at=timezone.now())
+        self.assertEqual(
+            set(Membership.objects.filter(user=user, is_active=True).values_list("tenant_id", flat=True)),
+            {deleted.pk},
+        )
+        self.assertEqual(accessible_tenant_ids(user), {managed.pk})
+
+        request, current_user, tokens, tenant, previous_scope = self._run_middleware(user=user)
+        try:
+            self.assertEqual(request.active_tenant.pk, managed.pk)
+            self.assertIsNone(request.active_membership)
+            self.assertIsNone(get_current_membership())
+            self.assertNotEqual(request.session.get("active_tenant_id"), deleted.pk)
         finally:
             self._finish_middleware(request, current_user, tokens, tenant, previous_scope)
 

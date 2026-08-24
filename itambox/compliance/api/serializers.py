@@ -1,12 +1,12 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from assets.api.nested_serializers import NestedAssetSerializer
 from assets.api.serializers import CategorySerializer, StatusLabelSerializer
 from assets.models import Asset, AssetMaintenance, Category, StatusLabel
 from compliance.models import AssetAudit, AuditSession, CustodyReceipt, CustodyTemplate
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
-from itambox.api.nested_serializers import NestedAssetSerializer
 from organization.api.serializers import (
     AssetHolderSerializer,
     NestedLocationSerializer,

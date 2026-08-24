@@ -55,6 +55,7 @@
   "itambox/core/tests/test_management_commands.py",
   "itambox/core/tests/test_media_isolation.py",
   "itambox/core/tests/test_mitigations_phase2.py",
+  "itambox/core/tests/test_mitigations_phase3.py",
   "itambox/core/tests/test_multi_tenant_auth.py",
   "itambox/core/tests/test_nav_group_gate_unify.py",
   "itambox/core/tests/test_objectchange_responsive.py",
@@ -169,7 +170,14 @@
   "scripts/tests/test_migration_audit.py",
   "scripts/tests/test_release_policy.py",
   "scripts/tests/test_security_gate.py",
-  "scripts/tests/test_typing_policy.py"
+  "scripts/tests/test_typing_policy.py",
+  "itambox/assets/tests/test_graphql_adversarial.py",
+  "itambox/assets/tests/test_nested_serializers.py",
+  "itambox/core/tests/test_provider_slot.py",
+  "itambox/itambox/tests/test_issue134_api_scope.py",
+  "itambox/organization/tests/test_tenant_access_policy.py",
+  "itambox/users/tests/test_can_login.py",
+  "itambox/users/tests/test_token_ip_auth.py"
  ],
  "baseline_tests": [
   "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -221,6 +229,7 @@
   "itambox/core/tests/test_label_renderer_html.py",
   "itambox/core/tests/test_ldap_oidc_error_contracts.py",
   "itambox/core/tests/test_mitigations_phase2.py",
+  "itambox/core/tests/test_mitigations_phase3.py",
   "itambox/core/tests/test_nav_group_gate_unify.py",
   "itambox/core/tests/test_objectchange_responsive.py",
   "itambox/core/tests/test_oidc.py",
@@ -344,7 +353,14 @@
   "itambox/core/tests/test_compile_locales.py",
   "itambox/core/tests/test_config_contract.py",
   "itambox/core/tests/test_crypto.py",
-  "itambox/users/tests/test_token_peppers.py"
+  "itambox/users/tests/test_token_peppers.py",
+  "itambox/assets/tests/test_graphql_adversarial.py",
+  "itambox/assets/tests/test_nested_serializers.py",
+  "itambox/core/tests/test_provider_slot.py",
+  "itambox/itambox/tests/test_issue134_api_scope.py",
+  "itambox/organization/tests/test_tenant_access_policy.py",
+  "itambox/users/tests/test_can_login.py",
+  "itambox/users/tests/test_token_ip_auth.py"
  ],
  "supporting_files": [
   "itambox/inventory/tests/factories.py",
