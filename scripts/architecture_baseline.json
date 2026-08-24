@@ -20,36 +20,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-F3|itambox.api.permissions|organization.access|function-body",
-      "rule": "R-F3",
-      "source": "itambox.api.permissions",
-      "source_layer": "framework",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 2,
-      "owner": "area:api",
-      "disposition": "debt",
-      "removal_issue": 442,
-      "removal_direction": "Publish the behaviour itambox.api.permissions needs from organization.access as a registry hook the framework owns, so the framework depends on its own interface rather than on organization.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-F3|itambox.api.views|users.api.serializers|function-body",
-      "rule": "R-F3",
-      "source": "itambox.api.views",
-      "source_layer": "framework",
-      "target": "users.api.serializers",
-      "target_layer": "presentation",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:api",
-      "disposition": "debt",
-      "removal_issue": 442,
-      "removal_direction": "Publish the behaviour itambox.api.views needs from users.api.serializers as a registry hook the framework owns, so the framework depends on its own interface rather than on users.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-F3|itambox.middleware|organization.access|function-body",
       "rule": "R-F3",
       "source": "itambox.middleware",

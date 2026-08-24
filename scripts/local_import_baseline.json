@@ -2435,18 +2435,6 @@
     },
     {
       "path": "itambox/itambox/api/permissions.py",
-      "context": "ClassDef:StrictTenantPermission/FunctionDef:_has_multi_tenant_object_permission",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/permissions.py",
-      "context": "ClassDef:StrictTenantPermission/FunctionDef:_shared_read_allowed",
-      "statement": "from organization.access import shared_stock_read_allowed",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/permissions.py",
       "context": "ClassDef:StrictTenantPermission/FunctionDef:has_object_permission",
       "statement": "from core.managers import get_current_all_accessible, get_current_tenant, get_current_tenant_group",
       "count": 1
@@ -2473,12 +2461,6 @@
       "path": "itambox/itambox/api/permissions.py",
       "context": "ClassDef:TokenPermissions/FunctionDef:has_permission",
       "statement": "from core.managers import get_current_all_accessible, get_current_tenant, get_current_tenant_group",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/views.py",
-      "context": "ClassDef:AuthenticationCheckView/FunctionDef:get",
-      "statement": "from users.api.serializers import UserSerializer",
       "count": 1
     },
     {
