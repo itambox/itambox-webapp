@@ -1,13 +1,11 @@
-import logging
-import os
-
 import saml2
 from django.conf import settings
 from django.http import Http404
+from djangosaml2.backends import Saml2Backend
 from saml2.config import SPConfig
 
+from core import identity_provisioning, tenant_scope
 from core.managers import get_current_tenant, set_current_tenant
-from organization.models import Tenant
 
 #: Session key pinning the tenant a SAML flow was started for. The IdP posts the
 #: assertion back to an anonymous, cross-site endpoint (``/saml2/acs/``), so
@@ -58,10 +56,13 @@ def restore_saml_tenant(request):
 
 
 def _live_tenant(slug):
-    """``_base_manager``: the SAML endpoints are anonymous, so no tenant scope is
-    established yet — the same bootstrap lookup ``TenantMiddleware`` performs.
+    """Use the registered tenant model at operation time.
+
+    SAML starts and completes on anonymous endpoints, so the lookup must remain
+    unscoped and must not retain a model class across app-registry lifecycles.
     """
-    return Tenant._base_manager.filter(slug=slug, deleted_at__isnull=True).first()
+    tenant_model = tenant_scope.tenant_model()
+    return tenant_model._base_manager.filter(slug=slug, deleted_at__isnull=True).first()
 
 
 def _configured_saml_tenant(slug):
@@ -80,8 +81,9 @@ def _configured_saml_tenant(slug):
 
 
 def _is_sole_live_tenant(slug):
+    tenant_model = tenant_scope.tenant_model()
     live_slugs = list(
-        Tenant._base_manager.filter(deleted_at__isnull=True).order_by("pk").values_list("slug", flat=True)[:2]
+        tenant_model._base_manager.filter(deleted_at__isnull=True).order_by("pk").values_list("slug", flat=True)[:2]
     )
     return live_slugs == [slug]
 
@@ -161,15 +163,75 @@ def load_saml_config(request=None):
     return config
 
 
-from djangosaml2.backends import Saml2Backend
+def _saml_attribute(ava, aliases):
+    if isinstance(aliases, str):
+        aliases = [aliases]
+    for alias in aliases:
+        value = ava.get(alias)
+        if value:
+            if isinstance(value, list):
+                value = value[0]
+            if isinstance(value, bytes):
+                return value.decode("utf-8")
+            return str(value)
+    return None
+
+
+def _saml_groups(ava):
+    groups = ava.get("groups") or ava.get("memberOf") or ava.get("User.Groups") or []
+    if isinstance(groups, str):
+        groups = [groups]
+    elif not isinstance(groups, list):
+        groups = []
+
+    normalized = []
+    for group in groups:
+        if isinstance(group, bytes):
+            normalized.append(group.decode("utf-8"))
+        else:
+            normalized.append(str(group))
+    return normalized
+
+
+def _saml_profile(user, ava):
+    email = _saml_attribute(ava, ["email", "mail", "User.Email"]) or user.email
+    first_name = _saml_attribute(ava, ["givenName", "first_name", "User.FirstName"]) or user.first_name or "SAML"
+    last_name = _saml_attribute(ava, ["sn", "last_name", "User.LastName"]) or user.last_name or "User"
+    upn = _saml_attribute(ava, ["upn", "userPrincipalName", "uid", "nameidentifier"]) or email
+
+    if not upn:
+        upn = email or f"{user.username}@saml"
+    if not email:
+        email = f"{user.username}@saml.local"
+
+    return identity_provisioning.ExternalIdentityProfile(
+        source="SAML",
+        email=email,
+        upn=upn,
+        first_name=first_name,
+        last_name=last_name,
+    )
+
+
+def _saml_role_name(tenant, groups):
+    tenant_config = _tenant_saml_config(tenant.slug)
+    group_role_mapping = tenant_config.get("SAML_GROUP_ROLE_MAPPING", {})
+
+    user_roles = []
+    for group in groups:
+        if group in group_role_mapping:
+            mapped_role = group_role_mapping[group]
+            if isinstance(mapped_role, str):
+                user_roles.append(mapped_role.lower())
+
+    for priority_role in ("admin", "manager", "member"):
+        if priority_role in user_roles:
+            return {"admin": "Admin", "manager": "Manager", "member": "Member"}[priority_role]
+    return "Member"
 
 
 class TenantSaml2Backend(Saml2Backend):
-    """
-    A custom SAML2 authentication backend that delegates authentication to djangosaml2
-    but rejects all permissions checks (has_perm/has_module_perms) to prevent bypassing
-    the custom multi-tenant RBAC system.
-    """
+    """SAML authentication with tenant-aware configuration and JIT handoff."""
 
     def authenticate(self, request, session_info=None, attribute_mapping=None, create_unknown_user=True, **kwargs):
         user = super().authenticate(request, session_info, attribute_mapping, create_unknown_user, **kwargs)
@@ -184,128 +246,18 @@ class TenantSaml2Backend(Saml2Backend):
     def sync_saml_user_profile_and_memberships(self, user, session_info):
         tenant = get_current_tenant()
         if not tenant:
-            return
-
-        from django.db import transaction
-        from django.db.utils import IntegrityError
-
-        from organization.models import AssetHolder, Membership, Role
-
-        logger = logging.getLogger("djangosaml2")
-        ava = session_info.get("ava", {})
-
-        def get_attr(keys):
-            if isinstance(keys, str):
-                keys = [keys]
-            for key in keys:
-                val = ava.get(key)
-                if val:
-                    if isinstance(val, list):
-                        val = val[0]
-                    if isinstance(val, bytes):
-                        return val.decode("utf-8")
-                    return str(val)
             return None
 
-        email = get_attr(["email", "mail", "User.Email"]) or user.email
-        first_name = get_attr(["givenName", "first_name", "User.FirstName"]) or user.first_name or "SAML"
-        last_name = get_attr(["sn", "last_name", "User.LastName"]) or user.last_name or "User"
-        upn = get_attr(["upn", "userPrincipalName", "uid", "nameidentifier"]) or email
-
-        if not upn:
-            upn = email or f"{user.username}@saml"
-        if not email:
-            email = f"{user.username}@saml.local"
-
-        # Check if the user already has a linked profile in the target tenant
-        holder = user.asset_holder_profiles.filter(tenant=tenant).first()
-        if not holder:
-            if upn:
-                holder = AssetHolder.objects.filter(tenant=tenant, upn=upn).first()
-            if not holder and email:
-                holder = AssetHolder.objects.filter(tenant=tenant, email=email).first()
-
-            if holder and holder.user is None:
-                holder.user = user
-                try:
-                    with transaction.atomic():
-                        holder.save()
-                except IntegrityError as e:
-                    logger.warning(f"IntegrityError while saving AssetHolder: {e}")
-                    holder = None
-            elif not holder or (holder and holder.user != user):
-                try:
-                    with transaction.atomic():
-                        holder = AssetHolder.objects.create(
-                            user=user, first_name=first_name, last_name=last_name, upn=upn, email=email, tenant=tenant
-                        )
-                except IntegrityError as e:
-                    logger.warning(f"IntegrityError while creating AssetHolder: {e}")
-                    holder = None
-
-        groups = ava.get("groups") or ava.get("memberOf") or ava.get("User.Groups") or []
-        if isinstance(groups, str):
-            groups = [groups]
-        elif not isinstance(groups, list):
-            groups = []
-
-        groups_cleaned = []
-        for g in groups:
-            if isinstance(g, bytes):
-                groups_cleaned.append(g.decode("utf-8"))
-            else:
-                groups_cleaned.append(str(g))
-
-        tenant_config = _tenant_saml_config(tenant.slug)
-        group_role_mapping = tenant_config.get("SAML_GROUP_ROLE_MAPPING", {})
-
-        user_roles = []
-        for group in groups_cleaned:
-            if group in group_role_mapping:
-                mapped_role = group_role_mapping[group]
-                if isinstance(mapped_role, str):
-                    user_roles.append(mapped_role.lower())
-
-        resolved_role_name = None
-        for priority_role in ["admin", "manager", "member"]:
-            if priority_role in user_roles:
-                resolved_role_name = priority_role
-                break
-
-        if not resolved_role_name:
-            resolved_role_name = "member"
-
-        role_title_map = {"admin": "Admin", "manager": "Manager", "member": "Member"}
-        db_role_name = role_title_map.get(resolved_role_name, "Member")
-
-        # Safe JIT provisioning: never auto-create a privileged role from a group
-        # claim; assign Admin/Manager only if the operator created them deliberately.
-        from core.auth.provisioning import provision_membership
-
-        provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, "SAML")
-
-    def get_permissions_for_role(self, role_name):
-        from django.contrib.auth.models import Permission
-
-        from organization.forms.role_form import MATRIX_MODELS
-
-        perms = set()
-        for key, info in MATRIX_MODELS.items():
-            app = info["app"]
-            model = info["model_name"]
-            if role_name == "Admin":
-                perms.update(
-                    [f"{app}.view_{model}", f"{app}.add_{model}", f"{app}.change_{model}", f"{app}.delete_{model}"]
-                )
-            elif role_name in ("Manager", "Member"):
-                perms.update([f"{app}.view_{model}", f"{app}.add_{model}", f"{app}.change_{model}"])
-        perms.update(
-            ["extras.view_dashboard", "extras.change_dashboard", "extras.add_dashboard", "extras.delete_dashboard"]
+        ava = session_info.get("ava", {})
+        profile = _saml_profile(user, ava)
+        role_name = _saml_role_name(tenant, _saml_groups(ava))
+        command = identity_provisioning.ExternalIdentityProvisioningCommand(
+            user=user,
+            customer_tenant=tenant,
+            profile=profile,
+            customer_role_name=role_name,
         )
-        all_codenames = set(
-            f"{p.content_type.app_label}.{p.codename}" for p in Permission.objects.select_related("content_type").all()
-        )
-        return list(perms & all_codenames)
+        return identity_provisioning.provision_external_identity(command)
 
     def has_perm(self, user_obj, perm, obj=None):
         return False

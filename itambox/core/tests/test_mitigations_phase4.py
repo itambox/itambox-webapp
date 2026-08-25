@@ -14,6 +14,7 @@ from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetRequest, AssetType, StatusLabel
 from compliance.models import CustodyReceipt
+from core import identity_provisioning
 from core.auth.ldap import MultiTenantLDAPBackend
 from core.auth.saml import TenantSaml2Backend
 from core.managers import set_current_tenant
@@ -21,6 +22,7 @@ from core.tests.mixins import grant
 from core.validators import validate_file_attachment, validate_image_attachment
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, Location, Membership, Role, Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 
 User = get_user_model()
 
@@ -248,7 +250,8 @@ class MitigationsPhase4Tests(TestCase):
         saml_configs = {self.tenant.slug: {"SAML_GROUP_ROLE_MAPPING": {"ManagerSAMLGroup": "manager"}}}
 
         with override_settings(ITAMBOX_TENANT_SAML_CONFIGS=saml_configs):
-            backend.sync_saml_user_profile_and_memberships(saml_user, session_info)
+            with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                backend.sync_saml_user_profile_and_memberships(saml_user, session_info)
 
         # Verify AssetHolder profile is created
         holder = AssetHolder.objects.get(user=saml_user)
