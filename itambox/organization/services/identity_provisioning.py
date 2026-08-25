@@ -1,0 +1,1119 @@
+"""Organization-owned identity provisioning for interactive and LDAP batch flows.
+
+This module is the concrete organization side of the SDK-free identity port. It
+owns the organization aggregate and deliberately does not resolve or mutate a
+canonical User, an external identity binding, or provider claims.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Any, NoReturn, cast
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, connection, transaction
+from django.db.models import Q
+from django.utils import timezone
+
+from core.identity_provisioning import (
+    CustomerRoleName,
+    ExternalIdentityProvisioningCommand,
+    ExternalIdentityProvisioningResult,
+    IdentityProvisioner,
+    TenantRef,
+    UserRef,
+)
+from core.mfa import PRIVILEGED_ROLE_NAMES, role_is_privileged
+from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.services.role_permission_policy import permissions_for_sso_role
+from users.models import GroupMembership, User
+
+logger = logging.getLogger("itambox.organization.identity")
+
+PRIVILEGED_JIT_TTL = timedelta(days=1)
+LDAP_DIRECTORY_SYNC_REASON = "LDAP directory synchronization"
+LDAP_DIRECTORY_SYNC_PRIVILEGED_TTL = timedelta(days=1)
+LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST = (
+    "assets.view_asset",
+    "assets.add_asset",
+    "assets.change_asset",
+    "inventory.view_accessory",
+    "inventory.add_accessory",
+    "inventory.change_accessory",
+    "inventory.view_consumable",
+    "inventory.add_consumable",
+    "inventory.change_consumable",
+    "inventory.view_kit",
+    "inventory.add_kit",
+    "inventory.change_kit",
+    "inventory.view_component",
+    "inventory.add_component",
+    "inventory.change_component",
+    "organization.view_location",
+    "organization.add_location",
+    "organization.change_location",
+    "organization.view_site",
+    "organization.add_site",
+    "organization.change_site",
+    "organization.view_assetholder",
+    "organization.add_assetholder",
+    "organization.change_assetholder",
+    "extras.view_dashboard",
+    "extras.add_dashboard",
+    "extras.change_dashboard",
+)
+LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS = frozenset(LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST)
+
+
+@dataclass(frozen=True)
+class LDAPDirectoryIdentityCommand:
+    """Normalized input for the non-interactive LDAP directory-sync API."""
+
+    user: UserRef
+    tenant: TenantRef
+
+
+@dataclass(frozen=True)
+class _TenantRow:
+    pk: int
+    deleted_at: Any
+    is_provider: bool
+    managed_by_id: int | None
+
+
+@dataclass
+class _AggregateLocks:
+    memberships: dict[int, Membership]
+    group_memberships: list[GroupMembership]
+    grants: list[RoleGrant]
+    roles: list[Role]
+    scopes: list[RoleGrantScope]
+
+
+class IdentityProvisioningError(ValidationError):
+    """Fail-closed organization aggregate error."""
+
+
+# This hook is intentionally empty. It gives failure-injection tests a stable
+# stage boundary without adding a runtime setting or a second writer.
+def _stage_checkpoint(stage: str) -> None:
+    del stage
+
+
+def _reject(message: str) -> NoReturn:
+    raise IdentityProvisioningError(message)
+
+
+def _quoted(identifier: str) -> str:
+    return connection.ops.quote_name(identifier)
+
+
+def _lock_live_tenants(tenant_ids: set[int]) -> dict[int, _TenantRow]:
+    """Lock the exact live tenant set once with parameterized PostgreSQL FOR SHARE."""
+
+    ordered_ids = sorted({int(value) for value in tenant_ids})
+    if not ordered_ids:
+        _reject("Identity provisioning requires a tenant.")
+
+    meta = Tenant._meta
+    table = _quoted(meta.db_table)
+    id_column = _quoted(str(meta.get_field("id").column))
+    deleted_column = _quoted(str(meta.get_field("deleted_at").column))
+    provider_column = _quoted(str(meta.get_field("is_provider").column))
+    manager_column = _quoted(str(meta.get_field("managed_by").column))
+    placeholders = ", ".join(["%s"] * len(ordered_ids))
+    sql = (
+        f"SELECT {id_column}, {deleted_column}, {provider_column}, {manager_column} "
+        f"FROM {table} WHERE {id_column} IN ({placeholders}) "
+        f"AND {deleted_column} IS NULL ORDER BY {id_column} FOR SHARE"
+    )
+    with connection.cursor() as cursor:
+        cursor.execute(sql, ordered_ids)
+        rows = cursor.fetchall()
+
+    if len(rows) != len(ordered_ids):
+        _reject("Identity provisioning target tenant is not live.")
+    return {
+        int(row[0]): _TenantRow(
+            pk=int(row[0]),
+            deleted_at=row[1],
+            is_provider=bool(row[2]),
+            managed_by_id=int(row[3]) if row[3] is not None else None,
+        )
+        for row in rows
+    }
+
+
+def _lock_user(user: UserRef) -> User:
+    user_id = getattr(user, "pk", None)
+    if not isinstance(user_id, int):
+        _reject("Identity provisioning requires an existing canonical user.")
+    locked = User._base_manager.select_for_update().filter(pk=user_id).first()
+    if locked is None:
+        _reject("Identity provisioning canonical user does not exist.")
+    return locked
+
+
+def _membership_tenant_ids(*, customer_row: _TenantRow, provider_intent: bool) -> set[int]:
+    ids = {customer_row.pk}
+    if provider_intent and customer_row.managed_by_id is not None:
+        ids.add(customer_row.managed_by_id)
+    if not provider_intent and customer_row.managed_by_id is not None:
+        # Customer-mode sticky-provider dominance is decided from the same
+        # Membership query; it must not perform a second Membership lock query.
+        ids.add(customer_row.managed_by_id)
+    return ids
+
+
+def _lock_memberships(user_id: int, tenant_ids: set[int]) -> dict[int, Membership]:
+    rows = list(
+        Membership._base_manager.select_for_update()
+        .filter(user_id=user_id, tenant_id__in=sorted(tenant_ids))
+        .select_related("tenant")
+        .order_by("tenant_id", "pk")
+    )
+    return {row.tenant_id: row for row in rows}
+
+
+def _lock_group_memberships(membership_ids: set[int]) -> list[GroupMembership]:
+    if not membership_ids:
+        return []
+    return list(
+        GroupMembership._base_manager.select_for_update()
+        .filter(membership_id__in=sorted(membership_ids))
+        .order_by("pk")
+    )
+
+
+def _lock_grants(membership_ids: set[int]) -> list[RoleGrant]:
+    if not membership_ids:
+        return []
+    return list(
+        RoleGrant._base_manager.select_for_update().filter(membership_id__in=sorted(membership_ids)).order_by("pk")
+    )
+
+
+def _lock_roles(
+    *,
+    grants: list[RoleGrant],
+    role_names: tuple[tuple[int, str], ...],
+) -> list[Role]:
+    predicate = Q(pk__in=sorted({grant.role_id for grant in grants}))
+    for tenant_id, name in role_names:
+        predicate |= Q(tenant_id=tenant_id, name=name, deleted_at__isnull=True)
+    return list(
+        Role._base_manager.select_for_update().filter(predicate, deleted_at__isnull=True).order_by("tenant_id", "pk")
+    )
+
+
+def _lock_scopes(grants: list[RoleGrant]) -> list[RoleGrantScope]:
+    grant_ids = sorted({grant.pk for grant in grants})
+    if not grant_ids:
+        return []
+    return list(
+        RoleGrantScope._base_manager.select_for_update()
+        .filter(role_grant_id__in=grant_ids)
+        .order_by("role_grant_id", "pk")
+    )
+
+
+def _lock_aggregate(
+    *,
+    memberships: dict[int, Membership],
+    customer_tenant_id: int,
+    role_names: tuple[tuple[int, str], ...],
+    provider_transition: bool,
+) -> _AggregateLocks:
+    membership_ids = {row.pk for row in memberships.values()}
+    customer_membership = memberships.get(customer_tenant_id)
+    group_membership_ids = {customer_membership.pk} if provider_transition and customer_membership else set()
+    group_memberships = _lock_group_memberships(group_membership_ids)
+    grants = _lock_grants(membership_ids)
+    roles = _lock_roles(grants=grants, role_names=role_names)
+    scopes = _lock_scopes(grants)
+    return _AggregateLocks(
+        memberships=memberships,
+        group_memberships=group_memberships,
+        grants=grants,
+        roles=roles,
+        scopes=scopes,
+    )
+
+
+def _find_role(tenant_id: int, name: str, *, lock: bool = False) -> Role | None:
+    manager = Role._base_manager
+    query = manager.filter(tenant_id=tenant_id, name=name, deleted_at__isnull=True).order_by("tenant_id", "pk")
+    if lock:
+        query = query.select_for_update()
+    return query.first()
+
+
+def _create_role(tenant_id: int, name: str, source: str) -> Role:
+    permissions = permissions_for_sso_role(cast(CustomerRoleName, name))  # Permission is read only for a missing role.
+    role: Role | None
+    try:
+        with transaction.atomic():
+            role = Role._base_manager.create(
+                tenant_id=tenant_id,
+                name=name,
+                description=f"Auto-provisioned {name} role via {source}",
+                permissions=permissions,
+            )
+    except IntegrityError:
+        role = _find_role(tenant_id, name, lock=True)
+        if role is None:
+            raise
+        _log(
+            "role_uniqueness_reconciled",
+            source=source,
+            tenant_id=tenant_id,
+            role_id=role.pk,
+            exception_type="IntegrityError",
+        )
+        return role
+    _stage_checkpoint("customer.role_created")
+    return role
+
+
+def _resolve_customer_role(
+    *,
+    tenant_id: int,
+    requested_name: str,
+    source: str,
+    locked_roles: list[Role],
+) -> Role:
+    by_name = {(role.tenant_id, role.name): role for role in locked_roles}
+    role = by_name.get((tenant_id, requested_name))
+    if role is not None:
+        return role
+    if requested_name in PRIVILEGED_ROLE_NAMES and not getattr(
+        settings,
+        "ITAMBOX_SSO_AUTOCREATE_PRIVILEGED_ROLES",
+        True,
+    ):
+        _log("privileged_role_fallback", source=source, tenant_id=tenant_id)
+        fallback = by_name.get((tenant_id, "Member"))
+        return fallback if fallback is not None else _create_role(tenant_id, "Member", source)
+    return _create_role(tenant_id, requested_name, source)
+
+
+def _provider_relationship_valid(
+    *,
+    customer: _TenantRow,
+    provider: _TenantRow,
+    provider_id: int,
+) -> bool:
+    return (
+        customer.pk != provider.pk
+        and not customer.is_provider
+        and provider.is_provider
+        and provider.managed_by_id is None
+        and customer.managed_by_id == provider_id
+    )
+
+
+def _profile_values(command: ExternalIdentityProvisioningCommand, user: User) -> tuple[str, str, str, str]:
+    profile = command.profile
+    source = profile.source.lower()
+    email = (profile.email or getattr(user, "email", "") or "").strip()
+    upn = (profile.upn or email or f"{user.username}@{source}").strip()
+    first_name = profile.first_name or getattr(user, "first_name", "") or source.upper()
+    last_name = profile.last_name or getattr(user, "last_name", "") or "User"
+    return upn, email, first_name, last_name
+
+
+def _holder_candidates(*, user_id: int, tenant_id: int, upn: str, email: str) -> list[AssetHolder]:
+    predicate = Q(user_id=user_id) | Q(upn=upn)
+    if email:
+        predicate |= Q(email=email)
+    return list(
+        AssetHolder._base_manager.select_for_update()
+        .filter(tenant_id=tenant_id, deleted_at__isnull=True)
+        .filter(predicate)
+        .order_by("tenant_id", "pk")
+    )
+
+
+def _all_customer_holders(*, user_id: int, tenant_id: int) -> list[AssetHolder]:
+    return list(
+        AssetHolder._base_manager.select_for_update()
+        .filter(tenant_id=tenant_id, user_id=user_id)
+        .order_by("tenant_id", "pk")
+    )
+
+
+def _holder_collision_re_read(*, user_id: int, tenant_id: int, upn: str, source: str) -> AssetHolder | None:
+    """Constrained conflict recovery: user or exact UPN only, never email."""
+
+    try:
+        with transaction.atomic():
+            rows = list(
+                AssetHolder._base_manager.select_for_update()
+                .filter(tenant_id=tenant_id, deleted_at__isnull=True)
+                .filter(Q(user_id=user_id) | Q(upn=upn))
+                .order_by("tenant_id", "pk")
+            )
+            same_user = next((row for row in rows if row.user_id == user_id), None)
+            if same_user is not None:
+                return same_user
+            same_upn = next((row for row in rows if row.user_id is None and row.upn == upn), None)
+            if same_upn is None:
+                _log(
+                    "holder_collision_unresolved",
+                    source=source,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    exception_type="IntegrityError",
+                )
+                return None
+            same_upn.user_id = user_id
+            try:
+                same_upn.save(update_fields=["user"])
+            except IntegrityError:
+                _log(
+                    "holder_collision_unresolved",
+                    source=source,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    exception_type="IntegrityError",
+                )
+                return None
+            return same_upn
+    except IntegrityError:
+        _log(
+            "holder_collision_unresolved",
+            source=source,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            exception_type="IntegrityError",
+        )
+        return None
+
+
+class _UnsafeHolderCandidate:
+    """Marker for an unsafe email-only collision."""
+
+
+_UNSAFE_HOLDER_CANDIDATE = _UnsafeHolderCandidate()
+
+
+def _select_holder_candidate(
+    *,
+    user: User,
+    tenant_id: int,
+    upn: str,
+    email: str,
+    candidates: list[AssetHolder],
+    source: str,
+) -> AssetHolder | _UnsafeHolderCandidate | None:
+    by_user = next((row for row in candidates if row.user_id == user.pk), None)
+    if by_user is not None:
+        return by_user
+
+    by_upn = next((row for row in candidates if row.upn == upn), None)
+    if by_upn is not None:
+        if by_upn.user_id not in (None, user.pk):
+            _log(
+                "holder_collision_other_user",
+                source=source,
+                user_id=user.pk,
+                tenant_id=tenant_id,
+                holder_id=by_upn.pk,
+            )
+            return _UNSAFE_HOLDER_CANDIDATE
+        return by_upn
+
+    by_email = next((row for row in candidates if email and row.email == email), None)
+    if by_email is None:
+        return None
+    if by_email.user_id not in (None, user.pk):
+        _log(
+            "holder_collision_other_user",
+            source=source,
+            user_id=user.pk,
+            tenant_id=tenant_id,
+            holder_id=by_email.pk,
+        )
+        return _UNSAFE_HOLDER_CANDIDATE
+    if by_email.upn not in ("", upn):
+        _log(
+            "holder_email_hint_rejected",
+            source=source,
+            user_id=user.pk,
+            tenant_id=tenant_id,
+            holder_id=by_email.pk,
+        )
+        return _UNSAFE_HOLDER_CANDIDATE
+    return by_email
+
+
+def _link_existing_holder(
+    *,
+    candidate: AssetHolder,
+    user: User,
+    tenant_id: int,
+    upn: str,
+    source: str,
+) -> AssetHolder | None:
+    try:
+        with transaction.atomic():
+            candidate.user_id = user.pk
+            candidate.save(update_fields=["user"])
+    except IntegrityError:
+        return _holder_collision_re_read(user_id=user.pk, tenant_id=tenant_id, upn=upn, source=source)
+    _stage_checkpoint("customer.holder_linked")
+    return candidate
+
+
+def _create_holder(
+    *,
+    user: User,
+    tenant_id: int,
+    upn: str,
+    email: str,
+    first_name: str,
+    last_name: str,
+    source: str,
+) -> AssetHolder | None:
+    holder: AssetHolder | None
+    try:
+        with transaction.atomic():
+            holder = AssetHolder._base_manager.create(
+                user_id=user.pk,
+                tenant_id=tenant_id,
+                upn=upn,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+            )
+    except IntegrityError:
+        holder = _holder_collision_re_read(user_id=user.pk, tenant_id=tenant_id, upn=upn, source=source)
+        if holder is None:
+            _log(
+                "holder_collision_unresolved",
+                source=source,
+                user_id=user.pk,
+                tenant_id=tenant_id,
+                exception_type="IntegrityError",
+            )
+        return holder
+    _stage_checkpoint("customer.holder_created")
+    return holder
+
+
+def _link_or_create_holder(
+    *,
+    user: User,
+    tenant_id: int,
+    upn: str,
+    email: str,
+    first_name: str,
+    last_name: str,
+    candidates: list[AssetHolder],
+    source: str,
+) -> AssetHolder | None:
+    candidate = _select_holder_candidate(
+        user=user,
+        tenant_id=tenant_id,
+        upn=upn,
+        email=email,
+        candidates=candidates,
+        source=source,
+    )
+    if isinstance(candidate, _UnsafeHolderCandidate):
+        return None
+    if candidate is not None and candidate.user_id == user.pk:
+        return candidate
+    if candidate is not None:
+        return _link_existing_holder(
+            candidate=candidate,
+            user=user,
+            tenant_id=tenant_id,
+            upn=upn,
+            source=source,
+        )
+    return _create_holder(
+        user=user,
+        tenant_id=tenant_id,
+        upn=upn,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        source=source,
+    )
+
+
+def _scopes_by_grant(scopes: list[RoleGrantScope]) -> dict[int, list[RoleGrantScope]]:
+    grouped: dict[int, list[RoleGrantScope]] = defaultdict(list)
+    for scope in scopes:
+        grouped[scope.role_grant_id].append(scope)
+    return grouped
+
+
+def _scope_key(scope: RoleGrantScope) -> tuple[str, int | None, int | None]:
+    return scope.scope_type, scope.tenant_id, scope.tenant_group_id
+
+
+def _delete_scope(scope: RoleGrantScope) -> None:
+    RoleGrantScope._base_manager.filter(pk=scope.pk).delete()
+
+
+def _retire_conflicting_own_grants(
+    grants: list[RoleGrant],
+    role: Role,
+    scopes_by_grant: dict[int, list[RoleGrantScope]],
+) -> None:
+    for grant in list(grants):
+        grant_scopes = list(scopes_by_grant.get(grant.pk, ()))
+        own_scopes = [scope for scope in grant_scopes if scope.scope_type == RoleGrantScope.SCOPE_OWN]
+        if grant.role_id == role.pk:
+            continue
+        for scope in own_scopes:
+            _delete_scope(scope)
+        remaining = [scope for scope in grant_scopes if scope.scope_type != RoleGrantScope.SCOPE_OWN]
+        scopes_by_grant[grant.pk] = remaining
+        if not remaining:
+            grant.delete()
+
+
+def _merge_duplicate_same_role_grants(
+    grants: list[RoleGrant],
+    role: Role,
+    scopes_by_grant: dict[int, list[RoleGrantScope]],
+) -> RoleGrant | None:
+    matching = [
+        grant
+        for grant in grants
+        if grant.role_id == role.pk
+        and any(scope.scope_type == RoleGrantScope.SCOPE_OWN for scope in scopes_by_grant.get(grant.pk, ()))
+    ]
+    if not matching:
+        return None
+    matching.sort(key=lambda grant: grant.pk)
+    canonical = matching[0]
+    canonical_keys = {_scope_key(scope) for scope in scopes_by_grant.get(canonical.pk, ())}
+    for duplicate in matching[1:]:
+        remaining: list[RoleGrantScope] = []
+        for scope in list(scopes_by_grant.get(duplicate.pk, ())):
+            key = _scope_key(scope)
+            if key == (RoleGrantScope.SCOPE_OWN, None, None):
+                _delete_scope(scope)
+                continue
+            if key in canonical_keys:
+                _delete_scope(scope)
+                continue
+            try:
+                RoleGrantScope._base_manager.filter(pk=scope.pk).update(role_grant_id=canonical.pk)
+            except IntegrityError:
+                existing = RoleGrantScope._base_manager.filter(
+                    role_grant_id=canonical.pk,
+                    scope_type=scope.scope_type,
+                    tenant_id=cast(int, scope.tenant_id),
+                    tenant_group_id=cast(int, scope.tenant_group_id),
+                ).first()
+                if existing is None:
+                    raise
+                _delete_scope(scope)
+            canonical_keys.add(key)
+        scopes_by_grant[duplicate.pk] = remaining
+        if not remaining:
+            duplicate.delete()
+    return canonical
+
+
+def _grant_metadata(role: Role, source: str) -> dict[str, Any]:
+    if not role_is_privileged(role):
+        return {"reason": "", "valid_until": None}
+    return {
+        "reason": f"{source} group-claim provisioning",
+        "valid_until": timezone.now() + PRIVILEGED_JIT_TTL,
+    }
+
+
+def _ensure_own_scope(grant: RoleGrant, existing_scopes: list[RoleGrantScope] | None = None) -> None:
+    if existing_scopes is not None:
+        if any(
+            scope.role_grant_id == grant.pk and scope.scope_type == RoleGrantScope.SCOPE_OWN
+            for scope in existing_scopes
+        ):
+            return
+    else:
+        # Callers outside the ordinary aggregate lock path may ask for a direct
+        # exact lookup. The interactive path always supplies the captured rows.
+        if RoleGrantScope._base_manager.filter(
+            role_grant_id=grant.pk,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        ).exists():
+            return
+    try:
+        with transaction.atomic():
+            RoleGrantScope._base_manager.create(
+                role_grant_id=grant.pk,
+                scope_type=RoleGrantScope.SCOPE_OWN,
+            )
+    except IntegrityError:
+        if not RoleGrantScope._base_manager.filter(
+            role_grant_id=grant.pk,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        ).exists():
+            raise
+
+
+def _reconcile_customer_grants(
+    *,
+    membership: Membership,
+    role: Role,
+    grants: list[RoleGrant],
+    scopes: list[RoleGrantScope],
+    source: str,
+) -> RoleGrant:
+    scopes_by_grant = _scopes_by_grant(scopes)
+    _retire_conflicting_own_grants(grants, role, scopes_by_grant)
+    current = _merge_duplicate_same_role_grants(grants, role, scopes_by_grant)
+    metadata = _grant_metadata(role, source)
+    if current is None:
+        current = RoleGrant._base_manager.create(
+            membership_id=membership.pk,
+            role_id=role.pk,
+            granted_by=None,
+            **metadata,
+        )
+    elif metadata["valid_until"] is not None:
+        current.reason = metadata["reason"]
+        current.valid_until = metadata["valid_until"]
+        current.save(update_fields=["reason", "valid_until"])
+    _ensure_own_scope(current, existing_scopes=scopes_by_grant.get(current.pk, []))
+    _stage_checkpoint("customer.scope_reconciled")
+    _stage_checkpoint("customer.grant_reconciled")
+    return current
+
+
+def _active_provider_membership(*, customer_row: _TenantRow, memberships: dict[int, Membership]) -> Membership | None:
+    provider_id = customer_row.managed_by_id
+    if provider_id is None:
+        return None
+    membership = memberships.get(provider_id)
+    if membership is None or not membership.is_active:
+        return None
+    provider = membership.tenant
+    if provider.deleted_at is not None or not provider.is_provider or provider.managed_by_id is not None:
+        return None
+    return membership
+
+
+def _validate_command_tenants(
+    command: ExternalIdentityProvisioningCommand,
+) -> tuple[int, int | None, dict[int, _TenantRow]]:
+    customer_id = getattr(command.customer_tenant, "pk", None)
+    if not isinstance(customer_id, int):
+        _reject("Identity provisioning requires an existing customer tenant.")
+    provider_intent = command.provider_staff
+    provider_id = getattr(provider_intent.provider_tenant, "pk", None) if provider_intent else None
+    if provider_intent is not None and not isinstance(provider_id, int):
+        _reject("Identity provisioning requires an existing provider tenant.")
+    tenant_ids = {customer_id}
+    if provider_id is not None:
+        tenant_ids.add(provider_id)
+    rows = _lock_live_tenants(tenant_ids)
+    customer = rows[customer_id]
+    if provider_id is not None and not _provider_relationship_valid(
+        customer=customer,
+        provider=rows[provider_id],
+        provider_id=provider_id,
+    ):
+        _reject("Identity provisioning provider relationship is invalid.")
+    return customer_id, provider_id, rows
+
+
+def _provider_transition(
+    *,
+    command: ExternalIdentityProvisioningCommand,
+    customer_id: int,
+    provider_id: int,
+    rows: dict[int, _TenantRow],
+    aggregate: _AggregateLocks,
+    locked_user: User,
+) -> ExternalIdentityProvisioningResult:
+    intent = command.provider_staff
+    assert intent is not None
+    provider_roles = [
+        role for role in aggregate.roles if role.tenant_id == provider_id and role.name == intent.role_name
+    ]
+    provider_role = provider_roles[0] if provider_roles else None
+    if provider_role is None:
+        _log(
+            "provider_mapping_rejected",
+            source=command.profile.source,
+            user_id=locked_user.pk,
+            customer_tenant_id=customer_id,
+            provider_tenant_id=provider_id,
+        )
+        return ExternalIdentityProvisioningResult(mode="provider_mapping_rejected")
+
+    customer_membership = aggregate.memberships.get(customer_id)
+    provider_membership = aggregate.memberships.get(provider_id)
+    customer_holders = _all_customer_holders(user_id=locked_user.pk, tenant_id=customer_id)
+
+    if provider_membership is None:
+        provider_membership = Membership._base_manager.create(
+            user_id=locked_user.pk,
+            tenant_id=provider_id,
+            is_active=True,
+        )
+    elif not provider_membership.is_active:
+        provider_membership.is_active = True
+        provider_membership.save(update_fields=["is_active"])
+    _stage_checkpoint("provider.membership_activated")
+
+    # A provider principal is intentionally grant-free. Customer grants and
+    # group links are retired by deleting the customer Membership below.
+    for grant in aggregate.grants:
+        if grant.membership_id == provider_membership.pk:
+            grant.delete()
+    _stage_checkpoint("provider.grants_cleared")
+
+    if customer_membership is not None:
+        customer_membership.delete()
+    _stage_checkpoint("provider.customer_retired")
+
+    for holder in customer_holders:
+        holder.user_id = None
+        holder.save(update_fields=["user"])
+    _stage_checkpoint("provider.holders_unlinked")
+
+    return ExternalIdentityProvisioningResult(
+        mode="provider_staff",
+        membership_id=provider_membership.pk,
+        role_id=provider_role.pk,
+    )
+
+
+def _requested_role_names(
+    *,
+    command: ExternalIdentityProvisioningCommand,
+    customer_id: int,
+    provider_id: int | None,
+) -> tuple[tuple[int, str], ...]:
+    if provider_id is not None:
+        intent = command.provider_staff
+        if intent is None:
+            _reject("Identity provisioning provider intent is missing.")
+        return ((provider_id, intent.role_name),)
+    names = [(customer_id, command.customer_role_name)]
+    if command.customer_role_name in PRIVILEGED_ROLE_NAMES and not getattr(
+        settings, "ITAMBOX_SSO_AUTOCREATE_PRIVILEGED_ROLES", True
+    ):
+        names.append((customer_id, "Member"))
+    return tuple(names)
+
+
+def _provision_customer(
+    *,
+    command: ExternalIdentityProvisioningCommand,
+    customer_id: int,
+    locked_user: User,
+    memberships: dict[int, Membership],
+    aggregate: _AggregateLocks,
+) -> ExternalIdentityProvisioningResult:
+    source = command.profile.source
+    role = _resolve_customer_role(
+        tenant_id=customer_id,
+        requested_name=command.customer_role_name,
+        source=source,
+        locked_roles=aggregate.roles,
+    )
+    upn, email, first_name, last_name = _profile_values(command, locked_user)
+    candidates = _holder_candidates(
+        user_id=locked_user.pk,
+        tenant_id=customer_id,
+        upn=upn,
+        email=email,
+    )
+    membership = memberships.get(customer_id)
+    if membership is None:
+        try:
+            with transaction.atomic():
+                membership = Membership._base_manager.create(
+                    user_id=locked_user.pk,
+                    tenant_id=customer_id,
+                    is_active=True,
+                )
+        except IntegrityError:
+            membership = (
+                Membership._base_manager.select_for_update()
+                .filter(
+                    user_id=locked_user.pk,
+                    tenant_id=customer_id,
+                )
+                .first()
+            )
+            if membership is None:
+                raise
+            # A competing Membership writer may also have committed grants.
+            # Refresh the exact child aggregate; never use stale lists.
+            refreshed_grants = _lock_grants({membership.pk})
+            aggregate.grants = refreshed_grants
+            aggregate.roles = _lock_roles(
+                grants=refreshed_grants,
+                role_names=((customer_id, role.name),),
+            )
+            aggregate.scopes = _lock_scopes(refreshed_grants)
+        memberships[customer_id] = membership
+        aggregate.memberships = memberships
+        _stage_checkpoint("customer.membership_created")
+
+    holder = _link_or_create_holder(
+        user=locked_user,
+        tenant_id=customer_id,
+        upn=upn,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        candidates=candidates,
+        source=source,
+    )
+    grant = _reconcile_customer_grants(
+        membership=membership,
+        role=role,
+        grants=aggregate.grants,
+        scopes=aggregate.scopes,
+        source=source,
+    )
+    return ExternalIdentityProvisioningResult(
+        mode="customer",
+        holder_id=holder.pk if holder is not None else None,
+        membership_id=membership.pk,
+        role_id=grant.role_id,
+    )
+
+
+class OrganizationIdentityProvisioner(IdentityProvisioner):
+    """The sole interactive organization aggregate writer."""
+
+    def provision(self, command: ExternalIdentityProvisioningCommand) -> ExternalIdentityProvisioningResult:
+        with transaction.atomic():
+            customer_id, provider_id, tenant_rows = _validate_command_tenants(command)
+            customer_row = tenant_rows[customer_id]
+            locked_user = _lock_user(command.user)
+            _stage_checkpoint("locks.user")
+            membership_ids = _membership_tenant_ids(
+                customer_row=customer_row,
+                provider_intent=provider_id is not None,
+            )
+            memberships = _lock_memberships(locked_user.pk, membership_ids)
+
+            if provider_id is None:
+                sticky = _active_provider_membership(customer_row=customer_row, memberships=memberships)
+                if sticky is not None:
+                    return ExternalIdentityProvisioningResult(mode="provider_staff", membership_id=sticky.pk)
+
+            role_names = _requested_role_names(
+                command=command,
+                customer_id=customer_id,
+                provider_id=provider_id,
+            )
+            aggregate = _lock_aggregate(
+                memberships=memberships,
+                customer_tenant_id=customer_id,
+                role_names=role_names,
+                provider_transition=provider_id is not None,
+            )
+            if provider_id is not None:
+                return _provider_transition(
+                    command=command,
+                    customer_id=customer_id,
+                    provider_id=provider_id,
+                    rows=tenant_rows,
+                    aggregate=aggregate,
+                    locked_user=locked_user,
+                )
+            return _provision_customer(
+                command=command,
+                customer_id=customer_id,
+                locked_user=locked_user,
+                memberships=memberships,
+                aggregate=aggregate,
+            )
+
+
+def _get_or_create_directory_role(tenant_id: int) -> Role:
+    role = _find_role(tenant_id, "Member")
+    if role is not None:
+        return role
+    try:
+        with transaction.atomic():
+            role = Role._base_manager.create(
+                tenant_id=tenant_id,
+                name="Member",
+                description="Default Standard Member",
+                permissions=list(LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST),
+            )
+    except IntegrityError:
+        role = _find_role(tenant_id, "Member", lock=True)
+        if role is None:
+            raise
+        return role
+    _stage_checkpoint("ldap.role_created")
+    return role
+
+
+def _ensure_directory_grant(
+    *,
+    membership: Membership,
+    role: Role,
+    existing_grants: list[RoleGrant],
+    existing_scopes: list[RoleGrantScope],
+) -> RoleGrant | None:
+    now = timezone.now()
+    owned = [
+        grant
+        for grant in existing_grants
+        if grant.membership_id == membership.pk
+        and grant.role_id == role.pk
+        and grant.reason == LDAP_DIRECTORY_SYNC_REASON
+        and grant.granted_by_id is None
+    ]
+    if len(owned) > 1:
+        return None
+
+    scopes_by_grant = _scopes_by_grant(existing_scopes)
+    if owned:
+        grant = owned[0]
+        desired_until = now + LDAP_DIRECTORY_SYNC_PRIVILEGED_TTL if role_is_privileged(role) else None
+        changed = grant.valid_until != desired_until
+        if changed:
+            grant.valid_until = desired_until
+            grant.save(update_fields=["valid_until"])
+        if not any(scope.scope_type == RoleGrantScope.SCOPE_OWN for scope in scopes_by_grant.get(grant.pk, ())):
+            _ensure_own_scope(grant, existing_scopes=existing_scopes)
+        _stage_checkpoint("ldap.grant_refreshed")
+        return grant
+
+    active_equivalent = next(
+        (
+            grant
+            for grant in existing_grants
+            if grant.membership_id == membership.pk
+            and grant.role_id == role.pk
+            and any(scope.scope_type == RoleGrantScope.SCOPE_OWN for scope in scopes_by_grant.get(grant.pk, ()))
+            and (grant.valid_until is None or grant.valid_until > now)
+        ),
+        None,
+    )
+    if active_equivalent is not None:
+        return active_equivalent
+
+    desired_until = now + LDAP_DIRECTORY_SYNC_PRIVILEGED_TTL if role_is_privileged(role) else None
+    try:
+        with transaction.atomic():
+            grant = RoleGrant._base_manager.create(
+                membership_id=membership.pk,
+                role_id=role.pk,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                valid_until=desired_until,
+                granted_by_id=None,
+            )
+    except IntegrityError:
+        exact = (
+            RoleGrant._base_manager.select_for_update().filter(pk__in=[grant.pk for grant in existing_grants]).first()
+        )
+        if exact is None:
+            raise
+        return exact
+    _ensure_own_scope(grant, existing_scopes=existing_scopes)
+    _stage_checkpoint("ldap.grant_created")
+    return grant
+
+
+def provision_ldap_directory_identity(command: LDAPDirectoryIdentityCommand) -> None:
+    """Persist the fixed LDAP directory-sync Member contract.
+
+    This API is intentionally separate from the interactive port: it never
+    creates or links an AssetHolder and it never consumes the interactive SSO
+    permission catalog.
+    """
+
+    tenant_id = getattr(command.tenant, "pk", None)
+    user_id = getattr(command.user, "pk", None)
+    if not isinstance(tenant_id, int) or not isinstance(user_id, int):
+        _reject("LDAP directory synchronization requires existing rows.")
+
+    with transaction.atomic():
+        _lock_live_tenants({tenant_id})
+        locked_user = _lock_user(command.user)
+        memberships = _lock_memberships(locked_user.pk, {tenant_id})
+        existing_membership = memberships.get(tenant_id)
+        role = _get_or_create_directory_role(tenant_id)
+        aggregate = _lock_aggregate(
+            memberships=memberships,
+            customer_tenant_id=tenant_id,
+            role_names=((tenant_id, "Member"),),
+            provider_transition=False,
+        )
+        if existing_membership is None:
+            try:
+                with transaction.atomic():
+                    existing_membership = Membership._base_manager.create(
+                        user_id=locked_user.pk,
+                        tenant_id=int(tenant_id),
+                        is_active=True,
+                    )
+            except IntegrityError:
+                existing_membership = (
+                    Membership._base_manager.select_for_update()
+                    .filter(
+                        user_id=locked_user.pk,
+                        tenant_id=int(tenant_id),
+                    )
+                    .first()
+                )
+                if existing_membership is None:
+                    raise
+            _stage_checkpoint("ldap.membership_created")
+        _ensure_directory_grant(
+            membership=existing_membership,
+            role=role,
+            existing_grants=aggregate.grants,
+            existing_scopes=aggregate.scopes,
+        )
+
+
+organization_identity_provisioner: IdentityProvisioner = OrganizationIdentityProvisioner()
+
+
+_ALLOWED_LOG_FIELDS = frozenset(
+    {
+        "source",
+        "reason_code",
+        "user_id",
+        "customer_tenant_id",
+        "provider_tenant_id",
+        "tenant_id",
+        "role_id",
+        "holder_id",
+        "membership_id",
+        "exception_type",
+    }
+)
+
+
+def _log(reason_code: str, **fields: Any) -> None:
+    safe = {key: value for key, value in fields.items() if key in _ALLOWED_LOG_FIELDS}
+    safe["reason_code"] = reason_code
+    logger.warning("identity provisioning event", extra=safe)
+
+
+__all__ = [
+    "IdentityProvisioningError",
+    "OrganizationIdentityProvisioner",
+    "organization_identity_provisioner",
+    "LDAPDirectoryIdentityCommand",
+    "provision_ldap_directory_identity",
+    "LDAP_DIRECTORY_SYNC_REASON",
+    "LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST",
+    "LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS",
+]
