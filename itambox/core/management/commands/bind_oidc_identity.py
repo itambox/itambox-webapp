@@ -1,5 +1,4 @@
 from django.apps import apps
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError, connection, transaction
@@ -9,15 +8,13 @@ from core.auth.oidc import (
     _acquire_oidc_identity_lock,
     _set_oidc_transaction_timeouts,
 )
-from core.auth.providers import _resolve_oidc_setting, is_usable_oidc_config
+from core.auth.providers import _config_mapping, _resolve_oidc_setting, is_usable_oidc_config
 from core.oidc_identity import oidc_sensitive_audit, validate_oidc_identity
 from core.tasks.context import TaskContext
 
 
 def configured_oidc_issuers() -> set[str]:
-    tenant_configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
-    if not isinstance(tenant_configs, dict):
-        tenant_configs = {}
+    tenant_configs = _config_mapping("ITAMBOX_TENANT_OIDC_CONFIGS")
 
     TenantModel = apps.get_model("organization", "Tenant")
     live_slugs = set(
@@ -34,7 +31,7 @@ def configured_oidc_issuers() -> set[str]:
         if isinstance(value, str) and value:
             issuers.add(value)
 
-    if not tenant_configs and is_usable_oidc_config({}):
+    if is_usable_oidc_config({}):
         value = _resolve_oidc_setting({}, "OIDC_OP_ISSUER")
         if isinstance(value, str) and value:
             issuers.add(value)

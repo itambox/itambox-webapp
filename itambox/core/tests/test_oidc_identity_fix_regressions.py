@@ -18,6 +18,16 @@ from extras.models import Event
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from users.models import OIDCIdentity, User
 
+GLOBAL_OIDC_SETTINGS = {
+    "OIDC_OP_ISSUER": "https://global.example/issuer",
+    "OIDC_RP_CLIENT_ID": "global-client",
+    "OIDC_RP_CLIENT_SECRET": "global-secret",
+    "OIDC_OP_AUTHORIZATION_ENDPOINT": "https://global.example/authorize",
+    "OIDC_OP_TOKEN_ENDPOINT": "https://global.example/token",
+    "OIDC_OP_USER_ENDPOINT": "https://global.example/userinfo",
+    "OIDC_OP_JWKS_ENDPOINT": "https://global.example/jwks",
+}
+
 
 class OIDCIdentityAuditRegressionTests(TestCase):
     def setUp(self):
@@ -246,10 +256,13 @@ class OIDCIdentityIssuerPrecedenceRegressionTests(TestCase):
                 "OIDC_OP_JWKS_ENDPOINT": "https://idp.example/jwks",
             }
         },
-        OIDC_OP_ISSUER="https://global.example/issuer",
+        **GLOBAL_OIDC_SETTINGS,
     )
-    def test_command_accepts_only_effective_runtime_issuer(self):
-        self.assertEqual(Command._configured_issuers(), {"https://upper.example/issuer"})
+    def test_command_accepts_effective_tenant_and_global_but_not_lower_precedence_issuer(self):
+        self.assertEqual(
+            Command._configured_issuers(),
+            {"https://upper.example/issuer", "https://global.example/issuer"},
+        )
 
 
 COMPAT_CONFIG = {

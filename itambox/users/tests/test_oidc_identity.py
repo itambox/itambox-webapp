@@ -8,6 +8,7 @@ from django.db import IntegrityError
 from django.test import TestCase, override_settings
 
 from core.auth.oidc import TenantOIDCBackend
+from core.management.commands.bind_oidc_identity import Command
 from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.oidc_identity import (
@@ -39,6 +40,15 @@ OIDC_SETTINGS = {
         "OIDC_OP_USER_ENDPOINT": "https://idp.example/userinfo-beta",
         "OIDC_OP_JWKS_ENDPOINT": "https://idp.example/jwks-beta",
     },
+}
+GLOBAL_OIDC_SETTINGS = {
+    "OIDC_OP_ISSUER": "https://global.example/issuer",
+    "OIDC_RP_CLIENT_ID": "global-client",
+    "OIDC_RP_CLIENT_SECRET": "global-secret",
+    "OIDC_OP_AUTHORIZATION_ENDPOINT": "https://global.example/authorize",
+    "OIDC_OP_TOKEN_ENDPOINT": "https://global.example/token",
+    "OIDC_OP_USER_ENDPOINT": "https://global.example/userinfo",
+    "OIDC_OP_JWKS_ENDPOINT": "https://global.example/jwks",
 }
 
 
@@ -182,10 +192,7 @@ class OIDCIdentityModelTests(TestCase):
         )
 
 
-@override_settings(
-    ITAMBOX_TENANT_OIDC_CONFIGS=OIDC_SETTINGS,
-    OIDC_OP_ISSUER="https://global.example/issuer",
-)
+@override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=OIDC_SETTINGS, **GLOBAL_OIDC_SETTINGS)
 class OIDCIdentityCommandTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -220,10 +227,11 @@ class OIDCIdentityCommandTests(TestCase):
         for secret in (issuer, subject, self.user.email, self.user.username):
             self.assertNotIn(secret, output)
 
-    def test_effective_configured_issuer_set_accepts_only_live_tenant_values(self):
+    def test_effective_configured_issuer_set_accepts_live_tenant_and_global_values(self):
         for issuer, subject in (
             ("https://idp.example/issuer", "tenant-subject"),
             ("https://idp.example/issuer-beta", "tenant-subject-beta"),
+            ("https://global.example/issuer", "global-subject"),
         ):
             with self.subTest(issuer=issuer):
                 self.call_bind(
@@ -237,17 +245,81 @@ class OIDCIdentityCommandTests(TestCase):
                     "--operator",
                     str(self.operator.pk),
                 )
-        with self.assertRaises(CommandError):
-            self.call_bind(
+        self.assertEqual(OIDCIdentity.objects.count(), 3)
+
+    def test_usable_global_is_accepted_when_only_non_string_tenant_keys_exist(self):
+        with self.settings(
+            ITAMBOX_TENANT_OIDC_CONFIGS={42: OIDC_SETTINGS["tenant-alpha"]},
+            **GLOBAL_OIDC_SETTINGS,
+        ):
+            output = self.call_bind(
                 "--user",
                 str(self.user.pk),
                 "--issuer",
                 "https://global.example/issuer",
                 "--subject",
-                "global-subject",
+                "global-malformed-map-subject",
                 "--confirm",
             )
-        self.assertEqual(OIDCIdentity.objects.count(), 2)
+
+        self.assertIn("Created", output)
+        self.assertEqual(OIDCIdentity.objects.count(), 1)
+
+    def test_both_issuer_spellings_use_only_runtime_effective_first_value(self):
+        configs = {
+            "tenant-alpha": {
+                **OIDC_SETTINGS["tenant-alpha"],
+                "OIDC_OP_ISSUER": "https://upper.example/issuer",
+                "oidc_op_issuer": "https://lower.example/issuer",
+            }
+        }
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs, **GLOBAL_OIDC_SETTINGS):
+            issuers = Command._configured_issuers()
+
+        self.assertEqual(issuers, {"https://upper.example/issuer", "https://global.example/issuer"})
+
+    def test_disabled_ghost_and_incomplete_tenant_configs_are_not_issuer_sources(self):
+        Tenant.objects.create(name="Disabled", slug="tenant-disabled")
+        Tenant.objects.create(name="Incomplete", slug="tenant-incomplete")
+        configs = {
+            "tenant-alpha": OIDC_SETTINGS["tenant-alpha"],
+            "tenant-disabled": {
+                **OIDC_SETTINGS["tenant-alpha"],
+                "OIDC_OP_ISSUER": "https://disabled.example/issuer",
+                "enabled": False,
+            },
+            "tenant-incomplete": {
+                **OIDC_SETTINGS["tenant-alpha"],
+                "OIDC_OP_ISSUER": "https://incomplete.example/issuer",
+                "OIDC_OP_TOKEN_ENDPOINT": "",
+            },
+            "tenant-ghost": {
+                **OIDC_SETTINGS["tenant-alpha"],
+                "OIDC_OP_ISSUER": "https://ghost.example/issuer",
+            },
+        }
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs, **GLOBAL_OIDC_SETTINGS):
+            issuers = Command._configured_issuers()
+
+        self.assertEqual(issuers, {"https://idp.example/issuer", "https://global.example/issuer"})
+
+    def test_unusable_global_is_not_an_issuer_source(self):
+        unusable_global = {**GLOBAL_OIDC_SETTINGS, "OIDC_OP_ISSUER": ""}
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=OIDC_SETTINGS, **unusable_global):
+            issuers = Command._configured_issuers()
+            with self.assertRaises(CommandError):
+                self.call_bind(
+                    "--user",
+                    str(self.user.pk),
+                    "--issuer",
+                    "https://global.example/issuer",
+                    "--subject",
+                    "unusable-global-subject",
+                    "--dry-run",
+                )
+
+        self.assertEqual(issuers, {"https://idp.example/issuer", "https://idp.example/issuer-beta"})
+        self.assertEqual(OIDCIdentity.objects.count(), 0)
 
     def test_unknown_or_normalized_issuer_is_rejected_without_write(self):
         for issuer in (
