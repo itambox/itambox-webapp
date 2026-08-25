@@ -3,6 +3,7 @@ import hmac
 import ipaddress
 import secrets
 import uuid
+from typing import Callable, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -17,6 +18,13 @@ from django.utils.translation import gettext_lazy as _
 from core.managers import AllObjectsManager, SoftDeleteManager, TenantScopingAllObjectsManager
 from core.mixins import AutoSlugMixin, SoftDeleteMixin
 from core.models import ChangeLoggingMixin, StandardModel
+from core.oidc_identity import (
+    OIDC_ISSUER_MAX_LENGTH,
+    OIDC_SUBJECT_MAX_LENGTH,
+    validate_oidc_identity,
+    validate_oidc_issuer,
+    validate_oidc_subject,
+)
 
 
 def token_peppers():
@@ -90,6 +98,45 @@ class User(AbstractUser):
     # email-based account-linking takeover. Inline onboarding therefore resolves
     # identity at the write path (users.services): it reuses a single match, fails
     # closed on an ambiguous email, and never silently merges accounts.
+
+
+class OIDCIdentity(ChangeLoggingMixin, models.Model):
+    """The exact verified OIDC principal binding owned by the users domain."""
+
+    # The external identity key is credential-like. It is intentionally absent
+    # from ObjectChange snapshots; the binding itself remains auditable through
+    # its global row and sanitized object representation.
+    _change_logging_excluded_fields = ["issuer", "subject"]
+    changelog_global = True
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="oidc_identities",
+    )
+    issuer = models.CharField(
+        max_length=OIDC_ISSUER_MAX_LENGTH,
+        validators=[cast(Callable[[object], None], validate_oidc_issuer)],
+    )
+    subject = models.CharField(
+        max_length=OIDC_SUBJECT_MAX_LENGTH,
+        validators=[cast(Callable[[object], None], validate_oidc_subject)],
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["issuer", "subject"],
+                name="users_oidcidentity_unique_issuer_subject",
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        validate_oidc_identity(self.issuer, self.subject)
+
+    def __str__(self) -> str:
+        return f"OIDC identity binding for User #{self.user_id}"
 
 
 class UserPreference(models.Model):

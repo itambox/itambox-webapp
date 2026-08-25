@@ -6,7 +6,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCBackend, TenantOIDCCallbackView
+from core.auth.oidc import (
+    TenantOIDCBackend,
+    VerifiedOIDCIdentity,
+)
 from core.managers import get_current_tenant, set_current_tenant
 from organization.models import (
     AssetHolder,
@@ -17,7 +20,7 @@ from organization.models import (
     Tenant,
 )
 from organization.rbac import accessible_tenant_ids, effective_permissions
-from users.models import GroupMembership, UserGroup
+from users.models import GroupMembership, OIDCIdentity, UserGroup
 
 User = get_user_model()
 
@@ -54,6 +57,29 @@ class TenantOIDCTestCase(TestCase):
 
     def tearDown(self):
         set_current_tenant(None)
+
+    def resolve_verified(self, backend, claims, existing_user=None):
+        claims = dict(claims)
+        tenant = get_current_tenant()
+        issuer = TEST_OIDC_CONFIGS[tenant.slug]["OIDC_OP_ISSUER"]
+        subject = claims.get("sub")
+        if not subject and existing_user is not None:
+            subject = (
+                OIDCIdentity.objects.filter(user=existing_user, issuer=issuer).values_list("subject", flat=True).first()
+            )
+        subject = subject or claims.get("email") or "explicit-test-subject"
+        claims["sub"] = subject
+        identity = VerifiedOIDCIdentity(issuer=issuer, subject=subject)
+        if (
+            existing_user is not None
+            and not OIDCIdentity.objects.filter(
+                user=existing_user,
+                issuer=issuer,
+                subject=subject,
+            ).exists()
+        ):
+            OIDCIdentity.objects.create(user=existing_user, issuer=issuer, subject=subject)
+        return backend._resolve_verified_identity(identity, claims)
 
     def test_settings_routing(self):
         backend = TenantOIDCBackend()
@@ -104,15 +130,15 @@ class TenantOIDCTestCase(TestCase):
         }
 
         # Create User
-        user = backend.create_user(claims)
+        user = self.resolve_verified(backend, claims)
         self.assertEqual(user.email, "user1@alpha.com")
         self.assertEqual(user.first_name, "Alice")
         self.assertEqual(user.last_name, "Smith")
 
-        # Unique suffix test: create another user with same base username
-        user2 = backend.create_user(claims)
-        self.assertNotEqual(user.username, user2.username)
-        self.assertTrue(user2.username.startswith(user.username))
+        # The verified identity, not the mutable email/username claims, is authoritative.
+        user2 = self.resolve_verified(backend, claims)
+        self.assertEqual(user.pk, user2.pk)
+        self.assertEqual(User.objects.count(), 1)
 
         # Update User
         update_claims = {
@@ -120,7 +146,7 @@ class TenantOIDCTestCase(TestCase):
             "given_name": "Alice-Updated",
             "family_name": "Smith-Updated",
         }
-        updated_user = backend.update_user(user, update_claims)
+        updated_user = self.resolve_verified(backend, update_claims, existing_user=user)
         self.assertEqual(updated_user.email, "user1-updated@alpha.com")
         self.assertEqual(updated_user.first_name, "Alice-Updated")
         self.assertEqual(updated_user.last_name, "Smith-Updated")
@@ -136,13 +162,13 @@ class TenantOIDCTestCase(TestCase):
 
         claims_a = {"email": "pre@alpha.com", "sub": "sub-a", "given_name": "Pre", "family_name": "Existing"}
 
-        user_a = backend.create_user(claims_a)
+        user_a = self.resolve_verified(backend, claims_a)
         existing_holder.refresh_from_db()
         self.assertEqual(existing_holder.user, user_a)
 
         # Scenario B: No existing AssetHolder (auto-provisions a new one)
         claims_b = {"email": "new@alpha.com", "sub": "sub-b", "given_name": "New", "family_name": "User"}
-        user_b = backend.create_user(claims_b)
+        user_b = self.resolve_verified(backend, claims_b)
         new_holder = AssetHolder.objects.get(user=user_b, tenant=self.tenant_alpha)
         self.assertEqual(new_holder.email, "new@alpha.com")
         self.assertEqual(new_holder.upn, "new@alpha.com")
@@ -153,7 +179,7 @@ class TenantOIDCTestCase(TestCase):
 
         # Setup OIDC claims mapping to Admin
         claims_admin = {"email": "admin@alpha.com", "sub": "sub-admin", "groups": ["alpha-admins", "alpha-members"]}
-        user_admin = backend.create_user(claims_admin)
+        user_admin = self.resolve_verified(backend, claims_admin)
 
         membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
         self.assertEqual(membership_admin.role_grants.first().role.name, "Admin")
@@ -164,7 +190,7 @@ class TenantOIDCTestCase(TestCase):
 
         # Setup OIDC claims mapping to Manager (lower priority than Admin, higher than Member)
         claims_manager = {"email": "manager@alpha.com", "sub": "sub-mgr", "groups": ["alpha-managers", "alpha-members"]}
-        user_mgr = backend.create_user(claims_manager)
+        user_mgr = self.resolve_verified(backend, claims_manager)
 
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
         self.assertEqual(membership_mgr.role_grants.first().role.name, "Manager")
@@ -175,7 +201,7 @@ class TenantOIDCTestCase(TestCase):
 
         # Fallback to Member
         claims_fallback = {"email": "member@alpha.com", "sub": "sub-mem", "groups": ["unknown-group"]}
-        user_mem = backend.create_user(claims_fallback)
+        user_mem = self.resolve_verified(backend, claims_fallback)
 
         membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
         self.assertEqual(membership_mem.role_grants.first().role.name, "Member")
@@ -210,12 +236,13 @@ class TenantOIDCTestCase(TestCase):
 
         set_current_tenant(self.tenant_alpha)
         with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
-            user = TenantOIDCBackend().create_user(
+            user = self.resolve_verified(
+                TenantOIDCBackend(),
                 {
                     "email": "provider-tech@example.com",
                     "sub": "provider-tech",
                     "groups": ["provider-technicians"],
-                }
+                },
             )
 
         provider_membership = Membership.objects.get(user=user)
@@ -342,13 +369,14 @@ class TenantOIDCTestCase(TestCase):
 
         set_current_tenant(self.tenant_alpha)
         with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
-            updated = TenantOIDCBackend().update_user(
-                user,
+            updated = self.resolve_verified(
+                TenantOIDCBackend(),
                 {
                     "email": user.email,
                     "sub": "transition-tech",
                     "groups": ["provider-technicians"],
                 },
+                existing_user=user,
             )
 
         self.assertEqual(updated, user)
@@ -457,13 +485,14 @@ class TenantOIDCTestCase(TestCase):
 
         set_current_tenant(self.tenant_alpha)
         with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
-            TenantOIDCBackend().update_user(
-                user,
+            self.resolve_verified(
+                TenantOIDCBackend(),
                 {
                     "email": user.email,
                     "sub": "retained-customer",
                     "groups": ["provider-technicians"],
                 },
+                existing_user=user,
             )
 
         customer_membership.refresh_from_db()
@@ -531,13 +560,14 @@ class TenantOIDCTestCase(TestCase):
                 side_effect=RuntimeError("holder unlink failed"),
             ):
                 with self.assertRaisesRegex(RuntimeError, "holder unlink failed"):
-                    TenantOIDCBackend().update_user(
-                        user,
+                    self.resolve_verified(
+                        TenantOIDCBackend(),
                         {
                             "email": user.email,
                             "sub": "atomic-transition-tech",
                             "groups": ["provider-technicians"],
                         },
+                        existing_user=user,
                     )
 
         provider_membership.refresh_from_db()
@@ -573,12 +603,13 @@ class TenantOIDCTestCase(TestCase):
 
         set_current_tenant(self.tenant_alpha)
         with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
-            user = TenantOIDCBackend().create_user(
+            user = self.resolve_verified(
+                TenantOIDCBackend(),
                 {
                     "email": "unresolved-provider-tech@example.com",
                     "sub": "unresolved-provider-tech",
                     "groups": ["provider-technicians"],
-                }
+                },
             )
 
         self.assertFalse(Membership.objects.filter(user=user).exists())
@@ -609,12 +640,13 @@ class TenantOIDCTestCase(TestCase):
 
         set_current_tenant(self.tenant_alpha)
         with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
-            user = TenantOIDCBackend().create_user(
+            user = self.resolve_verified(
+                TenantOIDCBackend(),
                 {
                     "email": "customer-user@example.com",
                     "sub": "customer-user",
                     "groups": ["customer-users"],
-                }
+                },
             )
 
         customer_membership = Membership.objects.get(user=user)
@@ -688,17 +720,17 @@ class TenantOIDCTestCase(TestCase):
         set_current_tenant(self.tenant_alpha)
 
         claims_admin = {"email": "admin-ci@alpha.com", "sub": "sub-admin-ci", "groups": ["alpha-admins"]}
-        user_admin = backend.create_user(claims_admin)
+        user_admin = self.resolve_verified(backend, claims_admin)
         membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
         self.assertEqual(membership_admin.role_grants.first().role.name, "Admin")
 
         claims_mgr = {"email": "mgr-ci@alpha.com", "sub": "sub-mgr-ci", "groups": ["alpha-managers"]}
-        user_mgr = backend.create_user(claims_mgr)
+        user_mgr = self.resolve_verified(backend, claims_mgr)
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
         self.assertEqual(membership_mgr.role_grants.first().role.name, "Manager")
 
         claims_mem = {"email": "mem-ci@alpha.com", "sub": "sub-mem-ci", "groups": ["alpha-members"]}
-        user_mem = backend.create_user(claims_mem)
+        user_mem = self.resolve_verified(backend, claims_mem)
         membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
         self.assertEqual(membership_mem.role_grants.first().role.name, "Member")
 
@@ -739,7 +771,7 @@ class TenantOIDCTestCase(TestCase):
 
         # This should log warning and continue without raising IntegrityError/crashing
         with self.assertLogs("core.auth.oidc", level="WARNING") as cm:
-            user_b = backend.create_user(claims_b)
+            user_b = self.resolve_verified(backend, claims_b)
             self.assertIsNotNone(user_b)
             # Check that warning was logged
             log_output = "".join(cm.output)
@@ -761,7 +793,7 @@ class TenantOIDCTestCase(TestCase):
             "family_name": "User",
             "groups": ["alpha-members"],
         }
-        user = backend.create_user(claims)
+        user = self.resolve_verified(backend, claims)
 
         # Verify the user has a profile in tenant-alpha
         self.assertEqual(user.asset_holder_profiles.filter(tenant=self.tenant_alpha).first().tenant, self.tenant_alpha)
@@ -777,7 +809,7 @@ class TenantOIDCTestCase(TestCase):
         }
 
         # Should update / sync user and membership without crashing, creating a new profile
-        updated_user = backend.update_user(user, beta_claims)
+        updated_user = self.resolve_verified(backend, beta_claims, existing_user=user)
         self.assertEqual(updated_user, user)
 
         # Verify membership and profile were created for tenant-beta
@@ -794,7 +826,7 @@ class TenantOIDCTestCase(TestCase):
             "given_name": "Only",
             "family_name": "Sub",
         }
-        user_only_sub = backend.create_user(claims_only_sub)
+        user_only_sub = self.resolve_verified(backend, claims_only_sub)
         self.assertIsNotNone(user_only_sub)
         self.assertEqual(user_only_sub.username, "only-sub-123")
         self.assertEqual(user_only_sub.email, "")
@@ -811,7 +843,7 @@ class TenantOIDCTestCase(TestCase):
             "given_name": "Empty",
             "family_name": "Email",
         }
-        user_empty_email = backend.create_user(claims_empty_email)
+        user_empty_email = self.resolve_verified(backend, claims_empty_email)
         self.assertIsNotNone(user_empty_email)
         self.assertEqual(user_empty_email.email, "")
 
@@ -825,18 +857,18 @@ class TenantOIDCTestCase(TestCase):
             "sub": "no-groups-sub",
             "email": "nogroups@alpha.com",
         }
-        user_no_groups = backend.create_user(claims_no_groups)
+        user_no_groups = self.resolve_verified(backend, claims_no_groups)
         membership_no_groups = Membership.objects.get(user=user_no_groups, tenant=self.tenant_alpha)
         self.assertEqual(membership_no_groups.role_grants.first().role.name, "Member")  # Fallback to Member
 
         # Case D: malformed 'groups' claim (e.g. not a list or string, like a dict or integer)
         claims_dict_groups = {"sub": "dict-groups-sub", "email": "dictgroups@alpha.com", "groups": {"some": "dict"}}
-        user_dict_groups = backend.create_user(claims_dict_groups)
+        user_dict_groups = self.resolve_verified(backend, claims_dict_groups)
         membership_dict_groups = Membership.objects.get(user=user_dict_groups, tenant=self.tenant_alpha)
         self.assertEqual(membership_dict_groups.role_grants.first().role.name, "Member")  # Fallback to Member
 
         claims_int_groups = {"sub": "int-groups-sub", "email": "intgroups@alpha.com", "groups": 12345}
-        user_int_groups = backend.create_user(claims_int_groups)
+        user_int_groups = self.resolve_verified(backend, claims_int_groups)
         membership_int_groups = Membership.objects.get(user=user_int_groups, tenant=self.tenant_alpha)
         self.assertEqual(membership_int_groups.role_grants.first().role.name, "Member")  # Fallback to Member
 
@@ -845,14 +877,15 @@ class TenantOIDCTestCase(TestCase):
 
         # User A in Tenant Alpha has UPN "coll@test.com"
         set_current_tenant(self.tenant_alpha)
-        user_a = backend.create_user(
+        user_a = self.resolve_verified(
+            backend,
             {
                 "email": "usera@alpha.com",
                 "sub": "sub-usera",
                 "upn": "coll@test.com",
                 "given_name": "User",
                 "family_name": "A",
-            }
+            },
         )
         self.assertEqual(user_a.asset_holder_profiles.filter(tenant=self.tenant_alpha).first().upn, "coll@test.com")
         self.assertEqual(
@@ -863,14 +896,15 @@ class TenantOIDCTestCase(TestCase):
         # Since UPN has a unique constraint per tenant, this must fail at AssetHolder creation
         # but User B should still log in successfully (without AssetHolder profile)
         with self.assertLogs("core.auth.oidc", level="WARNING") as cm:
-            user_b = backend.create_user(
+            user_b = self.resolve_verified(
+                backend,
                 {
                     "email": "userb@alpha.com",
                     "sub": "sub-userb",
                     "upn": "coll@test.com",
                     "given_name": "User",
                     "family_name": "B",
-                }
+                },
             )
             self.assertIsNotNone(user_b)
             self.assertTrue(any("IntegrityError while creating AssetHolder" in line for line in cm.output))
@@ -884,8 +918,8 @@ class TenantOIDCTestCase(TestCase):
         # A user already has a linked profile in Tenant Alpha. They now log into Tenant Beta.
         # It should succeed and create a new profile in Tenant Beta.
         set_current_tenant(self.tenant_beta)
-        updated_user_a = backend.update_user(
-            user_a,
+        updated_user_a = self.resolve_verified(
+            backend,
             {
                 "email": "usera@alpha.com",
                 "sub": "sub-usera",
@@ -894,6 +928,7 @@ class TenantOIDCTestCase(TestCase):
                 "family_name": "A",
                 "groups": ["beta-users"],
             },
+            existing_user=user_a,
         )
         self.assertEqual(updated_user_a, user_a)
 
@@ -914,7 +949,7 @@ class TenantOIDCTestCase(TestCase):
             "sub": "sub-multi-group",
             "groups": ["alpha-members", "alpha-admins", "alpha-managers"],
         }
-        user = backend.create_user(claims)
+        user = self.resolve_verified(backend, claims)
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
         self.assertEqual(membership.role_grants.first().role.name, "Admin")
 
@@ -925,7 +960,7 @@ class TenantOIDCTestCase(TestCase):
             "sub": "sub-multi-group-mgr",
             "groups": ["alpha-members", "alpha-managers"],
         }
-        user_mgr = backend.create_user(claims_mgr)
+        user_mgr = self.resolve_verified(backend, claims_mgr)
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
         self.assertEqual(membership_mgr.role_grants.first().role.name, "Manager")
 
@@ -937,7 +972,7 @@ class TenantOIDCTestCase(TestCase):
         # Since group lookup is case-sensitive, it won't match "alpha-admins",
         # and will fall back to Member
         claims = {"email": "caps-group@alpha.com", "sub": "sub-caps-group", "groups": ["ALPHA-ADMINS"]}
-        user = backend.create_user(claims)
+        user = self.resolve_verified(backend, claims)
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
         self.assertEqual(membership.role_grants.first().role.name, "Member")
 

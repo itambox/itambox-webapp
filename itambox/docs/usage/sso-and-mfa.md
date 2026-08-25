@@ -613,3 +613,4 @@ tenant's SAML config. Only do this after a security review.
 - [Users](../models/users/user.md) — user account model and `can_login` flag
 - [API Tokens & SCIM](api-tokens-and-scim.md) — API authentication and user provisioning
 - [Installation Guide](../operations/installation.md) — deployment and environment setup
+- [Updating a deployment](../operations/upgrades.md) — OIDC binding migration and rollback disclosure

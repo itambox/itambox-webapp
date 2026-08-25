@@ -42,6 +42,7 @@ from core.mixins import (
     SoftDeleteMixin,
     TaggableMixin,
 )
+from core.oidc_identity import oidc_audit_excluded_fields, oidc_audit_object_repr
 from core.serialization import serialize_object
 from core.validators import validate_file_attachment, validate_image_attachment
 
@@ -243,8 +244,15 @@ _user_validation_cache = contextvars.ContextVar("user_validation_cache", default
 
 
 def write_object_change(
-    *, instance, action, user, request_id, change_tenant, prechange_data=None, postchange_data=None
-):
+    *,
+    instance: object,
+    action: str,
+    user: object | None,
+    request_id: object,
+    change_tenant: object | None,
+    prechange_data: dict[str, object] | None = None,
+    postchange_data: dict[str, object] | None = None,
+) -> object:
     """Create the ``ObjectChange`` audit row for a logged change.
 
     Single source of truth for the audit-row payload shape, shared by
@@ -262,7 +270,12 @@ def write_object_change(
         action=action,
         changed_object_type=ct,
         changed_object_id=instance.pk,
-        object_repr=str(instance)[:200],
+        object_repr=oidc_audit_object_repr(
+            instance=instance,
+            app_label=ct.app_label,
+            model=ct.model,
+            default=str(instance)[:200],
+        ),
         object_type_repr=f"{ct.app_label} | {ct.model}",
         prechange_data=prechange_data,
         postchange_data=postchange_data,
@@ -292,8 +305,14 @@ class ChangeLoggingMixin:
         self._prechange_snapshot = None
         super().__init__(*args, **kwargs)
 
+    def _serialize_for_change(self, instance):
+        return serialize_object(
+            instance,
+            exclude_fields=oidc_audit_excluded_fields(self._change_logging_excluded_fields),
+        )
+
     def snapshot(self):
-        self._prechange_snapshot = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        self._prechange_snapshot = self._serialize_for_change(self)
 
     def _log_change(self, action, prechange_data=None, postchange_data=None, message="", user=None):
         # ``user`` overrides the acting user for this row (e.g. an explicit actor
@@ -394,10 +413,10 @@ class ChangeLoggingMixin:
         target_ids = sorted({getattr(v, "pk", v) for v in (new_values or [])})
         if target_ids == current_ids:
             return False
-        prechange = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        prechange = self._serialize_for_change(self)
         prechange[field_name] = current_ids
         getattr(self, field_name).set(list(new_values or []))
-        postchange = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        postchange = self._serialize_for_change(self)
         postchange[field_name] = target_ids
         self._log_change(
             action=ObjectChangeActionChoices.ACTION_UPDATE,
@@ -424,16 +443,14 @@ class ChangeLoggingMixin:
                 # filters would hide the row from the default manager.
                 original_instance = self.__class__._base_manager.filter(pk=self.pk).first()
                 if original_instance is not None:
-                    prechange_data = serialize_object(
-                        original_instance, exclude_fields=self._change_logging_excluded_fields
-                    )
+                    prechange_data = self._serialize_for_change(original_instance)
 
         super().save(*args, **kwargs)
 
         action = self._changelog_action or (
             ObjectChangeActionChoices.ACTION_CREATE if is_creation else ObjectChangeActionChoices.ACTION_UPDATE
         )
-        postchange_data = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        postchange_data = self._serialize_for_change(self)
 
         if action == ObjectChangeActionChoices.ACTION_UPDATE and prechange_data == postchange_data:
             return
@@ -476,7 +493,7 @@ class ChangeLoggingMixin:
         if self._prechange_snapshot is not None:
             prechange_data = self._prechange_snapshot
         else:
-            prechange_data = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+            prechange_data = self._serialize_for_change(self)
         action = self._changelog_action or ObjectChangeActionChoices.ACTION_DELETE
 
         self._log_change(action=action, prechange_data=prechange_data, message=self._changelog_message)

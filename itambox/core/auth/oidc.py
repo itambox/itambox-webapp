@@ -1,9 +1,12 @@
 import logging
+from dataclasses import dataclass
+from typing import Protocol
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
-from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
+from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation, ValidationError
 from django.db import IntegrityError, models, transaction
 from django.http import Http404
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
@@ -13,8 +16,18 @@ from mozilla_django_oidc.views import OIDCAuthenticationCallbackView, OIDCAuthen
 from core.auth.providers import is_usable_oidc_config
 from core.auth.provisioning import provision_membership, provision_provider_membership
 from core.context import get_current_request_id, get_current_user
-from core.errors import IntegrationAuthenticationError, IntegrationConfigurationError, IntegrationContext
+from core.errors import (
+    FailureDisposition,
+    IntegrationAuthenticationError,
+    IntegrationConfigurationError,
+    IntegrationContext,
+)
 from core.managers import get_current_tenant, set_current_tenant
+from core.oidc_identity import (
+    oidc_advisory_lock_parts,
+    oidc_sensitive_audit,
+    validate_oidc_identity,
+)
 from organization.models import Tenant
 
 logger = logging.getLogger(__name__)
@@ -33,6 +46,55 @@ class OIDCTokenValidationError(IntegrationAuthenticationError, SuspiciousOperati
 class OIDCTokenConfigurationError(IntegrationConfigurationError, SuspiciousOperation):
     code = "oidc.token_configuration"
     user_message = "OIDC token validation is not configured securely."
+
+
+class OIDCIdentityBindingRequiredError(IntegrationAuthenticationError, SuspiciousOperation):
+    code = "oidc.identity_binding_required"
+    user_message = "OIDC identity requires an explicit operator binding."
+
+
+class OIDCIdentityProvisioningError(IntegrationAuthenticationError, SuspiciousOperation):
+    code = "oidc.identity_provisioning"
+    disposition = FailureDisposition.RETRYABLE
+    user_message = "OIDC identity provisioning could not be completed."
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedOIDCIdentity:
+    issuer: str
+    subject: str
+
+
+class VerifiedOIDCResolver(Protocol):
+    def _resolve_identity_phase_a(
+        self, identity: VerifiedOIDCIdentity, claims: dict[str, object]
+    ) -> tuple[int, int] | None:
+        """Resolve or create the canonical binding in phase A."""
+
+    def _finish_identity_phase_b(
+        self,
+        binding_id: int,
+        expected_user_id: int,
+        claims: dict[str, object],
+    ) -> object:
+        """Finish profile and Organization provisioning in phase B."""
+
+
+def resolve_verified_oidc_identity(
+    resolver: VerifiedOIDCResolver,
+    identity: VerifiedOIDCIdentity,
+    claims: dict[str, object],
+) -> object | None:
+    resolved = resolver._resolve_identity_phase_a(identity, claims)
+    if resolved is None:
+        return None
+    binding_id, user_id = resolved
+    return resolver._finish_identity_phase_b(binding_id, user_id, claims)
+
+
+OIDC_LOCK_TIMEOUT = "2000ms"
+OIDC_STATEMENT_TIMEOUT = "10000ms"
+MAX_USERNAME_ALLOCATION_ATTEMPTS = 1000
 
 
 def _oidc_context(operation):
@@ -68,6 +130,49 @@ def _raise_token_configuration_error():
         extra=log_extra,
     )
     raise error
+
+
+def _identity_error(error_type, operation, *, user_id=None, binding_id=None, exception_type=None):
+    error = error_type(context=_oidc_context(operation))
+    log_extra = error.log_extra(
+        object_id=str(binding_id or user_id) if binding_id or user_id else None,
+        exception_type=exception_type,
+    )
+    logger.warning("OIDC identity operation failed", extra=log_extra)
+    return error
+
+
+def _raise_identity_error(error_type, operation, *, user_id=None, binding_id=None, exception_type=None):
+    raise _identity_error(
+        error_type,
+        operation,
+        user_id=user_id,
+        binding_id=binding_id,
+        exception_type=exception_type,
+    ) from None
+
+
+def _raise_claims_validation_error():
+    _raise_identity_error(OIDCTokenValidationError, "claims.verify")
+
+
+def _set_oidc_transaction_timeouts(cursor: object) -> None:
+    if transaction.get_connection().vendor != "postgresql":
+        raise RuntimeError("OIDC identity binding requires PostgreSQL.")
+    cursor.execute("SET LOCAL lock_timeout = %s", [OIDC_LOCK_TIMEOUT])
+    cursor.execute("SET LOCAL statement_timeout = %s", [OIDC_STATEMENT_TIMEOUT])
+
+
+def _acquire_oidc_identity_lock(cursor: object, identity: VerifiedOIDCIdentity) -> None:
+    lock_parts = oidc_advisory_lock_parts(identity.issuer, identity.subject)
+    cursor.execute(
+        "SELECT pg_advisory_xact_lock(%s::integer, %s::integer)",
+        lock_parts,
+    )
+
+
+def _oidc_identity_model():
+    return apps.get_model("users", "OIDCIdentity")
 
 
 def _usable_tenant_oidc_config(tenant):
@@ -177,6 +282,10 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
             _raise_token_configuration_error()
         if payload.get("iss") != expected_iss:
             _raise_token_validation_error()
+        try:
+            validate_oidc_identity(payload.get("iss"), payload.get("sub"))
+        except ValidationError:
+            _raise_token_validation_error()
 
         return payload
 
@@ -200,59 +309,200 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
             return None
         return user
 
-    def filter_users_by_claims(self, claims):
+    def get_or_create_user(self, access_token: object, id_token: object, payload: object) -> object | None:
+        """Resolve one canonical User from the verified ID-token identity."""
+        identity = self._verified_identity(payload)
+        user_info = self.get_userinfo(access_token, id_token, payload)
+        if not isinstance(user_info, dict) or not self.verify_claims(user_info):
+            _raise_claims_validation_error()
+        self._validate_userinfo_identity(user_info, identity)
+
+        try:
+            return resolve_verified_oidc_identity(self, identity, user_info)
+        except SuspiciousOperation:
+            raise
+        # broad except: boundary-isolation: adapter errors are not enumerable; raise a safe typed failure
+        except Exception as exc:
+            raise _identity_error(
+                OIDCIdentityProvisioningError,
+                "identity.provision",
+                exception_type=type(exc).__name__,
+            ) from None
+
+    def _verified_identity(self, payload):
+        if not isinstance(payload, dict):
+            _raise_token_validation_error()
+        try:
+            issuer, subject = validate_oidc_identity(payload.get("iss"), payload.get("sub"))
+        except ValidationError:
+            _raise_token_validation_error()
+
+        expected_issuer = self.get_settings("OIDC_OP_ISSUER", None)
+        if not expected_issuer:
+            _raise_token_configuration_error()
+        if issuer != expected_issuer:
+            _raise_token_validation_error()
+        return VerifiedOIDCIdentity(issuer=issuer, subject=subject)
+
+    def _validate_userinfo_identity(self, user_info, identity):
+        if "iss" in user_info and user_info["iss"] != identity.issuer:
+            _raise_token_validation_error()
+        if "sub" in user_info and user_info["sub"] != identity.subject:
+            _raise_token_validation_error()
+
+    def _select_identity_binding(self, identity, *, for_update=False):
+        IdentityModel = _oidc_identity_model()
+        queryset = IdentityModel._base_manager.select_related("user")
+        if for_update:
+            queryset = queryset.select_for_update(of=("self",))
+        return queryset.filter(issuer=identity.issuer, subject=identity.subject).first()
+
+    def _resolve_identity_phase_a(self, identity, user_info):
+        with oidc_sensitive_audit():
+            with transaction.atomic():
+                with transaction.get_connection().cursor() as cursor:
+                    _set_oidc_transaction_timeouts(cursor)
+                    _acquire_oidc_identity_lock(cursor, identity)
+
+                binding = self._select_identity_binding(identity, for_update=True)
+                if binding is not None:
+                    return binding.pk, binding.user_id
+
+                if self._former_oidc_candidates(user_info).exists():
+                    _raise_identity_error(
+                        OIDCIdentityBindingRequiredError,
+                        "identity.legacy_candidate",
+                    )
+
+                if not self.get_settings("OIDC_CREATE_USER", True):
+                    return None
+
+                return self._create_user_and_binding(identity, user_info)
+
+    def _former_oidc_candidates(self, claims):
         email = claims.get("email")
-        if email:
-            users = self.UserModel.objects.filter(email__iexact=email)
+        if isinstance(email, str) and email:
+            users = self.UserModel._base_manager.filter(email__iexact=email)
             if users.exists():
                 return users
 
-        username = self.get_username(claims)
-        if username:
-            return self.UserModel.objects.filter(username=username)
+        username = email or claims.get("sub") or "oidc_user"
+        if not isinstance(username, str) or not username:
+            username = "oidc_user"
+        return self.UserModel._base_manager.filter(username=username)
 
-        return self.UserModel.objects.none()
+    def _username_candidates(self, claims):
+        base_username = self.get_username(claims)
+        if not isinstance(base_username, str) or not base_username:
+            base_username = "oidc_user"
+        max_length = self.UserModel._meta.get_field("username").max_length or 150
+        base_username = base_username[:max_length]
+        yield base_username
+        for counter in range(1, MAX_USERNAME_ALLOCATION_ATTEMPTS):
+            suffix = f"_{counter}"
+            yield f"{base_username[: max_length - len(suffix)]}{suffix}"
+
+    def _create_user_and_binding(self, identity, claims):
+        IdentityModel = _oidc_identity_model()
+        email = self._claim_text(claims, "email")
+        first_name = self._claim_text(claims, "given_name", "first_name")
+        last_name = self._claim_text(claims, "family_name", "last_name")
+
+        for username in self._username_candidates(claims):
+            try:
+                with transaction.atomic():
+                    with oidc_sensitive_audit():
+                        user = self.UserModel.objects.create_user(
+                            username=username,
+                            email=email,
+                            first_name=first_name,
+                            last_name=last_name,
+                        )
+                        binding = IdentityModel.objects.create(
+                            user=user,
+                            issuer=identity.issuer,
+                            subject=identity.subject,
+                        )
+                return binding.pk, user.pk
+            except IntegrityError:
+                binding = self._select_identity_binding(identity, for_update=True)
+                if binding is not None:
+                    return binding.pk, binding.user_id
+                if self.UserModel._base_manager.filter(username=username).exists():
+                    continue
+                _raise_identity_error(
+                    OIDCIdentityProvisioningError,
+                    "identity.create",
+                    exception_type="IntegrityError",
+                )
+
+        _raise_identity_error(OIDCIdentityProvisioningError, "identity.username_allocation")
+
+    def _finish_identity_phase_b(self, binding_id, expected_user_id, claims):
+        with oidc_sensitive_audit():
+            with transaction.atomic():
+                with transaction.get_connection().cursor() as cursor:
+                    _set_oidc_transaction_timeouts(cursor)
+
+                IdentityModel = _oidc_identity_model()
+                binding = IdentityModel._base_manager.select_for_update(of=("self",)).filter(pk=binding_id).first()
+                if binding is None or binding.user_id != expected_user_id:
+                    _raise_identity_error(
+                        OIDCIdentityProvisioningError,
+                        "identity.binding_changed",
+                        user_id=expected_user_id,
+                        binding_id=binding_id,
+                    )
+
+                user = self.UserModel._base_manager.select_for_update().get(pk=binding.user_id)
+                self._update_user_profile(user, claims)
+                self.sync_user_profile_and_memberships(user, claims)
+                return user
+
+    @staticmethod
+    def _claim_text(claims, *names):
+        for name in names:
+            value = claims.get(name)
+            if isinstance(value, str) and value:
+                return value
+        return ""
+
+    def _resolve_verified_identity(self, identity: VerifiedOIDCIdentity, claims: dict[str, object]) -> object | None:
+        """Resolve and provision only after the caller supplies verified identity data."""
+        return resolve_verified_oidc_identity(self, identity, claims)
+
+    def filter_users_by_claims(self, claims):
+        _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
 
     def get_username(self, claims):
         email = claims.get("email")
         sub = claims.get("sub")
-        username = email or sub or "oidc_user"
-        return username
+        return email or sub or "oidc_user"
 
     def create_user(self, claims):
-        email = claims.get("email")
-        base_username = self.get_username(claims)
+        _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
 
-        username = base_username
-        counter = 1
-        while self.UserModel.objects.filter(username=username).exists():
-            username = f"{base_username}_{counter}"
-            counter += 1
+    def _update_user_profile(self, user, claims):
+        update_fields = []
+        email = self._claim_text(claims, "email")
+        first_name = self._claim_text(claims, "given_name", "first_name")
+        last_name = self._claim_text(claims, "family_name", "last_name")
 
-        first_name = claims.get("given_name") or claims.get("first_name", "")
-        last_name = claims.get("family_name") or claims.get("last_name", "")
-
-        user = self.UserModel.objects.create_user(
-            username=username, email=email, first_name=first_name, last_name=last_name
-        )
-        self.sync_user_profile_and_memberships(user, claims)
+        if email and user.email != email:
+            user.email = email
+            update_fields.append("email")
+        if first_name and user.first_name != first_name:
+            user.first_name = first_name
+            update_fields.append("first_name")
+        if last_name and user.last_name != last_name:
+            user.last_name = last_name
+            update_fields.append("last_name")
+        if update_fields:
+            user.save(update_fields=update_fields)
         return user
 
     def update_user(self, user, claims):
-        email = claims.get("email")
-        first_name = claims.get("given_name") or claims.get("first_name", "")
-        last_name = claims.get("family_name") or claims.get("last_name", "")
-
-        if email:
-            user.email = email
-        if first_name:
-            user.first_name = first_name
-        if last_name:
-            user.last_name = last_name
-        user.save()
-
-        self.sync_user_profile_and_memberships(user, claims)
-        return user
+        _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
 
     def sync_user_profile_and_memberships(self, user, claims):
         tenant = get_current_tenant()
@@ -336,8 +586,19 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                 try:
                     with transaction.atomic():
                         holder.save()
-                except IntegrityError as e:
-                    logger.warning(f"IntegrityError while saving AssetHolder: {e}")
+                except IntegrityError:
+                    logger.warning(
+                        "IntegrityError while saving AssetHolder",
+                        extra={
+                            "integration": {
+                                "provider": "oidc",
+                                "operation": "organization.holder_link",
+                                "tenant_id": tenant.pk,
+                                "actor_id": user.pk,
+                                "error_code": "holder_collision",
+                            }
+                        },
+                    )
                     holder = None
             elif not holder or (holder and holder.user != user):
                 first_name = claims.get("given_name") or claims.get("first_name") or user.first_name or "OIDC"
@@ -353,8 +614,19 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                             email=email,
                             tenant=tenant,
                         )
-                except IntegrityError as e:
-                    logger.warning(f"IntegrityError while creating AssetHolder: {e}")
+                except IntegrityError:
+                    logger.warning(
+                        "IntegrityError while creating AssetHolder",
+                        extra={
+                            "integration": {
+                                "provider": "oidc",
+                                "operation": "organization.holder_create",
+                                "tenant_id": tenant.pk,
+                                "actor_id": user.pk,
+                                "error_code": "holder_collision",
+                            }
+                        },
+                    )
                     holder = None
 
         # 2. Membership & Role Syncing

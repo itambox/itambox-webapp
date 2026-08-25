@@ -239,5 +239,25 @@ class RetentionVocabularyPolicyTest(unittest.TestCase):
         self.assertIn("event stream is retained indefinitely by default", documented)
 
 
+class OIDCBindingRolloutDocumentationPolicyTest(unittest.TestCase):
+    """The irreversible OIDC binding rollout contract remains operator-visible."""
+
+    def test_oidc_binding_rollout_discloses_backfill_fail_closed_and_rollback_loss(self):
+        upgrades = (DOCS_ROOT / "operations" / "upgrades.md").read_text(encoding="utf-8")
+        required = (
+            "no automatic backfill",
+            "legacy logins fail closed",
+            "users.0103_oidcidentity",
+            "permanently drops every binding",
+            "email/username claim resolution behavior is reopened",
+        )
+        for phrase in required:
+            self.assertIn(phrase, upgrades)
+
+    def test_sso_document_links_the_binding_rollout_runbook(self):
+        sso = (DOCS_ROOT / "usage" / "sso-and-mfa.md").read_text(encoding="utf-8")
+        self.assertIn("../operations/upgrades.md", sso)
+
+
 if __name__ == "__main__":
     unittest.main()
