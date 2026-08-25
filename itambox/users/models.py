@@ -3,6 +3,7 @@ import hmac
 import ipaddress
 import secrets
 import uuid
+from typing import Callable, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -115,11 +116,11 @@ class OIDCIdentity(ChangeLoggingMixin, models.Model):
     )
     issuer = models.CharField(
         max_length=OIDC_ISSUER_MAX_LENGTH,
-        validators=[validate_oidc_issuer],
+        validators=[cast(Callable[[object], None], validate_oidc_issuer)],
     )
     subject = models.CharField(
         max_length=OIDC_SUBJECT_MAX_LENGTH,
-        validators=[validate_oidc_subject],
+        validators=[cast(Callable[[object], None], validate_oidc_subject)],
     )
 
     class Meta:
@@ -130,11 +131,11 @@ class OIDCIdentity(ChangeLoggingMixin, models.Model):
             ),
         ]
 
-    def clean(self):
+    def clean(self) -> None:
         super().clean()
         validate_oidc_identity(self.issuer, self.subject)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"OIDC identity binding for User #{self.user_id}"
 
 

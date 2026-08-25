@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 48,
-  "policy_sha256": "dfe4eb619953dcd4bbe96a7a4620ddc271c0550034e90b2f8b798de102981f33",
+  "next_sequence": 54,
+  "policy_sha256": "fb0d7dee2420798a72777076e80e3b1d948626920041b9b0a0f08b48153c7228",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -53,6 +53,21 @@
       ]
     },
     {
+      "sequence": 49,
+      "path": "itambox/core/auth/oidc.py",
+      "module": "core.auth.oidc",
+      "issue": "#454",
+      "note": "Issue #454 admission: typed verified identity value object, resolver protocol, canonical Phase-A/Phase-B handoff, and parameterized PostgreSQL timeout/lock boundaries.",
+      "scope": "symbols",
+      "symbols": [
+        "VerifiedOIDCIdentity",
+        "VerifiedOIDCResolver",
+        "_acquire_oidc_identity_lock",
+        "_set_oidc_transaction_timeouts",
+        "resolve_verified_oidc_identity"
+      ]
+    },
+    {
       "sequence": 2,
       "path": "itambox/core/context.py",
       "module": "core.context",
@@ -62,6 +77,38 @@
       "symbols": [
         "SystemAuthorizationContext"
       ]
+    },
+    {
+      "sequence": 50,
+      "path": "itambox/core/management/commands/bind_oidc_identity.py",
+      "module": "core.management.commands.bind_oidc_identity",
+      "issue": "#454",
+      "note": "Issue #454 admission: configured issuer resolution and strict operator identity input boundary.",
+      "scope": "symbols",
+      "symbols": [
+        "configured_oidc_issuers",
+        "validate_oidc_identity_input"
+      ]
+    },
+    {
+      "sequence": 53,
+      "path": "itambox/core/models.py",
+      "module": "core.models",
+      "issue": "#454",
+      "note": "Issue #454 admission: shared ObjectChange writer preserves truthful actor and tenant semantics while applying scoped representation redaction.",
+      "scope": "symbols",
+      "symbols": [
+        "write_object_change"
+      ]
+    },
+    {
+      "sequence": 48,
+      "path": "itambox/core/oidc_identity.py",
+      "module": "core.oidc_identity",
+      "issue": "#454",
+      "note": "Issue #454 admission: whole identity validation, lock framing, context-safe audit redaction, and profile audit payload module.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 44,
@@ -669,6 +716,30 @@
         "_SCIMGroupResource",
         "_SCIMMembershipResource",
         "_SCIMUserResource"
+      ]
+    },
+    {
+      "sequence": 51,
+      "path": "itambox/users/models.py",
+      "module": "users.models",
+      "issue": "#454",
+      "note": "Issue #454 admission: users-owned OIDCIdentity model validation, global binding semantics, and sanitized representation.",
+      "scope": "symbols",
+      "symbols": [
+        "OIDCIdentity"
+      ]
+    },
+    {
+      "sequence": 52,
+      "path": "itambox/users/signals.py",
+      "module": "users.signals",
+      "issue": "#454",
+      "note": "Issue #454 admission: User audit snapshot and redacted OIDC profile-event signal boundaries.",
+      "scope": "symbols",
+      "symbols": [
+        "user_post_delete",
+        "user_post_save",
+        "user_pre_save"
       ]
     }
   ],

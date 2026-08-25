@@ -34,6 +34,19 @@ OIDC_AUDIT_EXCLUDED_FIELDS = frozenset(
     }
 )
 
+# These representations can contain a user name or profile claims through their
+# own fields or through a related object's __str__. Other OIDC-touched rows keep
+# their normal representation so unrelated audit semantics remain intact.
+OIDC_AUDIT_GENERIC_REPR_MODELS = frozenset(
+    {
+        ("users", "user"),
+        ("organization", "assetholder"),
+        ("organization", "membership"),
+        ("organization", "rolegrant"),
+        ("organization", "rolegrantscope"),
+    }
+)
+
 _oidc_sensitive_audit = ContextVar("oidc_sensitive_audit", default=False)
 
 
@@ -75,12 +88,6 @@ def oidc_advisory_lock_parts(issuer: str, subject: str) -> tuple[int, int]:
     )
 
 
-def oidc_advisory_lock_key(issuer: str, subject: str) -> int:
-    """Return the signed 64-bit form retained for helper compatibility."""
-
-    return int.from_bytes(oidc_identity_digest(issuer, subject)[:8], byteorder="big", signed=True)
-
-
 def oidc_audit_excluded_fields(fields: list[str] | tuple[str, ...]) -> list[str]:
     excluded = list(fields)
     if not oidc_sensitive_audit_enabled():
@@ -89,6 +96,19 @@ def oidc_audit_excluded_fields(fields: list[str] | tuple[str, ...]) -> list[str]
         if field not in excluded:
             excluded.append(field)
     return excluded
+
+
+def oidc_audit_object_repr(*, instance: object, app_label: str, model: str, default: str) -> str:
+    if oidc_sensitive_audit_enabled() and (app_label, model) in OIDC_AUDIT_GENERIC_REPR_MODELS:
+        return f"{app_label}.{model} #{getattr(instance, 'pk', None)}"
+    return default
+
+
+def oidc_profile_audit_payload(changed_fields: list[str] | tuple[str, ...]) -> dict[str, object]:
+    return {
+        "reason_code": "oidc_profile_sync",
+        "changed_fields": sorted(set(changed_fields)),
+    }
 
 
 def oidc_sensitive_audit_enabled() -> bool:

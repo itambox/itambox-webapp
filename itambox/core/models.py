@@ -42,7 +42,7 @@ from core.mixins import (
     SoftDeleteMixin,
     TaggableMixin,
 )
-from core.oidc_identity import oidc_audit_excluded_fields, oidc_sensitive_audit_enabled
+from core.oidc_identity import oidc_audit_excluded_fields, oidc_audit_object_repr
 from core.serialization import serialize_object
 from core.validators import validate_file_attachment, validate_image_attachment
 
@@ -244,8 +244,15 @@ _user_validation_cache = contextvars.ContextVar("user_validation_cache", default
 
 
 def write_object_change(
-    *, instance, action, user, request_id, change_tenant, prechange_data=None, postchange_data=None
-):
+    *,
+    instance: object,
+    action: str,
+    user: object | None,
+    request_id: object,
+    change_tenant: object | None,
+    prechange_data: dict[str, object] | None = None,
+    postchange_data: dict[str, object] | None = None,
+) -> object:
     """Create the ``ObjectChange`` audit row for a logged change.
 
     Single source of truth for the audit-row payload shape, shared by
@@ -257,14 +264,17 @@ def write_object_change(
     ct = ContentType.objects.get_for_model(instance.__class__)
     return ObjectChange._base_manager.create(
         tenant=change_tenant,
-        user=None if oidc_sensitive_audit_enabled() else user,
-        user_name="System" if oidc_sensitive_audit_enabled() else (user.username if user else "System"),
+        user=user,
+        user_name=user.username if user else "System",
         request_id=request_id,
         action=action,
         changed_object_type=ct,
         changed_object_id=instance.pk,
-        object_repr=(
-            f"{ct.app_label}.{ct.model} #{instance.pk}" if oidc_sensitive_audit_enabled() else str(instance)[:200]
+        object_repr=oidc_audit_object_repr(
+            instance=instance,
+            app_label=ct.app_label,
+            model=ct.model,
+            default=str(instance)[:200],
         ),
         object_type_repr=f"{ct.app_label} | {ct.model}",
         prechange_data=prechange_data,

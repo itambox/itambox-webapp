@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from typing import Protocol
 
 from django.apps import apps
 from django.conf import settings
@@ -62,6 +63,33 @@ class OIDCIdentityProvisioningError(IntegrationAuthenticationError, SuspiciousOp
 class VerifiedOIDCIdentity:
     issuer: str
     subject: str
+
+
+class VerifiedOIDCResolver(Protocol):
+    def _resolve_identity_phase_a(
+        self, identity: VerifiedOIDCIdentity, claims: dict[str, object]
+    ) -> tuple[int, int] | None:
+        raise NotImplementedError
+
+    def _finish_identity_phase_b(
+        self,
+        binding_id: int,
+        expected_user_id: int,
+        claims: dict[str, object],
+    ) -> object:
+        raise NotImplementedError
+
+
+def resolve_verified_oidc_identity(
+    resolver: VerifiedOIDCResolver,
+    identity: VerifiedOIDCIdentity,
+    claims: dict[str, object],
+) -> object | None:
+    resolved = resolver._resolve_identity_phase_a(identity, claims)
+    if resolved is None:
+        return None
+    binding_id, user_id = resolved
+    return resolver._finish_identity_phase_b(binding_id, user_id, claims)
 
 
 OIDC_LOCK_TIMEOUT = "2000ms"
@@ -128,14 +156,14 @@ def _raise_claims_validation_error():
     _raise_identity_error(OIDCTokenValidationError, "claims.verify")
 
 
-def _set_oidc_transaction_timeouts(cursor):
+def _set_oidc_transaction_timeouts(cursor: object) -> None:
     if transaction.get_connection().vendor != "postgresql":
         raise RuntimeError("OIDC identity binding requires PostgreSQL.")
     cursor.execute("SET LOCAL lock_timeout = %s", [OIDC_LOCK_TIMEOUT])
     cursor.execute("SET LOCAL statement_timeout = %s", [OIDC_STATEMENT_TIMEOUT])
 
 
-def _acquire_oidc_identity_lock(cursor, identity):
+def _acquire_oidc_identity_lock(cursor: object, identity: VerifiedOIDCIdentity) -> None:
     lock_parts = oidc_advisory_lock_parts(identity.issuer, identity.subject)
     cursor.execute(
         "SELECT pg_advisory_xact_lock(%s::integer, %s::integer)",
@@ -281,7 +309,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
             return None
         return user
 
-    def get_or_create_user(self, access_token, id_token, payload):
+    def get_or_create_user(self, access_token: object, id_token: object, payload: object) -> object | None:
         """Resolve one canonical User from the verified ID-token identity."""
         identity = self._verified_identity(payload)
         user_info = self.get_userinfo(access_token, id_token, payload)
@@ -290,32 +318,14 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         self._validate_userinfo_identity(user_info, identity)
 
         try:
-            resolved = self._resolve_identity_phase_a(identity, user_info)
+            return resolve_verified_oidc_identity(self, identity, user_info)
         except SuspiciousOperation:
             raise
         # broad except: boundary-isolation: adapter errors are not enumerable; raise a safe typed failure
         except Exception as exc:
             raise _identity_error(
                 OIDCIdentityProvisioningError,
-                "identity.resolve",
-                exception_type=type(exc).__name__,
-            ) from None
-
-        if resolved is None:
-            return None
-
-        binding_id, user_id = resolved
-        try:
-            return self._finish_identity_phase_b(binding_id, user_id, user_info)
-        except SuspiciousOperation:
-            raise
-        # broad except: boundary-isolation: adapter errors are not enumerable; raise a safe typed failure
-        except Exception as exc:
-            raise _identity_error(
-                OIDCIdentityProvisioningError,
-                "organization.provision",
-                user_id=user_id,
-                binding_id=binding_id,
+                "identity.provision",
                 exception_type=type(exc).__name__,
             ) from None
 
@@ -457,8 +467,12 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                 return value
         return ""
 
+    def _resolve_verified_identity(self, identity: VerifiedOIDCIdentity, claims: dict[str, object]) -> object | None:
+        """Resolve and provision only after the caller supplies verified identity data."""
+        return resolve_verified_oidc_identity(self, identity, claims)
+
     def filter_users_by_claims(self, claims):
-        return self._former_oidc_candidates(claims)
+        _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
 
     def get_username(self, claims):
         email = claims.get("email")
@@ -466,28 +480,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         return email or sub or "oidc_user"
 
     def create_user(self, claims):
-        """Retain the legacy helper for non-lifecycle callers.
-
-        The authenticated OIDC lifecycle never calls this method: it creates
-        the User and OIDCIdentity together in ``_create_user_and_binding``.
-        """
-        email = self._claim_text(claims, "email")
-        first_name = self._claim_text(claims, "given_name", "first_name")
-        last_name = self._claim_text(claims, "family_name", "last_name")
-        with oidc_sensitive_audit():
-            username = next(
-                username
-                for username in self._username_candidates(claims)
-                if not self.UserModel._base_manager.filter(username=username).exists()
-            )
-            user = self.UserModel.objects.create_user(
-                username=username,
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-            )
-            self.sync_user_profile_and_memberships(user, claims)
-        return user
+        _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
 
     def _update_user_profile(self, user, claims):
         update_fields = []
@@ -509,10 +502,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         return user
 
     def update_user(self, user, claims):
-        with oidc_sensitive_audit():
-            self._update_user_profile(user, claims)
-            self.sync_user_profile_and_memberships(user, claims)
-        return user
+        _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
 
     def sync_user_profile_and_memberships(self, user, claims):
         tenant = get_current_tenant()

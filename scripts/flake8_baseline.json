@@ -4710,30 +4710,6 @@
     {
       "path": "itambox/core/tests/test_oidc.py",
       "code": "F401",
-      "message": "'core.auth.oidc.TenantOIDCAuthorizeView' imported but unused",
-      "source": "from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCBackend, TenantOIDCCallbackView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F401",
-      "message": "'core.auth.oidc.TenantOIDCCallbackView' imported but unused",
-      "source": "from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCBackend, TenantOIDCCallbackView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F401",
-      "message": "'core.managers.get_current_tenant' imported but unused",
-      "source": "from core.managers import get_current_tenant, set_current_tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F401",
       "message": "'django.contrib.auth.models.Permission' imported but unused",
       "source": "from django.contrib.auth.models import Permission",
       "context": "Module:body",

@@ -9,8 +9,46 @@ from core.auth.oidc import (
     _acquire_oidc_identity_lock,
     _set_oidc_transaction_timeouts,
 )
+from core.auth.providers import _resolve_oidc_setting, is_usable_oidc_config
 from core.oidc_identity import oidc_sensitive_audit, validate_oidc_identity
 from core.tasks.context import TaskContext
+
+
+def configured_oidc_issuers() -> set[str]:
+    tenant_configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
+    if not isinstance(tenant_configs, dict):
+        tenant_configs = {}
+
+    TenantModel = apps.get_model("organization", "Tenant")
+    live_slugs = set(
+        TenantModel._base_manager.filter(
+            slug__in=[slug for slug in tenant_configs if isinstance(slug, str)],
+            deleted_at__isnull=True,
+        ).values_list("slug", flat=True)
+    )
+    issuers = set()
+    for slug, config in tenant_configs.items():
+        if slug not in live_slugs or not is_usable_oidc_config(config):
+            continue
+        value = _resolve_oidc_setting(config, "OIDC_OP_ISSUER")
+        if isinstance(value, str) and value:
+            issuers.add(value)
+
+    if not tenant_configs and is_usable_oidc_config({}):
+        value = _resolve_oidc_setting({}, "OIDC_OP_ISSUER")
+        if isinstance(value, str) and value:
+            issuers.add(value)
+    return issuers
+
+
+def validate_oidc_identity_input(issuer: object, subject: object) -> tuple[str, str]:
+    try:
+        validated_issuer, validated_subject = validate_oidc_identity(issuer, subject)
+    except ValidationError:
+        raise CommandError("The OIDC identity input is invalid.") from None
+    if validated_issuer not in configured_oidc_issuers():
+        raise CommandError("The OIDC issuer is not configured.")
+    return validated_issuer, validated_subject
 
 
 class Command(BaseCommand):
@@ -55,30 +93,11 @@ class Command(BaseCommand):
         )
 
     @staticmethod
-    def _configured_issuers():
-        issuers = set()
-        tenant_configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
-        if isinstance(tenant_configs, dict):
-            for config in tenant_configs.values():
-                if not isinstance(config, dict):
-                    continue
-                for key in ("OIDC_OP_ISSUER", "oidc_op_issuer"):
-                    value = config.get(key)
-                    if isinstance(value, str) and value:
-                        issuers.add(value)
-
-        global_issuer = getattr(settings, "OIDC_OP_ISSUER", None)
-        if isinstance(global_issuer, str) and global_issuer:
-            issuers.add(global_issuer)
-        return issuers
+    def _configured_issuers() -> set[str]:
+        return configured_oidc_issuers()
 
     def _validate_input(self, issuer, subject):
-        try:
-            validate_oidc_identity(issuer, subject)
-        except ValidationError:
-            raise CommandError("The OIDC identity input is invalid.") from None
-        if issuer not in self._configured_issuers():
-            raise CommandError("The OIDC issuer is not configured.")
+        validate_oidc_identity_input(issuer, subject)
 
     @staticmethod
     def _identity_model():

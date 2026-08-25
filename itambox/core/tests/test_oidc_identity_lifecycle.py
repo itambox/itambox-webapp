@@ -10,7 +10,9 @@ from core.auth.oidc import (
     TenantOIDCBackend,
 )
 from core.managers import set_current_tenant
-from organization.models import AssetHolder, Membership, RoleGrant, RoleGrantScope, Tenant
+from core.models import ObjectChange
+from extras.models import Event
+from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from users.models import OIDCIdentity, User
 
 ISSUER = "https://idp.example/issuer"
@@ -273,6 +275,17 @@ class TenantOIDCProviderCompatibilityTests(TestCase):
                 "OIDC_GROUP_PROVIDER_ROLE_MAPPING": {"provider-staff": "Missing role"},
             },
         }
+        before = {
+            "users": User.objects.count(),
+            "bindings": OIDCIdentity.objects.count(),
+            "holders": AssetHolder.objects.count(),
+            "memberships": Membership.objects.count(),
+            "roles": Role.objects.count(),
+            "grants": RoleGrant.objects.count(),
+            "scopes": RoleGrantScope.objects.count(),
+            "changes": ObjectChange.objects.count(),
+            "events": Event.objects.count(),
+        }
         with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
             with (
                 patch.object(backend, "get_userinfo", return_value=claims),
@@ -294,6 +307,15 @@ class TenantOIDCProviderCompatibilityTests(TestCase):
         self.assertFalse(AssetHolder.objects.filter(user=user).exists())
         self.assertFalse(RoleGrant.objects.filter(membership__user=user).exists())
         self.assertFalse(RoleGrantScope.objects.filter(role_grant__membership__user=user).exists())
+        self.assertEqual(User.objects.count(), before["users"] + 1)
+        self.assertEqual(OIDCIdentity.objects.count(), before["bindings"] + 1)
+        self.assertEqual(AssetHolder.objects.count(), before["holders"])
+        self.assertEqual(Membership.objects.count(), before["memberships"])
+        self.assertEqual(Role.objects.count(), before["roles"])
+        self.assertEqual(RoleGrant.objects.count(), before["grants"])
+        self.assertEqual(RoleGrantScope.objects.count(), before["scopes"])
+        self.assertEqual(ObjectChange.objects.count(), before["changes"])
+        self.assertEqual(Event.objects.count(), before["events"])
 
 
 class OIDCIdentityLogContractTests(TransactionTestCase):

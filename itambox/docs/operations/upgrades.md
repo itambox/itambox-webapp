@@ -7,6 +7,52 @@ behavior must also pass the isolated [Recovery qualification drill](recovery-dri
 That runbook proves predecessor restore, candidate upgrade, fresh-install schema
 parity, restore-first rollback, and re-upgrade without exposing protected values.
 
+## OIDC identity binding migration (#454)
+
+The OIDC `(issuer, subject)` binding migration creates schema only. It performs no automatic backfill and never guesses a binding from email, username, UPN, tenant,
+or an existing AssetHolder. Existing OIDC users therefore require an explicit
+`bind_oidc_identity` operation before they can use the new login path. Until that
+binding exists, legacy logins fail closed; they do not silently fall back to the
+predecessor resolver.
+
+### Forward deployment order
+
+1. Export and protect any operator-approved binding plan separately from the
+   database backup. Do not derive one automatically from mutable claims.
+2. Apply the candidate schema migration (`users.0103_oidcidentity`) while the
+   predecessor application is still stopped or controlled. The predecessor does
+   not use the new table.
+3. Deploy the candidate application code only after the schema migration has
+   completed successfully.
+4. Validate the exact configured issuer and subject, then run the explicit
+   `bind_oidc_identity --confirm` command for each approved User. Use `--dry-run`
+   first and keep the command output sanitized.
+5. Admit OIDC traffic only after the required bindings and a login verification
+   have been completed. Unbound legacy users continue to fail closed.
+
+### Rollback and irreversible data loss
+
+Reversing `users.0103_oidcidentity` permanently drops every binding created after
+this migration. Reverse does not restore, reconstruct, or preserve those rows;
+export them first if they must be recreated. A database backup is the preferred
+rollback source. Without an export or backup, all bindings must be manually
+recreated through the explicit command after a later forward deployment.
+
+If a schema reverse is unavoidable, stop writers, roll back the application code
+to the predecessor first, verify that no candidate code can query
+`users_oidcidentity`, and only then reverse the migration. Never leave candidate
+code running against a database in which the binding table has already been
+dropped. A schema reverse while candidate code is active causes missing-table
+failures; a code rollback before schema reverse leaves the table unused but
+available for recovery.
+
+The predecessor code is not a security-equivalent rollback: once it is serving,
+its email/username claim resolution behavior is reopened. That can relink a
+login through mutable claims and is the security consequence of rolling back the
+binding code. Treat this as a temporary security regression, keep OIDC traffic
+blocked unless explicitly accepted, and redeploy the binding code/schema in the
+forward order above as soon as possible.
+
 ## Preflight
 
 1. Select and review an exact target commit.

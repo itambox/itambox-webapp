@@ -1014,7 +1014,11 @@ class CommittedRecordTests(unittest.TestCase):
             [entry["path"] for entry in self.record["checked"]],
             [
                 "itambox/assets/api/serializers.py",
+                "itambox/core/auth/oidc.py",
                 "itambox/core/context.py",
+                "itambox/core/management/commands/bind_oidc_identity.py",
+                "itambox/core/models.py",
+                "itambox/core/oidc_identity.py",
                 "itambox/core/provider_slot.py",
                 "itambox/core/reports/contracts.py",
                 "itambox/core/reports/orchestration.py",
@@ -1060,6 +1064,8 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/users/api/scim/provider_services.py",
                 "itambox/users/api/scim/provider_views.py",
                 "itambox/users/api/scim/serializers.py",
+                "itambox/users/models.py",
+                "itambox/users/signals.py",
             ],
         )
         self.assertEqual(
@@ -1074,7 +1080,23 @@ class CommittedRecordTests(unittest.TestCase):
                         "StatusLabelSerializer",
                     ],
                 ),
+                "itambox/core/auth/oidc.py": (
+                    "symbols",
+                    [
+                        "VerifiedOIDCIdentity",
+                        "VerifiedOIDCResolver",
+                        "_acquire_oidc_identity_lock",
+                        "_set_oidc_transaction_timeouts",
+                        "resolve_verified_oidc_identity",
+                    ],
+                ),
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
+                "itambox/core/management/commands/bind_oidc_identity.py": (
+                    "symbols",
+                    ["configured_oidc_issuers", "validate_oidc_identity_input"],
+                ),
+                "itambox/core/models.py": ("symbols", ["write_object_change"]),
+                "itambox/core/oidc_identity.py": ("module", []),
                 "itambox/core/provider_slot.py": ("module", []),
                 "itambox/core/reports/contracts.py": (
                     "symbols",
@@ -1344,6 +1366,11 @@ class CommittedRecordTests(unittest.TestCase):
                         "_SCIMMembershipResource",
                         "_SCIMUserResource",
                     ],
+                ),
+                "itambox/users/models.py": ("symbols", ["OIDCIdentity"]),
+                "itambox/users/signals.py": (
+                    "symbols",
+                    ["user_post_delete", "user_post_save", "user_pre_save"],
                 ),
             },
         )

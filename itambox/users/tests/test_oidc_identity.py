@@ -1,10 +1,14 @@
 from io import StringIO
+from unittest.mock import patch
 
 from django.core import management
 from django.core.exceptions import ValidationError
 from django.core.management import CommandError
+from django.db import IntegrityError
 from django.test import TestCase, override_settings
 
+from core.auth.oidc import TenantOIDCBackend
+from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.oidc_identity import (
     OIDC_ISSUER_MAX_LENGTH,
@@ -13,14 +17,27 @@ from core.oidc_identity import (
     oidc_identity_bytes,
 )
 from core.tasks.context import TaskContext
+from organization.models import Tenant
 from users.models import OIDCIdentity, User
 
 OIDC_SETTINGS = {
     "tenant-alpha": {
         "OIDC_OP_ISSUER": "https://idp.example/issuer",
+        "OIDC_RP_CLIENT_ID": "client-alpha",
+        "OIDC_RP_CLIENT_SECRET": "secret-alpha",
+        "OIDC_OP_AUTHORIZATION_ENDPOINT": "https://idp.example/authorize",
+        "OIDC_OP_TOKEN_ENDPOINT": "https://idp.example/token",
+        "OIDC_OP_USER_ENDPOINT": "https://idp.example/userinfo",
+        "OIDC_OP_JWKS_ENDPOINT": "https://idp.example/jwks",
     },
     "tenant-beta": {
         "oidc_op_issuer": "https://idp.example/issuer-beta",
+        "OIDC_RP_CLIENT_ID": "client-beta",
+        "OIDC_RP_CLIENT_SECRET": "secret-beta",
+        "OIDC_OP_AUTHORIZATION_ENDPOINT": "https://idp.example/authorize-beta",
+        "OIDC_OP_TOKEN_ENDPOINT": "https://idp.example/token-beta",
+        "OIDC_OP_USER_ENDPOINT": "https://idp.example/userinfo-beta",
+        "OIDC_OP_JWKS_ENDPOINT": "https://idp.example/jwks-beta",
     },
 }
 
@@ -69,13 +86,12 @@ class OIDCIdentityModelTests(TestCase):
                 self.user.pk,
             )
 
-        with self.assertRaises(Exception) as caught:
+        with self.assertRaises(IntegrityError):
             OIDCIdentity.objects.create(
                 user=self.user,
                 issuer=rows[0][0],
                 subject=rows[0][1],
             )
-        self.assertEqual(caught.exception.__class__.__name__, "IntegrityError")
 
     def test_exact_values_are_stored_without_normalization(self):
         issuer = "HTTPS://IdP.example:443/issuer/"
@@ -178,6 +194,8 @@ class OIDCIdentityCommandTests(TestCase):
         )
         self.other_user = User.objects.create_user(username="command-other")
         self.operator = User.objects.create_user(username="command-operator")
+        self.tenant_alpha = Tenant.objects.create(name="Alpha", slug="tenant-alpha")
+        self.tenant_beta = Tenant.objects.create(name="Beta", slug="tenant-beta")
 
     def call_bind(self, *args):
         output = StringIO()
@@ -202,10 +220,10 @@ class OIDCIdentityCommandTests(TestCase):
         for secret in (issuer, subject, self.user.email, self.user.username):
             self.assertNotIn(secret, output)
 
-    def test_complete_configured_issuer_set_accepts_tenant_and_global_values(self):
+    def test_effective_configured_issuer_set_accepts_only_live_tenant_values(self):
         for issuer, subject in (
-            ("https://idp.example/issuer-beta", "tenant-subject"),
-            ("https://global.example/issuer", "global-subject"),
+            ("https://idp.example/issuer", "tenant-subject"),
+            ("https://idp.example/issuer-beta", "tenant-subject-beta"),
         ):
             with self.subTest(issuer=issuer):
                 self.call_bind(
@@ -219,6 +237,16 @@ class OIDCIdentityCommandTests(TestCase):
                     "--operator",
                     str(self.operator.pk),
                 )
+        with self.assertRaises(CommandError):
+            self.call_bind(
+                "--user",
+                str(self.user.pk),
+                "--issuer",
+                "https://global.example/issuer",
+                "--subject",
+                "global-subject",
+                "--confirm",
+            )
         self.assertEqual(OIDCIdentity.objects.count(), 2)
 
     def test_unknown_or_normalized_issuer_is_rejected_without_write(self):
@@ -263,7 +291,7 @@ class OIDCIdentityCommandTests(TestCase):
             changed_object_type__model="oidcidentity",
             changed_object_id=OIDCIdentity.objects.get(user=self.user).pk,
         ).get()
-        self.assertIsNone(change.user_id)
+        self.assertEqual(change.user_id, self.operator.pk)
         self.assertNotEqual(change.user_id, self.user.pk)
 
     def test_conflicting_user_never_reassigns_binding(self):
@@ -301,3 +329,96 @@ class OIDCIdentityCommandTests(TestCase):
             )
 
         self.assertEqual(OIDCIdentity.objects.filter(user=self.user).count(), 2)
+
+    def test_nonexistent_target_operator_and_malformed_input_fail_before_writes(self):
+        valid = (
+            "--issuer",
+            "https://idp.example/issuer",
+            "--subject",
+            "command-negative-subject",
+            "--confirm",
+        )
+        with self.assertRaises(CommandError):
+            self.call_bind("--user", "999999", *valid)
+        with self.assertRaises(CommandError):
+            self.call_bind("--user", str(self.user.pk), *valid, "--operator", "999999")
+        for subject in ("", "über", "x" * 256):
+            with self.subTest(subject_type=type(subject).__name__, subject_length=len(subject)):
+                with self.assertRaises(CommandError):
+                    self.call_bind(
+                        "--user",
+                        str(self.user.pk),
+                        "--issuer",
+                        "https://idp.example/issuer",
+                        "--subject",
+                        subject,
+                        "--confirm",
+                    )
+        self.assertEqual(OIDCIdentity.objects.count(), 0)
+
+    def test_dry_run_existing_and_conflicting_binding_are_read_only(self):
+        existing = OIDCIdentity.objects.create(
+            user=self.user,
+            issuer="https://idp.example/issuer",
+            subject="existing-dry-run-subject",
+        )
+        output = self.call_bind(
+            "--user",
+            str(self.user.pk),
+            "--issuer",
+            existing.issuer,
+            "--subject",
+            existing.subject,
+            "--dry-run",
+        )
+        self.assertIn("already exists", output)
+        conflicting = OIDCIdentity.objects.create(
+            user=self.other_user,
+            issuer="https://idp.example/issuer",
+            subject="conflicting-dry-run-subject",
+        )
+        with self.assertRaises(CommandError):
+            self.call_bind(
+                "--user",
+                str(self.user.pk),
+                "--issuer",
+                conflicting.issuer,
+                "--subject",
+                conflicting.subject,
+                "--dry-run",
+            )
+        self.assertEqual(OIDCIdentity.objects.count(), 2)
+
+    def test_command_created_binding_authorizes_next_canonical_login(self):
+        subject = "command-to-login-subject"
+        self.call_bind(
+            "--user",
+            str(self.user.pk),
+            "--issuer",
+            "https://idp.example/issuer",
+            "--subject",
+            subject,
+            "--confirm",
+        )
+        set_current_tenant(self.tenant_alpha)
+        backend = TenantOIDCBackend()
+        with (
+            patch.object(
+                backend,
+                "get_userinfo",
+                return_value={
+                    "iss": "https://idp.example/issuer",
+                    "sub": subject,
+                    "email": "changed-after-command@example.test",
+                },
+            ),
+            patch.object(backend, "verify_claims", return_value=True),
+        ):
+            resolved = backend.get_or_create_user(
+                "access-token",
+                "id-token",
+                {"iss": "https://idp.example/issuer", "sub": subject},
+            )
+        set_current_tenant(None)
+        self.assertEqual(resolved.pk, self.user.pk)
+        self.assertEqual(OIDCIdentity.objects.filter(issuer="https://idp.example/issuer", subject=subject).count(), 1)
