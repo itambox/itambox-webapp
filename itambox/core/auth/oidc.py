@@ -5,16 +5,15 @@ from typing import Protocol
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation, ValidationError
-from django.db import IntegrityError, models, transaction
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import import_from_settings
 from mozilla_django_oidc.views import OIDCAuthenticationCallbackView, OIDCAuthenticationRequestView
 
+from core import identity_provisioning, tenant_scope
 from core.auth.providers import is_usable_oidc_config
-from core.auth.provisioning import provision_membership, provision_provider_membership
 from core.context import get_current_request_id, get_current_user
 from core.errors import (
     FailureDisposition,
@@ -28,7 +27,6 @@ from core.oidc_identity import (
     oidc_sensitive_audit,
     validate_oidc_identity,
 )
-from organization.models import Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -188,9 +186,10 @@ def _usable_tenant_oidc_config(tenant):
 
 def _get_usable_oidc_tenant(tenant_slug, session):
     """Resolve a live, configured tenant without falling back to global OIDC."""
+    tenant_model = tenant_scope.tenant_model()
     try:
-        tenant = Tenant.objects.get(slug=tenant_slug)
-    except Tenant.DoesNotExist:
+        tenant = tenant_model._base_manager.get(slug=tenant_slug, deleted_at__isnull=True)
+    except tenant_model.DoesNotExist:
         session.pop("oidc_tenant_slug", None)
         raise Http404(f"Tenant {tenant_slug!r} does not exist.") from None
     if _usable_tenant_oidc_config(tenant) is None:
@@ -454,9 +453,41 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                         binding_id=binding_id,
                     )
 
-                user = self.UserModel._base_manager.select_for_update().get(pk=binding.user_id)
+                # The binding lock is the only adapter-owned row lock in Phase B.
+                # The organization port owns the normative Tenant -> User -> aggregate
+                # lock order; loading User here must remain non-locking.
+                user = self.UserModel._base_manager.get(pk=binding.user_id)
+                if not getattr(user, "can_login", True):
+                    return user
+
+                current_tenant = get_current_tenant()
+                if current_tenant is None:
+                    self._update_user_profile(user, claims)
+                    return user
+
+                tenant_model = tenant_scope.tenant_model()
+                customer_tenant = tenant_model._base_manager.get(pk=current_tenant.pk)
+                groups = self._normalized_groups(claims)
+                provider_tenant = None
+                if customer_tenant.managed_by_id and groups:
+                    provider_tenant = tenant_model._base_manager.get(pk=customer_tenant.managed_by_id)
+
+                command = identity_provisioning.ExternalIdentityProvisioningCommand(
+                    user=user,
+                    customer_tenant=customer_tenant,
+                    profile=self._external_identity_profile(user, claims),
+                    customer_role_name=self._customer_role_name(customer_tenant, groups),
+                    provider_staff=self._provider_staff_intent(
+                        customer_tenant,
+                        provider_tenant,
+                        groups,
+                    ),
+                )
+                result = identity_provisioning.provision_external_identity(command)
+                if getattr(result, "mode", None) == "provider_mapping_rejected":
+                    return user
+
                 self._update_user_profile(user, claims)
-                self.sync_user_profile_and_memberships(user, claims)
                 return user
 
     @staticmethod
@@ -466,6 +497,63 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
             if isinstance(value, str) and value:
                 return value
         return ""
+
+    @staticmethod
+    def _normalized_groups(claims):
+        groups = claims.get("groups", [])
+        if isinstance(groups, str):
+            return [groups]
+        if not isinstance(groups, list):
+            return []
+        return [group for group in groups if isinstance(group, str)]
+
+    @staticmethod
+    def _customer_role_name(customer_tenant, groups):
+        configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
+        tenant_config = configs.get(customer_tenant.slug, {}) if isinstance(configs, dict) else {}
+        mapping = tenant_config.get("OIDC_GROUP_ROLE_MAPPING", {}) if isinstance(tenant_config, dict) else {}
+        if not isinstance(mapping, dict):
+            mapping = {}
+        mapped_roles = {
+            mapping[group].lower() for group in groups if group in mapping and isinstance(mapping[group], str)
+        }
+        for role_name in ("admin", "manager", "member"):
+            if role_name in mapped_roles:
+                return role_name.title()
+        return "Member"
+
+    @staticmethod
+    def _provider_staff_intent(customer_tenant, provider_tenant, groups):
+        if provider_tenant is None or not customer_tenant.managed_by_id:
+            return None
+        configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
+        provider_config = configs.get(provider_tenant.slug, {}) if isinstance(configs, dict) else {}
+        mapping = (
+            provider_config.get("OIDC_GROUP_PROVIDER_ROLE_MAPPING", {}) if isinstance(provider_config, dict) else {}
+        )
+        if not isinstance(mapping, dict):
+            mapping = {}
+        for group in groups:
+            if group in mapping:
+                role_name = mapping[group] if isinstance(mapping[group], str) else ""
+                return identity_provisioning.ProviderStaffIntent(
+                    provider_tenant=provider_tenant,
+                    role_name=role_name,
+                )
+        return None
+
+    def _external_identity_profile(self, user, claims):
+        email = self._claim_text(claims, "email") or getattr(user, "email", "") or None
+        upn = self._claim_text(claims, "upn", "email") or getattr(user, "email", "") or None
+        first_name = self._claim_text(claims, "given_name", "first_name") or user.first_name or "OIDC"
+        last_name = self._claim_text(claims, "family_name", "last_name") or user.last_name or "User"
+        return identity_provisioning.ExternalIdentityProfile(
+            source="OIDC",
+            email=email,
+            upn=upn,
+            first_name=first_name,
+            last_name=last_name,
+        )
 
     def _resolve_verified_identity(self, identity: VerifiedOIDCIdentity, claims: dict[str, object]) -> object | None:
         """Resolve and provision only after the caller supplies verified identity data."""
@@ -503,183 +591,6 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
 
     def update_user(self, user, claims):
         _raise_identity_error(OIDCIdentityBindingRequiredError, "identity.unverified_helper")
-
-    def sync_user_profile_and_memberships(self, user, claims):
-        tenant = get_current_tenant()
-        if not tenant:
-            return
-
-        groups_claim = claims.get("groups", [])
-        if isinstance(groups_claim, str):
-            groups_claim = [groups_claim]
-        elif not isinstance(groups_claim, list):
-            groups_claim = []
-
-        tenant_configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
-
-        # inline import: app-registry: avoids loading organization models while Django's auth
-        # backends are initialized during app setup.
-        from organization.models import AssetHolder, Membership
-
-        # Provider-staff claims provision provider identity, not a local
-        # customer identity. Resolve them before creating/linking a customer
-        # profile or membership. A matching mapping is terminal even when its
-        # provider role is missing, so configuration errors fail closed instead
-        # of silently falling back to customer JIT provisioning.
-        if tenant.managed_by_id and groups_claim:
-            managing_config = tenant_configs.get(tenant.managed_by.slug, {})
-            staff_role_mapping = managing_config.get(
-                "OIDC_GROUP_PROVIDER_ROLE_MAPPING",
-                {},
-            )
-            for group in groups_claim:
-                if group not in staff_role_mapping:
-                    continue
-                with transaction.atomic():
-                    provider_membership = provision_provider_membership(
-                        user,
-                        tenant.managed_by,
-                        staff_role_mapping[group],
-                        "OIDC",
-                    )
-                    if provider_membership is not None:
-                        # This user is provider staff, not a customer-local
-                        # principal. Removing the current customer's Membership
-                        # hard-deletes its direct grants and group links by
-                        # cascade. Preserve operational holder history by
-                        # unlinking the global User instead of deleting holders.
-                        customer_membership = (
-                            Membership._base_manager.select_for_update()
-                            .filter(
-                                user=user,
-                                tenant=tenant,
-                            )
-                            .first()
-                        )
-                        if customer_membership is not None:
-                            customer_membership.delete()
-                        customer_holders = list(
-                            AssetHolder._base_manager.select_for_update().filter(
-                                user=user,
-                                tenant=tenant,
-                            )
-                        )
-                        for holder in customer_holders:
-                            holder.user = None
-                            holder.save(update_fields=["user"])
-                return
-
-        # 1. Profile Provisioning / Linking
-        upn = claims.get("upn") or claims.get("email") or user.email
-        email = claims.get("email") or user.email
-
-        # Check if the user already has a linked profile in the target tenant
-        holder = user.asset_holder_profiles.filter(tenant=tenant).first()
-        if not holder:
-            if upn:
-                holder = AssetHolder.objects.filter(tenant=tenant, upn=upn).first()
-            if not holder and email:
-                holder = AssetHolder.objects.filter(tenant=tenant, email=email).first()
-
-            if holder and holder.user is None:
-                holder.user = user
-                try:
-                    with transaction.atomic():
-                        holder.save()
-                except IntegrityError:
-                    logger.warning(
-                        "IntegrityError while saving AssetHolder",
-                        extra={
-                            "integration": {
-                                "provider": "oidc",
-                                "operation": "organization.holder_link",
-                                "tenant_id": tenant.pk,
-                                "actor_id": user.pk,
-                                "error_code": "holder_collision",
-                            }
-                        },
-                    )
-                    holder = None
-            elif not holder or (holder and holder.user != user):
-                first_name = claims.get("given_name") or claims.get("first_name") or user.first_name or "OIDC"
-                last_name = claims.get("family_name") or claims.get("last_name") or user.last_name or "User"
-
-                try:
-                    with transaction.atomic():
-                        holder = AssetHolder.objects.create(
-                            user=user,
-                            first_name=first_name,
-                            last_name=last_name,
-                            upn=upn or email or f"{user.username}@oidc",
-                            email=email,
-                            tenant=tenant,
-                        )
-                except IntegrityError:
-                    logger.warning(
-                        "IntegrityError while creating AssetHolder",
-                        extra={
-                            "integration": {
-                                "provider": "oidc",
-                                "operation": "organization.holder_create",
-                                "tenant_id": tenant.pk,
-                                "actor_id": user.pk,
-                                "error_code": "holder_collision",
-                            }
-                        },
-                    )
-                    holder = None
-
-        # 2. Membership & Role Syncing
-        tenant_config = tenant_configs.get(tenant.slug, {})
-        group_role_mapping = tenant_config.get("OIDC_GROUP_ROLE_MAPPING", {})
-
-        user_roles = []
-        for group in groups_claim:
-            if group in group_role_mapping:
-                mapped_role = group_role_mapping[group]
-                if isinstance(mapped_role, str):
-                    user_roles.append(mapped_role.lower())
-
-        # Resolve the highest priority role
-        resolved_role_name = None
-        for priority_role in ["admin", "manager", "member"]:
-            if priority_role in user_roles:
-                resolved_role_name = priority_role
-                break
-
-        if not resolved_role_name:
-            resolved_role_name = "member"
-
-        # Map to proper title-cased name for DB
-        role_title_map = {"admin": "Admin", "manager": "Manager", "member": "Member"}
-        db_role_name = role_title_map.get(resolved_role_name, "Member")
-
-        # Safe JIT provisioning: never auto-create a privileged role from a group
-        # claim; assign Admin/Manager only if the operator created them deliberately.
-        provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, "OIDC")
-
-    def get_permissions_for_role(self, role_name):
-        from organization.forms.role_form import MATRIX_MODELS
-
-        perms = set()
-        for key, info in MATRIX_MODELS.items():
-            app = info["app"]
-            model = info["model_name"]
-            if role_name == "Admin":
-                perms.update(
-                    [f"{app}.view_{model}", f"{app}.add_{model}", f"{app}.change_{model}", f"{app}.delete_{model}"]
-                )
-            elif role_name in ("Manager", "Member"):
-                perms.update([f"{app}.view_{model}", f"{app}.add_{model}", f"{app}.change_{model}"])
-        # Add dashboard / extra permissions
-        perms.update(
-            ["extras.view_dashboard", "extras.change_dashboard", "extras.add_dashboard", "extras.delete_dashboard"]
-        )
-        # Filter to only valid db permissions
-        all_codenames = set(
-            f"{p.content_type.app_label}.{p.codename}" for p in Permission.objects.select_related("content_type").all()
-        )
-        return list(perms & all_codenames)
 
 
 class TenantOIDCAuthorizeView(TenantOIDCSettingsMixin, OIDCAuthenticationRequestView):

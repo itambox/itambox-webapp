@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from core import identity_provisioning
 from core.auth.oidc import (
     TenantOIDCBackend,
     VerifiedOIDCIdentity,
@@ -20,6 +21,7 @@ from organization.models import (
     Tenant,
 )
 from organization.rbac import accessible_tenant_ids, effective_permissions
+from organization.services.identity_provisioning import organization_identity_provisioner
 from users.models import GroupMembership, OIDCIdentity, UserGroup
 
 User = get_user_model()
@@ -79,7 +81,8 @@ class TenantOIDCTestCase(TestCase):
             ).exists()
         ):
             OIDCIdentity.objects.create(user=existing_user, issuer=issuer, subject=subject)
-        return backend._resolve_verified_identity(identity, claims)
+        with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+            return backend._resolve_verified_identity(identity, claims)
 
     def test_settings_routing(self):
         backend = TenantOIDCBackend()
@@ -769,13 +772,14 @@ class TenantOIDCTestCase(TestCase):
             "family_name": "B",
         }
 
-        # This should log warning and continue without raising IntegrityError/crashing
-        with self.assertLogs("core.auth.oidc", level="WARNING") as cm:
+        # This should log a sanitized warning and continue without raising IntegrityError/crashing
+        with self.assertLogs("itambox.organization.identity", level="WARNING") as cm:
             user_b = self.resolve_verified(backend, claims_b)
             self.assertIsNotNone(user_b)
-            # Check that warning was logged
-            log_output = "".join(cm.output)
-            self.assertIn("IntegrityError while creating AssetHolder", log_output)
+            self.assertTrue(
+                any(record.__dict__.get("reason_code") == "holder_collision_other_user" for record in cm.records)
+            )
+            self.assertNotIn("collision-upn@alpha.com", "\n".join(cm.output))
 
         # Verify user_b was created but has no asset_holder_profile (or it wasn't duplicate created)
         user_b.refresh_from_db()
@@ -895,7 +899,7 @@ class TenantOIDCTestCase(TestCase):
         # Now, try to create User B in Tenant Alpha with the same UPN "coll@test.com"
         # Since UPN has a unique constraint per tenant, this must fail at AssetHolder creation
         # but User B should still log in successfully (without AssetHolder profile)
-        with self.assertLogs("core.auth.oidc", level="WARNING") as cm:
+        with self.assertLogs("itambox.organization.identity", level="WARNING") as cm:
             user_b = self.resolve_verified(
                 backend,
                 {
@@ -907,7 +911,10 @@ class TenantOIDCTestCase(TestCase):
                 },
             )
             self.assertIsNotNone(user_b)
-            self.assertTrue(any("IntegrityError while creating AssetHolder" in line for line in cm.output))
+            self.assertTrue(
+                any(record.__dict__.get("reason_code") == "holder_collision_other_user" for record in cm.records)
+            )
+            self.assertNotIn("coll@test.com", "\n".join(cm.output))
 
         # Verify user_b was created, is in tenant_alpha, but has no asset_holder_profile
         user_b.refresh_from_db()

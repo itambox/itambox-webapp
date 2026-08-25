@@ -7,6 +7,7 @@ from django.core.management import CommandError
 from django.db import IntegrityError
 from django.test import TestCase, override_settings
 
+from core import identity_provisioning
 from core.auth.oidc import TenantOIDCBackend
 from core.management.commands.bind_oidc_identity import Command
 from core.managers import set_current_tenant
@@ -19,6 +20,7 @@ from core.oidc_identity import (
 )
 from core.tasks.context import TaskContext
 from organization.models import Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 from users.models import OIDCIdentity, User
 
 OIDC_SETTINGS = {
@@ -486,11 +488,12 @@ class OIDCIdentityCommandTests(TestCase):
             ),
             patch.object(backend, "verify_claims", return_value=True),
         ):
-            resolved = backend.get_or_create_user(
-                "access-token",
-                "id-token",
-                {"iss": "https://idp.example/issuer", "sub": subject},
-            )
+            with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                resolved = backend.get_or_create_user(
+                    "access-token",
+                    "id-token",
+                    {"iss": "https://idp.example/issuer", "sub": subject},
+                )
         set_current_tenant(None)
         self.assertEqual(resolved.pk, self.user.pk)
         self.assertEqual(OIDCIdentity.objects.filter(issuer="https://idp.example/issuer", subject=subject).count(), 1)

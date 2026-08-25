@@ -5,6 +5,7 @@ import pytest
 from django.db import IntegrityError, close_old_connections, connection, connections, transaction
 from django.test import TransactionTestCase, override_settings
 
+from core import identity_provisioning
 from core.auth.oidc import (
     OIDCIdentityProvisioningError,
     TenantOIDCBackend,
@@ -13,6 +14,7 @@ from core.auth.oidc import (
 )
 from core.managers import set_current_tenant
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 from users.models import OIDCIdentity, User
 
 ISSUER = "https://race.example/issuer"
@@ -131,11 +133,12 @@ class OIDCIdentityConcurrencyTests(TransactionTestCase):
                 return result
 
             with connection.execute_wrapper(execute_wrapper):
-                user = backend.get_or_create_user(
-                    "access-token",
-                    "id-token",
-                    {"iss": ISSUER, "sub": subject},
-                )
+                with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                    user = backend.get_or_create_user(
+                        "access-token",
+                        "id-token",
+                        {"iss": ISSUER, "sub": subject},
+                    )
             results[label]["user_id"] = user.pk if user is not None else None
         except Exception as exc:
             results[label]["error_type"] = type(exc).__name__
@@ -290,11 +293,12 @@ class OIDCIdentityConcurrencyTests(TransactionTestCase):
             close_old_connections()
             try:
                 set_current_tenant(Tenant._base_manager.get(pk=self.tenant.pk))
-                user = backend.get_or_create_user(
-                    "access-token",
-                    "id-token",
-                    {"iss": ISSUER, "sub": subject},
-                )
+                with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                    user = backend.get_or_create_user(
+                        "access-token",
+                        "id-token",
+                        {"iss": ISSUER, "sub": subject},
+                    )
                 result["user_id"] = user.pk
             except Exception as exc:
                 result["error_type"] = type(exc).__name__
