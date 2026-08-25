@@ -14,11 +14,11 @@ from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import RequestFactory, TestCase
 
-from core.auth.guards import validate_permission_grant
 from core.managers import set_current_membership, set_current_tenant
 from core.tests.mixins import grant
 from itambox.api.permissions import TokenPermissions
 from organization.models import Membership, Role, Tenant
+from organization.services.role_grant_validation import validate_permission_grant
 
 User = get_user_model()
 

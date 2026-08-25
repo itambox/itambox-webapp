@@ -16,10 +16,10 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.auth.guards import validate_permission_grant, validate_role_grant
 from core.forms import FilterForm
 from core.managers import get_current_tenant
 from core.mfa import role_is_privileged
+from organization.services.role_grant_validation import validate_permission_grant, validate_role_grant
 
 from ..models import Role, RoleGrantScope
 from .helpers import add_standard_buttons

@@ -495,7 +495,6 @@ class UserBulkEditForm(BulkEditForm):
 # provider-owned groups may be projected into managed tenants through RoleGrant scopes.
 from django.db import transaction
 
-from core.auth.guards import validate_role_grant
 from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
 from organization.models import (
     Membership,
@@ -505,6 +504,7 @@ from organization.models import (
     Tenant,
     TenantGroup,
 )
+from organization.services.role_grant_validation import validate_role_grant
 
 from .filters import UserGroupFilterSet
 from .models import GroupMembership, UserGroup

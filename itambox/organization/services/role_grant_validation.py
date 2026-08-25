@@ -4,8 +4,10 @@ from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from core.auth import MembershipBackend
+from core import tenant_scope
 from core.tenant_scope import get_descendant_tenant_group_ids
+from organization.models import RoleGrantScope, Tenant
+from organization.rbac import applicable_grants
 
 
 def validate_permission_grant(granting_user, permissions, tenant):
@@ -15,7 +17,11 @@ def validate_permission_grant(granting_user, permissions, tenant):
     requested = set(permissions or [])
     if not requested:
         return
-    held = MembershipBackend()._effective_perms_for_tenant(granting_user, tenant) if tenant is not None else frozenset()
+    held = (
+        tenant_scope.resolve_effective_permissions_with_expiry(granting_user, tenant)[0]
+        if tenant is not None
+        else frozenset()
+    )
     escalated = sorted(requested - set(held))
     if escalated:
         raise ValidationError(
@@ -49,10 +55,6 @@ def validate_role_grant(
         or granting_user.has_perm("organization.change_rolegrant", obj=principal_tenant)
     ):
         raise ValidationError(_("You are not allowed to grant reach into managed tenants."))
-
-    # inline imports: cycle: avoid core.auth <-> organization import cycles at load time.
-    from organization.models import RoleGrantScope, Tenant
-    from organization.rbac import applicable_grants
 
     requested_permissions = set(getattr(role, "permissions", None) or [])
     own_ids = set()

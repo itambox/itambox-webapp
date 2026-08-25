@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from core import restore_authority
 from core.tests.mixins import grant
 from organization.models import (
     Membership,
@@ -19,6 +20,7 @@ from organization.models import (
     Tenant,
     TenantGroup,
 )
+from organization.services.restore_authority import organization_restore_authority
 from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
@@ -28,6 +30,10 @@ class RestoreGrantEscalationMixin:
     restore_model = None
 
     def setUp(self):
+        self._restore_authority_override = restore_authority.override_restore_authority_validator(
+            organization_restore_authority
+        )
+        self._restore_authority_override.__enter__()
         self.provider = Tenant.objects.create(
             name="Restore Provider",
             slug="restore-provider",
@@ -70,6 +76,10 @@ class RestoreGrantEscalationMixin:
         session["active_tenant_id"] = self.provider.pk
         session.pop("active_tenant_group_id", None)
         session.save()
+
+    def tearDown(self):
+        self._restore_authority_override.__exit__(None, None, None)
+        super().tearDown()
 
     def add_explicit_authority(self):
         role = Role.objects.create(
@@ -291,15 +301,16 @@ class RestoreGrantEscalationMixin:
         )
         content_type = ContentType.objects.get_for_model(self.restore_model)
 
-        response = self.client.post(
-            reverse(
-                "object_bulk_restore",
-                kwargs={
-                    "content_type_id": content_type.pk,
-                },
-            ),
-            {"pk": [safe.pk, unsafe.pk]},
-        )
+        with restore_authority.override_restore_authority_validator(organization_restore_authority):
+            response = self.client.post(
+                reverse(
+                    "object_bulk_restore",
+                    kwargs={
+                        "content_type_id": content_type.pk,
+                    },
+                ),
+                {"pk": [safe.pk, unsafe.pk]},
+            )
 
         self.assertEqual(response.status_code, 302)
         safe.refresh_from_db()
@@ -445,15 +456,16 @@ class UnrelatedModelRestoreRegressionTests(TestCase):
         session["active_tenant_id"] = tenant.pk
         session.save()
         content_type = ContentType.objects.get_for_model(Site)
-        response = self.client.post(
-            reverse(
-                "object_restore",
-                kwargs={
-                    "content_type_id": content_type.pk,
-                    "object_id": site.pk,
-                },
+        with restore_authority.override_restore_authority_validator(organization_restore_authority):
+            response = self.client.post(
+                reverse(
+                    "object_restore",
+                    kwargs={
+                        "content_type_id": content_type.pk,
+                        "object_id": site.pk,
+                    },
+                )
             )
-        )
 
         self.assertEqual(response.status_code, 302)
         site.refresh_from_db()

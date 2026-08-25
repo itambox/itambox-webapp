@@ -678,8 +678,8 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import transaction
 from django.db.models import Count, Prefetch
 
-from core.auth.guards import validate_group_membership_grant
 from itambox.views.generic import ObjectBulkDeleteView
+from organization.services.role_grant_validation import validate_group_membership_grant
 
 from .filters import UserGroupFilterSet
 from .forms import UserGroupAssignUsersForm, UserGroupFilterForm, UserGroupForm
