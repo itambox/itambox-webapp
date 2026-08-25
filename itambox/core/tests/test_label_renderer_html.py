@@ -1,8 +1,20 @@
+import io
 from types import SimpleNamespace
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from pypdf import PdfReader
 
-from core.tasks.labels import _build_labels_document, _default_label_card, render_label_html
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
+from core.tasks.labels import (
+    _build_labels_document,
+    _default_label_card,
+    _label_print_css,
+    generate_base64_barcode,
+    render_label_html,
+    render_labels_pdf,
+)
+from extras.models import LabelTemplate
+from organization.models import Tenant
 
 
 class LabelRendererHTMLTests(SimpleTestCase):
@@ -107,3 +119,82 @@ class LabelRendererHTMLTests(SimpleTestCase):
         self.assertIn('class="grid-table page-break-always"', document)
         self.assertIn('class="grid-table page-break-avoid"', document)
         self.assertIn("&nbsp;", document)
+
+
+class LabelPrintCssSourceTests(SimpleTestCase):
+    def test_label_print_css_checkout_source_is_present_and_nonempty(self):
+        # The runtime PDF document builder reads this authored stylesheet from
+        # the checkout (and from the packaged runtime image, which is verified
+        # by the production-image check in the PR evidence, not by this unit
+        # test). This test guards the checkout source against pruning.
+        css = _label_print_css()
+        self.assertTrue(css.strip())
+        self.assertIn(".label-card", css)
+        self.assertIn("page-break-always", css)
+
+
+class LabelPdfRenderIntegrationTests(TestCase):
+    """Real two-label PDF compilation through the locked xhtml2pdf engine.
+
+    No mocks: the real barcode generator, label renderer, document builder and
+    the shared ``html_to_pdf_bytes()`` invocation are exercised so that a
+    regression in the packaged label CSS, the document markup or the renderer
+    call itself surfaces as a structural test failure (issue #453).
+    """
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="PDF Tenant", slug="pdf-tenant")
+        manufacturer = Manufacturer.objects.create(name="PDF Mfr", slug="pdf-mfr")
+        role = AssetRole.objects.create(name="PDF Role", slug="pdf-role")
+        asset_type = AssetType.objects.create(manufacturer=manufacturer, model="PDF Model", slug="pdf-model")
+        status, _ = StatusLabel.objects.get_or_create(
+            slug="available", defaults={"name": "Available", "type": "deployable"}
+        )
+        self.asset1 = Asset.objects.create(
+            name="One PDF Asset",
+            asset_tag="PDF-1",
+            asset_type=asset_type,
+            asset_role=role,
+            status=status,
+            tenant=self.tenant,
+        )
+        self.asset2 = Asset.objects.create(
+            name="Two PDF Asset",
+            asset_tag="PDF-2",
+            asset_type=asset_type,
+            asset_role=role,
+            status=status,
+            tenant=self.tenant,
+        )
+        # seed-equivalent "Standard QR Asset Label" template code (2.0 x 1.0 in)
+        self.template = LabelTemplate.objects.create(
+            name="Standard QR Asset Label",
+            description="2.0 x 1.0 inch QR label for laptops & desktops (seed-equivalent)",
+            barcode_format="qr",
+            page_width=2.0,
+            page_height=1.0,
+            template_code=(
+                '<table class="label-card-table"><tr>'
+                '<td class="label-card-metadata"><div class="label-card-title">{{ asset.name }}</div>'
+                '<div class="label-card-tag">{{ asset.asset_tag }}</div></td>'
+                '<td class="label-card-barcode-cell">{{ barcode_img }}</td></tr></table>'
+            ),
+        )
+
+    def test_real_two_label_documents_compile_to_valid_pdf(self):
+        cases = (("roll", 2), ("a4_grid", 1))
+        for layout, expected_pages in cases:
+            with self.subTest(layout=layout):
+                cards = []
+                for asset in (self.asset1, self.asset2):
+                    uri = generate_base64_barcode(asset, "qr")
+                    cards.append(render_label_html(asset, self.template, uri))
+
+                document = _build_labels_document(cards, self.template, layout)
+                self.assertIn(".label-card", document)
+
+                pdf_bytes = render_labels_pdf([self.asset1, self.asset2], self.template, layout)
+
+                self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+                reader = PdfReader(io.BytesIO(pdf_bytes))
+                self.assertEqual(len(reader.pages), expected_pages)

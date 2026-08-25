@@ -32,6 +32,59 @@ def _label_print_css() -> str:
     return _LABEL_PRINT_CSS_PATH.read_text(encoding="utf-8")
 
 
+def _try_create_notification(user, *, subject, message, level, target_url=None, log_extra=None, job=None):
+    """Deliver a task notification best-effort (failure isolation).
+
+    Notification delivery must never reverse an already-durable task outcome
+    (completed job + persisted attachment) nor mask the original task error,
+    so creation failures are logged with safe metadata only and swallowed.
+    """
+    try:
+        Notification.objects.create(user=user, subject=subject, message=message, level=level, target_url=target_url)
+    # broad except: availability-tradeoff: notification delivery is best-effort and must
+    # never reverse a durable task outcome (completed job + persisted attachment) nor mask
+    # the original task error, so creation failures are logged with safe metadata only.
+    except Exception as exc:
+        logger.error(
+            "Task notification delivery failed",
+            extra={**(log_extra or {}), "phase": "notification", "exception_type": type(exc).__name__},
+        )
+        if job is not None:
+            try:
+                job.append_log("Notification delivery failed (phase=notification).")
+            # broad except: boundary-isolation: a failing job-log append must not cascade
+            # while handling a notification failure
+            except Exception as log_exc:
+                logger.error(
+                    "Job log append failed while handling notification failure",
+                    extra={**(log_extra or {}), "phase": "notification", "exception_type": type(log_exc).__name__},
+                )
+
+
+def _cleanup_partial_attachment(job, attachment, log_extra):
+    """Best-effort removal of a partial attachment after a failed persistence step.
+
+    A retry must not accumulate orphaned FileAttachment rows or stored files:
+    once a failure reached the task boundary, the job is not durably completed
+    (success notifications are best-effort), so any attachment created by this
+    run is removed, including its stored file (Django does not delete FileField
+    files on model deletion). Cleanup failures are logged with safe metadata
+    only.
+    """
+    if attachment is None:
+        return
+    try:
+        attachment.file.delete(save=False)
+        attachment.delete()
+    # broad except: availability-tradeoff: attachment cleanup is best-effort; a cleanup
+    # failure must not cascade into the already-recorded task boundary outcome
+    except Exception as exc:
+        logger.error(
+            "Attachment cleanup failed",
+            extra={**log_extra, "phase": "attachment_cleanup", "exception_type": type(exc).__name__},
+        )
+
+
 def _safe_label_measurement(value: object, default: float) -> str:
     """Return a bounded, CSS-safe inch measurement for a label dimension."""
     try:
@@ -83,13 +136,15 @@ def _finalize_label_zip(job, user, zip_buffer: io.BytesIO, rendered: int, total:
 
     job.append_log("ZIP package generated and saved successfully.")
     job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
-    Notification.objects.create(
-        user=user,
+    _try_create_notification(
+        user,
         subject=_("Label Generation Complete"),
         message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
         % {"count": rendered},
         level=Notification.LEVEL_SUCCESS,
         target_url=attachment.get_download_url(),
+        log_extra={"job_id": job.pk},
+        job=job,
     )
     return TaskResult(
         TaskStatus.PARTIAL if rendered < total else TaskStatus.SUCCESS,
@@ -155,12 +210,14 @@ def generate_label_batch_task(
                 status = classify_task_error(e)
                 logger.error("Label ZIP task failed", extra={**log_extra, "exception_type": type(e).__name__})
                 job.mark_failed(f"[{status.value}] labels.zip_failed")
-                Notification.objects.create(
-                    user=ctx.user,
+                _try_create_notification(
+                    ctx.user,
                     subject=_("Label Generation Failed"),
                     message=_("Label generation failed. Code: labels.zip_failed"),
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
+                    log_extra=log_extra,
+                    job=job,
                 )
                 return TaskResult(status, "labels.zip_failed", user_visible=True)
         # broad except: task-isolation: failures before Job resolution remain observable to the queue caller
@@ -429,6 +486,11 @@ def generate_label_pdf_batch_task(
 
     with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="labels.pdf_batch") as ctx:
         log_extra = {**ctx.log_context, "job_id": job_id}
+        # Boundary state: initialized before any fallible step so both failure
+        # handlers can always reference a bound phase and attachment, and no
+        # transient error is ever masked by an UnboundLocalError.
+        phase = "job_resolve"
+        attachment = None
         try:
             try:
                 job = Job.objects.get(pk=job_id)
@@ -436,12 +498,14 @@ def generate_label_pdf_batch_task(
                 logger.error("Label PDF job not found", extra=log_extra)
                 return TaskResult(TaskStatus.TERMINAL, "labels.job_not_found")
 
+            phase = "job_start"
             if not job.mark_running():
                 logger.info("Job %s is no longer pending (cancelled?); skipping PDF label generation.", job_id)
                 return TaskResult(TaskStatus.SKIPPED, "labels.job_not_pending")
             job.append_log("Starting asynchronous PDF label batch generation...")
 
             try:
+                phase = "template_resolve"
                 label_template = LabelTemplate.objects.get(pk=template_id)
                 job.append_log("Label template resolved.")
             except LabelTemplate.DoesNotExist:
@@ -451,6 +515,7 @@ def generate_label_pdf_batch_task(
 
             job.append_log(f"Layout mode: {layout_mode} | Total assets to print: {len(asset_pks)}")
 
+            phase = "asset_resolve"
             assets = list(Asset.objects.filter(pk__in=asset_pks))
             if not assets:
                 job.append_log("No matching assets found to print.")
@@ -458,6 +523,7 @@ def generate_label_pdf_batch_task(
                 return TaskResult(TaskStatus.SKIPPED, "labels.no_assets", user_visible=True)
 
             # Render individual cards (with per-asset logging for the job trail)
+            phase = "label_render"
             rendered_cards = []
             for asset in assets:
                 try:
@@ -478,10 +544,14 @@ def generate_label_pdf_batch_task(
                 return TaskResult(TaskStatus.TERMINAL, "labels.no_labels_rendered", user_visible=True)
 
             job.append_log("Compiling PDF document using xhtml2pdf...")
+            phase = "document_build"
             html_content = _build_labels_document(rendered_cards, label_template, layout_mode)
+
+            phase = "pdf_render"
             pdf_bytes = _html_to_pdf_bytes(html_content)
 
             # Save FileAttachment
+            phase = "attachment_persist"
             ct = ContentType.objects.get_for_model(Job)
             attachment = FileAttachment.objects.create(
                 model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.pdf", mime_type="application/pdf"
@@ -489,16 +559,20 @@ def generate_label_pdf_batch_task(
             attachment.file.save(f"labels_batch_{job.pk}.pdf", ContentFile(pdf_bytes))
             attachment.save()
 
+            phase = "job_finalize"
             job.append_log("PDF document generated and saved successfully.")
             job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
 
-            Notification.objects.create(
-                user=ctx.user,
+            phase = "notification"
+            _try_create_notification(
+                ctx.user,
                 subject=_("Label Generation Complete"),
                 message=_("Successfully generated label PDF for %(count)s asset(s). Click to download.")
                 % {"count": len(assets)},
                 level=Notification.LEVEL_SUCCESS,
                 target_url=attachment.get_download_url(),
+                log_extra=log_extra,
+                job=job,
             )
             return TaskResult(
                 TaskStatus.PARTIAL if len(rendered_cards) < len(assets) else TaskStatus.SUCCESS,
@@ -510,14 +584,21 @@ def generate_label_pdf_batch_task(
         # broad except: task-isolation: record a safe typed task-boundary failure
         except Exception as e:
             status = classify_task_error(e)
-            logger.error("Label PDF task failed", extra={**log_extra, "exception_type": type(e).__name__})
+            logger.error(
+                "Label PDF task failed",
+                extra={**log_extra, "phase": phase, "exception_type": type(e).__name__},
+            )
             if "job" in locals():
+                job.append_log(f"[{status.value}] labels.pdf_failed phase={phase}")
                 job.mark_failed(f"[{status.value}] labels.pdf_failed")
-            Notification.objects.create(
-                user=ctx.user,
+                _cleanup_partial_attachment(job, attachment, log_extra)
+            _try_create_notification(
+                ctx.user,
                 subject=_("Label Generation Failed"),
                 message=_("Label generation failed. Code: labels.pdf_failed"),
                 level=Notification.LEVEL_DANGER,
                 target_url=reverse_job_detail(job.pk) if "job" in locals() else None,
+                log_extra=log_extra,
+                job=job if "job" in locals() else None,
             )
             return TaskResult(status, "labels.pdf_failed", user_visible=True)
