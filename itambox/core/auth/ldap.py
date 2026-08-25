@@ -1,17 +1,31 @@
 import logging
 import sys
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import CommandError
 
+from core import identity_provisioning, tenant_scope
+from core.context import (
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_request_id,
+    get_current_tenant,
+    get_current_tenant_group,
+    get_current_user,
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
 from core.errors import (
     IntegrationAuthenticationError,
     IntegrationConfigurationError,
+    IntegrationContext,
     IntegrationRequestError,
     IntegrationUnavailableError,
 )
-from core.managers import get_current_tenant, set_current_tenant
 
 try:  # noqa: C901
     import ldap
@@ -100,6 +114,7 @@ def _ldap_exception_types(*names):
 _LDAP_TRANSIENT_ERRORS = _ldap_exception_types("SERVER_DOWN", "TIMEOUT", "CONNECT_ERROR", "UNAVAILABLE", "BUSY")
 _LDAP_AUTHENTICATION_ERRORS = _ldap_exception_types("INVALID_CREDENTIALS", "INSUFFICIENT_ACCESS")
 _LDAP_CONFIGURATION_ERRORS = _ldap_exception_types("FILTER_ERROR", "PARAM_ERROR", "PROTOCOL_ERROR")
+_LDAP_PROVIDER_ERROR = getattr(ldap, "LDAPError", Exception)
 
 
 class LDAPConfigurationError(IntegrationConfigurationError, CommandError):
@@ -146,6 +161,29 @@ def classify_ldap_error(exc, *, context):
 
 
 logger = logging.getLogger("django_auth_ldap")
+
+
+@dataclass(frozen=True)
+class _LDAPContextSnapshot:
+    tenant: object | None
+    membership: object | None
+    tenant_group: object | None
+    all_accessible: bool
+
+    @classmethod
+    def capture(cls):
+        return cls(
+            tenant=get_current_tenant(),
+            membership=get_current_membership(),
+            tenant_group=get_current_tenant_group(),
+            all_accessible=get_current_all_accessible(),
+        )
+
+    def restore(self):
+        set_current_tenant(self.tenant)
+        set_current_membership(self.membership)
+        set_current_tenant_group(self.tenant_group)
+        set_current_all_accessible(self.all_accessible)
 
 
 class TenantLDAPSettings:
@@ -207,6 +245,128 @@ class TenantLDAPSettings:
         return getattr(settings, global_name, None)
 
 
+def _ldap_context(operation):
+    tenant = get_current_tenant()
+    actor = get_current_user()
+    request_id = get_current_request_id()
+    return IntegrationContext(
+        provider="ldap",
+        operation=operation,
+        tenant_id=getattr(tenant, "pk", None),
+        actor_id=getattr(actor, "pk", None),
+        request_id=str(request_id) if request_id else None,
+    )
+
+
+def _normalize_ldap_text(value):
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if value is None:
+        return None
+    return str(value)
+
+
+def _read_ldap_attributes(user):
+    email = getattr(user, "email", None) or None
+    first_name = getattr(user, "first_name", None) or "LDAP"
+    last_name = getattr(user, "last_name", None) or "User"
+    upn = None
+    ldap_user = getattr(user, "ldap_user", None)
+    if ldap_user:
+        try:
+            attrs = ldap_user.attrs
+            if attrs:
+                upn = _normalize_ldap_text(attrs.get("userPrincipalName")) or _normalize_ldap_text(attrs.get("mail"))
+                email = _normalize_ldap_text(attrs.get("mail")) or email
+                first_name = _normalize_ldap_text(attrs.get("givenName")) or first_name
+                last_name = _normalize_ldap_text(attrs.get("sn")) or last_name
+        # broad except: boundary-isolation: LDAP attribute proxies expose provider-specific failures
+        except Exception as exc:
+            logger.warning(
+                "LDAP attribute read failed",
+                extra={
+                    "source": "ldap",
+                    "reason_code": "attribute_read_failed",
+                    "user_id": getattr(user, "pk", None),
+                    "tenant_id": getattr(get_current_tenant(), "pk", None),
+                    "exception_type": type(exc).__name__,
+                },
+            )
+    username = getattr(user, "username", "user")
+    upn = upn or email or f"{username}@ldap"
+    email = email or f"{username}@ldap.local"
+    return email, upn, first_name, last_name
+
+
+def _read_ldap_groups(user):
+    ldap_user = getattr(user, "ldap_user", None)
+    if not ldap_user:
+        return []
+    try:
+        values = list(ldap_user.group_names)
+    # broad except: boundary-isolation: LDAP group proxies expose provider-specific failures
+    except Exception as exc:
+        logger.debug(
+            "LDAP group read failed; using alternate provider field",
+            extra={
+                "source": "ldap",
+                "reason_code": "group_names_unavailable",
+                "user_id": getattr(user, "pk", None),
+                "tenant_id": getattr(get_current_tenant(), "pk", None),
+                "exception_type": type(exc).__name__,
+            },
+        )
+        try:
+            values = list(ldap_user.group_dns)
+        # broad except: boundary-isolation: LDAP group proxies expose provider-specific failures
+        except Exception as exc:
+            logger.warning(
+                "LDAP group read failed",
+                extra={
+                    "source": "ldap",
+                    "reason_code": "group_read_failed",
+                    "user_id": getattr(user, "pk", None),
+                    "tenant_id": getattr(get_current_tenant(), "pk", None),
+                    "exception_type": type(exc).__name__,
+                },
+            )
+            return []
+    try:
+        return [text for value in values if (text := _normalize_ldap_text(value))]
+    # broad except: boundary-isolation: LDAP group values may be provider-specific bytes
+    except Exception as exc:
+        logger.warning(
+            "LDAP group normalization failed",
+            extra={
+                "source": "ldap",
+                "reason_code": "group_normalization_failed",
+                "user_id": getattr(user, "pk", None),
+                "tenant_id": getattr(get_current_tenant(), "pk", None),
+                "exception_type": type(exc).__name__,
+            },
+        )
+        return []
+
+
+def _resolve_ldap_role_name(tenant, groups):
+    tenant_configs = getattr(settings, "ITAMBOX_TENANT_LDAP_CONFIGS", {})
+    if not isinstance(tenant_configs, dict):
+        return "Member"
+    tenant_config = tenant_configs.get(getattr(tenant, "slug", ""), {})
+    group_role_mapping = tenant_config.get("LDAP_GROUP_ROLE_MAPPING", {}) if isinstance(tenant_config, dict) else {}
+    mapped_roles = []
+    for group in groups:
+        mapped_role = group_role_mapping.get(group) if isinstance(group_role_mapping, dict) else None
+        if isinstance(mapped_role, str):
+            mapped_roles.append(mapped_role.lower())
+    for priority_role in ("admin", "manager", "member"):
+        if priority_role in mapped_roles:
+            return {"admin": "Admin", "manager": "Manager", "member": "Member"}[priority_role]
+    return "Member"
+
+
 class MultiTenantLDAPBackend(LDAPBackend):
     """
     A custom authentication backend for django-auth-ldap.
@@ -221,8 +381,10 @@ class MultiTenantLDAPBackend(LDAPBackend):
             return super().settings
 
         tenant_configs = getattr(settings, "ITAMBOX_TENANT_LDAP_CONFIGS", {})
+        if not isinstance(tenant_configs, dict):
+            return super().settings
         tenant_config = tenant_configs.get(tenant.slug)
-        if not tenant_config:
+        if not isinstance(tenant_config, dict):
             return super().settings
 
         return TenantLDAPSettings(tenant_config)
@@ -239,198 +401,91 @@ class MultiTenantLDAPBackend(LDAPBackend):
         except ImproperlyConfigured:
             return False
 
+    def _infer_tenant_from_username(self, username):
+        if not username or "@" not in username:
+            return None
+        domain = username.rsplit("@", 1)[1].strip().lower()
+        if not domain:
+            return None
+        tenant_model = tenant_scope.tenant_model()
+        manager = getattr(tenant_model, "_base_manager", tenant_model.objects)
+        candidates = [domain.split(".", 1)[0], domain]
+        seen = set()
+        for slug in candidates:
+            if not slug or slug in seen:
+                continue
+            seen.add(slug)
+            try:
+                return manager.get(slug=slug, deleted_at__isnull=True)
+            except tenant_model.DoesNotExist:
+                continue
+        return None
+
+    def _provision_ldap_identity(self, user, tenant):
+        email, upn, first_name, last_name = _read_ldap_attributes(user)
+        role_name = _resolve_ldap_role_name(tenant, _read_ldap_groups(user))
+        command = identity_provisioning.ExternalIdentityProvisioningCommand(
+            user=user,
+            customer_tenant=tenant,
+            profile=identity_provisioning.ExternalIdentityProfile(
+                source="LDAP",
+                email=email,
+                upn=upn,
+                first_name=first_name,
+                last_name=last_name,
+            ),
+            customer_role_name=role_name,
+        )
+        return identity_provisioning.provision_external_identity(command)
+
     def authenticate(self, request, username=None, password=None, **kwargs):  # noqa: C901
-        # The optional dependency fallback is capability removal, not degraded
-        # authorization: this backend must never authenticate when python-ldap is
-        # unavailable. Other configured backends make their own independent decision.
-        if not django_auth_ldap_installed:
-            return None
-        # Resolve active tenant from UPN/email suffix if not already set
-        if not get_current_tenant() and username and "@" in username:
-            parts = username.split("@")
-            domain = parts[-1].strip().lower()
-            from organization.models import Tenant
-
-            try:
-                slug_candidate = domain.split(".")[0]
-                tenant = Tenant.objects.get(slug=slug_candidate)
-                set_current_tenant(tenant)
-            except Tenant.DoesNotExist:
-                # Also try direct domain/slug match
-                try:
-                    tenant = Tenant.objects.get(slug=domain)
-                    set_current_tenant(tenant)
-                except Tenant.DoesNotExist:
-                    tenant = None
-
-        # No LDAP configured for this tenant or globally — skip rather than raise,
-        # so password (and SSO) backends further down the chain can authenticate.
-        if not self._is_configured():
-            return None
-
+        previous_context = _LDAPContextSnapshot.capture()
+        successful = False
         try:
-            user = super().authenticate(request, username, password, **kwargs)
-        except ImproperlyConfigured as e:
-            logger.debug("LDAP backend skipped — not configured: %s", e)
-            return None
-        # ``can_login=False`` bars all interactive login, including LDAP/SSO.
-        if user and not getattr(user, "can_login", True):
-            return None
-        if user:
-            self.sync_ldap_user_profile_and_memberships(user)
-        return user
+            # The optional dependency fallback is capability removal, not degraded
+            # authorization: this must never authenticate when python-ldap is
+            # unavailable. Other configured backends make their own independent decision.
+            if not django_auth_ldap_installed:
+                return None
 
-    def sync_ldap_user_profile_and_memberships(self, user):  # noqa: C901
-        tenant = get_current_tenant()
-        if not tenant:
-            return
+            if not get_current_tenant() and username and "@" in username:
+                tenant = self._infer_tenant_from_username(username)
+                if tenant is not None:
+                    set_current_tenant(tenant)
 
-        from django.db import transaction
-        from django.db.utils import IntegrityError
+            # No LDAP configured for this tenant or globally — skip rather than raise,
+            # so password (and SSO) backends further down the chain can authenticate.
+            if not self._is_configured():
+                return None
 
-        from organization.models import AssetHolder
-
-        # 1. Profile Provisioning / Linking
-        upn = None
-        email = user.email
-        first_name = user.first_name or "LDAP"
-        last_name = user.last_name or "User"
-
-        # If django_auth_ldap is active, we can extract attributes from user.ldap_user
-        if hasattr(user, "ldap_user") and user.ldap_user:
             try:
-                ldap_attrs = user.ldap_user.attrs
-                if ldap_attrs:
-
-                    def get_attr(name):
-                        val = ldap_attrs.get(name)
-                        if val:
-                            if isinstance(val, list):
-                                val = val[0]
-                            if isinstance(val, bytes):
-                                return val.decode("utf-8")
-                            return str(val)
-                        return None
-
-                    upn = get_attr("userPrincipalName") or get_attr("mail")
-                    email = get_attr("mail") or email
-                    first_name = get_attr("givenName") or first_name
-                    last_name = get_attr("sn") or last_name
-            # broad except: boundary-isolation: LDAP attribute proxies expose provider-specific failures
-            except Exception as exc:
-                logger.warning(
-                    "Could not read LDAP attributes for user_id=%s tenant_id=%s exception_type=%s",
-                    user.pk,
-                    tenant.pk,
-                    type(exc).__name__,
-                )
-
-        if not upn:
-            upn = email or f"{user.username}@ldap"
-        if not email:
-            email = f"{user.username}@ldap.local"
-
-        # Check if the user already has a linked profile in the target tenant
-        holder = user.asset_holder_profiles.filter(tenant=tenant).first()
-        if not holder:
-            if upn:
-                holder = AssetHolder.objects.filter(tenant=tenant, upn=upn).first()
-            if not holder and email:
-                holder = AssetHolder.objects.filter(tenant=tenant, email=email).first()
-
-            if holder and holder.user is None:
-                holder.user = user
-                try:
-                    with transaction.atomic():
-                        holder.save()
-                except IntegrityError as e:
-                    logger.warning(f"IntegrityError while saving AssetHolder: {e}")
-                    holder = None
-            elif not holder or (holder and holder.user != user):
-                try:
-                    with transaction.atomic():
-                        holder = AssetHolder.objects.create(
-                            user=user, first_name=first_name, last_name=last_name, upn=upn, email=email, tenant=tenant
-                        )
-                except IntegrityError as e:
-                    logger.warning(f"IntegrityError while creating AssetHolder: {e}")
-                    holder = None
-
-        # 2. Membership & Role Syncing
-        groups = []
-        if hasattr(user, "ldap_user") and user.ldap_user:
-            try:
-                groups = list(user.ldap_user.group_names)
-            # broad except: boundary-isolation: LDAP group proxies expose provider-specific failures
-            except Exception as exc:
+                user = super().authenticate(request, username, password, **kwargs)
+            except ImproperlyConfigured as exc:
                 logger.debug(
-                    "LDAP group_names unavailable for user_id=%s tenant_id=%s; trying group_dns (exception_type=%s)",
-                    user.pk,
-                    tenant.pk,
-                    type(exc).__name__,
+                    "LDAP backend skipped",
+                    extra={
+                        "source": "ldap",
+                        "reason_code": "not_configured",
+                        "exception_type": type(exc).__name__,
+                    },
                 )
-                try:
-                    groups = list(user.ldap_user.group_dns)
-                # broad except: boundary-isolation: LDAP group proxies expose provider-specific failures
-                except Exception as exc:
-                    logger.warning(
-                        "Could not read LDAP groups for user_id=%s tenant_id=%s exception_type=%s",
-                        user.pk,
-                        tenant.pk,
-                        type(exc).__name__,
-                    )
+                return None
+            except _LDAP_PROVIDER_ERROR as exc:
+                raise classify_ldap_error(exc, context=_ldap_context("authenticate")) from exc
 
-        tenant_configs = getattr(settings, "ITAMBOX_TENANT_LDAP_CONFIGS", {})
-        tenant_config = tenant_configs.get(tenant.slug, {})
-        group_role_mapping = tenant_config.get("LDAP_GROUP_ROLE_MAPPING", {})
-
-        user_roles = []
-        for group in groups:
-            if group in group_role_mapping:
-                mapped_role = group_role_mapping[group]
-                if isinstance(mapped_role, str):
-                    user_roles.append(mapped_role.lower())
-
-        resolved_role_name = None
-        for priority_role in ["admin", "manager", "member"]:
-            if priority_role in user_roles:
-                resolved_role_name = priority_role
-                break
-
-        if not resolved_role_name:
-            resolved_role_name = "member"
-
-        role_title_map = {"admin": "Admin", "manager": "Manager", "member": "Member"}
-        db_role_name = role_title_map.get(resolved_role_name, "Member")
-
-        # Safe JIT provisioning: never auto-create a privileged role from a group
-        # claim; assign Admin/Manager only if the operator created them deliberately.
-        from core.auth.provisioning import provision_membership
-
-        provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, "LDAP")
-
-    def get_permissions_for_role(self, role_name):
-        from django.contrib.auth.models import Permission
-
-        from organization.forms.role_form import MATRIX_MODELS
-
-        perms = set()
-        for _key, info in MATRIX_MODELS.items():
-            app = info["app"]
-            model = info["model_name"]
-            if role_name == "Admin":
-                perms.update(
-                    [f"{app}.view_{model}", f"{app}.add_{model}", f"{app}.change_{model}", f"{app}.delete_{model}"]
-                )
-            elif role_name in ("Manager", "Member"):
-                perms.update([f"{app}.view_{model}", f"{app}.add_{model}", f"{app}.change_{model}"])
-        perms.update(
-            ["extras.view_dashboard", "extras.change_dashboard", "extras.add_dashboard", "extras.delete_dashboard"]
-        )
-        all_codenames = set(
-            f"{p.content_type.app_label}.{p.codename}" for p in Permission.objects.select_related("content_type").all()
-        )
-        return list(perms & all_codenames)
+            if user is None:
+                return None
+            # ``can_login=False`` bars all interactive login, including LDAP/SSO.
+            if not getattr(user, "can_login", True):
+                return None
+            tenant = get_current_tenant()
+            if tenant is not None:
+                self._provision_ldap_identity(user, tenant)
+            successful = True
+            return user
+        finally:
+            if not successful:
+                previous_context.restore()
 
     def has_perm(self, user_obj, perm, obj=None):
         return False

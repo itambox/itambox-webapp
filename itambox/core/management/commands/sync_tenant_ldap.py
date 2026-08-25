@@ -1,11 +1,6 @@
-import logging
-from datetime import timedelta
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Q
-from django.utils import timezone
 
 from core.auth.ldap import (
     LDAPConfigurationError,
@@ -16,17 +11,13 @@ from core.auth.ldap import (
 )
 from core.context import get_current_request_id
 from core.errors import IntegrationContext
-from core.mfa import role_is_privileged
 from core.tasks.context import TaskContext
 from itambox.middleware import get_current_user
-from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.models import Tenant
+from organization.services import identity_provisioning
 
-logger = logging.getLogger("django_auth_ldap")
 User = get_user_model()
 _LDAP_PROVIDER_ERROR = getattr(ldap, "LDAPError", Exception)
-
-LDAP_GRANT_REASON = "LDAP directory synchronization"
-LDAP_PRIVILEGED_GRANT_LIFETIME = timedelta(days=1)
 
 
 def _ldap_context(tenant, operation):
@@ -56,58 +47,8 @@ def _require_real_ldap_backend():
         raise ImportError
 
 
-def _ensure_ldap_role_grant(membership, role):
-    """Ensure LDAP's own-scope role without taking ownership of manual grants."""
-    now = timezone.now()
-    desired_valid_until = now + LDAP_PRIVILEGED_GRANT_LIFETIME if role_is_privileged(role) else None
-
-    # LDAP owns a grant only when both durable markers match exactly. The outer
-    # TaskContext actor is intentionally change-log attribution, not granted_by:
-    # granted_by=None distinguishes this system-managed row from a manual grant.
-    ldap_owned = list(
-        membership.role_grants.filter(
-            role=role,
-            reason=LDAP_GRANT_REASON,
-            granted_by__isnull=True,
-        ).order_by("pk")
-    )
-    if len(ldap_owned) == 1:
-        grant = ldap_owned[0]
-        if grant.valid_until != desired_valid_until:
-            grant.valid_until = desired_valid_until
-            grant.full_clean()
-            grant.save(update_fields=["valid_until"])
-        RoleGrantScope.objects.get_or_create(
-            role_grant=grant,
-            scope_type=RoleGrantScope.SCOPE_OWN,
-        )
-        return grant
-
-    equivalent_grants = membership.role_grants.filter(
-        role=role,
-        scopes__scope_type=RoleGrantScope.SCOPE_OWN,
-    ).distinct()
-    active_equivalent = equivalent_grants.filter(Q(valid_until__isnull=True) | Q(valid_until__gt=now))
-
-    # An active manual grant already supplies the requested access. Multiple
-    # LDAP-marked rows are also left alone: choosing one would be ambiguous.
-    if active_equivalent.exists():
-        return active_equivalent.order_by("pk").first()
-
-    grant = RoleGrant(
-        membership=membership,
-        role=role,
-        reason=LDAP_GRANT_REASON,
-        valid_until=desired_valid_until,
-        granted_by=None,
-    )
-    grant.full_clean()
-    grant.save()
-    RoleGrantScope.objects.create(
-        role_grant=grant,
-        scope_type=RoleGrantScope.SCOPE_OWN,
-    )
-    return grant
+def _directory_text(value):
+    return value.decode("utf-8") if isinstance(value, bytes) else value
 
 
 class Command(BaseCommand):
@@ -119,13 +60,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         tenant_slug = options["tenant"]
         try:
-            tenant = Tenant.objects.get(slug=tenant_slug)
+            tenant = Tenant._base_manager.get(slug=tenant_slug, deleted_at__isnull=True)
         except Tenant.DoesNotExist:
-            raise CommandError(f"Tenant with slug {tenant_slug!r} does not exist.") from None
+            raise CommandError("The requested LDAP tenant does not exist.") from None
 
         # TaskContext sets the tenant scope AND wires _request_id + _current_user
-        # so that ChangeLoggingMixin records ObjectChange entries for all User/
-        # Membership saves that happen during the sync.
+        # so that ChangeLoggingMixin records User saves during the sync.
         # Direct CLI execution has no actor and remains system-attributed. When
         # called from sync_tenant_ldap_task, carry its actor into this nested
         # context instead of replacing it with user=None.
@@ -137,13 +77,14 @@ class Command(BaseCommand):
             self._run_sync(tenant)
 
     def _run_sync(self, tenant):
-        self.stdout.write(self.style.NOTICE(f"Scoping LDAP synchronization to tenant: {tenant.name} ({tenant.slug})"))
+        self.stdout.write(self.style.NOTICE(f"Scoping LDAP synchronization (tenant_id={tenant.pk})"))
 
-        # Retrieve configurations from settings
         tenant_configs = getattr(settings, "ITAMBOX_TENANT_LDAP_CONFIGS", {})
         config = tenant_configs.get(tenant.slug)
 
         if not config:
+            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
+        if not isinstance(config, dict):
             raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
 
         server_uri = config.get("SERVER_URI") or config.get("server_uri")
@@ -152,7 +93,6 @@ class Command(BaseCommand):
         user_search_base = config.get("USER_SEARCH_BASE") or config.get("user_search_base")
         user_search_filter = config.get("USER_SEARCH_FILTER") or config.get("user_search_filter")
 
-        # Fallback to nested dict USER_SEARCH if base or filter are not directly configured
         if not user_search_base or not user_search_filter:
             user_search = config.get("USER_SEARCH") or config.get("user_search")
             if user_search and isinstance(user_search, dict):
@@ -163,12 +103,11 @@ class Command(BaseCommand):
 
         if not user_search_filter:
             user_search_filter = "(uid=%(user)s)"
+        if not isinstance(user_search_filter, str):
+            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
         require_group = config.get("REQUIRE_GROUP") or config.get("require_group")
 
-        if not server_uri or not bind_dn:
-            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
-
-        if not user_search_base:
+        if not server_uri or not bind_dn or not user_search_base:
             raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
 
         try:
@@ -177,29 +116,31 @@ class Command(BaseCommand):
             raise LDAPDependencyUnavailableError(context=_ldap_context(tenant, "sync.dependency")) from None
 
         self.stdout.write("Connecting to configured LDAP server...")
-        conn = _initialize_connection(server_uri, tenant)
+        connection = _initialize_connection(server_uri, tenant)
+        operation = "sync.bind"
 
         try:
-            conn.simple_bind_s(bind_dn, bind_password)
+            connection.simple_bind_s(bind_dn, bind_password)
             self.stdout.write(self.style.SUCCESS("LDAP bind successful."))
         except _LDAP_PROVIDER_ERROR as exc:
-            raise classify_ldap_error(exc, context=_ldap_context(tenant, "sync.bind")) from exc
+            connection.unbind_s()
+            raise classify_ldap_error(exc, context=_ldap_context(tenant, operation)) from exc
 
-        # Resolve wildcards for bulk synchronization search
         search_filter = user_search_filter
         if "%(user)s" in search_filter:
             search_filter = search_filter.replace("%(user)s", "*")
 
         scope = ldap.SCOPE_SUBTREE
         retrieve_attrs = ["uid", "cn", "sn", "givenName", "mail", "memberOf"]
+        operation = "sync.search"
 
         try:
-            result_id = conn.search(user_search_base, scope, search_filter, retrieve_attrs)
+            result_id = connection.search(user_search_base, scope, search_filter, retrieve_attrs)
             created_count = 0
             updated_count = 0
 
             while True:
-                result_type, result_data = conn.result(result_id, 0)
+                result_type, result_data = connection.result(result_id, 0)
                 if not result_data:
                     break
                 if result_type == ldap.RES_SEARCH_ENTRY:
@@ -213,31 +154,15 @@ class Command(BaseCommand):
                         if not uid_vals:
                             continue
 
-                        username = uid_vals[0].decode("utf-8") if isinstance(uid_vals[0], bytes) else uid_vals[0]
-                        email = (
-                            mail_vals[0].decode("utf-8")
-                            if mail_vals and isinstance(mail_vals[0], bytes)
-                            else (mail_vals[0] if mail_vals else "")
-                        )
-                        first_name = (
-                            gn_vals[0].decode("utf-8")
-                            if gn_vals and isinstance(gn_vals[0], bytes)
-                            else (gn_vals[0] if gn_vals else "")
-                        )
-                        last_name = (
-                            sn_vals[0].decode("utf-8")
-                            if sn_vals and isinstance(sn_vals[0], bytes)
-                            else (sn_vals[0] if sn_vals else "")
-                        )
+                        username = _directory_text(uid_vals[0])
+                        email = _directory_text(mail_vals[0]) if mail_vals else ""
+                        first_name = _directory_text(gn_vals[0]) if gn_vals else ""
+                        last_name = _directory_text(sn_vals[0]) if sn_vals else ""
                         if not last_name and cn_vals:
-                            last_name = cn_vals[0].decode("utf-8") if isinstance(cn_vals[0], bytes) else cn_vals[0]
+                            last_name = _directory_text(cn_vals[0])
 
-                        # Filter by group membership if specified
                         if require_group:
-                            member_of = []
-                            for v in entry.get("memberOf", []):
-                                val = v.decode("utf-8") if isinstance(v, bytes) else v
-                                member_of.append(val)
+                            member_of = [_directory_text(value) for value in entry.get("memberOf", [])]
                             if require_group not in member_of:
                                 continue
 
@@ -250,56 +175,19 @@ class Command(BaseCommand):
                                 "is_active": True,
                             },
                         )
-
-                        # Add user to tenant membership as member by default
-                        tenant_role, _ = Role.objects.get_or_create(
-                            tenant=tenant,
-                            name="Member",
-                            defaults={
-                                "description": "Default Standard Member",
-                                "permissions": [
-                                    "assets.view_asset",
-                                    "assets.add_asset",
-                                    "assets.change_asset",
-                                    "inventory.view_accessory",
-                                    "inventory.add_accessory",
-                                    "inventory.change_accessory",
-                                    "inventory.view_consumable",
-                                    "inventory.add_consumable",
-                                    "inventory.change_consumable",
-                                    "inventory.view_kit",
-                                    "inventory.add_kit",
-                                    "inventory.change_kit",
-                                    "inventory.view_component",
-                                    "inventory.add_component",
-                                    "inventory.change_component",
-                                    "organization.view_location",
-                                    "organization.add_location",
-                                    "organization.change_location",
-                                    "organization.view_site",
-                                    "organization.add_site",
-                                    "organization.change_site",
-                                    "organization.view_assetholder",
-                                    "organization.add_assetholder",
-                                    "organization.change_assetholder",
-                                    "extras.view_dashboard",
-                                    "extras.add_dashboard",
-                                    "extras.change_dashboard",
-                                ],
-                            },
+                        identity_provisioning.provision_ldap_directory_identity(
+                            identity_provisioning.LDAPDirectoryIdentityCommand(
+                                user=user,
+                                tenant=tenant,
+                            )
                         )
-                        membership, _ = Membership.objects.get_or_create(
-                            user=user,
-                            tenant=tenant,
-                        )
-                        _ensure_ldap_role_grant(membership, tenant_role)
 
                         if created:
                             created_count += 1
-                            self.stdout.write(self.style.SUCCESS(f"Created user: {username}"))
+                            self.stdout.write(self.style.SUCCESS(f"Created directory user_id={user.pk}"))
                         else:
                             updated_count += 1
-                            self.stdout.write(f"Updated user: {username}")
+                            self.stdout.write(f"Updated directory user_id={user.pk}")
 
             self.stdout.write(
                 self.style.SUCCESS(
@@ -308,9 +196,6 @@ class Command(BaseCommand):
             )
 
         except _LDAP_PROVIDER_ERROR as exc:
-            raise classify_ldap_error(exc, context=_ldap_context(tenant, "sync.search")) from exc
+            raise classify_ldap_error(exc, context=_ldap_context(tenant, operation)) from exc
         finally:
-            # Tenant context cleanup is handled by TaskContext.__exit__; do NOT
-            # call set_current_tenant(None) here as it would fire before TaskContext
-            # restores the previous context, breaking nested invocations.
-            conn.unbind_s()
+            connection.unbind_s()

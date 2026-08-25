@@ -161,12 +161,12 @@ class MultiTenantAuthTestCase(TestCase):
 
             # Auth query with UPN username matching tenant alpha slug
             backend.authenticate(request=None, username="user1@tenant-alpha", password="password")
-            self.assertEqual(get_current_tenant(), self.tenant_alpha)
+            self.assertIsNone(get_current_tenant())
 
             set_current_tenant(None)
             # Auth query with domain matching tenant beta slug
             backend.authenticate(request=None, username="user1@tenant-beta.org", password="password")
-            self.assertEqual(get_current_tenant(), self.tenant_beta)
+            self.assertIsNone(get_current_tenant())
 
     @patch(
         "core.management.commands.sync_tenant_ldap.django_auth_ldap_installed",
