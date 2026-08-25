@@ -9,6 +9,10 @@ from unittest import mock
 from django.test import TestCase
 
 from core.identity_provisioning import ExternalIdentityProfile, ExternalIdentityProvisioningCommand, ProviderStaffIntent
+from core.models import ObjectChange
+from core.oidc_identity import oidc_sensitive_audit
+from core.tasks.context import TaskContext
+from extras.models import Event
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services.identity_provisioning import (
     LDAPDirectoryIdentityCommand,
@@ -52,6 +56,30 @@ class IdentityServiceRollbackTests(TestCase):
             "holders": list(
                 AssetHolder._base_manager.order_by("pk").values_list(
                     "pk", "user_id", "tenant_id", "upn", "email", "deleted_at"
+                )
+            ),
+            "users": list(
+                User._base_manager.order_by("pk").values_list(
+                    "pk", "username", "email", "first_name", "last_name", "is_active"
+                )
+            ),
+            "object_changes": list(
+                ObjectChange._base_manager.order_by("pk").values_list(
+                    "pk",
+                    "tenant_id",
+                    "user_id",
+                    "request_id",
+                    "action",
+                    "changed_object_type_id",
+                    "changed_object_id",
+                    "object_repr",
+                    "prechange_data",
+                    "postchange_data",
+                )
+            ),
+            "events": list(
+                Event._base_manager.order_by("pk").values_list(
+                    "pk", "model_id", "object_id", "action", "data", "processed"
                 )
             ),
             "groups": list(User.objects.order_by("pk").values_list("pk", "username", "email")),
@@ -206,3 +234,33 @@ class IdentityServiceRollbackTests(TestCase):
                     RoleGrant.objects.create(membership=membership, role=role)
                 command = LDAPDirectoryIdentityCommand(user=user, tenant=self.customer)
                 self.fail_at(stage, lambda command=command: provision_ldap_directory_identity(command))
+
+    def test_ldap_grant_refresh_checkpoint_rolls_back_full_audit_and_profile_state(self):
+        actor = User.objects.create_superuser(
+            username="ldap-refresh-actor-443",
+            email="ldap-refresh-actor-443@example.invalid",
+            password="not-used-443",
+        )
+        user = User.objects.create_user(
+            username="ldap-refresh-443",
+            email="ldap-refresh-443@example.invalid",
+            first_name="Before",
+            last_name="Refresh",
+        )
+        command = LDAPDirectoryIdentityCommand(user=user, tenant=self.customer)
+        provision_ldap_directory_identity(command)
+        before = self.fingerprint()
+
+        def checkpoint(stage):
+            if stage == "ldap.grant_refreshed":
+                raise RuntimeError(stage)
+
+        with (
+            TaskContext(tenant_id=self.customer.pk, user_id=actor.pk),
+            oidc_sensitive_audit(),
+            mock.patch("organization.services.identity_provisioning._stage_checkpoint", side_effect=checkpoint),
+            self.assertRaisesRegex(RuntimeError, "ldap.grant_refreshed"),
+        ):
+            provision_ldap_directory_identity(command)
+
+        self.assertEqual(self.fingerprint(), before)

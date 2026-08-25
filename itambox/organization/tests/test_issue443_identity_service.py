@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
+import inspect
 import json
+import logging
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -13,12 +17,17 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
+import organization.services.identity_provisioning as identity_service
 from core.identity_provisioning import (
     ExternalIdentityProfile,
     ExternalIdentityProvisioningCommand,
     ProviderStaffIntent,
 )
 from core.mfa import role_is_privileged
+from core.models import ObjectChange
+from core.oidc_identity import oidc_sensitive_audit
+from core.tasks.context import TaskContext
+from extras.models import Event
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services.identity_provisioning import (
     LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS,
@@ -118,6 +127,30 @@ class IdentityServiceCase(TestCase):
                     "pk", "user_group_id", "membership_id", "source"
                 )
             ),
+            "users": list(
+                User._base_manager.order_by("pk").values_list(
+                    "pk", "username", "email", "first_name", "last_name", "is_active"
+                )
+            ),
+            "object_changes": list(
+                ObjectChange._base_manager.order_by("pk").values_list(
+                    "pk",
+                    "tenant_id",
+                    "user_id",
+                    "request_id",
+                    "action",
+                    "changed_object_type_id",
+                    "changed_object_id",
+                    "object_repr",
+                    "prechange_data",
+                    "postchange_data",
+                )
+            ),
+            "events": list(
+                Event._base_manager.order_by("pk").values_list(
+                    "pk", "model_id", "object_id", "action", "data", "processed"
+                )
+            ),
         }
         encoded = json.dumps(payload, default=str, sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest(), payload
@@ -130,11 +163,31 @@ class IdentityServiceCase(TestCase):
     def assert_no_sensitive_log_text(self, records):
         for record in records:
             message = record.getMessage() if hasattr(record, "getMessage") else str(record)
-            self.assertNotIn(CANARY_EMAIL, message)
-            self.assertNotIn(CANARY_UPN, message)
-            self.assertNotIn(CANARY_GROUP, message)
-            self.assertNotIn(CANARY_ROLE, message)
-            self.assertNotIn(CANARY_DRIVER, message)
+            structured = json.dumps(record.__dict__, default=str, sort_keys=True)
+            rendered = logging.Formatter(
+                "%(levelname)s %(name)s %(message)s "
+                "%(source)s %(reason_code)s %(user_id)s %(tenant_id)s "
+                "%(customer_tenant_id)s %(provider_tenant_id)s %(role_id)s "
+                "%(holder_id)s %(membership_id)s %(exception_type)s",
+                defaults={
+                    "source": None,
+                    "reason_code": None,
+                    "user_id": None,
+                    "tenant_id": None,
+                    "customer_tenant_id": None,
+                    "provider_tenant_id": None,
+                    "role_id": None,
+                    "holder_id": None,
+                    "membership_id": None,
+                    "exception_type": None,
+                },
+            ).format(record)
+            for text in (message, structured, rendered):
+                self.assertNotIn(CANARY_EMAIL, text)
+                self.assertNotIn(CANARY_UPN, text)
+                self.assertNotIn(CANARY_GROUP, text)
+                self.assertNotIn(CANARY_ROLE, text)
+                self.assertNotIn(CANARY_DRIVER, text)
             self.assertNotIn(
                 "IntegrityError", message.split("exception_type=")[-1] if "exception_type=" in message else ""
             )
@@ -266,6 +319,56 @@ class TenantAndLockContractTests(IdentityServiceCase):
         self.assertIn("%s", sql)
         self.assertEqual(list(params), [self.customer.pk])
         self.assertEqual(role.pk, Role.objects.get(tenant=self.customer, name="Member").pk)
+
+    def test_provider_tenant_sql_has_exact_sorted_ids_and_liveness_columns(self):
+        provider_role = self.role(self.provider, name="ProviderStaff")
+        statements = []
+
+        def wrapper(execute, sql, params, many, context):
+            statements.append((sql, params))
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(wrapper):
+            self.provisioner.provision(self.command(provider_staff=self.provider_intent(role_name=provider_role.name)))
+
+        tenant_locks = [
+            (sql, params)
+            for sql, params in statements
+            if "organization_tenant" in sql.lower() and "for share" in sql.lower()
+        ]
+        self.assertEqual(len(tenant_locks), 1)
+        sql, params = tenant_locks[0]
+        self.assertEqual(list(params), sorted([self.customer.pk, self.provider.pk]))
+        self.assertIn('SELECT "id", "deleted_at", "is_provider", "managed_by_id"', sql)
+        self.assertIn("ORDER BY", sql.upper())
+        self.assertIn("FOR SHARE", sql.upper())
+        self.assertNotIn("FOR UPDATE", sql.upper())
+        self.assertNotIn("FOR KEY SHARE", sql.upper())
+
+    def test_missing_deleted_duplicate_and_contradictory_tenant_sets_fail_before_any_write(self):
+        deleted = Tenant.objects.create(name="Deleted 443", slug="deleted-443")
+        Tenant._base_manager.filter(pk=deleted.pk).update(deleted_at=timezone.now())
+        wrong_provider = Tenant.objects.create(name="Wrong Provider 443", slug="wrong-provider-443", is_provider=True)
+        cases = (
+            ("missing customer", self.command(tenant=SimpleNamespace(pk=99999991))),
+            ("deleted customer", self.command(tenant=deleted)),
+            (
+                "duplicate customer/provider id",
+                self.command(provider_staff=self.provider_intent(provider=self.customer, role_name="Missing")),
+            ),
+            (
+                "contradictory provider relationship",
+                self.command(provider_staff=self.provider_intent(provider=wrong_provider, role_name="Missing")),
+            ),
+        )
+        for label, command in cases:
+            with self.subTest(label=label):
+                before_hash, before = self.organization_fingerprint()
+                with self.assertRaises(IdentityProvisioningError):
+                    self.provisioner.provision(command)
+                after_hash, after = self.organization_fingerprint()
+                self.assertEqual(before_hash, after_hash)
+                self.assertEqual(before, after)
 
     def test_ordinary_customer_path_queries_group_membership_zero_times(self):
         self.role(self.customer)
@@ -492,6 +595,78 @@ class GrantConvergenceTests(IdentityServiceCase):
             {RoleGrantScope.SCOPE_OWN, RoleGrantScope.SCOPE_TENANT},
         )
         self.assertEqual(result.membership_id, membership.pk)
+
+    def test_same_role_nonown_only_historical_grants_converge_and_keep_every_scope(self):
+        role = self.role(self.customer)
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        legacy = RoleGrant.objects.create(membership=membership, role=role, reason="legacy non-own")
+        duplicate = RoleGrant.objects.create(membership=membership, role=role, reason="legacy own")
+        RoleGrantScope._base_manager.bulk_create(
+            [
+                RoleGrantScope(
+                    role_grant_id=legacy.pk,
+                    scope_type=RoleGrantScope.SCOPE_TENANT,
+                    tenant_id=self.customer.pk,
+                )
+            ]
+        )
+        RoleGrantScope.objects.create(role_grant=duplicate, scope_type=RoleGrantScope.SCOPE_OWN)
+
+        result = self.provisioner.provision(self.command())
+
+        grants = list(RoleGrant._base_manager.filter(membership=membership, role=role).order_by("pk"))
+        self.assertEqual([grant.pk for grant in grants], [legacy.pk])
+        self.assertEqual(
+            set(RoleGrantScope._base_manager.filter(role_grant=legacy).values_list("scope_type", flat=True)),
+            {RoleGrantScope.SCOPE_OWN, RoleGrantScope.SCOPE_TENANT},
+        )
+        self.assertEqual(result.membership_id, membership.pk)
+
+    def test_customer_reconciliation_does_not_mutate_inactive_provider_membership_children(self):
+        customer_role = self.role(self.customer)
+        provider_role = self.role(self.provider, name="ProviderStaff")
+        provider_membership = Membership.objects.create(user=self.user, tenant=self.provider, is_active=False)
+        provider_grant = RoleGrant.objects.create(
+            membership=provider_membership,
+            role=provider_role,
+            reason="historical provider grant",
+        )
+        RoleGrantScope.objects.create(role_grant=provider_grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        RoleGrantScope._base_manager.create(
+            role_grant_id=provider_grant.pk,
+            scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+        )
+        before_grant = tuple(
+            RoleGrant._base_manager.filter(pk=provider_grant.pk)
+            .values_list("pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until")
+            .get()
+        )
+        before_scopes = tuple(
+            RoleGrantScope._base_manager.filter(role_grant=provider_grant)
+            .order_by("pk")
+            .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+        )
+
+        result = self.provisioner.provision(self.command())
+
+        self.assertEqual(result.mode, "customer")
+        self.assertEqual(
+            tuple(
+                RoleGrant._base_manager.filter(pk=provider_grant.pk)
+                .values_list("pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until")
+                .get()
+            ),
+            before_grant,
+        )
+        self.assertEqual(
+            tuple(
+                RoleGrantScope._base_manager.filter(role_grant=provider_grant)
+                .order_by("pk")
+                .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+            ),
+            before_scopes,
+        )
+        self.assertEqual(Role.objects.get(pk=result.role_id).pk, customer_role.pk)
 
     def test_conflicting_own_grant_with_nonown_scope_is_preserved_without_own_scope(self):
         target = self.role(self.customer, name="Member")
@@ -813,6 +988,112 @@ class LoggingAndFailureContractTests(IdentityServiceCase):
             self.provisioner.provision(self.command(user=unsaved))
 
         after_hash, after = self.organization_fingerprint()
+        self.assertEqual(before_hash, after_hash)
+        self.assertEqual(before, after)
+
+    def test_service_contract_has_no_direct_any_and_documents_oidc_binding_handoff(self):
+        source = inspect.getsource(identity_service)
+        tree = ast.parse(source)
+        self.assertNotIn("from typing import Any", source)
+        self.assertFalse(any(isinstance(node, ast.Name) and node.id == "Any" for node in ast.walk(tree)))
+        signature = inspect.signature(OrganizationIdentityProvisioner.provision)
+        self.assertEqual(tuple(signature.parameters), ("self", "command"))
+        docstring = inspect.getdoc(OrganizationIdentityProvisioner.provision) or ""
+        self.assertIn("Tenant FOR SHARE", docstring)
+        self.assertIn("must not pre-lock User or Tenant", docstring)
+        self.assertNotIn("skip_user_lock", docstring)
+        self.assertNotIn("skip_tenant_lock", docstring)
+
+    def test_structured_log_fields_and_rendered_output_are_redacted(self):
+        self.role(self.customer)
+        AssetHolder.objects.create(
+            user=None,
+            tenant=self.customer,
+            upn="structured-log-other-upn-443@example.invalid",
+            email=CANARY_EMAIL,
+            first_name="Structured",
+            last_name="Canary",
+        )
+        with self.assertLogs("itambox.organization.identity", level="WARNING") as logs:
+            result = self.provisioner.provision(
+                self.command(
+                    profile=self.profile(
+                        email=CANARY_EMAIL,
+                        upn=CANARY_UPN,
+                    )
+                )
+            )
+
+        self.assertEqual(result.mode, "customer")
+        self.assertTrue(logs.records)
+        for record in logs.records:
+            self.assertEqual(record.__dict__.get("reason_code"), "holder_email_hint_rejected")
+        self.assert_no_sensitive_log_text(logs.records)
+
+    def test_task_and_oidc_context_produce_truthful_redacted_audit_for_success(self):
+        actor = User.objects.create_superuser(
+            username="audit-actor-443",
+            email="audit-actor-443@example.invalid",
+            password="not-used-443",
+        )
+        before_user = tuple(
+            User._base_manager.filter(pk=self.user.pk).values_list("pk", "username", "email", "first_name", "last_name")
+        )
+        before_changes = ObjectChange._base_manager.count()
+        before_events = Event._base_manager.count()
+
+        with TaskContext(tenant_id=self.customer.pk, user_id=actor.pk), oidc_sensitive_audit():
+            result = self.provisioner.provision(
+                self.command(
+                    profile=self.profile(email=CANARY_EMAIL, upn=CANARY_UPN),
+                )
+            )
+
+        self.assertEqual(result.mode, "customer")
+        changes = list(ObjectChange._base_manager.filter(pk__gt=before_changes).order_by("pk"))
+        events = list(Event._base_manager.filter(pk__gt=before_events).order_by("pk"))
+        self.assertTrue(changes)
+        self.assertTrue(all(change.user_id == actor.pk for change in changes))
+        self.assertTrue(all(change.tenant_id == self.customer.pk for change in changes))
+        audit_text = json.dumps(
+            [
+                {
+                    "object_repr": change.object_repr,
+                    "prechange_data": change.prechange_data,
+                    "postchange_data": change.postchange_data,
+                }
+                for change in changes
+            ],
+            default=str,
+            sort_keys=True,
+        )
+        event_text = json.dumps([event.data for event in events], default=str, sort_keys=True)
+        self.assertNotIn(CANARY_EMAIL, audit_text)
+        self.assertNotIn(CANARY_UPN, audit_text)
+        self.assertNotIn(CANARY_EMAIL, event_text)
+        self.assertNotIn(CANARY_UPN, event_text)
+        self.assertEqual(
+            before_user,
+            tuple(
+                User._base_manager.filter(pk=self.user.pk).values_list(
+                    "pk", "username", "email", "first_name", "last_name"
+                )
+            ),
+        )
+
+    def test_provider_rejection_is_zero_write_in_full_task_oidc_fingerprint(self):
+        actor = User.objects.create_superuser(
+            username="reject-actor-443",
+            email="reject-actor-443@example.invalid",
+            password="not-used-443",
+        )
+        before_hash, before = self.organization_fingerprint()
+        with TaskContext(tenant_id=self.customer.pk, user_id=actor.pk), oidc_sensitive_audit():
+            result = self.provisioner.provision(
+                self.command(provider_staff=self.provider_intent(role_name=CANARY_ROLE))
+            )
+        after_hash, after = self.organization_fingerprint()
+        self.assertEqual(result.mode, "provider_mapping_rejected")
         self.assertEqual(before_hash, after_hash)
         self.assertEqual(before, after)
 

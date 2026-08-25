@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import Any, NoReturn, cast
+from datetime import datetime, timedelta
+from typing import NoReturn, TypedDict, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -80,9 +80,14 @@ class LDAPDirectoryIdentityCommand:
 @dataclass(frozen=True)
 class _TenantRow:
     pk: int
-    deleted_at: Any
+    deleted_at: datetime | None
     is_provider: bool
     managed_by_id: int | None
+
+
+class _GrantMetadata(TypedDict):
+    reason: str
+    valid_until: datetime | None
 
 
 @dataclass
@@ -90,8 +95,10 @@ class _AggregateLocks:
     memberships: dict[int, Membership]
     group_memberships: list[GroupMembership]
     grants: list[RoleGrant]
+    grants_by_membership: dict[int, list[RoleGrant]]
     roles: list[Role]
     scopes: list[RoleGrantScope]
+    scopes_by_grant: dict[int, list[RoleGrantScope]]
 
 
 class IdentityProvisioningError(ValidationError):
@@ -110,6 +117,28 @@ def _reject(message: str) -> NoReturn:
 
 def _quoted(identifier: str) -> str:
     return connection.ops.quote_name(identifier)
+
+
+def _tenant_row_from_db(row: object) -> _TenantRow:
+    """Validate the DB-API tuple once before it enters typed domain state."""
+
+    if not isinstance(row, tuple) or len(row) != 4:
+        _reject("Identity provisioning tenant row has an invalid database shape.")
+    pk, deleted_at, is_provider, managed_by_id = row
+    if not isinstance(pk, int) or isinstance(pk, bool):
+        _reject("Identity provisioning tenant row has an invalid primary key.")
+    if deleted_at is not None and not isinstance(deleted_at, datetime):
+        _reject("Identity provisioning tenant row has an invalid deletion timestamp.")
+    if not isinstance(is_provider, bool):
+        _reject("Identity provisioning tenant row has an invalid provider flag.")
+    if managed_by_id is not None and (not isinstance(managed_by_id, int) or isinstance(managed_by_id, bool)):
+        _reject("Identity provisioning tenant row has an invalid manager id.")
+    return _TenantRow(
+        pk=pk,
+        deleted_at=deleted_at,
+        is_provider=is_provider,
+        managed_by_id=managed_by_id,
+    )
 
 
 def _lock_live_tenants(tenant_ids: set[int]) -> dict[int, _TenantRow]:
@@ -137,15 +166,8 @@ def _lock_live_tenants(tenant_ids: set[int]) -> dict[int, _TenantRow]:
 
     if len(rows) != len(ordered_ids):
         _reject("Identity provisioning target tenant is not live.")
-    return {
-        int(row[0]): _TenantRow(
-            pk=int(row[0]),
-            deleted_at=row[1],
-            is_provider=bool(row[2]),
-            managed_by_id=int(row[3]) if row[3] is not None else None,
-        )
-        for row in rows
-    }
+    typed_rows = [_tenant_row_from_db(cast(object, row)) for row in rows]
+    return {row.pk: row for row in typed_rows}
 
 
 def _lock_user(user: UserRef) -> User:
@@ -235,13 +257,29 @@ def _lock_aggregate(
     grants = _lock_grants(membership_ids)
     roles = _lock_roles(grants=grants, role_names=role_names)
     scopes = _lock_scopes(grants)
+    grants_by_membership: dict[int, list[RoleGrant]] = {}
+    for grant in grants:
+        if grant.membership_id is not None:
+            grants_by_membership.setdefault(grant.membership_id, []).append(grant)
+    scopes_by_grant = _scopes_by_grant(scopes)
     return _AggregateLocks(
         memberships=memberships,
         group_memberships=group_memberships,
         grants=grants,
+        grants_by_membership=grants_by_membership,
         roles=roles,
         scopes=scopes,
+        scopes_by_grant=scopes_by_grant,
     )
+
+
+def _reindex_aggregate_children(aggregate: _AggregateLocks) -> None:
+    grants_by_membership: dict[int, list[RoleGrant]] = {}
+    for grant in aggregate.grants:
+        if grant.membership_id is not None:
+            grants_by_membership.setdefault(grant.membership_id, []).append(grant)
+    aggregate.grants_by_membership = grants_by_membership
+    aggregate.scopes_by_grant = _scopes_by_grant(aggregate.scopes)
 
 
 def _find_role(tenant_id: int, name: str, *, lock: bool = False) -> Role | None:
@@ -580,52 +618,76 @@ def _retire_conflicting_own_grants(
             grant.delete()
 
 
+def _merge_scope_into_canonical(
+    *,
+    scope: RoleGrantScope,
+    canonical_id: int,
+    canonical_scopes: list[RoleGrantScope],
+    canonical_keys: set[tuple[str, int | None, int | None]],
+    canonical_scope_ids: set[int],
+) -> None:
+    key = _scope_key(scope)
+    if key in canonical_keys:
+        _delete_scope(scope)
+        return
+    try:
+        RoleGrantScope._base_manager.filter(pk=scope.pk).update(role_grant_id=canonical_id)
+    except IntegrityError:
+        existing_query = RoleGrantScope._base_manager.select_for_update().filter(
+            role_grant_id=canonical_id,
+            scope_type=scope.scope_type,
+        )
+        if scope.tenant_id is None:
+            existing_query = existing_query.filter(tenant_id__isnull=True)
+        else:
+            existing_query = existing_query.filter(tenant_id=scope.tenant_id)
+        if scope.tenant_group_id is None:
+            existing_query = existing_query.filter(tenant_group_id__isnull=True)
+        else:
+            existing_query = existing_query.filter(tenant_group_id=scope.tenant_group_id)
+        existing = existing_query.first()
+        if existing is None:
+            raise
+        _delete_scope(scope)
+        if existing.pk not in canonical_scope_ids:
+            canonical_scopes.append(existing)
+            canonical_scope_ids.add(existing.pk)
+    else:
+        canonical_scopes.append(scope)
+        canonical_scope_ids.add(scope.pk)
+    canonical_keys.add(key)
+
+
 def _merge_duplicate_same_role_grants(
     grants: list[RoleGrant],
     role: Role,
     scopes_by_grant: dict[int, list[RoleGrantScope]],
 ) -> RoleGrant | None:
-    matching = [
-        grant
-        for grant in grants
-        if grant.role_id == role.pk
-        and any(scope.scope_type == RoleGrantScope.SCOPE_OWN for scope in scopes_by_grant.get(grant.pk, ()))
-    ]
+    """Converge every direct same-role grant, including non-own-only history."""
+
+    matching = [grant for grant in grants if grant.role_id == role.pk and grant.membership_id is not None]
     if not matching:
         return None
     matching.sort(key=lambda grant: grant.pk)
     canonical = matching[0]
-    canonical_keys = {_scope_key(scope) for scope in scopes_by_grant.get(canonical.pk, ())}
+    canonical_scopes = scopes_by_grant.setdefault(canonical.pk, [])
+    canonical_keys = {_scope_key(scope) for scope in canonical_scopes}
+    canonical_scope_ids = {scope.pk for scope in canonical_scopes}
     for duplicate in matching[1:]:
-        remaining: list[RoleGrantScope] = []
         for scope in list(scopes_by_grant.get(duplicate.pk, ())):
-            key = _scope_key(scope)
-            if key == (RoleGrantScope.SCOPE_OWN, None, None):
-                _delete_scope(scope)
-                continue
-            if key in canonical_keys:
-                _delete_scope(scope)
-                continue
-            try:
-                RoleGrantScope._base_manager.filter(pk=scope.pk).update(role_grant_id=canonical.pk)
-            except IntegrityError:
-                existing = RoleGrantScope._base_manager.filter(
-                    role_grant_id=canonical.pk,
-                    scope_type=scope.scope_type,
-                    tenant_id=cast(int, scope.tenant_id),
-                    tenant_group_id=cast(int, scope.tenant_group_id),
-                ).first()
-                if existing is None:
-                    raise
-                _delete_scope(scope)
-            canonical_keys.add(key)
-        scopes_by_grant[duplicate.pk] = remaining
-        if not remaining:
-            duplicate.delete()
+            _merge_scope_into_canonical(
+                scope=scope,
+                canonical_id=canonical.pk,
+                canonical_scopes=canonical_scopes,
+                canonical_keys=canonical_keys,
+                canonical_scope_ids=canonical_scope_ids,
+            )
+        scopes_by_grant[duplicate.pk] = []
+        duplicate.delete()
     return canonical
 
 
-def _grant_metadata(role: Role, source: str) -> dict[str, Any]:
+def _grant_metadata(role: Role, source: str) -> _GrantMetadata:
     if not role_is_privileged(role):
         return {"reason": "", "valid_until": None}
     return {
@@ -671,9 +733,12 @@ def _reconcile_customer_grants(
     scopes: list[RoleGrantScope],
     source: str,
 ) -> RoleGrant:
-    scopes_by_grant = _scopes_by_grant(scopes)
-    _retire_conflicting_own_grants(grants, role, scopes_by_grant)
-    current = _merge_duplicate_same_role_grants(grants, role, scopes_by_grant)
+    membership_grants = [grant for grant in grants if grant.membership_id == membership.pk]
+    membership_grant_ids = {grant.pk for grant in membership_grants}
+    membership_scopes = [scope for scope in scopes if scope.role_grant_id in membership_grant_ids]
+    scopes_by_grant = _scopes_by_grant(membership_scopes)
+    _retire_conflicting_own_grants(membership_grants, role, scopes_by_grant)
+    current = _merge_duplicate_same_role_grants(membership_grants, role, scopes_by_grant)
     metadata = _grant_metadata(role, source)
     if current is None:
         current = RoleGrant._base_manager.create(
@@ -811,6 +876,26 @@ def _requested_role_names(
     return tuple(names)
 
 
+def _create_membership(*, user_id: int, tenant_id: int) -> tuple[Membership, bool]:
+    """Create a Membership or reread the exact live uniqueness identity."""
+
+    try:
+        with transaction.atomic():
+            return (
+                Membership._base_manager.create(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    is_active=True,
+                ),
+                True,
+            )
+    except IntegrityError:
+        membership = Membership._base_manager.select_for_update().filter(user_id=user_id, tenant_id=tenant_id).first()
+        if membership is None:
+            raise
+        return membership, False
+
+
 def _provision_customer(
     *,
     command: ExternalIdentityProvisioningCommand,
@@ -835,36 +920,41 @@ def _provision_customer(
     )
     membership = memberships.get(customer_id)
     if membership is None:
-        try:
-            with transaction.atomic():
-                membership = Membership._base_manager.create(
-                    user_id=locked_user.pk,
-                    tenant_id=customer_id,
-                    is_active=True,
-                )
-        except IntegrityError:
-            membership = (
-                Membership._base_manager.select_for_update()
-                .filter(
-                    user_id=locked_user.pk,
-                    tenant_id=customer_id,
-                )
-                .first()
-            )
-            if membership is None:
-                raise
+        membership, created = _create_membership(user_id=locked_user.pk, tenant_id=customer_id)
+        if not created:
             # A competing Membership writer may also have committed grants.
-            # Refresh the exact child aggregate; never use stale lists.
+            # Refresh only the conflict path; normal provisioning keeps one query per lock table.
             refreshed_grants = _lock_grants({membership.pk})
-            aggregate.grants = refreshed_grants
-            aggregate.roles = _lock_roles(
+            aggregate.grants = [
+                grant for grant in aggregate.grants if grant.membership_id != membership.pk
+            ] + refreshed_grants
+            refreshed_scopes = _lock_scopes(refreshed_grants)
+            refreshed_grant_ids = {grant.pk for grant in refreshed_grants}
+            aggregate.scopes = [
+                scope for scope in aggregate.scopes if scope.role_grant_id not in refreshed_grant_ids
+            ] + refreshed_scopes
+            refreshed_roles = _lock_roles(
                 grants=refreshed_grants,
                 role_names=((customer_id, role.name),),
             )
-            aggregate.scopes = _lock_scopes(refreshed_grants)
+            roles_by_pk = {locked_role.pk: locked_role for locked_role in aggregate.roles}
+            roles_by_pk.update({locked_role.pk: locked_role for locked_role in refreshed_roles})
+            aggregate.roles = sorted(
+                roles_by_pk.values(), key=lambda locked_role: (locked_role.tenant_id, locked_role.pk)
+            )
+            _reindex_aggregate_children(aggregate)
         memberships[customer_id] = membership
         aggregate.memberships = memberships
         _stage_checkpoint("customer.membership_created")
+
+    customer_grants = aggregate.grants_by_membership.get(membership.pk, [])
+    customer_grant_ids = {grant.pk for grant in customer_grants}
+    customer_scopes = [
+        scope
+        for scoped_rows in aggregate.scopes_by_grant.values()
+        for scope in scoped_rows
+        if scope.role_grant_id in customer_grant_ids
+    ]
 
     holder = _link_or_create_holder(
         user=locked_user,
@@ -879,8 +969,8 @@ def _provision_customer(
     grant = _reconcile_customer_grants(
         membership=membership,
         role=role,
-        grants=aggregate.grants,
-        scopes=aggregate.scopes,
+        grants=customer_grants,
+        scopes=customer_scopes,
         source=source,
     )
     return ExternalIdentityProvisioningResult(
@@ -895,6 +985,12 @@ class OrganizationIdentityProvisioner(IdentityProvisioner):
     """The sole interactive organization aggregate writer."""
 
     def provision(self, command: ExternalIdentityProvisioningCommand) -> ExternalIdentityProvisioningResult:
+        """Run the normative Tenant FOR SHARE -> User -> aggregate lock plan.
+
+        The caller may hold an OIDC binding-row lock in the surrounding Phase-B
+        transaction, but must not pre-lock User or Tenant and must not request a
+        reversed or skipped service lock. Organization owns this handoff.
+        """
         with transaction.atomic():
             customer_id, provider_id, tenant_rows = _validate_command_tenants(command)
             customer_row = tenant_rows[customer_id]
@@ -940,8 +1036,17 @@ class OrganizationIdentityProvisioner(IdentityProvisioner):
             )
 
 
-def _get_or_create_directory_role(tenant_id: int) -> Role:
-    role = _find_role(tenant_id, "Member")
+def _get_or_create_directory_role(*, tenant_id: int, locked_roles: list[Role]) -> Role:
+    """Resolve the already-locked role name, creating only after that pass."""
+
+    role = next(
+        (
+            locked_role
+            for locked_role in locked_roles
+            if locked_role.tenant_id == tenant_id and locked_role.name == "Member"
+        ),
+        None,
+    )
     if role is not None:
         return role
     try:
@@ -1019,7 +1124,15 @@ def _ensure_directory_grant(
             )
     except IntegrityError:
         exact = (
-            RoleGrant._base_manager.select_for_update().filter(pk__in=[grant.pk for grant in existing_grants]).first()
+            RoleGrant._base_manager.select_for_update()
+            .filter(
+                membership_id=membership.pk,
+                role_id=role.pk,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            )
+            .order_by("pk")
+            .first()
         )
         if exact is None:
             raise
@@ -1047,38 +1160,40 @@ def provision_ldap_directory_identity(command: LDAPDirectoryIdentityCommand) -> 
         locked_user = _lock_user(command.user)
         memberships = _lock_memberships(locked_user.pk, {tenant_id})
         existing_membership = memberships.get(tenant_id)
-        role = _get_or_create_directory_role(tenant_id)
         aggregate = _lock_aggregate(
             memberships=memberships,
             customer_tenant_id=tenant_id,
             role_names=((tenant_id, "Member"),),
             provider_transition=False,
         )
+        role = _get_or_create_directory_role(tenant_id=tenant_id, locked_roles=aggregate.roles)
         if existing_membership is None:
-            try:
-                with transaction.atomic():
-                    existing_membership = Membership._base_manager.create(
-                        user_id=locked_user.pk,
-                        tenant_id=int(tenant_id),
-                        is_active=True,
-                    )
-            except IntegrityError:
-                existing_membership = (
-                    Membership._base_manager.select_for_update()
-                    .filter(
-                        user_id=locked_user.pk,
-                        tenant_id=int(tenant_id),
-                    )
-                    .first()
-                )
-                if existing_membership is None:
-                    raise
+            existing_membership, created = _create_membership(user_id=locked_user.pk, tenant_id=int(tenant_id))
+            if not created:
+                refreshed_grants = _lock_grants({existing_membership.pk})
+                aggregate.grants = [
+                    grant for grant in aggregate.grants if grant.membership_id != existing_membership.pk
+                ] + refreshed_grants
+                refreshed_scopes = _lock_scopes(refreshed_grants)
+                refreshed_grant_ids = {grant.pk for grant in refreshed_grants}
+                aggregate.scopes = [
+                    scope for scope in aggregate.scopes if scope.role_grant_id not in refreshed_grant_ids
+                ] + refreshed_scopes
+                _reindex_aggregate_children(aggregate)
             _stage_checkpoint("ldap.membership_created")
+        existing_grants = aggregate.grants_by_membership.get(existing_membership.pk, [])
+        existing_grant_ids = {grant.pk for grant in existing_grants}
+        existing_scopes = [
+            scope
+            for scope_list in aggregate.scopes_by_grant.values()
+            for scope in scope_list
+            if scope.role_grant_id in existing_grant_ids
+        ]
         _ensure_directory_grant(
             membership=existing_membership,
             role=role,
-            existing_grants=aggregate.grants,
-            existing_scopes=aggregate.scopes,
+            existing_grants=existing_grants,
+            existing_scopes=existing_scopes,
         )
 
 
@@ -1101,8 +1216,8 @@ _ALLOWED_LOG_FIELDS = frozenset(
 )
 
 
-def _log(reason_code: str, **fields: Any) -> None:
-    safe = {key: value for key, value in fields.items() if key in _ALLOWED_LOG_FIELDS}
+def _log(reason_code: str, **fields: str | int | None) -> None:
+    safe: dict[str, str | int | None] = {key: value for key, value in fields.items() if key in _ALLOWED_LOG_FIELDS}
     safe["reason_code"] = reason_code
     logger.warning("identity provisioning event", extra=safe)
 

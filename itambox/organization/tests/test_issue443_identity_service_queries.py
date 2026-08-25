@@ -135,6 +135,30 @@ class IdentityServiceQueryContractTests(TestCase):
         self.assertNotIn("FOR UPDATE", tenant_lock[0].upper())
         self.assertNotIn("FOR KEY SHARE", tenant_lock[0].upper())
         self.assertIn("%s", tenant_lock[0])
+
+        lock_sequence = []
+        for sql, _params in statements:
+            normalized = " ".join(sql.split()).lower()
+            if "organization_tenant" in normalized and "for share" in normalized:
+                lock_sequence.append("tenant")
+            elif 'from "users_user"' in normalized and "for update" in normalized:
+                lock_sequence.append("user")
+            elif 'from "organization_membership"' in normalized and "for update" in normalized:
+                lock_sequence.append("membership")
+            elif 'from "users_groupmembership"' in normalized and "for update" in normalized:
+                lock_sequence.append("group_membership")
+            elif 'from "organization_rolegrant"' in normalized and "for update" in normalized:
+                lock_sequence.append("grant")
+            elif 'from "organization_role"' in normalized and "for update" in normalized:
+                lock_sequence.append("role")
+            elif 'from "organization_rolegrantscope"' in normalized and "for update" in normalized:
+                lock_sequence.append("scope")
+            elif 'from "organization_assetholder"' in normalized and "for update" in normalized:
+                lock_sequence.append("holder")
+        self.assertEqual(
+            lock_sequence,
+            ["tenant", "user", "membership", "group_membership", "grant", "role", "scope", "holder"],
+        )
         holder.refresh_from_db()
         self.assertIsNone(holder.user_id)
 
@@ -175,3 +199,62 @@ class IdentityServiceQueryContractTests(TestCase):
         _, repeat_statements = self.capture(self.provisioner.provision, self.command(role="Manager"))
         self.assertEqual(sum("auth_permission" in sql.lower() for sql, _params in first_statements), 1)
         self.assertEqual(sum("auth_permission" in sql.lower() for sql, _params in repeat_statements), 0)
+
+    def test_ldap_existing_role_has_one_full_lock_sequence_without_role_preread(self):
+        role = Role.objects.create(
+            tenant=self.customer,
+            name="Member",
+            permissions=["assets.view_asset"],
+        )
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        grant = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+
+        _, statements = self.capture(
+            provision_ldap_directory_identity,
+            LDAPDirectoryIdentityCommand(user=self.user, tenant=self.customer),
+        )
+
+        labels = []
+        for sql, _params in statements:
+            normalized = " ".join(sql.split()).lower()
+            if "organization_tenant" in normalized and "for share" in normalized:
+                labels.append("tenant")
+            elif 'from "users_user"' in normalized and "for update" in normalized:
+                labels.append("user")
+            elif 'from "organization_membership"' in normalized and "for update" in normalized:
+                labels.append("membership")
+            elif 'from "organization_rolegrant"' in normalized and "for update" in normalized:
+                labels.append("grant")
+            elif 'from "organization_role"' in normalized and (
+                '"name" = %s' in normalized or "for update" in normalized
+            ):
+                labels.append("role")
+            elif 'from "organization_rolegrantscope"' in normalized and "for update" in normalized:
+                labels.append("scope")
+
+        self.assertEqual(labels, ["tenant", "user", "membership", "grant", "role", "scope"])
+
+    def test_ldap_missing_role_locks_name_before_create_and_rereads_only_on_conflict(self):
+        role_events = []
+
+        def wrapper(execute, sql, params, many, context):
+            normalized = " ".join(sql.split()).lower()
+            if (
+                'from "organization_role"' in normalized and ('"name" = %s' in normalized or "for update" in normalized)
+            ) or normalized.startswith('insert into "organization_role"'):
+                role_events.append(
+                    "select_for_update"
+                    if normalized.startswith("select") and "for update" in normalized
+                    else "select"
+                    if normalized.startswith("select")
+                    else "insert"
+                )
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(wrapper):
+            provision_ldap_directory_identity(
+                LDAPDirectoryIdentityCommand(user=self.user, tenant=self.customer),
+            )
+
+        self.assertEqual(role_events, ["select_for_update", "insert"])
