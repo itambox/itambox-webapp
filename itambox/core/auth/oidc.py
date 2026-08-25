@@ -69,7 +69,7 @@ class VerifiedOIDCResolver(Protocol):
     def _resolve_identity_phase_a(
         self, identity: VerifiedOIDCIdentity, claims: dict[str, object]
     ) -> tuple[int, int] | None:
-        raise NotImplementedError
+        """Resolve or create the canonical binding in phase A."""
 
     def _finish_identity_phase_b(
         self,
@@ -77,7 +77,7 @@ class VerifiedOIDCResolver(Protocol):
         expected_user_id: int,
         claims: dict[str, object],
     ) -> object:
-        raise NotImplementedError
+        """Finish profile and Organization provisioning in phase B."""
 
 
 def resolve_verified_oidc_identity(
