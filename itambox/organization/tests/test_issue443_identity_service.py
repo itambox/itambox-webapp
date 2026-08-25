@@ -35,6 +35,7 @@ from organization.services.identity_provisioning import (
     IdentityProvisioningError,
     LDAPDirectoryIdentityCommand,
     OrganizationIdentityProvisioner,
+    organization_identity_provisioner,
     provision_ldap_directory_identity,
 )
 from users.models import GroupMembership, User, UserGroup
@@ -881,6 +882,65 @@ class LDAPDirectoryContractTests(IdentityServiceCase):
         self.assertIsNotNone(grant.valid_until)
         self.assertEqual(AssetHolder.objects.count(), before_holders)
 
+    def test_public_ldap_conflict_reread_always_restores_own_scope(self):
+        role = self.role(self.customer, name="Member", permissions=list(LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS))
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        real_create = RoleGrant._base_manager.create
+        real_lock_aggregate = identity_service._lock_aggregate
+        injected = {"count": 0}
+        conflicts = {"count": 0}
+
+        def inject_exact_row(*args, **kwargs):
+            aggregate = real_lock_aggregate(*args, **kwargs)
+            if injected["count"] == 0:
+                injected["count"] += 1
+                locked_membership = aggregate.memberships[self.customer.pk]
+                locked_role = next(locked for locked in aggregate.roles if locked.pk == role.pk)
+                real_create(
+                    membership_id=locked_membership.pk,
+                    role_id=locked_role.pk,
+                    reason=LDAP_DIRECTORY_SYNC_REASON,
+                    valid_until=timezone.now() + timedelta(days=1),
+                    granted_by_id=None,
+                )
+            return aggregate
+
+        def conflict_once(**kwargs):
+            if (
+                kwargs.get("membership_id") == membership.pk
+                and kwargs.get("role_id") == role.pk
+                and kwargs.get("reason") == LDAP_DIRECTORY_SYNC_REASON
+                and conflicts["count"] == 0
+            ):
+                conflicts["count"] += 1
+                raise IntegrityError(CANARY_DRIVER)
+            return real_create(**kwargs)
+
+        with (
+            mock.patch.object(identity_service, "_lock_aggregate", side_effect=inject_exact_row),
+            mock.patch.object(RoleGrant._base_manager, "create", side_effect=conflict_once),
+        ):
+            provision_ldap_directory_identity(self.ldap_command())
+
+        grant = RoleGrant.objects.get(membership=membership, role=role, reason=LDAP_DIRECTORY_SYNC_REASON)
+        self.assertEqual(injected["count"], 1)
+        self.assertEqual(conflicts["count"], 1)
+        self.assertIsNone(grant.granted_by_id)
+        self.assertIsNotNone(grant.valid_until)
+        self.assertEqual(
+            list(grant.scopes.values_list("scope_type", flat=True)),
+            [RoleGrantScope.SCOPE_OWN],
+        )
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).count(),
+            1,
+        )
+
     def test_batch_repeat_refreshes_only_ldap_owned_grant_origin(self):
         provision_ldap_directory_identity(self.ldap_command())
         grant = RoleGrant.objects.get(membership__user=self.user, reason=LDAP_DIRECTORY_SYNC_REASON)
@@ -1114,11 +1174,67 @@ class LoggingAndFailureContractTests(IdentityServiceCase):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_service_module_exposes_identity_provisioner_contract_and_separate_ldap_api():
-    from core.identity_provisioning import IdentityProvisioner
-    from organization.services.identity_provisioning import OrganizationIdentityProvisioner
+def test_service_module_exposes_real_identity_port_contract_and_separate_ldap_api():
+    from core.identity_provisioning import (
+        ExternalIdentityProfile,
+        ExternalIdentityProvisioningCommand,
+        IdentityProvisioner,
+        override_identity_provisioner,
+        provision_external_identity,
+    )
 
-    assert issubclass(OrganizationIdentityProvisioner, object)
-    assert hasattr(IdentityProvisioner, "provision")
+    provider = Tenant.objects.create(
+        name="Protocol Provider 443",
+        slug="protocol-provider-443",
+        is_provider=True,
+    )
+    customer = Tenant.objects.create(
+        name="Protocol Customer 443",
+        slug="protocol-customer-443",
+        managed_by=provider,
+    )
+    user = User.objects.create_user(username="protocol-user-443", email="protocol-user-443@example.invalid")
+    command = ExternalIdentityProvisioningCommand(
+        user=user,
+        customer_tenant=customer,
+        profile=ExternalIdentityProfile(
+            source="OIDC",
+            email=user.email,
+            upn="protocol-user-443@example.invalid",
+            first_name="Protocol",
+            last_name="User",
+        ),
+        customer_role_name="Member",
+    )
+
+    protocol_public_members = {name for name in vars(IdentityProvisioner) if not name.startswith("_")}
+    assert protocol_public_members == {"provision"}
+    assert tuple(inspect.signature(IdentityProvisioner.provision).parameters) == ("self", "command")
+    assert tuple(inspect.signature(OrganizationIdentityProvisioner.provision).parameters) == ("self", "command")
+    assert organization_identity_provisioner.__class__ is OrganizationIdentityProvisioner
+    assert not hasattr(IdentityProvisioner, "provision_ldap_directory_identity")
+    assert set(identity_service.__all__) == {
+        "IdentityProvisioningError",
+        "OrganizationIdentityProvisioner",
+        "organization_identity_provisioner",
+        "LDAPDirectoryIdentityCommand",
+        "provision_ldap_directory_identity",
+        "LDAP_DIRECTORY_SYNC_REASON",
+        "LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST",
+        "LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS",
+    }
+    assert not any(name.startswith("_") for name in identity_service.__all__)
+
+    with override_identity_provisioner(organization_identity_provisioner):
+        result = provision_external_identity(command)
+
+    assert result.mode == "customer"
+    membership = Membership.objects.get(user=user, tenant=customer)
+    holder = AssetHolder.objects.get(user=user, tenant=customer)
+    grant = RoleGrant.objects.get(membership=membership)
+    assert result.membership_id == membership.pk
+    assert result.holder_id == holder.pk
+    assert result.role_id == grant.role_id
+    assert list(grant.scopes.values_list("scope_type", flat=True)) == [RoleGrantScope.SCOPE_OWN]
     assert LDAPDirectoryIdentityCommand is not ExternalIdentityProvisioningCommand
     assert callable(provision_ldap_directory_identity)

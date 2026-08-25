@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
+import json
 import threading
+import time
+from datetime import timedelta
 from threading import Barrier, BrokenBarrierError, Event
 from unittest import mock
 
 import pytest
 from django.db import connection, connections, transaction
 from django.test import TransactionTestCase
+from django.utils import timezone
 
 import organization.services.identity_provisioning as identity_service
 from core.identity_provisioning import ExternalIdentityProfile, ExternalIdentityProvisioningCommand, ProviderStaffIntent
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
-from organization.services.identity_provisioning import OrganizationIdentityProvisioner
+from organization.services.identity_provisioning import (
+    LDAP_DIRECTORY_SYNC_REASON,
+    LDAPDirectoryIdentityCommand,
+    OrganizationIdentityProvisioner,
+    provision_ldap_directory_identity,
+)
 from users.models import OIDCIdentity, User
 
 pytestmark = pytest.mark.serial_only
@@ -65,19 +74,36 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
             cursor.execute("SET LOCAL statement_timeout = '10s'")
 
     @staticmethod
-    def _run(command, output, before_execute=None):
+    def _run(command, output, before_execute=None, after_execute=None, provision=None):
         try:
             connections.close_all()
+            connection.ensure_connection()
+            backend = connection.connection
+            if backend is None:
+                raise AssertionError("worker connection did not initialize")
+            output["backend_pid"] = backend.get_backend_pid()
+            user_id = getattr(command.user, "pk", "unknown")
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('application_name', %s, false)",
+                    [f"itambox443r-{threading.current_thread().name}-user-{user_id}"],
+                )
+                cursor.execute("SET SESSION lock_timeout = '10s'")
+                cursor.execute("SET SESSION statement_timeout = '30s'")
+            operation = provision or OrganizationIdentityProvisioner().provision
             if before_execute is None:
-                output["result"] = OrganizationIdentityProvisioner().provision(command)
+                output["result"] = operation(command)
             else:
 
                 def wrapper(execute, sql, params, many, context):
                     before_execute(sql)
-                    return execute(sql, params, many, context)
+                    result = execute(sql, params, many, context)
+                    if after_execute is not None:
+                        after_execute(sql)
+                    return result
 
                 with connection.execute_wrapper(wrapper):
-                    output["result"] = OrganizationIdentityProvisioner().provision(command)
+                    output["result"] = operation(command)
         except Exception as exc:  # the main thread asserts the exact class
             output["error"] = exc
         finally:
@@ -106,6 +132,53 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
         for thread in threads:
             thread.join(timeout=15)
             self.assertFalse(thread.is_alive(), f"worker {thread.name} exceeded the bounded join")
+
+    def _wait_for_user_lock_wait(self, *, waiting_pid, blocking_pid, user_id):
+        deadline = time.monotonic() + 8
+        observations = []
+        while time.monotonic() < deadline:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT waiting.pid,
+                           waiting.wait_event_type,
+                           waiting.wait_event,
+                           wait_lock.locktype,
+                           wait_lock.relation::regclass::text,
+                           wait_lock.page,
+                           wait_lock.tuple,
+                           blocking.pid,
+                           waiting.query,
+                           blocking.query,
+                           waiting.application_name
+                    FROM pg_stat_activity AS waiting
+                    JOIN pg_locks AS wait_lock
+                      ON wait_lock.pid = waiting.pid
+                     AND NOT wait_lock.granted
+                    LEFT JOIN LATERAL unnest(pg_blocking_pids(waiting.pid)) AS blocker(pid) ON TRUE
+                    LEFT JOIN pg_stat_activity AS blocking ON blocking.pid = blocker.pid
+                    WHERE waiting.pid = %s
+                      AND waiting.datname = current_database()
+                    """,
+                    [waiting_pid],
+                )
+                rows = cursor.fetchall()
+            observations.extend(rows)
+            for row in rows:
+                waiting_query = (row[8] or "").lower()
+                application_name = row[10] or ""
+                if (
+                    row[0] == waiting_pid
+                    and row[1] == "Lock"
+                    and row[3] in {"transactionid", "tuple"}
+                    and row[7] == blocking_pid
+                    and 'from "users_user"' in waiting_query
+                    and "for update" in waiting_query
+                    and f"user-{user_id}" in application_name
+                ):
+                    return row
+            Event().wait(0.02)
+        self.fail(f"backend {waiting_pid} never waited on User row held by {blocking_pid}: {observations[-5:]}")
 
     def test_same_canonical_user_concurrent_customer_calls_converge_one_aggregate(self):
         user = User.objects.create_user(username="same-user-443", email="same-user-443@example.invalid")
@@ -148,6 +221,108 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
         self.assertEqual(RoleGrantScope.objects.filter(role_grant__membership=membership).count(), 1)
         self.assertEqual(AssetHolder.objects.filter(user=user, tenant=self.customer).count(), 1)
         self.assertEqual({output["result"].membership_id for output in outputs}, {membership.pk})
+
+    def test_public_ldap_calls_serialize_missing_role_membership_and_grant(self):
+        self.member_role.delete()
+        user = User.objects.create_user(username="ldap-race-443", email="ldap-race-443@example.invalid")
+        first_name = "ldap-race-first"
+        first_role_insert_reached = Event()
+        role_insert_barrier = Barrier(2)
+        first_membership_insert_reached = Event()
+        membership_insert_barrier = Barrier(2)
+        second_backend_started = Event()
+
+        def observe_first(sql):
+            normalized = " ".join(sql.split()).lower()
+            if threading.current_thread().name != first_name:
+                second_backend_started.set()
+                return
+            if normalized.startswith('insert into "organization_role"'):
+                first_role_insert_reached.set()
+                try:
+                    role_insert_barrier.wait(timeout=8)
+                except BrokenBarrierError as exc:
+                    raise AssertionError("LDAP Role INSERT barrier was not released") from exc
+            elif normalized.startswith('insert into "organization_membership"'):
+                first_membership_insert_reached.set()
+                try:
+                    membership_insert_barrier.wait(timeout=8)
+                except BrokenBarrierError as exc:
+                    raise AssertionError("LDAP Membership INSERT barrier was not released") from exc
+
+        command = LDAPDirectoryIdentityCommand(user=user, tenant=self.customer)
+        outputs = [{}, {}]
+        first = threading.Thread(
+            target=self._run,
+            name=first_name,
+            args=(command, outputs[0]),
+            kwargs={"before_execute": observe_first, "provision": provision_ldap_directory_identity},
+        )
+        second = threading.Thread(
+            target=self._run,
+            name="ldap-race-second",
+            args=(command, outputs[1]),
+            kwargs={"before_execute": observe_first, "provision": provision_ldap_directory_identity},
+        )
+        started_threads = []
+        role_barrier_released = False
+        membership_barrier_released = False
+        try:
+            first.start()
+            started_threads.append(first)
+            self.assertTrue(first_role_insert_reached.wait(timeout=8), "LDAP call did not reach real Role INSERT")
+            second.start()
+            started_threads.append(second)
+            self.assertTrue(second_backend_started.wait(timeout=8), "second LDAP backend did not start")
+            observed_wait = self._wait_for_user_lock_wait(
+                waiting_pid=outputs[1]["backend_pid"],
+                blocking_pid=outputs[0]["backend_pid"],
+                user_id=user.pk,
+            )
+            self.assertEqual(observed_wait[0], outputs[1]["backend_pid"])
+            self.assertEqual(observed_wait[7], outputs[0]["backend_pid"])
+            role_insert_barrier.wait(timeout=8)
+            role_barrier_released = True
+            self.assertTrue(
+                first_membership_insert_reached.wait(timeout=8),
+                "LDAP call did not reach real Membership INSERT",
+            )
+            membership_insert_barrier.wait(timeout=8)
+            membership_barrier_released = True
+        finally:
+            if not role_barrier_released:
+                role_insert_barrier.abort()
+            if not membership_barrier_released:
+                membership_insert_barrier.abort()
+            self._join_bounded(started_threads)
+
+        self.assertEqual([output.get("error") for output in outputs], [None, None])
+        self.assertEqual(
+            Role._base_manager.filter(tenant=self.customer, name="Member", deleted_at__isnull=True).count(), 1
+        )
+        role = Role._base_manager.get(tenant=self.customer, name="Member", deleted_at__isnull=True)
+        membership = Membership.objects.get(user=user, tenant=self.customer)
+        grants = list(
+            RoleGrant._base_manager.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            )
+        )
+        self.assertEqual(Membership.objects.filter(user=user, tenant=self.customer).count(), 1)
+        self.assertEqual(len(grants), 1)
+        grant = grants[0]
+        self.assertIsNone(grant.granted_by_id)
+        self.assertIsNotNone(grant.valid_until)
+        now = timezone.now()
+        self.assertGreaterEqual(grant.valid_until, now + timedelta(hours=23))
+        self.assertLessEqual(grant.valid_until, now + timedelta(days=1, minutes=1))
+        self.assertEqual(
+            list(RoleGrantScope.objects.filter(role_grant=grant).values_list("scope_type", flat=True)),
+            [RoleGrantScope.SCOPE_OWN],
+        )
+        self.assertEqual(AssetHolder.objects.filter(user=user, tenant=self.customer).count(), 0)
 
     def test_different_users_same_tenant_shared_lock_coexists(self):
         users = [
@@ -194,7 +369,7 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
         second_command = customer_command if first_mode == "provider" else provider_command
         first_name = f"{first_mode}-first"
         first_locked = Event()
-        second_lock_attempted = Event()
+        second_backend_started = Event()
         release_first = Event()
 
         def checkpoint(stage):
@@ -203,12 +378,13 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
             self._set_local_timeouts()
             if threading.current_thread().name == first_name:
                 first_locked.set()
-                self.assertTrue(release_first.wait(timeout=8))
+                if not release_first.wait(timeout=8):
+                    raise AssertionError(f"{first_mode} winner was not released")
 
-        def observe_second_lock(sql):
-            normalized = " ".join(sql.split()).lower()
-            if 'from "users_user"' in normalized and "for update" in normalized:
-                second_lock_attempted.set()
+        def observe_second_backend(sql):
+            del sql
+            if threading.current_thread().name != first_name:
+                second_backend_started.set()
 
         outputs = [{}, {}]
         first = threading.Thread(target=self._run, name=first_name, args=(first_command, outputs[0]))
@@ -216,18 +392,28 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
             target=self._run,
             name=f"{first_mode}-second",
             args=(second_command, outputs[1]),
-            kwargs={"before_execute": observe_second_lock},
+            kwargs={"before_execute": observe_second_backend},
         )
-        with mock.patch("organization.services.identity_provisioning._stage_checkpoint", side_effect=checkpoint):
-            first.start()
-            self.assertTrue(first_locked.wait(timeout=8), f"{first_mode} command did not reach the User lock")
-            second.start()
-            self.assertTrue(
-                second_lock_attempted.wait(timeout=8),
-                f"{first_mode} second transaction did not reach the contested User lock before release",
-            )
+        started_threads = []
+        try:
+            with mock.patch("organization.services.identity_provisioning._stage_checkpoint", side_effect=checkpoint):
+                first.start()
+                started_threads.append(first)
+                self.assertTrue(first_locked.wait(timeout=8), f"{first_mode} command did not reach the User lock")
+                second.start()
+                started_threads.append(second)
+                self.assertTrue(second_backend_started.wait(timeout=8), f"{first_mode} second backend did not start")
+                observed_wait = self._wait_for_user_lock_wait(
+                    waiting_pid=outputs[1]["backend_pid"],
+                    blocking_pid=outputs[0]["backend_pid"],
+                    user_id=user.pk,
+                )
+                self.assertEqual(observed_wait[0], outputs[1]["backend_pid"])
+                self.assertEqual(observed_wait[7], outputs[0]["backend_pid"])
+                release_first.set()
+        finally:
             release_first.set()
-            self._join_bounded((first, second))
+            self._join_bounded(started_threads)
 
         self.assertEqual([output.get("error") for output in outputs], [None, None])
         provider_membership = Membership.objects.get(user=user, tenant=self.provider)
@@ -338,58 +524,74 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
         membership = Membership.objects.get(user=user, tenant=self.customer)
         self.assertEqual({output["result"][0].pk for output in outputs}, {membership.pk})
 
-    def test_real_holder_uniqueness_conflict_never_steals_linked_holder(self):
+    def test_public_holder_uniqueness_conflict_keeps_one_winner_and_loser_aggregate(self):
+        Role.objects.create(
+            tenant=self.customer,
+            name="Manager",
+            permissions=["assets.view_asset"],
+        )
         users = [
             User.objects.create_user(username="holder-race-a-443", email="holder-race-a-443@example.invalid"),
             User.objects.create_user(username="holder-race-b-443", email="holder-race-b-443@example.invalid"),
         ]
+        shared_upn = "shared-holder-race-443@example.invalid"
+        emails = [user.email for user in users]
         insert_barrier = Barrier(2)
 
         def observe_holder_insert(sql):
             normalized = " ".join(sql.split()).lower()
             if normalized.startswith('insert into "organization_assetholder"'):
-                insert_barrier.wait(timeout=8)
+                try:
+                    insert_barrier.wait(timeout=8)
+                except BrokenBarrierError as exc:
+                    raise AssertionError("both public calls did not reach the real holder INSERT") from exc
 
-        def create_holder(user_id):
-            live_user = User._base_manager.get(pk=user_id)
-            return identity_service._create_holder(
-                user=live_user,
-                tenant_id=self.customer.pk,
-                upn="shared-holder-race-443@example.invalid",
-                email=f"holder-{user_id}@example.invalid",
-                first_name="Concurrent",
-                last_name="Holder",
-                source="OIDC",
-            )
-
+        commands = [
+            self._command(users[0], role="Member", email=emails[0], upn=shared_upn),
+            self._command(users[1], role="Manager", email=emails[1], upn=shared_upn),
+        ]
         outputs = [{}, {}]
         threads = [
             threading.Thread(
-                target=self._run_function,
+                target=self._run,
                 name="holder-race-a",
-                args=(lambda: create_holder(users[0].pk), outputs[0]),
+                args=(commands[0], outputs[0]),
                 kwargs={"before_execute": observe_holder_insert},
             ),
             threading.Thread(
-                target=self._run_function,
+                target=self._run,
                 name="holder-race-b",
-                args=(lambda: create_holder(users[1].pk), outputs[1]),
+                args=(commands[1], outputs[1]),
                 kwargs={"before_execute": observe_holder_insert},
             ),
         ]
-        for thread in threads:
-            thread.start()
-        self._join_bounded(threads)
+        with self.assertLogs("itambox.organization.identity", level="WARNING") as logs:
+            for thread in threads:
+                thread.start()
+            self._join_bounded(threads)
 
         self.assertEqual([output.get("error") for output in outputs], [None, None])
-        holders = list(
-            AssetHolder._base_manager.filter(tenant=self.customer, upn="shared-holder-race-443@example.invalid")
-        )
+        holders = list(AssetHolder._base_manager.filter(tenant=self.customer, upn=shared_upn))
         self.assertEqual(len(holders), 1)
-        self.assertEqual(
-            {output["result"].pk if output["result"] is not None else None for output in outputs}, {holders[0].pk, None}
-        )
-        self.assertIn(holders[0].user_id, {users[0].pk, users[1].pk})
+        holder = holders[0]
+        result_holder_ids = [output["result"].holder_id for output in outputs]
+        self.assertCountEqual(result_holder_ids, [holder.pk, None])
+        self.assertIn(holder.user_id, {users[0].pk, users[1].pk})
+        for user, output in zip(users, outputs, strict=True):
+            membership = Membership.objects.get(user=user, tenant=self.customer)
+            self.assertEqual(Membership.objects.filter(user=user, tenant=self.customer).count(), 1)
+            self.assertEqual(RoleGrant.objects.filter(membership=membership).count(), 1)
+            grant = RoleGrant.objects.get(membership=membership)
+            self.assertEqual(RoleGrantScope.objects.filter(role_grant=grant).count(), 1)
+            self.assertEqual(output["result"].membership_id, membership.pk)
+        self.assertGreaterEqual(len(logs.records), 1)
+        for record in logs.records:
+            self.assertEqual(record.__dict__.get("reason_code"), "holder_collision_unresolved")
+            self.assertIsNone(record.exc_info)
+            rendered = json.dumps(record.__dict__, default=str, sort_keys=True)
+            self.assertNotIn(shared_upn, rendered)
+            for email in emails:
+                self.assertNotIn(email, rendered)
 
     def test_real_scope_uniqueness_conflict_rereads_exact_scope(self):
         membership = Membership.objects.create(
@@ -430,70 +632,6 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
         self.assertEqual(
             RoleGrantScope.objects.filter(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN).count(), 1
         )
-
-    def test_real_directory_grant_uniqueness_conflict_rereads_exact_semantic_identity(self):
-        user = User.objects.create_user(username="grant-race-443", email="grant-race-443@example.invalid")
-        membership = Membership.objects.create(user=user, tenant=self.customer)
-        index_name = "itambox443rservicefix_grant_semantic_uq"
-        quoted_index_name = connection.ops.quote_name(index_name)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f'CREATE UNIQUE INDEX {quoted_index_name} ON "organization_rolegrant" '
-                '("membership_id", "role_id", "reason") '
-                'WHERE "membership_id" IS NOT NULL AND "granted_by_id" IS NULL'
-            )
-        insert_barrier = Barrier(2)
-
-        def observe_grant_insert(sql):
-            normalized = " ".join(sql.split()).lower()
-            if normalized.startswith('insert into "organization_rolegrant"'):
-                insert_barrier.wait(timeout=8)
-
-        def ensure_grant():
-            with transaction.atomic():
-                live_membership = Membership._base_manager.get(pk=membership.pk)
-                live_role = Role._base_manager.get(pk=self.member_role.pk)
-                return identity_service._ensure_directory_grant(
-                    membership=live_membership,
-                    role=live_role,
-                    existing_grants=[],
-                    existing_scopes=[],
-                )
-
-        outputs = [{}, {}]
-        threads = [
-            threading.Thread(
-                target=self._run_function,
-                name="grant-race-a",
-                args=(ensure_grant, outputs[0]),
-                kwargs={"before_execute": observe_grant_insert},
-            ),
-            threading.Thread(
-                target=self._run_function,
-                name="grant-race-b",
-                args=(ensure_grant, outputs[1]),
-                kwargs={"before_execute": observe_grant_insert},
-            ),
-        ]
-        try:
-            for thread in threads:
-                thread.start()
-            self._join_bounded(threads)
-        finally:
-            connections.close_all()
-            with connection.cursor() as cursor:
-                cursor.execute(f"DROP INDEX IF EXISTS {quoted_index_name}")
-
-        self.assertEqual([output.get("error") for output in outputs], [None, None])
-        grants = list(
-            RoleGrant._base_manager.filter(
-                membership=membership,
-                role=self.member_role,
-                reason="LDAP directory synchronization",
-                granted_by__isnull=True,
-            )
-        )
-        self.assertEqual(len(grants), 1)
 
     def _synthetic_onboarding_worker(self, user, events, output):
         try:

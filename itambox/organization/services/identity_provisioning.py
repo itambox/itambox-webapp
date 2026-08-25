@@ -1136,6 +1136,7 @@ def _ensure_directory_grant(
         )
         if exact is None:
             raise
+        _ensure_own_scope(exact)
         return exact
     _ensure_own_scope(grant, existing_scopes=existing_scopes)
     _stage_checkpoint("ldap.grant_created")
