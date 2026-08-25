@@ -7,6 +7,7 @@ from django.dispatch import receiver
 from core.choices import ObjectChangeActionChoices
 from core.managers import get_current_tenant
 from core.models import write_object_change
+from core.oidc_identity import oidc_audit_excluded_fields
 from core.serialization import serialize_object
 from itambox.middleware import get_current_request_id, get_current_user
 
@@ -22,7 +23,7 @@ def user_pre_save(sender, instance, **kwargs):
         orig = User._base_manager.filter(pk=instance.pk).first()
         if orig:
             instance._prechange_snapshot = serialize_object(
-                orig, exclude_fields=["password", "last_login", "updated_at"]
+                orig, exclude_fields=oidc_audit_excluded_fields(["password", "last_login", "updated_at"])
             )
 
 
@@ -33,7 +34,10 @@ def user_post_save(sender, instance, created, **kwargs):
         return
 
     prechange_data = getattr(instance, "_prechange_snapshot", None)
-    postchange_data = serialize_object(instance, exclude_fields=["password", "last_login", "updated_at"])
+    postchange_data = serialize_object(
+        instance,
+        exclude_fields=oidc_audit_excluded_fields(["password", "last_login", "updated_at"]),
+    )
 
     action = ObjectChangeActionChoices.ACTION_CREATE if created else ObjectChangeActionChoices.ACTION_UPDATE
 
@@ -62,7 +66,10 @@ def user_post_delete(sender, instance, **kwargs):
 
     prechange_data = getattr(instance, "_prechange_snapshot", None)
     if not prechange_data:
-        prechange_data = serialize_object(instance, exclude_fields=["password", "last_login", "updated_at"])
+        prechange_data = serialize_object(
+            instance,
+            exclude_fields=oidc_audit_excluded_fields(["password", "last_login", "updated_at"]),
+        )
 
     write_object_change(
         instance=instance,

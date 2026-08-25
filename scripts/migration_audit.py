@@ -38,6 +38,7 @@ POST_TRANSITION_MIGRATIONS = {
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
     "users.0102_token_updated_at",
+    "users.0103_oidcidentity",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")
 ALLOWED_DISPOSITIONS = {
