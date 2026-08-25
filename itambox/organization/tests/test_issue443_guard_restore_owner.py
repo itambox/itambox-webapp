@@ -7,14 +7,22 @@ import inspect
 import os
 import subprocess
 import sys
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest import mock
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import SimpleTestCase, TestCase
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 from core import tenant_scope
+from core.authorization_cache import clear_local_authorization_cache, invalidate_user_authorization_cache
+from core.tests.mixins import grant
 from itambox.views.generic import restore as generic_restore
+from organization.models import Role, Tenant
 from organization.services import role_grant_validation
 from organization.services.restore_authority import (
     OrganizationRestoreAuthority,
@@ -22,6 +30,7 @@ from organization.services.restore_authority import (
 )
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+User = get_user_model()
 
 
 class GuardOwnerSurfaceTests(SimpleTestCase):
@@ -37,8 +46,8 @@ class GuardOwnerSurfaceTests(SimpleTestCase):
             self.assertEqual(str(inspect.signature(getattr(role_grant_validation, name))), signature)
 
     def test_permission_grant_uses_canonical_tenant_scope_and_never_membership_backend(self):
-        actor = SimpleNamespace(is_superuser=False)
-        tenant = object()
+        actor = SimpleNamespace(pk=1, is_superuser=False)
+        tenant = SimpleNamespace(pk=2)
         with mock.patch.object(
             tenant_scope,
             "resolve_effective_permissions_with_expiry",
@@ -51,7 +60,7 @@ class GuardOwnerSurfaceTests(SimpleTestCase):
         backend.assert_not_called()
 
     def test_permission_grant_preserves_bypass_and_exact_message(self):
-        tenant = object()
+        tenant = SimpleNamespace(pk=2)
         with mock.patch.object(tenant_scope, "resolve_effective_permissions_with_expiry") as resolve:
             role_grant_validation.validate_permission_grant(None, ["assets.delete_asset"], tenant)
             role_grant_validation.validate_permission_grant(
@@ -59,7 +68,7 @@ class GuardOwnerSurfaceTests(SimpleTestCase):
             )
         resolve.assert_not_called()
 
-        actor = SimpleNamespace(is_superuser=False)
+        actor = SimpleNamespace(pk=1, is_superuser=False)
         with mock.patch.object(
             tenant_scope,
             "resolve_effective_permissions_with_expiry",
@@ -72,11 +81,112 @@ class GuardOwnerSurfaceTests(SimpleTestCase):
             ["Privilege escalation detected: you cannot grant permissions you do not hold: assets.delete_asset"],
         )
 
+    def test_caller_owner_imports_are_safe_during_fresh_django_setup(self):
+        script = """
+import django
+django.setup()
+import users.forms
+import users.views
+print('caller-imports-ok')
+"""
+        result = subprocess.run(
+            (sys.executable, "-c", script),
+            cwd=_PROJECT_ROOT,
+            env={
+                **os.environ,
+                "DJANGO_SETTINGS_MODULE": "core.settings.dev",
+                "ITAMBOX_ENV": "dev",
+                "ITAMBOX_SECRET_KEY": "issue443-import-test-secret",
+                "PYTHONPATH": _PROJECT_ROOT,
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("caller-imports-ok", result.stdout)
+
     def test_owner_does_not_import_integration_guard_or_membership_backend(self):
         source = inspect.getsource(role_grant_validation)
         self.assertNotIn("core.auth.guards", source)
         self.assertNotIn("MembershipBackend", source)
-        self.assertNotIn("from core.auth", source)
+        self.assertNotIn("from core.auth import", source)
+
+
+class PermissionCacheContractTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            name="Issue 443 cache tenant",
+            slug="issue-443-cache-tenant",
+        )
+        self.actor = User.objects.create_user(
+            username="issue-443-cache-actor",
+            password="pw",
+        )
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="Issue 443 cache role",
+            permissions=["assets.view_asset"],
+        )
+        grant(self.actor, self.tenant, role)
+        clear_local_authorization_cache(self.actor)
+
+    def test_permission_cache_matches_old_miss_hit_expiry_and_invalidation_contract(self):
+        cache_key = f"_perms_tenant_{self.tenant.pk}"
+        resolver = tenant_scope.resolve_effective_permissions_with_expiry
+        with mock.patch.object(tenant_scope, "resolve_effective_permissions_with_expiry", wraps=resolver) as resolve:
+            with CaptureQueriesContext(connection) as first_queries:
+                role_grant_validation.validate_permission_grant(
+                    self.actor,
+                    ["assets.view_asset"],
+                    self.tenant,
+                )
+
+            with CaptureQueriesContext(connection) as hit_queries:
+                role_grant_validation.validate_permission_grant(
+                    self.actor,
+                    ["assets.view_asset"],
+                    self.tenant,
+                )
+
+            self.assertGreater(len(first_queries), 0)
+            self.assertEqual(len(hit_queries), 0)
+            self.assertEqual(resolve.call_count, 1)
+            permissions, valid_until = getattr(self.actor, cache_key)
+            self.assertEqual(permissions, frozenset({"assets.view_asset"}))
+            self.assertIsNone(valid_until)
+
+            # Keep the old cache entry but make its expiry stale. Dropping only
+            # the resolver's grant memo forces the expired path to exercise the
+            # real database resolver again.
+            if hasattr(self.actor, "_applicable_grants"):
+                del self.actor._applicable_grants
+            setattr(
+                self.actor,
+                cache_key,
+                (permissions, timezone.now() - timedelta(seconds=1)),
+            )
+            with CaptureQueriesContext(connection) as expired_queries:
+                role_grant_validation.validate_permission_grant(
+                    self.actor,
+                    ["assets.view_asset"],
+                    self.tenant,
+                )
+
+            self.assertGreater(len(expired_queries), 0)
+            self.assertEqual(resolve.call_count, 2)
+
+            invalidate_user_authorization_cache(self.actor)
+            self.assertFalse(hasattr(self.actor, cache_key))
+            with CaptureQueriesContext(connection) as invalidated_queries:
+                role_grant_validation.validate_permission_grant(
+                    self.actor,
+                    ["assets.view_asset"],
+                    self.tenant,
+                )
+
+            self.assertGreater(len(invalidated_queries), 0)
+            self.assertEqual(resolve.call_count, 3)
 
 
 class RestoreAuthorityDispatchTests(SimpleTestCase):

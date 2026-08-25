@@ -11,6 +11,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from organization.services.role_grant_validation import validate_role_grant
+
 # Import UserPreference from this app's models
 from .models import UserPreference
 from .services import DEFAULT_WORKSPACE_KEY, workspace_choices
@@ -504,7 +506,6 @@ from organization.models import (
     Tenant,
     TenantGroup,
 )
-from organization.services.role_grant_validation import validate_role_grant
 
 from .filters import UserGroupFilterSet
 from .models import GroupMembership, UserGroup

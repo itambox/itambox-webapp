@@ -1,6 +1,8 @@
 """Restore-time escalation guards for retained Role and UserGroup grants."""
 
+import unittest
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
@@ -34,6 +36,7 @@ class RestoreGrantEscalationMixin:
             organization_restore_authority
         )
         self._restore_authority_override.__enter__()
+        self.addCleanup(self._restore_authority_override.__exit__, None, None, None)
         self.provider = Tenant.objects.create(
             name="Restore Provider",
             slug="restore-provider",
@@ -76,10 +79,6 @@ class RestoreGrantEscalationMixin:
         session["active_tenant_id"] = self.provider.pk
         session.pop("active_tenant_group_id", None)
         session.save()
-
-    def tearDown(self):
-        self._restore_authority_override.__exit__(None, None, None)
-        super().tearDown()
 
     def add_explicit_authority(self):
         role = Role.objects.create(
@@ -322,6 +321,34 @@ class RestoreGrantEscalationMixin:
             any("Skipped 1" in message and "outside your authority" in message for message in rendered_messages),
             rendered_messages,
         )
+
+
+class RestoreOverrideCleanupTests(TestCase):
+    def test_set_up_failure_after_override_entry_does_not_leak_to_next_context(self):
+        class FailingRestoreSetupCase(RestoreGrantEscalationMixin, TestCase):
+            restore_model = Role
+
+            def setUp(self):
+                with mock.patch.object(
+                    Tenant.objects,
+                    "create",
+                    side_effect=RuntimeError("forced setup failure"),
+                ):
+                    super().setUp()
+
+            def test_setup_body_is_never_reached(self):
+                self.fail("setUp unexpectedly completed")
+
+        outer_provider = mock.Mock()
+        with restore_authority.override_restore_authority_validator(outer_provider):
+            result = unittest.TestResult()
+            unittest.TestSuite([FailingRestoreSetupCase("test_setup_body_is_never_reached")]).run(result)
+
+            self.assertEqual(len(result.errors), 1)
+            self.assertIn("forced setup failure", result.errors[0][1])
+            restore_authority.validate_restore_grant_authority("user", "object")
+
+        outer_provider.validate.assert_called_once_with("user", "object")
 
 
 class RoleRestoreGrantEscalationTests(RestoreGrantEscalationMixin, TestCase):
