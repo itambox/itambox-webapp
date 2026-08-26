@@ -26,6 +26,7 @@ from itambox.registry import registry
 from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.capability_notices import capability_notice
+from itambox.views.generic.extensions import build_detail_provider_context
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
@@ -190,9 +191,10 @@ class ObjectDetailView(
 
         # A4: resolve ContentType once for this object — it is used by changelog,
         # journaling, image/file attachments, bookmarks, and watches below.
+        shared_content_type = ContentType.objects.get_for_model(obj)
         _obj_ct_exists = ContentType.objects.filter(app_label="core", model="objectchange").exists()
         if _obj_ct_exists:
-            obj_type = ContentType.objects.get_for_model(obj)
+            obj_type = shared_content_type
         else:
             obj_type = None
 
@@ -228,7 +230,7 @@ class ObjectDetailView(
 
         if registry.model_has_feature(obj.__class__, "journaling"):
             if obj_type is None:
-                obj_type = ContentType.objects.get_for_model(obj)
+                obj_type = shared_content_type
             journal_qs = JournalEntry.objects.filter(
                 model=obj_type,
                 object_id=obj.pk,
@@ -248,7 +250,7 @@ class ObjectDetailView(
 
         if registry.model_has_feature(obj.__class__, "image_attachments"):
             if obj_type is None:
-                obj_type = ContentType.objects.get_for_model(obj)
+                obj_type = shared_content_type
             context["image_attachments"] = ImageAttachment.objects.filter(
                 model=obj_type,
                 object_id=obj.pk,
@@ -257,7 +259,7 @@ class ObjectDetailView(
 
         if registry.model_has_feature(obj.__class__, "file_attachments"):
             if obj_type is None:
-                obj_type = ContentType.objects.get_for_model(obj)
+                obj_type = shared_content_type
             context["file_attachments"] = FileAttachment.objects.filter(
                 model=obj_type,
                 object_id=obj.pk,
@@ -266,7 +268,7 @@ class ObjectDetailView(
 
         if registry.model_has_feature(obj.__class__, "subscribable"):
             if obj_type is None:
-                obj_type = ContentType.objects.get_for_model(obj)
+                obj_type = shared_content_type
             context["has_subscriptions"] = True
             context["subscribable_content_type_id"] = obj_type.pk
 
@@ -283,7 +285,7 @@ class ObjectDetailView(
 
         if registry.model_has_feature(obj.__class__, "bookmarkable"):
             if obj_type is None:
-                obj_type = ContentType.objects.get_for_model(obj)
+                obj_type = shared_content_type
             context["is_bookmarkable"] = True
             context["bookmark_content_type_id"] = obj_type.pk
             if self.request.user.is_authenticated:
@@ -297,7 +299,7 @@ class ObjectDetailView(
 
         if registry.model_has_feature(obj.__class__, "watchable"):
             if obj_type is None:
-                obj_type = ContentType.objects.get_for_model(obj)
+                obj_type = shared_content_type
             context["is_watchable"] = True
             context["watch_content_type_id"] = obj_type.pk
             if self.request.user.is_authenticated:
@@ -315,4 +317,9 @@ class ObjectDetailView(
             context["related_objects_list"] = self._build_related_objects_list(obj)
 
         context["help_url"] = get_help_url(self, app_label, model_name)
-        return context
+        return build_detail_provider_context(
+            self.request,
+            obj,
+            shared_content_type,
+            core_context=context,
+        )

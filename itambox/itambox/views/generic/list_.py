@@ -1,7 +1,6 @@
 import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import NON_FIELD_ERRORS, ImproperlyConfigured, PermissionDenied
 from django.db.models import Q
 from django.http import QueryDict
@@ -20,6 +19,12 @@ from itambox.registry import registry
 from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.capability_notices import capability_notice
+from itambox.views.generic.extensions import (
+    build_list_provider_context,
+    filter_list_provider_queryset,
+    resolve_list_provider_params,
+    validate_generic_display_form,
+)
 from itambox.views.generic.mixins import (
     TenantScopingViewMixin,
     user_can_mutate_model,
@@ -77,10 +82,21 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         only; the extra ``Q`` drops other members' private (shared=False,
         not-mine) tenant filters.
         """
-        ct = ContentType.objects.get_for_model(model)
+        ct = self._get_list_presentation(model).content_type
         return SavedFilter.objects.filter(content_type=ct, enabled=True).filter(
             Q(tenant__isnull=True) | Q(shared=True) | Q(created_by=self.request.user)
         )
+
+    def _get_list_presentation(self, model):
+        resolution = getattr(self, "_list_presentation", None)
+        if resolution is None:
+            resolution = resolve_list_provider_params(
+                self.request,
+                model,
+                partial=self.is_htmx_partial(),
+            )
+            self._list_presentation = resolution
+        return resolution
 
     def _get_recycle_bin_queryset(self, model):
         """The soft-deleted rows for ``?deleted=true``, still tenant-scoped."""
@@ -112,17 +128,18 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if not model:
             return self.request.GET
 
-        raw_filter_pk = self.request.GET.get("filter")
+        provider_params = self._get_list_presentation(model).params
+        raw_filter_pk = provider_params.get("filter")
         if not raw_filter_pk:
-            return self.request.GET
+            return provider_params
         try:
             filter_pk = int(raw_filter_pk)
         except (TypeError, ValueError):
-            return self.request.GET
+            return provider_params
 
         saved = self.get_visible_saved_filters(model).filter(pk=filter_pk).first()
         if saved is None:
-            return self.request.GET
+            return provider_params
 
         saved_params = QueryDict(mutable=True)
         # Stored parameters are a dict; multi-valued filter params
@@ -134,6 +151,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             else:
                 saved_params[key] = value
         self._active_saved_filter_id = saved.pk
+        saved_params._mutable = False
         return saved_params
 
     def _merge_filterset_errors_into_form(self):
@@ -165,6 +183,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         filter_params = self._resolve_filter_params(model)
         self._resolved_filter_params = filter_params
         self.filter_form = None
+        self.filter_validation_failed = False
 
         if self.filterset_form:
             self.filter_form = self.filterset_form(filter_params, queryset=queryset)
@@ -177,11 +196,8 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         if self.filterset:
             self.filter = self.filter_form.filterset if self.filter_form else self.filterset(filter_params, queryset)
-            filter_is_valid = self.filter.is_valid()
-            form_is_valid = self.filter_form.is_valid() if self.filter_form else True
-            if not filter_is_valid or not form_is_valid:
-                if self.filter_form and not filter_is_valid:
-                    self._merge_filterset_errors_into_form()
+            if not validate_generic_display_form(self.filter_form, self.filter, filter_params):
+                self.filter_validation_failed = True
                 logger.warning("Invalid filter params for %s: %s", self.__class__.__name__, self.filter.errors)
                 queryset = queryset.none()
             else:
@@ -192,6 +208,13 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         # in which case its stored cf_* params drive the custom-field filtering.
         if model and registry.model_has_feature(model, "custom_field_data"):
             queryset = apply_custom_field_filters(queryset, model, filter_params)
+
+        if model and not self.filter_validation_failed:
+            queryset = filter_list_provider_queryset(
+                self._get_list_presentation(model),
+                queryset,
+                params=filter_params,
+            )
 
         return queryset
 
@@ -252,7 +275,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             context["label_templates"] = []
         else:
             try:
-                content_type = ContentType.objects.get_for_model(_model)
+                content_type = self._get_list_presentation(_model).content_type
                 context["export_templates"] = list(ExportTemplate.objects.filter(content_type=content_type))
             except Exception:
                 context["export_templates"] = []
@@ -348,7 +371,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             context["is_deleted_view"] = True
 
             try:
-                ct = ContentType.objects.get_for_model(_model)
+                ct = self._get_list_presentation(_model).content_type
                 context["bulk_restore_url"] = reverse("object_bulk_restore", kwargs={"content_type_id": ct.pk})
                 context["bulk_purge_url"] = reverse("object_bulk_purge", kwargs={"content_type_id": ct.pk})
             except Exception:
@@ -374,4 +397,8 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context["is_deleted_view"] = show_deleted
         context["breadcrumbs"] = getattr(self, "get_breadcrumbs", lambda: base_breadcrumbs)()
         context["help_url"] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
-        return context
+        return build_list_provider_context(
+            self._get_list_presentation(_model),
+            context,
+            params=getattr(self, "_resolved_filter_params", None),
+        )

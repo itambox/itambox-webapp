@@ -8,8 +8,12 @@ from itambox.capabilities import (
     SOURCE_ALWAYS,
     STABLE,
     Capability,
-    registry,
 )
+from itambox.capabilities import (
+    registry as capability_registry,
+)
+from itambox.registry import registry as generic_presentation_registry
+from subscriptions.feature_views import SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER
 
 
 class SubscriptionsConfig(AppConfig):
@@ -25,10 +29,22 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.forms  # noqa: F401 -- side-effect import registers curated import forms
 
         self._register_capabilities()
+        self._register_generic_presentation()
         post_migrate.connect(self._register_subscription_tasks, sender=self)
 
     def _register_capabilities(self):
-        registry.register_all(self._capabilities())
+        capability_registry.register_all(self._capabilities())
+
+    def _register_generic_presentation(self):
+        generic_presentation_registry.register_generic_presentation(
+            "subscriptions",
+            SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER,
+            detail_features=("subscribable",),
+            list_params=False,
+            list_filter=False,
+            list_context=False,
+            priority=200,
+        )
 
     def _capabilities(self):
         return (
