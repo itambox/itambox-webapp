@@ -722,7 +722,7 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
                     and expected_lock_clause in waiting_query
                 ):
                     return
-            Event().wait(0.02)
+            # The next pg_stat_activity/pg_locks query is the deterministic wait/yield.
         self.fail(f"OIDC Tenant {expected_lock_clause.upper()} wait was not observed: {observations[-3:]}")
 
     def _onboarding_worker(self):

@@ -30,7 +30,7 @@ from core.models import ObjectChange
 from core.oidc_identity import oidc_sensitive_audit
 from core.tasks.context import TaskContext
 from extras.models import Event
-from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from organization.services.identity_provisioning import (
     LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS,
     LDAP_DIRECTORY_SYNC_REASON,
@@ -621,7 +621,7 @@ class HolderReconciliationTests(IdentityServiceCase):
 
 
 class GrantConvergenceTests(IdentityServiceCase):
-    def test_duplicate_same_role_own_grants_converge_and_nonown_scopes_survive(self):
+    def test_duplicate_same_role_own_grants_converge_without_moving_unique_scopes(self):
         role = self.role(self.customer)
         membership = Membership.objects.create(user=self.user, tenant=self.customer)
         first = RoleGrant.objects.create(membership=membership, role=role)
@@ -641,11 +641,14 @@ class GrantConvergenceTests(IdentityServiceCase):
         result = self.provisioner.provision(self.command())
 
         grants = list(RoleGrant.objects.filter(membership=membership, role=role).order_by("pk"))
-        self.assertEqual(len(grants), 1)
-        self.assertEqual(grants[0].pk, first.pk)
+        self.assertEqual([grant.pk for grant in grants], [first.pk, second.pk])
         self.assertEqual(
-            set(RoleGrantScope.objects.filter(role_grant=grants[0]).values_list("scope_type", flat=True)),
-            {RoleGrantScope.SCOPE_OWN, RoleGrantScope.SCOPE_TENANT},
+            set(RoleGrantScope.objects.filter(role_grant=first).values_list("scope_type", flat=True)),
+            {RoleGrantScope.SCOPE_OWN},
+        )
+        self.assertEqual(
+            set(RoleGrantScope.objects.filter(role_grant=second).values_list("scope_type", flat=True)),
+            {RoleGrantScope.SCOPE_TENANT},
         )
         self.assertEqual(result.membership_id, membership.pk)
 
@@ -931,129 +934,283 @@ class GrantConvergenceTests(IdentityServiceCase):
         self.assertEqual(changes[0].prechange_data["role_grant"], conflicting.pk)
         self.assertIsNone(changes[0].postchange_data)
 
-    def test_scope_move_uses_instance_audit_with_truthful_actor_and_request(self):
-        role = self.role(self.customer, name="Member")
-        membership = Membership.objects.create(user=self.user, tenant=self.customer)
-        canonical = RoleGrant.objects.create(membership=membership, role=role)
-        duplicate = RoleGrant.objects.create(membership=membership, role=role)
-        RoleGrantScope.objects.create(role_grant=canonical, scope_type=RoleGrantScope.SCOPE_OWN)
-        moved_scope = RoleGrantScope._base_manager.bulk_create(
-            [
-                RoleGrantScope(
-                    role_grant_id=duplicate.pk,
-                    scope_type=RoleGrantScope.SCOPE_TENANT,
-                    tenant_id=self.customer.pk,
-                )
-            ]
-        )[0]
-        actor = User.objects.create_superuser(
-            username="scope-move-audit-443",
-            email="scope-move-audit-443@example.invalid",
-            password="not-used-443",
+    def _provider_grant_fixture(self):
+        role = self.role(
+            self.provider,
+            name="ProviderStaff",
+            permissions=["assets.view_asset", "assets.change_asset"],
+        )
+        membership = Membership.objects.create(user=self.user, tenant=self.provider)
+        return role, membership
+
+    def _provision_provider_role(self, role):
+        return self.provisioner.provision(self.command(tenant=self.provider, role=role.name))
+
+    def test_provider_grants_do_not_move_expired_all_managed_scope_to_permanent_own(self):
+        role, membership = self._provider_grant_fixture()
+        own = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        # Create a valid finite privileged row first; raw update explicitly models
+        # the historical permanent state that current model validation rejects.
+        RoleGrant._base_manager.filter(pk=own.pk).update(valid_until=None)
+        own.refresh_from_db()
+        expired = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=timezone.now() + timedelta(hours=1),
+        )
+        RoleGrant._base_manager.filter(pk=expired.pk).update(valid_until=timezone.now() - timedelta(minutes=1))
+        expired.refresh_from_db()
+        RoleGrantScope.objects.create(role_grant=own, scope_type=RoleGrantScope.SCOPE_OWN)
+        RoleGrantScope.objects.create(role_grant=expired, scope_type=RoleGrantScope.SCOPE_ALL_MANAGED)
+
+        before = (
+            own.covers_tenant(self.provider),
+            own.covers_tenant(self.customer),
+            expired.covers_tenant(self.customer),
         )
 
-        with TaskContext(tenant_id=self.customer.pk, user_id=actor.pk), oidc_sensitive_audit():
-            request_id = get_current_request_id()
-            result = self.provisioner.provision(self.command())
+        self._provision_provider_role(role)
 
-        self.assertEqual(result.mode, "customer")
-        moved_scope.refresh_from_db()
-        self.assertEqual(moved_scope.role_grant_id, canonical.pk)
-        changes = list(
-            ObjectChange._base_manager.filter(
-                changed_object_id=moved_scope.pk,
-                changed_object_type__app_label="organization",
-                changed_object_type__model="rolegrantscope",
-            ).order_by("pk")
+        own.refresh_from_db()
+        self.assertTrue(RoleGrant.objects.filter(pk=expired.pk).exists())
+        expired.refresh_from_db()
+        after = (
+            own.covers_tenant(self.provider),
+            own.covers_tenant(self.customer),
+            expired.covers_tenant(self.customer),
         )
-        self.assertEqual([change.action for change in changes], ["update"])
-        self.assertEqual(changes[0].user_id, actor.pk)
-        self.assertEqual(changes[0].request_id, request_id)
-        self.assertEqual(changes[0].prechange_data["role_grant"], duplicate.pk)
-        self.assertEqual(changes[0].postchange_data["role_grant"], canonical.pk)
-
-    def test_real_scope_move_conflict_uses_savepoint_reread_and_only_audits_tombstone(self):
-        role = self.role(self.customer, name="Member")
-        membership = Membership.objects.create(user=self.user, tenant=self.customer)
-        canonical = RoleGrant.objects.create(membership=membership, role=role)
-        duplicate = RoleGrant.objects.create(membership=membership, role=role)
-        RoleGrantScope.objects.create(role_grant=canonical, scope_type=RoleGrantScope.SCOPE_OWN)
-        moved_scope = RoleGrantScope._base_manager.bulk_create(
-            [
-                RoleGrantScope(
-                    role_grant_id=duplicate.pk,
-                    scope_type=RoleGrantScope.SCOPE_TENANT,
-                    tenant_id=self.customer.pk,
-                )
-            ]
-        )[0]
-        actor = User.objects.create_superuser(
-            username="scope-conflict-audit-443",
-            email="scope-conflict-audit-443@example.invalid",
-            password="not-used-443",
+        self.assertEqual(after, before)
+        self.assertTrue(own.covers_tenant(self.provider))
+        self.assertFalse(expired.covers_tenant(self.customer))
+        self.assertTrue(
+            RoleGrantScope.objects.filter(
+                role_grant=expired,
+                scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+            ).exists()
         )
-        real_lock_aggregate = identity_service._lock_aggregate
-        injected = {"done": False}
-
-        def inject_canonical_conflict(*args, **kwargs):
-            aggregate = real_lock_aggregate(*args, **kwargs)
-            if not injected["done"]:
-                injected["done"] = True
-                RoleGrantScope._base_manager.bulk_create(
-                    [
-                        RoleGrantScope(
-                            role_grant_id=canonical.pk,
-                            scope_type=RoleGrantScope.SCOPE_TENANT,
-                            tenant_id=self.customer.pk,
-                        )
-                    ]
-                )
-            return aggregate
-
-        statements = []
-
-        def capture(execute, sql, params, many, context):
-            statements.append(sql)
-            return execute(sql, params, many, context)
-
-        with (
-            mock.patch.object(identity_service, "_lock_aggregate", side_effect=inject_canonical_conflict),
-            TaskContext(tenant_id=self.customer.pk, user_id=actor.pk),
-            oidc_sensitive_audit(),
-        ):
-            request_id = get_current_request_id()
-            with connection.execute_wrapper(capture):
-                result = self.provisioner.provision(self.command())
-
-        self.assertTrue(injected["done"])
-        self.assertEqual(result.mode, "customer")
-        self.assertFalse(RoleGrantScope._base_manager.filter(pk=moved_scope.pk).exists())
         self.assertEqual(
-            RoleGrantScope._base_manager.filter(
-                role_grant=canonical,
-                scope_type=RoleGrantScope.SCOPE_TENANT,
-                tenant=self.customer,
-            ).count(),
-            1,
+            set(RoleGrant.objects.filter(membership=membership, role=role).values_list("pk", flat=True)),
+            {own.pk, expired.pk},
         )
-        scope_updates = [
-            sql
-            for sql in statements
-            if sql.lstrip().upper().startswith("UPDATE") and "organization_rolegrantscope" in sql.lower()
-        ]
-        self.assertEqual(len(scope_updates), 1)
-        self.assertTrue(any(sql.lstrip().upper().startswith("SAVEPOINT") for sql in statements))
-        changes = list(
-            ObjectChange._base_manager.filter(
-                changed_object_id=moved_scope.pk,
-                changed_object_type__app_label="organization",
-                changed_object_type__model="rolegrantscope",
-            ).order_by("pk")
+
+    def test_provider_grants_keep_shorter_tenant_group_scope_on_original_grant(self):
+        role, membership = self._provider_grant_fixture()
+        group = TenantGroup.objects.create(name="Lifetime group 443", slug="lifetime-group-443")
+        group_tenant = Tenant.objects.create(
+            name="Lifetime group tenant 443",
+            slug="lifetime-group-tenant-443",
+            group=group,
+            managed_by=self.provider,
         )
-        self.assertEqual([change.action for change in changes], ["delete"])
-        self.assertEqual(changes[0].user_id, actor.pk)
-        self.assertEqual(changes[0].request_id, request_id)
-        self.assertEqual(changes[0].prechange_data["role_grant"], duplicate.pk)
+        own_until = timezone.now() + timedelta(days=3)
+        group_until = timezone.now() + timedelta(hours=1)
+        own = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=own_until,
+        )
+        group_grant = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=group_until,
+        )
+        RoleGrantScope.objects.create(role_grant=own, scope_type=RoleGrantScope.SCOPE_OWN)
+        group_scope = RoleGrantScope.objects.create(
+            role_grant=group_grant,
+            scope_type=RoleGrantScope.SCOPE_TENANT_GROUP,
+            tenant_group=group,
+        )
+
+        before = (own.covers_tenant(self.provider), group_grant.covers_tenant(group_tenant))
+        self._provision_provider_role(role)
+
+        own.refresh_from_db()
+        self.assertTrue(RoleGrant.objects.filter(pk=group_grant.pk).exists())
+        group_grant.refresh_from_db()
+        group_scope.refresh_from_db()
+        after = (own.covers_tenant(self.provider), group_grant.covers_tenant(group_tenant))
+        self.assertEqual(after, before)
+        self.assertEqual(group_grant.pk, group_scope.role_grant_id)
+        self.assertEqual(group_grant.valid_until, group_until)
+        self.assertEqual(
+            set(RoleGrant.objects.filter(membership=membership, role=role).values_list("pk", flat=True)),
+            {own.pk, group_grant.pk},
+        )
+
+    def test_provider_grants_with_identical_scope_sets_converge_to_widest_validity(self):
+        role, membership = self._provider_grant_fixture()
+        short_until = timezone.now() + timedelta(hours=1)
+        wide_until = timezone.now() + timedelta(days=3)
+        short = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=short_until,
+        )
+        wide = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=wide_until,
+        )
+        RoleGrantScope.objects.create(role_grant=short, scope_type=RoleGrantScope.SCOPE_OWN)
+        wide_scope = RoleGrantScope.objects.create(role_grant=wide, scope_type=RoleGrantScope.SCOPE_OWN)
+        before = (short.covers_tenant(self.provider), wide.covers_tenant(self.provider))
+
+        self._provision_provider_role(role)
+
+        wide.refresh_from_db()
+        after = (wide.covers_tenant(self.provider),)
+        self.assertEqual(after, (any(before),))
+        self.assertEqual(wide.valid_until, wide_until)
+        self.assertFalse(RoleGrant.objects.filter(pk=short.pk).exists())
+        self.assertFalse(RoleGrantScope.objects.filter(role_grant_id=short.pk).exists())
+        self.assertEqual(wide_scope.role_grant_id, wide.pk)
+        self.assertEqual(
+            list(RoleGrant.objects.filter(membership=membership, role=role).values_list("pk", flat=True)),
+            [wide.pk],
+        )
+
+    def test_provider_grants_converge_overlapping_scope_and_retain_unique_scope_lifetime(self):
+        role, membership = self._provider_grant_fixture()
+        group = TenantGroup.objects.create(name="Mixed lifetime group 443", slug="mixed-lifetime-group-443")
+        group_tenant = Tenant.objects.create(
+            name="Mixed lifetime tenant 443",
+            slug="mixed-lifetime-tenant-443",
+            group=group,
+            managed_by=self.provider,
+        )
+        wide_until = timezone.now() + timedelta(days=3)
+        mixed_until = timezone.now() + timedelta(hours=1)
+        wide = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=wide_until,
+        )
+        mixed = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=mixed_until,
+        )
+        RoleGrantScope.objects.create(role_grant=wide, scope_type=RoleGrantScope.SCOPE_OWN)
+        mixed_own = RoleGrantScope.objects.create(role_grant=mixed, scope_type=RoleGrantScope.SCOPE_OWN)
+        mixed_group = RoleGrantScope.objects.create(
+            role_grant=mixed,
+            scope_type=RoleGrantScope.SCOPE_TENANT_GROUP,
+            tenant_group=group,
+        )
+        before = (wide.covers_tenant(self.provider), mixed.covers_tenant(group_tenant))
+
+        self._provision_provider_role(role)
+
+        wide.refresh_from_db()
+        self.assertTrue(RoleGrant.objects.filter(pk=mixed.pk).exists())
+        mixed.refresh_from_db()
+        mixed_group.refresh_from_db()
+        after = (wide.covers_tenant(self.provider), mixed.covers_tenant(group_tenant))
+        self.assertEqual(after, before)
+        self.assertFalse(RoleGrantScope.objects.filter(pk=mixed_own.pk).exists())
+        self.assertEqual(mixed_group.role_grant_id, mixed.pk)
+        self.assertEqual(mixed.valid_until, mixed_until)
+        self.assertEqual(
+            set(RoleGrant.objects.filter(membership=membership, role=role).values_list("pk", flat=True)),
+            {wide.pk, mixed.pk},
+        )
+
+    def test_provider_grant_convergence_repeat_is_idempotent_and_audit_truthful(self):
+        role, membership = self._provider_grant_fixture()
+        short_until = timezone.now() + timedelta(hours=1)
+        wide_until = timezone.now() + timedelta(days=3)
+        short = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=short_until,
+        )
+        wide = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason="OIDC group-claim provisioning",
+            valid_until=wide_until,
+        )
+        short_scope = RoleGrantScope.objects.create(role_grant=short, scope_type=RoleGrantScope.SCOPE_OWN)
+        wide_scope = RoleGrantScope.objects.create(role_grant=wide, scope_type=RoleGrantScope.SCOPE_OWN)
+        actor = User.objects.create_superuser(
+            username="provider-convergence-audit-443",
+            email="provider-convergence-audit-443@example.invalid",
+            password="not-used-443",
+        )
+
+        with TaskContext(tenant_id=self.provider.pk, user_id=actor.pk), oidc_sensitive_audit():
+            request_id = get_current_request_id()
+            before_effective = (short.covers_tenant(self.provider), wide.covers_tenant(self.provider))
+            self._provision_provider_role(role)
+            first_changes = list(
+                ObjectChange._base_manager.filter(
+                    changed_object_id__in=[short.pk, short_scope.pk],
+                    changed_object_type__app_label="organization",
+                    changed_object_type__model__in=["rolegrant", "rolegrantscope"],
+                ).order_by("pk")
+            )
+            state_after_first = (
+                tuple(
+                    RoleGrant._base_manager.filter(membership=membership, role=role).values_list("pk", "valid_until")
+                ),
+                tuple(
+                    RoleGrantScope._base_manager.filter(role_grant__membership=membership)
+                    .order_by("pk")
+                    .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+                ),
+            )
+            self._provision_provider_role(role)
+            second_changes = list(
+                ObjectChange._base_manager.filter(
+                    changed_object_id__in=[short.pk, short_scope.pk],
+                    changed_object_type__app_label="organization",
+                    changed_object_type__model__in=["rolegrant", "rolegrantscope"],
+                ).order_by("pk")
+            )
+
+        self.assertEqual(before_effective, (True, True))
+        self.assertEqual(
+            [(change.action, change.changed_object_id) for change in first_changes],
+            [("delete", short_scope.pk), ("delete", short.pk)],
+        )
+        self.assertEqual(second_changes, first_changes)
+        self.assertTrue(all(change.user_id == actor.pk for change in first_changes))
+        self.assertTrue(all(change.request_id == request_id for change in first_changes))
+        self.assertTrue(all(change.postchange_data is None for change in first_changes))
+        scope_change = next(
+            change
+            for change in first_changes
+            if change.changed_object_type.model == "rolegrantscope" and change.changed_object_id == short_scope.pk
+        )
+        self.assertEqual(scope_change.prechange_data["role_grant"], short.pk)
+        grant_change = next(
+            change
+            for change in first_changes
+            if change.changed_object_type.model == "rolegrant" and change.changed_object_id == short.pk
+        )
+        self.assertEqual(grant_change.prechange_data["membership"], membership.pk)
+        self.assertEqual(
+            state_after_first,
+            (
+                ((wide.pk, wide_until),),
+                ((wide_scope.pk, wide.pk, RoleGrantScope.SCOPE_OWN, None, None),),
+            ),
+        )
+        self.assertFalse(RoleGrant.objects.filter(pk=short.pk).exists())
+        self.assertTrue(RoleGrant.objects.filter(pk=wide.pk, valid_until=wide_until).exists())
 
 
 class ProviderContractTests(IdentityServiceCase):

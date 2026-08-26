@@ -626,55 +626,6 @@ def _retire_conflicting_own_grants(
             grant.delete()
 
 
-def _merge_scope_into_canonical(
-    *,
-    scope: RoleGrantScope,
-    canonical_id: int,
-    canonical_scopes: list[RoleGrantScope],
-    canonical_keys: set[tuple[str, int | None, int | None]],
-    canonical_scope_ids: set[int],
-) -> None:
-    key = _scope_key(scope)
-    if key in canonical_keys:
-        _delete_scope(scope)
-        return
-    original_role_grant_id = scope.role_grant_id
-    try:
-        try:
-            with transaction.atomic():
-                scope.__dict__["_identity_scope_merge"] = True
-                scope.role_grant_id = canonical_id
-                scope.save(update_fields=["role_grant"])
-        finally:
-            scope.__dict__.pop("_identity_scope_merge", None)
-    except IntegrityError:
-        scope.role_grant_id = original_role_grant_id
-        scope._state.fields_cache.pop("role_grant", None)
-        existing_query = RoleGrantScope._base_manager.select_for_update(of=("self",)).filter(
-            role_grant_id=canonical_id,
-            scope_type=scope.scope_type,
-        )
-        if scope.tenant_id is None:
-            existing_query = existing_query.filter(tenant_id__isnull=True)
-        else:
-            existing_query = existing_query.filter(tenant_id=scope.tenant_id)
-        if scope.tenant_group_id is None:
-            existing_query = existing_query.filter(tenant_group_id__isnull=True)
-        else:
-            existing_query = existing_query.filter(tenant_group_id=scope.tenant_group_id)
-        existing = existing_query.first()
-        if existing is None:
-            raise
-        _delete_scope(scope)
-        if existing.pk not in canonical_scope_ids:
-            canonical_scopes.append(existing)
-            canonical_scope_ids.add(existing.pk)
-    else:
-        canonical_scopes.append(scope)
-        canonical_scope_ids.add(scope.pk)
-    canonical_keys.add(key)
-
-
 def _grant_provenance_key(grant: RoleGrant) -> tuple[int | None, str]:
     """Return the immutable provenance boundary for same-role convergence."""
 
@@ -704,21 +655,58 @@ def _grant_is_effective(grant: RoleGrant, now: datetime) -> bool:
     return grant.valid_until is None or grant.valid_until > now
 
 
+def _scope_winners_for_group(
+    group: list[RoleGrant],
+    scopes_by_grant: dict[int, list[RoleGrantScope]],
+    now: datetime,
+) -> dict[tuple[str, int | None, int | None], RoleGrant]:
+    priorities = {grant.pk: _grant_validity_priority(grant, now) for grant in group}
+    winners: dict[tuple[str, int | None, int | None], RoleGrant] = {}
+    for grant in group:
+        for scope in scopes_by_grant.get(grant.pk, ()):
+            key = _scope_key(scope)
+            winner = winners.get(key)
+            if winner is None or priorities[grant.pk] > priorities[winner.pk]:
+                winners[key] = grant
+    return winners
+
+
+def _retain_group_after_scope_convergence(
+    group: list[RoleGrant],
+    scope_winners: dict[tuple[str, int | None, int | None], RoleGrant],
+    scopes_by_grant: dict[int, list[RoleGrantScope]],
+) -> list[RoleGrant]:
+    retained_grants: list[RoleGrant] = []
+    for grant in group:
+        retained_scopes: list[RoleGrantScope] = []
+        for scope in list(scopes_by_grant.get(grant.pk, ())):
+            if scope_winners[_scope_key(scope)].pk == grant.pk:
+                retained_scopes.append(scope)
+            else:
+                # The winner already has this semantic key and the widest
+                # validity, so deleting this child cannot expand or shorten
+                # the effective authorization for the key.
+                _delete_scope(scope)
+        scopes_by_grant[grant.pk] = retained_scopes
+        if retained_scopes:
+            retained_grants.append(grant)
+        else:
+            # Empty historical duplicates carry no semantic authorization;
+            # their parent can be retired truthfully after its children were
+            # handled above.
+            grant.delete()
+    return retained_grants
+
+
 def _merge_duplicate_same_role_grants(
     grants: list[RoleGrant],
     role: Role,
     scopes_by_grant: dict[int, list[RoleGrantScope]],
 ) -> list[RoleGrant]:
-    """Converge only race-equivalent direct grants within provenance groups.
-
-    A provenance group is the exact ``(granted_by_id, reason)`` pair. Grants
-    from different operators, automation reasons, or historical origins never
-    collapse into one another. Within one group, validity chooses the
-    canonical row before scopes move: permanent > latest future-valid > latest
-    expired. Scope moves/deletions use the normal model audit path, so mixed
-    OWN/non-OWN history remains truthful.
-    """
-
+    # Provenance remains the exact (granted_by_id, reason) pair. Each
+    # semantic key independently keeps the grant with the widest validity.
+    # Unique scopes stay on their original grant; no scope foreign key is
+    # reassigned because expiry belongs to the parent RoleGrant.
     matching = [grant for grant in grants if grant.role_id == role.pk and grant.membership_id is not None]
     if not matching:
         return []
@@ -726,28 +714,11 @@ def _merge_duplicate_same_role_grants(
     groups: dict[tuple[int | None, str], list[RoleGrant]] = {}
     for grant in matching:
         groups.setdefault(_grant_provenance_key(grant), []).append(grant)
-
-    canonicals: list[RoleGrant] = []
+    retained_grants: list[RoleGrant] = []
     for group in groups.values():
-        canonical = max(group, key=lambda grant: _grant_validity_priority(grant, now))
-        canonical_scopes = scopes_by_grant.setdefault(canonical.pk, [])
-        canonical_keys = {_scope_key(scope) for scope in canonical_scopes}
-        canonical_scope_ids = {scope.pk for scope in canonical_scopes}
-        for duplicate in group:
-            if duplicate.pk == canonical.pk:
-                continue
-            for scope in list(scopes_by_grant.get(duplicate.pk, ())):
-                _merge_scope_into_canonical(
-                    scope=scope,
-                    canonical_id=canonical.pk,
-                    canonical_scopes=canonical_scopes,
-                    canonical_keys=canonical_keys,
-                    canonical_scope_ids=canonical_scope_ids,
-                )
-            scopes_by_grant[duplicate.pk] = []
-            duplicate.delete()
-        canonicals.append(canonical)
-    return canonicals
+        scope_winners = _scope_winners_for_group(group, scopes_by_grant, now)
+        retained_grants.extend(_retain_group_after_scope_convergence(group, scope_winners, scopes_by_grant))
+    return retained_grants
 
 
 def _grant_metadata(role: Role, source: str) -> _GrantMetadata:
@@ -788,6 +759,18 @@ def _ensure_own_scope(grant: RoleGrant, existing_scopes: list[RoleGrantScope] | 
             raise
 
 
+def _refresh_grant_validity(grant: RoleGrant, desired_until: datetime | None) -> None:
+    # Only lengthen a finite window or convert a finite non-privileged window
+    # to permanent; never shorten an existing validity.
+    if desired_until is None:
+        if grant.valid_until is None:
+            return
+    elif grant.valid_until is None or grant.valid_until >= desired_until:
+        return
+    grant.valid_until = desired_until
+    grant.save(update_fields=["valid_until"])
+
+
 def _refresh_system_grant_metadata(grant: RoleGrant, metadata: _GrantMetadata) -> None:
     """Refresh only the current system provenance, never a manual row.
 
@@ -798,14 +781,7 @@ def _refresh_system_grant_metadata(grant: RoleGrant, metadata: _GrantMetadata) -
 
     if grant.granted_by_id is not None or grant.reason != metadata["reason"]:
         return
-    desired_until = metadata["valid_until"]
-    if desired_until is None:
-        if grant.valid_until is None:
-            return
-    elif grant.valid_until is None or grant.valid_until >= desired_until:
-        return
-    grant.valid_until = desired_until
-    grant.save(update_fields=["valid_until"])
+    _refresh_grant_validity(grant, metadata["valid_until"])
 
 
 def _reconcile_customer_grants(
@@ -1195,10 +1171,7 @@ def _ensure_directory_grant(
     if len(owned) == 1:
         grant = owned[0]
         desired_until = now + LDAP_DIRECTORY_SYNC_PRIVILEGED_TTL if role_is_privileged(role) else None
-        changed = grant.valid_until != desired_until
-        if changed:
-            grant.valid_until = desired_until
-            grant.save(update_fields=["valid_until"])
+        _refresh_grant_validity(grant, desired_until)
         if not any(scope.scope_type == RoleGrantScope.SCOPE_OWN for scope in scopes_by_grant.get(grant.pk, ())):
             _ensure_own_scope(grant, existing_scopes=existing_scopes)
         _stage_checkpoint("ldap.grant_refreshed")

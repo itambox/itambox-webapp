@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import threading
 import time
 from datetime import timedelta
+from pathlib import Path
 from threading import Barrier, BrokenBarrierError, Event
 from unittest import mock
 
@@ -133,6 +135,44 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
             thread.join(timeout=15)
             self.assertFalse(thread.is_alive(), f"worker {thread.name} exceeded the bounded join")
 
+    def test_required_contention_pollers_have_no_positive_duration_waits(self):
+        helper_sources = (
+            (Path(__file__), "_wait_for_user_lock_wait"),
+            (Path(__file__).resolve().parents[2] / "core/tests/test_oidc_phase_b.py", "_wait_for_real_tenant_wait"),
+        )
+        for path, function_name in helper_sources:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            function = next(
+                (
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name
+                ),
+                None,
+            )
+            self.assertIsNotNone(function, f"missing required contention helper {path}:{function_name}")
+            violations = []
+            for node in ast.walk(function):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                    continue
+                if node.func.attr not in {"wait", "sleep"}:
+                    continue
+                if (
+                    node.func.attr == "sleep"
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "asyncio"
+                    and node.args
+                    and isinstance(node.args[0], ast.Constant)
+                    and node.args[0].value == 0
+                ):
+                    continue
+                violations.append(f"{node.func.attr}@{node.lineno}")
+            self.assertEqual(
+                violations,
+                [],
+                f"{path}:{function_name} must use PostgreSQL observations, not sleep/wait polling",
+            )
+
     def _wait_for_user_lock_wait(self, *, waiting_pid, blocking_pid, user_id):
         deadline = time.monotonic() + 8
         observations = []
@@ -177,7 +217,7 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
                     and f"user-{user_id}" in application_name
                 ):
                     return row
-            Event().wait(0.02)
+            # The next pg_stat_activity/pg_locks query is the deterministic wait/yield.
         self.fail(f"backend {waiting_pid} never waited on User row held by {blocking_pid}: {observations[-5:]}")
 
     def test_same_canonical_user_concurrent_customer_calls_converge_one_aggregate(self):

@@ -27,6 +27,7 @@ from core.context import (
     set_current_tenant_group,
 )
 from core.management.commands import sync_tenant_ldap as command_module
+from core.models import ObjectChange
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services import identity_provisioning as organization_identity
 from users.models import User
@@ -222,6 +223,124 @@ class LDAPBatchRestartTests(TestCase):
             assert "directory-secret" not in output
         assert first_connection.unbound is True
         assert second_connection.unbound is True
+
+    def test_exact_ldap_owned_permanent_and_longer_future_are_monotonic_and_audit_stable(self):
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="Member",
+            permissions=list(organization_identity.LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST),
+        )
+        longer_until = timezone.now() + timedelta(days=3)
+        cases = (("batch-permanent", None), ("batch-longer", longer_until))
+        for username, historical_valid_until in cases:
+            with self.subTest(username=username):
+                user = User.objects.create_user(username=username, email=f"{username}@example.invalid")
+                membership = Membership.objects.create(user=user, tenant=self.tenant)
+                grant = RoleGrant.objects.create(
+                    membership=membership,
+                    role=role,
+                    reason=organization_identity.LDAP_DIRECTORY_SYNC_REASON,
+                    granted_by=None,
+                    valid_until=timezone.now() + timedelta(days=1),
+                )
+                # Model validation rejects a permanent privileged direct grant.
+                # Create a valid finite row first, then emulate the legacy/out-of-band
+                # historical state through an explicit raw update.
+                RoleGrant._base_manager.filter(pk=grant.pk).update(valid_until=historical_valid_until)
+                grant.refresh_from_db()
+                scope = RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+
+                before_grant = (
+                    RoleGrant._base_manager.filter(pk=grant.pk)
+                    .values_list("pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until")
+                    .get()
+                )
+                before_scope = (
+                    RoleGrantScope._base_manager.filter(pk=scope.pk)
+                    .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+                    .get()
+                )
+
+                def change_rows(model, object_id):
+                    return tuple(
+                        ObjectChange._base_manager.filter(
+                            changed_object_id=object_id,
+                            changed_object_type__app_label="organization",
+                            changed_object_type__model=model,
+                        )
+                        .order_by("pk")
+                        .values_list("pk", "action", "user_id", "request_id", "prechange_data", "postchange_data")
+                    )
+
+                before_audit = (change_rows("rolegrant", grant.pk), change_rows("rolegrantscope", scope.pk))
+
+                self._run(username=username, email=user.email)
+                self._run(username=username, email=user.email)
+
+                grant.refresh_from_db()
+                assert (
+                    RoleGrant._base_manager.filter(pk=grant.pk)
+                    .values_list("pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until")
+                    .get()
+                    == before_grant
+                )
+                assert (
+                    RoleGrantScope._base_manager.filter(pk=scope.pk)
+                    .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+                    .get()
+                    == before_scope
+                )
+                assert change_rows("rolegrant", grant.pk) == before_audit[0]
+                assert change_rows("rolegrantscope", scope.pk) == before_audit[1]
+                assert RoleGrant.objects.filter(membership=membership, role=role).count() == 1
+
+    def test_exact_ldap_owned_shorter_and_expired_refresh_to_one_day_without_duplicates(self):
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="Member",
+            permissions=list(organization_identity.LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST),
+        )
+        cases = (
+            ("batch-shorter", timezone.now() + timedelta(hours=1)),
+            ("batch-expired", timezone.now() - timedelta(minutes=1)),
+        )
+        for username, initial_until in cases:
+            with self.subTest(username=username):
+                user = User.objects.create_user(username=username, email=f"{username}@example.invalid")
+                membership = Membership.objects.create(user=user, tenant=self.tenant)
+                grant = RoleGrant.objects.create(
+                    membership=membership,
+                    role=role,
+                    reason=organization_identity.LDAP_DIRECTORY_SYNC_REASON,
+                    granted_by=None,
+                    valid_until=timezone.now() + timedelta(days=1),
+                )
+                # Expired privileged direct grants are also historical state: use
+                # a valid finite insert, then make the expiry explicit via raw SQL.
+                RoleGrant._base_manager.filter(pk=grant.pk).update(valid_until=initial_until)
+                grant.refresh_from_db()
+                scope = RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+                observed_before_refresh = timezone.now()
+
+                self._run(username=username, email=user.email)
+                self._run(username=username, email=user.email)
+
+                grant.refresh_from_db()
+                observed_after_refresh = timezone.now()
+                assert grant.valid_until >= observed_after_refresh + timedelta(hours=23)
+                assert grant.valid_until <= observed_before_refresh + timedelta(days=1, minutes=2)
+                assert grant.reason == organization_identity.LDAP_DIRECTORY_SYNC_REASON
+                assert grant.granted_by_id is None
+                assert RoleGrantScope._base_manager.filter(pk=scope.pk, role_grant_id=grant.pk).count() == 1
+                assert (
+                    RoleGrant.objects.filter(
+                        membership=membership,
+                        role=role,
+                        reason=organization_identity.LDAP_DIRECTORY_SYNC_REASON,
+                        granted_by__isnull=True,
+                    ).count()
+                    == 1
+                )
 
     def test_existing_can_login_false_is_synced_and_second_directory_entry_is_processed(self):
         blocked = User.objects.create_user(
