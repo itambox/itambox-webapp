@@ -11,7 +11,6 @@ from .generic import (
     ObjectImportView,
     ObjectBulkEditView,
     ObjectBulkDeleteView,
-    table_config,
 )
 from .features import (
     ObjectChangeListView,
