@@ -509,10 +509,47 @@ class AssetBulkDeleteView(ObjectBulkDeleteView):
     queryset = Asset.objects.all()
 
 
+def _parse_label_asset_pks(raw_pks):
+    try:
+        normalized_pks = [int(pk) for pk in raw_pks]
+    except (TypeError, ValueError):
+        return None
+    if any(pk <= 0 for pk in normalized_pks) or len(set(normalized_pks)) != len(normalized_pks):
+        return None
+    return normalized_pks
+
+
+def _resolve_label_batch_assets(request, raw_pks):
+    normalized_pks = _parse_label_asset_pks(raw_pks)
+    invalid_message = _("The selected assets are invalid or no longer accessible.")
+    if normalized_pks is None:
+        return None, invalid_message
+
+    # Resolve through the active tenant/group/aggregate queryset first. The
+    # per-object view check is still required because queryset visibility and
+    # the asset's actual label-disclosure permission are separate boundaries.
+    assets = list(Asset.objects.filter(pk__in=normalized_pks))
+    assets_by_pk = {asset.pk: asset for asset in assets}
+    if len(assets) != len(normalized_pks) or not all(
+        request.user.has_perm("assets.view_asset", obj=asset) for asset in assets
+    ):
+        return None, invalid_message
+
+    tenant_ids = {asset.tenant_id for asset in assets}
+    if not tenant_ids or None in tenant_ids:
+        return None, _("The selected assets are invalid or no longer accessible.")
+    return ([assets_by_pk[pk] for pk in normalized_pks], assets_by_pk[normalized_pks[0]].tenant), None
+
+
+def _label_job_redirect_url(job):
+    try:
+        return reverse("job_detail", kwargs={"pk": job.pk})
+    except NoReverseMatch:
+        return f"/jobs/{job.pk}/"
+
+
 @login_required
 def bulk_print_labels(request):
-    if not request.user.has_perm("assets.change_asset"):
-        return HttpResponse(status=403)
     if request.method != "POST":
         return HttpResponse(status=405)
 
@@ -520,35 +557,41 @@ def bulk_print_labels(request):
     template_id = request.POST.get("template_id")
     layout_mode = request.POST.get("layout_mode", "roll")
 
-    if not object_pks:
-        messages.error(request, _("No assets selected for label printing."))
+    def redirect_to_asset_list():
         return HttpResponseRedirect(
             safe_return_url(request, request.META.get("HTTP_REFERER"), reverse("assets:asset_list"))
         )
+
+    if not object_pks:
+        messages.error(request, _("No assets selected for label printing."))
+        return redirect_to_asset_list()
 
     try:
         template_id = int(template_id)
     except (TypeError, ValueError):
         messages.error(request, _("No valid label template specified."))
-        return HttpResponseRedirect(
-            safe_return_url(request, request.META.get("HTTP_REFERER"), reverse("assets:asset_list"))
-        )
+        return redirect_to_asset_list()
+
+    batch, error = _resolve_label_batch_assets(request, object_pks)
+    if error:
+        messages.error(request, error)
+        return redirect_to_asset_list()
+    assets, selected_tenant = batch
 
     from django.conf import settings
     from django_q.tasks import async_task
 
-    from core.managers import get_current_tenant
     from core.models import Job
 
+    tenant_id = selected_tenant.pk
     ct = ContentType.objects.get_for_model(Asset)
-    current_tenant = get_current_tenant()
-    tenant_id = current_tenant.pk if current_tenant else None
 
     job = Job.objects.create(
-        name=f"Label Batch Generation: {len(object_pks)} Assets",
-        tenant=current_tenant,
+        name=f"Label Batch Generation: {len(assets)} Assets",
+        tenant=selected_tenant,
         model=ct,
         status=Job.STATUS_PENDING,
+        data={"scope_tenant_ids": sorted({asset.tenant_id for asset in assets})},
     )
 
     if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
@@ -574,10 +617,7 @@ def bulk_print_labels(request):
             )
         )
 
-    try:
-        redirect_url = reverse("job_detail", kwargs={"pk": job.pk})
-    except NoReverseMatch:
-        redirect_url = f"/jobs/{job.pk}/"
+    redirect_url = _label_job_redirect_url(job)
 
     messages.success(
         request,
