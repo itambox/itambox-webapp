@@ -140,7 +140,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             queryset = filter_list_provider_queryset(
                 self._get_list_presentation(model),
                 queryset,
-                params=filter_params,
             )
 
         return queryset
@@ -292,5 +291,4 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         return build_list_provider_context(
             self._get_list_presentation(_model),
             context,
-            params=getattr(self, "_resolved_filter_params", None),
         )

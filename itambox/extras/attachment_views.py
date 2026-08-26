@@ -14,16 +14,13 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
-from core.forms import FilterForm, JournalEntryForm
+from core.forms import JournalEntryForm
 from extras.filters import JournalEntryFilterSet
+from extras.forms import JournalEntryFilterForm
 from extras.models import FileAttachment, ImageAttachment, JournalEntry
 from extras.tables import JournalEntryTable
 from itambox.views.generic import ObjectListView
 from itambox.views.generic.utils import safe_return_url
-
-
-class JournalEntryFilterForm(FilterForm):
-    filterset_class = JournalEntryFilterSet
 
 
 @method_decorator(login_required, name="dispatch")
@@ -45,7 +42,15 @@ class JournalEntryListView(ObjectListView):
 
 
 def _attachment_parent_for_change(request, content_type, object_id):
-    """Return the scoped parent if the user may change it, else raise 404."""
+    """Return the tenant-scoped parent only when the user may change it.
+
+    Upload/delete/journal writes keep the historical object-bound
+    ``change_<parent>`` authorization: the parent is resolved through its
+    tenant-scoping default manager (so a guessed cross-tenant object_id cannot
+    select a row outside the active tenant), and ``has_perm(..., obj=parent)``
+    requires the object-bound permission from ``TenantMembershipBackend``.
+    Every failure is a 404 so attachment IDs are not enumerable.
+    """
     model_class = content_type.model_class()
     if model_class is None:
         raise Http404
@@ -60,7 +65,22 @@ def _attachment_parent_for_change(request, content_type, object_id):
 
 
 def _attachment_parent_for_view(request, content_type, object_id):
-    """Return the default-manager-scoped parent when object view access is held."""
+    """Return the default-manager parent only when object view access is held.
+
+    Attachment files live under /media/ and are served directly by the web
+    server, so the attachment rows themselves are the only authorization point:
+    without this check a file would be reachable purely by guessing its pk
+    (cross-tenant file IDOR). Reads resolve the parent through its default
+    (scoped) manager and require the object-bound ``view_<parent>`` permission;
+    every failure is a 404. This intentionally replaces the old
+    active-tenant-equality check (which allowed any authenticated user to read
+    an unscoped global parent's attachment and denied authorized aggregate-
+    scope Job attachments when no single active tenant was set) with the
+    canonical membership-based object permission semantics of
+    ``TenantMembershipBackend``: for tenant-scoped parents the scoped manager
+    keeps ordinary cross-tenant denial, while an aggregate-scope Job is served
+    only when the user holds the object-bound job view permission.
+    """
     model_class = content_type.model_class()
     if model_class is None:
         raise Http404

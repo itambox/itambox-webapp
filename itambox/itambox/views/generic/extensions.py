@@ -119,12 +119,9 @@ def _provider_state_for(
 def filter_list_provider_queryset(
     resolution: ResolvedListPresentation,
     queryset: QuerySet[Model],
-    *,
-    params: QueryDict | None = None,
 ) -> QuerySet[Model]:
     """Apply every opted-in provider to the supplied validated queryset."""
     current = queryset
-    effective_params = resolution.params if params is None else params
     for registration in registry.generic_presentation_registrations():
         if not registration.list_filter:
             continue
@@ -132,7 +129,7 @@ def filter_list_provider_queryset(
             ListFilterInput(
                 request=resolution.request,
                 model=resolution.model,
-                params=effective_params,
+                params=resolution.params,
                 queryset=current,
                 content_type=resolution.content_type,
                 partial=resolution.partial,
@@ -194,13 +191,10 @@ def _merge_provider_context(
 def build_list_provider_context(
     resolution: ResolvedListPresentation,
     core_context: Mapping[str, object],
-    *,
-    params: QueryDict | None = None,
 ) -> dict[str, object]:
     """Merge plural provider context after the immutable core context exists."""
     merged = dict(core_context)
     owners = {key: "core" for key in merged}
-    effective_params = resolution.params if params is None else params
     for registration in registry.generic_presentation_registrations():
         if not registration.list_context:
             continue
@@ -208,7 +202,7 @@ def build_list_provider_context(
             ListContextInput(
                 request=resolution.request,
                 model=resolution.model,
-                params=effective_params,
+                params=resolution.params,
                 content_type=resolution.content_type,
                 partial=resolution.partial,
                 state=_provider_state_for(resolution, registration),
@@ -226,7 +220,9 @@ def build_detail_provider_context(
     core_context: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Invoke each active feature owner once and collision-check its context."""
-    active_features = frozenset(registry.model_features.get(type(obj), set())) & GENERIC_PRESENTATION_DETAIL_FEATURES
+    active_features = frozenset(
+        feature for feature in GENERIC_PRESENTATION_DETAIL_FEATURES if registry.model_has_feature(type(obj), feature)
+    )
     features_by_owner = {}
     for feature in sorted(active_features):
         owner = registry.generic_presentation_owner_for(feature)

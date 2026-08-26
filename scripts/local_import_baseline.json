@@ -1798,18 +1798,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/customfields.py",
-      "context": "FunctionDef:build_custom_field_form_field",
-      "statement": "from extras.models import CustomField",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/customfields.py",
-      "context": "FunctionDef:custom_fields_for_model",
-      "statement": "from extras.models import CustomField",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/dashboard/views.py",
       "context": "ClassDef:DashboardCreateView/FunctionDef:post",
       "statement": "from django.contrib import messages",

@@ -154,3 +154,35 @@ class JobAttachmentAuthorizationTests(TestCase):
         response = self.client.get(reverse("file_attachment_download", kwargs={"pk": attachment.pk}))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_cross_workspace_read_follows_object_bound_membership_permission(self):
+        """Adaptation #8 (review): reads use the canonical membership-based object
+        permission semantics of ``TenantMembershipBackend`` instead of the old
+        active-tenant-equality check.
+
+        A user with memberships in both tenants holds ``view_job`` bound to a Job
+        in either tenant, so the read succeeds even while the active workspace is
+        the other tenant. This is the deliberate replacement mandated by Design
+        v1.1 section 8: the old check denied authorized aggregate-scope Job
+        attachments (no single active tenant) and permitted unscoped global
+        parents without any permission at all; the new check binds reads to the
+        object-bound permission for every parent, while tenant-scoped parents
+        keep ordinary cross-tenant denial through their scoped default manager.
+        """
+        job = Job.objects.create(name="A-side parent", tenant=self.tenant_a)
+        attachment = self.make_attachment(job, "a-side-parent.txt")
+        grant(
+            self.user,
+            self.tenant_b,
+            Role.objects.create(tenant=self.tenant_b, name="Job Attachment B Member", permissions=["core.view_job"]),
+        )
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_b.pk
+        session.pop("active_all_accessible", None)
+        session.save()
+
+        response = self.client.get(reverse("file_attachment_download", kwargs={"pk": attachment.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
