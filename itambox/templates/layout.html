@@ -61,7 +61,8 @@
                   {% if recent_unread_notifications %}
                     {% for notif in recent_unread_notifications %}
                       <a href="{% url 'users:view_notification' pk=notif.pk %}"
-                         class="list-group-item list-group-item-action py-2">
+                         class="list-group-item list-group-item-action py-2"
+                         hx-boost="false">
                         <div class="d-flex align-items-center">
                           <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} me-2"></span>
                           <div class="text-truncate csp-style-7ef9446763d9">{{ notif.subject }}</div>
