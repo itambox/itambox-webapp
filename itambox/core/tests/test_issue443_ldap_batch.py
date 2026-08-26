@@ -210,6 +210,24 @@ class LDAPBatchRestartTests(TestCase):
         assert first_connection.unbound is True
         assert second_connection.unbound is True
 
+    def test_preexisting_same_email_holder_stays_unlinked_during_batch_membership_creation(self):
+        holder = AssetHolder.objects.create(
+            user=None,
+            tenant=self.tenant,
+            upn="batch-holder-authoritative-upn-443@example.invalid",
+            email="batch-user@example.invalid",
+            first_name="Batch",
+            last_name="Holder",
+        )
+
+        self._run()
+
+        holder.refresh_from_db()
+        assert holder.user_id is None
+        user = User.objects.get(username="batch-user")
+        membership = Membership.objects.get(user=user, tenant=self.tenant)
+        assert membership.is_active is True
+
     def test_active_manual_equivalent_is_reused_without_ldap_owned_row(self):
         user = User.objects.create_user(username="batch-user", email="batch-user@example.invalid")
         role = Role.objects.create(

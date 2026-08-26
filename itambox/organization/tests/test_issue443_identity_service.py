@@ -12,12 +12,13 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-from django.db import IntegrityError, connection
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 import organization.services.identity_provisioning as identity_service
+from core.context import get_current_request_id
 from core.identity_provisioning import (
     ExternalIdentityProfile,
     ExternalIdentityProvisioningCommand,
@@ -523,6 +524,56 @@ class HolderReconciliationTests(IdentityServiceCase):
         self.assertEqual(RoleGrant.objects.filter(membership_id=result.membership_id).count(), 1)
         self.assert_no_sensitive_log_text(logs.records)
 
+    def test_service_membership_creation_does_not_trigger_email_only_autolink_after_upn_rejection(self):
+        candidate = AssetHolder.objects.create(
+            user=None,
+            tenant=self.customer,
+            upn="stored-holder-upn-443@example.invalid",
+            email=self.user.email,
+            first_name="Stored",
+            last_name="Holder",
+        )
+
+        with self.assertLogs("itambox.organization.identity", level="WARNING") as logs:
+            result = self.provisioner.provision(
+                self.command(
+                    profile=self.profile(
+                        email=self.user.email,
+                        upn="authoritative-user-upn-443@example.invalid",
+                    )
+                )
+            )
+
+        self.assertIsNone(result.holder_id)
+        candidate.refresh_from_db()
+        self.assertIsNone(candidate.user_id)
+        self.assertEqual(Membership.objects.filter(pk=result.membership_id).count(), 1)
+        self.assertEqual(RoleGrant.objects.filter(membership_id=result.membership_id).count(), 1)
+        self.assert_no_sensitive_log_text(logs.records)
+
+    def test_service_membership_marker_has_no_asset_holder_signal_query_or_write(self):
+        candidate = AssetHolder.objects.create(
+            user=None,
+            tenant=self.customer,
+            upn="signal-query-holder-443@example.invalid",
+            email=self.user.email,
+            first_name="Signal",
+            last_name="Holder",
+        )
+
+        with CaptureQueriesContext(connection) as captured:
+            with transaction.atomic():
+                membership, created = identity_service._create_membership(
+                    user_id=self.user.pk,
+                    tenant_id=self.customer.pk,
+                )
+
+        self.assertTrue(created)
+        self.assertEqual(membership.user_id, self.user.pk)
+        self.assertFalse(any("organization_assetholder" in query["sql"].lower() for query in captured.captured_queries))
+        candidate.refresh_from_db()
+        self.assertIsNone(candidate.user_id)
+
     def test_linked_other_user_is_never_stolen(self):
         other = User.objects.create_user(username="other-holder-443", email="other-holder-443@example.invalid")
         candidate = AssetHolder.objects.create(
@@ -715,6 +766,173 @@ class GrantConvergenceTests(IdentityServiceCase):
         self.assertEqual(result.membership_id, membership.pk)
         self.assertEqual(RoleGrantScope.objects.filter(pk=scope.pk).count(), 1)
 
+    def test_conflicting_own_scope_revocation_leaves_audited_tombstone(self):
+        self.role(self.customer, name="Member")
+        other = self.role(self.customer, name="Other", permissions=["assets.view_asset"])
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        conflicting = RoleGrant.objects.create(membership=membership, role=other)
+        own_scope = RoleGrantScope.objects.create(
+            role_grant=conflicting,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        RoleGrantScope._base_manager.bulk_create(
+            [
+                RoleGrantScope(
+                    role_grant_id=conflicting.pk,
+                    scope_type=RoleGrantScope.SCOPE_TENANT,
+                    tenant_id=self.customer.pk,
+                )
+            ]
+        )
+        actor = User.objects.create_superuser(
+            username="scope-revoke-audit-443",
+            email="scope-revoke-audit-443@example.invalid",
+            password="not-used-443",
+        )
+
+        with TaskContext(tenant_id=self.customer.pk, user_id=actor.pk), oidc_sensitive_audit():
+            request_id = get_current_request_id()
+            result = self.provisioner.provision(self.command())
+
+        self.assertEqual(result.mode, "customer")
+        self.assertFalse(RoleGrantScope._base_manager.filter(pk=own_scope.pk).exists())
+        changes = list(
+            ObjectChange._base_manager.filter(
+                changed_object_id=own_scope.pk,
+                changed_object_type__app_label="organization",
+                changed_object_type__model="rolegrantscope",
+            ).order_by("pk")
+        )
+        self.assertEqual([change.action for change in changes], ["delete"])
+        self.assertEqual(changes[0].user_id, actor.pk)
+        self.assertEqual(changes[0].request_id, request_id)
+        self.assertEqual(changes[0].prechange_data["role_grant"], conflicting.pk)
+        self.assertIsNone(changes[0].postchange_data)
+
+    def test_scope_move_uses_instance_audit_with_truthful_actor_and_request(self):
+        role = self.role(self.customer, name="Member")
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        canonical = RoleGrant.objects.create(membership=membership, role=role)
+        duplicate = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=canonical, scope_type=RoleGrantScope.SCOPE_OWN)
+        moved_scope = RoleGrantScope._base_manager.bulk_create(
+            [
+                RoleGrantScope(
+                    role_grant_id=duplicate.pk,
+                    scope_type=RoleGrantScope.SCOPE_TENANT,
+                    tenant_id=self.customer.pk,
+                )
+            ]
+        )[0]
+        actor = User.objects.create_superuser(
+            username="scope-move-audit-443",
+            email="scope-move-audit-443@example.invalid",
+            password="not-used-443",
+        )
+
+        with TaskContext(tenant_id=self.customer.pk, user_id=actor.pk), oidc_sensitive_audit():
+            request_id = get_current_request_id()
+            result = self.provisioner.provision(self.command())
+
+        self.assertEqual(result.mode, "customer")
+        moved_scope.refresh_from_db()
+        self.assertEqual(moved_scope.role_grant_id, canonical.pk)
+        changes = list(
+            ObjectChange._base_manager.filter(
+                changed_object_id=moved_scope.pk,
+                changed_object_type__app_label="organization",
+                changed_object_type__model="rolegrantscope",
+            ).order_by("pk")
+        )
+        self.assertEqual([change.action for change in changes], ["update"])
+        self.assertEqual(changes[0].user_id, actor.pk)
+        self.assertEqual(changes[0].request_id, request_id)
+        self.assertEqual(changes[0].prechange_data["role_grant"], duplicate.pk)
+        self.assertEqual(changes[0].postchange_data["role_grant"], canonical.pk)
+
+    def test_real_scope_move_conflict_uses_savepoint_reread_and_only_audits_tombstone(self):
+        role = self.role(self.customer, name="Member")
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        canonical = RoleGrant.objects.create(membership=membership, role=role)
+        duplicate = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=canonical, scope_type=RoleGrantScope.SCOPE_OWN)
+        moved_scope = RoleGrantScope._base_manager.bulk_create(
+            [
+                RoleGrantScope(
+                    role_grant_id=duplicate.pk,
+                    scope_type=RoleGrantScope.SCOPE_TENANT,
+                    tenant_id=self.customer.pk,
+                )
+            ]
+        )[0]
+        actor = User.objects.create_superuser(
+            username="scope-conflict-audit-443",
+            email="scope-conflict-audit-443@example.invalid",
+            password="not-used-443",
+        )
+        real_lock_aggregate = identity_service._lock_aggregate
+        injected = {"done": False}
+
+        def inject_canonical_conflict(*args, **kwargs):
+            aggregate = real_lock_aggregate(*args, **kwargs)
+            if not injected["done"]:
+                injected["done"] = True
+                RoleGrantScope._base_manager.bulk_create(
+                    [
+                        RoleGrantScope(
+                            role_grant_id=canonical.pk,
+                            scope_type=RoleGrantScope.SCOPE_TENANT,
+                            tenant_id=self.customer.pk,
+                        )
+                    ]
+                )
+            return aggregate
+
+        statements = []
+
+        def capture(execute, sql, params, many, context):
+            statements.append(sql)
+            return execute(sql, params, many, context)
+
+        with (
+            mock.patch.object(identity_service, "_lock_aggregate", side_effect=inject_canonical_conflict),
+            TaskContext(tenant_id=self.customer.pk, user_id=actor.pk),
+            oidc_sensitive_audit(),
+        ):
+            request_id = get_current_request_id()
+            with connection.execute_wrapper(capture):
+                result = self.provisioner.provision(self.command())
+
+        self.assertTrue(injected["done"])
+        self.assertEqual(result.mode, "customer")
+        self.assertFalse(RoleGrantScope._base_manager.filter(pk=moved_scope.pk).exists())
+        self.assertEqual(
+            RoleGrantScope._base_manager.filter(
+                role_grant=canonical,
+                scope_type=RoleGrantScope.SCOPE_TENANT,
+                tenant=self.customer,
+            ).count(),
+            1,
+        )
+        scope_updates = [
+            sql
+            for sql in statements
+            if sql.lstrip().upper().startswith("UPDATE") and "organization_rolegrantscope" in sql.lower()
+        ]
+        self.assertEqual(len(scope_updates), 1)
+        self.assertTrue(any(sql.lstrip().upper().startswith("SAVEPOINT") for sql in statements))
+        changes = list(
+            ObjectChange._base_manager.filter(
+                changed_object_id=moved_scope.pk,
+                changed_object_type__app_label="organization",
+                changed_object_type__model="rolegrantscope",
+            ).order_by("pk")
+        )
+        self.assertEqual([change.action for change in changes], ["delete"])
+        self.assertEqual(changes[0].user_id, actor.pk)
+        self.assertEqual(changes[0].request_id, request_id)
+        self.assertEqual(changes[0].prechange_data["role_grant"], duplicate.pk)
+
 
 class ProviderContractTests(IdentityServiceCase):
     def provider_setup(self):
@@ -760,6 +978,26 @@ class ProviderContractTests(IdentityServiceCase):
             unrelated_membership,
             unrelated_holder,
         )
+
+    def test_new_provider_membership_does_not_trigger_email_only_holder_autolink(self):
+        provider_role = self.role(self.provider, name="ProviderStaff")
+        holder = AssetHolder.objects.create(
+            user=None,
+            tenant=self.provider,
+            upn="provider-signal-holder-443@example.invalid",
+            email=self.user.email,
+            first_name="Provider",
+            last_name="Holder",
+        )
+
+        result = self.provisioner.provision(
+            self.command(provider_staff=self.provider_intent(role_name=provider_role.name))
+        )
+
+        self.assertEqual(result.mode, "provider_staff")
+        holder.refresh_from_db()
+        self.assertIsNone(holder.user_id)
+        self.assertEqual(Membership.objects.filter(user=self.user, tenant=self.provider).count(), 1)
 
     def test_invalid_provider_mapping_is_terminal_zero_write_existing_user(self):
         self.role(self.customer)

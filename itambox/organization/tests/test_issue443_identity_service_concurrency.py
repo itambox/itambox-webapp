@@ -429,6 +429,101 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
     def test_customer_first_then_provider_transition_is_provider_only(self):
         self._run_ordered_provider_customer("customer")
 
+    def test_public_provider_transition_reconciles_first_party_membership_uniqueness_winner(self):
+        user = User.objects.create_user(
+            username="provider-membership-winner-443",
+            email="provider-membership-winner-443@example.invalid",
+        )
+        customer_membership = Membership.objects.create(user=user, tenant=self.customer)
+        customer_grant = RoleGrant.objects.create(membership=customer_membership, role=self.member_role)
+        RoleGrantScope.objects.create(role_grant=customer_grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        customer_holder = AssetHolder.objects.create(
+            user=user,
+            tenant=self.customer,
+            upn="provider-membership-winner-443@example.invalid",
+            email=user.email,
+            first_name="Provider",
+            last_name="Winner",
+        )
+        with transaction.atomic():
+            stale_memberships = identity_service._lock_memberships(
+                user.pk,
+                {self.customer.pk, self.provider.pk},
+            )
+        writer_state = {"membership_id": None, "error": None}
+
+        def first_party_writer():
+            try:
+                connections.close_all()
+                with transaction.atomic():
+                    provider_membership = Membership.objects.create(
+                        user_id=user.pk,
+                        tenant_id=self.provider.pk,
+                        is_active=False,
+                    )
+                    provider_grant = RoleGrant.objects.create(
+                        membership=provider_membership,
+                        role=self.provider_role,
+                        reason="first-party provider membership writer",
+                    )
+                    RoleGrantScope.objects.create(
+                        role_grant=provider_grant,
+                        scope_type=RoleGrantScope.SCOPE_OWN,
+                    )
+                    writer_state["membership_id"] = provider_membership.pk
+            except Exception as exc:
+                writer_state["error"] = exc
+            finally:
+                connections.close_all()
+
+        writer = threading.Thread(target=first_party_writer, name="provider-membership-winner")
+        writer.start()
+        writer.join(timeout=8)
+        self.assertFalse(writer.is_alive(), "first-party provider writer exceeded the bounded join")
+        self.assertIsNone(writer_state["error"])
+        self.assertIsNotNone(writer_state["membership_id"])
+
+        command = self._command(
+            user,
+            provider_staff=ProviderStaffIntent(provider_tenant=self.provider, role_name="ProviderStaff"),
+        )
+        statements = []
+
+        def capture(execute, sql, params, many, context):
+            statements.append(sql)
+            return execute(sql, params, many, context)
+
+        with (
+            mock.patch.object(
+                identity_service,
+                "_lock_memberships",
+                return_value=stale_memberships,
+            ),
+            connection.execute_wrapper(capture),
+        ):
+            result = self.provisioner.provision(command)
+
+        self.assertEqual(result.mode, "provider_staff")
+        self.assertEqual(
+            sum(
+                " ".join(sql.split()).lower().startswith('insert into "organization_membership"') for sql in statements
+            ),
+            1,
+        )
+        self.assertTrue(any(sql.lstrip().upper().startswith("SAVEPOINT") for sql in statements))
+        self.assertEqual(
+            Membership.objects.filter(user=user, tenant=self.provider).count(),
+            1,
+        )
+        provider_membership = Membership.objects.get(user=user, tenant=self.provider)
+        self.assertEqual(provider_membership.pk, writer_state["membership_id"])
+        self.assertTrue(provider_membership.is_active)
+        self.assertFalse(RoleGrant.objects.filter(membership=provider_membership).exists())
+        self.assertFalse(Membership.objects.filter(pk=customer_membership.pk).exists())
+        customer_holder.refresh_from_db()
+        self.assertIsNone(customer_holder.user_id)
+        self.assertFalse(RoleGrant.objects.filter(membership__user=user).exists())
+
     def test_repeated_provider_transition_remains_provider_only(self):
         user = User.objects.create_user(username="repeat-provider-443", email="repeat-provider-443@example.invalid")
         command = self._command(

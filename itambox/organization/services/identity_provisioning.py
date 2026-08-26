@@ -599,7 +599,7 @@ def _scope_key(scope: RoleGrantScope) -> tuple[str, int | None, int | None]:
 
 
 def _delete_scope(scope: RoleGrantScope) -> None:
-    RoleGrantScope._base_manager.filter(pk=scope.pk).delete()
+    scope.delete()
 
 
 def _retire_conflicting_own_grants(
@@ -632,10 +632,19 @@ def _merge_scope_into_canonical(
     if key in canonical_keys:
         _delete_scope(scope)
         return
+    original_role_grant_id = scope.role_grant_id
     try:
-        RoleGrantScope._base_manager.filter(pk=scope.pk).update(role_grant_id=canonical_id)
+        try:
+            with transaction.atomic():
+                scope.__dict__["_identity_scope_merge"] = True
+                scope.role_grant_id = canonical_id
+                scope.save(update_fields=["role_grant"])
+        finally:
+            scope.__dict__.pop("_identity_scope_merge", None)
     except IntegrityError:
-        existing_query = RoleGrantScope._base_manager.select_for_update().filter(
+        scope.role_grant_id = original_role_grant_id
+        scope._state.fields_cache.pop("role_grant", None)
+        existing_query = RoleGrantScope._base_manager.select_for_update(of=("self",)).filter(
             role_grant_id=canonical_id,
             scope_type=scope.scope_type,
         )
@@ -826,14 +835,25 @@ def _provider_transition(
     customer_holders = _all_customer_holders(user_id=locked_user.pk, tenant_id=customer_id)
 
     if provider_membership is None:
-        provider_membership = Membership._base_manager.create(
+        provider_membership, created = _create_membership(
             user_id=locked_user.pk,
             tenant_id=provider_id,
-            is_active=True,
         )
-    elif not provider_membership.is_active:
+        if not created:
+            refreshed_grants = _lock_grants({provider_membership.pk})
+            aggregate.grants = [
+                grant for grant in aggregate.grants if grant.membership_id != provider_membership.pk
+            ] + refreshed_grants
+            refreshed_scopes = _lock_scopes(refreshed_grants)
+            refreshed_grant_ids = {grant.pk for grant in refreshed_grants}
+            aggregate.scopes = [
+                scope for scope in aggregate.scopes if scope.role_grant_id not in refreshed_grant_ids
+            ] + refreshed_scopes
+            _reindex_aggregate_children(aggregate)
+    if not provider_membership.is_active:
         provider_membership.is_active = True
         provider_membership.save(update_fields=["is_active"])
+    aggregate.memberships[provider_id] = provider_membership
     _stage_checkpoint("provider.membership_activated")
 
     # A provider principal is intentionally grant-free. Customer grants and
@@ -883,19 +903,21 @@ def _create_membership(*, user_id: int, tenant_id: int) -> tuple[Membership, boo
 
     try:
         with transaction.atomic():
-            return (
-                Membership._base_manager.create(
-                    user_id=user_id,
-                    tenant_id=tenant_id,
-                    is_active=True,
-                ),
-                True,
+            membership = Membership(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                is_active=True,
             )
+            membership.__dict__["_skip_asset_holder_autolink"] = True
+            membership.save(force_insert=True)
+            return membership, True
     except IntegrityError:
-        membership = Membership._base_manager.select_for_update().filter(user_id=user_id, tenant_id=tenant_id).first()
-        if membership is None:
+        existing_membership = (
+            Membership._base_manager.select_for_update().filter(user_id=user_id, tenant_id=tenant_id).first()
+        )
+        if existing_membership is None:
             raise
-        return membership, False
+        return existing_membership, False
 
 
 def _provision_customer(
