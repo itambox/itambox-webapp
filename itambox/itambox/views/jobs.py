@@ -4,19 +4,20 @@
 
 import logging
 
+from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from django.views.generic import View
 
-from core.managers import get_current_tenant
+from core.managers import get_current_tenant, get_current_tenant_group
 from core.models import Job
 from core.tables import JobTable
-from core.tenant_scope import accessible_tenant_ids
+from core.tenant_scope import accessible_tenant_ids, get_descendant_tenant_group_ids
 from itambox.views.generic import ObjectDetailView, ObjectListView
 
 logger = logging.getLogger(__name__)
@@ -26,19 +27,34 @@ def scoped_jobs(user):
     """
     Jobs visible to a user. Job has no tenant-scoping manager, so scope
     explicitly: superusers see everything (including system jobs without a
-    tenant); everyone else sees the active tenant's jobs — or, in the
-    aggregate "all accessible tenants" scope, every accessible tenant's jobs,
-    so a bulk job created there redirects to a page its creator can open.
+    tenant); everyone else sees the active tenant's jobs. A tenant-group scope
+    is restricted to the selected group's live subtree, while the aggregate
+    scope spans the complete canonical accessible tenant set.
     """
     if user.is_superuser:
         return Job.objects.all()
     tenant = get_current_tenant()
     if tenant is not None:
-        return Job.objects.filter(tenant=tenant)
-    tenant_ids = accessible_tenant_ids(user)
+        allowed_scope = [tenant.pk]
+        return Job.objects.filter(tenant=tenant).filter(
+            Q(data__scope_tenant_ids__isnull=True) | Q(data__scope_tenant_ids__contained_by=allowed_scope)
+        )
+
+    tenant_ids = set(accessible_tenant_ids(user))
+    group = get_current_tenant_group()
+    if group is not None:
+        Tenant = apps.get_model("organization", "Tenant")
+        group_tenant_ids = Tenant._base_manager.filter(
+            group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
+            deleted_at__isnull=True,
+        ).values_list("pk", flat=True)
+        tenant_ids &= set(group_tenant_ids)
     if not tenant_ids:
         return Job.objects.none()
-    return Job.objects.filter(tenant_id__in=tenant_ids)
+    allowed_scope = sorted(tenant_ids)
+    return Job.objects.filter(tenant_id__in=allowed_scope).filter(
+        Q(data__scope_tenant_ids__isnull=True) | Q(data__scope_tenant_ids__contained_by=allowed_scope)
+    )
 
 
 class JobListView(ObjectListView):

@@ -13,8 +13,9 @@ from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from core.models import Job, Notification
 from core.tasks.labels import generate_label_batch_task, generate_label_pdf_batch_task
 from core.tasks.utils import TaskStatus
+from core.tests.mixins import grant
 from extras.models import FileAttachment, LabelTemplate
-from organization.models import Tenant
+from organization.models import Membership, Role, Tenant, TenantGroup
 
 User = get_user_model()
 
@@ -500,3 +501,251 @@ class BulkActionsTestCase(TestCase):
         # asset2 should have tag2 but not tag1
         self.assertIn(tag2, self.asset2.tags.all())
         self.assertNotIn(tag1, self.asset2.tags.all())
+
+
+class LabelBulkScopeTests(TestCase):
+    def setUp(self):
+        self.group = TenantGroup.objects.create(name="Label Group", slug="label-group")
+        self.tenant_a = Tenant.objects.create(name="Label Tenant A", slug="label-tenant-a", group=self.group)
+        self.tenant_b = Tenant.objects.create(name="Label Tenant B", slug="label-tenant-b", group=self.group)
+        self.outside_tenant = Tenant.objects.create(name="Outside Tenant", slug="outside-label-tenant")
+        self.unreachable_tenant = Tenant.objects.create(name="Unreachable Tenant", slug="unreachable-label-tenant")
+        self.user = User.objects.create_user(username="label-scope-user", password="pw")
+        for tenant in (self.tenant_a, self.tenant_b, self.outside_tenant):
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Label viewer {tenant.pk}",
+                permissions=["assets.view_asset", "core.view_job"],
+            )
+            grant(self.user, tenant, role)
+
+        status = StatusLabel.objects.create(name="Available label", slug="available-label", type="deployable")
+        self.asset_a = Asset.objects.create(name="Asset A", asset_tag="LABEL-A", status=status, tenant=self.tenant_a)
+        self.asset_b = Asset.objects.create(name="Asset B", asset_tag="LABEL-B", status=status, tenant=self.tenant_b)
+        self.unreachable_asset = Asset.objects.create(
+            name="Unreachable asset",
+            asset_tag="LABEL-X",
+            status=status,
+            tenant=self.unreachable_tenant,
+        )
+        self.outside_job = Job.objects.create(name="Outside group job", tenant=self.outside_tenant)
+        self.template = LabelTemplate.objects.create(name="Scope label template")
+        self.url = reverse("assets:asset_bulk_print_labels")
+
+    def _login_with_scope(self, *, all_accessible=False, group=None):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session.pop("active_tenant_group_id", None)
+        session.pop("active_all_accessible", None)
+        if all_accessible:
+            session["active_all_accessible"] = True
+        elif group is not None:
+            session["active_tenant_group_id"] = group.pk
+        session.save()
+
+    def _login_with_tenant(self, tenant):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session.pop("active_tenant_group_id", None)
+        session.pop("active_all_accessible", None)
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
+    def _post(self, pks):
+        return self.client.post(
+            self.url,
+            {
+                "pk": [str(pk) for pk in pks],
+                "template_id": self.template.pk,
+                "layout_mode": "roll",
+            },
+        )
+
+    @patch("django_q.tasks.async_task")
+    def test_all_accessible_scope_prints_assets_from_multiple_tenants(self, mock_async):
+        self._login_with_scope(all_accessible=True)
+
+        response = self._post([self.asset_a.pk, self.asset_b.pk])
+
+        self.assertEqual(response.status_code, 302)
+        job = Job.objects.latest("created")
+        self.assertEqual(job.tenant_id, self.tenant_a.pk)
+        self.assertEqual(job.data["scope_tenant_ids"], [self.tenant_a.pk, self.tenant_b.pk])
+        self.assertEqual(mock_async.call_args.args[5], self.user.pk)
+        self.assertEqual(mock_async.call_args.args[6], self.tenant_a.pk)
+        self.assertEqual(self.client.get(response.url).status_code, 200)
+
+    @patch("django_q.tasks.async_task")
+    def test_group_scope_prints_assets_from_multiple_tenants(self, mock_async):
+        self._login_with_scope(group=self.group)
+
+        response = self._post([self.asset_a.pk, self.asset_b.pk])
+
+        self.assertEqual(response.status_code, 302)
+        job = Job.objects.latest("created")
+        self.assertEqual(job.tenant_id, self.tenant_a.pk)
+        self.assertEqual(job.data["scope_tenant_ids"], [self.tenant_a.pk, self.tenant_b.pk])
+        self.assertEqual(mock_async.call_args.args[6], self.tenant_a.pk)
+        self.assertEqual(self.client.get(response.url).status_code, 200)
+
+    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
+    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    def test_pdf_task_uses_persisted_multi_tenant_scope(self, _barcode, _render, _pdf):
+        job = Job.objects.create(
+            name="multi-tenant labels",
+            tenant=self.tenant_a,
+            status=Job.STATUS_PENDING,
+            data={"scope_tenant_ids": [self.tenant_a.pk, self.tenant_b.pk]},
+        )
+
+        result = generate_label_pdf_batch_task(
+            job.pk,
+            [self.asset_a.pk, self.asset_b.pk],
+            self.template.pk,
+            "roll",
+            self.user.pk,
+            self.tenant_a.pk,
+        )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.SUCCESS, "labels.pdf_completed"))
+        self.assertEqual(job.status, Job.STATUS_COMPLETED)
+        self.assertEqual(FileAttachment.objects.filter(object_id=job.pk).count(), 1)
+
+    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
+    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    def test_pdf_task_rejects_assets_outside_persisted_scope(self, _barcode, _render, _pdf):
+        job = Job.objects.create(
+            name="scoped labels",
+            tenant=self.tenant_a,
+            status=Job.STATUS_PENDING,
+            data={"scope_tenant_ids": [self.tenant_a.pk]},
+        )
+
+        result = generate_label_pdf_batch_task(
+            job.pk,
+            [self.asset_a.pk, self.asset_b.pk],
+            self.template.pk,
+            "roll",
+            self.user.pk,
+            self.tenant_a.pk,
+        )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "labels.assets_not_accessible"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertEqual(FileAttachment.objects.filter(object_id=job.pk).count(), 0)
+
+    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
+    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    def test_pdf_task_rejects_asset_after_view_access_is_revoked(self, _barcode, _render, _pdf):
+        Role.objects.filter(tenant=self.tenant_b).update(permissions=["core.view_job"])
+        job = Job.objects.create(
+            name="revoked labels",
+            tenant=self.tenant_a,
+            status=Job.STATUS_PENDING,
+            data={"scope_tenant_ids": [self.tenant_a.pk, self.tenant_b.pk]},
+        )
+
+        result = generate_label_pdf_batch_task(
+            job.pk,
+            [self.asset_a.pk, self.asset_b.pk],
+            self.template.pk,
+            "roll",
+            self.user.pk,
+            self.tenant_a.pk,
+        )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "labels.assets_not_accessible"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+
+    @patch("django_q.tasks.async_task")
+    def test_bulk_print_labels_rejects_invalid_asset_ids_before_job_creation(self, mock_async):
+        self._login_with_scope(all_accessible=True)
+        before = Job.objects.count()
+
+        for pks in (("not-an-id",), ("1", "1"), ("0",)):
+            with self.subTest(pks=pks):
+                response = self._post(pks)
+                self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(Job.objects.count(), before)
+        mock_async.assert_not_called()
+
+    @patch("django_q.tasks.async_task")
+    def test_bulk_print_labels_rejects_empty_selection_before_job_creation(self, mock_async):
+        self._login_with_scope(all_accessible=True)
+        before = Job.objects.count()
+
+        response = self.client.post(
+            self.url,
+            {"template_id": self.template.pk, "layout_mode": "roll"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Job.objects.count(), before)
+        mock_async.assert_not_called()
+
+    @patch("django_q.tasks.async_task")
+    def test_bulk_print_labels_rejects_invalid_template_before_job_creation(self, mock_async):
+        self._login_with_scope(all_accessible=True)
+        before = Job.objects.count()
+
+        response = self.client.post(
+            self.url,
+            {"pk": [str(self.asset_a.pk)], "template_id": "not-a-template", "layout_mode": "roll"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Job.objects.count(), before)
+        mock_async.assert_not_called()
+
+    @patch("django_q.tasks.async_task")
+    def test_aggregate_scope_rejects_inaccessible_selection_before_job_creation(self, mock_async):
+        self._login_with_scope(all_accessible=True)
+        before = Job.objects.count()
+
+        response = self._post([self.asset_a.pk, self.unreachable_asset.pk])
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Job.objects.count(), before)
+        mock_async.assert_not_called()
+
+    def test_single_tenant_scope_hides_multi_tenant_job_anchored_to_that_tenant(self):
+        job = Job.objects.create(
+            name="multi-tenant labels",
+            tenant=self.tenant_a,
+            status=Job.STATUS_COMPLETED,
+            data={"scope_tenant_ids": [self.tenant_a.pk, self.tenant_b.pk]},
+        )
+        self._login_with_tenant(self.tenant_a)
+
+        response = self.client.get(reverse("job_detail", kwargs={"pk": job.pk}))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_all_accessible_scope_hides_multi_tenant_job_after_access_revoked(self):
+        job = Job.objects.create(
+            name="multi-tenant labels",
+            tenant=self.tenant_a,
+            status=Job.STATUS_COMPLETED,
+            data={"scope_tenant_ids": [self.tenant_a.pk, self.tenant_b.pk]},
+        )
+        Membership.objects.filter(user=self.user, tenant=self.tenant_b).delete()
+        self._login_with_scope(all_accessible=True)
+
+        response = self.client.get(reverse("job_detail", kwargs={"pk": job.pk}))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_group_scope_hides_jobs_outside_selected_group(self):
+        self._login_with_scope(group=self.group)
+
+        response = self.client.get(reverse("job_detail", kwargs={"pk": self.outside_job.pk}))
+
+        self.assertEqual(response.status_code, 404)

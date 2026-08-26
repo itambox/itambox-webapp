@@ -456,12 +456,6 @@
     {
       "path": "itambox/assets/views/asset_views.py",
       "context": "FunctionDef:bulk_print_labels",
-      "statement": "from core.managers import get_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "context": "FunctionDef:bulk_print_labels",
       "statement": "from core.models import Job",
       "count": 1
     },

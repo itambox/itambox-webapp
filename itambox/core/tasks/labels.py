@@ -85,6 +85,37 @@ def _cleanup_partial_attachment(job, attachment, log_extra):
         )
 
 
+def _resolve_label_task_assets(asset_model, asset_pks, scope_tenant_ids, user):
+    assets = list(
+        asset_model._base_manager.filter(
+            pk__in=asset_pks,
+            tenant_id__in=scope_tenant_ids,
+        )
+    )
+    expected_asset_count = len({int(pk) for pk in asset_pks})
+    if len(assets) != expected_asset_count:
+        return assets, "inaccessible"
+    if (
+        user is not None
+        and not user.is_superuser
+        and not all(user.has_perm("assets.view_asset", obj=asset) for asset in assets)
+    ):
+        return assets, "inaccessible"
+    if not assets:
+        return assets, "empty"
+    return assets, None
+
+
+def _finish_label_asset_resolution(job, resolution):
+    if resolution == "inaccessible":
+        job.append_log("Some selected assets are no longer accessible.")
+        job.mark_failed("[terminal] labels.assets_not_accessible")
+        return TaskResult(TaskStatus.TERMINAL, "labels.assets_not_accessible", user_visible=True)
+    job.append_log("No matching assets found to print.")
+    job.mark_completed(result={"status": "no_assets"})
+    return TaskResult(TaskStatus.SKIPPED, "labels.no_assets", user_visible=True)
+
+
 def _safe_label_measurement(value: object, default: float) -> str:
     """Return a bounded, CSS-safe inch measurement for a label dimension."""
     try:
@@ -516,11 +547,11 @@ def generate_label_pdf_batch_task(
             job.append_log(f"Layout mode: {layout_mode} | Total assets to print: {len(asset_pks)}")
 
             phase = "asset_resolve"
-            assets = list(Asset.objects.filter(pk__in=asset_pks))
-            if not assets:
-                job.append_log("No matching assets found to print.")
-                job.mark_completed(result={"status": "no_assets"})
-                return TaskResult(TaskStatus.SKIPPED, "labels.no_assets", user_visible=True)
+            scope_tenant_ids = job.data.get("scope_tenant_ids") or ([tenant_id] if tenant_id is not None else [])
+            scope_tenant_ids = [int(scope_id) for scope_id in scope_tenant_ids]
+            assets, resolution = _resolve_label_task_assets(Asset, asset_pks, scope_tenant_ids, ctx.user)
+            if resolution is not None:
+                return _finish_label_asset_resolution(job, resolution)
 
             # Render individual cards (with per-asset logging for the job trail)
             phase = "label_render"
