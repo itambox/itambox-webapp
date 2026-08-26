@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import get_args
 from unittest import mock
 
-from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from core import identity_provisioning, restore_authority
