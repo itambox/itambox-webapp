@@ -14,7 +14,6 @@ class PrincipalRef(_Protocol):
 class RestoreAuthorityValidator(_Protocol):
     def validate(self, user: PrincipalRef, obj: object) -> None:
         """Validate restore authority for one principal and object."""
-        ...
 
 
 _restore_authority_validator = _SingleProviderSlot[RestoreAuthorityValidator]("restore-authority validator")

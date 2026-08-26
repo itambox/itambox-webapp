@@ -68,7 +68,6 @@ class IdentityProvisioner(_Protocol):
         command: ExternalIdentityProvisioningCommand,
     ) -> ExternalIdentityProvisioningResult:
         """Provision one normalized external identity command."""
-        ...
 
 
 _identity_provisioner = _SingleProviderSlot[IdentityProvisioner]("identity provisioner")

@@ -28,17 +28,14 @@ class _AuthorizationUser(Protocol):
 
     def has_perm(self, permission: str, obj: Tenant | None = None) -> bool:
         """Return whether this principal holds ``permission`` for ``obj``."""
-        ...
 
 
 class _GrantRelation(Protocol):
     def select_related(self, *fields: str) -> _GrantRelation:
         """Return a query relation with the requested joins."""
-        ...
 
     def prefetch_related(self, *lookups: str) -> Iterable[RoleGrant]:
         """Return the relation with the requested prefetched children."""
-        ...
 
 
 class _UserGroup(Protocol):

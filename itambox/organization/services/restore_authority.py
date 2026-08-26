@@ -23,7 +23,6 @@ class _GuardPrincipal(Protocol):
 
     def has_perm(self, permission: str, obj: Tenant | None = None) -> bool:
         """Return whether this principal holds ``permission`` for ``obj``."""
-        ...
 
 
 class OrganizationRestoreAuthority:
