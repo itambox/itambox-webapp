@@ -28,7 +28,7 @@ from core.context import (
     set_current_tenant_group,
 )
 from core.identity_provisioning import ExternalIdentityProvisioningCommand
-from organization.models import AssetHolder, Membership, RoleGrant, RoleGrantScope, Tenant
+from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services.identity_provisioning import organization_identity_provisioner
 
 User = get_user_model()
@@ -559,6 +559,54 @@ class LDAPAdapterRestartTests(TestCase):
         assert RoleGrant.objects.filter(membership=membership).count() == 1
         grant = RoleGrant.objects.get(membership=membership)
         assert list(grant.scopes.values_list("scope_type", flat=True)) == [RoleGrantScope.SCOPE_OWN]
+
+    def test_ldap_customer_mode_keeps_manual_provider_membership_and_allows_dual_home(self):
+        provider = Tenant.objects.create(name="LDAP manual provider", slug="ldap-manual-provider", is_provider=True)
+        self.tenant.managed_by = provider
+        self.tenant.save(update_fields=["managed_by"])
+        provider_role = Role.objects.create(tenant=provider, name="ProviderStaff", permissions=["assets.view_asset"])
+        provider_membership = Membership.objects.create(user=self.user, tenant=provider, is_active=True)
+        provider_grant = RoleGrant.objects.create(
+            membership=provider_membership,
+            role=provider_role,
+            granted_by=self.user,
+            reason="operator provider membership",
+        )
+        RoleGrantScope.objects.create(role_grant=provider_grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        before_grant = tuple(
+            RoleGrant._base_manager.filter(pk=provider_grant.pk).values_list(
+                "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+            )
+        )
+        before_scopes = tuple(
+            RoleGrantScope._base_manager.filter(role_grant=provider_grant).values_list(
+                "pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id"
+            )
+        )
+        set_current_tenant(self.tenant)
+
+        with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+            result = self._authenticate(groups=[])[2]
+
+        assert result is self.user
+        assert Membership.objects.filter(user=self.user, tenant=self.tenant, is_active=True).exists()
+        assert Membership.objects.filter(user=self.user, tenant=provider, is_active=True).exists()
+        assert (
+            tuple(
+                RoleGrant._base_manager.filter(pk=provider_grant.pk).values_list(
+                    "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+                )
+            )
+            == before_grant
+        )
+        assert (
+            tuple(
+                RoleGrantScope._base_manager.filter(role_grant=provider_grant).values_list(
+                    "pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id"
+                )
+            )
+            == before_scopes
+        )
 
     def test_interactive_query_ceiling_does_not_scale_with_group_count(self):
         set_current_tenant(self.tenant)

@@ -185,7 +185,6 @@ class IdentityServiceRollbackTests(TestCase):
         for index, stage in enumerate(
             (
                 "provider.membership_activated",
-                "provider.grants_cleared",
                 "provider.customer_retired",
                 "provider.holders_unlinked",
             )

@@ -20,6 +20,7 @@ from core import identity_provisioning
 from core.auth import saml as saml_module
 from core.managers import set_current_tenant
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 
 User = get_user_model()
 
@@ -213,6 +214,55 @@ class SAMLAdapterContractTests(TestCase):
         )
         verbs = [query["sql"].lstrip().split(maxsplit=1)[0].upper() for query in repeat_queries]
         self.assertFalse(any(verb in {"INSERT", "DELETE"} for verb in verbs))
+
+    @override_settings(ITAMBOX_TENANT_SAML_CONFIGS={"saml-customer": SAML_CONFIG})
+    def test_saml_customer_mode_keeps_manual_provider_membership_and_allows_dual_home(self):
+        provider = Tenant.objects.create(name="SAML manual provider", slug="saml-manual-provider", is_provider=True)
+        self.tenant.managed_by = provider
+        self.tenant.save(update_fields=["managed_by"])
+        provider_role = Role.objects.create(tenant=provider, name="ProviderStaff", permissions=["assets.view_asset"])
+        provider_membership = Membership.objects.create(user=self.user, tenant=provider, is_active=True)
+        provider_grant = RoleGrant.objects.create(
+            membership=provider_membership,
+            role=provider_role,
+            granted_by=self.user,
+            reason="operator provider membership",
+        )
+        RoleGrantScope.objects.create(role_grant=provider_grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        before_grant = tuple(
+            RoleGrant._base_manager.filter(pk=provider_grant.pk).values_list(
+                "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+            )
+        )
+        before_scopes = tuple(
+            RoleGrantScope._base_manager.filter(role_grant=provider_grant).values_list(
+                "pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id"
+            )
+        )
+        self.activate_tenant()
+
+        with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+            result = self.backend.sync_saml_user_profile_and_memberships(self.user, self.session_info())
+
+        self.assertEqual(result.mode, "customer")
+        self.assertTrue(Membership.objects.filter(user=self.user, tenant=self.tenant, is_active=True).exists())
+        self.assertTrue(Membership.objects.filter(user=self.user, tenant=provider, is_active=True).exists())
+        self.assertEqual(
+            tuple(
+                RoleGrant._base_manager.filter(pk=provider_grant.pk).values_list(
+                    "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+                )
+            ),
+            before_grant,
+        )
+        self.assertEqual(
+            tuple(
+                RoleGrantScope._base_manager.filter(role_grant=provider_grant).values_list(
+                    "pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id"
+                )
+            ),
+            before_scopes,
+        )
 
     @override_settings(ITAMBOX_TENANT_SAML_CONFIGS={"saml-customer": SAML_CONFIG})
     def test_saml_config_keeps_secure_signature_and_unsolicited_defaults(self):

@@ -10,6 +10,7 @@ from threading import Event
 from unittest.mock import Mock, patch
 
 import pytest
+from django.contrib.contenttypes.models import ContentType
 from django.db import close_old_connections, connection, connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
@@ -152,14 +153,44 @@ class OIDCPhaseBPortContractTests(TestCase):
         self.assertNotIn("provider-first", repr(command))
         self.assertNotIn("provider-second", repr(command))
 
-    def test_rejected_provider_intent_is_terminal_without_profile_or_organization_write(self):
-        before_profile = (self.user.email, self.user.first_name, self.user.last_name)
+    def test_rejected_provider_intent_refreshes_user_profile_without_organization_audit(self):
+        organization_models = (
+            Tenant,
+            AssetHolder,
+            Membership,
+            Role,
+            RoleGrant,
+            RoleGrantScope,
+            UserGroup,
+            GroupMembership,
+        )
+        organization_content_types = {ContentType.objects.get_for_model(model).pk for model in organization_models}
         before_organization = (
             AssetHolder.objects.count(),
             Membership.objects.count(),
             Role.objects.count(),
             RoleGrant.objects.count(),
             RoleGrantScope.objects.count(),
+        )
+        before_organization_audit = (
+            tuple(
+                ObjectChange.objects.filter(changed_object_type_id__in=organization_content_types)
+                .order_by("pk")
+                .values_list(
+                    "pk",
+                    "changed_object_type_id",
+                    "changed_object_id",
+                    "action",
+                    "object_repr",
+                    "prechange_data",
+                    "postchange_data",
+                )
+            ),
+            tuple(
+                AuditEvent.objects.filter(model_id__in=organization_content_types)
+                .order_by("pk")
+                .values_list("pk", "model_id", "object_id", "action", "data", "processed")
+            ),
         )
         with patch.object(
             identity_provisioning,
@@ -177,7 +208,7 @@ class OIDCPhaseBPortContractTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(
             (self.user.email, self.user.first_name, self.user.last_name),
-            before_profile,
+            ("new@example.test", "New", "Name"),
         )
         self.assertEqual(
             (
@@ -188,6 +219,29 @@ class OIDCPhaseBPortContractTests(TestCase):
                 RoleGrantScope.objects.count(),
             ),
             before_organization,
+        )
+        self.assertEqual(
+            (
+                tuple(
+                    ObjectChange.objects.filter(changed_object_type_id__in=organization_content_types)
+                    .order_by("pk")
+                    .values_list(
+                        "pk",
+                        "changed_object_type_id",
+                        "changed_object_id",
+                        "action",
+                        "object_repr",
+                        "prechange_data",
+                        "postchange_data",
+                    )
+                ),
+                tuple(
+                    AuditEvent.objects.filter(model_id__in=organization_content_types)
+                    .order_by("pk")
+                    .values_list("pk", "model_id", "object_id", "action", "data", "processed")
+                ),
+            ),
+            before_organization_audit,
         )
 
     def test_can_login_false_does_not_call_identity_port_or_mutate_phase_b(self):
@@ -1228,12 +1282,6 @@ class OIDCProviderGroupOrderTests(TestCase):
                     first_name="Old",
                     last_name="Profile",
                 )
-                existing_profile = (
-                    existing.username,
-                    existing.email,
-                    existing.first_name,
-                    existing.last_name,
-                )
                 before = self._state_fingerprint()
                 recorder = RecordingIdentityProvisioner()
                 with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
@@ -1257,9 +1305,9 @@ class OIDCProviderGroupOrderTests(TestCase):
                 existing.refresh_from_db()
                 self.assertEqual(
                     (existing.username, existing.email, existing.first_name, existing.last_name),
-                    existing_profile,
+                    (existing.username, "should-not-update@example.test", "Should", "NotUpdate"),
                 )
-                self.assertEqual(self._state_fingerprint(), before)
+                self.assertEqual(self._state_fingerprint()["organization"], before["organization"])
                 self.assertFalse(Membership._base_manager.filter(user=existing).exists())
                 self.assertFalse(AssetHolder._base_manager.filter(user=existing).exists())
                 self.assertFalse(RoleGrant._base_manager.filter(membership__user=existing).exists())

@@ -450,7 +450,7 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
                 user.pk,
                 {self.customer.pk, self.provider.pk},
             )
-        writer_state = {"membership_id": None, "error": None}
+        writer_state = {"membership_id": None, "grant_id": None, "error": None}
 
         def first_party_writer():
             try:
@@ -470,7 +470,12 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
                         role_grant=provider_grant,
                         scope_type=RoleGrantScope.SCOPE_OWN,
                     )
+                    RoleGrantScope._base_manager.create(
+                        role_grant_id=provider_grant.pk,
+                        scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+                    )
                     writer_state["membership_id"] = provider_membership.pk
+                    writer_state["grant_id"] = provider_grant.pk
             except Exception as exc:
                 writer_state["error"] = exc
             finally:
@@ -518,11 +523,24 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
         provider_membership = Membership.objects.get(user=user, tenant=self.provider)
         self.assertEqual(provider_membership.pk, writer_state["membership_id"])
         self.assertTrue(provider_membership.is_active)
-        self.assertFalse(RoleGrant.objects.filter(membership=provider_membership).exists())
+        provider_grant = RoleGrant.objects.get(pk=writer_state["grant_id"])
+        self.assertEqual(provider_grant.membership_id, provider_membership.pk)
+        self.assertEqual(provider_grant.role_id, self.provider_role.pk)
+        self.assertEqual(
+            list(
+                RoleGrantScope.objects.filter(role_grant=provider_grant).values_list(
+                    "scope_type", "tenant_id", "tenant_group_id"
+                )
+            ),
+            [
+                (RoleGrantScope.SCOPE_ALL_MANAGED, None, None),
+                (RoleGrantScope.SCOPE_OWN, None, None),
+            ],
+        )
         self.assertFalse(Membership.objects.filter(pk=customer_membership.pk).exists())
         customer_holder.refresh_from_db()
         self.assertIsNone(customer_holder.user_id)
-        self.assertFalse(RoleGrant.objects.filter(membership__user=user).exists())
+        self.assertEqual(RoleGrant.objects.filter(membership__user=user).count(), 1)
 
     def test_repeated_provider_transition_remains_provider_only(self):
         user = User.objects.create_user(username="repeat-provider-443", email="repeat-provider-443@example.invalid")

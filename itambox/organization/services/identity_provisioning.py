@@ -170,25 +170,31 @@ def _lock_live_tenants(tenant_ids: set[int]) -> dict[int, _TenantRow]:
     return {row.pk: row for row in typed_rows}
 
 
-def _lock_user(user: UserRef) -> User:
+def _lock_existing_user(user: UserRef) -> User:
     user_id = getattr(user, "pk", None)
     if not isinstance(user_id, int):
         _reject("Identity provisioning requires an existing canonical user.")
     locked = User._base_manager.select_for_update().filter(pk=user_id).first()
     if locked is None:
         _reject("Identity provisioning canonical user does not exist.")
-    if not locked.can_login:
-        _reject("Identity provisioning canonical user cannot log in.")
     return locked
 
 
-def _membership_tenant_ids(*, customer_row: _TenantRow, provider_intent: bool) -> set[int]:
+def _require_interactive_login_allowed(user: User) -> None:
+    if user.can_login is False:
+        _reject("Identity provisioning canonical user cannot log in.")
+
+
+def _membership_tenant_ids(
+    *,
+    customer_row: _TenantRow,
+    provider_intent: bool,
+    sticky_provider: bool,
+) -> set[int]:
     ids = {customer_row.pk}
-    if provider_intent and customer_row.managed_by_id is not None:
-        ids.add(customer_row.managed_by_id)
-    if not provider_intent and customer_row.managed_by_id is not None:
-        # Customer-mode sticky-provider dominance is decided from the same
-        # Membership query; it must not perform a second Membership lock query.
+    if (provider_intent or sticky_provider) and customer_row.managed_by_id is not None:
+        # OIDC customer-mode sticky-provider dominance and provider transitions
+        # both inspect the managing-provider Membership in this one lock query.
         ids.add(customer_row.managed_by_id)
     return ids
 
@@ -669,33 +675,79 @@ def _merge_scope_into_canonical(
     canonical_keys.add(key)
 
 
+def _grant_provenance_key(grant: RoleGrant) -> tuple[int | None, str]:
+    """Return the immutable provenance boundary for same-role convergence."""
+
+    return grant.granted_by_id, grant.reason
+
+
+def _grant_validity_priority(grant: RoleGrant, now: datetime) -> tuple[int, datetime, int]:
+    """Rank permanent, effective future, and expired grants conservatively.
+
+    Permanent validity outranks every finite window. Among finite windows, an
+    effective grant outranks an expired one and the latest window wins. The
+    primary-key tie-break keeps a stable oldest row only when validity is equal.
+    """
+
+    if grant.valid_until is None:
+        return 2, datetime.max.replace(tzinfo=now.tzinfo), -grant.pk
+    if grant.valid_until > now:
+        return 1, grant.valid_until, -grant.pk
+    return 0, grant.valid_until, -grant.pk
+
+
+def _grant_has_own_scope(grant: RoleGrant, scopes_by_grant: dict[int, list[RoleGrantScope]]) -> bool:
+    return any(scope.scope_type == RoleGrantScope.SCOPE_OWN for scope in scopes_by_grant.get(grant.pk, ()))
+
+
+def _grant_is_effective(grant: RoleGrant, now: datetime) -> bool:
+    return grant.valid_until is None or grant.valid_until > now
+
+
 def _merge_duplicate_same_role_grants(
     grants: list[RoleGrant],
     role: Role,
     scopes_by_grant: dict[int, list[RoleGrantScope]],
-) -> RoleGrant | None:
-    """Converge every direct same-role grant, including non-own-only history."""
+) -> list[RoleGrant]:
+    """Converge only race-equivalent direct grants within provenance groups.
+
+    A provenance group is the exact ``(granted_by_id, reason)`` pair. Grants
+    from different operators, automation reasons, or historical origins never
+    collapse into one another. Within one group, validity chooses the
+    canonical row before scopes move: permanent > latest future-valid > latest
+    expired. Scope moves/deletions use the normal model audit path, so mixed
+    OWN/non-OWN history remains truthful.
+    """
 
     matching = [grant for grant in grants if grant.role_id == role.pk and grant.membership_id is not None]
     if not matching:
-        return None
-    matching.sort(key=lambda grant: grant.pk)
-    canonical = matching[0]
-    canonical_scopes = scopes_by_grant.setdefault(canonical.pk, [])
-    canonical_keys = {_scope_key(scope) for scope in canonical_scopes}
-    canonical_scope_ids = {scope.pk for scope in canonical_scopes}
-    for duplicate in matching[1:]:
-        for scope in list(scopes_by_grant.get(duplicate.pk, ())):
-            _merge_scope_into_canonical(
-                scope=scope,
-                canonical_id=canonical.pk,
-                canonical_scopes=canonical_scopes,
-                canonical_keys=canonical_keys,
-                canonical_scope_ids=canonical_scope_ids,
-            )
-        scopes_by_grant[duplicate.pk] = []
-        duplicate.delete()
-    return canonical
+        return []
+    now = timezone.now()
+    groups: dict[tuple[int | None, str], list[RoleGrant]] = {}
+    for grant in matching:
+        groups.setdefault(_grant_provenance_key(grant), []).append(grant)
+
+    canonicals: list[RoleGrant] = []
+    for group in groups.values():
+        canonical = max(group, key=lambda grant: _grant_validity_priority(grant, now))
+        canonical_scopes = scopes_by_grant.setdefault(canonical.pk, [])
+        canonical_keys = {_scope_key(scope) for scope in canonical_scopes}
+        canonical_scope_ids = {scope.pk for scope in canonical_scopes}
+        for duplicate in group:
+            if duplicate.pk == canonical.pk:
+                continue
+            for scope in list(scopes_by_grant.get(duplicate.pk, ())):
+                _merge_scope_into_canonical(
+                    scope=scope,
+                    canonical_id=canonical.pk,
+                    canonical_scopes=canonical_scopes,
+                    canonical_keys=canonical_keys,
+                    canonical_scope_ids=canonical_scope_ids,
+                )
+            scopes_by_grant[duplicate.pk] = []
+            duplicate.delete()
+        canonicals.append(canonical)
+    return canonicals
 
 
 def _grant_metadata(role: Role, source: str) -> _GrantMetadata:
@@ -736,6 +788,26 @@ def _ensure_own_scope(grant: RoleGrant, existing_scopes: list[RoleGrantScope] | 
             raise
 
 
+def _refresh_system_grant_metadata(grant: RoleGrant, metadata: _GrantMetadata) -> None:
+    """Refresh only the current system provenance, never a manual row.
+
+    A refresh can extend a finite system window or make a non-privileged system
+    grant permanent. It never shortens a permanent/future window and never
+    changes a row whose provenance is operator/manual/historical.
+    """
+
+    if grant.granted_by_id is not None or grant.reason != metadata["reason"]:
+        return
+    desired_until = metadata["valid_until"]
+    if desired_until is None:
+        if grant.valid_until is None:
+            return
+    elif grant.valid_until is None or grant.valid_until >= desired_until:
+        return
+    grant.valid_until = desired_until
+    grant.save(update_fields=["valid_until"])
+
+
 def _reconcile_customer_grants(
     *,
     membership: Membership,
@@ -749,20 +821,34 @@ def _reconcile_customer_grants(
     membership_scopes = [scope for scope in scopes if scope.role_grant_id in membership_grant_ids]
     scopes_by_grant = _scopes_by_grant(membership_scopes)
     _retire_conflicting_own_grants(membership_grants, role, scopes_by_grant)
-    current = _merge_duplicate_same_role_grants(membership_grants, role, scopes_by_grant)
+    canonicals = _merge_duplicate_same_role_grants(membership_grants, role, scopes_by_grant)
     metadata = _grant_metadata(role, source)
-    if current is None:
+    desired_key = (None, metadata["reason"])
+    desired = next(
+        (grant for grant in canonicals if _grant_provenance_key(grant) == desired_key),
+        None,
+    )
+    now = timezone.now()
+    effective_own = [
+        grant
+        for grant in canonicals
+        if _grant_has_own_scope(grant, scopes_by_grant) and _grant_is_effective(grant, now)
+    ]
+    if effective_own:
+        current = max(effective_own, key=lambda grant: _grant_validity_priority(grant, now))
+        _refresh_system_grant_metadata(current, metadata)
+    elif desired is not None:
+        current = desired
+        _refresh_system_grant_metadata(current, metadata)
+        _ensure_own_scope(current, existing_scopes=scopes_by_grant.get(current.pk, []))
+    else:
         current = RoleGrant._base_manager.create(
             membership_id=membership.pk,
             role_id=role.pk,
             granted_by=None,
             **metadata,
         )
-    elif metadata["valid_until"] is not None:
-        current.reason = metadata["reason"]
-        current.valid_until = metadata["valid_until"]
-        current.save(update_fields=["reason", "valid_until"])
-    _ensure_own_scope(current, existing_scopes=scopes_by_grant.get(current.pk, []))
+        _ensure_own_scope(current, existing_scopes=[])
     _stage_checkpoint("customer.scope_reconciled")
     _stage_checkpoint("customer.grant_reconciled")
     return current
@@ -856,12 +942,9 @@ def _provider_transition(
     aggregate.memberships[provider_id] = provider_membership
     _stage_checkpoint("provider.membership_activated")
 
-    # A provider principal is intentionally grant-free. Customer grants and
-    # group links are retired by deleting the customer Membership below.
-    for grant in aggregate.grants:
-        if grant.membership_id == provider_membership.pk:
-            grant.delete()
-    _stage_checkpoint("provider.grants_cleared")
+    # Provider mapping never mints a grant, but an existing operator/SCIM/
+    # manual/historical provider grant is independent durable authorization and
+    # must remain byte/audit equivalent while the Membership is reactivated.
 
     if customer_membership is not None:
         customer_membership.delete()
@@ -1018,15 +1101,17 @@ class OrganizationIdentityProvisioner(IdentityProvisioner):
         with transaction.atomic():
             customer_id, provider_id, tenant_rows = _validate_command_tenants(command)
             customer_row = tenant_rows[customer_id]
-            locked_user = _lock_user(command.user)
+            locked_user = _lock_existing_user(command.user)
+            _require_interactive_login_allowed(locked_user)
             _stage_checkpoint("locks.user")
             membership_ids = _membership_tenant_ids(
                 customer_row=customer_row,
                 provider_intent=provider_id is not None,
+                sticky_provider=provider_id is None and command.profile.source == "OIDC",
             )
             memberships = _lock_memberships(locked_user.pk, membership_ids)
 
-            if provider_id is None:
+            if provider_id is None and command.profile.source == "OIDC":
                 sticky = _active_provider_membership(customer_row=customer_row, memberships=memberships)
                 if sticky is not None:
                     return ExternalIdentityProvisioningResult(mode="provider_staff", membership_id=sticky.pk)
@@ -1106,11 +1191,8 @@ def _ensure_directory_grant(
         and grant.reason == LDAP_DIRECTORY_SYNC_REASON
         and grant.granted_by_id is None
     ]
-    if len(owned) > 1:
-        return None
-
     scopes_by_grant = _scopes_by_grant(existing_scopes)
-    if owned:
+    if len(owned) == 1:
         grant = owned[0]
         desired_until = now + LDAP_DIRECTORY_SYNC_PRIVILEGED_TTL if role_is_privileged(role) else None
         changed = grant.valid_until != desired_until
@@ -1122,6 +1204,9 @@ def _ensure_directory_grant(
         _stage_checkpoint("ldap.grant_refreshed")
         return grant
 
+    # Ambiguous LDAP-owned rows are historical evidence, not a merge candidate.
+    # Leave every such row/scope untouched, then inspect all same-role OWN rows
+    # for an effective equivalent before creating one fresh exact LDAP row.
     active_equivalent = next(
         (
             grant
@@ -1182,7 +1267,7 @@ def provision_ldap_directory_identity(command: LDAPDirectoryIdentityCommand) -> 
 
     with transaction.atomic():
         _lock_live_tenants({tenant_id})
-        locked_user = _lock_user(command.user)
+        locked_user = _lock_existing_user(command.user)
         memberships = _lock_memberships(locked_user.pk, {tenant_id})
         existing_membership = memberships.get(tenant_id)
         aggregate = _lock_aggregate(

@@ -104,6 +104,19 @@ class _FakeLDAPConnection:
         self.unbound = True
 
 
+class _MultiEntryLDAPConnection(_FakeLDAPConnection):
+    def __init__(self, entries):
+        super().__init__()
+        self.entries = entries
+
+    def result(self, result_id, timeout):
+        del result_id, timeout
+        if self._result_calls == 0:
+            self._result_calls += 1
+            return command_module.ldap.RES_SEARCH_ENTRY, self.entries
+        return None, None
+
+
 class LDAPBatchRestartTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Batch tenant", slug="batch-tenant")
@@ -209,6 +222,66 @@ class LDAPBatchRestartTests(TestCase):
             assert "directory-secret" not in output
         assert first_connection.unbound is True
         assert second_connection.unbound is True
+
+    def test_existing_can_login_false_is_synced_and_second_directory_entry_is_processed(self):
+        blocked = User.objects.create_user(
+            username="batch-blocked",
+            email="old-blocked@example.invalid",
+            can_login=False,
+        )
+        connection = _MultiEntryLDAPConnection(
+            [
+                (
+                    "uid=batch-blocked,ou=users,dc=invalid",
+                    {
+                        "uid": [b"batch-blocked"],
+                        "mail": [b"batch-blocked@example.invalid"],
+                        "givenName": [b"Blocked"],
+                        "sn": [b"Existing"],
+                    },
+                ),
+                (
+                    "uid=batch-second,ou=users,dc=invalid",
+                    {
+                        "uid": [b"batch-second"],
+                        "mail": [b"batch-second@example.invalid"],
+                        "givenName": [b"Second"],
+                        "sn": [b"Entry"],
+                    },
+                ),
+            ]
+        )
+
+        output, returned_connection = self._run(connection=connection)
+
+        blocked.refresh_from_db()
+        second = User.objects.get(username="batch-second")
+        self.assertFalse(blocked.can_login)
+        self.assertEqual(User.objects.filter(username__in=["batch-blocked", "batch-second"]).count(), 2)
+        self.assertEqual(Membership.objects.filter(user__in=[blocked, second], tenant=self.tenant).count(), 2)
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership__user__in=[blocked, second],
+                reason=organization_identity.LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).count(),
+            2,
+        )
+        self.assertEqual(
+            output,
+            "\n".join(
+                (
+                    f"Scoping LDAP synchronization (tenant_id={self.tenant.pk})",
+                    "Connecting to configured LDAP server...",
+                    "LDAP bind successful.",
+                    f"Updated directory user_id={blocked.pk}",
+                    f"Created directory user_id={second.pk}",
+                    f"LDAP sync complete for tenant {self.tenant.slug!r}. Created: 1, Updated: 1",
+                    "",
+                )
+            ),
+        )
+        self.assertTrue(returned_connection.unbound)
 
     def test_preexisting_same_email_holder_stays_unlinked_during_batch_membership_creation(self):
         holder = AssetHolder.objects.create(

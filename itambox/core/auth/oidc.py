@@ -503,6 +503,9 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                         binding_id=binding.pk,
                     )
                 if getattr(result, "mode", None) == "provider_mapping_rejected":
+                    # Organization owns only the terminal access decision here;
+                    # the verified canonical User profile remains adapter-owned.
+                    self._update_user_profile(current_user, claims)
                     return current_user
 
                 self._update_user_profile(current_user, claims)

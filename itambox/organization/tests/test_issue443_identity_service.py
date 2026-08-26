@@ -18,6 +18,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 import organization.services.identity_provisioning as identity_service
+from core.auth import MembershipBackend
 from core.context import get_current_request_id
 from core.identity_provisioning import (
     ExternalIdentityProfile,
@@ -667,12 +668,133 @@ class GrantConvergenceTests(IdentityServiceCase):
         result = self.provisioner.provision(self.command())
 
         grants = list(RoleGrant._base_manager.filter(membership=membership, role=role).order_by("pk"))
-        self.assertEqual([grant.pk for grant in grants], [legacy.pk])
+        self.assertEqual([grant.pk for grant in grants], [legacy.pk, duplicate.pk])
         self.assertEqual(
             set(RoleGrantScope._base_manager.filter(role_grant=legacy).values_list("scope_type", flat=True)),
-            {RoleGrantScope.SCOPE_OWN, RoleGrantScope.SCOPE_TENANT},
+            {RoleGrantScope.SCOPE_TENANT},
+        )
+        self.assertEqual(
+            set(RoleGrantScope._base_manager.filter(role_grant=duplicate).values_list("scope_type", flat=True)),
+            {RoleGrantScope.SCOPE_OWN},
         )
         self.assertEqual(result.membership_id, membership.pk)
+
+    def test_same_provenance_prefers_permanent_over_expired_oldest(self):
+        role = self.role(
+            self.customer,
+            name="Member",
+            permissions=["assets.view_asset", "assets.change_asset"],
+        )
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        reason = "OIDC group-claim provisioning"
+        expired = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=reason,
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrant._base_manager.filter(pk=expired.pk).update(valid_until=timezone.now() - timedelta(minutes=1))
+        expired.refresh_from_db()
+        permanent = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=reason,
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrant._base_manager.filter(pk=permanent.pk).update(valid_until=None)
+        permanent.refresh_from_db()
+        RoleGrantScope.objects.create(role_grant=expired, scope_type=RoleGrantScope.SCOPE_OWN)
+        RoleGrantScope.objects.create(role_grant=permanent, scope_type=RoleGrantScope.SCOPE_OWN)
+
+        self.provisioner.provision(self.command())
+
+        grants = list(RoleGrant._base_manager.filter(membership=membership, role=role).order_by("pk"))
+        self.assertEqual([grant.pk for grant in grants], [permanent.pk])
+        self.assertIsNone(grants[0].valid_until)
+        self.assertTrue(grants[0].is_active)
+        self.assertEqual(
+            list(RoleGrantScope.objects.filter(role_grant=grants[0]).values_list("scope_type", flat=True)),
+            [RoleGrantScope.SCOPE_OWN],
+        )
+
+    def test_same_provenance_prefers_latest_future_over_expired_oldest_without_shortening_it(self):
+        role = self.role(
+            self.customer,
+            name="Member",
+            permissions=["assets.view_asset", "assets.change_asset"],
+        )
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        reason = "OIDC group-claim provisioning"
+        expired = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=reason,
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrant._base_manager.filter(pk=expired.pk).update(valid_until=timezone.now() - timedelta(minutes=1))
+        expired.refresh_from_db()
+        future_until = timezone.now() + timedelta(days=3)
+        future = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=reason,
+            valid_until=future_until,
+        )
+        RoleGrantScope.objects.create(role_grant=expired, scope_type=RoleGrantScope.SCOPE_OWN)
+        RoleGrantScope.objects.create(role_grant=future, scope_type=RoleGrantScope.SCOPE_OWN)
+
+        self.provisioner.provision(self.command())
+
+        grants = list(RoleGrant._base_manager.filter(membership=membership, role=role).order_by("pk"))
+        self.assertEqual([grant.pk for grant in grants], [future.pk])
+        self.assertGreaterEqual(grants[0].valid_until, future_until)
+        self.assertTrue(grants[0].is_active)
+
+    def test_distinct_manual_and_system_provenance_survive_and_effective_permission_remains(self):
+        role = self.role(
+            self.customer,
+            name="Member",
+            permissions=["assets.view_asset", "assets.change_asset"],
+        )
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        manual_until = timezone.now() + timedelta(days=2)
+        manual = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            granted_by=self.user,
+            reason="operator-approved manual grant",
+            valid_until=manual_until,
+        )
+        system = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            granted_by=None,
+            reason="OIDC group-claim provisioning",
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrantScope.objects.create(role_grant=manual, scope_type=RoleGrantScope.SCOPE_OWN)
+        RoleGrantScope.objects.create(role_grant=system, scope_type=RoleGrantScope.SCOPE_OWN)
+        manual_before = tuple(
+            RoleGrant._base_manager.filter(pk=manual.pk).values_list("pk", "granted_by_id", "reason", "valid_until")
+        )
+
+        self.provisioner.provision(self.command())
+        self.provisioner.provision(self.command())
+
+        grants = list(RoleGrant._base_manager.filter(membership=membership, role=role).order_by("pk"))
+        self.assertEqual({grant.pk for grant in grants}, {manual.pk, system.pk})
+        self.assertEqual(
+            tuple(
+                RoleGrant._base_manager.filter(pk=manual.pk).values_list("pk", "granted_by_id", "reason", "valid_until")
+            ),
+            manual_before,
+        )
+        self.assertEqual(
+            RoleGrantScope.objects.filter(role_grant__in=grants, scope_type=RoleGrantScope.SCOPE_OWN).count(),
+            2,
+        )
+        fresh_user = User._base_manager.get(pk=self.user.pk)
+        self.assertTrue(MembershipBackend().has_perm(fresh_user, "assets.view_asset", obj=self.customer))
 
     def test_customer_reconciliation_does_not_mutate_inactive_provider_membership_children(self):
         customer_role = self.role(self.customer)
@@ -958,6 +1080,10 @@ class ProviderContractTests(IdentityServiceCase):
         provider_membership = Membership.objects.create(user=self.user, tenant=self.provider, is_active=False)
         provider_other_grant = RoleGrant.objects.create(membership=provider_membership, role=provider_role)
         RoleGrantScope.objects.create(role_grant=provider_other_grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        RoleGrantScope._base_manager.create(
+            role_grant_id=provider_other_grant.pk,
+            scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+        )
         unrelated = User.objects.create_user(username="unrelated-443", email="unrelated-443@example.invalid")
         unrelated_membership = Membership.objects.create(user=unrelated, tenant=self.customer)
         unrelated_holder = AssetHolder.objects.create(
@@ -1040,6 +1166,16 @@ class ProviderContractTests(IdentityServiceCase):
             unrelated_membership,
             unrelated_holder,
         ) = self.provider_setup()
+        provider_grant_before = tuple(
+            RoleGrant._base_manager.filter(membership=provider_membership).values_list(
+                "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+            )
+        )
+        provider_scopes_before = tuple(
+            RoleGrantScope._base_manager.filter(role_grant__membership=provider_membership)
+            .order_by("pk")
+            .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+        )
 
         result = self.provisioner.provision(
             self.command(provider_staff=self.provider_intent(role_name=provider_role.name))
@@ -1048,7 +1184,22 @@ class ProviderContractTests(IdentityServiceCase):
         self.assertEqual(result.mode, "provider_staff")
         provider_membership.refresh_from_db()
         self.assertTrue(provider_membership.is_active)
-        self.assertFalse(RoleGrant.objects.filter(membership=provider_membership).exists())
+        self.assertEqual(
+            tuple(
+                RoleGrant._base_manager.filter(membership=provider_membership).values_list(
+                    "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+                )
+            ),
+            provider_grant_before,
+        )
+        self.assertEqual(
+            tuple(
+                RoleGrantScope._base_manager.filter(role_grant__membership=provider_membership)
+                .order_by("pk")
+                .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+            ),
+            provider_scopes_before,
+        )
         self.assertFalse(Membership.objects.filter(pk=customer_membership.pk).exists())
         holder.refresh_from_db()
         self.assertIsNone(holder.user_id)
@@ -1079,6 +1230,42 @@ class ProviderContractTests(IdentityServiceCase):
         self.assertEqual(
             AssetHolder.objects.filter(user=self.user, tenant=self.customer, user__isnull=False).count(), 1
         )
+
+    def test_ldap_and_saml_customer_modes_do_not_apply_oidc_sticky_provider_shortcut(self):
+        (
+            provider_role,
+            customer_membership,
+            _group,
+            _holder,
+            provider_membership,
+            _unrelated,
+            _unrelated_membership,
+            _unrelated_holder,
+        ) = self.provider_setup()
+        provider_membership.is_active = True
+        provider_membership.save(update_fields=["is_active"])
+        provider_grant_before = tuple(
+            RoleGrant._base_manager.filter(membership=provider_membership).values_list(
+                "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+            )
+        )
+
+        for source in ("LDAP", "SAML"):
+            with self.subTest(source=source):
+                result = self.provisioner.provision(self.command(profile=self.profile(source=source)))
+                self.assertEqual(result.mode, "customer")
+                self.assertTrue(Membership.objects.filter(pk=customer_membership.pk).exists())
+                self.assertTrue(
+                    Membership.objects.filter(user=self.user, tenant=self.provider, is_active=True).exists()
+                )
+                self.assertEqual(
+                    tuple(
+                        RoleGrant._base_manager.filter(membership=provider_membership).values_list(
+                            "pk", "membership_id", "role_id", "granted_by_id", "reason", "valid_until"
+                        )
+                    ),
+                    provider_grant_before,
+                )
 
     def test_provider_transition_failure_after_write_rolls_back_exact_organization_fingerprint(self):
         self.provider_setup()
@@ -1232,9 +1419,10 @@ class LDAPDirectoryContractTests(IdentityServiceCase):
         ldap_grant = RoleGrant.objects.get(membership=membership, reason=LDAP_DIRECTORY_SYNC_REASON)
         self.assertIsNone(ldap_grant.granted_by_id)
 
-    def test_ambiguous_ldap_owned_rows_are_untouched(self):
+    def test_ambiguous_ldap_owned_rows_stay_untouched_and_one_fresh_row_converges(self):
         role = self.role(self.customer, name="Member", permissions=list(LDAP_DIRECTORY_SYNC_MEMBER_PERMISSIONS))
         membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        expiry = timezone.now() - timedelta(minutes=1)
         first = RoleGrant.objects.create(
             membership=membership,
             role=role,
@@ -1249,15 +1437,225 @@ class LDAPDirectoryContractTests(IdentityServiceCase):
             valid_until=timezone.now() + timedelta(days=1),
             granted_by=None,
         )
+        RoleGrant._base_manager.filter(pk__in=(first.pk, second.pk)).update(valid_until=expiry)
+        first.refresh_from_db()
+        second.refresh_from_db()
         RoleGrantScope.objects.create(role_grant=first, scope_type=RoleGrantScope.SCOPE_OWN)
         RoleGrantScope.objects.create(role_grant=second, scope_type=RoleGrantScope.SCOPE_OWN)
-        before_hash, before = self.organization_fingerprint()
+        before_rows = list(
+            RoleGrant._base_manager.filter(pk__in=(first.pk, second.pk))
+            .order_by("pk")
+            .values_list("pk", "valid_until", "reason", "granted_by_id")
+        )
+        before_scopes = list(
+            RoleGrantScope._base_manager.filter(role_grant_id__in=(first.pk, second.pk))
+            .order_by("pk")
+            .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+        )
 
         provision_ldap_directory_identity(self.ldap_command())
 
-        after_hash, after = self.organization_fingerprint()
-        self.assertEqual(before_hash, after_hash)
-        self.assertEqual(before, after)
+        after_rows = list(
+            RoleGrant._base_manager.filter(pk__in=(first.pk, second.pk))
+            .order_by("pk")
+            .values_list("pk", "valid_until", "reason", "granted_by_id")
+        )
+        after_scopes = list(
+            RoleGrantScope._base_manager.filter(role_grant_id__in=(first.pk, second.pk))
+            .order_by("pk")
+            .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+        )
+        self.assertEqual(after_rows, before_rows)
+        self.assertEqual(after_scopes, before_scopes)
+        grants = list(
+            RoleGrant._base_manager.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).order_by("pk")
+        )
+        self.assertEqual(len(grants), 3)
+        fresh = grants[-1]
+        self.assertNotIn(fresh.pk, {first.pk, second.pk})
+        now = timezone.now()
+        self.assertGreaterEqual(fresh.valid_until, now + timedelta(hours=23))
+        self.assertLessEqual(fresh.valid_until, now + timedelta(days=1, minutes=1))
+        self.assertEqual(
+            list(RoleGrantScope.objects.filter(role_grant=fresh).values_list("scope_type", flat=True)),
+            [RoleGrantScope.SCOPE_OWN],
+        )
+
+        provision_ldap_directory_identity(self.ldap_command())
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).count(),
+            3,
+        )
+
+    def test_ambiguous_ldap_owned_rows_without_own_scope_create_one_fresh_row(self):
+        role = self.role(self.customer, name="Member", permissions=["assets.view_asset"])
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        first = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=LDAP_DIRECTORY_SYNC_REASON,
+            granted_by=None,
+        )
+        second = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=LDAP_DIRECTORY_SYNC_REASON,
+            granted_by=None,
+        )
+        before_rows = list(
+            RoleGrant._base_manager.filter(pk__in=(first.pk, second.pk))
+            .order_by("pk")
+            .values_list("pk", "valid_until", "reason", "granted_by_id")
+        )
+
+        provision_ldap_directory_identity(self.ldap_command())
+
+        self.assertEqual(
+            list(
+                RoleGrant._base_manager.filter(pk__in=(first.pk, second.pk))
+                .order_by("pk")
+                .values_list("pk", "valid_until", "reason", "granted_by_id")
+            ),
+            before_rows,
+        )
+        grants = list(
+            RoleGrant._base_manager.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).order_by("pk")
+        )
+        self.assertEqual(len(grants), 3)
+        fresh = grants[-1]
+        self.assertEqual(
+            list(RoleGrantScope.objects.filter(role_grant=fresh).values_list("scope_type", flat=True)),
+            [RoleGrantScope.SCOPE_OWN],
+        )
+        provision_ldap_directory_identity(self.ldap_command())
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).count(),
+            3,
+        )
+
+    def test_ambiguous_mixed_expired_and_incomplete_ldap_rows_stay_unchanged(self):
+        role = self.role(self.customer, name="Member", permissions=["assets.view_asset"])
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        expired = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=LDAP_DIRECTORY_SYNC_REASON,
+            granted_by=None,
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrant._base_manager.filter(pk=expired.pk).update(valid_until=timezone.now() - timedelta(minutes=1))
+        expired.refresh_from_db()
+        incomplete = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            reason=LDAP_DIRECTORY_SYNC_REASON,
+            granted_by=None,
+        )
+        RoleGrantScope.objects.create(role_grant=expired, scope_type=RoleGrantScope.SCOPE_OWN)
+        before_rows = list(
+            RoleGrant._base_manager.filter(pk__in=(expired.pk, incomplete.pk))
+            .order_by("pk")
+            .values_list("pk", "valid_until", "reason", "granted_by_id")
+        )
+        before_scopes = list(
+            RoleGrantScope._base_manager.filter(role_grant_id=expired.pk).values_list(
+                "pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id"
+            )
+        )
+
+        provision_ldap_directory_identity(self.ldap_command())
+
+        self.assertEqual(
+            list(
+                RoleGrant._base_manager.filter(pk__in=(expired.pk, incomplete.pk))
+                .order_by("pk")
+                .values_list("pk", "valid_until", "reason", "granted_by_id")
+            ),
+            before_rows,
+        )
+        self.assertEqual(
+            list(
+                RoleGrantScope._base_manager.filter(role_grant_id=expired.pk).values_list(
+                    "pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id"
+                )
+            ),
+            before_scopes,
+        )
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).count(),
+            3,
+        )
+
+    def test_ambiguous_ldap_rows_reuse_active_manual_equivalent_without_new_ldap_row(self):
+        role = self.role(self.customer, name="Member", permissions=["assets.view_asset"])
+        membership = Membership.objects.create(user=self.user, tenant=self.customer)
+        old_rows = []
+        for _ in range(2):
+            grant = RoleGrant.objects.create(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by=None,
+            )
+            old_rows.append(grant)
+        manual = RoleGrant.objects.create(
+            membership=membership,
+            role=role,
+            granted_by=self.user,
+            reason="active operator equivalent",
+            valid_until=timezone.now() + timedelta(days=2),
+        )
+        RoleGrantScope.objects.create(role_grant=manual, scope_type=RoleGrantScope.SCOPE_OWN)
+        before_manual = tuple(
+            RoleGrant._base_manager.filter(pk=manual.pk).values_list("pk", "granted_by_id", "reason", "valid_until")
+        )
+
+        provision_ldap_directory_identity(self.ldap_command())
+
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+                granted_by__isnull=True,
+            ).count(),
+            2,
+        )
+        self.assertEqual(
+            tuple(
+                RoleGrant._base_manager.filter(pk=manual.pk).values_list("pk", "granted_by_id", "reason", "valid_until")
+            ),
+            before_manual,
+        )
+        self.assertEqual(
+            {grant.pk for grant in RoleGrant._base_manager.filter(pk__in=[row.pk for row in old_rows])},
+            {row.pk for row in old_rows},
+        )
 
 
 class LoggingAndFailureContractTests(IdentityServiceCase):

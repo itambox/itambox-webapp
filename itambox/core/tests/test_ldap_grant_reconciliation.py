@@ -187,13 +187,27 @@ class LDAPGrantReconciliationTests(TestCase):
         for grant in old_grants:
             grant.refresh_from_db()
             self.assertEqual(grant.valid_until, expired_at)
+        grants = list(
+            RoleGrant.objects.filter(
+                membership=self.membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+            ).order_by("pk")
+        )
+        self.assertEqual(len(grants), 3)
+        fresh = grants[-1]
+        self.assertNotIn(fresh.pk, {grant.pk for grant in old_grants})
+        self.assertGreater(fresh.valid_until, timezone.now())
+        self.assertEqual(fresh.scopes.filter(scope_type=RoleGrantScope.SCOPE_OWN).count(), 1)
+
+        provision_ldap_directory_identity(self.command())
         self.assertEqual(
             RoleGrant.objects.filter(
                 membership=self.membership,
                 role=role,
                 reason=LDAP_DIRECTORY_SYNC_REASON,
             ).count(),
-            2,
+            3,
         )
 
     def test_nested_command_context_preserves_outer_task_actor(self):
