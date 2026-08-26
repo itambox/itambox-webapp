@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, StatusLabel
+from core.models import Job
 from core.tests.mixins import grant
 from extras.models import FileAttachment, ImageAttachment
 from organization.models import Role, Tenant
@@ -72,3 +73,84 @@ class AttachmentCrossTenantIDORTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["X-Content-Type-Options"], "nosniff")
         self.assertIn("attachment", resp["Content-Disposition"])
+
+    def test_view_permission_allows_read_but_not_delete_or_upload(self):
+        self._login_a()
+
+        delete_url = reverse("file_attachment_delete", kwargs={"pk": self.file_a.pk})
+        self.assertEqual(self.client.post(delete_url, {"return_url": "/"}).status_code, 404)
+        self.assertTrue(FileAttachment.objects.filter(pk=self.file_a.pk).exists())
+
+        upload_url = reverse(
+            "file_attachment_upload",
+            kwargs={"app_label": "assets", "model_name": "asset", "object_id": self.asset_a.pk},
+        )
+        response = self.client.post(upload_url, {"file": SimpleUploadedFile("blocked.txt", b"blocked")})
+        self.assertEqual(response.status_code, 404)
+
+
+class JobAttachmentAuthorizationTests(TestCase):
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name="Job Attachment A", slug="job-attachment-a")
+        self.tenant_b = Tenant.objects.create(name="Job Attachment B", slug="job-attachment-b")
+        self.user = User.objects.create_user(username="job_attachment_user", password="pw")
+        self.role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Job Attachment Viewer",
+            permissions=["core.view_job"],
+        )
+        grant(self.user, self.tenant_a, self.role)
+        self.job_content_type = ContentType.objects.get_for_model(Job)
+
+    def make_attachment(self, job, name):
+        return FileAttachment.objects.create(
+            model=self.job_content_type,
+            object_id=job.pk,
+            file=SimpleUploadedFile(name, name.encode()),
+            name=name,
+        )
+
+    def login_aggregate(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+    def test_global_parent_without_object_view_permission_returns_404(self):
+        denied_user = User.objects.create_user(username="job_attachment_denied", password="pw")
+        grant(
+            denied_user,
+            self.tenant_a,
+            Role.objects.create(tenant=self.tenant_a, name="Job Attachment Denied", permissions=[]),
+        )
+        job = Job.objects.create(name="Global parent", tenant=None)
+        attachment = self.make_attachment(job, "global-parent.txt")
+        self.client.force_login(denied_user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_a.pk
+        session.save()
+
+        response = self.client.get(reverse("file_attachment_download", kwargs={"pk": attachment.pk}))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_authorized_aggregate_scope_job_attachment_succeeds_with_headers(self):
+        job = Job.objects.create(name="Aggregate parent", tenant=self.tenant_a)
+        attachment = self.make_attachment(job, "aggregate-parent.txt")
+        self.login_aggregate()
+
+        response = self.client.get(reverse("file_attachment_download", kwargs={"pk": attachment.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertIn("attachment", response["Content-Disposition"])
+
+    def test_inaccessible_aggregate_scope_job_attachment_returns_404(self):
+        job = Job.objects.create(name="Foreign aggregate parent", tenant=self.tenant_b)
+        attachment = self.make_attachment(job, "foreign-aggregate-parent.txt")
+        self.login_aggregate()
+
+        response = self.client.get(reverse("file_attachment_download", kwargs={"pk": attachment.pk}))
+
+        self.assertEqual(response.status_code, 404)
