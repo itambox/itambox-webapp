@@ -10,20 +10,22 @@ from threading import Event
 from unittest.mock import Mock, patch
 
 import pytest
-from django.db import connection, connections
+from django.db import close_old_connections, connection, connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 import core.auth.oidc as oidc_module
 import organization.services.tenant_onboarding as tenant_onboarding
 from core import identity_provisioning
-from core.auth.oidc import TenantOIDCBackend
+from core.auth.oidc import OIDCIdentityProvisioningError, TenantOIDCBackend
 from core.identity_provisioning import ExternalIdentityProvisioningResult
 from core.managers import set_current_tenant
+from core.models import ObjectChange
 from core.oidc_identity import oidc_sensitive_audit
+from extras.models import Event as AuditEvent
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services.identity_provisioning import organization_identity_provisioner
-from users.models import OIDCIdentity, User
+from users.models import GroupMembership, OIDCIdentity, User, UserGroup
 
 ISSUER = "https://phase-b.example/issuer"
 OIDC_CONFIG = {
@@ -208,6 +210,57 @@ class OIDCPhaseBPortContractTests(TestCase):
             before_organization,
         )
 
+    def test_can_login_disabled_after_service_rolls_back_phase_b_and_wraps_typed_failure(self):
+        before = {
+            "organization": (
+                AssetHolder.objects.count(),
+                Membership.objects.count(),
+                Role.objects.count(),
+                RoleGrant.objects.count(),
+                RoleGrantScope.objects.count(),
+            ),
+            "profile": (self.user.email, self.user.first_name, self.user.last_name),
+            "changes": ObjectChange.objects.count(),
+            "events": AuditEvent.objects.count(),
+        }
+
+        def provision_then_disable(command):
+            result = organization_identity_provisioner.provision(command)
+            User._base_manager.filter(pk=self.user.pk).update(can_login=False)
+            return result
+
+        with patch.object(
+            identity_provisioning,
+            "provision_external_identity",
+            side_effect=provision_then_disable,
+        ) as provision:
+            with self.assertRaises(OIDCIdentityProvisioningError):
+                self.backend._finish_identity_phase_b(
+                    self.binding.pk,
+                    self.user.pk,
+                    self.claims(),
+                )
+
+        provision.assert_called_once()
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.can_login)
+        self.assertEqual(
+            (self.user.email, self.user.first_name, self.user.last_name),
+            before["profile"],
+        )
+        self.assertEqual(
+            (
+                AssetHolder.objects.count(),
+                Membership.objects.count(),
+                Role.objects.count(),
+                RoleGrant.objects.count(),
+                RoleGrantScope.objects.count(),
+            ),
+            before["organization"],
+        )
+        self.assertEqual(ObjectChange.objects.count(), before["changes"])
+        self.assertEqual(AuditEvent.objects.count(), before["events"])
+
     def test_phase_b_source_has_one_binding_lock_and_no_user_lock(self):
         source = inspect.getsource(TenantOIDCBackend._finish_identity_phase_b)
         tree = ast.parse(textwrap.dedent(source))
@@ -311,6 +364,152 @@ class OIDCPhaseBAuditFailureTests(TestCase):
         )
 
 
+@pytest.mark.serial_only
+@override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=OIDC_CONFIG)
+class OIDCPhaseBStaleHandoffConcurrencyTests(TransactionTestCase):
+    reset_sequences = True
+
+    def setUp(self):
+        set_current_tenant(None)
+        self.customer = Tenant.objects.create(name="Stale Handoff Customer", slug="phase-b-customer")
+        Role.objects.create(tenant=self.customer, name="Admin", permissions=[])
+        self.user = User.objects.create_user(
+            username="stale-handoff-user",
+            email="old-stale@example.test",
+            first_name="Old",
+            last_name="Profile",
+        )
+        self.binding = OIDCIdentity.objects.create(
+            user=self.user,
+            issuer=ISSUER,
+            subject="stale-handoff-subject",
+        )
+        set_current_tenant(self.customer)
+        self.backend = TenantOIDCBackend()
+
+    def tearDown(self):
+        set_current_tenant(None)
+        connections.close_all()
+
+    def _resolve_after_committed_update(self, update_kwargs, claims=None):
+        claims = claims or {
+            "iss": ISSUER,
+            "sub": self.binding.subject,
+            "email": "new-stale@example.test",
+            "given_name": "New",
+            "family_name": "Profile",
+            "groups": [],
+        }
+        snapshot_ready = Event()
+        writer_committed = Event()
+        writer_output = {}
+
+        def writer():
+            close_old_connections()
+            try:
+                if not snapshot_ready.wait(timeout=10):
+                    raise AssertionError("adapter did not finish its initial User snapshot")
+                writer_output["updated"] = User._base_manager.filter(pk=self.user.pk).update(**update_kwargs)
+            except Exception as exc:
+                writer_output["error"] = exc
+            finally:
+                writer_committed.set()
+                connections.close_all()
+
+        def provision(command):
+            snapshot_ready.set()
+            if not writer_committed.wait(timeout=10):
+                raise AssertionError("concurrent User update did not commit")
+            if writer_output.get("error") is not None:
+                raise writer_output["error"]
+            return organization_identity_provisioner.provision(command)
+
+        writer_thread = threading.Thread(target=writer, name="oidc-stale-handoff-writer")
+        writer_thread.start()
+        try:
+            with (
+                patch.object(self.backend, "get_userinfo", return_value=claims),
+                patch.object(self.backend, "verify_claims", return_value=True),
+                patch.object(
+                    identity_provisioning,
+                    "provision_external_identity",
+                    side_effect=provision,
+                ),
+            ):
+                return self.backend.get_or_create_user(
+                    "access-token",
+                    "id-token",
+                    {"iss": ISSUER, "sub": self.binding.subject},
+                )
+        finally:
+            snapshot_ready.set()
+            writer_thread.join(timeout=15)
+            self.assertFalse(writer_thread.is_alive())
+            self.assertIsNone(writer_output.get("error"))
+            connections.close_all()
+
+    def test_committed_can_login_disable_before_service_lock_has_zero_phase_b_delta(self):
+        before = {
+            "user_profile": User._base_manager.values_list("username", "email", "first_name", "last_name").get(
+                pk=self.user.pk
+            ),
+            "user_count": User.objects.count(),
+            "binding_count": OIDCIdentity.objects.count(),
+            "organization": (
+                AssetHolder.objects.count(),
+                Membership.objects.count(),
+                RoleGrant.objects.count(),
+                RoleGrantScope.objects.count(),
+            ),
+            "changes": ObjectChange.objects.count(),
+            "events": AuditEvent.objects.count(),
+        }
+
+        with self.assertRaises(OIDCIdentityProvisioningError):
+            self._resolve_after_committed_update({"can_login": False})
+
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.can_login)
+        self.assertEqual(
+            User._base_manager.values_list("username", "email", "first_name", "last_name").get(pk=self.user.pk),
+            before["user_profile"],
+        )
+        self.assertEqual(User.objects.count(), before["user_count"])
+        self.assertEqual(OIDCIdentity.objects.count(), before["binding_count"])
+        self.assertEqual(
+            (
+                AssetHolder.objects.count(),
+                Membership.objects.count(),
+                RoleGrant.objects.count(),
+                RoleGrantScope.objects.count(),
+            ),
+            before["organization"],
+        )
+        self.assertEqual(ObjectChange.objects.count(), before["changes"])
+        self.assertEqual(AuditEvent.objects.count(), before["events"])
+
+    def test_current_unrelated_profile_fields_survive_stale_handoff(self):
+        result = self._resolve_after_committed_update(
+            {"username": "concurrent-profile-user", "last_name": "Concurrent"},
+            {
+                "iss": ISSUER,
+                "sub": self.binding.subject,
+                "email": "claim-wins@example.test",
+                "groups": [],
+            },
+        )
+
+        self.assertEqual(result.pk, self.user.pk)
+        self.assertEqual(result.email, "claim-wins@example.test")
+        self.assertEqual(result.username, "concurrent-profile-user")
+        self.assertEqual(result.last_name, "Concurrent")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "claim-wins@example.test")
+        self.assertEqual(self.user.username, "concurrent-profile-user")
+        self.assertEqual(self.user.last_name, "Concurrent")
+        self.assertEqual(self.user.first_name, "Old")
+
+
 B2_OIDC_CONFIG = {
     "b2-customer": {
         "OIDC_OP_ISSUER": "https://b2.example/issuer",
@@ -384,6 +583,9 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
             "service_wait_observed": Event(),
             "binding_locked": Event(),
             "onboarding_user_locked": Event(),
+            "oidc_tenant_locked": Event(),
+            "onboarding_tenant_attempted": Event(),
+            "onboarding_wait_observed": Event(),
         }
         self.outputs = {"onboarding": {}, "oidc": {}}
         self.lock_orders = {"onboarding": [], "oidc": []}
@@ -407,7 +609,7 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
             cursor.execute("SET SESSION statement_timeout = '30s'")
         return pid
 
-    def _wait_for_real_tenant_wait(self, waiting_pid, blocking_pid):
+    def _wait_for_real_tenant_wait(self, waiting_pid, blocking_pid, expected_lock_clause="for share"):
         deadline = time.monotonic() + 8
         observations = []
         while time.monotonic() < deadline:
@@ -446,11 +648,11 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
                     and row[3] in {"transactionid", "tuple"}
                     and row[7] == blocking_pid
                     and "organization_tenant" in waiting_query
-                    and "for share" in waiting_query
+                    and expected_lock_clause in waiting_query
                 ):
                     return
             Event().wait(0.02)
-        self.fail(f"OIDC Tenant FOR SHARE wait was not observed: {observations[-3:]}")
+        self.fail(f"OIDC Tenant {expected_lock_clause.upper()} wait was not observed: {observations[-3:]}")
 
     def _onboarding_worker(self):
         try:
@@ -486,7 +688,33 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
         finally:
             connections.close_all()
 
-    def _oidc_worker(self):
+    def _reverse_onboarding_worker(self):
+        try:
+            pid = self._prepare_worker_connection("onboarding")
+
+            def observe_onboarding_sql(execute, sql, params, many, context):
+                normalized = " ".join(sql.split()).lower()
+                if 'from "organization_tenant"' in normalized and "for update" in normalized:
+                    self.lock_orders["onboarding"].append("tenant")
+                    self.events["onboarding_tenant_attempted"].set()
+                if 'from "users_user"' in normalized and "for update" in normalized:
+                    self.lock_orders["onboarding"].append("user")
+                    self.events["onboarding_user_locked"].set()
+                return execute(sql, params, many, context)
+
+            with connection.execute_wrapper(observe_onboarding_sql):
+                self.outputs["onboarding"]["result"] = tenant_onboarding.onboard_managed_tenant(
+                    actor=User._base_manager.get(pk=self.user.pk),
+                    provider_id=self.provider.pk,
+                    tenant=Tenant._base_manager.get(pk=self.customer.pk),
+                )
+            self.outputs["onboarding"]["pid"] = pid
+        except Exception as exc:
+            self.outputs["onboarding"]["error"] = exc
+        finally:
+            connections.close_all()
+
+    def _oidc_worker(self, *, pause_after_tenant=False):
         try:
             pid = self._prepare_worker_connection("oidc")
             tenant = Tenant._base_manager.get(pk=self.customer.pk)
@@ -512,6 +740,13 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
                         self.events["binding_locked"].set()
                     self.lock_orders["oidc"].append("binding")
                 if 'from "organization_tenant"' in normalized and "for share" in normalized:
+                    if pause_after_tenant:
+                        result = execute(sql, params, many, context)
+                        self.lock_orders["oidc"].append("tenant")
+                        self.events["oidc_tenant_locked"].set()
+                        if not self.events["onboarding_wait_observed"].wait(timeout=8):
+                            raise AssertionError("real onboarding Tenant wait was not observed")
+                        return result
                     self.events["service_tenant_attempted"].set()
                     self.lock_orders["oidc"].append("tenant")
                 if 'from "users_user"' in normalized and "for update" in normalized:
@@ -564,6 +799,48 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
         self.assertLess(self.lock_orders["oidc"].index("tenant"), self.lock_orders["oidc"].index("user"))
         self.assertEqual(self.outputs["oidc"]["result"].pk, self.user.pk)
 
+    def test_real_oidc_first_composes_with_real_onboarding_without_deadlock(self):
+        oidc = threading.Thread(
+            target=self._oidc_worker,
+            kwargs={"pause_after_tenant": True},
+            name="real-b2-oidc-first",
+        )
+        onboarding = threading.Thread(target=self._reverse_onboarding_worker, name="real-b2-onboarding-second")
+        onboarding_started = False
+        oidc.start()
+        try:
+            self.assertTrue(self.events["oidc_tenant_locked"].wait(timeout=8))
+            onboarding.start()
+            onboarding_started = True
+            self.assertTrue(self.events["onboarding_tenant_attempted"].wait(timeout=8))
+            self._wait_for_real_tenant_wait(
+                self._onboarding_pid_from_activity(),
+                self._oidc_pid_from_activity(),
+                expected_lock_clause="for update",
+            )
+            self.events["onboarding_wait_observed"].set()
+        finally:
+            self.events["onboarding_wait_observed"].set()
+            oidc.join(timeout=15)
+            if onboarding_started:
+                onboarding.join(timeout=15)
+        self.assertFalse(oidc.is_alive())
+        self.assertFalse(onboarding.is_alive())
+        self.assertIsNone(self.outputs["oidc"].get("error"))
+        self.assertIsNone(self.outputs["onboarding"].get("error"))
+        self.assertTrue(self.events["onboarding_user_locked"].is_set())
+        self.assertLess(self.lock_orders["oidc"].index("tenant"), self.lock_orders["oidc"].index("user"))
+        self.assertLess(
+            self.lock_orders["onboarding"].index("tenant"),
+            self.lock_orders["onboarding"].index("user"),
+        )
+        self.assertEqual(self.outputs["oidc"]["result"].pk, self.user.pk)
+        self.assertEqual(Membership.objects.filter(user=self.user, tenant=self.provider).count(), 1)
+        self.assertFalse(Membership.objects.filter(user=self.user, tenant=self.customer).exists())
+        self.assertTrue(Membership.objects.get(user=self.user, tenant=self.provider).is_active)
+        self.assertFalse(AssetHolder.objects.filter(user=self.user, tenant=self.customer).exists())
+        self.assertTrue(RoleGrant.objects.filter(membership__user=self.user, membership__tenant=self.provider).exists())
+
     def _oidc_pid_from_activity(self):
         with connection.cursor() as cursor:
             cursor.execute(
@@ -583,3 +860,317 @@ class OIDCB2LockCompositionTests(TransactionTestCase):
             row = cursor.fetchone()
         self.assertIsNotNone(row)
         return row[0]
+
+
+PROVIDER_ORDER_CONFIG = {
+    "phase-b-customer": {
+        **OIDC_CONFIG["phase-b-customer"],
+        "OIDC_GROUP_ROLE_MAPPING": {
+            "customer-admin": "Admin",
+            "provider-first": "Admin",
+            "provider-second": "Admin",
+        },
+    },
+    "phase-b-provider": {
+        "OIDC_OP_ISSUER": ISSUER,
+        "OIDC_GROUP_PROVIDER_ROLE_MAPPING": {
+            "provider-first": "Provider Staff",
+            "provider-second": "Provider Staff Second",
+        },
+    },
+}
+
+
+@override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=PROVIDER_ORDER_CONFIG)
+class OIDCProviderGroupOrderTests(TestCase):
+    def setUp(self):
+        set_current_tenant(None)
+        self.provider = Tenant.objects.create(
+            name="Provider Order Provider",
+            slug="phase-b-provider",
+            is_provider=True,
+        )
+        self.customer = Tenant.objects.create(
+            name="Provider Order Customer",
+            slug="phase-b-customer",
+            managed_by=self.provider,
+        )
+        self.customer_role = Role.objects.create(
+            tenant=self.customer,
+            name="Admin",
+            permissions=[],
+        )
+        self.provider_first_role = Role.objects.create(
+            tenant=self.provider,
+            name="Provider Staff",
+            permissions=[],
+        )
+        self.provider_second_role = Role.objects.create(
+            tenant=self.provider,
+            name="Provider Staff Second",
+            permissions=[],
+        )
+        self.unrelated_user = User.objects.create_user(
+            username="provider-order-unrelated",
+            email="provider-order-unrelated@example.test",
+            first_name="Unrelated",
+            last_name="Identity",
+        )
+        self.unrelated_membership = Membership.objects.create(
+            user=self.unrelated_user,
+            tenant=self.customer,
+            is_active=True,
+        )
+        self.unrelated_grant = RoleGrant.objects.create(
+            membership=self.unrelated_membership,
+            role=self.customer_role,
+            reason="Unrelated provider-order fixture",
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrantScope.objects.create(
+            role_grant=self.unrelated_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        self.unrelated_group = UserGroup.objects.create(
+            tenant=self.customer,
+            name="Unrelated customer group",
+            slug="unrelated-customer-group",
+        )
+        self.unrelated_group_membership = GroupMembership.objects.create(
+            user_group=self.unrelated_group,
+            membership=self.unrelated_membership,
+        )
+        self.unrelated_holder = AssetHolder._base_manager.create(
+            user=self.unrelated_user,
+            tenant=self.customer,
+            first_name="Unrelated",
+            last_name="Identity",
+            upn=self.unrelated_user.email,
+            email=self.unrelated_user.email,
+        )
+        set_current_tenant(self.customer)
+
+    def tearDown(self):
+        set_current_tenant(None)
+
+    def _unrelated_snapshot(self):
+        return {
+            "user": User._base_manager.values_list(
+                "pk",
+                "username",
+                "email",
+                "first_name",
+                "last_name",
+                "can_login",
+            ).get(pk=self.unrelated_user.pk),
+            "memberships": tuple(
+                Membership._base_manager.filter(user=self.unrelated_user)
+                .order_by("pk")
+                .values_list("pk", "tenant_id", "is_active")
+            ),
+            "grants": tuple(
+                RoleGrant._base_manager.filter(membership__user=self.unrelated_user)
+                .order_by("pk")
+                .values_list("pk", "membership_id", "role_id")
+            ),
+            "scopes": tuple(
+                RoleGrantScope._base_manager.filter(role_grant__membership__user=self.unrelated_user)
+                .order_by("pk")
+                .values_list("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
+            ),
+            "groups": tuple(
+                GroupMembership._base_manager.filter(membership__user=self.unrelated_user)
+                .order_by("pk")
+                .values_list("pk", "user_group_id", "membership_id", "source", "external_id")
+            ),
+            "holders": tuple(
+                AssetHolder._base_manager.filter(user=self.unrelated_user)
+                .order_by("pk")
+                .values_list("pk", "user_id", "tenant_id", "upn", "email", "first_name", "last_name")
+            ),
+        }
+
+    def _resolve(self, subject, claims):
+        userinfo = {
+            "iss": ISSUER,
+            "sub": subject,
+            **claims,
+        }
+        backend = TenantOIDCBackend()
+        backend.get_userinfo = Mock(return_value=userinfo)
+        backend.verify_claims = Mock(return_value=True)
+        with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+            return backend.get_or_create_user(
+                "access-token",
+                "id-token",
+                {"iss": ISSUER, "sub": subject},
+            )
+
+    def _create_bound_user(self, username, email, subject):
+        user = User.objects.create_user(username=username, email=email, first_name="Initial", last_name="Profile")
+        OIDCIdentity.objects.create(user=user, issuer=ISSUER, subject=subject)
+        return user
+
+    def _assert_provider_only(self, user, unrelated_before):
+        self.assertEqual(Membership._base_manager.filter(user=user, tenant=self.provider).count(), 1)
+        self.assertEqual(
+            Membership._base_manager.filter(user=user, tenant=self.provider, is_active=True).count(),
+            1,
+        )
+        self.assertFalse(Membership._base_manager.filter(user=user, tenant=self.customer).exists())
+        self.assertFalse(
+            RoleGrant._base_manager.filter(membership__user=user, membership__tenant=self.customer).exists()
+        )
+        self.assertFalse(
+            GroupMembership._base_manager.filter(membership__user=user, user_group__tenant=self.customer).exists()
+        )
+        self.assertFalse(AssetHolder._base_manager.filter(user=user, tenant=self.customer).exists())
+        provider_membership = Membership._base_manager.get(user=user, tenant=self.provider)
+        self.assertFalse(RoleGrant._base_manager.filter(membership=provider_membership).exists())
+        self.assertEqual(self._unrelated_snapshot(), unrelated_before)
+
+    def test_customer_first_then_provider_and_provider_first_then_stale_customer_are_provider_only(self):
+        unrelated_before = self._unrelated_snapshot()
+        customer_first = self._create_bound_user(
+            "provider-order-customer-first",
+            "provider-order-customer-first@example.test",
+            "provider-order-customer-first-subject",
+        )
+        customer_result = self._resolve(
+            "provider-order-customer-first-subject",
+            {
+                "email": customer_first.email,
+                "given_name": "Customer",
+                "family_name": "First",
+                "groups": ["customer-admin"],
+            },
+        )
+        self.assertEqual(customer_result.pk, customer_first.pk)
+        provider_result = self._resolve(
+            "provider-order-customer-first-subject",
+            {
+                "email": customer_first.email,
+                "given_name": "Provider",
+                "family_name": "First",
+                "groups": ["provider-first", "provider-second", "customer-admin"],
+            },
+        )
+        self.assertEqual(provider_result.pk, customer_first.pk)
+        customer_first_membership = Membership._base_manager.get(user=customer_first, tenant=self.provider)
+        self.assertFalse(RoleGrant._base_manager.filter(membership=customer_first_membership).exists())
+        self.assertEqual(
+            OIDCIdentity.objects.get(issuer=ISSUER, subject="provider-order-customer-first-subject").user_id,
+            customer_first.pk,
+        )
+        self._assert_provider_only(customer_first, unrelated_before)
+        self.assertEqual(
+            AssetHolder._base_manager.filter(tenant=self.customer, upn=customer_first.email).count(),
+            1,
+        )
+        self.assertIsNone(AssetHolder._base_manager.get(tenant=self.customer, upn=customer_first.email).user_id)
+
+        provider_first = self._create_bound_user(
+            "provider-order-provider-first",
+            "provider-order-provider-first@example.test",
+            "provider-order-provider-first-subject",
+        )
+        first_provider_result = self._resolve(
+            "provider-order-provider-first-subject",
+            {
+                "email": provider_first.email,
+                "given_name": "Provider",
+                "family_name": "First",
+                "groups": ["provider-first", "provider-second", "customer-admin"],
+            },
+        )
+        self.assertEqual(first_provider_result.pk, provider_first.pk)
+        self.assertFalse(
+            RoleGrant._base_manager.filter(
+                membership__user=provider_first,
+                membership__tenant=self.provider,
+                role=self.provider_first_role,
+            ).exists()
+        )
+        stale_customer_result = self._resolve(
+            "provider-order-provider-first-subject",
+            {
+                "email": provider_first.email,
+                "given_name": "Stale",
+                "family_name": "Customer",
+                "groups": ["customer-admin"],
+            },
+        )
+        self.assertEqual(stale_customer_result.pk, provider_first.pk)
+        self._assert_provider_only(provider_first, unrelated_before)
+
+    def test_missing_first_provider_role_is_terminal_without_fallback_for_existing_and_new_binding(self):
+        settings = {
+            **PROVIDER_ORDER_CONFIG,
+            "phase-b-provider": {
+                **PROVIDER_ORDER_CONFIG["phase-b-provider"],
+                "OIDC_GROUP_PROVIDER_ROLE_MAPPING": {
+                    "provider-first": "Missing Provider Staff",
+                    "provider-second": self.provider_second_role.name,
+                },
+            },
+        }
+        existing = self._create_bound_user(
+            "provider-order-existing-missing",
+            "provider-order-existing-missing@example.test",
+            "provider-order-existing-missing-subject",
+        )
+        existing_profile = (
+            existing.username,
+            existing.email,
+            existing.first_name,
+            existing.last_name,
+        )
+        unrelated_before = self._unrelated_snapshot()
+        before = {
+            "memberships": Membership._base_manager.count(),
+            "holders": AssetHolder._base_manager.count(),
+            "grants": RoleGrant._base_manager.count(),
+            "scopes": RoleGrantScope._base_manager.count(),
+            "groups": GroupMembership._base_manager.count(),
+        }
+        with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
+            existing_result = self._resolve(
+                "provider-order-existing-missing-subject",
+                {
+                    "email": "should-not-update@example.test",
+                    "given_name": "Should",
+                    "family_name": "NotUpdate",
+                    "groups": ["provider-first", "provider-second", "customer-admin"],
+                },
+            )
+        self.assertEqual(existing_result.pk, existing.pk)
+        existing.refresh_from_db()
+        self.assertEqual(
+            (existing.username, existing.email, existing.first_name, existing.last_name),
+            existing_profile,
+        )
+        self.assertEqual(Membership._base_manager.count(), before["memberships"])
+        self.assertEqual(AssetHolder._base_manager.count(), before["holders"])
+        self.assertEqual(RoleGrant._base_manager.count(), before["grants"])
+        self.assertEqual(RoleGrantScope._base_manager.count(), before["scopes"])
+        self.assertEqual(GroupMembership._base_manager.count(), before["groups"])
+        self.assertEqual(self._unrelated_snapshot(), unrelated_before)
+
+        with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
+            new_result = self._resolve(
+                "provider-order-new-missing-subject",
+                {
+                    "email": "provider-order-new-missing@example.test",
+                    "given_name": "New",
+                    "family_name": "Missing",
+                    "groups": ["provider-first", "provider-second", "customer-admin"],
+                },
+            )
+        self.assertIsNotNone(new_result)
+        new_binding = OIDCIdentity.objects.get(issuer=ISSUER, subject="provider-order-new-missing-subject")
+        self.assertEqual(new_binding.user_id, new_result.pk)
+        self.assertFalse(Membership._base_manager.filter(user_id=new_result.pk).exists())
+        self.assertFalse(AssetHolder._base_manager.filter(user_id=new_result.pk).exists())
+        self.assertFalse(RoleGrant._base_manager.filter(membership__user_id=new_result.pk).exists())
+        self.assertFalse(GroupMembership._base_manager.filter(membership__user_id=new_result.pk).exists())
+        self.assertEqual(self._unrelated_snapshot(), unrelated_before)

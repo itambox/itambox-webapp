@@ -177,6 +177,8 @@ def _lock_user(user: UserRef) -> User:
     locked = User._base_manager.select_for_update().filter(pk=user_id).first()
     if locked is None:
         _reject("Identity provisioning canonical user does not exist.")
+    if not locked.can_login:
+        _reject("Identity provisioning canonical user cannot log in.")
     return locked
 
 
@@ -193,7 +195,7 @@ def _membership_tenant_ids(*, customer_row: _TenantRow, provider_intent: bool) -
 
 def _lock_memberships(user_id: int, tenant_ids: set[int]) -> dict[int, Membership]:
     rows = list(
-        Membership._base_manager.select_for_update()
+        Membership._base_manager.select_for_update(of=("self",))
         .filter(user_id=user_id, tenant_id__in=sorted(tenant_ids))
         .select_related("tenant")
         .order_by("tenant_id", "pk")

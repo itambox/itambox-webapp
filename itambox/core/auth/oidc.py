@@ -483,12 +483,30 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                         groups,
                     ),
                 )
-                result = identity_provisioning.provision_external_identity(command)
-                if getattr(result, "mode", None) == "provider_mapping_rejected":
-                    return user
+                try:
+                    result = identity_provisioning.provision_external_identity(command)
+                except ValidationError as exc:
+                    _raise_identity_error(
+                        OIDCIdentityProvisioningError,
+                        "identity.provision",
+                        user_id=binding.user_id,
+                        binding_id=binding.pk,
+                        exception_type=type(exc).__name__,
+                    )
 
-                self._update_user_profile(user, claims)
-                return user
+                current_user = self.UserModel._base_manager.get(pk=binding.user_id)
+                if not getattr(current_user, "can_login", True):
+                    _raise_identity_error(
+                        OIDCIdentityProvisioningError,
+                        "identity.disabled",
+                        user_id=current_user.pk,
+                        binding_id=binding.pk,
+                    )
+                if getattr(result, "mode", None) == "provider_mapping_rejected":
+                    return current_user
+
+                self._update_user_profile(current_user, claims)
+                return current_user
 
     @staticmethod
     def _claim_text(claims, *names):
