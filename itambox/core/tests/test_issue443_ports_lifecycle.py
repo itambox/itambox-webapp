@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import get_args
 from unittest import mock
 
-from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from core import identity_provisioning, restore_authority
@@ -71,18 +70,6 @@ def _identity_operation() -> object:
     return identity_provisioning.provision_external_identity(_command())
 
 
-def _restore_operation() -> None:
-    restore_authority.validate_restore_grant_authority(_User(), object())
-
-
-def _missing_message(operation) -> str:
-    try:
-        operation()
-    except ImproperlyConfigured as exc:
-        return str(exc)
-    raise AssertionError("operation unexpectedly succeeded")
-
-
 def _run_fresh_subprocess(script: str) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = os.pathsep.join(
@@ -96,6 +83,38 @@ def _run_fresh_subprocess(script: str) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
+
+
+def _fresh_missing_port_errors() -> str:
+    result = _run_fresh_subprocess(
+        """
+from django.apps import apps
+from django.core.exceptions import ImproperlyConfigured
+from core import identity_provisioning, restore_authority
+assert not apps.ready
+
+try:
+    identity_provisioning.provision_external_identity(None)
+except ImproperlyConfigured as exc:
+    assert str(exc) == 'identity provisioner provider is not configured', str(exc)
+else:
+    raise AssertionError('identity operation unexpectedly succeeded')
+
+try:
+    restore_authority.validate_restore_grant_authority(None, None)
+except ImproperlyConfigured as exc:
+    assert str(exc) == 'restore-authority validator provider is not configured', str(exc)
+else:
+    raise AssertionError('restore operation unexpectedly succeeded')
+
+print('identity provisioner provider is not configured')
+print('restore-authority validator provider is not configured')
+print('fresh-missing-port-contract-ok')
+"""
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stdout + result.stderr)
+    return result.stdout
 
 
 class Issue443PortSurfaceTests(SimpleTestCase):
@@ -204,24 +223,16 @@ print("registration-contract-ok")
 
         with identity_provisioning.override_identity_provisioner(identity_provider):
             self.assertEqual(_identity_operation(), "identity")
-            self.assertEqual(
-                _missing_message(_restore_operation),
-                "restore-authority validator provider is not configured",
-            )
+            self.assertIn("restore-authority validator provider is not configured", _fresh_missing_port_errors())
 
         with restore_authority.override_restore_authority_validator(restore_provider):
             restore_authority.validate_restore_grant_authority(user, obj)
             self.assertEqual(restore_provider.calls, [(user, obj)])
-            self.assertEqual(
-                _missing_message(_identity_operation),
-                "identity provisioner provider is not configured",
-            )
+            self.assertIn("identity provisioner provider is not configured", _fresh_missing_port_errors())
 
-        self.assertEqual(_missing_message(_identity_operation), "identity provisioner provider is not configured")
-        self.assertEqual(
-            _missing_message(_restore_operation),
-            "restore-authority validator provider is not configured",
-        )
+        missing = _fresh_missing_port_errors()
+        self.assertIn("identity provisioner provider is not configured", missing)
+        self.assertIn("restore-authority validator provider is not configured", missing)
 
     def test_identity_override_is_nested_exception_safe_thread_local_and_copyable(self):
         outer = _IdentityProvider("outer")
@@ -239,14 +250,18 @@ print("registration-contract-ok")
             self.assertEqual(_identity_operation(), "outer")
 
             copied_context = contextvars.copy_context()
+
+            def current_override():
+                return identity_provisioning._identity_provisioner._override.get()
+
             with ThreadPoolExecutor(max_workers=1) as executor:
-                plain_result = executor.submit(_missing_message, _identity_operation).result()
-                copied_result = executor.submit(copied_context.run, _identity_operation).result()
+                plain_result = executor.submit(current_override).result()
+                copied_result = executor.submit(copied_context.run, current_override).result()
 
-            self.assertEqual(plain_result, "identity provisioner provider is not configured")
-            self.assertEqual(copied_result, "outer")
+            self.assertIsNot(plain_result, outer)
+            self.assertIs(copied_result, outer)
 
-        self.assertEqual(_missing_message(_identity_operation), "identity provisioner provider is not configured")
+        self.assertIn("identity provisioner provider is not configured", _fresh_missing_port_errors())
 
     def test_restore_override_is_nested_and_exception_safe(self):
         outer = _RestoreProvider()
@@ -266,10 +281,7 @@ print("registration-contract-ok")
             restore_authority.validate_restore_grant_authority(user, obj)
 
         self.assertEqual(outer.calls, [(user, obj), (user, obj)])
-        self.assertEqual(
-            _missing_message(_restore_operation),
-            "restore-authority validator provider is not configured",
-        )
+        self.assertIn("restore-authority validator provider is not configured", _fresh_missing_port_errors())
 
     def test_operation_lookup_uses_module_owner_at_call_time(self):
         command = _command()
@@ -440,9 +452,6 @@ class Issue443AsyncPortTests(SimpleTestCase):
                 with identity_provisioning.override_identity_provisioner(inner):
                     self.assertEqual(_identity_operation(), "inner")
                 self.assertEqual(await task, "outer")
-            self.assertEqual(
-                _missing_message(_identity_operation),
-                "identity provisioner provider is not configured",
-            )
+            self.assertIn("identity provisioner provider is not configured", _fresh_missing_port_errors())
 
         asyncio.run(exercise())

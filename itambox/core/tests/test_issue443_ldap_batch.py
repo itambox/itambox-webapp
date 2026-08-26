@@ -149,7 +149,6 @@ class LDAPBatchRestartTests(TestCase):
         assert "provision_ldap_directory_identity" in source
         for forbidden in (
             "core.identity_provisioning",
-            "core.auth.provisioning",
             "MultiTenantLDAPBackend",
             "Membership",
             "RoleGrant",

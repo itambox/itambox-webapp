@@ -4,9 +4,6 @@ import pytest
 from django.apps import apps
 from django.contrib.auth.models import Permission
 
-from core.auth.ldap import MultiTenantLDAPBackend
-from core.auth.oidc import TenantOIDCBackend
-from core.auth.saml import TenantSaml2Backend
 from organization.forms import MATRIX_MODELS as PACKAGE_MATRIX_MODELS
 from organization.forms.role_form import MATRIX_MODELS as ROLE_FORM_MATRIX_MODELS
 
@@ -82,8 +79,6 @@ DASHBOARD_PERMISSIONS = frozenset(
     }
 )
 
-OLD_BACKENDS = (MultiTenantLDAPBackend, TenantOIDCBackend, TenantSaml2Backend)
-
 
 def _independent_live_permissions(role_name):
     actions = {
@@ -104,21 +99,38 @@ def _independent_live_permissions(role_name):
 
 
 @pytest.mark.django_db
-def test_current_old_three_backend_methods_match_independent_expected_sets():
-    for role_name, expected_count in (("Admin", 235), ("Manager", 177), ("Member", 177)):
-        expected = _independent_live_permissions(role_name)
-        outputs = {frozenset(object.__new__(backend).get_permissions_for_role(role_name)) for backend in OLD_BACKENDS}
-        assert outputs == {frozenset(expected)}
-        assert len(expected) == expected_count
+def test_all_three_adapters_have_deleted_permission_generation_methods():
+    from core.auth.ldap import MultiTenantLDAPBackend
+    from core.auth.oidc import TenantOIDCBackend
+    from core.auth.saml import TenantSaml2Backend
+
+    for backend in (MultiTenantLDAPBackend, TenantOIDCBackend, TenantSaml2Backend):
+        assert not hasattr(backend, "get_permissions_for_role")
 
 
 @pytest.mark.django_db
-def test_current_old_three_backend_methods_preserve_manager_member_dashboard_shape():
-    manager = {frozenset(object.__new__(backend).get_permissions_for_role("Manager")) for backend in OLD_BACKENDS}
-    member = {frozenset(object.__new__(backend).get_permissions_for_role("Member")) for backend in OLD_BACKENDS}
-    assert manager == member
-    assert len(manager) == 1
-    assert next(iter(manager)).issuperset(DASHBOARD_PERMISSIONS)
+def test_semantic_policy_matches_independent_expected_sets_and_golden_counts():
+    from organization.services.role_permission_policy import permissions_for_sso_role
+
+    for role_name, expected_count in (("Admin", 235), ("Manager", 177), ("Member", 177)):
+        expected = _independent_live_permissions(role_name)
+        actual = set(permissions_for_sso_role(role_name))
+        assert actual == expected
+        assert len(expected) == expected_count
+        assert actual.issuperset(DASHBOARD_PERMISSIONS)
+
+    assert set(permissions_for_sso_role("Manager")) == set(permissions_for_sso_role("Member"))
+
+
+@pytest.mark.django_db
+def test_independent_expected_set_catches_semantic_policy_target_sabotage(monkeypatch):
+    import organization.services.role_permission_policy as policy
+
+    expected = _independent_live_permissions("Admin")
+    sabotaged = tuple(target for target in policy.ROLE_PERMISSION_TARGETS if target.key != "asset")
+    monkeypatch.setattr(policy, "ROLE_PERMISSION_TARGETS", sabotaged)
+
+    assert set(policy.permissions_for_sso_role("Admin")) != expected
 
 
 def test_current_both_matrix_surfaces_are_identical_ordered_59_key_dicts():
@@ -130,18 +142,6 @@ def test_current_both_matrix_surfaces_are_identical_ordered_59_key_dicts():
     assert ROLE_FORM_MATRIX_MODELS == PACKAGE_MATRIX_MODELS
     for value in ROLE_FORM_MATRIX_MODELS.values():
         assert tuple(value) == ("label", "app", "model_name", "group")
-
-
-@pytest.mark.django_db
-def test_new_semantic_policy_matches_all_three_old_methods_before_deletion():
-    from organization.services.role_permission_policy import permissions_for_sso_role
-
-    for role_name in ("Admin", "Manager", "Member"):
-        expected = _independent_live_permissions(role_name)
-        actual = set(permissions_for_sso_role(role_name))
-        assert actual == expected
-        for backend in OLD_BACKENDS:
-            assert actual == set(object.__new__(backend).get_permissions_for_role(role_name))
 
 
 @pytest.mark.django_db

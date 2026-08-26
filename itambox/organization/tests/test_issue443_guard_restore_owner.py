@@ -295,10 +295,10 @@ class GenericRestorePortTests(TestCase):
 
     def test_missing_binding_and_old_import_refusal_are_exact(self):
         script = """
-import django
-django.setup()
+from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
 from core import restore_authority
+assert not apps.ready
 try:
     restore_authority.validate_restore_grant_authority(None, None)
 except ImproperlyConfigured as exc:

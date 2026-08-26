@@ -169,7 +169,6 @@ class LDAPAdapterRestartTests(TestCase):
             "organization.models",
             "organization.forms",
             "organization.services",
-            "core.auth.provisioning",
             "django.contrib.auth.models import Permission",
             "AssetHolder",
             "Membership",

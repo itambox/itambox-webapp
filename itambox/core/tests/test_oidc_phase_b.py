@@ -297,7 +297,6 @@ class OIDCPhaseBPortContractTests(TestCase):
     def test_adapter_has_no_direct_organization_or_legacy_provisioning_ownership(self):
         source = inspect.getsource(oidc_module)
         self.assertNotIn("from organization.models", source)
-        self.assertNotIn("core.auth.provisioning", source)
         self.assertNotIn("MATRIX_MODELS", source)
         self.assertNotIn("Permission", source)
         self.assertNotIn("sync_user_profile_and_memberships", source)

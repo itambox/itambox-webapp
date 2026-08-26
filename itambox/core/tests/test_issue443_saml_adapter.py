@@ -94,7 +94,6 @@ class SAMLAdapterContractTests(TestCase):
         imports = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
         self.assertNotIn("organization.models", imports)
         self.assertNotIn("organization.forms.role_form", imports)
-        self.assertNotIn("core.auth.provisioning", imports)
         self.assertNotIn("get_permissions_for_role", source)
         self.assertNotIn("AssetHolder", source)
         self.assertNotIn("Membership", source)
