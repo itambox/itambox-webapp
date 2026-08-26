@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import get_args
 from unittest import mock
 
+from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from core import identity_provisioning, restore_authority
@@ -110,6 +111,111 @@ else:
 print('identity provisioner provider is not configured')
 print('restore-authority validator provider is not configured')
 print('fresh-missing-port-contract-ok')
+"""
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stdout + result.stderr)
+    return result.stdout
+
+
+def _fresh_identity_default_keeps_restore_missing() -> str:
+    result = _run_fresh_subprocess(
+        """
+from django.core.exceptions import ImproperlyConfigured
+from core import identity_provisioning, restore_authority
+
+class Identity:
+    def provision(self, command):
+        return "identity-default"
+
+identity_provisioning.configure_identity_provisioner(Identity())
+assert identity_provisioning.provision_external_identity(None) == "identity-default"
+try:
+    restore_authority.validate_restore_grant_authority(None, None)
+except ImproperlyConfigured as exc:
+    assert str(exc) == "restore-authority validator provider is not configured", str(exc)
+else:
+    raise AssertionError("restore operation unexpectedly used the identity default")
+
+print("identity-default-keeps-restore-missing")
+"""
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stdout + result.stderr)
+    return result.stdout
+
+
+def _fresh_restore_default_keeps_identity_missing() -> str:
+    result = _run_fresh_subprocess(
+        """
+from django.core.exceptions import ImproperlyConfigured
+from core import identity_provisioning, restore_authority
+
+class Restore:
+    def __init__(self):
+        self.calls = 0
+
+    def validate(self, user, obj):
+        self.calls += 1
+
+restore = Restore()
+restore_authority.configure_restore_authority_validator(restore)
+restore_authority.validate_restore_grant_authority(None, None)
+assert restore.calls == 1
+try:
+    identity_provisioning.provision_external_identity(None)
+except ImproperlyConfigured as exc:
+    assert str(exc) == "identity provisioner provider is not configured", str(exc)
+else:
+    raise AssertionError("identity operation unexpectedly used the restore default")
+
+print("restore-default-keeps-identity-missing")
+"""
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stdout + result.stderr)
+    return result.stdout
+
+
+def _fresh_overrides_are_cross_port_isolated() -> str:
+    result = _run_fresh_subprocess(
+        """
+from django.core.exceptions import ImproperlyConfigured
+from core import identity_provisioning, restore_authority
+
+class Identity:
+    def provision(self, command):
+        return "identity-override"
+
+class Restore:
+    def __init__(self):
+        self.calls = 0
+
+    def validate(self, user, obj):
+        self.calls += 1
+
+identity = Identity()
+restore = Restore()
+with identity_provisioning.override_identity_provisioner(identity):
+    assert identity_provisioning.provision_external_identity(None) == "identity-override"
+    try:
+        restore_authority.validate_restore_grant_authority(None, None)
+    except ImproperlyConfigured as exc:
+        assert str(exc) == "restore-authority validator provider is not configured", str(exc)
+    else:
+        raise AssertionError("restore operation unexpectedly used the identity override")
+
+with restore_authority.override_restore_authority_validator(restore):
+    restore_authority.validate_restore_grant_authority(None, None)
+    assert restore.calls == 1
+    try:
+        identity_provisioning.provision_external_identity(None)
+    except ImproperlyConfigured as exc:
+        assert str(exc) == "identity provisioner provider is not configured", str(exc)
+    else:
+        raise AssertionError("identity operation unexpectedly used the restore override")
+
+print("override-cross-port-isolation-ok")
 """
     )
     if result.returncode != 0:
@@ -223,12 +329,14 @@ print("registration-contract-ok")
 
         with identity_provisioning.override_identity_provisioner(identity_provider):
             self.assertEqual(_identity_operation(), "identity")
-            self.assertIn("restore-authority validator provider is not configured", _fresh_missing_port_errors())
 
         with restore_authority.override_restore_authority_validator(restore_provider):
             restore_authority.validate_restore_grant_authority(user, obj)
             self.assertEqual(restore_provider.calls, [(user, obj)])
-            self.assertIn("identity provisioner provider is not configured", _fresh_missing_port_errors())
+
+        self.assertIn("identity-default-keeps-restore-missing", _fresh_identity_default_keeps_restore_missing())
+        self.assertIn("restore-default-keeps-identity-missing", _fresh_restore_default_keeps_identity_missing())
+        self.assertIn("override-cross-port-isolation-ok", _fresh_overrides_are_cross_port_isolated())
 
         missing = _fresh_missing_port_errors()
         self.assertIn("identity provisioner provider is not configured", missing)

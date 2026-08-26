@@ -224,7 +224,7 @@ UNINVENTORIED_INTERNAL_ENUMS = (
 
 #: ``ITAMBOX_*`` reads are derived from the whole first-party application tree,
 #: not from the settings package alone: the highest-value knobs are read where
-#: they are used (``core/crypto.py``, ``core/auth/provisioning.py``), and a
+#: they are used (``core/crypto.py``, ``organization/services/identity_provisioning.py``), and a
 #: promise that a new name cannot arrive unclassified has to cover those.
 SETTINGS_SCAN_ROOT = "itambox"
 SETTINGS_PACKAGE_PREFIX = "itambox/core/settings/"
