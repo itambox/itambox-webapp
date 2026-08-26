@@ -11,17 +11,8 @@ from django.utils.translation import override
 from django.views.generic import DetailView
 from django_tables2 import RequestConfig
 
-from core.forms import JournalEntryForm
 from core.models import ObjectChange
 from core.tables import BaseTable, ObjectChangeTable
-from extras.customfields import get_custom_fields_display
-from extras.models import (
-    Bookmark,
-    FileAttachment,
-    ImageAttachment,
-    JournalEntry,
-    ObjectWatch,
-)
 from itambox.registry import registry
 from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.authorization import PermissionResolver
@@ -35,8 +26,6 @@ from itambox.views.generic.mixins import (
 from itambox.views.generic.related_objects import RelatedObjectProvider
 from itambox.views.generic.utils import resolve_view_model
 from itambox.views.htmx import BaseHTMXView
-from subscriptions.models import SubscriptionAssignment
-from subscriptions.tables import SubscriptionAssignmentTable
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +121,57 @@ class ObjectDetailView(
             return RelatedObjectProvider(obj, excluded_model_labels=self.related_object_exclusions).build()
         return RelatedObjectProvider(obj).build()
 
+    def _action_url(self, obj, model_name, action, allowed):
+        if not allowed:
+            return None
+        try:
+            return reverse(get_model_viewname(obj, action), kwargs={"pk": obj.pk})
+        except NoReverseMatch:
+            logger.debug("%s URL not resolvable for %s obj=%s", action.title(), model_name, obj.pk)
+            return None
+
+    def _build_mutation_context(self, obj, app_label, model_name):
+        mutation_allowed = user_can_mutate_model(self.request.user, obj.__class__)
+        can_change = mutation_allowed and self.request.user.has_perm(
+            f"{app_label}.change_{model_name}",
+            obj=obj,
+        )
+        can_delete = mutation_allowed and self.request.user.has_perm(
+            f"{app_label}.delete_{model_name}",
+            obj=obj,
+        )
+        can_clone = (
+            mutation_allowed
+            and registry.model_has_feature(obj.__class__, "cloneable")
+            and self.request.user.has_perm(f"{app_label}.add_{model_name}", obj=obj)
+        )
+        return {
+            "can_change": can_change,
+            "can_delete": can_delete,
+            "edit_url": self._action_url(obj, model_name, "update", can_change),
+            "delete_url": self._action_url(obj, model_name, "delete", can_delete),
+            "clone_url": self._action_url(obj, model_name, "clone", can_clone),
+        }
+
+    def _build_changelog_context(self, obj, content_type):
+        context = {}
+        object_change_type_exists = ContentType.objects.filter(app_label="core", model="objectchange").exists()
+        if hasattr(obj, "get_changelog_url") or object_change_type_exists:
+            context["changelog_url"] = (
+                reverse("objectchange_list")
+                + "?"
+                + urlencode({"changed_object_type": content_type.pk, "changed_object_id": obj.pk})
+            )
+        if object_change_type_exists:
+            queryset = ObjectChange.objects.filter(
+                changed_object_type=content_type,
+                changed_object_id=obj.pk,
+            ).order_by("-time")[:50]
+            table = ObjectChangeTable(list(queryset))
+            RequestConfig(self.request, paginate={"per_page": 10}).configure(table)
+            context["changelog_table"] = table
+        return context
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         obj = self.get_object()
@@ -143,43 +183,7 @@ class ObjectDetailView(
         context["layout"] = self.layout
         context.setdefault("capability_notice", capability_notice(obj.__class__))
 
-        mutation_allowed = user_can_mutate_model(self.request.user, obj.__class__)
-        can_change = mutation_allowed and self.request.user.has_perm(
-            f"{app_label}.change_{model_name}",
-            obj=obj,
-        )
-        can_delete = mutation_allowed and self.request.user.has_perm(
-            f"{app_label}.delete_{model_name}",
-            obj=obj,
-        )
-        context["can_change"] = can_change
-        context["can_delete"] = can_delete
-        context["edit_url"] = None
-        if can_change:
-            try:
-                context["edit_url"] = reverse(get_model_viewname(obj, "update"), kwargs={"pk": obj.pk})
-            except NoReverseMatch:
-                logger.debug("Edit URL not resolvable for %s obj=%s", model_name, obj.pk)
-
-        context["delete_url"] = None
-        if can_delete:
-            try:
-                context["delete_url"] = reverse(get_model_viewname(obj, "delete"), kwargs={"pk": obj.pk})
-            except NoReverseMatch:
-                logger.debug("Delete URL not resolvable for %s obj=%s", model_name, obj.pk)
-
-        # Clone is offered generically for any model flagged cloneable (via
-        # CloneableMixin) that has a clone view wired and that the user may add.
-        context["clone_url"] = None
-        if (
-            mutation_allowed
-            and registry.model_has_feature(obj.__class__, "cloneable")
-            and self.request.user.has_perm(f"{app_label}.add_{model_name}", obj=obj)
-        ):
-            try:
-                context["clone_url"] = reverse(get_model_viewname(obj, "clone"), kwargs={"pk": obj.pk})
-            except NoReverseMatch:
-                logger.debug("Clone URL not resolvable for %s obj=%s", model_name, obj.pk)
+        context.update(self._build_mutation_context(obj, app_label, model_name))
 
         context["title"] = str(obj)
         base_breadcrumbs = [
@@ -192,30 +196,7 @@ class ObjectDetailView(
         # A4: resolve ContentType once for this object — it is used by changelog,
         # journaling, image/file attachments, bookmarks, and watches below.
         shared_content_type = ContentType.objects.get_for_model(obj)
-        _obj_ct_exists = ContentType.objects.filter(app_label="core", model="objectchange").exists()
-        if _obj_ct_exists:
-            obj_type = shared_content_type
-        else:
-            obj_type = None
-
-        if hasattr(obj, "get_changelog_url"):
-            context["changelog_url"] = obj.get_changelog_url()
-        elif _obj_ct_exists:
-            changelog_url = (
-                reverse("objectchange_list")
-                + "?"
-                + urlencode({"changed_object_type": obj_type.pk, "changed_object_id": obj.pk})
-            )
-            context["changelog_url"] = changelog_url
-
-        if _obj_ct_exists:
-            changelog_qs = ObjectChange.objects.filter(
-                changed_object_type=obj_type,
-                changed_object_id=obj.pk,
-            ).order_by("-time")[:50]
-            changelog_table = ObjectChangeTable(list(changelog_qs))
-            RequestConfig(self.request, paginate={"per_page": 10}).configure(changelog_table)
-            context["changelog_table"] = changelog_table
+        context.update(self._build_changelog_context(obj, shared_content_type))
 
         context["page_actions"] = {
             "edit_url": context.get("edit_url"),
@@ -227,89 +208,6 @@ class ObjectDetailView(
             "clone": context.get("clone_url"),
         }
         context["content_template_name"] = self.get_template_names()[0]
-
-        if registry.model_has_feature(obj.__class__, "journaling"):
-            if obj_type is None:
-                obj_type = shared_content_type
-            journal_qs = JournalEntry.objects.filter(
-                model=obj_type,
-                object_id=obj.pk,
-            )
-            context["has_journaling"] = True
-            context["journal_app_label"] = app_label
-            context["journal_model_name"] = model_name
-            context["journal_entries"] = journal_qs.select_related("user").order_by("-created")[:50]
-            context["journal_entries_count"] = journal_qs.count()
-            context["journal_form"] = JournalEntryForm()
-
-        context["attachment_app_label"] = app_label
-        context["attachment_model_name"] = model_name
-
-        if registry.model_has_feature(obj.__class__, "custom_field_data"):
-            context["custom_fields_display"] = get_custom_fields_display(obj)
-
-        if registry.model_has_feature(obj.__class__, "image_attachments"):
-            if obj_type is None:
-                obj_type = shared_content_type
-            context["image_attachments"] = ImageAttachment.objects.filter(
-                model=obj_type,
-                object_id=obj.pk,
-            ).order_by("-created")[:20]
-            context["has_image_attachments"] = True
-
-        if registry.model_has_feature(obj.__class__, "file_attachments"):
-            if obj_type is None:
-                obj_type = shared_content_type
-            context["file_attachments"] = FileAttachment.objects.filter(
-                model=obj_type,
-                object_id=obj.pk,
-            ).order_by("-created")[:20]
-            context["has_file_attachments"] = True
-
-        if registry.model_has_feature(obj.__class__, "subscribable"):
-            if obj_type is None:
-                obj_type = shared_content_type
-            context["has_subscriptions"] = True
-            context["subscribable_content_type_id"] = obj_type.pk
-
-            assignments_qs = SubscriptionAssignment.objects.filter(
-                content_type=obj_type,
-                object_id=obj.pk,
-            ).select_related("subscription", "subscription__provider", "assigned_by")
-
-            subs_table = SubscriptionAssignmentTable(assignments_qs, request=self.request)
-            subs_table.exclude = ("content_type", "object_id", "assigned_object")
-            RequestConfig(self.request, paginate=False).configure(subs_table)
-            context["subscription_assignments_table"] = subs_table
-            context["subscription_assignments_count"] = assignments_qs.count()
-
-        if registry.model_has_feature(obj.__class__, "bookmarkable"):
-            if obj_type is None:
-                obj_type = shared_content_type
-            context["is_bookmarkable"] = True
-            context["bookmark_content_type_id"] = obj_type.pk
-            if self.request.user.is_authenticated:
-                context["is_bookmarked"] = Bookmark.objects.filter(
-                    user=self.request.user,
-                    model=obj_type,
-                    object_id=obj.pk,
-                ).exists()
-            else:
-                context["is_bookmarked"] = False
-
-        if registry.model_has_feature(obj.__class__, "watchable"):
-            if obj_type is None:
-                obj_type = shared_content_type
-            context["is_watchable"] = True
-            context["watch_content_type_id"] = obj_type.pk
-            if self.request.user.is_authenticated:
-                context["is_watched"] = ObjectWatch.objects.filter(
-                    user=self.request.user,
-                    model=obj_type,
-                    object_id=obj.pk,
-                ).exists()
-            else:
-                context["is_watched"] = False
 
         if "related_objects_list" not in context and self.disable_related_objects_list:
             context["related_objects_list"] = []

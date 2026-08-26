@@ -270,6 +270,7 @@ class TestListPipeline:
                 filter_list_provider_queryset(resolution, Group.objects.all())
 
 
+@pytest.mark.django_db
 class TestContextCollisionsAndFailures:
     def test_list_context_rejects_a_core_collision(self):
         provider = RecordingProvider(context=lambda _input: {"can_change": False})

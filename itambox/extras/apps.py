@@ -1,7 +1,6 @@
 from django.apps import AppConfig
 
 from core.features import object_enabled_probe, report_designer_probe
-from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
@@ -39,11 +38,12 @@ class ExtrasConfig(AppConfig):
     name = "extras"
 
     def ready(self):
-        # Import search indexes to register them
+        # inline imports: app-registry: extras.search and extras.feature_views register after app population
         import extras.search
+        from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
 
         self._register_capabilities()
-        self._register_generic_presentation()
+        self._register_generic_presentation(EXTRAS_GENERIC_PRESENTATION_PROVIDER)
 
     def _register_capabilities(self):
         """Declare the reporting, alerting, and automation slices.
@@ -59,12 +59,12 @@ class ExtrasConfig(AppConfig):
         """
         capability_registry.register_all(self._capabilities())
 
-    def _register_generic_presentation(self):
+    def _register_generic_presentation(self, provider):
         job_model = self.apps.get_model("core", "Job")
         generic_presentation_registry.register_feature(job_model, "job_file_attachments")
         generic_presentation_registry.register_generic_presentation(
             "extras",
-            EXTRAS_GENERIC_PRESENTATION_PROVIDER,
+            provider,
             detail_features=(
                 "bookmarkable",
                 "custom_field_data",

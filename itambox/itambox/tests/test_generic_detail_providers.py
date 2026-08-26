@@ -179,7 +179,7 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         )
         self.assertEqual(list(assignment_queryset), [self.assignment])
 
-    def test_combined_provider_query_budget_is_nine_queries(self):
+    def test_combined_provider_query_budget_is_ten_queries(self):
         with CaptureQueriesContext(connection) as queries:
             context = build_detail_provider_context(self.request, self.asset, self.content_type)
             list(context["journal_entries"])
@@ -187,7 +187,25 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
             list(context["file_attachments"])
             list(context["subscription_assignments_table"].data.data)
 
-        self.assertEqual(len(queries), 9)
+        self.assertEqual(len(queries), 10)
+
+    def test_extras_provider_query_budget_is_seven_queries(self):
+        with CaptureQueriesContext(connection) as queries:
+            context = EXTRAS_GENERIC_PRESENTATION_PROVIDER.build_detail_context(
+                self.extras_input(
+                    "bookmarkable",
+                    "custom_field_data",
+                    "file_attachments",
+                    "image_attachments",
+                    "journaling",
+                    "watchable",
+                )
+            )
+            list(context["journal_entries"])
+            list(context["image_attachments"])
+            list(context["file_attachments"])
+
+        self.assertEqual(len(queries), 7)
 
     def test_providers_reuse_the_supplied_content_type_without_resolving_another(self):
         with patch.object(
@@ -259,16 +277,18 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
             name="job-output.txt",
         )
 
-        context = EXTRAS_GENERIC_PRESENTATION_PROVIDER.build_detail_context(
-            DetailContextInput(
-                request=self.request,
-                obj=job,
-                content_type=job_content_type,
-                active_features=frozenset({"job_file_attachments"}),
+        with CaptureQueriesContext(connection) as queries:
+            context = EXTRAS_GENERIC_PRESENTATION_PROVIDER.build_detail_context(
+                DetailContextInput(
+                    request=self.request,
+                    obj=job,
+                    content_type=job_content_type,
+                    active_features=frozenset({"job_file_attachments"}),
+                )
             )
-        )
+            self.assertEqual(list(context["attachments"]), [attachment])
 
-        self.assertEqual(list(context["attachments"]), [attachment])
+        self.assertEqual(len(queries), 1)
         self.assertEqual(context["attachment_app_label"], "core")
         self.assertEqual(context["attachment_model_name"], "job")
 
@@ -278,25 +298,24 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         request = RequestFactory().get(f"/groups/{group.pk}/")
         request.user = self.tenant_user
 
-        with patch.object(EXTRAS_GENERIC_PRESENTATION_PROVIDER, "build_detail_context") as extras_detail:
-            context = build_detail_provider_context(
-                request,
-                group,
-                group_content_type,
-                core_context={"title": "Group"},
-            )
+        with (
+            CaptureQueriesContext(connection) as queries,
+            patch.object(EXTRAS_GENERIC_PRESENTATION_PROVIDER, "build_detail_context") as extras_detail,
+        ):
+            context = build_detail_provider_context(request, group, group_content_type, core_context={"title": "Group"})
 
         extras_detail.assert_not_called()
+        self.assertEqual(len(queries), 0)
         self.assertEqual(context, {"title": "Group"})
 
 
 class MovedFeatureRouteOwnershipTests(SimpleTestCase):
     def test_every_moved_route_resolves_to_its_concrete_extras_owner(self):
         cases = {
-            reverse("journalentry_list"): "extras.feature_views",
+            reverse("journalentry_list"): "extras.attachment_views",
             reverse(
                 "journal_entry_add", kwargs={"app_label": "assets", "model_name": "asset", "object_id": 1}
-            ): "extras.feature_views",
+            ): "extras.attachment_views",
             reverse(
                 "object_export",
                 kwargs={"app_label": "assets", "model_name": "asset", "template_id": 0},

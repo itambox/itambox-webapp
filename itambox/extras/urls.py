@@ -1,10 +1,7 @@
 from django.urls import include, path
 
-from itambox.views.features import (
-    EventRuleDeleteView,
-    EventRuleDetailView,
-    EventRuleEditView,
-    EventRuleListView,
+from extras.event_rule_views import EventRuleDeleteView, EventRuleDetailView, EventRuleEditView, EventRuleListView
+from extras.export_views import (
     ExportTemplateDeleteView,
     ExportTemplateDetailView,
     ExportTemplateEditView,
@@ -13,6 +10,8 @@ from itambox.views.features import (
     LabelTemplateDetailView,
     LabelTemplateEditView,
     LabelTemplateListView,
+)
+from extras.webhook_views import (
     WebhookDeliveryRedeliverView,
     WebhookEndpointDeleteView,
     WebhookEndpointDetailView,

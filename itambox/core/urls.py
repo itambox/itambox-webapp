@@ -26,15 +26,14 @@ from django.urls import include, path
 from django.views.decorators.cache import never_cache
 from django.views.generic import RedirectView, TemplateView
 from django.views.i18n import JavaScriptCatalog
+from users.table_config_views import table_config
 
 from assets import views as asset_views  # Import the assets views
 from assets.views_scan import ScanResolveView
 from core.schema import schema
 from core.views.auth import ITAMboxLoginView, TenantSamlAcsView, TenantSamlLoginView
 from core.views.graphql import PrivateGraphQLView
-from extras.dashboard import views as dashboard_views
-from itambox.plugins.utils import is_plugin_active, record_plugin_failure
-from itambox.views.features import (
+from extras.attachment_views import (
     FileAttachmentDeleteView,
     FileAttachmentDownloadView,
     FileAttachmentUploadView,
@@ -43,12 +42,11 @@ from itambox.views.features import (
     ImageAttachmentUploadView,
     JournalEntryCreateView,
     JournalEntryListView,
-    LabelPrintView,
-    LabelSelectView,
-    ObjectChangeListView,
-    ObjectChangeView,
-    ObjectExportView,
 )
+from extras.dashboard import views as dashboard_views
+from extras.export_views import LabelPrintView, LabelSelectView, ObjectExportView
+from itambox.plugins.utils import is_plugin_active, record_plugin_failure
+from itambox.views.features import ObjectChangeListView, ObjectChangeView
 from itambox.views.generic import (
     GenericObjectImportView,
     ObjectBulkDeleteView,

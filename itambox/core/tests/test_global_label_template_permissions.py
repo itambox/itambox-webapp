@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
+
 from extras.export_views import LabelTemplateDeleteView, LabelTemplateEditView
 
 

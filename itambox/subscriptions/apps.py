@@ -13,7 +13,6 @@ from itambox.capabilities import (
     registry as capability_registry,
 )
 from itambox.registry import registry as generic_presentation_registry
-from subscriptions.feature_views import SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER
 
 
 class SubscriptionsConfig(AppConfig):
@@ -22,23 +21,23 @@ class SubscriptionsConfig(AppConfig):
     verbose_name = "Subscriptions"
 
     def ready(self):
-        import subscriptions.signals  # noqa
-        import subscriptions.search  # noqa
-
-        # inline import: app-registry: curated import forms load only after the app registry is ready.
+        # inline imports: app-registry: subscription forms, signals, search, and provider load after app population
         import subscriptions.forms  # noqa: F401 -- side-effect import registers curated import forms
+        import subscriptions.search  # noqa
+        import subscriptions.signals  # noqa
+        from subscriptions.feature_views import SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER
 
         self._register_capabilities()
-        self._register_generic_presentation()
+        self._register_generic_presentation(SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER)
         post_migrate.connect(self._register_subscription_tasks, sender=self)
 
     def _register_capabilities(self):
         capability_registry.register_all(self._capabilities())
 
-    def _register_generic_presentation(self):
+    def _register_generic_presentation(self, provider):
         generic_presentation_registry.register_generic_presentation(
             "subscriptions",
-            SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER,
+            provider,
             detail_features=("subscribable",),
             list_params=False,
             list_filter=False,
