@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
+import re
+from collections import Counter
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -12,6 +15,7 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from core import identity_provisioning, tenant_scope
+from core.auth import PasswordLoginOnlyBackend
 from core.auth import ldap as ldap_module
 from core.context import (
     get_current_all_accessible,
@@ -28,6 +32,41 @@ from organization.models import AssetHolder, Membership, RoleGrant, RoleGrantSco
 from organization.services.identity_provisioning import organization_identity_provisioner
 
 User = get_user_model()
+
+INTERACTIVE_ADAPTER_QUERY_CEILING = 60
+_QUERY_TABLE_REFERENCE = re.compile(
+    r"\b(?:FROM|JOIN|UPDATE|INTO)\s+(?:ONLY\s+)?([\"`]?[^\s,()]+[\"`]?)",
+    re.IGNORECASE,
+)
+
+
+def _query_evidence(queries):
+    table_counts = Counter()
+    verb_table_sequence = []
+    for query in queries:
+        normalized_sql = " ".join(query["sql"].split())
+        verb_match = re.search(r"\b(SELECT|INSERT|UPDATE|DELETE)\b", normalized_sql, re.IGNORECASE)
+        verb = verb_match.group(1).upper() if verb_match else "OTHER"
+        tables = tuple(table.strip('"`').lower() for table in _QUERY_TABLE_REFERENCE.findall(normalized_sql))
+        verb_table_sequence.append((verb, tables))
+        for table in tables:
+            table_counts[f"{verb}:{table}"] += 1
+
+    sequence = tuple(verb_table_sequence)
+    return {
+        "query_count": len(queries),
+        "table_count_signature": tuple(sorted(table_counts.items())),
+        "verb_table_sequence_hash": hashlib.sha256(repr(sequence).encode("utf-8")).hexdigest(),
+    }
+
+
+class _CapturingIdentityProvisioner:
+    def __init__(self):
+        self.commands = []
+
+    def provision(self, command):
+        self.commands.append(command)
+        return identity_provisioning.ExternalIdentityProvisioningResult(mode="customer")
 
 
 class _LDAPUserProxy:
@@ -91,7 +130,7 @@ class LDAPAdapterRestartTests(TestCase):
             get_current_all_accessible(),
         )
 
-    def _authenticate(self, *, user=None, username=None, config=None, groups=None, attrs=None):
+    def _authenticate(self, *, user=None, username=None, config=None, groups=None, attrs=None, group_error=None):
         user = user or self.user
         user.ldap_user = _LDAPUserProxy(
             attrs
@@ -102,6 +141,7 @@ class LDAPAdapterRestartTests(TestCase):
                 "sn": [b"User"],
             },
             groups=groups,
+            group_error=group_error,
         )
         backend = ldap_module.MultiTenantLDAPBackend()
         username = username or user.username
@@ -221,6 +261,42 @@ class LDAPAdapterRestartTests(TestCase):
         assert not hasattr(command, "settings")
         assert not hasattr(command, "credentials")
         assert not hasattr(command, "claims")
+
+    def test_public_authenticate_uses_group_dns_fallback_and_normalizes_proxy_bytes(self):
+        set_current_tenant(self.tenant)
+        provider = _CapturingIdentityProvisioner()
+        group_error = RuntimeError("provider group details")
+        mapping = {"directory-fallback-admin": "Admin"}
+
+        with (
+            identity_provisioning.override_identity_provisioner(provider),
+            override_settings(
+                ITAMBOX_TENANT_LDAP_CONFIGS=self._config(self.tenant, mapping=mapping),
+                AUTH_LDAP_USER_SEARCH=None,
+                AUTH_LDAP_USER_DN_TEMPLATE=None,
+            ),
+        ):
+            result = self._authenticate(
+                config=self._config(self.tenant, mapping=mapping),
+                groups=[b"directory-fallback-admin"],
+                group_error=group_error,
+                attrs={
+                    "userPrincipalName": [b"directory-fallback@adapter.invalid"],
+                    "mail": [b"directory-fallback@example.invalid"],
+                    "givenName": [b"Fallback"],
+                    "sn": [b"User"],
+                },
+            )[2]
+
+        assert result is self.user
+        assert len(provider.commands) == 1
+        command = provider.commands[0]
+        assert command.profile.email == "directory-fallback@example.invalid"
+        assert command.profile.upn == "directory-fallback@adapter.invalid"
+        assert command.profile.first_name == "Fallback"
+        assert command.profile.last_name == "User"
+        assert command.customer_role_name == "Admin"
+        assert self._context_values() == (self.tenant, None, None, False)
 
     def test_role_mapping_falls_back_to_member_without_matching_group(self):
         set_current_tenant(self.tenant)
@@ -487,8 +563,10 @@ class LDAPAdapterRestartTests(TestCase):
 
     def test_interactive_query_ceiling_does_not_scale_with_group_count(self):
         set_current_tenant(self.tenant)
+        warmup_user = User.objects.create_user(username="query-warmup")
         short_user = User.objects.create_user(username="query-short")
         many_user = User.objects.create_user(username="query-many")
+        warmup_user.ldap_user = _LDAPUserProxy({"mail": [b"query-warmup@example.invalid"]}, [b"warmup"])
         short_user.ldap_user = _LDAPUserProxy({"mail": [b"query-short@example.invalid"]}, [b"g0"])
         many_user.ldap_user = _LDAPUserProxy(
             {"mail": [b"query-many@example.invalid"]},
@@ -497,13 +575,18 @@ class LDAPAdapterRestartTests(TestCase):
         config = self._config(self.tenant)
         with (
             identity_provisioning.override_identity_provisioner(organization_identity_provisioner),
-            patch.object(ldap_module.LDAPBackend, "authenticate", side_effect=[short_user, many_user]),
+            patch.object(ldap_module.LDAPBackend, "authenticate", side_effect=[warmup_user, short_user, many_user]),
             override_settings(
                 ITAMBOX_TENANT_LDAP_CONFIGS=config,
                 AUTH_LDAP_USER_SEARCH=None,
                 AUTH_LDAP_USER_DN_TEMPLATE=None,
             ),
         ):
+            ldap_module.MultiTenantLDAPBackend().authenticate(
+                request=None,
+                username=warmup_user.username,
+                password="directory-password",
+            )
             with CaptureQueriesContext(connection) as short_queries:
                 ldap_module.MultiTenantLDAPBackend().authenticate(
                     request=None,
@@ -517,9 +600,15 @@ class LDAPAdapterRestartTests(TestCase):
                     password="directory-password",
                 )
 
-        assert len(short_queries) <= 60
-        assert len(many_queries) <= 60
-        assert len(many_queries) <= len(short_queries) + 2
+        # CaptureQueriesContext measures application PostgreSQL queries only;
+        # it does not measure or imply anything about external LDAP traffic.
+        short_evidence = _query_evidence(short_queries)
+        many_evidence = _query_evidence(many_queries)
+        assert short_evidence["query_count"] <= INTERACTIVE_ADAPTER_QUERY_CEILING
+        assert many_evidence["query_count"] <= INTERACTIVE_ADAPTER_QUERY_CEILING
+        assert many_evidence["query_count"] == short_evidence["query_count"]
+        assert many_evidence["table_count_signature"] == short_evidence["table_count_signature"]
+        assert many_evidence["verb_table_sequence_hash"] == short_evidence["verb_table_sequence_hash"]
 
         local_user = User.objects.create_user(
             username="local@chain-tenant.example",
@@ -556,3 +645,120 @@ class LDAPAdapterRestartTests(TestCase):
         assert get_current_all_accessible() is False
         parent_authenticate.assert_not_called()
         provision.assert_not_called()
+
+    def test_full_chain_none_restores_context_before_real_password_backend(self):
+        local_user = User.objects.create_user(username="user@acme", password="local-password")
+        acme = Tenant.objects.create(name="Acme", slug="acme")
+        prior_membership = SimpleNamespace(pk=1001)
+        prior_group = SimpleNamespace(pk=1002)
+        set_current_tenant(None)
+        set_current_membership(prior_membership)
+        set_current_tenant_group(prior_group)
+        set_current_all_accessible(True)
+        expected_context = (None, prior_membership, prior_group, True)
+        parent_context = []
+        password_context = []
+
+        def parent_authenticate(*args, **kwargs):
+            del args, kwargs
+            parent_context.append((get_current_tenant().pk, prior_membership, prior_group, True))
+            local_user.ldap_user = _LDAPUserProxy({"mail": [b"user@acme"]})
+            return None
+
+        real_password_authenticate = PasswordLoginOnlyBackend.authenticate
+
+        def password_authenticate(password_backend, request, username=None, password=None, **kwargs):
+            password_context.append(self._context_values())
+            return real_password_authenticate(
+                password_backend,
+                request,
+                username=username,
+                password=password,
+                **kwargs,
+            )
+
+        port_module = getattr(ldap_module, "identity_provisioning", identity_provisioning)
+        with (
+            patch.object(ldap_module, "django_auth_ldap_installed", True),
+            patch.object(
+                ldap_module.LDAPBackend, "authenticate", side_effect=parent_authenticate
+            ) as parent_authenticate_mock,
+            patch.object(
+                PasswordLoginOnlyBackend,
+                "authenticate",
+                autospec=True,
+                side_effect=password_authenticate,
+            ) as password_authenticate_mock,
+            patch.object(port_module, "provision_external_identity") as provision,
+            override_settings(
+                AUTHENTICATION_BACKENDS=[
+                    "core.auth.ldap.MultiTenantLDAPBackend",
+                    "core.auth.PasswordLoginOnlyBackend",
+                ],
+                ITAMBOX_TENANT_LDAP_CONFIGS=self._config(acme),
+                AUTH_LDAP_USER_SEARCH=None,
+                AUTH_LDAP_USER_DN_TEMPLATE=None,
+            ),
+        ):
+            result = django_authenticate(request=None, username=local_user.username, password="local-password")
+
+        assert result.pk == local_user.pk
+        assert parent_authenticate_mock.call_count == 1
+        assert parent_context == [(acme.pk, prior_membership, prior_group, True)]
+        assert password_authenticate_mock.call_count == 1
+        assert password_context == [expected_context]
+        assert self._context_values() == expected_context
+        provision.assert_not_called()
+
+    def test_full_chain_provider_error_is_typed_restored_and_local_password_still_works(self):
+        local_user = User.objects.create_user(username="error@acme", password="local-password")
+        acme = Tenant.objects.create(name="Acme error", slug="acme")
+        prior_membership = SimpleNamespace(pk=1011)
+        prior_group = SimpleNamespace(pk=1012)
+        set_current_tenant(None)
+        set_current_membership(prior_membership)
+        set_current_tenant_group(prior_group)
+        set_current_all_accessible(True)
+        expected_context = (None, prior_membership, prior_group, True)
+        provider_error = ldap_module.ldap.SERVER_DOWN("provider-secret")
+
+        def parent_authenticate(*args, **kwargs):
+            del args, kwargs
+            assert get_current_tenant().pk == acme.pk
+            local_user.ldap_user = _LDAPUserProxy({"mail": [b"error@acme"]})
+            raise provider_error
+
+        port_module = getattr(ldap_module, "identity_provisioning", identity_provisioning)
+        with (
+            patch.object(ldap_module, "django_auth_ldap_installed", True),
+            patch.object(
+                ldap_module.LDAPBackend, "authenticate", side_effect=parent_authenticate
+            ) as parent_authenticate_mock,
+            patch.object(port_module, "provision_external_identity") as provision,
+            override_settings(
+                ITAMBOX_TENANT_LDAP_CONFIGS=self._config(acme),
+                AUTH_LDAP_USER_SEARCH=None,
+                AUTH_LDAP_USER_DN_TEMPLATE=None,
+            ),
+            self.assertRaises(ldap_module.LDAPUnavailableError) as raised,
+        ):
+            ldap_module.MultiTenantLDAPBackend().authenticate(
+                request=None,
+                username=local_user.username,
+                password="local-password",
+            )
+
+        assert parent_authenticate_mock.call_count == 1
+        assert isinstance(raised.exception, ldap_module.LDAPUnavailableError)
+        assert raised.exception.cause_type == type(provider_error).__name__
+        assert "provider-secret" not in str(raised.exception)
+        assert self._context_values() == expected_context
+        provision.assert_not_called()
+
+        result = PasswordLoginOnlyBackend().authenticate(
+            request=None,
+            username=local_user.username,
+            password="local-password",
+        )
+        assert result.pk == local_user.pk
+        assert self._context_values() == expected_context

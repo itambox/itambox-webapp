@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
+import re
+from collections import Counter
 from datetime import timedelta
 from io import StringIO
 from types import SimpleNamespace
@@ -27,6 +30,32 @@ from core.management.commands import sync_tenant_ldap as command_module
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services import identity_provisioning as organization_identity
 from users.models import User
+
+BATCH_ADAPTER_QUERY_CEILING = 80
+_QUERY_TABLE_REFERENCE = re.compile(
+    r"\b(?:FROM|JOIN|UPDATE|INTO)\s+(?:ONLY\s+)?([\"`]?[^\s,()]+[\"`]?)",
+    re.IGNORECASE,
+)
+
+
+def _query_evidence(queries):
+    table_counts = Counter()
+    verb_table_sequence = []
+    for query in queries:
+        normalized_sql = " ".join(query["sql"].split())
+        verb_match = re.search(r"\b(SELECT|INSERT|UPDATE|DELETE)\b", normalized_sql, re.IGNORECASE)
+        verb = verb_match.group(1).upper() if verb_match else "OTHER"
+        tables = tuple(table.strip('"`').lower() for table in _QUERY_TABLE_REFERENCE.findall(normalized_sql))
+        verb_table_sequence.append((verb, tables))
+        for table in tables:
+            table_counts[f"{verb}:{table}"] += 1
+
+    sequence = tuple(verb_table_sequence)
+    return {
+        "query_count": len(queries),
+        "table_count_signature": tuple(sorted(table_counts.items())),
+        "verb_table_sequence_hash": hashlib.sha256(repr(sequence).encode("utf-8")).hexdigest(),
+    }
 
 
 class _FakeLDAPConnection:
@@ -282,14 +311,21 @@ class LDAPBatchRestartTests(TestCase):
             username="batch-query-many",
             groups=[f"g{index}" for index in range(40)],
         )
+        self._run(username="batch-query-warmup")
         with CaptureQueriesContext(connection) as short_queries:
             self._run(connection=short_connection, username="batch-query-short")
         with CaptureQueriesContext(connection) as many_queries:
             self._run(connection=many_connection, username="batch-query-many")
 
-        assert len(short_queries) <= 80
-        assert len(many_queries) <= 80
-        assert len(many_queries) <= len(short_queries) + 2
+        # CaptureQueriesContext measures application PostgreSQL queries only;
+        # it does not measure or imply anything about external LDAP traffic.
+        short_evidence = _query_evidence(short_queries)
+        many_evidence = _query_evidence(many_queries)
+        assert short_evidence["query_count"] <= BATCH_ADAPTER_QUERY_CEILING
+        assert many_evidence["query_count"] <= BATCH_ADAPTER_QUERY_CEILING
+        assert many_evidence["query_count"] == short_evidence["query_count"]
+        assert many_evidence["table_count_signature"] == short_evidence["table_count_signature"]
+        assert many_evidence["verb_table_sequence_hash"] == short_evidence["verb_table_sequence_hash"]
 
     def test_task_context_restores_prior_context_when_service_fails(self):
         prior_tenant = SimpleNamespace(pk=1201)
