@@ -11,10 +11,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.generic import View
 
-from core.auth.guards import (
-    validate_group_membership_grant,
-    validate_role_reactivation_grants,
-)
+from core import restore_authority
 from core.purge_handlers import purge_object
 from itambox.utils import get_model_viewname
 from itambox.views.generic.htmx_responses import is_htmx_request, success_response
@@ -25,14 +22,6 @@ from itambox.views.generic.mixins import (
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
-
-
-def _validate_restore_grant_authority(user, obj):
-    """Reject restores that would reactivate grants the actor could not create."""
-    if obj._meta.label_lower == "organization.role":
-        validate_role_reactivation_grants(user, obj)
-    elif obj._meta.label_lower == "users.usergroup" and obj.is_active:
-        validate_group_membership_grant(user, obj)
 
 
 class HtmxActionMixin:
@@ -74,7 +63,7 @@ class ObjectRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredM
     def post(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
-                _validate_restore_grant_authority(request.user, self.object)
+                restore_authority.validate_restore_grant_authority(request.user, self.object)
                 self.object.restore()
         except ValidationError as exc:
             logger.warning(
@@ -173,7 +162,7 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
         with transaction.atomic():
             for obj in rows:
                 try:
-                    _validate_restore_grant_authority(request.user, obj)
+                    restore_authority.validate_restore_grant_authority(request.user, obj)
                 except ValidationError as exc:
                     unsafe_skipped += 1
                     logger.warning(

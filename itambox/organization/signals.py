@@ -63,7 +63,7 @@ def _role_grant_id_user_ids(grant_ids):
 @receiver(post_save, sender=Membership)
 def bind_asset_holder_on_membership(sender, instance, created, **kwargs):
     """Bind an unclaimed tenant AssetHolder with the joining user's email."""
-    if not created:
+    if not created or getattr(instance, "_skip_asset_holder_autolink", False):
         return
     email = (instance.user.email or "").strip()
     if not email:

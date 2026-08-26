@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 from django.core.exceptions import SuspiciousOperation
 from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 
+from core import identity_provisioning
 from core.auth.oidc import (
     OIDCIdentityBindingRequiredError,
     OIDCIdentityProvisioningError,
@@ -13,6 +14,7 @@ from core.managers import set_current_tenant
 from core.models import ObjectChange
 from extras.models import Event
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 from users.models import OIDCIdentity, User
 
 ISSUER = "https://idp.example/issuer"
@@ -49,7 +51,8 @@ class TenantOIDCIdentityLifecycleTests(TestCase):
                 return_value=True,
             ),
         ):
-            return self.backend.get_or_create_user("access-token", "id-token", payload)
+            with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                return self.backend.get_or_create_user("access-token", "id-token", payload)
 
     def test_existing_binding_is_authority_after_email_and_username_change(self):
         user = User.objects.create_user(username="old-display", email="old@example.test")
@@ -190,8 +193,8 @@ class TenantOIDCIdentityLifecycleTests(TestCase):
         payload = {"iss": ISSUER, "sub": "retry-subject"}
         with (
             patch.object(
-                self.backend,
-                "sync_user_profile_and_memberships",
+                identity_provisioning,
+                "provision_external_identity",
                 side_effect=RuntimeError("raw organization failure should not leak"),
             ),
             patch.object(self.backend, "get_userinfo", return_value={"email": "retry@example.test"}),
@@ -295,11 +298,12 @@ class TenantOIDCProviderCompatibilityTests(TestCase):
                     return_value=True,
                 ),
             ):
-                user = backend.get_or_create_user(
-                    "access-token",
-                    "id-token",
-                    {"iss": ISSUER, "sub": "provider-staff-subject"},
-                )
+                with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                    user = backend.get_or_create_user(
+                        "access-token",
+                        "id-token",
+                        {"iss": ISSUER, "sub": "provider-staff-subject"},
+                    )
 
         self.assertIsNotNone(user)
         self.assertTrue(OIDCIdentity.objects.filter(user=user).exists())
@@ -344,8 +348,8 @@ class OIDCIdentityLogContractTests(TransactionTestCase):
                     return_value=True,
                 ),
                 patch.object(
-                    backend,
-                    "sync_user_profile_and_memberships",
+                    identity_provisioning,
+                    "provision_external_identity",
                     side_effect=RuntimeError("raw organization failure"),
                 ),
             ):

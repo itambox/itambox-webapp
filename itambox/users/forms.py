@@ -11,6 +11,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from organization.services.role_grant_validation import validate_role_grant
+
 # Import UserPreference from this app's models
 from .models import UserPreference
 from .services import DEFAULT_WORKSPACE_KEY, workspace_choices
@@ -495,7 +497,6 @@ class UserBulkEditForm(BulkEditForm):
 # provider-owned groups may be projected into managed tenants through RoleGrant scopes.
 from django.db import transaction
 
-from core.auth.guards import validate_role_grant
 from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
 from organization.models import (
     Membership,

@@ -17,7 +17,7 @@ from django.conf import settings
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import urlencode
 
-from organization.models import Tenant
+from core import tenant_scope
 
 SAML = "SAML"
 OIDC = "OIDC"
@@ -49,8 +49,9 @@ def get_login_providers(next_url=""):
     saml_configs = _config_mapping("ITAMBOX_TENANT_SAML_CONFIGS")
     oidc_configs = _config_mapping("ITAMBOX_TENANT_OIDC_CONFIGS")
 
-    tenants = _tenants_by_slug(set(saml_configs) | set(oidc_configs))
-    default_saml_tenant = _default_saml_tenant(saml_configs)
+    tenant_model = tenant_scope.tenant_model()
+    tenants = _tenants_by_slug(tenant_model, set(saml_configs) | set(oidc_configs))
+    default_saml_tenant = _default_saml_tenant(tenant_model, saml_configs)
     if default_saml_tenant is not None:
         tenants[default_saml_tenant.slug] = default_saml_tenant
 
@@ -89,7 +90,7 @@ def _config_mapping(setting_name):
     return {key: value for key, value in configs.items() if isinstance(key, str)}
 
 
-def _tenants_by_slug(slugs):
+def _tenants_by_slug(tenant_model, slugs):
     """Resolve live tenants for the configured slugs.
 
     ``_base_manager``: the login page is anonymous, so no tenant scope is
@@ -97,21 +98,21 @@ def _tenants_by_slug(slugs):
     """
     if not slugs:
         return {}
-    tenants = Tenant._base_manager.filter(slug__in=slugs, deleted_at__isnull=True)
+    tenants = tenant_model._base_manager.filter(slug__in=slugs, deleted_at__isnull=True)
     return {tenant.slug: tenant for tenant in tenants}
 
 
-def _sole_live_tenant():
+def _sole_live_tenant(tenant_model):
     """Return the sole live tenant, or ``None`` when global SAML is ambiguous."""
-    tenants = list(Tenant._base_manager.filter(deleted_at__isnull=True).order_by("pk")[:2])
+    tenants = list(tenant_model._base_manager.filter(deleted_at__isnull=True).order_by("pk")[:2])
     return tenants[0] if len(tenants) == 1 else None
 
 
-def _default_saml_tenant(saml_configs):
+def _default_saml_tenant(tenant_model, saml_configs):
     """Resolve an unambiguous tenant for a deployment-wide SAML config."""
     if DEFAULT_KEY not in saml_configs:
         return None
-    tenant = _sole_live_tenant()
+    tenant = _sole_live_tenant(tenant_model)
     if tenant is None or tenant.slug in saml_configs:
         return None
     return tenant

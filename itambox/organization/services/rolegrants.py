@@ -25,7 +25,6 @@ from django.db.models import Q, QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.auth.guards import validate_group_membership_grant, validate_role_grant
 from core.mfa import role_is_privileged
 from core.tenant_scope import get_descendant_tenant_group_ids
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
@@ -37,13 +36,14 @@ from organization.services.errors import (
     MembershipServiceError,
     ServiceError,
 )
+from organization.services.role_grant_validation import validate_group_membership_grant, validate_role_grant
 
 ManagedScope = Literal["explicit", "tenant_group", "all_managed"]
 GrantAction = Literal["created", "updated", "revoked", "unchanged"]
 
 #: Wire value accepted for a managed row covering named tenants. ``explicit`` is
 #: the UI's value for "specific tenants"; it maps to ``RoleGrantScope
-#: .SCOPE_TENANT`` children. ``core.auth.guards.validate_role_grant`` treats
+#: .SCOPE_TENANT`` children. ``organization.services.role_grant_validation.validate_role_grant`` treats
 #: "explicit" and "tenant" identically (neither is in its dynamic-scope tuple),
 #: so normalising on it is behaviour-preserving.
 SCOPE_EXPLICIT: ManagedScope = "explicit"
@@ -300,7 +300,7 @@ def _group_expansion(principal_tenant: Tenant, group: TenantGroup) -> set:
 
 
 def requested_tenant_ids_for(principal_tenant: Tenant, spec: ManagedGrantSpec) -> set[int] | None:
-    """The coverage ``core.auth.guards.validate_role_grant`` should reason about.
+    """The coverage ``organization.services.role_grant_validation.validate_role_grant`` should reason about.
 
     ``None`` for the dynamic scopes, which the guard resolves from the actor's
     own all-managed authority rather than from a concrete tenant list.
@@ -475,7 +475,7 @@ def _validate_elevated_metadata(rejections, plan, existing_own_role_ids):
 
 
 def _validate_escalation(rejections, actor, principal_tenant, plan):
-    """Step 5 / A4-A8 — ``core.auth.guards`` owns the decision; this only routes
+    """Step 5 / A4-A8 — ``organization.services.role_grant_validation`` owns the decision; this only routes
     each message to the field or row it belongs on."""
     for spec in plan.own:
         try:
@@ -544,7 +544,7 @@ def validate_grant_plan(
          ``organization.access.get_descendant_tenant_group_ids``, and the
          managed shape mirrors ``RoleGrantScope.clean``.
       4. INV-5 elevated metadata, own/managed asymmetry preserved exactly.
-      5. ``core.auth.guards.validate_role_grant`` per own role and managed row.
+      5. ``organization.services.role_grant_validation.validate_role_grant`` per own role and managed row.
       6. INV-14 ``validate_group_membership_grant`` per retained live group.
 
     Steps 1-3 are data-integrity rules and halt before the actor-relative

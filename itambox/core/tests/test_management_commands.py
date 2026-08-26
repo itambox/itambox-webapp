@@ -230,7 +230,7 @@ class SyncTenantLDAPDependencyTest(SimpleTestCase):
             CommandError,
             "locked Linux/WSL or Docker environment",
         ):
-            command._run_sync(SimpleNamespace(slug="test", name="Test"))
+            command._run_sync(SimpleNamespace(pk=1, slug="test", name="Test"))
 
         self.assertNotIn("Connecting to LDAP server", stdout.getvalue())
         mock_ldap_init.assert_not_called()

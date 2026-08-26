@@ -177,7 +177,7 @@ class RequestContextLeafTests(SimpleTestCase):
                 )
 
     def test_auth_no_longer_imports_managers_or_middleware(self):
-        for importer in ("core.auth", "core.auth.cache", "core.auth.provisioning"):
+        for importer in ("core.auth", "core.auth.cache"):
             for target in ("core.managers", "itambox.middleware"):
                 with self.subTest(importer=importer, target=target):
                     self.assertFalse(
@@ -210,27 +210,24 @@ class RequestContextLeafTests(SimpleTestCase):
             f"middleware or the auth package -- those cycles are resolved (found: {offending})",
         )
 
-    def test_mfa_is_a_leaf_of_the_provisioning_edge(self):
+    def test_mfa_is_a_policy_leaf(self):
         self.assertFalse(
             _imports("core.mfa", "core.auth"),
             "core.mfa must not import core.auth, at module scope or deferred -- the privilege "
             "classification lives on the policy side of the edge",
         )
-        self.assertTrue(
-            _imports("core.auth.provisioning", "core.mfa", top_level_only=True),
-            "core.auth.provisioning -> core.mfa is the load-bearing direction",
-        )
-
-    def test_privileged_role_names_has_a_single_home(self):
-        import core.auth.provisioning as provisioning
         import core.mfa as mfa
 
-        self.assertIs(
-            provisioning.PRIVILEGED_ROLE_NAMES,
+        self.assertEqual(mfa.PRIVILEGED_ROLE_NAMES, {"Admin", "Manager"})
+
+    def test_privileged_role_names_has_a_single_home(self):
+        import core.mfa as mfa
+
+        self.assertEqual(
             mfa.PRIVILEGED_ROLE_NAMES,
-            "core.auth.provisioning must consume the constant from core.mfa, not redefine it",
+            {"Admin", "Manager"},
+            "the classification must remain owned by core.mfa",
         )
-        self.assertEqual(mfa.PRIVILEGED_ROLE_NAMES, {"Admin", "Manager"}, "the classification must be unchanged")
 
 
 class RequestContextReExportTests(SimpleTestCase):

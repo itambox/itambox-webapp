@@ -8,12 +8,14 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import ProtectedError
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetRequest, AssetType, StatusLabel
 from compliance.models import CustodyReceipt
+from core import identity_provisioning
+from core.auth import ldap as ldap_module
 from core.auth.ldap import MultiTenantLDAPBackend
 from core.auth.saml import TenantSaml2Backend
 from core.managers import set_current_tenant
@@ -21,6 +23,7 @@ from core.tests.mixins import grant
 from core.validators import validate_file_attachment, validate_image_attachment
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, Location, Membership, Role, Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 
 User = get_user_model()
 
@@ -214,13 +217,36 @@ class MitigationsPhase4Tests(TestCase):
 
         ldap_user.ldap_user = MockLDAPUser()
 
-        # Setup settings for group mapping
-        from django.test import override_settings
+        # Exercise the real public backend path with a deterministic parent
+        # result; no external LDAP connection is made by this test.
+        ldap_configs = {
+            self.tenant.slug: {
+                "USER_SEARCH": {
+                    "base_dn": "ou=users,dc=example,dc=test",
+                    "filter": "(uid=%(user)s)",
+                },
+                "LDAP_GROUP_ROLE_MAPPING": {"AdminLDAPGroup": "admin"},
+            }
+        }
 
-        ldap_configs = {self.tenant.slug: {"LDAP_GROUP_ROLE_MAPPING": {"AdminLDAPGroup": "admin"}}}
+        with (
+            identity_provisioning.override_identity_provisioner(organization_identity_provisioner),
+            patch.object(ldap_module, "django_auth_ldap_installed", True),
+            patch.object(ldap_module.LDAPBackend, "authenticate", return_value=ldap_user) as parent_authenticate,
+            override_settings(
+                ITAMBOX_TENANT_LDAP_CONFIGS=ldap_configs,
+                AUTH_LDAP_USER_SEARCH=None,
+                AUTH_LDAP_USER_DN_TEMPLATE=None,
+            ),
+        ):
+            result = backend.authenticate(
+                request=None,
+                username=ldap_user.username,
+                password="directory-password",
+            )
 
-        with override_settings(ITAMBOX_TENANT_LDAP_CONFIGS=ldap_configs):
-            backend.sync_ldap_user_profile_and_memberships(ldap_user)
+        self.assertIs(result, ldap_user)
+        parent_authenticate.assert_called_once()
 
         # Verify AssetHolder profile is created
         holder = AssetHolder.objects.get(user=ldap_user)
@@ -248,7 +274,8 @@ class MitigationsPhase4Tests(TestCase):
         saml_configs = {self.tenant.slug: {"SAML_GROUP_ROLE_MAPPING": {"ManagerSAMLGroup": "manager"}}}
 
         with override_settings(ITAMBOX_TENANT_SAML_CONFIGS=saml_configs):
-            backend.sync_saml_user_profile_and_memberships(saml_user, session_info)
+            with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                backend.sync_saml_user_profile_and_memberships(saml_user, session_info)
 
         # Verify AssetHolder profile is created
         holder = AssetHolder.objects.get(user=saml_user)

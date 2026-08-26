@@ -1,11 +1,19 @@
 from types import SimpleNamespace
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import PropertyMock, patch
 
 from django.http import Http404, HttpResponse
 from django.test import SimpleTestCase, TestCase
 
-from core.auth.ldap import MultiTenantLDAPBackend
+from core import identity_provisioning
+from core.auth import ldap as ldap_module
 from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
+from core.context import (
+    get_current_tenant,
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
 
 
 class _FailingLDAPUser:
@@ -22,9 +30,24 @@ class _FailingLDAPUser:
         raise RuntimeError("provider group-dn failure")
 
 
+class _CapturingIdentityProvisioner:
+    def __init__(self):
+        self.commands = []
+
+    def provision(self, command):
+        self.commands.append(command)
+        return identity_provisioning.ExternalIdentityProvisioningResult(mode="customer")
+
+
 class LDAPBoundaryTests(SimpleTestCase):
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+
     def test_unexpected_configuration_failure_propagates(self):
-        backend = MultiTenantLDAPBackend()
+        backend = ldap_module.MultiTenantLDAPBackend()
         with patch.object(
             type(backend),
             "settings",
@@ -34,11 +57,9 @@ class LDAPBoundaryTests(SimpleTestCase):
             with self.assertRaisesRegex(RuntimeError, "unexpected failure"):
                 backend._is_configured()
 
-    @patch("core.auth.provisioning.provision_membership")
-    @patch("core.auth.ldap.get_current_tenant")
-    def test_provider_attribute_and_group_failures_are_logged_with_context(self, current_tenant, provision):
+    def test_provider_attribute_and_group_failures_are_logged_with_context(self):
         tenant = SimpleNamespace(pk=17, slug="ldap-tenant")
-        current_tenant.return_value = tenant
+        set_current_tenant(tenant)
         user = SimpleNamespace(
             pk=23,
             username="ldap-user",
@@ -47,18 +68,45 @@ class LDAPBoundaryTests(SimpleTestCase):
             last_name="User",
             ldap_user=_FailingLDAPUser(),
         )
-        profiles = Mock()
-        profiles.filter.return_value.first.return_value = SimpleNamespace(user=user)
-        user.asset_holder_profiles = profiles
+        provider = _CapturingIdentityProvisioner()
 
-        with self.settings(ITAMBOX_TENANT_LDAP_CONFIGS={}):
-            with self.assertLogs("django_auth_ldap", level="DEBUG") as logs:
-                MultiTenantLDAPBackend().sync_ldap_user_profile_and_memberships(user)
+        with (
+            self.settings(
+                ITAMBOX_TENANT_LDAP_CONFIGS={
+                    tenant.slug: {
+                        "USER_SEARCH": {
+                            "base_dn": "ou=users,dc=example,dc=test",
+                            "filter": "(uid=%(user)s)",
+                        }
+                    }
+                }
+            ),
+            identity_provisioning.override_identity_provisioner(provider),
+            patch.object(ldap_module, "django_auth_ldap_installed", True),
+            patch.object(ldap_module.LDAPBackend, "authenticate", return_value=user) as parent_authenticate,
+            self.assertLogs("django_auth_ldap", level="DEBUG") as logs,
+        ):
+            result = ldap_module.MultiTenantLDAPBackend().authenticate(
+                request=None,
+                username=user.username,
+                password="directory-password",
+            )
 
+        self.assertIs(result, user)
+        parent_authenticate.assert_called_once()
+        self.assertEqual(len(provider.commands), 1)
+        self.assertEqual(provider.commands[0].profile.email, "ldap@example.test")
+        self.assertEqual(provider.commands[0].customer_role_name, "Member")
+        records_by_reason = {record.reason_code: record for record in logs.records}
+        self.assertEqual(records_by_reason["attribute_read_failed"].user_id, 23)
+        self.assertEqual(records_by_reason["attribute_read_failed"].tenant_id, 17)
+        self.assertEqual(records_by_reason["group_names_unavailable"].exception_type, "RuntimeError")
+        self.assertEqual(records_by_reason["group_read_failed"].exception_type, "RuntimeError")
         output = "\n".join(logs.output)
-        self.assertIn("user_id=23", output)
-        self.assertIn("tenant_id=17", output)
-        provision.assert_called_once()
+        self.assertNotIn("provider attribute failure", output)
+        self.assertNotIn("provider group-name failure", output)
+        self.assertNotIn("provider group-dn failure", output)
+        self.assertIs(get_current_tenant(), tenant)
 
 
 class OIDCStaleTenantTests(TestCase):

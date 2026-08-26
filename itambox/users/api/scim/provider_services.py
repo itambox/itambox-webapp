@@ -6,8 +6,8 @@ from collections.abc import Collection
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 
-from core.auth.guards import validate_group_membership_grant
 from organization.models import Membership
+from organization.services.role_grant_validation import validate_group_membership_grant
 from users.api.scim.identifiers import identifier_lookup_or_none
 from users.api.scim.provider_patch import UNSET, GroupPatch, SCIMPatchError, UserPatch
 from users.models import GroupMembership, User, UserGroup

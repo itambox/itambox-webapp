@@ -12,7 +12,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
-from core.auth.guards import validate_role_grant
 from core.mfa import role_is_privileged
 from itambox.views.generic import (
     ObjectBulkDeleteView,
@@ -24,6 +23,7 @@ from itambox.views.generic import (
 )
 from itambox.views.generic.mixins import filter_permitted_rows
 from itambox.views.generic.utils import safe_return_url
+from organization.services.role_grant_validation import validate_role_grant
 
 from ..filters import RoleFilterSet
 from ..forms import RoleAssignUsersForm, RoleFilterForm, RoleForm

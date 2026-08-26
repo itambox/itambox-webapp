@@ -1111,7 +1111,9 @@ class RoleGrantScope(ChangeLoggingMixin, models.Model):
         else:
             raise ValidationError({"scope_type": _("Unknown role grant scope type.")})
 
-        if not self.role_grant_id:
+        # The identity service sets this operation-local marker only while moving
+        # a locked historical scope between grants with the same role and principal.
+        if not self.role_grant_id or getattr(self, "_identity_scope_merge", False):
             return
         grant = self.role_grant
         owner_id = grant.principal_tenant_id

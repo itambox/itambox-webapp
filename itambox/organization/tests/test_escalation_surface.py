@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from core.auth.guards import validate_group_membership_grant, validate_role_grant
 from core.tests.mixins import grant
 from organization.models import (
     Role,
@@ -13,6 +12,7 @@ from organization.models import (
     Tenant,
     TenantGroup,
 )
+from organization.services.role_grant_validation import validate_group_membership_grant, validate_role_grant
 from users.models import UserGroup
 
 User = get_user_model()

@@ -4,6 +4,7 @@ from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils.module_loading import import_string
 
+from core import identity_provisioning
 from core.auth.oidc import (
     OIDCIdentityBindingRequiredError,
     OIDCIdentityProvisioningError,
@@ -16,6 +17,7 @@ from core.oidc_identity import oidc_sensitive_audit, oidc_sensitive_audit_enable
 from core.tasks.context import TaskContext
 from extras.models import Event
 from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.services.identity_provisioning import organization_identity_provisioner
 from users.models import OIDCIdentity, User
 
 GLOBAL_OIDC_SETTINGS = {
@@ -180,7 +182,8 @@ class OIDCPhaseBAuditRegressionTests(TestCase):
                 patch.object(backend, "get_userinfo", return_value=claims),
                 patch.object(backend, "verify_claims", return_value=True),
             ):
-                user = backend.get_or_create_user("access-token", "id-token", claims)
+                with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                    user = backend.get_or_create_user("access-token", "id-token", claims)
 
         identity = OIDCIdentity.objects.get(user=user)
         holder = AssetHolder.objects.get(user=user, tenant=self.tenant)
@@ -345,7 +348,8 @@ class OIDCCompatibilityRegressionTests(TestCase):
         backend.verify_claims = Mock(return_value=True)
         request = self.request()
 
-        result = backend.authenticate(request, nonce="expected-nonce", code_verifier="pkce-verifier")
+        with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+            result = backend.authenticate(request, nonce="expected-nonce", code_verifier="pkce-verifier")
 
         self.assertIsNotNone(result)
         self.assertTrue(result.can_login)
@@ -557,49 +561,29 @@ class OIDCPhaseBRollbackRegressionTests(TestCase):
             ),
             patch.object(self.backend, "verify_claims", return_value=True),
         ):
-            return self.backend.get_or_create_user(
-                "access-token",
-                "id-token",
-                {"iss": "https://compat.example/issuer", "sub": "rollback-subject"},
-            )
+            with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+                return self.backend.get_or_create_user(
+                    "access-token",
+                    "id-token",
+                    {"iss": "https://compat.example/issuer", "sub": "rollback-subject"},
+                )
 
     def assert_stage_rolls_back_and_retry_converges(self, stage):
         before = self.fingerprint()
-        if stage == "holder":
-            original = AssetHolder.objects.create
+        checkpoint = {
+            "holder": "customer.holder_created",
+            "membership": "customer.membership_created",
+            "grant": "customer.grant_reconciled",
+            "scope": "customer.scope_reconciled",
+        }[stage]
 
-            def fail_after_create(*args, **kwargs):
-                original(*args, **kwargs)
-                raise RuntimeError("injected holder stage failure")
+        def fail_at_checkpoint(current):
+            if current == checkpoint:
+                raise RuntimeError(f"injected {stage} stage failure")
 
-            target = AssetHolder.objects
-        elif stage == "membership":
-            original = Membership.objects.get_or_create
-
-            def fail_after_create(*args, **kwargs):
-                original(*args, **kwargs)
-                raise RuntimeError("injected membership stage failure")
-
-            target = Membership.objects
-        elif stage == "grant":
-            original = RoleGrant.objects.create
-
-            def fail_after_create(*args, **kwargs):
-                original(*args, **kwargs)
-                raise RuntimeError("injected grant stage failure")
-
-            target = RoleGrant.objects
-        else:
-            original = RoleGrantScope.objects.create
-
-            def fail_after_create(*args, **kwargs):
-                original(*args, **kwargs)
-                raise RuntimeError("injected scope stage failure")
-
-            target = RoleGrantScope.objects
-
-        with patch.object(
-            target, "create" if stage != "membership" else "get_or_create", side_effect=fail_after_create
+        with patch(
+            "organization.services.identity_provisioning._stage_checkpoint",
+            side_effect=fail_at_checkpoint,
         ):
             with self.assertRaises(OIDCIdentityProvisioningError):
                 self.resolve()

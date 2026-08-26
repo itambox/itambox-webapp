@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 54,
-  "policy_sha256": "fb0d7dee2420798a72777076e80e3b1d948626920041b9b0a0f08b48153c7228",
+  "next_sequence": 61,
+  "policy_sha256": "343ce8c35272ea2fc859f88bcd01a259f766f1bb922458b69e521bc8e7812925",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -77,6 +77,15 @@
       "symbols": [
         "SystemAuthorizationContext"
       ]
+    },
+    {
+      "sequence": 54,
+      "path": "itambox/core/identity_provisioning.py",
+      "module": "core.identity_provisioning",
+      "issue": "#443",
+      "note": "Issue #443 admission: SDK-free identity provisioning command/result boundary and operation-time typed provider dispatch.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 50,
@@ -158,6 +167,15 @@
         "get_report_provider",
         "register_report_provider"
       ]
+    },
+    {
+      "sequence": 55,
+      "path": "itambox/core/restore_authority.py",
+      "module": "core.restore_authority",
+      "issue": "#443",
+      "note": "Issue #443 admission: SDK-free restore-authority port, fail-closed dispatch, and operation-time provider override boundary.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 15,
@@ -466,6 +484,17 @@
       ]
     },
     {
+      "sequence": 56,
+      "path": "itambox/organization/forms/role_matrix.py",
+      "module": "organization.forms.role_matrix",
+      "issue": "#443",
+      "note": "Issue #443 admission: declaration validation for the presentation overlay. Whole-module admission is intentionally not claimed because frozen build_matrix_models lacks a return annotation; this minimal symbol scope is the canonical clean boundary.",
+      "scope": "symbols",
+      "symbols": [
+        "_validate_declarations"
+      ]
+    },
+    {
       "sequence": 34,
       "path": "itambox/organization/services/__init__.py",
       "module": "organization.services",
@@ -480,6 +509,15 @@
       "module": "organization.services.errors",
       "issue": "#93",
       "note": "Slice 10 organization-service admission: typed, field-mappable service-error contract. ValidationError compatibility and message-disclosure ordering remain unchanged.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
+      "sequence": 57,
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "module": "organization.services.identity_provisioning",
+      "issue": "#443",
+      "note": "Issue #443 admission: organization-owned interactive and LDAP directory identity provisioning transaction, lock, reconciliation, and sanitized logging boundary.",
       "scope": "module",
       "symbols": []
     },
@@ -517,6 +555,33 @@
         "is_container_scoped_unfiltered",
         "visible_to_containers"
       ]
+    },
+    {
+      "sequence": 58,
+      "path": "itambox/organization/services/restore_authority.py",
+      "module": "organization.services.restore_authority",
+      "issue": "#443",
+      "note": "Issue #443 admission: organization-owned restore label dispatch and grant-authority validation adapter.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
+      "sequence": 59,
+      "path": "itambox/organization/services/role_grant_validation.py",
+      "module": "organization.services.role_grant_validation",
+      "issue": "#443",
+      "note": "Issue #443 admission: organization-owned role and group grant validation with preserved escalation messages and scope semantics.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
+      "sequence": 60,
+      "path": "itambox/organization/services/role_permission_policy.py",
+      "module": "organization.services.role_permission_policy",
+      "issue": "#443",
+      "note": "Issue #443 admission: presentation-free semantic role permission target catalog and live permission-set construction.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 33,

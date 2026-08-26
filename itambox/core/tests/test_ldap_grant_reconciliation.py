@@ -1,24 +1,19 @@
 from datetime import timedelta
-from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from core.management.commands.sync_tenant_ldap import (
-    LDAP_GRANT_REASON,
-    Command,
-    _ensure_ldap_role_grant,
-)
+from core.management.commands.sync_tenant_ldap import Command
 from core.tasks.context import TaskContext
 from itambox.middleware import get_current_user
-from organization.models import (
-    Membership,
-    Role,
-    RoleGrant,
-    RoleGrantScope,
-    Tenant,
+from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.services.identity_provisioning import (
+    LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST,
+    LDAP_DIRECTORY_SYNC_REASON,
+    LDAPDirectoryIdentityCommand,
+    provision_ldap_directory_identity,
 )
 
 User = get_user_model()
@@ -34,12 +29,8 @@ class LDAPGrantReconciliationTests(TestCase):
             tenant=self.tenant,
         )
 
-    def make_role(self, name, permissions):
-        return Role.objects.create(
-            tenant=self.tenant,
-            name=name,
-            permissions=permissions,
-        )
+    def command(self):
+        return LDAPDirectoryIdentityCommand(user=self.user, tenant=self.tenant)
 
     @staticmethod
     def add_own_scope(grant):
@@ -48,142 +39,187 @@ class LDAPGrantReconciliationTests(TestCase):
             scope_type=RoleGrantScope.SCOPE_OWN,
         )
 
-    def test_non_privileged_ldap_grant_is_indefinite_and_idempotent(self):
-        role = self.make_role("Directory reader", ["assets.view_asset"])
-
-        first = _ensure_ldap_role_grant(self.membership, role)
-        second = _ensure_ldap_role_grant(self.membership, role)
-
-        self.assertEqual(first.pk, second.pk)
-        first.refresh_from_db()
-        self.assertEqual(first.reason, LDAP_GRANT_REASON)
-        self.assertIsNone(first.granted_by)
-        self.assertIsNone(first.valid_until)
-        self.assertTrue(
-            first.scopes.filter(
-                scope_type=RoleGrantScope.SCOPE_OWN,
-            ).exists()
+    def make_member_role(self):
+        return Role.objects.create(
+            tenant=self.tenant,
+            name="Member",
+            permissions=list(LDAP_DIRECTORY_SYNC_MEMBER_PERMISSION_LIST),
         )
-        self.assertEqual(self.membership.role_grants.filter(role=role).count(), 1)
+
+    def test_ldap_grant_is_idempotent_and_has_fixed_provenance(self):
+        first_role = self.make_member_role()
+
+        provision_ldap_directory_identity(self.command())
+        first = RoleGrant.objects.get(membership=self.membership, role=first_role)
+        first_pk = first.pk
+        first_expiry = first.valid_until
+
+        provision_ldap_directory_identity(self.command())
+
+        second = RoleGrant.objects.get(pk=first_pk)
+        self.assertEqual(second.reason, LDAP_DIRECTORY_SYNC_REASON)
+        self.assertIsNone(second.granted_by)
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=self.membership,
+                role=first_role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+            ).count(),
+            1,
+        )
+        self.assertGreater(second.valid_until, first_expiry)
+        self.assertEqual(
+            second.scopes.filter(scope_type=RoleGrantScope.SCOPE_OWN).count(),
+            1,
+        )
 
     def test_privileged_ldap_grant_has_reason_and_future_expiry(self):
-        role = self.make_role("Directory editor", ["assets.change_asset"])
+        self.make_member_role()
         before = timezone.now()
 
-        grant = _ensure_ldap_role_grant(self.membership, role)
+        provision_ldap_directory_identity(self.command())
 
-        self.assertEqual(grant.reason, LDAP_GRANT_REASON)
+        grant = RoleGrant.objects.get(membership=self.membership)
+        self.assertEqual(grant.reason, LDAP_DIRECTORY_SYNC_REASON)
         self.assertIsNone(grant.granted_by)
         self.assertGreater(grant.valid_until, before)
         self.assertLessEqual(grant.valid_until, before + timedelta(days=1, seconds=1))
         grant.full_clean()
 
     def test_active_manual_equivalent_is_untouched_and_satisfies_access(self):
-        role = self.make_role("Manual reader", ["assets.view_asset"])
+        role = self.make_member_role()
         manual = RoleGrant.objects.create(
             membership=self.membership,
             role=role,
             granted_by=self.actor,
             reason="Approved by operator",
-            valid_until=None,
+            valid_until=timezone.now() + timedelta(days=2),
         )
         self.add_own_scope(manual)
 
-        result = _ensure_ldap_role_grant(self.membership, role)
+        provision_ldap_directory_identity(self.command())
 
-        self.assertEqual(result.pk, manual.pk)
         manual.refresh_from_db()
         self.assertEqual(manual.reason, "Approved by operator")
         self.assertEqual(manual.granted_by, self.actor)
-        self.assertIsNone(manual.valid_until)
+        self.assertIsNotNone(manual.valid_until)
         self.assertEqual(self.membership.role_grants.filter(role=role).count(), 1)
 
     def test_exact_reason_with_manual_actor_is_not_reclassified_as_ldap(self):
-        role = self.make_role("Manual marker reader", ["assets.view_asset"])
+        role = self.make_member_role()
         manual = RoleGrant.objects.create(
             membership=self.membership,
             role=role,
             granted_by=self.actor,
-            reason=LDAP_GRANT_REASON,
-            valid_until=None,
+            reason=LDAP_DIRECTORY_SYNC_REASON,
+            valid_until=timezone.now() + timedelta(days=2),
         )
         self.add_own_scope(manual)
 
-        _ensure_ldap_role_grant(self.membership, role)
+        provision_ldap_directory_identity(self.command())
 
         manual.refresh_from_db()
         self.assertEqual(manual.granted_by, self.actor)
         self.assertEqual(self.membership.role_grants.filter(role=role).count(), 1)
 
     def test_expired_manual_grant_is_preserved_and_new_ldap_grant_is_created(self):
-        role = self.make_role("Expired manual reader", ["assets.view_asset"])
+        role = self.make_member_role()
         expired_at = timezone.now() - timedelta(hours=1)
         manual = RoleGrant.objects.create(
             membership=self.membership,
             role=role,
             granted_by=self.actor,
             reason="Expired manual approval",
-            valid_until=expired_at,
+            valid_until=timezone.now() + timedelta(minutes=1),
         )
+        RoleGrant._base_manager.filter(pk=manual.pk).update(valid_until=expired_at)
         self.add_own_scope(manual)
 
-        ldap_grant = _ensure_ldap_role_grant(self.membership, role)
+        provision_ldap_directory_identity(self.command())
 
-        self.assertNotEqual(ldap_grant.pk, manual.pk)
         manual.refresh_from_db()
         self.assertEqual(manual.reason, "Expired manual approval")
         self.assertEqual(manual.granted_by, self.actor)
         self.assertEqual(manual.valid_until, expired_at)
-        self.assertEqual(ldap_grant.reason, LDAP_GRANT_REASON)
-        self.assertIsNone(ldap_grant.valid_until)
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=self.membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+            ).count(),
+            1,
+        )
 
-    def test_existing_ldap_grant_is_normalized_only_when_origin_is_exact(self):
-        role = self.make_role("Legacy LDAP reader", ["assets.view_asset"])
+    def test_existing_ldap_grant_refreshes_only_when_origin_is_exact(self):
+        role = self.make_member_role()
         grant = RoleGrant.objects.create(
             membership=self.membership,
             role=role,
-            reason=LDAP_GRANT_REASON,
+            reason=LDAP_DIRECTORY_SYNC_REASON,
             granted_by=None,
             valid_until=timezone.now() + timedelta(hours=1),
         )
         self.add_own_scope(grant)
 
-        result = _ensure_ldap_role_grant(self.membership, role)
+        provision_ldap_directory_identity(self.command())
 
-        self.assertEqual(result.pk, grant.pk)
         grant.refresh_from_db()
-        self.assertIsNone(grant.valid_until)
+        self.assertGreater(grant.valid_until, timezone.now() + timedelta(hours=23))
 
     def test_ambiguous_expired_ldap_rows_are_not_overwritten(self):
-        role = self.make_role("Ambiguous LDAP reader", ["assets.view_asset"])
+        role = self.make_member_role()
         expired_at = timezone.now() - timedelta(hours=1)
         old_grants = []
         for _ in range(2):
             grant = RoleGrant.objects.create(
                 membership=self.membership,
                 role=role,
-                reason=LDAP_GRANT_REASON,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
                 granted_by=None,
-                valid_until=expired_at,
+                valid_until=timezone.now() + timedelta(minutes=1),
             )
+            RoleGrant._base_manager.filter(pk=grant.pk).update(valid_until=expired_at)
             self.add_own_scope(grant)
             old_grants.append(grant)
 
-        new_grant = _ensure_ldap_role_grant(self.membership, role)
+        provision_ldap_directory_identity(self.command())
 
-        self.assertNotIn(new_grant.pk, [grant.pk for grant in old_grants])
         for grant in old_grants:
             grant.refresh_from_db()
             self.assertEqual(grant.valid_until, expired_at)
-        self.assertIsNone(new_grant.valid_until)
+        grants = list(
+            RoleGrant.objects.filter(
+                membership=self.membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+            ).order_by("pk")
+        )
+        self.assertEqual(len(grants), 3)
+        fresh = grants[-1]
+        self.assertNotIn(fresh.pk, {grant.pk for grant in old_grants})
+        self.assertGreater(fresh.valid_until, timezone.now())
+        self.assertEqual(fresh.scopes.filter(scope_type=RoleGrantScope.SCOPE_OWN).count(), 1)
+
+        provision_ldap_directory_identity(self.command())
+        self.assertEqual(
+            RoleGrant.objects.filter(
+                membership=self.membership,
+                role=role,
+                reason=LDAP_DIRECTORY_SYNC_REASON,
+            ).count(),
+            3,
+        )
 
     def test_nested_command_context_preserves_outer_task_actor(self):
         observed_actor_ids = []
 
         def observe_actor(command, tenant):
+            del command, tenant
             observed_actor_ids.append(get_current_user().pk)
 
         with TaskContext(tenant_id=self.tenant.pk, user_id=self.actor.pk):
+            from unittest.mock import patch
+
             with patch.object(Command, "_run_sync", autospec=True, side_effect=observe_actor):
                 call_command("sync_tenant_ldap", tenant=self.tenant.slug)
             self.assertEqual(get_current_user(), self.actor)

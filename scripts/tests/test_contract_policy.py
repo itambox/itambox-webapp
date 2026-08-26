@@ -594,7 +594,8 @@ class SettingsDerivationTests(unittest.TestCase):
     def test_the_sso_privileged_role_switch_is_derived_and_classified(self):
         """The authorization-relevant knob the old scan could not see."""
         self.assertIn("ITAMBOX_SSO_AUTOCREATE_PRIVILEGED_ROLES", self.names)
-        self.assertIn("itambox/core/auth/provisioning.py", self.scanned)
+        self.assertIn("itambox/organization/services/identity_provisioning.py", self.scanned)
+        self.assertNotIn("itambox/core/auth/provisioning.py", self.scanned)
         self.assertEqual(policy.compare_settings(self.names, policy.documented_settings(REPO_ROOT)), ())
 
     def test_every_derived_name_is_published_or_excluded_with_a_reason(self):

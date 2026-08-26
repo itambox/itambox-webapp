@@ -97,7 +97,7 @@ class ProviderEntryPointHelperTests(SimpleTestCase):
         tenant = SimpleNamespace(slug="acme")
 
         with (
-            patch("organization.models.Tenant.objects.get", return_value=tenant),
+            patch("organization.models.Tenant._base_manager.get", return_value=tenant),
             patch(
                 "mozilla_django_oidc.views.OIDCAuthenticationRequestView.dispatch",
                 return_value=HttpResponse(status=200),
@@ -115,7 +115,7 @@ class ProviderEntryPointHelperTests(SimpleTestCase):
         tenant = SimpleNamespace(slug="acme")
 
         with (
-            patch("organization.models.Tenant.objects.get", return_value=tenant),
+            patch("organization.models.Tenant._base_manager.get", return_value=tenant),
             patch(
                 "mozilla_django_oidc.views.OIDCAuthenticationCallbackView.dispatch",
                 return_value=HttpResponse(status=200),
@@ -131,7 +131,7 @@ class ProviderEntryPointHelperTests(SimpleTestCase):
         request = SimpleNamespace(GET={}, session={"oidc_tenant_slug": "deleted"})
 
         with (
-            patch("organization.models.Tenant.objects.get", side_effect=Tenant.DoesNotExist),
+            patch("organization.models.Tenant._base_manager.get", side_effect=Tenant.DoesNotExist),
             patch(
                 "mozilla_django_oidc.views.OIDCAuthenticationRequestView.dispatch",
                 return_value=HttpResponse(status=200),
@@ -147,7 +147,7 @@ class ProviderEntryPointHelperTests(SimpleTestCase):
         request = SimpleNamespace(session={"oidc_tenant_slug": "deleted"})
 
         with (
-            patch("organization.models.Tenant.objects.get", side_effect=Tenant.DoesNotExist),
+            patch("organization.models.Tenant._base_manager.get", side_effect=Tenant.DoesNotExist),
             patch(
                 "mozilla_django_oidc.views.OIDCAuthenticationCallbackView.dispatch",
                 return_value=HttpResponse(status=200),
@@ -165,7 +165,7 @@ class ProviderEntryPointHelperTests(SimpleTestCase):
         view.request = request
 
         with (
-            patch("organization.models.Tenant.objects.get", side_effect=Tenant.DoesNotExist),
+            patch("organization.models.Tenant._base_manager.get", side_effect=Tenant.DoesNotExist),
             patch(
                 "mozilla_django_oidc.views.OIDCAuthenticationCallbackView.login_success",
                 return_value=HttpResponse(status=200),

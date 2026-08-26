@@ -61,7 +61,7 @@ class MFAPolicyHelperTests(TestCase):
     """
 
     # A representative set of mutating perms in the stored "<app>.<codename>"
-    # shape (as the SSO backends' get_permissions_for_role emits).
+    # shape emitted by the semantic SSO role permission policy.
     WRITE_PERMS = ["assets.view_asset", "assets.add_asset", "assets.change_asset"]
     READ_ONLY_PERMS = ["assets.view_asset", "extras.view_dashboard"]
 

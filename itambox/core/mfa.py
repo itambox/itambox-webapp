@@ -1,11 +1,9 @@
 """MFA policy for local-password sessions.
 
-Also the home of the privilege classification this policy is built on
-(``PRIVILEGED_ROLE_NAMES`` / :func:`role_is_privileged`). The constant used to
-live in ``core.auth.provisioning``, which imports :func:`role_is_privileged`
-from here — a real cycle that a function-body import only hid (issue #87 phase
-D). The classification is policy, not provisioning mechanics, so it belongs on
-this side of the edge and leaves this module a dependency-free leaf.
+This module is also the home of the privilege classification used by the MFA
+policy (``PRIVILEGED_ROLE_NAMES`` / :func:`role_is_privileged`). The
+classification is policy, not identity-provisioning mechanics, so it belongs
+on this side of the edge and leaves this module a dependency-free leaf.
 """
 
 from core.tenant_scope import applicable_grants
