@@ -1,15 +1,19 @@
+import io
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.core.files.storage import default_storage
 from django.db import OperationalError
 from django.test import TestCase
 from django.urls import reverse
+from pypdf import PdfReader
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
-from core.models import Job
+from core.models import Job, Notification
 from core.tasks.labels import generate_label_batch_task, generate_label_pdf_batch_task
 from core.tasks.utils import TaskStatus
-from extras.models import LabelTemplate
+from extras.models import FileAttachment, LabelTemplate
 from organization.models import Tenant
 
 User = get_user_model()
@@ -179,6 +183,175 @@ class BulkActionsTestCase(TestCase):
         self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "labels.pdf_failed"))
         self.assertNotIn("secret-pdf-payload", job.logs)
 
+    def test_pdf_task_completes_with_real_renderer_and_valid_attachment(self):
+        job = self._job()
+
+        result = generate_label_pdf_batch_task(
+            job.pk, [self.asset1.pk, self.asset2.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
+        )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.SUCCESS, "labels.pdf_completed"))
+        self.assertEqual(dict(result.counts), {"rendered": 2, "failed": 0})
+        self.assertEqual(job.status, Job.STATUS_COMPLETED)
+
+        ct = ContentType.objects.get_for_model(Job)
+        attachments = FileAttachment.objects.filter(model=ct, object_id=job.pk)
+        self.assertEqual(attachments.count(), 1)
+        attachment = attachments.first()
+        self.assertEqual(attachment.mime_type, "application/pdf")
+        data = attachment.file.read()
+        self.assertTrue(data.startswith(b"%PDF-"))
+        reader = PdfReader(io.BytesIO(data))
+        self.assertEqual(len(reader.pages), 2)
+
+        self.assertIn("download_url", job.result)
+        self.assertTrue(job.result["download_url"].startswith("/"))
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.user, level=Notification.LEVEL_SUCCESS, target_url__startswith="/"
+            ).exists()
+        )
+
+    @patch("core.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-notify"))
+    def test_pdf_task_success_notification_failure_does_not_fail_completed_job(self, _notify):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+            result = generate_label_pdf_batch_task(
+                job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
+            )
+
+        job.refresh_from_db()
+        ct = ContentType.objects.get_for_model(Job)
+        attachment = FileAttachment.objects.filter(model=ct, object_id=job.pk).first()
+        self.assertEqual((result.status, result.code), (TaskStatus.SUCCESS, "labels.pdf_completed"))
+        self.assertEqual(job.status, Job.STATUS_COMPLETED)
+        self.assertIsNotNone(attachment)
+        data = attachment.file.read()
+        self.assertTrue(data.startswith(b"%PDF-"))
+        PdfReader(io.BytesIO(data))
+        self.assertIn("(phase=notification)", job.logs)
+        self.assertNotIn("secret-notify", " ".join(captured.output) + " " + job.logs)
+
+    @patch("core.tasks.labels._html_to_pdf_bytes", side_effect=RuntimeError("secret-render-payload"))
+    def test_pdf_task_render_failure_is_terminal_phased_and_redacted(self, _render):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+            result = generate_label_pdf_batch_task(
+                job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
+            )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "labels.pdf_failed"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertIn("phase=pdf_render", job.logs)
+        self.assertNotIn("secret-render-payload", " ".join(captured.output) + " " + job.logs)
+        ct = ContentType.objects.get_for_model(Job)
+        self.assertEqual(FileAttachment.objects.filter(model=ct, object_id=job.pk).count(), 0)
+        notification = Notification.objects.filter(user=self.user, level=Notification.LEVEL_DANGER).first()
+        self.assertIsNotNone(notification)
+        self.assertNotIn("secret-render-payload", notification.message)
+
+    @patch("core.tasks.labels.Job.objects.get", side_effect=OperationalError("secret-database"))
+    def test_pdf_entry_database_failure_is_retryable_and_not_masked(self, _get):
+        # The PDF task's single task boundary also covers Job resolution: a
+        # transient failure there must be classified, with the boundary state
+        # (phase/attachment) bound — never replaced by an UnboundLocalError.
+        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+            result = generate_label_pdf_batch_task(17, [], self.label_template.pk, "roll", self.user.pk, self.tenant.pk)
+
+        self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "labels.pdf_failed"))
+        self.assertNotIn("secret-database", " ".join(captured.output))
+        self.assertTrue(any(getattr(record, "phase", None) == "job_resolve" for record in captured.records))
+
+    @patch("core.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-notify"))
+    @patch("core.tasks.labels._html_to_pdf_bytes", side_effect=RuntimeError("secret-render"))
+    def test_pdf_task_failure_notification_failure_does_not_mask_task_outcome(self, _render, _notify):
+        # The failure notification is best-effort: even if BOTH the render and
+        # the notification delivery fail, the original task outcome and job
+        # state must survive, redacted.
+        job = self._job()
+
+        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+            result = generate_label_pdf_batch_task(
+                job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
+            )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "labels.pdf_failed"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertIn("phase=pdf_render", job.logs)
+        self.assertIn("(phase=notification)", job.logs)
+        self.assertNotIn("secret-render", " ".join(captured.output) + " " + job.logs)
+        self.assertNotIn("secret-notify", " ".join(captured.output) + " " + job.logs)
+        ct = ContentType.objects.get_for_model(Job)
+        self.assertEqual(FileAttachment.objects.filter(model=ct, object_id=job.pk).count(), 0)
+
+    def test_pdf_task_persist_failure_cleans_up_partial_attachment(self):
+        job = self._job()
+
+        real_save = FileAttachment.save
+        calls = {"n": 0}
+
+        def flaky_save(self, *args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # allow the create() insert; the explicit save() afterwards fails
+                return real_save(self, *args, **kwargs)
+            raise OperationalError("secret-storage")
+
+        with (
+            self.assertLogs("core.tasks.labels", level="ERROR") as captured,
+            patch.object(FileAttachment, "save", new=flaky_save),
+        ):
+            result = generate_label_pdf_batch_task(
+                job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
+            )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "labels.pdf_failed"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertIn("phase=attachment_persist", job.logs)
+        self.assertNotIn("secret-storage", " ".join(captured.output) + " " + job.logs)
+        ct = ContentType.objects.get_for_model(Job)
+        self.assertEqual(FileAttachment.objects.filter(model=ct, object_id=job.pk).count(), 0)
+        self.assertEqual(
+            [name for name in default_storage.listdir("attachments/files")[1] if name == f"labels_batch_{job.pk}.pdf"],
+            [],
+        )
+
+    @patch("extras.models.FileAttachment.delete", side_effect=OperationalError("secret-cleanup"))
+    def test_pdf_task_persist_failure_reports_cleanup_failure_without_leaking(self, _delete):
+        job = self._job()
+
+        real_save = FileAttachment.save
+        calls = {"n": 0}
+
+        def flaky_save(self, *args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return real_save(self, *args, **kwargs)
+            raise OperationalError("secret-storage")
+
+        with (
+            self.assertLogs("core.tasks.labels", level="ERROR") as captured,
+            patch.object(FileAttachment, "save", new=flaky_save),
+        ):
+            result = generate_label_pdf_batch_task(
+                job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
+            )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "labels.pdf_failed"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        # cleanup failed, so the orphan row remains — but nothing sensitive leaked
+        ct = ContentType.objects.get_for_model(Job)
+        self.assertEqual(FileAttachment.objects.filter(model=ct, object_id=job.pk).count(), 1)
+        self.assertNotIn("secret-cleanup", " ".join(captured.output) + " " + job.logs)
+        self.assertTrue(any(record.phase == "attachment_cleanup" for record in captured.records))
+
     @patch("core.tasks.labels.generate_single_label_graphic", side_effect=RuntimeError("secret-zip-label"))
     def test_zip_item_failure_is_isolated_and_redacted(self, _graphic):
         job = self._job()
@@ -203,6 +376,20 @@ class BulkActionsTestCase(TestCase):
         self.assertEqual(dict(result.counts), {"rendered": 1, "failed": 0})
         self.assertNotIn(self.asset1.asset_tag, job.logs)
         self.assertNotIn(self.asset1.name, job.logs)
+
+    @patch("core.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-zip-notify"))
+    @patch("core.tasks.labels.generate_single_label_graphic", return_value=b"safe-image")
+    def test_zip_success_notification_failure_does_not_fail_completed_job(self, _graphic, _notify):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+            result = generate_label_batch_task(job.pk, [self.asset1.pk], "qr", self.user.pk, self.tenant.pk)
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.SUCCESS, "labels.zip_completed"))
+        self.assertEqual(job.status, Job.STATUS_COMPLETED)
+        self.assertIn("(phase=notification)", job.logs)
+        self.assertNotIn("secret-zip-notify", " ".join(captured.output) + " " + job.logs)
 
     @patch(
         "core.tasks.labels.generate_single_label_graphic",
