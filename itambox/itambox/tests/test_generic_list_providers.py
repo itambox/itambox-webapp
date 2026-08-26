@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db import connection
+from django.db import DatabaseError, connection
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
@@ -100,24 +100,25 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
         return request
 
     def _run_view(self, params=None, *, partial=False, boosted=False):
-        view = AssetListView()
-        view.setup(self._request(params, partial=partial, boosted=boosted))
-        queryset = view.get_queryset()
-        view.object_list = queryset
-        context = view.get_context_data(object_list=queryset)
-        rows = list(context["table"].data.data)
+        with self.tenant_context(self.tenant, self.tenant_membership):
+            view = AssetListView()
+            view.setup(self._request(params, partial=partial, boosted=boosted))
+            queryset = view.get_queryset()
+            view.object_list = queryset
+            context = view.get_context_data(object_list=queryset)
+            rows = list(context["table"].data.data)
         return view, context, rows
+
+    def _resolve(self, params=None, *, partial=False):
+        with self.tenant_context(self.tenant, self.tenant_membership):
+            return resolve_list_provider_params(self._request(params), Asset, partial=partial)
 
     @staticmethod
     def _table_query_count(queries, table_name):
         return sum(table_name in query["sql"].lower() for query in queries)
 
     def test_visible_saved_filter_activates_multivalue_params_and_private_state(self):
-        resolution = resolve_list_provider_params(
-            self._request({"filter": self.saved_filter.pk, "q": "raw"}),
-            Asset,
-            partial=False,
-        )
+        resolution = self._resolve({"filter": self.saved_filter.pk, "q": "raw"})
 
         state = resolution.provider_state["extras"]
         self.assertEqual(resolution.params.getlist("status"), [str(self.status.pk)])
@@ -168,7 +169,7 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
                 if filter_value is not None:
                     params["filter"] = filter_value
                 params._mutable = False
-                resolution = resolve_list_provider_params(self._request(params), Asset, partial=False)
+                resolution = self._resolve(params)
 
                 self.assertEqual(resolution.params.getlist("q"), ["raw", "second"])
                 if filter_value is not None:
@@ -178,11 +179,7 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
     def test_selected_saved_filter_catalogue_is_evaluated_once_and_reused(self):
         ContentType.objects.clear_cache()
         with CaptureQueriesContext(connection) as queries:
-            resolution = resolve_list_provider_params(
-                self._request({"filter": self.saved_filter.pk}),
-                Asset,
-                partial=True,
-            )
+            resolution = self._resolve({"filter": self.saved_filter.pk}, partial=True)
             context = build_list_provider_context(resolution, {})
 
         state_catalogue = resolution.provider_state["extras"]["saved_filters"]
@@ -191,6 +188,18 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
         self.assertEqual(self._table_query_count(queries, "extras_savedfilter"), 1)
         self.assertEqual(self._table_query_count(queries, "extras_exporttemplate"), 0)
         self.assertEqual(self._table_query_count(queries, "extras_labeltemplate"), 0)
+
+    def test_optional_catalogue_failure_degrades_but_activation_failure_propagates(self):
+        failure = DatabaseError("saved-filter catalogue unavailable")
+        with patch.object(SavedFilter.objects, "filter", side_effect=failure):
+            resolution = self._resolve()
+
+        self.assertEqual(resolution.provider_state["extras"]["saved_filters"], [])
+        self.assertIsNone(resolution.provider_state["extras"]["active_saved_filter_id"])
+
+        with patch.object(SavedFilter.objects, "filter", side_effect=failure):
+            with self.assertRaisesRegex(DatabaseError, "catalogue unavailable"):
+                self._resolve({"filter": self.saved_filter.pk})
 
     def test_full_and_boosted_catalogues_are_bounded(self):
         for boosted in (False, True):
@@ -347,12 +356,46 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
                 self.table_calls += 1
                 return super().get_table()
 
-        view = CountingAssetListView()
-        view.setup(self._request({"filter": self.saved_filter.pk}))
-        queryset = view.get_queryset()
-        view.object_list = queryset
-        context = view.get_context_data(object_list=queryset)
-        list(context["table"].data.data)
+        with self.tenant_context(self.tenant, self.tenant_membership):
+            view = CountingAssetListView()
+            view.setup(self._request({"filter": self.saved_filter.pk}))
+            queryset = view.get_queryset()
+            view.object_list = queryset
+            context = view.get_context_data(object_list=queryset)
+            list(context["table"].data.data)
 
         self.assertEqual(view.queryset_calls, 1)
         self.assertEqual(view.table_calls, 1)
+
+    def test_representative_query_counts_do_not_exceed_the_p6_base(self):
+        invalid_saved = SavedFilter.objects.create(
+            name="Query budget invalid saved status",
+            content_type=self.content_type,
+            tenant=self.tenant,
+            shared=False,
+            created_by=self.tenant_user,
+            parameters={"status": "999999999"},
+        )
+        base_counts = {
+            "full_raw": 14,
+            "full_selected": 14,
+            "htmx_raw": 9,
+            "htmx_selected": 12,
+            "invalid_raw": 7,
+            "invalid_saved": 8,
+        }
+        cases = (
+            ("full_raw", {}, False),
+            ("full_selected", {"filter": self.saved_filter.pk}, False),
+            ("htmx_raw", {}, True),
+            ("htmx_selected", {"filter": self.saved_filter.pk}, True),
+            ("invalid_raw", {"status": "999999999"}, False),
+            ("invalid_saved", {"filter": invalid_saved.pk}, False),
+        )
+
+        for label, params, partial in cases:
+            with self.subTest(label=label):
+                ContentType.objects.clear_cache()
+                with CaptureQueriesContext(connection) as queries:
+                    self._run_view(params, partial=partial)
+                self.assertLessEqual(len(queries), base_counts[label])
