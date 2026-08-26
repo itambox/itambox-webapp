@@ -1016,6 +1016,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/assets/api/serializers.py",
                 "itambox/core/auth/oidc.py",
                 "itambox/core/context.py",
+                "itambox/core/identity_provisioning.py",
                 "itambox/core/management/commands/bind_oidc_identity.py",
                 "itambox/core/models.py",
                 "itambox/core/oidc_identity.py",
@@ -1023,6 +1024,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/reports/contracts.py",
                 "itambox/core/reports/orchestration.py",
                 "itambox/core/reports/registry.py",
+                "itambox/core/restore_authority.py",
                 "itambox/core/tasks/alerts.py",
                 "itambox/core/tasks/checkin.py",
                 "itambox/core/tasks/checkout.py",
@@ -1046,10 +1048,15 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/licenses/api/serializers.py",
                 "itambox/organization/access.py",
                 "itambox/organization/api/serializers.py",
+                "itambox/organization/forms/role_matrix.py",
                 "itambox/organization/services/__init__.py",
                 "itambox/organization/services/errors.py",
+                "itambox/organization/services/identity_provisioning.py",
                 "itambox/organization/services/membership.py",
                 "itambox/organization/services/resource_access.py",
+                "itambox/organization/services/restore_authority.py",
+                "itambox/organization/services/role_grant_validation.py",
+                "itambox/organization/services/role_permission_policy.py",
                 "itambox/organization/services/rolegrants.py",
                 "itambox/organization/services/tenant_access.py",
                 "itambox/procurement/api/serializers.py",
@@ -1096,6 +1103,7 @@ class CommittedRecordTests(unittest.TestCase):
                     ["configured_oidc_issuers", "validate_oidc_identity_input"],
                 ),
                 "itambox/core/models.py": ("symbols", ["write_object_change"]),
+                "itambox/core/identity_provisioning.py": ("module", []),
                 "itambox/core/oidc_identity.py": ("module", []),
                 "itambox/core/provider_slot.py": ("module", []),
                 "itambox/core/reports/contracts.py": (
@@ -1115,6 +1123,7 @@ class CommittedRecordTests(unittest.TestCase):
                         "register_report_provider",
                     ],
                 ),
+                "itambox/core/restore_authority.py": ("module", []),
                 "itambox/core/tasks/alerts.py": (
                     "symbols",
                     ["evaluate_alert_rules_task", "run_alert_rule_now"],
@@ -1237,8 +1246,10 @@ class CommittedRecordTests(unittest.TestCase):
                         "TenantSerializer",
                     ],
                 ),
+                "itambox/organization/forms/role_matrix.py": ("symbols", ["_validate_declarations"]),
                 "itambox/organization/services/__init__.py": ("module", []),
                 "itambox/organization/services/errors.py": ("module", []),
+                "itambox/organization/services/identity_provisioning.py": ("module", []),
                 "itambox/organization/services/membership.py": (
                     "symbols",
                     [
@@ -1260,6 +1271,9 @@ class CommittedRecordTests(unittest.TestCase):
                     "symbols",
                     ["_ContainerPermissionActor", "is_container_scoped_unfiltered", "visible_to_containers"],
                 ),
+                "itambox/organization/services/restore_authority.py": ("module", []),
+                "itambox/organization/services/role_grant_validation.py": ("module", []),
+                "itambox/organization/services/role_permission_policy.py": ("module", []),
                 "itambox/organization/services/rolegrants.py": (
                     "symbols",
                     [

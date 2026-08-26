@@ -2652,30 +2652,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/auth/guards.py",
-      "code": "C901",
-      "message": "'_live_role_grant_scope_request' is too complex (19)",
-      "source": "def _live_role_grant_scope_request(",
-      "context": "Module:body/FunctionDef:_live_role_grant_scope_request:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/guards.py",
-      "code": "C901",
-      "message": "'validate_role_grant' is too complex (13)",
-      "source": "def validate_role_grant(",
-      "context": "Module:body/FunctionDef:validate_role_grant:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "B007",
-      "message": "Loop control variable 'key' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for key, info in MATRIX_MODELS.items():",
-      "context": "Module:body/ClassDef:TenantOIDCBackend:body/FunctionDef:get_permissions_for_role:body/For:Tuple(elts=[Name(id='key', ctx=Store()), Name(id='info', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='MATRIX_MODELS', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/auth/oidc.py",
       "code": "B907",
       "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -2689,70 +2665,6 @@
       "message": "'self.__class__.__name__' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise AttributeError(f\"'{self.__class__.__name__}' object has no attribute '{name}'\")",
       "context": "Module:body/ClassDef:TenantOIDCSettingsMixin:body/FunctionDef:__getattr__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "C901",
-      "message": "'TenantOIDCBackend.sync_user_profile_and_memberships' is too complex (25)",
-      "source": "    def sync_user_profile_and_memberships(self, user, claims):",
-      "context": "Module:body/ClassDef:TenantOIDCBackend:body/FunctionDef:sync_user_profile_and_memberships:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "F401",
-      "message": "'django.db.models' imported but unused",
-      "source": "from django.db import IntegrityError, models, transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/saml.py",
-      "code": "B007",
-      "message": "Loop control variable 'key' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for key, info in MATRIX_MODELS.items():",
-      "context": "Module:body/ClassDef:TenantSaml2Backend:body/FunctionDef:get_permissions_for_role:body/For:Tuple(elts=[Name(id='key', ctx=Store()), Name(id='info', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='MATRIX_MODELS', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/saml.py",
-      "code": "C901",
-      "message": "'TenantSaml2Backend.sync_saml_user_profile_and_memberships' is too complex (29)",
-      "source": "    def sync_saml_user_profile_and_memberships(self, user, session_info):",
-      "context": "Module:body/ClassDef:TenantSaml2Backend:body/FunctionDef:sync_saml_user_profile_and_memberships:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/saml.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from djangosaml2.backends import Saml2Backend",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/saml.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "        from organization.models import AssetHolder, Membership, Role",
-      "context": "Module:body/ClassDef:TenantSaml2Backend:body/FunctionDef:sync_saml_user_profile_and_memberships:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/saml.py",
-      "code": "F401",
-      "message": "'organization.models.Role' imported but unused",
-      "source": "        from organization.models import AssetHolder, Membership, Role",
-      "context": "Module:body/ClassDef:TenantSaml2Backend:body/FunctionDef:sync_saml_user_profile_and_memberships:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/saml.py",
-      "code": "F401",
-      "message": "'os' imported but unused",
-      "source": "import os",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -9375,14 +9287,6 @@
       "path": "itambox/users/forms.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from core.auth.guards import validate_role_grant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
       "source": "from core.forms import BulkEditForm, FilterForm",
       "context": "Module:body",
       "count": 1
@@ -9648,14 +9552,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "from .tables import UserTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.auth.guards import validate_group_membership_grant",
       "context": "Module:body",
       "count": 1
     },
