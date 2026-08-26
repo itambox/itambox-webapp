@@ -249,7 +249,7 @@ def test_present_and_absent_optional_plugin_projection_and_effective_counts(monk
 
 
 @pytest.mark.django_db
-def test_active_matrix_keeps_both_legacy_surfaces_exactly_compatible():
+def test_complete_matrix_keeps_both_legacy_surfaces_exactly_compatible():
     from organization.forms.role_matrix import MATRIX_MODELS as PRESENTATION_MATRIX_MODELS
 
     assert list(ROLE_FORM_MATRIX_MODELS) == list(PACKAGE_MATRIX_MODELS) == list(PRESENTATION_MATRIX_MODELS)
@@ -264,7 +264,7 @@ def test_active_matrix_keeps_both_legacy_surfaces_exactly_compatible():
         }
         assert info == expected
         assert key in [target[0] for target in EXPECTED_TARGETS]
-        assert key != "docusignenvelope"
+    assert list(ROLE_FORM_MATRIX_MODELS)[-1] == "docusignenvelope"
 
 
 @pytest.mark.parametrize("mutation,expected_fragment", (("missing", "missing="), ("extra", "extra=")))
