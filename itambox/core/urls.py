@@ -26,7 +26,6 @@ from django.urls import include, path
 from django.views.decorators.cache import never_cache
 from django.views.generic import RedirectView, TemplateView
 from django.views.i18n import JavaScriptCatalog
-from users.table_config_views import table_config
 
 from assets import views as asset_views  # Import the assets views
 from assets.views_scan import ScanResolveView
