@@ -18,7 +18,11 @@ import core.auth.oidc as oidc_module
 import organization.services.tenant_onboarding as tenant_onboarding
 from core import identity_provisioning
 from core.auth.oidc import OIDCIdentityProvisioningError, TenantOIDCBackend
-from core.identity_provisioning import ExternalIdentityProvisioningResult
+from core.identity_provisioning import (
+    ExternalIdentityProvisioningCommand,
+    ExternalIdentityProvisioningResult,
+    IdentityProvisioner,
+)
 from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.oidc_identity import oidc_sensitive_audit
@@ -50,6 +54,20 @@ OIDC_CONFIG = {
         },
     },
 }
+
+
+class RecordingIdentityProvisioner(IdentityProvisioner):
+    """Transparent recording decorator around the real organization service."""
+
+    def __init__(self):
+        self.commands: list[ExternalIdentityProvisioningCommand] = []
+        self.results: list[ExternalIdentityProvisioningResult] = []
+
+    def provision(self, command: ExternalIdentityProvisioningCommand) -> ExternalIdentityProvisioningResult:
+        result = organization_identity_provisioner.provision(command)
+        self.commands.append(command)
+        self.results.append(result)
+        return result
 
 
 @override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=OIDC_CONFIG)
@@ -874,8 +892,8 @@ PROVIDER_ORDER_CONFIG = {
     "phase-b-provider": {
         "OIDC_OP_ISSUER": ISSUER,
         "OIDC_GROUP_PROVIDER_ROLE_MAPPING": {
-            "provider-first": "Provider Staff",
-            "provider-second": "Provider Staff Second",
+            "provider-first": "ProviderFirstRole",
+            "provider-second": "ProviderSecondRole",
         },
     },
 }
@@ -902,12 +920,12 @@ class OIDCProviderGroupOrderTests(TestCase):
         )
         self.provider_first_role = Role.objects.create(
             tenant=self.provider,
-            name="Provider Staff",
+            name="ProviderFirstRole",
             permissions=[],
         )
         self.provider_second_role = Role.objects.create(
             tenant=self.provider,
-            name="Provider Staff Second",
+            name="ProviderSecondRole",
             permissions=[],
         )
         self.unrelated_user = User.objects.create_user(
@@ -953,6 +971,36 @@ class OIDCProviderGroupOrderTests(TestCase):
     def tearDown(self):
         set_current_tenant(None)
 
+    @staticmethod
+    def _table_fingerprint(model):
+        field_names = tuple(field.attname for field in model._meta.concrete_fields)
+        return tuple(tuple(row) for row in model._base_manager.order_by("pk").values_list(*field_names))
+
+    def _state_fingerprint(self):
+        return {
+            "identity": {model._meta.label_lower: self._table_fingerprint(model) for model in (User, OIDCIdentity)},
+            "organization": {
+                model._meta.label_lower: self._table_fingerprint(model)
+                for model in (
+                    Tenant,
+                    Role,
+                    AssetHolder,
+                    Membership,
+                    RoleGrant,
+                    RoleGrantScope,
+                    UserGroup,
+                    GroupMembership,
+                )
+            },
+            "audit": {model._meta.label_lower: self._table_fingerprint(model) for model in (ObjectChange, AuditEvent)},
+        }
+
+    def _assert_preexisting_rows_unchanged(self, before, after):
+        for section, tables in before.items():
+            for label, rows in tables.items():
+                for row in rows:
+                    self.assertGreaterEqual(after[section][label].count(row), rows.count(row))
+
     def _unrelated_snapshot(self):
         return {
             "user": User._base_manager.values_list(
@@ -990,7 +1038,7 @@ class OIDCProviderGroupOrderTests(TestCase):
             ),
         }
 
-    def _resolve(self, subject, claims):
+    def _resolve(self, subject, claims, provisioner=organization_identity_provisioner):
         userinfo = {
             "iss": ISSUER,
             "sub": subject,
@@ -999,15 +1047,20 @@ class OIDCProviderGroupOrderTests(TestCase):
         backend = TenantOIDCBackend()
         backend.get_userinfo = Mock(return_value=userinfo)
         backend.verify_claims = Mock(return_value=True)
-        with identity_provisioning.override_identity_provisioner(organization_identity_provisioner):
+        with identity_provisioning.override_identity_provisioner(provisioner):
             return backend.get_or_create_user(
                 "access-token",
                 "id-token",
                 {"iss": ISSUER, "sub": subject},
             )
 
-    def _create_bound_user(self, username, email, subject):
-        user = User.objects.create_user(username=username, email=email, first_name="Initial", last_name="Profile")
+    def _create_bound_user(self, username, email, subject, first_name="Initial", last_name="Profile"):
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
         OIDCIdentity.objects.create(user=user, issuer=ISSUER, subject=subject)
         return user
 
@@ -1103,74 +1156,151 @@ class OIDCProviderGroupOrderTests(TestCase):
         self.assertEqual(stale_customer_result.pk, provider_first.pk)
         self._assert_provider_only(provider_first, unrelated_before)
 
-    def test_missing_first_provider_role_is_terminal_without_fallback_for_existing_and_new_binding(self):
-        settings = {
-            **PROVIDER_ORDER_CONFIG,
-            "phase-b-provider": {
-                **PROVIDER_ORDER_CONFIG["phase-b-provider"],
-                "OIDC_GROUP_PROVIDER_ROLE_MAPPING": {
-                    "provider-first": "Missing Provider Staff",
-                    "provider-second": self.provider_second_role.name,
-                },
-            },
-        }
-        existing = self._create_bound_user(
-            "provider-order-existing-missing",
-            "provider-order-existing-missing@example.test",
-            "provider-order-existing-missing-subject",
+    def test_provider_claim_order_uses_first_mapping_and_real_role_result(self):
+        scenarios = (
+            ("provider-first", ("provider-first", "provider-second"), self.provider_first_role),
+            ("provider-second", ("provider-second", "provider-first"), self.provider_second_role),
         )
-        existing_profile = (
-            existing.username,
-            existing.email,
-            existing.first_name,
-            existing.last_name,
-        )
-        unrelated_before = self._unrelated_snapshot()
-        before = {
-            "memberships": Membership._base_manager.count(),
-            "holders": AssetHolder._base_manager.count(),
-            "grants": RoleGrant._base_manager.count(),
-            "scopes": RoleGrantScope._base_manager.count(),
-            "groups": GroupMembership._base_manager.count(),
-        }
-        with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
-            existing_result = self._resolve(
-                "provider-order-existing-missing-subject",
-                {
-                    "email": "should-not-update@example.test",
-                    "given_name": "Should",
-                    "family_name": "NotUpdate",
-                    "groups": ["provider-first", "provider-second", "customer-admin"],
-                },
-            )
-        self.assertEqual(existing_result.pk, existing.pk)
-        existing.refresh_from_db()
-        self.assertEqual(
-            (existing.username, existing.email, existing.first_name, existing.last_name),
-            existing_profile,
-        )
-        self.assertEqual(Membership._base_manager.count(), before["memberships"])
-        self.assertEqual(AssetHolder._base_manager.count(), before["holders"])
-        self.assertEqual(RoleGrant._base_manager.count(), before["grants"])
-        self.assertEqual(RoleGrantScope._base_manager.count(), before["scopes"])
-        self.assertEqual(GroupMembership._base_manager.count(), before["groups"])
-        self.assertEqual(self._unrelated_snapshot(), unrelated_before)
+        for label, groups, expected_role in scenarios:
+            with self.subTest(order=groups):
+                subject = f"provider-order-real-{label}-subject"
+                email = f"provider-order-real-{label}@example.test"
+                user = self._create_bound_user(
+                    f"provider-order-real-{label}",
+                    email,
+                    subject,
+                    first_name="Provider",
+                    last_name="Order",
+                )
+                unrelated_before = self._unrelated_snapshot()
+                before = self._state_fingerprint()
+                recorder = RecordingIdentityProvisioner()
 
-        with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
-            new_result = self._resolve(
-                "provider-order-new-missing-subject",
-                {
-                    "email": "provider-order-new-missing@example.test",
-                    "given_name": "New",
-                    "family_name": "Missing",
-                    "groups": ["provider-first", "provider-second", "customer-admin"],
+                resolved = self._resolve(
+                    subject,
+                    {
+                        "email": email,
+                        "given_name": "Provider",
+                        "family_name": "Order",
+                        "groups": list(groups),
+                    },
+                    recorder,
+                )
+
+                self.assertEqual(resolved.pk, user.pk)
+                self.assertEqual(len(recorder.commands), 1)
+                self.assertEqual(len(recorder.results), 1)
+                command = recorder.commands[0]
+                self.assertIsNotNone(command.provider_staff)
+                self.assertEqual(command.provider_staff.role_name, expected_role.name)
+                result = recorder.results[0]
+                self.assertEqual(result.mode, "provider_staff")
+                self.assertEqual(result.role_id, expected_role.pk)
+                self._assert_provider_only(user, unrelated_before)
+                after = self._state_fingerprint()
+                self._assert_preexisting_rows_unchanged(before, after)
+                self.assertEqual(self._unrelated_snapshot(), unrelated_before)
+
+    def test_missing_first_provider_role_is_terminal_without_fallback_for_both_orders(self):
+        scenarios = (
+            ("provider-first", ("provider-first", "provider-second")),
+            ("provider-second", ("provider-second", "provider-first")),
+        )
+        for label, groups in scenarios:
+            first_group, later_group = groups
+            missing_role = f"Missing {first_group} role"
+            valid_role = self.provider_second_role if later_group == "provider-second" else self.provider_first_role
+            settings = {
+                **PROVIDER_ORDER_CONFIG,
+                "phase-b-provider": {
+                    **PROVIDER_ORDER_CONFIG["phase-b-provider"],
+                    "OIDC_GROUP_PROVIDER_ROLE_MAPPING": {
+                        first_group: missing_role,
+                        later_group: valid_role.name,
+                    },
                 },
-            )
-        self.assertIsNotNone(new_result)
-        new_binding = OIDCIdentity.objects.get(issuer=ISSUER, subject="provider-order-new-missing-subject")
-        self.assertEqual(new_binding.user_id, new_result.pk)
-        self.assertFalse(Membership._base_manager.filter(user_id=new_result.pk).exists())
-        self.assertFalse(AssetHolder._base_manager.filter(user_id=new_result.pk).exists())
-        self.assertFalse(RoleGrant._base_manager.filter(membership__user_id=new_result.pk).exists())
-        self.assertFalse(GroupMembership._base_manager.filter(membership__user_id=new_result.pk).exists())
-        self.assertEqual(self._unrelated_snapshot(), unrelated_before)
+            }
+            with self.subTest(order=groups, missing_group=first_group):
+                existing_subject = f"provider-order-existing-missing-{label}-subject"
+                existing = self._create_bound_user(
+                    f"provider-order-existing-missing-{label}",
+                    f"provider-order-existing-missing-{label}@example.test",
+                    existing_subject,
+                    first_name="Old",
+                    last_name="Profile",
+                )
+                existing_profile = (
+                    existing.username,
+                    existing.email,
+                    existing.first_name,
+                    existing.last_name,
+                )
+                before = self._state_fingerprint()
+                recorder = RecordingIdentityProvisioner()
+                with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
+                    existing_result = self._resolve(
+                        existing_subject,
+                        {
+                            "email": "should-not-update@example.test",
+                            "given_name": "Should",
+                            "family_name": "NotUpdate",
+                            "groups": [*groups, "customer-admin"],
+                        },
+                        recorder,
+                    )
+
+                self.assertEqual(existing_result.pk, existing.pk)
+                self.assertEqual(len(recorder.commands), 1)
+                self.assertEqual(len(recorder.results), 1)
+                self.assertEqual(recorder.commands[0].provider_staff.role_name, missing_role)
+                self.assertEqual(recorder.results[0].mode, "provider_mapping_rejected")
+                self.assertIsNone(recorder.results[0].role_id)
+                existing.refresh_from_db()
+                self.assertEqual(
+                    (existing.username, existing.email, existing.first_name, existing.last_name),
+                    existing_profile,
+                )
+                self.assertEqual(self._state_fingerprint(), before)
+                self.assertFalse(Membership._base_manager.filter(user=existing).exists())
+                self.assertFalse(AssetHolder._base_manager.filter(user=existing).exists())
+                self.assertFalse(RoleGrant._base_manager.filter(membership__user=existing).exists())
+                self.assertFalse(GroupMembership._base_manager.filter(membership__user=existing).exists())
+
+                new_subject = f"provider-order-new-missing-{label}-subject"
+                before_new = self._state_fingerprint()
+                before_user_count = User._base_manager.count()
+                before_binding_count = OIDCIdentity._base_manager.count()
+                new_recorder = RecordingIdentityProvisioner()
+                with override_settings(ITAMBOX_TENANT_OIDC_CONFIGS=settings):
+                    new_result = self._resolve(
+                        new_subject,
+                        {
+                            "email": f"provider-order-new-missing-{label}@example.test",
+                            "given_name": "New",
+                            "family_name": "Missing",
+                            "groups": [*groups, "customer-admin"],
+                        },
+                        new_recorder,
+                    )
+
+                self.assertIsNotNone(new_result)
+                self.assertEqual(len(new_recorder.commands), 1)
+                self.assertEqual(len(new_recorder.results), 1)
+                self.assertEqual(new_recorder.commands[0].provider_staff.role_name, missing_role)
+                self.assertEqual(new_recorder.results[0].mode, "provider_mapping_rejected")
+                self.assertIsNone(new_recorder.results[0].role_id)
+                new_binding = OIDCIdentity.objects.get(issuer=ISSUER, subject=new_subject)
+                self.assertEqual(new_binding.user_id, new_result.pk)
+                new_user = User._base_manager.get(pk=new_result.pk)
+                self.assertEqual(new_user.email, f"provider-order-new-missing-{label}@example.test")
+                self.assertEqual(new_user.first_name, "New")
+                self.assertEqual(new_user.last_name, "Missing")
+                self.assertEqual(User._base_manager.count(), before_user_count + 1)
+                self.assertEqual(OIDCIdentity._base_manager.count(), before_binding_count + 1)
+                after_new = self._state_fingerprint()
+                self.assertEqual(after_new["organization"], before_new["organization"])
+                self._assert_preexisting_rows_unchanged(before_new, after_new)
+                self.assertFalse(Membership._base_manager.filter(user=new_result).exists())
+                self.assertFalse(AssetHolder._base_manager.filter(user=new_result).exists())
+                self.assertFalse(RoleGrant._base_manager.filter(membership__user=new_result).exists())
+                self.assertFalse(GroupMembership._base_manager.filter(membership__user=new_result).exists())
