@@ -10,4 +10,4 @@ from .columns import (
 )
 from .jobs import JobTable
 from .object_change import ObjectChangeTable
-from .templates import EventRuleTable, ExportTemplateTable, LabelTemplateTable, SearchResultTable, WebhookEndpointTable
+from .templates import SearchResultTable

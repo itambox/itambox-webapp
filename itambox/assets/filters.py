@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.choices import RequestStatusChoices
 from core.filters import BaseFilterSet
 from extras.models import Tag
+from itambox.scanning import strip_itambox_prefix
 from organization.models import AssetHolder, Location, Site, Tenant
 
 from .models import (
@@ -148,8 +149,6 @@ class AssetFilterSet(BaseFilterSet):
         """Perform basic search across designated fields."""
         if not value.strip():
             return queryset
-        from assets.scanning import strip_itambox_prefix
-
         value = strip_itambox_prefix(value)
         # Basic search across name, asset_tag, serial_number (can be expanded)
         # Consider adding asset_holder.name if performance allows

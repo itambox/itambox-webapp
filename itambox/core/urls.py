@@ -57,10 +57,10 @@ from itambox.views.generic import (
     ObjectBulkRestoreView,
     ObjectPurgeView,
     ObjectRestoreView,
-    table_config,
 )
 from itambox.views.jobs import JobCancelView, JobDetailView, JobListView
 from itambox.views.utility import SearchView, health  # Import core views, aliased to avoid clash
+from users.table_config_views import table_config
 
 mimetypes.add_type("application/zip", ".zip")
 

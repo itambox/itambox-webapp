@@ -27,7 +27,7 @@ from core.csv_utils import csv_safe
 from core.filters import ObjectChangeFilterSet
 from core.forms import JournalEntryForm
 from core.models import ObjectChange
-from core.tables import EventRuleTable, ExportTemplateTable, LabelTemplateTable, ObjectChangeTable, WebhookEndpointTable
+from core.tables import ObjectChangeTable
 from core.tasks.webhooks import redeliver_webhook_delivery, send_webhook_test
 from extras.filters import JournalEntryFilterSet
 from extras.forms import (
@@ -48,7 +48,14 @@ from extras.models import (
     WebhookDelivery,
     WebhookEndpoint,
 )
-from extras.tables import JournalEntryTable, WebhookDeliveryTable
+from extras.tables import (
+    EventRuleTable,
+    ExportTemplateTable,
+    JournalEntryTable,
+    LabelTemplateTable,
+    WebhookDeliveryTable,
+    WebhookEndpointTable,
+)
 from itambox.panels import Panel
 from itambox.registry import registry
 from itambox.views.generic.utils import safe_return_url

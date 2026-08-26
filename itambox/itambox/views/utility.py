@@ -10,6 +10,7 @@ from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
 from core.forms import SearchForm
+from itambox.scanning import strip_itambox_prefix
 from itambox.utils import get_table_for_model
 
 from .generic import BaseHTMXView
@@ -23,8 +24,6 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
     def get(self, request):
         query = request.GET.get("q", "").strip()
         if query:
-            from assets.scanning import strip_itambox_prefix
-
             query = strip_itambox_prefix(query)
         obj_types = request.GET.getlist("obj_type")
 
