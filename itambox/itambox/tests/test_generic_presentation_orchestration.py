@@ -230,6 +230,47 @@ class TestListPipeline:
         assert isinstance(resolution.provider_state, MappingProxyType)
         assert resolution.provider_state["first"] is not resolution.provider_state["second"]
 
+    def test_two_fake_parameter_providers_compose_around_production_extras(self, django_user_model):
+        call_order = []
+
+        def before(input):
+            call_order.append("before")
+            changed = input.params.copy()
+            changed["before"] = "one"
+            return ListParamsResult(changed, {})
+
+        def after(input):
+            call_order.append("after")
+            assert input.params["before"] == "one"
+            changed = input.params.copy()
+            changed["after"] = "two"
+            return ListParamsResult(changed, {})
+
+        request = make_request()
+        request.user = django_user_model.objects.create_user(username="plural-production-list")
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider("before", RecordingProvider(params=before), list_params=True, priority=50)
+            register_provider(
+                "extras",
+                EXTRAS_GENERIC_PRESENTATION_PROVIDER,
+                list_params=True,
+                list_filter=True,
+                list_context=True,
+                priority=100,
+            )
+            register_provider("after", RecordingProvider(params=after), list_params=True, priority=150)
+
+            resolution = resolve_list_provider_params(request, Group, partial=True)
+            context = build_list_provider_context(resolution, {})
+
+        assert call_order == ["before", "after"]
+        assert resolution.params["before"] == "one"
+        assert resolution.params["after"] == "two"
+        assert context["saved_filters"] == []
+        assert context["active_saved_filter_id"] is None
+        assert context["export_templates"] == []
+        assert context["label_templates"] == []
+
     @pytest.mark.parametrize("second_action", ("replace", "delete"))
     def test_parameter_collision_names_both_providers_and_key(self, second_action):
         def first(input):
@@ -436,8 +477,9 @@ class TestProductionReadiness:
         extras_params.assert_not_called()
         subscriptions_detail.assert_not_called()
 
-    def test_noop_production_providers_leave_core_context_unchanged(self):
+    def test_production_list_provider_preserves_queryset_and_supplies_context(self, django_user_model):
         request = make_request()
+        request.user = django_user_model.objects.create_user(username="production-list-provider")
         resolution = resolve_list_provider_params(request, Group, partial=False)
         queryset = Group.objects.all()
         filtered = filter_list_provider_queryset(resolution, queryset)
@@ -448,5 +490,6 @@ class TestProductionReadiness:
         assert resolution.params is not request.GET
         assert resolution.params == request.GET
         assert filtered is queryset
-        assert merged == core_context
+        assert set(("saved_filters", "active_saved_filter_id", "export_templates", "label_templates")) <= set(merged)
+        assert merged["active_saved_filter_id"] is None
         assert merged is not core_context
