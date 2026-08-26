@@ -2,6 +2,7 @@ from functools import cache
 
 from django.utils.translation import gettext_lazy as _
 
+from core.tenant_scope import accessible_tenant_ids, tenant_model
 from itambox.capabilities import registry
 
 from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
@@ -13,10 +14,7 @@ def _msp_layer_active(user):
     default manager would silently return nothing outside a matching tenant context."""
     cached = getattr(user, "_msp_layer_active_cache", None)
     if cached is None:
-        # inline import: app-registry: organization models are not loadable at navigation module import
-        # time (AppRegistryNotReady).
-        from organization.models import Tenant
-
+        Tenant = tenant_model()
         cached = Tenant._base_manager.filter(
             is_provider=True,
             deleted_at__isnull=True,
@@ -27,11 +25,7 @@ def _msp_layer_active(user):
 
 def _user_provider_tenants(user):
     """The user's accessible managing (``is_provider``) tenants."""
-    # inline import: app-registry: organization pulls in models; importing at module top would risk
-    # AppRegistryNotReady during navigation module load.
-    from organization.access import accessible_tenant_ids
-    from organization.models import Tenant
-
+    Tenant = tenant_model()
     ids = accessible_tenant_ids(user)
     if not ids:
         return []
@@ -73,11 +67,7 @@ def can_manage_user_groups(user):
         return False
     if user.is_superuser:
         return True
-    # inline import: app-registry: organization pulls in models; importing at module top would risk
-    # AppRegistryNotReady during navigation module load.
-    from organization.access import accessible_tenant_ids
-    from organization.models import Tenant
-
+    Tenant = tenant_model()
     ids = accessible_tenant_ids(user)
     if not ids:
         return False

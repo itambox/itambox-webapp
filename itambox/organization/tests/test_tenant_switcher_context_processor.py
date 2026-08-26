@@ -10,8 +10,8 @@ from django.test.utils import CaptureQueriesContext
 from django.utils.functional import SimpleLazyObject
 
 from core.tests.mixins import grant
-from itambox.context_processors import tenant_switcher_processor
 from organization.models import Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
+from organization.views.context_processors import tenant_switcher_processor
 
 User = get_user_model()
 
