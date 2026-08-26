@@ -133,10 +133,11 @@ def test_independent_expected_set_catches_semantic_policy_target_sabotage(monkey
     assert set(policy.permissions_for_sso_role("Admin")) != expected
 
 
-def test_current_both_matrix_surfaces_are_identical_ordered_59_key_dicts():
+def test_current_both_matrix_surfaces_preserve_the_ordered_60_key_compatibility_dict():
     assert not apps.is_installed("itambox_esign")
-    expected_keys = [key for key, app, _model in EXPECTED_TARGETS if app != "itambox_esign"]
-    assert len(expected_keys) == 59
+    expected_keys = [key for key, _app, _model in EXPECTED_TARGETS]
+    assert len(expected_keys) == 60
+    assert expected_keys[-1] == "docusignenvelope"
     assert list(ROLE_FORM_MATRIX_MODELS) == expected_keys
     assert list(PACKAGE_MATRIX_MODELS) == expected_keys
     assert ROLE_FORM_MATRIX_MODELS == PACKAGE_MATRIX_MODELS
@@ -222,7 +223,7 @@ def test_present_and_absent_optional_plugin_projection_and_effective_counts(monk
 
     monkeypatch.setattr(apps, "is_installed", lambda label: False)
     assert len(policy.active_role_permission_targets()) == 59
-    assert len(presentation.build_matrix_models()) == 59
+    assert len(presentation.build_matrix_models()) == 60
     assert [target.key for target in policy.active_role_permission_targets()][-1] == "configcontext"
     assert len(policy.permissions_for_sso_role("Admin")) == 235
     assert len(policy.permissions_for_sso_role("Manager")) == 177
@@ -382,4 +383,4 @@ def test_presentation_values_match_the_established_60_row_contract():
         for key, info in PACKAGE_MATRIX_MODELS.items()
     ]
     assert len(EXPECTED_PRESENTATION_ROWS) == 60
-    assert actual == expected[:-1]
+    assert actual == expected

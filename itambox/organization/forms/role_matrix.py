@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
 
-from organization.services.role_permission_policy import ROLE_PERMISSION_TARGETS, active_role_permission_targets
+from organization.services.role_permission_policy import ROLE_PERMISSION_TARGETS
 
 ROLE_PERMISSION_PRESENTATION = {
     # Inventory & Hardware
@@ -349,11 +349,10 @@ def _validate_declarations() -> None:
 
 
 def build_matrix_models():
-    """Build the legacy-shaped active presentation mapping from semantic targets."""
+    """Build the complete legacy-shaped presentation compatibility mapping."""
 
     _validate_declarations()
-    active_keys = tuple(target.key for target in active_role_permission_targets())
-    return {key: ROLE_PERMISSION_PRESENTATION[key] for key in active_keys}
+    return dict(ROLE_PERMISSION_PRESENTATION)
 
 
 MATRIX_MODELS = build_matrix_models()
