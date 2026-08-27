@@ -93,10 +93,11 @@ proposed for repair as `TenantResourceGrant` payloads via `--proposals`.
   schedule row exists, and SMTP works (see below). A stopped worker is the
   most common cause.
 - **Webhook not delivered** — deliveries are durable and recorded: open the
-  event's delivery history (`WebhookDelivery`) for per-attempt status and
-  outcomes, and use manual redelivery once the endpoint is fixed. Also check
-  the `EventRule.enabled` flag, the `WebhookEndpoint` URL/secret, and the
-  worker.
+  endpoint's delivery history under **Extras → Webhooks → <endpoint>** for the
+  attempt count, status, and latest outcome. Once the endpoint is fixed, a
+  completed delivery can be manually redelivered while its source event is
+  retained (requires `extras.change_webhookendpoint`). Also check the
+  `EventRule.enabled` flag, the `WebhookEndpoint` URL/secret, and the worker.
 - **No alert emails** — alert-rule evaluation is daily, not continuous, and
   channel delivery failures are logged, not retried. Check `ITAMBOX_EMAIL_*`
   and the logs for the channel delivery attempt.
