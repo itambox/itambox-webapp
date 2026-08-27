@@ -407,7 +407,7 @@ class EventsSystemTestCase(TransactionTestCase):
                 tenant_id=tenant.pk,
                 test_send=False,
             )
-            send_webhook_task(assertions=assertions, attempt=1)
+            send_webhook_task(assertions=assertions, attempt=0)
 
             payload = mock_request_pinned.call_args.kwargs["json"]
             self.assertEqual(payload["schema_version"], 1)

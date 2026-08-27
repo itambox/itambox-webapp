@@ -55,11 +55,11 @@ class WebhookRetryTestCase(TransactionTestCase):
         resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
         mock_request_pinned.return_value = resp
 
-        send_webhook_task(assertions=assertions, attempt=1)
+        send_webhook_task(assertions=assertions, attempt=0)
 
         mock_async.assert_called_once()
         _, kw = mock_async.call_args
-        self.assertEqual(kw["attempt"], 2)
+        self.assertEqual(kw["attempt"], 1)
         self.assertEqual(kw["assertions"]["delivery_pk"], delivery.pk)
         self.assertNotIn("url", kw["assertions"])
         self.assertNotIn("secret", kw["assertions"])
@@ -76,9 +76,9 @@ class WebhookRetryTestCase(TransactionTestCase):
         successful_response.raise_for_status.return_value = None
         mock_request_pinned.side_effect = [failed_response, successful_response]
 
-        send_webhook_task(assertions=assertions, attempt=1)
+        send_webhook_task(assertions=assertions, attempt=0)
         retry_kwargs = mock_async.call_args.kwargs
-        self.assertEqual(retry_kwargs["attempt"], 2)
+        self.assertEqual(retry_kwargs["attempt"], 1)
         send_webhook_task(**retry_kwargs)
 
         first_payload = mock_request_pinned.call_args_list[0].kwargs["data"]
@@ -114,7 +114,7 @@ class WebhookRetryTestCase(TransactionTestCase):
         resp.raise_for_status.return_value = None
         mock_request_pinned.return_value = resp
 
-        send_webhook_task(assertions=assertions, attempt=1)
+        send_webhook_task(assertions=assertions, attempt=0)
 
         mock_async.assert_not_called()
 
@@ -128,7 +128,7 @@ class WebhookRetryTestCase(TransactionTestCase):
         resp.raise_for_status.return_value = None
         mock_request_pinned.return_value = resp
 
-        send_webhook_task(assertions=assertions, attempt=1)
+        send_webhook_task(assertions=assertions, attempt=0)
 
         mock_async.assert_not_called()
 
@@ -146,7 +146,7 @@ class WebhookRetryTestCase(TransactionTestCase):
         resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
         mock_request_pinned.return_value = resp
 
-        send_webhook_task(assertions=assertions, attempt=1)
+        send_webhook_task(assertions=assertions, attempt=0)
 
         mock_async.assert_not_called()
         mock_schedule.objects.create.assert_called_once()
@@ -155,7 +155,7 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(kw["schedule_type"], mock_schedule.ONCE)
         self.assertGreater(kw["next_run"], timezone.now())
         retry = ast.literal_eval(kw["kwargs"])
-        self.assertEqual(retry["attempt"], 2)
+        self.assertEqual(retry["attempt"], 1)
         self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
         self.assertNotIn("url", retry["assertions"])
         self.assertNotIn("secret", retry["assertions"])
@@ -173,7 +173,7 @@ class WebhookRetryTestCase(TransactionTestCase):
         resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
         mock_request_pinned.return_value = resp
 
-        send_webhook_task(assertions=assertions, attempt=1)
+        send_webhook_task(assertions=assertions, attempt=0)
 
         # The HMAC was still computed (secret re-derived from the endpoint at run time).
         self.assertIn("X-Hub-Signature-256", mock_request_pinned.call_args[1]["headers"])
