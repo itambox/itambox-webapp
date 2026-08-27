@@ -301,9 +301,11 @@ CAPABILITY_LIMITATIONS = {
         "Channel delivery failures are logged, not retried.",
     ),
     "automation.webhooks": (
-        "The outbound payload schema is frozen at wire version 1 and changes only with a new schema_version.",
-        "Deliveries are durable: every delivery is recorded with a stable identity "
-        "and per-attempt outcomes, and operators can redeliver past deliveries.",
+        "The generic outbound payload schema is frozen at wire version 1; Slack and Teams "
+        "targets receive a reduced vendor envelope and no X-Hub-Signature-256 header.",
+        "Delivery is at-least-once: one durable row keeps the current attempt count and latest "
+        "outcome, consumers must deduplicate, and completed deliveries can be redelivered only "
+        "while the source event is retained.",
     ),
     "organization.role_grants": (),
     "organization.resource_grants": (),

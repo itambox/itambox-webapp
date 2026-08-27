@@ -15,7 +15,7 @@
     "automation.webhooks": {
       "activation": "opt-in",
       "contract_class": "beta-opt-in",
-      "exclusions": "Outbound payload schema is frozen at wire version 1 and changes only with a new schema_version; deliveries are durable with a recorded per-delivery history and manual redelivery",
+      "exclusions": "Generic payload schema is frozen at wire version 1; Slack/Teams use a reduced unsigned vendor envelope. Delivery is at-least-once, retains only the current attempt count/latest outcome, requires consumer deduplication, and manual redelivery requires a retained source event",
       "scope": "Event rules and webhook endpoints"
     },
     "organization.resource_grants": {
