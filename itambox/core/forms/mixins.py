@@ -9,6 +9,7 @@ import django_filters
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
 from django import forms
+from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -126,8 +127,7 @@ class BulkEditForm(forms.Form):
     )
 
     def __init__(self, *args, model=None, **kwargs):
-        from extras.models import Tag
-
+        Tag = apps.get_model("extras", "Tag")
         super().__init__(*args, **kwargs)
         self.fields["add_tags"].queryset = Tag.objects.all()
         self.fields["remove_tags"].queryset = Tag.objects.all()

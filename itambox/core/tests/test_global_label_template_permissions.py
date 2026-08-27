@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from itambox.views.features import LabelTemplateDeleteView, LabelTemplateEditView
+from extras.export_views import LabelTemplateDeleteView, LabelTemplateEditView
 
 
 class GlobalLabelTemplatePermissionTests(SimpleTestCase):

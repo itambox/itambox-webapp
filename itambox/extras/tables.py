@@ -18,13 +18,17 @@ from .models import (
     AlertRule,
     CustomField,
     CustomFieldset,
+    EventRule,
+    ExportTemplate,
     JournalEntry,
+    LabelTemplate,
     NotificationChannel,
     ReportTemplate,
     SavedFilter,
     ScheduledReport,
     Tag,
     WebhookDelivery,
+    WebhookEndpoint,
 )
 
 # =============================================================================
@@ -91,6 +95,76 @@ class TagColumn(tables.ManyToManyColumn):
 # =============================================================================
 # Model Tables
 # =============================================================================
+
+
+class ExportTemplateTable(BaseTable):
+    name = tables.Column(linkify=True)
+    content_type = tables.Column(verbose_name=_("Model"))
+    file_extension = tables.Column(verbose_name=_("File Type"))
+    mime_type = tables.Column()
+
+    class Meta(BaseTable.Meta):
+        model = ExportTemplate
+        fields = ("name", "content_type", "file_extension", "mime_type")
+        sequence = ("name", "content_type", "file_extension", "mime_type")
+
+    def render_content_type(self, value):
+        return f"{value.app_label}.{value.model}"
+
+
+class WebhookEndpointTable(BaseTable):
+    name = tables.Column(linkify=True)
+    url = tables.Column()
+    http_method = tables.Column(verbose_name=_("Method"))
+    enabled = BooleanColumn()
+    retry_count = tables.Column(verbose_name=_("Retries"))
+
+    class Meta(BaseTable.Meta):
+        model = WebhookEndpoint
+        fields = ("name", "url", "http_method", "enabled", "retry_count")
+        sequence = ("name", "url", "http_method", "enabled", "retry_count")
+
+
+class EventRuleTable(BaseTable):
+    name = tables.Column(linkify=True)
+    model = tables.Column(verbose_name=_("Model"))
+    action_type = tables.Column(verbose_name=_("Action"))
+    conditions = tables.Column(accessor="conditions_withdrawn", verbose_name=_("Conditions"), orderable=False)
+    enabled = BooleanColumn()
+
+    class Meta(BaseTable.Meta):
+        model = EventRule
+        fields = ("name", "model", "action_type", "conditions", "enabled")
+        sequence = ("name", "model", "action_type", "conditions", "enabled")
+
+    def render_model(self, value):
+        return f"{value.app_label}.{value.model}"
+
+    def render_action_type(self, value):
+        action_map = dict(EventRule.ACTION_TYPE_CHOICES)
+        return action_map.get(value, value)
+
+    def render_conditions(self, value):
+        if value:
+            return format_html('<span class="badge bg-warning">{}</span>', _("Withdrawn"))
+        return "—"
+
+
+class LabelTemplateTable(BaseTable):
+    name = tables.Column(linkify=True)
+    description = tables.Column()
+    page_width = tables.Column(verbose_name=_("Width (in)"))
+    page_height = tables.Column(verbose_name=_("Height (in)"))
+    barcode_format = tables.Column(verbose_name=_("Barcode"))
+
+    class Meta(BaseTable.Meta):
+        model = LabelTemplate
+        fields = ("name", "description", "page_width", "page_height", "barcode_format")
+        sequence = ("name", "description", "page_width", "page_height", "barcode_format")
+
+    def render_barcode_format(self, value):
+        fmt_map = dict(LabelTemplate._meta.get_field("barcode_format").choices)
+        return fmt_map.get(value, value)
 
 
 class TagTable(BaseTable):

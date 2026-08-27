@@ -124,7 +124,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_test_send_action_queues_delivery_and_redirects_with_message(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
 
-        with patch("itambox.views.features.send_webhook_test") as send_test:
+        with patch("extras.webhook_views.send_webhook_test") as send_test:
             response = self.client.post(self._test_url())
 
         self.assertEqual(response.status_code, 302)
@@ -135,7 +135,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_view_only_test_send_is_forbidden_without_side_effect(self):
         self.client_login_to_tenant(self.viewer, self.tenant_a)
 
-        with patch("itambox.views.features.send_webhook_test") as send_test:
+        with patch("extras.webhook_views.send_webhook_test") as send_test:
             response = self.client.post(self._test_url())
 
         self.assertEqual(response.status_code, 403)
@@ -156,7 +156,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
             )
 
         with patch(
-            "itambox.views.features.redeliver_webhook_delivery",
+            "extras.webhook_views.redeliver_webhook_delivery",
             side_effect=create_redelivery,
         ) as redeliver:
             response = self.client.post(self._redeliver_url(self.failed_delivery))
@@ -177,7 +177,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_other_tenant_redelivery_is_fail_closed(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
 
-        with patch("itambox.views.features.redeliver_webhook_delivery") as redeliver:
+        with patch("extras.webhook_views.redeliver_webhook_delivery") as redeliver:
             response = self.client.post(self._redeliver_url(self.other_delivery))
 
         self.assertEqual(response.status_code, 404)
@@ -186,7 +186,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_pending_redelivery_does_not_double_fire(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
 
-        with patch("itambox.views.features.redeliver_webhook_delivery") as redeliver:
+        with patch("extras.webhook_views.redeliver_webhook_delivery") as redeliver:
             response = self.client.post(self._redeliver_url(self.pending_delivery))
 
         self.assertEqual(response.status_code, 302)
@@ -231,7 +231,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_test_send_failure_shows_safe_message(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
 
-        with patch("itambox.views.features.send_webhook_test", side_effect=RuntimeError("boom")):
+        with patch("extras.webhook_views.send_webhook_test", side_effect=RuntimeError("boom")):
             response = self.client.post(self._test_url())
 
         self.assertEqual(response.status_code, 302)
@@ -243,7 +243,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_redeliver_unexpected_failure_shows_safe_message(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
 
-        with patch("itambox.views.features.redeliver_webhook_delivery", side_effect=RuntimeError("boom")):
+        with patch("extras.webhook_views.redeliver_webhook_delivery", side_effect=RuntimeError("boom")):
             response = self.client.post(self._redeliver_url(self.failed_delivery))
 
         self.assertEqual(response.status_code, 302)
@@ -256,7 +256,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
         self.client_login_to_tenant(self.operator, self.tenant_a)
 
         with patch(
-            "itambox.views.features.redeliver_webhook_delivery",
+            "extras.webhook_views.redeliver_webhook_delivery",
             side_effect=DjangoValidationError("unexpected validation failure"),
         ):
             response = self.client.post(self._redeliver_url(self.failed_delivery))

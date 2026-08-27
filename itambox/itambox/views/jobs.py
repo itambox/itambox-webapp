@@ -7,7 +7,6 @@ import logging
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import gettext as _
@@ -95,11 +94,6 @@ class JobDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Label/export jobs attach their generated files to the Job record
-        ct = ContentType.objects.get_for_model(Job)
-        from extras.models import FileAttachment
-
-        context["attachments"] = FileAttachment.objects.filter(model=ct, object_id=self.object.pk)
         context["title"] = self.object.name
         return context
 

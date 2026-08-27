@@ -8,6 +8,9 @@ groups.
 """
 
 from django import forms
+from django.apps import apps
+
+from core.context import get_current_user
 
 
 def scope_tenant_field(form, field_name="tenant", autoset_when_single=True):
@@ -35,15 +38,11 @@ def scope_tenant_field(form, field_name="tenant", autoset_when_single=True):
     if field is None:
         return
 
-    # inline imports: cycle: avoid a core.forms -> middleware/models import cycle at load
-    from itambox.middleware import get_current_user
-
     user = get_current_user()
     if user is None or getattr(user, "is_superuser", False):
         return  # operator / system context keeps the full picker
 
-    from organization.models import Tenant
-
+    Tenant = apps.get_model("organization", "Tenant")
     accessible = Tenant.objects.all()  # tenant-scoping manager → accessible set
     field.queryset = accessible
 

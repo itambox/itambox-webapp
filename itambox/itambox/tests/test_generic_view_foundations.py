@@ -20,6 +20,7 @@ the view layer rather than a test that needs adjusting.
 
 import json
 from html.parser import HTMLParser
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django import forms
@@ -191,6 +192,23 @@ class DetailContextCharacterizationTests(_CatalogFixtureMixin, TenantTestMixin, 
         response = self.client.get(self.url)
         # Authenticated + unauthorized -> PermissionDenied -> 403 (not a login redirect).
         self.assertEqual(response.status_code, 403)
+
+    def test_changelog_url_prefers_object_get_changelog_url_hook(self):
+        """Issue #444 review (P3): an object's explicit ``get_changelog_url()``
+        hook must win over the generic ``objectchange_list`` route."""
+        view = ObjectDetailView()
+        view.request = RequestFactory().get("/")
+        obj = SimpleNamespace(pk=4242, get_changelog_url=lambda: "/custom/changelog/4242/")
+        ct = ContentType.objects.get_for_model(Asset)
+
+        with patch("itambox.views.generic.detail.reverse") as reverse_mock:
+            context = view._build_changelog_context(obj, ct)
+            reverse_mock.assert_not_called()
+
+        self.assertEqual(context["changelog_url"], "/custom/changelog/4242/")
+        # The changelog table still renders when ObjectChange exists, using the
+        # same shared ContentType as before.
+        self.assertIn("changelog_table", context)
 
 
 # Detail-view tenant scoping (foreign pk -> 404, own pk -> 200) is already
@@ -1237,3 +1255,21 @@ class OobFilterCountTargetParityTests(_CatalogFixtureMixin, TenantTestMixin, Tes
             set(),
             "Filter-UI OOB emitter(s) without a full-page target: %r" % (sorted(missing),),
         )
+
+
+class ChangelogUrlFallbackTests(TestCase):
+    """Generic changelog URL fallback for models without a ``get_changelog_url`` hook."""
+
+    def test_changelog_url_falls_back_to_the_generic_objectchange_url(self):
+        view = ObjectDetailView()
+        view.request = RequestFactory().get("/")
+        obj = SimpleNamespace(pk=4243)
+        content_type = ContentType.objects.get_for_model(Asset)
+
+        with patch("itambox.views.generic.detail.reverse", wraps=reverse) as reverse_mock:
+            context = view._build_changelog_context(obj, content_type)
+
+        expected = reverse("objectchange_list")
+        self.assertTrue(context["changelog_url"].startswith(expected + "?"))
+        self.assertIn("changed_object_type", context["changelog_url"])
+        reverse_mock.assert_any_call("objectchange_list")

@@ -32,9 +32,7 @@ from assets.views_scan import ScanResolveView
 from core.schema import schema
 from core.views.auth import ITAMboxLoginView, TenantSamlAcsView, TenantSamlLoginView
 from core.views.graphql import PrivateGraphQLView
-from extras.dashboard import views as dashboard_views
-from itambox.plugins.utils import is_plugin_active, record_plugin_failure
-from itambox.views.features import (
+from extras.attachment_views import (
     FileAttachmentDeleteView,
     FileAttachmentDownloadView,
     FileAttachmentUploadView,
@@ -43,12 +41,11 @@ from itambox.views.features import (
     ImageAttachmentUploadView,
     JournalEntryCreateView,
     JournalEntryListView,
-    LabelPrintView,
-    LabelSelectView,
-    ObjectChangeListView,
-    ObjectChangeView,
-    ObjectExportView,
 )
+from extras.dashboard import views as dashboard_views
+from extras.export_views import LabelPrintView, LabelSelectView, ObjectExportView
+from itambox.plugins.utils import is_plugin_active, record_plugin_failure
+from itambox.views.features import ObjectChangeListView, ObjectChangeView
 from itambox.views.generic import (
     GenericObjectImportView,
     ObjectBulkDeleteView,
@@ -57,10 +54,10 @@ from itambox.views.generic import (
     ObjectBulkRestoreView,
     ObjectPurgeView,
     ObjectRestoreView,
-    table_config,
 )
 from itambox.views.jobs import JobCancelView, JobDetailView, JobListView
 from itambox.views.utility import SearchView, health  # Import core views, aliased to avoid clash
+from users.table_config_views import table_config
 
 mimetypes.add_type("application/zip", ".zip")
 

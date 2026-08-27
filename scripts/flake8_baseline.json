@@ -3948,46 +3948,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.templates.EventRuleTable' imported but unused",
-      "source": "from .templates import EventRuleTable, ExportTemplateTable, LabelTemplateTable, SearchResultTable, WebhookEndpointTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.templates.ExportTemplateTable' imported but unused",
-      "source": "from .templates import EventRuleTable, ExportTemplateTable, LabelTemplateTable, SearchResultTable, WebhookEndpointTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.templates.LabelTemplateTable' imported but unused",
-      "source": "from .templates import EventRuleTable, ExportTemplateTable, LabelTemplateTable, SearchResultTable, WebhookEndpointTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.templates.SearchResultTable' imported but unused",
-      "source": "from .templates import EventRuleTable, ExportTemplateTable, LabelTemplateTable, SearchResultTable, WebhookEndpointTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.templates.WebhookEndpointTable' imported but unused",
-      "source": "from .templates import EventRuleTable, ExportTemplateTable, LabelTemplateTable, SearchResultTable, WebhookEndpointTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tables/base.py",
       "code": "C901",
       "message": "'BaseTable._apply_prefetching' is too complex (29)",
@@ -6596,14 +6556,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/context_processors.py",
-      "code": "C901",
-      "message": "'tenant_switcher_processor' is too complex (19)",
-      "source": "def tenant_switcher_processor(request):",
-      "context": "Module:body/FunctionDef:tenant_switcher_processor:self",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/middleware.py",
       "code": "F401",
       "message": "'.ratelimit.RateLimitMiddleware' imported but unused",
@@ -6726,158 +6678,6 @@
     {
       "path": "itambox/itambox/views/__init__.py",
       "code": "F401",
-      "message": "'.features.EventRuleDeleteView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.EventRuleDetailView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.EventRuleEditView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.EventRuleListView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ExportTemplateDeleteView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ExportTemplateDetailView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ExportTemplateEditView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ExportTemplateListView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.FileAttachmentDeleteView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.FileAttachmentUploadView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ImageAttachmentDeleteView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ImageAttachmentUploadView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.JournalEntryCreateView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.LabelPrintView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.LabelSelectView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.LabelTemplateDeleteView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.LabelTemplateDetailView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.LabelTemplateEditView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.LabelTemplateListView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
       "message": "'.features.ObjectChangeListView' imported but unused",
       "source": "from .features import (",
       "context": "Module:body",
@@ -6887,46 +6687,6 @@
       "path": "itambox/itambox/views/__init__.py",
       "code": "F401",
       "message": "'.features.ObjectChangeView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.ObjectExportView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.WebhookEndpointDeleteView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.WebhookEndpointDetailView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.WebhookEndpointEditView' imported but unused",
-      "source": "from .features import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
-      "message": "'.features.WebhookEndpointListView' imported but unused",
       "source": "from .features import (",
       "context": "Module:body",
       "count": 1
@@ -7006,14 +6766,6 @@
     {
       "path": "itambox/itambox/views/__init__.py",
       "code": "F401",
-      "message": "'.generic.table_config' imported but unused",
-      "source": "from .generic import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/__init__.py",
-      "code": "F401",
       "message": "'.utility.SearchView' imported but unused",
       "source": "from .utility import SearchView, health",
       "context": "Module:body",
@@ -7036,35 +6788,11 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/views/features.py",
-      "code": "F401",
-      "message": "'django.urls.NoReverseMatch' imported but unused",
-      "source": "from django.urls import NoReverseMatch, reverse",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "code": "F401",
-      "message": "'django.utils.http.urlencode' imported but unused",
-      "source": "from django.utils.http import urlencode",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/views/generic/bulk.py",
       "code": "C901",
       "message": "'ObjectBulkEditView.post' is too complex (19)",
       "source": "    def post(self, request, *args, **kwargs):",
       "context": "Module:body/ClassDef:ObjectBulkEditView:body/FunctionDef:post:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/detail.py",
-      "code": "C901",
-      "message": "'ObjectDetailView.get_context_data' is too complex (31)",
-      "source": "    def get_context_data(self, **kwargs):",
-      "context": "Module:body/ClassDef:ObjectDetailView:body/FunctionDef:get_context_data:self",
       "count": 1
     },
     {
@@ -7097,14 +6825,6 @@
       "message": "line too long (149 > 120 characters)",
       "source": "                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: (",
       "context": "Module:body/ClassDef:ObjectImportView:body/FunctionDef:post:body/If:Compare(left=Constant(value='_confirm'), ops=[In()], comparators=[Attribute(value=Name(id='request', ctx=Load()), attr='POST', ctx=Load())]):body/If:Name(id='rows', ctx=Load()):body/If:Call(func=Attribute(value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='settings', ctx=Load()), Constant(value='Q_CLUSTER'), Dict(keys=[], values=[])], keywords=[]), attr='get', ctx=Load()), args=[Constant(value='sync'), Constant(value=False)], keywords=[]):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/list_.py",
-      "code": "C901",
-      "message": "'ObjectListView.get_context_data' is too complex (30)",
-      "source": "    def get_context_data(self, **kwargs):",
-      "context": "Module:body/ClassDef:ObjectListView:body/FunctionDef:get_context_data:self",
       "count": 1
     },
     {

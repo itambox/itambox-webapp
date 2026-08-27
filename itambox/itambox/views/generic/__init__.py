@@ -7,7 +7,7 @@
 #
 # Dependency order (no cycles):
 #   utils -> {authorization, htmx_responses, related_objects, table_context}
-#         -> mixins -> {table_config, restore, import_, delete, edit, detail, list_, bulk}
+#         -> mixins -> {restore, import_, delete, edit, detail, list_, bulk}
 # Ruff's import sorting would move the features re-export to the top and create
 # a runtime circular import, so preserve this explicitly documented order.
 # isort: off
@@ -44,8 +44,6 @@ from itambox.views.generic.mixins import (  # noqa: F401
     TenantScopingViewMixin,
     BulkViewMixin,
 )
-
-from itambox.views.generic.table_config import table_config  # noqa: F401
 
 from itambox.views.generic.restore import (  # noqa: F401
     HtmxActionMixin,
@@ -104,8 +102,6 @@ __all__ = [
     "TenantScopingViewMixin",
     "BulkViewMixin",
     "HtmxActionMixin",
-    # table config
-    "table_config",
     # restore / purge
     "ObjectRestoreView",
     "ObjectPurgeView",

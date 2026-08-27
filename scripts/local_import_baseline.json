@@ -34,12 +34,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/filters.py",
-      "context": "ClassDef:AssetFilterSet/FunctionDef:search",
-      "statement": "from assets.scanning import strip_itambox_prefix",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/asset_form.py",
       "context": "ClassDef:AssetForm/FunctionDef:clean_status",
       "statement": "from django.db.models import Q",
@@ -923,20 +917,8 @@
     },
     {
       "path": "itambox/core/forms/mixins.py",
-      "context": "ClassDef:BulkEditForm/FunctionDef:__init__",
-      "statement": "from extras.models import Tag",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
       "context": "ClassDef:CrispyFormMixin/FunctionDef:action_buttons",
       "statement": "from django.utils.translation import gettext as _",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/tenant.py",
-      "context": "FunctionDef:scope_tenant_field",
-      "statement": "from organization.models import Tenant",
       "count": 1
     },
     {
@@ -1426,12 +1408,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tables/columns.py",
-      "context": "ClassDef:AssigneeColumn/FunctionDef:render",
-      "statement": "from organization.models import Location",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tables/object_change.py",
       "context": "ClassDef:ObjectChangeTable/FunctionDef:render_action",
       "statement": "from core.choices import ObjectChangeActionChoices",
@@ -1810,12 +1786,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/apps.py",
-      "context": "ClassDef:ExtrasConfig/FunctionDef:ready",
-      "statement": "import extras.search",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/customfields.py",
       "context": "ClassDef:CustomFieldModelFormMixin/FunctionDef:append_custom_fields_to_layout",
       "statement": "from crispy_forms.layout import Div, Fieldset",
@@ -1825,18 +1795,6 @@
       "path": "itambox/extras/customfields.py",
       "context": "FunctionDef:apply_custom_field_filters",
       "statement": "from django.db.models import Q",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/customfields.py",
-      "context": "FunctionDef:build_custom_field_form_field",
-      "statement": "from extras.models import CustomField",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/customfields.py",
-      "context": "FunctionDef:custom_fields_for_model",
-      "statement": "from extras.models import CustomField",
       "count": 1
     },
     {
@@ -2362,24 +2320,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/context_processors.py",
-      "context": "FunctionDef:tenant_switcher_processor",
-      "statement": "from django.utils.functional import SimpleLazyObject",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/context_processors.py",
-      "context": "FunctionDef:tenant_switcher_processor",
-      "statement": "from organization.models import Membership, Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/context_processors.py",
-      "context": "FunctionDef:tenant_switcher_processor/FunctionDef:get_grouped_managed_tenants",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/quick_add.py",
       "context": "ClassDef:QuickAddMixin/FunctionDef:get_context_data",
       "statement": "from crispy_forms.helper import FormHelper",
@@ -2399,86 +2339,8 @@
     },
     {
       "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:FileAttachmentDownloadView/FunctionDef:get",
-      "statement": "from django.http import FileResponse",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:ImageAttachmentServeView/FunctionDef:get",
-      "statement": "from django.http import FileResponse",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:LabelPrintView/FunctionDef:get",
-      "statement": "from core.tasks.labels import render_labels_pdf",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointEditView/FunctionDef:_test_webhook",
-      "statement": "from core.events import _send_slack_notification",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointEditView/FunctionDef:_test_webhook",
-      "statement": "from core.events import _send_teams_notification",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointEditView/FunctionDef:_test_webhook",
-      "statement": "from core.http import request_pinned",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointEditView/FunctionDef:_test_webhook",
-      "statement": "from core.http import webhook_target_kind",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointEditView/FunctionDef:_test_webhook",
-      "statement": "from core.validators import validate_external_url",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointEditView/FunctionDef:_test_webhook",
-      "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WorkerStatusContextMixin/FunctionDef:get_context_data",
-      "statement": "from core.worker_status import get_worker_status",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "FunctionDef:_attachment_within_tenant",
-      "statement": "from core.managers import get_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
       "context": "FunctionDef:resolve_serialized_data",
       "statement": "from django.contrib.contenttypes.fields import GenericForeignKey",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/jobs.py",
-      "context": "ClassDef:JobDetailView/FunctionDef:get_context_data",
-      "statement": "from extras.models import FileAttachment",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/utility.py",
-      "context": "ClassDef:SearchView/FunctionDef:get",
-      "statement": "from assets.scanning import strip_itambox_prefix",
       "count": 1
     },
     {
@@ -2977,18 +2839,6 @@
       "path": "itambox/subscriptions/apps.py",
       "context": "ClassDef:SubscriptionsConfig/FunctionDef:_register_subscription_tasks",
       "statement": "from core.schedules import register_schedule",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/apps.py",
-      "context": "ClassDef:SubscriptionsConfig/FunctionDef:ready",
-      "statement": "import subscriptions.search",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/apps.py",
-      "context": "ClassDef:SubscriptionsConfig/FunctionDef:ready",
-      "statement": "import subscriptions.signals",
       "count": 1
     },
     {

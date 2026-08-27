@@ -17,7 +17,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-import itambox.views.features  # noqa: F401
+import extras.feature_views  # noqa: F401
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from core.tests.mixins import TenantTestMixin
 from extras.models import JournalEntry

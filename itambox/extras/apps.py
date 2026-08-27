@@ -14,8 +14,11 @@ from itambox.capabilities import (
     STABLE,
     ActivationState,
     Capability,
-    registry,
 )
+from itambox.capabilities import (
+    registry as capability_registry,
+)
+from itambox.registry import registry as generic_presentation_registry
 
 DOCS = CAPABILITY_REGISTRY_DOC_URL
 
@@ -35,10 +38,12 @@ class ExtrasConfig(AppConfig):
     name = "extras"
 
     def ready(self):
-        # Import search indexes to register them
+        # inline imports: app-registry: extras.search and extras.feature_views register after app population
         import extras.search
+        from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
 
         self._register_capabilities()
+        self._register_generic_presentation(EXTRAS_GENERIC_PRESENTATION_PROVIDER)
 
     def _register_capabilities(self):
         """Declare the reporting, alerting, and automation slices.
@@ -52,7 +57,28 @@ class ExtrasConfig(AppConfig):
         test swaps ``INSTALLED_APPS``, and with six entries a failure partway
         through has to be finishable on the next run.
         """
-        registry.register_all(self._capabilities())
+        capability_registry.register_all(self._capabilities())
+
+    def _register_generic_presentation(self, provider):
+        job_model = self.apps.get_model("core", "Job")
+        generic_presentation_registry.register_feature(job_model, "job_file_attachments")
+        generic_presentation_registry.register_generic_presentation(
+            "extras",
+            provider,
+            detail_features=(
+                "bookmarkable",
+                "custom_field_data",
+                "file_attachments",
+                "image_attachments",
+                "job_file_attachments",
+                "journaling",
+                "watchable",
+            ),
+            list_params=True,
+            list_filter=True,
+            list_context=True,
+            priority=100,
+        )
 
     def _capabilities(self):
         return (

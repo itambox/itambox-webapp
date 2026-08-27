@@ -377,9 +377,7 @@ class AssigneeColumn(tables.Column):
         if holder:
             try:
                 url = holder.get_absolute_url()
-                from organization.models import Location
-
-                if isinstance(holder, Location):
+                if getattr(holder, "_meta", None) is not None and holder._meta.label_lower == "organization.location":
                     return format_html('Location: <a href="{}">{}</a>', url, holder)
                 return format_html('<a href="{}">{}</a>', url, holder)
             except Exception:

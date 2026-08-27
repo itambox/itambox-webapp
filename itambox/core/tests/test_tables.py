@@ -194,3 +194,12 @@ class CoreTablesTestCase(TestCase):
         # Edge case empty ObjectChange
         oc = ObjectChange()
         self.assertIsNone(oc.get_changed_object_url())
+
+
+def test_search_result_table_stays_exported_from_core_tables():
+    """Issue #444 review (P2): the established ``core.tables`` package export
+    for the domain-neutral search table must survive the extras-table move."""
+    from core.tables import SearchResultTable as Exported
+    from core.tables.templates import SearchResultTable as Defined
+
+    assert Exported is Defined

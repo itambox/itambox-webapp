@@ -14,7 +14,7 @@ from django.test import RequestFactory, TestCase
 from core.tests.mixins import TenantTestMixin, grant
 from extras.models import CustomField, SavedFilter, Tag
 from extras.views import SavedFilterSaveView
-from itambox.views.generic import ObjectListView
+from itambox.views.generic.extensions import resolve_list_provider_params
 from organization.models import Tenant
 
 User = get_user_model()
@@ -85,11 +85,11 @@ class SavedFilterVisibilityTests(TenantTestMixin, TestCase):
         )
 
     def _visible_pks(self, user, model):
-        view = ObjectListView()
-        view.request = self.factory.get("/")
-        view.request.user = user
+        request = self.factory.get("/")
+        request.user = user
         with self.tenant_context(self.tenant, self.tenant_membership):
-            return set(view.get_visible_saved_filters(model).values_list("pk", flat=True))
+            resolution = resolve_list_provider_params(request, model, partial=False)
+        return {saved.pk for saved in resolution.provider_state["extras"]["saved_filters"]}
 
     def test_visibility_excludes_other_tenant_and_others_private(self):
         visible = self._visible_pks(self.tenant_user, Tag)

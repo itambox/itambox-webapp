@@ -9,7 +9,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from core.forms import scope_tenant_field
+from core.forms import scope_tenant_field, scope_tenant_group_field
 from core.managers import set_current_tenant, set_current_tenant_group
 from core.tests.mixins import grant
 from itambox.middleware import _current_user
@@ -20,6 +20,10 @@ User = get_user_model()
 
 class _TenantPickerForm(forms.Form):
     tenant = forms.ModelChoiceField(queryset=Tenant.objects.all(), required=False)
+
+
+class _TenantGroupPickerForm(forms.Form):
+    tenant_group = forms.ModelChoiceField(queryset=TenantGroup.objects.all(), required=False)
 
 
 class ScopeTenantFieldTests(TestCase):
@@ -56,6 +60,15 @@ class ScopeTenantFieldTests(TestCase):
         self.assertFalse(form.fields["tenant"].disabled)
         self.assertNotIsInstance(form.fields["tenant"].widget, forms.HiddenInput)
 
+    def test_system_context_keeps_full_picker(self):
+        _current_user.set(None)
+        form = _TenantPickerForm()
+        scope_tenant_field(form)
+
+        self.assertEqual(self._pks(form), {self.a1.pk, self.a2.pk, self.other.pk})
+        self.assertFalse(form.fields["tenant"].disabled)
+        self.assertNotIsInstance(form.fields["tenant"].widget, forms.HiddenInput)
+
     def test_single_tenant_member_autoset_and_hidden(self):
         _current_user.set(self.member)
         set_current_tenant(self.a1)
@@ -75,6 +88,31 @@ class ScopeTenantFieldTests(TestCase):
         self.assertEqual(self._pks(form), {self.a1.pk, self.a2.pk})
         self.assertNotIn(self.other.pk, self._pks(form))
         self.assertFalse(form.fields["tenant"].disabled)
+
+    def test_bound_picker_rejects_out_of_scope_tenant(self):
+        _current_user.set(self.member)
+        set_current_tenant(None)
+        set_current_tenant_group(self.group)
+        form = _TenantPickerForm(data={"tenant": self.other.pk})
+        scope_tenant_field(form)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("tenant", form.errors)
+
+    def test_group_picker_rejects_out_of_scope_group(self):
+        other_group = TenantGroup.objects.create(name="Other Group", slug="other-group")
+        _current_user.set(self.member)
+        set_current_tenant(None)
+        set_current_tenant_group(self.group)
+        form = _TenantGroupPickerForm(data={"tenant_group": other_group.pk})
+        scope_tenant_group_field(form)
+
+        self.assertEqual(
+            set(form.fields["tenant_group"].queryset.values_list("pk", flat=True)),
+            {self.group.pk},
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("tenant_group", form.errors)
 
     def test_wired_into_a_real_form(self):
         # End-to-end: a real edit form hides+locks its tenant picker for a

@@ -14,11 +14,11 @@ from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 
+from extras.models import CustomField
+
 
 def build_custom_field_form_field(cf, initial_value=None):
     """Build a django.forms field for a CustomField definition."""
-    from extras.models import CustomField
-
     common = {"label": cf.label, "required": cf.required, "initial": initial_value}
     if cf.field_type == CustomField.FIELD_TYPE_TEXT:
         return forms.CharField(widget=forms.TextInput(attrs={"class": "form-control"}), **common)
@@ -52,20 +52,8 @@ def serialize_custom_field_value(value):
 
 def custom_fields_for_model(model):
     """All active CustomFields whose object_types include the given model."""
-    from extras.models import CustomField
-
     ct = ContentType.objects.get_for_model(model)
     return CustomField.objects.filter(object_types=ct)
-
-
-def get_custom_fields_display(obj):
-    """Return [(label, value), ...] for an object's stored custom field data,
-    resolving display labels from the CustomField definitions."""
-    data = getattr(obj, "custom_field_data", None) or {}
-    if not data:
-        return []
-    labels = dict(custom_fields_for_model(type(obj)).values_list("name", "label"))
-    return [(labels.get(name, name), value) for name, value in sorted(data.items())]
 
 
 def apply_custom_field_filters(queryset, model, params):
