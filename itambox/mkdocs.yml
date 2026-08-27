@@ -61,7 +61,7 @@ nav:
   - Operations:
       - Capability Maturity: 'operations/capability-maturity.md'
       - Upgrades: 'operations/upgrades.md'
-      - Issue #445 Task-Path Cutover: 'operations/issue445-task-path-cutover.md'
+      - "Issue #445 Task-Path Cutover": 'operations/issue445-task-path-cutover.md'
       - Backup & Restore: 'operations/backup-restore.md'
       - Data Retention: 'operations/data-retention.md'
       - Recovery Qualification Drill: 'operations/recovery-drill.md'
