@@ -24,6 +24,18 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="webhookdelivery",
+            name="dispatch_stale_at",
+            field=models.DateTimeField(
+                blank=True,
+                db_index=True,
+                editable=False,
+                help_text="Recovery coordinator lease for a queued durable delivery.",
+                null=True,
+                verbose_name="Dispatch Stale At",
+            ),
+        ),
+        migrations.AddField(
+            model_name="webhookdelivery",
             name="event_rule_id",
             field=models.PositiveBigIntegerField(
                 blank=True,
@@ -31,6 +43,17 @@ class Migration(migrations.Migration):
                 help_text="Immutable identifier of the event rule execution that created this delivery.",
                 null=True,
                 verbose_name="Event Rule ID",
+            ),
+        ),
+        migrations.AddField(
+            model_name="webhookdelivery",
+            name="payload_timestamp",
+            field=models.DateTimeField(
+                blank=True,
+                editable=False,
+                help_text="Immutable timestamp used in every attempt of this delivery.",
+                null=True,
+                verbose_name="Payload Timestamp",
             ),
         ),
         migrations.AddField(

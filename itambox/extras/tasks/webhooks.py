@@ -22,6 +22,7 @@ import requests
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django_q.models import Schedule
 from django_q.tasks import async_task
@@ -33,6 +34,7 @@ from extras.models import Event, WebhookDelivery, WebhookEndpoint
 logger = logging.getLogger(__name__)
 WEBHOOK_ENVELOPE_SCHEMA_VERSION = 1
 WEBHOOK_TASK_PATH = "extras.tasks.webhooks.send_webhook_task"
+WEBHOOK_RECOVERY_TASK_PATH = "extras.tasks.webhooks.recover_pending_webhook_deliveries"
 
 _SAFE_REJECTED_MESSAGE = "Webhook delivery was rejected."
 _SAFE_CONFIGURATION_MESSAGE = "Invalid webhook configuration."
@@ -50,6 +52,9 @@ _IDENTITY_ERROR_CLASS = "integration.delivery_identity_rejected"
 # 660 seconds. A crashed worker therefore loses this lease before redelivery,
 # while a still-live task remains fenced for its entire allowed runtime.
 _CLAIM_LEASE_SECONDS = 600
+_RECOVERY_PENDING_STALE_SECONDS = 60
+_RECOVERY_DISPATCH_LEASE_SECONDS = 120
+_RECOVERY_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +280,7 @@ def _mark_dead_locked(delivery, *, error_class: str, error_message: str, respons
     delivery.completed_at = now
     delivery.claim_token = None
     delivery.claim_expires_at = None
+    delivery.dispatch_stale_at = None
     delivery.save(
         update_fields=[
             "status",
@@ -285,6 +291,7 @@ def _mark_dead_locked(delivery, *, error_class: str, error_message: str, respons
             "completed_at",
             "claim_token",
             "claim_expires_at",
+            "dispatch_stale_at",
             "updated_at",
         ]
     )
@@ -292,13 +299,16 @@ def _mark_dead_locked(delivery, *, error_class: str, error_message: str, respons
 
 def _event_payload_fields(delivery, event):
     """Payload provenance for the locked row: test envelope or its own event."""
+    payload_timestamp = delivery.payload_timestamp
     if delivery.test_send:
+        if payload_timestamp is None:
+            return None
         return (
             "test",
             "extras",
             "WebhookEndpoint",
             delivery.endpoint_id or "",
-            timezone.now().isoformat(),
+            payload_timestamp.isoformat(),
             {},
         )
     if event is None:
@@ -308,7 +318,7 @@ def _event_payload_fields(delivery, event):
         event.model.app_label,
         event.model.model,
         event.object_id,
-        event.timestamp.isoformat(),
+        (payload_timestamp or event.timestamp).isoformat(),
         event.data,
     )
 
@@ -410,6 +420,7 @@ def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
         delivery.attempt = max(delivery.attempt, attempt + 1)
         delivery.attempted_at = now
         delivery.next_retry_at = None
+        delivery.dispatch_stale_at = None
         delivery.save(
             update_fields=[
                 "claim_token",
@@ -417,6 +428,7 @@ def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
                 "attempt",
                 "attempted_at",
                 "next_retry_at",
+                "dispatch_stale_at",
                 "updated_at",
             ]
         )
@@ -789,6 +801,37 @@ def send_webhook_task(
             retry_backoff=plan.retry_backoff,
             retry_kwargs=retry_kwargs,
         )
+    # broad except: task-isolation: unexpected transport/runtime failures must release
+    # the durable claim through the typed retry state machine without logging details
+    except Exception as exc:
+        logger.error(
+            "%s disposition=retryable reason=unexpected_error error_class=%s",
+            delivery_log_message(context),
+            type(exc).__name__,
+        )
+        if attempt >= plan.retry_count:
+            result = DeliveryResult(
+                operation,
+                DeliveryDisposition.RETRYABLE,
+                error_class=_RETRY_EXHAUSTED_ERROR_CLASS,
+            )
+            retry_kwargs = None
+        else:
+            result = DeliveryResult(
+                operation,
+                DeliveryDisposition.RETRYABLE,
+                error_class=_UNAVAILABLE_ERROR_CLASS,
+            )
+            retry_kwargs = _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id)
+        return _finish_delivery(
+            delivery_pk=delivery.pk,
+            claim_token=claim_token,
+            result=result,
+            response_code=response_code,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
+            retry_kwargs=retry_kwargs,
+        )
 
 
 def _load_delivery_for_actor(delivery_pk: int, actor_id: int | None):
@@ -812,6 +855,64 @@ def _assertions_for(delivery) -> WebhookDeliveryAssertions:
         tenant_id=delivery.tenant_id,
         test_send=delivery.test_send,
     )
+
+
+def _recovery_attempt(delivery) -> int:
+    if delivery.attempted_at is None:
+        return max(delivery.attempt - 1, 0)
+    return delivery.attempt
+
+
+def _enqueue_recovered_delivery(delivery_pk: int, assertions: WebhookDeliveryAssertions, attempt: int) -> None:
+    try:
+        async_task(WEBHOOK_TASK_PATH, assertions, attempt=attempt)
+    # broad except: boundary-isolation: release only the recovery lease and log stable identifiers
+    except Exception as exc:
+        logger.error(
+            "operation=webhook.recover_pending disposition=retryable delivery_pk=%s error_class=%s",
+            delivery_pk,
+            type(exc).__name__,
+        )
+        WebhookDelivery._base_manager.filter(pk=delivery_pk).update(dispatch_stale_at=timezone.now())
+
+
+def _enqueue_recovery_batch(deliveries) -> None:
+    for delivery_pk, assertions, attempt in deliveries:
+        _enqueue_recovered_delivery(delivery_pk, assertions, attempt)
+
+
+def recover_pending_webhook_deliveries() -> dict[str, int]:
+    """Requeue durable rows stranded before enqueue or after an expired claim.
+
+    The coordinator never sends a webhook. It leases candidate rows under
+    ``select_for_update(skip_locked=True)`` and publishes identity-only tasks
+    after commit. Duplicate packages remain harmless because the worker's claim
+    lock permits only one active send for a delivery.
+    """
+    now = timezone.now()
+    pending_cutoff = now - datetime.timedelta(seconds=_RECOVERY_PENDING_STALE_SECONDS)
+    lease_until = now + datetime.timedelta(seconds=_RECOVERY_DISPATCH_LEASE_SECONDS)
+    status_due = Q(status=WebhookDelivery.STATUS_PENDING, created_at__lte=pending_cutoff) | Q(
+        status=WebhookDelivery.STATUS_FAILED,
+        next_retry_at__lte=now,
+    )
+    claim_due = Q(claim_token__isnull=True) | Q(claim_expires_at__isnull=True) | Q(claim_expires_at__lte=now)
+    dispatch_due = Q(dispatch_stale_at__isnull=True) | Q(dispatch_stale_at__lte=now)
+
+    with transaction.atomic():
+        candidates = list(
+            WebhookDelivery._base_manager.select_for_update(skip_locked=True)
+            .filter(status_due, claim_due, dispatch_due)
+            .order_by("pk")[:_RECOVERY_BATCH_SIZE]
+        )
+        deliveries = []
+        for delivery in candidates:
+            delivery.dispatch_stale_at = lease_until
+            delivery.save(update_fields=["dispatch_stale_at", "updated_at"])
+            deliveries.append((delivery.pk, _assertions_for(delivery), _recovery_attempt(delivery)))
+        if deliveries:
+            transaction.on_commit(lambda rows=tuple(deliveries): _enqueue_recovery_batch(rows))
+    return {"dispatched": len(deliveries)}
 
 
 def _enqueue_task(delivery, *, actor_id: int | None) -> None:
@@ -853,6 +954,14 @@ def _validate_redelivery_source(delivery) -> None:
         raise ValidationError(_SAFE_CONFIGURATION_MESSAGE)
 
 
+def _pending_claim_active(delivery, now) -> bool:
+    if delivery.status != WebhookDelivery.STATUS_PENDING:
+        return False
+    if delivery.claim_token is None or delivery.claim_expires_at is None:
+        return True
+    return delivery.claim_expires_at > now
+
+
 def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None):
     """Create and enqueue a fresh delivery for an existing delivery outcome."""
     source, actor = _load_delivery_for_actor(delivery_pk, actor_id)
@@ -860,7 +969,7 @@ def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None)
         raise PermissionDenied("Delivery not found.")
 
     now = timezone.now()
-    if source.status == "pending" or (source.next_retry_at is not None and source.next_retry_at > now):
+    if _pending_claim_active(source, now) or (source.next_retry_at is not None and source.next_retry_at > now):
         raise ValidationError(_SAFE_IN_PROGRESS_MESSAGE)
 
     with transaction.atomic():
@@ -873,7 +982,7 @@ def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None)
         if source is None:
             raise PermissionDenied("Delivery not found.")
         now = timezone.now()
-        if source.status == "pending" or (source.next_retry_at is not None and source.next_retry_at > now):
+        if _pending_claim_active(source, now) or (source.next_retry_at is not None and source.next_retry_at > now):
             raise ValidationError(_SAFE_IN_PROGRESS_MESSAGE)
 
         _validate_redelivery_source(source)
@@ -882,6 +991,7 @@ def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None)
             endpoint_id=source.endpoint_id,
             event_id=source.event_id,
             event_rule_id=source.event_rule_id,
+            payload_timestamp=source.payload_timestamp,
             target_url=source.target_url,
             target_http_method=source.target_http_method,
             target_headers=source.target_headers,
@@ -916,6 +1026,7 @@ def send_webhook_test(endpoint_pk: int, *, actor_id: int | None = None):
             tenant_id=endpoint.tenant_id,
             endpoint=endpoint,
             event=None,
+            payload_timestamp=timezone.now(),
             delivery_id=str(uuid4()),
             status="pending",
             test_send=True,

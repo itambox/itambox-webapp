@@ -26,6 +26,7 @@ tokens, secrets, DSNs, or raw exception text.
 import ast
 import inspect
 from collections import Counter, defaultdict
+from uuid import UUID
 
 from django.apps import apps as django_apps
 from django.conf import settings
@@ -56,6 +57,7 @@ CUTOVER_PATHS = frozenset(
         "extras.tasks.alerts.run_alert_rule_now",
         "extras.tasks.reports.generate_scheduled_report_task",
         "extras.tasks.webhooks.send_webhook_task",
+        "extras.tasks.webhooks.recover_pending_webhook_deliveries",
         "assets.tasks.requests.notify_new_request_task",
         "assets.tasks.checkin.bulk_checkin_task",
         "assets.tasks.checkout.bulk_checkout_task",
@@ -107,6 +109,36 @@ PHASES_TO_EXPECTED = {
     "rollback-preflight": "cutover",
     "reverse-postmigrate": "legacy",
 }
+LEGACY_WEBHOOK_PATH = "core.tasks.send_webhook_task"
+CUTOVER_WEBHOOK_PATH = "extras.tasks.webhooks.send_webhook_task"
+LEGACY_WEBHOOK_KEYS = frozenset(
+    {
+        "url",
+        "method",
+        "headers",
+        "secret",
+        "webhook_endpoint_id",
+        "event_id",
+        "delivery_id",
+        "tenant_id",
+        "event_action",
+        "event_model_app_label",
+        "event_model_name",
+        "event_object_id",
+        "event_timestamp_iso",
+        "event_data",
+        "attempt",
+        "retry_count",
+        "retry_backoff",
+        "actor_id",
+        "request_id",
+        "test_send",
+    }
+)
+CUTOVER_WEBHOOK_KEYS = frozenset({"assertions", "attempt", "actor_id", "request_id"})
+WEBHOOK_ASSERTION_KEYS = frozenset(
+    {"delivery_pk", "delivery_id", "webhook_endpoint_id", "event_id", "tenant_id", "test_send"}
+)
 
 
 class Command(BaseCommand):
@@ -138,6 +170,7 @@ class Command(BaseCommand):
         clusters = self._cluster_matrix()
         self._inventory_schedules(clusters, expected, state)
         self._inventory_ormq(clusters, expected, state)
+        self._inventory_historical_tasks(clusters, options["phase"], state)
 
         failures = self._report(state)
         if failures and options["strict"]:
@@ -181,6 +214,37 @@ class Command(BaseCommand):
                     continue
                 self._inspect_package(package, "ormq.package", expected, state)
 
+    def _inventory_historical_tasks(self, clusters, phase, state):
+        Task = django_apps.get_model("django_q", "Task")
+        database_aliases = set(connections)
+        database_aliases.update(cluster[0] for cluster in clusters)
+        for db_alias in sorted(database_aliases):
+            try:
+                rows = Task._base_manager.using(db_alias).values_list("func", "hook")
+                for func, hook in rows.iterator(chunk_size=500):
+                    self._classify_historical_surface(func, "task.func", phase, state)
+                    if hook:
+                        self._classify_historical_surface(hook, "task.hook", phase, state)
+            except DatabaseError:
+                self._problem("database.task", "inventory-failed", state)
+
+    def _classify_historical_surface(self, path, surface, phase, state):
+        resolved = self._resolve(path)
+        classification = self._classify(resolved)
+        if classification == "alias":
+            self._problem(surface, "noncanonical-alias", state, resolved)
+            return
+        if classification == "unknown-form":
+            state["undecodable"][surface] += 1
+            return
+        state["surfaces"][surface][resolved] += 1
+        if classification not in ("legacy", "cutover"):
+            return
+        if phase == "forward-postmigrate":
+            return
+        if classification != "legacy":
+            state["mismatches"][(surface, resolved)] += 1
+
     def _scan_schedules(self, database, expected, state):
         Schedule = django_apps.get_model("django_q", "Schedule")
         for func, hook, args, kwargs in Schedule.objects.using(database).values_list("func", "hook", "args", "kwargs"):
@@ -196,7 +260,77 @@ class Command(BaseCommand):
             if parsed_kwargs is None:
                 self._problem("schedule.kwargs", "invalid-literal", state)
                 continue
+            self._inspect_task_payload(func, parsed_kwargs, expected, state)
             self._inspect_kwargs(parsed_kwargs, "schedule.kwargs", expected, state)
+
+    def _inspect_task_payload(self, func, kwargs, expected, state):
+        resolved = self._resolve(func)
+        if resolved == LEGACY_WEBHOOK_PATH and expected == "legacy":
+            if not self._valid_legacy_webhook_payload(kwargs):
+                self._problem("schedule.kwargs", "legacy-webhook-payload-incompatible", state)
+        elif resolved == CUTOVER_WEBHOOK_PATH and expected == "cutover":
+            if not self._valid_cutover_webhook_payload(kwargs):
+                self._problem("schedule.kwargs", "cutover-webhook-payload-incompatible", state)
+
+    def _valid_legacy_webhook_payload(self, payload):
+        if set(payload) != LEGACY_WEBHOOK_KEYS:
+            return False
+        try:
+            UUID(str(payload["delivery_id"]))
+        except (TypeError, ValueError, AttributeError):
+            return False
+        optional_ids = ("webhook_endpoint_id", "event_id", "tenant_id", "actor_id")
+        return (
+            isinstance(payload["url"], str)
+            and bool(payload["url"])
+            and isinstance(payload["method"], str)
+            and isinstance(payload["headers"], dict)
+            and all(isinstance(key, str) for key in payload["headers"])
+            and (payload["secret"] is None or isinstance(payload["secret"], str))
+            and all(payload[key] is None or isinstance(payload[key], (int, str)) for key in optional_ids)
+            and all(
+                isinstance(payload[key], str)
+                for key in (
+                    "event_action",
+                    "event_model_app_label",
+                    "event_model_name",
+                    "event_timestamp_iso",
+                )
+            )
+            and isinstance(payload["event_object_id"], (int, str))
+            and isinstance(payload["event_data"], dict)
+            and all(
+                isinstance(payload[key], int) and not isinstance(payload[key], bool) and payload[key] >= 0
+                for key in ("attempt", "retry_count", "retry_backoff")
+            )
+            and (payload["request_id"] is None or isinstance(payload["request_id"], str))
+            and isinstance(payload["test_send"], bool)
+        )
+
+    def _valid_cutover_webhook_payload(self, payload):
+        assertions = payload.get("assertions")
+        if set(payload) != CUTOVER_WEBHOOK_KEYS or not isinstance(assertions, dict):
+            return False
+        if set(assertions) != WEBHOOK_ASSERTION_KEYS:
+            return False
+        try:
+            UUID(str(assertions["delivery_id"]))
+        except (TypeError, ValueError, AttributeError):
+            return False
+        return (
+            isinstance(assertions["delivery_pk"], int)
+            and not isinstance(assertions["delivery_pk"], bool)
+            and all(
+                assertions[key] is None or (isinstance(assertions[key], int) and not isinstance(assertions[key], bool))
+                for key in ("webhook_endpoint_id", "event_id", "tenant_id")
+            )
+            and isinstance(assertions["test_send"], bool)
+            and isinstance(payload["attempt"], int)
+            and not isinstance(payload["attempt"], bool)
+            and payload["attempt"] >= 0
+            and (payload["actor_id"] is None or isinstance(payload["actor_id"], int))
+            and (payload["request_id"] is None or isinstance(payload["request_id"], str))
+        )
 
     def _cluster_matrix(self):
         q_cluster = dict(getattr(settings, "Q_CLUSTER", {}) or {})

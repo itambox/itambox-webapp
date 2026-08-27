@@ -510,6 +510,13 @@ class WebhookDelivery(BaseModel):
         verbose_name=_("Event Rule ID"),
         help_text=_("Immutable identifier of the event rule execution that created this delivery."),
     )
+    payload_timestamp = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Payload Timestamp"),
+        help_text=_("Immutable timestamp used in every attempt of this delivery."),
+    )
     target_url = models.URLField(max_length=2000, blank=True, verbose_name=_("Target URL"))
     target_http_method = models.CharField(
         max_length=10,
@@ -563,6 +570,14 @@ class WebhookDelivery(BaseModel):
         db_index=True,
         editable=False,
         verbose_name=_("Claim Expires At"),
+    )
+    dispatch_stale_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        editable=False,
+        verbose_name=_("Dispatch Stale At"),
+        help_text=_("Recovery coordinator lease for a queued durable delivery."),
     )
 
     class Meta:

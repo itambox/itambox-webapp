@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection, transaction
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -620,6 +621,7 @@ class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):

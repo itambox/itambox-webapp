@@ -7,13 +7,14 @@ from unittest.mock import MagicMock, patch
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, override_settings
+from django.utils import timezone
 
 from assets.models import Manufacturer
 from core.events import send_notification_to_channel
 from core.models import Notification
-from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
-from extras.services.events import _check_conditions, _evaluate_condition, dispatch_event
+from extras.models import Event, EventRule, NotificationChannel, WebhookDelivery, WebhookEndpoint
+from extras.services.events import _check_conditions, _enqueue_delivery, dispatch_event
 from organization.models import Location, Tenant
 
 
@@ -21,6 +22,23 @@ class EventsSystemTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.manufacturer_ct = ContentType.objects.get_for_model(Manufacturer)
+
+    @override_settings(Q_CLUSTER={"sync": False})
+    def test_webhook_enqueue_waits_for_commit(self):
+        delivery = WebhookDelivery._base_manager.create(
+            delivery_id=str(uuid.uuid4()),
+            status=WebhookDelivery.STATUS_PENDING,
+            test_send=True,
+            payload_timestamp=timezone.now(),
+        )
+        with patch("extras.services.events.async_task") as async_task:
+            with transaction.atomic():
+                _enqueue_delivery(delivery, actor_id=None, request_id="issue445-on-commit")
+                async_task.assert_not_called()
+            async_task.assert_called_once()
+        assertions = async_task.call_args.args[1]
+        self.assertEqual(assertions.delivery_pk, delivery.pk)
+        self.assertEqual(async_task.call_args.kwargs["request_id"], "issue445-on-commit")
 
     @patch("core.http.request_pinned")
     def test_event_dispatch_on_create_update_delete(self, mock_request_pinned):
@@ -105,27 +123,10 @@ class EventsSystemTestCase(TransactionTestCase):
                     data={"app_label": "assets", "model_name": "manufacturer"},
                 )
 
-                self.assertFalse(_evaluate_condition(conditions, event))
                 self.assertFalse(_check_conditions(conditions, event))
                 dispatch_event(Manufacturer, event, "create")
 
                 self.assertFalse(Notification.objects.filter(subject=rule.action_config["subject"]).exists())
-
-    def test_evaluate_condition_gt_lt_and_non_dict_shapes(self):
-        """The withdrawn engine keeps its numeric operators (v2 reuse path) and
-        fails closed on unexpected shapes."""
-        event = Event(
-            model=self.manufacturer_ct,
-            object_id=1,
-            action="create",
-            data={"price": "10"},
-        )
-        self.assertTrue(_evaluate_condition({"field": "price", "op": "gt", "value": 5}, event))
-        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": 15}, event))
-        self.assertTrue(_evaluate_condition({"field": "price", "op": "lt", "value": 15}, event))
-        self.assertFalse(_evaluate_condition({"field": "price", "op": "lt", "value": 5}, event))
-        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": "not-a-number"}, event))
-        self.assertFalse(_evaluate_condition("not-a-dict", event))
         self.assertFalse(_check_conditions([], event))
 
     def test_empty_conditions_continue_to_match(self):
@@ -371,7 +372,6 @@ class EventsSystemTestCase(TransactionTestCase):
             ),
             start=1,
         ):
-            from extras.models import WebhookDelivery
             from extras.tasks.webhooks import WebhookDeliveryAssertions, send_webhook_task
 
             tenant = envelope_tenant_a if index == 1 else envelope_tenant_b

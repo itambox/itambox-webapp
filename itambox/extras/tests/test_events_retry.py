@@ -32,6 +32,7 @@ class WebhookRetryTestCase(TransactionTestCase):
             event_id=None,
             tenant_id=None,
             test_send=True,
+            payload_timestamp=timezone.now(),
             attempt=1,
             status=WebhookDelivery.STATUS_PENDING,
             target_url=endpoint.url,

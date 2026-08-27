@@ -17,7 +17,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages import get_messages
 from django.db import OperationalError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from assets.models import (
@@ -242,11 +242,27 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
         self.assertEqual(job.status, Job.STATUS_PENDING)
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.bulk_checkin_task")
+        self.assertEqual(args[0], "assets.tasks.checkin.bulk_checkin_task")
         self.assertEqual(args[1], job.pk)
         self.assertEqual(args[2], [str(self.a1.pk), str(self.a2.pk)])
         self.assertEqual(args[3], self.tenant_admin.pk)
         self.assertEqual(args[4], self.tenant.pk)
+
+    @override_settings(Q_CLUSTER={"sync": False})
+    @patch("django_q.tasks.async_task")
+    def test_bulk_checkin_async_enqueue_waits_for_commit(self, mock_async):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            response = self.client.post(
+                reverse("assets:asset_bulk_checkin"),
+                {"pk": [self.a1.pk], "notes": "queued after commit"},
+            )
+            self.assertEqual(response.status_code, 302)
+            mock_async.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args.args[0], "assets.tasks.checkin.bulk_checkin_task")
 
     @patch("django_q.tasks.async_task")
     def test_bulk_dispose_enqueues_with_proceeds_map(self, mock_async):
@@ -268,7 +284,7 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
         self.assertIsNotNone(job)
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.bulk_dispose_task")
+        self.assertEqual(args[0], "assets.tasks.disposal.bulk_dispose_task")
         disposal_kwargs = args[5]
         proceeds_map = args[6]
         self.assertEqual(disposal_kwargs["disposal_method"], "recycle")
@@ -939,7 +955,7 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         self.assertIsNotNone(job)
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.bulk_checkout_task")
+        self.assertEqual(args[0], "assets.tasks.checkout.bulk_checkout_task")
         self.assertEqual(args[1], job.pk)
         self.assertEqual(args[2], [str(self.asset.pk)])
         self.assertEqual(args[3], "assetholder")

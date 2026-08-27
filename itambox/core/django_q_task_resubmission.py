@@ -6,8 +6,11 @@ over, a historical row referencing a predecessor path (or a noncanonical
 moved alias) must never be re-enqueued — the path no longer resolves on the
 cutover branch, and silently re-enqueueing it would create queue debt instead
 of retrying work. ``GuardedTaskAdmin``/``GuardedFailAdmin`` replace the vendor
-admins via ``core.apps.CoreConfig.ready()`` and are all-or-nothing: when ANY
-selected row is blocked, NOTHING is enqueued and no Failure row is deleted.
+admins via ``core.apps.CoreConfig.ready()``. The blocked/invalid selection
+screen is all-or-nothing: when ANY selected row is unsafe, NOTHING is enqueued
+and no Failure row is deleted. Enqueue transport failures may occur after an
+earlier broker submission, but historical Failure rows are deleted only after
+every selected enqueue succeeds.
 
 Kept in its own module so imports of django-q models can never be drawn into
 an admin default-site resolution cycle.
@@ -34,6 +37,23 @@ LEGACY_TASK_PATHS = frozenset(
         "core.tasks.sync_tenant_intune",
         "core.tasks.labels.generate_label_batch_task",
         "core.tasks.labels.generate_label_pdf_batch_task",
+    }
+)
+CANONICAL_TASK_PATHS = frozenset(
+    {
+        "extras.tasks.alerts.evaluate_alert_rules_task",
+        "extras.tasks.alerts.run_alert_rule_now",
+        "extras.tasks.reports.generate_scheduled_report_task",
+        "extras.tasks.webhooks.send_webhook_task",
+        "extras.tasks.webhooks.recover_pending_webhook_deliveries",
+        "assets.tasks.requests.notify_new_request_task",
+        "assets.tasks.checkin.bulk_checkin_task",
+        "assets.tasks.checkout.bulk_checkout_task",
+        "assets.tasks.depreciation.calculate_depreciation",
+        "assets.tasks.disposal.bulk_dispose_task",
+        "assets.tasks.intune_sync.sync_tenant_intune",
+        "assets.tasks.labels.generate_label_batch_task",
+        "assets.tasks.labels.generate_label_pdf_batch_task",
     }
 )
 MOVED_NEIGHBORHOOD_PREFIXES = (
@@ -95,6 +115,8 @@ def is_blocked_task_path(func):
     """True when a stored task path is a predecessor or noncanonical alias."""
     if not isinstance(func, str) or not func:
         return False
+    if func in CANONICAL_TASK_PATHS:
+        return False
     if func in LEGACY_TASK_PATHS:
         return True
     if func in MOVED_NEIGHBORHOOD_MODULES:
@@ -106,6 +128,8 @@ def _task_payload(task):
     """Normalize native q2 values and the guarded action's legacy JSON form."""
     try:
         if not isinstance(task.func, str) or not task.func:
+            raise ValueError
+        if task.hook is not None and (not isinstance(task.hook, str) or not task.hook):
             raise ValueError
         args = json.loads(task.args) if isinstance(task.args, str) and task.args else task.args or ()
         kwargs = json.loads(task.kwargs) if isinstance(task.kwargs, str) and task.kwargs else task.kwargs or {}
@@ -127,7 +151,7 @@ def resubmit_task_guarded(model_admin, request, queryset):
     stable error code and the blocked path identities.
     """
     tasks = list(queryset)
-    blocked = sorted({task.func for task in tasks if is_blocked_task_path(task.func)})
+    blocked = sorted({path for task in tasks for path in (task.func, task.hook) if is_blocked_task_path(path)})
     payloads = [(task, _task_payload(task)) for task in tasks]
     invalid = [task for task, payload in payloads if payload is None]
     if blocked or invalid:
@@ -148,8 +172,8 @@ def resubmit_task_guarded(model_admin, request, queryset):
             cluster=task.cluster,
             **kwargs,
         )
-        if model_admin.model is Failure:
-            task.delete()
+    if model_admin.model is Failure:
+        Failure.objects.filter(pk__in=[task.pk for task, _payload in payloads]).delete()
 
 
 resubmit_task_guarded.short_description = _("Resubmit selected tasks to queue")

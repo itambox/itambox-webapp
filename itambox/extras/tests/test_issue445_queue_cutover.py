@@ -18,8 +18,39 @@ from django.test import TransactionTestCase, override_settings
 
 LEGACY = "core.tasks.evaluate_alert_rules_task"
 CUTOVER = "extras.tasks.alerts.evaluate_alert_rules_task"
+LEGACY_WEBHOOK = "core.tasks.send_webhook_task"
+CUTOVER_WEBHOOK = "extras.tasks.webhooks.send_webhook_task"
 UNRELATED = "core.tasks.retention.prune_changelog_task"
 ALIAS = "core.tasks.alerts.evaluate_alert_rules_task.extra"
+CANONICAL_SUCCESSORS = (
+    "extras.tasks.alerts.evaluate_alert_rules_task",
+    "extras.tasks.alerts.run_alert_rule_now",
+    "extras.tasks.reports.generate_scheduled_report_task",
+    "extras.tasks.webhooks.send_webhook_task",
+    "extras.tasks.webhooks.recover_pending_webhook_deliveries",
+    "assets.tasks.requests.notify_new_request_task",
+    "assets.tasks.checkin.bulk_checkin_task",
+    "assets.tasks.checkout.bulk_checkout_task",
+    "assets.tasks.depreciation.calculate_depreciation",
+    "assets.tasks.disposal.bulk_dispose_task",
+    "assets.tasks.intune_sync.sync_tenant_intune",
+    "assets.tasks.labels.generate_label_batch_task",
+    "assets.tasks.labels.generate_label_pdf_batch_task",
+)
+PREDECESSOR_PATHS = (
+    "core.tasks.evaluate_alert_rules_task",
+    "core.tasks.run_alert_rule_now",
+    "core.tasks.generate_scheduled_report_task",
+    "core.tasks.send_webhook_task",
+    "assets.tasks.notify_new_request_task",
+    "core.tasks.bulk_checkin_task",
+    "core.tasks.bulk_checkout_task",
+    "core.tasks.calculate_depreciation",
+    "core.tasks.bulk_dispose_task",
+    "core.tasks.sync_tenant_intune",
+    "core.tasks.labels.generate_label_batch_task",
+    "core.tasks.labels.generate_label_pdf_batch_task",
+)
 
 
 @pytest.mark.serial_only
@@ -50,6 +81,45 @@ class Issue445QueueCutoverTests(TransactionTestCase):
             repeats=-1,
         )
 
+    def _legacy_webhook_payload(self):
+        return {
+            "url": "https://example.invalid/legacy-retry",
+            "method": "POST",
+            "headers": {},
+            "secret": "",
+            "webhook_endpoint_id": None,
+            "event_id": None,
+            "delivery_id": str(uuid.uuid4()),
+            "tenant_id": None,
+            "event_action": "test",
+            "event_model_app_label": "extras",
+            "event_model_name": "webhookendpoint",
+            "event_object_id": 1,
+            "event_timestamp_iso": "2026-01-01T00:00:00+00:00",
+            "event_data": {},
+            "attempt": 1,
+            "retry_count": 3,
+            "retry_backoff": 60,
+            "actor_id": None,
+            "request_id": None,
+            "test_send": True,
+        }
+
+    def _cutover_webhook_payload(self):
+        return {
+            "assertions": {
+                "delivery_pk": 1,
+                "delivery_id": str(uuid.uuid4()),
+                "webhook_endpoint_id": None,
+                "event_id": None,
+                "tenant_id": None,
+                "test_send": True,
+            },
+            "attempt": 1,
+            "actor_id": None,
+            "request_id": None,
+        }
+
     def _ormq(self, func, *, hook=None, chain=None, kwargs=None, key="ITAMbox-Cluster"):
         from django_q.models import OrmQ
         from django_q.tasks import async_task
@@ -68,6 +138,23 @@ class Issue445QueueCutoverTests(TransactionTestCase):
         async_task(func, q_options=q_options, **(kwargs or {}))
         return OrmQ.objects.latest("pk")
 
+    def _historical_task(self, func, *, hook=None):
+        from django.utils import timezone
+        from django_q.models import Failure
+
+        now = timezone.now()
+        return Failure.objects.create(
+            id=uuid.uuid4().hex[:32],
+            name="historical cutover task",
+            func=func,
+            hook=hook,
+            args=(),
+            kwargs={},
+            success=False,
+            started=now,
+            stopped=now,
+        )
+
     def test_forward_preflight_passes_only_on_predecessor_paths(self):
         self._schedule(LEGACY)
         self._schedule(UNRELATED)
@@ -82,6 +169,27 @@ class Issue445QueueCutoverTests(TransactionTestCase):
         self._schedule(CUTOVER, hook=None)
         self._schedule(UNRELATED)
         call_command("verify_issue445_task_cutover", phase="forward-postmigrate", strict=True)
+
+    def test_webhook_schedule_payload_matches_each_cutover_phase(self):
+        self._schedule(LEGACY_WEBHOOK, kwargs=repr(self._legacy_webhook_payload()))
+        call_command("verify_issue445_task_cutover", phase="forward-preflight", strict=True)
+        self._clear_queue_state()
+
+        self._schedule(CUTOVER_WEBHOOK, kwargs=repr(self._cutover_webhook_payload()))
+        call_command("verify_issue445_task_cutover", phase="forward-postmigrate", strict=True)
+
+    def test_webhook_schedule_payload_mismatch_fails_closed(self):
+        cases = (
+            (LEGACY_WEBHOOK, {"url": "https://example.invalid/incomplete"}, "forward-preflight"),
+            (CUTOVER_WEBHOOK, self._legacy_webhook_payload(), "forward-postmigrate"),
+            (CUTOVER_WEBHOOK, {"assertions": {}}, "forward-postmigrate"),
+        )
+        for func, payload, phase in cases:
+            with self.subTest(func=func, phase=phase):
+                self._schedule(func, kwargs=repr(payload))
+                with self.assertRaises(CommandError):
+                    call_command("verify_issue445_task_cutover", phase=phase, strict=True)
+                self._clear_queue_state()
 
     def test_forward_postmigrate_rejects_predecessor_hook(self):
         self._schedule(CUTOVER, hook=LEGACY)
@@ -217,11 +325,29 @@ class Issue445QueueCutoverTests(TransactionTestCase):
         self._schedule(LEGACY)
         call_command("verify_issue445_task_cutover", phase="reverse-postmigrate", strict=True)
 
+    def test_forward_postmigrate_allows_guarded_historical_predecessors(self):
+        self._historical_task(LEGACY, hook=LEGACY)
+        call_command("verify_issue445_task_cutover", phase="forward-postmigrate", strict=True)
+
+    def test_rollback_preflight_rejects_historical_cutover_func(self):
+        self._historical_task(CUTOVER)
+        with self.assertRaises(CommandError):
+            call_command("verify_issue445_task_cutover", phase="rollback-preflight", strict=True)
+
+    def test_rollback_preflight_rejects_historical_cutover_hook(self):
+        self._historical_task(UNRELATED, hook=CUTOVER)
+        with self.assertRaises(CommandError):
+            call_command("verify_issue445_task_cutover", phase="rollback-preflight", strict=True)
+
+    def test_rollback_preflight_accepts_historical_predecessor_rows(self):
+        self._historical_task(LEGACY, hook=LEGACY)
+        call_command("verify_issue445_task_cutover", phase="rollback-preflight", strict=True)
+
 
 class Issue445ResubmissionGuardTests(TransactionTestCase):
     """All-or-nothing historical resubmission guard (no queue writes)."""
 
-    def _task_row(self, func, *, args=(), kwargs=None):
+    def _task_row(self, func, *, args=(), kwargs=None, hook=None):
         from django.utils import timezone
         from django_q.models import Failure
 
@@ -230,6 +356,7 @@ class Issue445ResubmissionGuardTests(TransactionTestCase):
             id=uuid.uuid4().hex[:32],
             name="historical failure",
             func=func,
+            hook=hook,
             args=args,
             kwargs={} if kwargs is None else kwargs,
             success=False,
@@ -284,6 +411,19 @@ class Issue445ResubmissionGuardTests(TransactionTestCase):
         model_admin.message_user.assert_not_called()
         self.assertFalse(good.__class__.objects.filter(pk=good.pk).exists())
 
+    def test_enqueue_failure_keeps_all_historical_failure_rows(self):
+        from core.django_q_task_resubmission import resubmit_task_guarded
+
+        rows = [self._task_row(UNRELATED), self._task_row(CUTOVER)]
+        model_admin = mock.Mock(model=rows[0].__class__)
+        with mock.patch(
+            "core.django_q_task_resubmission.async_task",
+            side_effect=[None, RuntimeError("issue445 broker failure")],
+        ):
+            with self.assertRaises(RuntimeError):
+                resubmit_task_guarded(model_admin, mock.Mock(), rows)
+        self.assertEqual(rows[0].__class__.objects.filter(pk__in=[row.pk for row in rows]).count(), 2)
+
     def test_native_list_args_and_cutover_path_are_allowed(self):
         from core.django_q_task_resubmission import resubmit_task_guarded
 
@@ -292,6 +432,37 @@ class Issue445ResubmissionGuardTests(TransactionTestCase):
         with mock.patch("core.django_q_task_resubmission.async_task") as enqueue:
             resubmit_task_guarded(model_admin, mock.Mock(), [good])
         enqueue.assert_called_once()
+
+    def test_every_canonical_successor_neighborhood_is_allowed(self):
+        from core.django_q_task_resubmission import is_blocked_task_path, resubmit_task_guarded
+
+        for path in CANONICAL_SUCCESSORS:
+            with self.subTest(path=path):
+                self.assertFalse(is_blocked_task_path(path))
+                row = self._task_row(path)
+                model_admin = mock.Mock(model=row.__class__)
+                with mock.patch("core.django_q_task_resubmission.async_task") as enqueue:
+                    resubmit_task_guarded(model_admin, mock.Mock(), [row])
+                enqueue.assert_called_once()
+
+    def test_every_predecessor_path_is_blocked(self):
+        from core.django_q_task_resubmission import is_blocked_task_path
+
+        for path in PREDECESSOR_PATHS:
+            with self.subTest(path=path):
+                self.assertTrue(is_blocked_task_path(path))
+
+    def test_stale_hook_blocks_whole_selection(self):
+        from core.django_q_task_resubmission import resubmit_task_guarded
+
+        rows = [self._task_row(CUTOVER, hook=LEGACY), self._task_row(UNRELATED)]
+        model_admin = mock.Mock(model=rows[0].__class__)
+        with mock.patch("core.django_q_task_resubmission.async_task") as enqueue:
+            resubmit_task_guarded(model_admin, mock.Mock(), rows)
+        enqueue.assert_not_called()
+        self.assertEqual(rows[0].__class__.objects.filter(pk__in=[row.pk for row in rows]).count(), 2)
+        message = model_admin.message_user.call_args.args[1]
+        self.assertIn(LEGACY, message)
 
     def test_native_empty_tuple_args_are_allowed(self):
         from core.django_q_task_resubmission import resubmit_task_guarded

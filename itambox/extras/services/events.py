@@ -111,19 +111,20 @@ def _eligible_rules(event, instance_tenant_id):
 
 
 def process_event_rules(event, instance_tenant_id=None):
-    """Attempt every eligible rule exactly once, then mark the event terminal.
+    """Serialize one terminal evaluation of every eligible rule for an event.
 
     The event row is locked for the complete rule-attempt transaction. Concurrent
     dispatchers therefore serialize before reading ``processed``; all database
     side effects and the terminal flag commit together. Queue dispatches registered
-    by rule actions remain ``transaction.on_commit`` callbacks, so a failed final
-    save rolls back the durable side effects and never publishes work.
+    by rule actions remain ``transaction.on_commit`` callbacks. Durable pending
+    webhook rows are recovered by the periodic coordinator if publication fails.
 
-    Each eligible rule gets one attempt; a rule action that raises is caught,
-    reported with identifiers only, and is terminal for that rule on this event.
-    Once every eligible rule has reached a terminal attempt — including the case
-    where none was eligible — the event is marked processed so a caught failure
-    can never be replayed into duplicate deliveries or notifications.
+    Each eligible rule gets one database attempt; a rule action that raises is
+    caught, reported with identifiers only, and terminal for that rule on this
+    event. Once every eligible rule has reached a terminal attempt — including
+    the case where none was eligible — the event is marked processed. External
+    webhook delivery remains at-least-once: consumers deduplicate by the stable
+    event and delivery identities.
     """
     if event.pk is None:
         return
@@ -173,41 +174,6 @@ def _check_conditions(conditions, event):
     return not has_authored_conditions(conditions)
 
 
-def _evaluate_condition(rule, event):
-    """Evaluate a single condition rule against the event."""
-
-    if not isinstance(rule, dict):
-        return False
-
-    field = rule.get("field")
-    op = rule.get("op")
-    value = rule.get("value")
-
-    if not field or not op:
-        return False
-
-    data = event.data or {}
-    actual = data.get(field)
-
-    if op == "eq":
-        return actual == value
-    elif op == "neq":
-        return actual != value
-    elif op == "contains":
-        return str(value) in str(actual) if actual else False
-    elif op == "in":
-        return actual in (value if isinstance(value, list) else [value])
-    elif op in ("gt", "lt"):
-        try:
-            lhs = float(actual)
-            rhs = float(value)
-        except (TypeError, ValueError):
-            return False
-        return lhs > rhs if op == "gt" else lhs < rhs
-
-    return False
-
-
 def _execute_event_action(rule, event, instance_tenant_id=None):
     """Execute the action specified by an event rule."""
 
@@ -236,6 +202,7 @@ def _send_webhook(rule, event, instance_tenant_id=None):
         tenant_id=instance_tenant_id,
         endpoint=rule.webhook,
         event=event,
+        payload_timestamp=event.timestamp,
         delivery_id=str(uuid4()),
         status=WebhookDelivery.STATUS_PENDING,
         **target,

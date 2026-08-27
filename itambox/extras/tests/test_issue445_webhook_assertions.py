@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
+from django.utils import timezone
 from django_q.models import Schedule
 
 from assets.models import Manufacturer
@@ -262,6 +263,7 @@ class Issue445WebhookAssertionTests(TestCase):
                 event=None,
                 delivery_id=str(uuid4()),
                 test_send=True,
+                payload_timestamp=timezone.now(),
                 target_url=self.endpoint.url,
                 target_http_method=self.endpoint.http_method,
                 target_headers=self.endpoint.headers,

@@ -11466,6 +11466,50 @@
     },
     {
       "dependencies": [
+        "django_q.0019_alter_task_options_alter_ormq_key_alter_ormq_lock_and_more",
+        "extras.0112_backfill_webhookdelivery_targets",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0113_upgrade_legacy_webhook_retry_schedules",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0113_upgrade_legacy_webhook_retry_schedules.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Validates and upgrades delayed legacy webhook retry schedules to assertion-only payloads, moves exact endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue secrets."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -17987,6 +18031,7 @@
     "extras.0110_issue445_task_paths",
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
+    "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -18073,6 +18118,7 @@
       "extras.0105_reporttemplate_advanced_mode_and_more",
       "extras.0110_issue445_task_paths",
       "extras.0112_backfill_webhookdelivery_targets",
+      "extras.0113_upgrade_legacy_webhook_retry_schedules",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -18272,7 +18318,7 @@
         ]
       }
     },
-    "post_transition_migrations": 26,
+    "post_transition_migrations": 27,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

@@ -33,6 +33,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0110_issue445_task_paths",
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
+    "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -111,6 +112,14 @@ SEMANTIC_DISPOSITIONS = {
             "history remains unbound because exact legacy rule provenance cannot be reconstructed safely."
         ),
         {"extras.0112_backfill_webhookdelivery_targets"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Validates and upgrades delayed legacy webhook retry schedules to assertion-only payloads, moves exact "
+            "endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue secrets."
+        ),
+        {"extras.0113_upgrade_legacy_webhook_retry_schedules"},
     ),
     **_dispositions(
         "required-fresh",

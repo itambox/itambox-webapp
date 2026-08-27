@@ -1,8 +1,14 @@
 """RED ownership-cutover probes for issue #445."""
 
+import ast
 import importlib
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
+from django.db import connection
 from django.test import TestCase
 
 CANONICAL_PAIRS = (
@@ -91,10 +97,110 @@ def test_task_packages_do_not_reexport_moved_callables():
         assert not leaked, f"missing issue445 import-free task-package contract: {package_name} re-exports {leaked}"
 
 
+def _producer_source_files(source_root):
+    for source in source_root.rglob("*.py"):
+        relative_parts = source.relative_to(source_root).parts
+        if not {"tests", "migrations", "__pycache__"}.intersection(relative_parts):
+            yield source
+
+
+def _async_task_literal(node):
+    if not isinstance(node, ast.Call) or not node.args:
+        return None
+    call_name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+    value = node.args[0]
+    if call_name == "async_task" and isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return value
+    return None
+
+
+def _schedule_func_literal(node):
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return None
+    if node.func.attr != "create" or ast.unparse(node.func.value) != "Schedule.objects":
+        return None
+    return next(
+        (
+            keyword.value
+            for keyword in node.keywords
+            if keyword.arg == "func"
+            and isinstance(keyword.value, ast.Constant)
+            and isinstance(keyword.value.value, str)
+        ),
+        None,
+    )
+
+
+def _literal_producer_paths():
+    source_root = Path(__file__).resolve().parents[2]
+    for source in _producer_source_files(source_root):
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        relative = source.relative_to(source_root).as_posix()
+        for node in ast.walk(tree):
+            for value in (_async_task_literal(node), _schedule_func_literal(node)):
+                if value is not None:
+                    yield relative, value.lineno, value.value
+
+
+def test_every_literal_task_producer_resolves_to_a_callable():
+    invalid = []
+    for source, line, task_path in _literal_producer_paths():
+        try:
+            resolved = _resolve(task_path)
+        except (ImportError, AttributeError, ValueError) as exc:
+            invalid.append(f"{source}:{line}: {task_path} ({type(exc).__name__})")
+            continue
+        if not callable(resolved):
+            invalid.append(f"{source}:{line}: {task_path} (not callable)")
+    assert not invalid, "unresolvable literal task producer(s):\n  " + "\n  ".join(sorted(invalid))
+
+
 class Issue445ZeroQueryImportTests(TestCase):
-    """PASS/RED by module: importing a task boundary must never query the ORM."""
+    """Import probes run out-of-process so class identities in the suite stay stable."""
 
     def test_boundary_module_imports_perform_zero_queries(self):
+        probe = """
+import importlib
+import sys
+import django
+
+django.setup()
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
+with CaptureQueriesContext(connection) as captured:
+    importlib.reload(importlib.import_module(sys.argv[1]))
+print(f"ISSUE445_QUERY_COUNT={len(captured)}")
+"""
+        database = connection.settings_dict
+        env = os.environ.copy()
+        env.update(
+            {
+                "DJANGO_SETTINGS_MODULE": os.environ.get("DJANGO_SETTINGS_MODULE", "core.settings"),
+                "ITAMBOX_ENV": "dev",
+                "ITAMBOX_SECRET_KEY": os.environ.get("ITAMBOX_SECRET_KEY", "issue445-subprocess-secret"),
+                "ITAMBOX_DB_NAME": str(database["NAME"]),
+                "ITAMBOX_DB_USER": str(database["USER"]),
+                "ITAMBOX_DB_PASSWORD": str(database["PASSWORD"]),
+                "ITAMBOX_DB_HOST": str(database["HOST"]),
+                "ITAMBOX_DB_PORT": str(database["PORT"]),
+                "ITAMBOX_DB_SSLMODE": str(database.get("OPTIONS", {}).get("sslmode", "disable")),
+            }
+        )
         for module_name in ZERO_QUERY_IMPORTS:
-            with self.subTest(module=module_name), self.assertNumQueries(0):
-                importlib.reload(importlib.import_module(module_name))
+            with self.subTest(module=module_name):
+                result = subprocess.run(
+                    [sys.executable, "-c", probe, module_name],
+                    cwd=Path(__file__).resolve().parents[2],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                marker = next(
+                    (line for line in result.stdout.splitlines() if line.startswith("ISSUE445_QUERY_COUNT=")),
+                    None,
+                )
+                self.assertEqual(marker, "ISSUE445_QUERY_COUNT=0", result.stdout)

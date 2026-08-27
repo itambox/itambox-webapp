@@ -26,12 +26,14 @@ from itambox.registry import registry as generic_presentation_registry
 
 DOCS = CAPABILITY_REGISTRY_DOC_URL
 
-# The daily alert schedule may only be registered once the cutover migration that
-# rewrites persisted task paths has actually been applied on the database being
-# migrated; before that, the canonical path does not exist for this database.
+# Canonical schedules are registered only after their owning cutover migrations
+# are applied on the database being migrated; predecessor states must never gain
+# task paths that their code cannot execute.
 ISSUE445_CUTOVER = ("extras", "0110_issue445_task_paths")
+ISSUE445_WEBHOOK_DURABILITY = ("extras", "0113_upgrade_legacy_webhook_retry_schedules")
 ALERT_DISPATCH_UID = "extras.issue445.register_daily_alert_schedule.v1"
 ALERT_TASK_PATH = "extras.tasks.alerts.evaluate_alert_rules_task"
+WEBHOOK_RECOVERY_TASK_PATH = "extras.tasks.webhooks.recover_pending_webhook_deliveries"
 
 
 def _scheduled_reports_probe():
@@ -67,11 +69,11 @@ class ExtrasConfig(AppConfig):
         )
 
     def _register_alert_schedule(self, sender, using=DEFAULT_DB_ALIAS, **kwargs):
-        """Ensure the daily alert evaluation schedule exists on the migrated database.
+        """Ensure issue-#445 periodic tasks exist only after their migrations.
 
-        Registration is deliberately gated on the cutover migration being applied:
-        a database still on a predecessor state (or one just reversed back to it)
-        must not gain a schedule row pointing at the cutover task path.
+        The alert schedule appears after the task-path cutover; the webhook
+        recovery schedule appears only after legacy retry payloads have been
+        upgraded. A predecessor database gains neither successor-only path.
         """
         # inline import: app-registry: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
@@ -80,18 +82,30 @@ class ExtrasConfig(AppConfig):
         recorder = MigrationRecorder(connection)
         if not recorder.has_table():
             return
+        applied = recorder.migration_qs
         app, name = ISSUE445_CUTOVER
-        if not recorder.migration_qs.filter(app=app, name=name).exists():
-            return
-        register_schedule(
-            ALERT_TASK_PATH,
-            defaults={
-                "name": "Daily Alert Rule Evaluation",
-                "schedule_type": Schedule.DAILY,
-                "repeats": -1,
-            },
-            using=using,
-        )
+        if applied.filter(app=app, name=name).exists():
+            register_schedule(
+                ALERT_TASK_PATH,
+                defaults={
+                    "name": "Daily Alert Rule Evaluation",
+                    "schedule_type": Schedule.DAILY,
+                    "repeats": -1,
+                },
+                using=using,
+            )
+        app, name = ISSUE445_WEBHOOK_DURABILITY
+        if applied.filter(app=app, name=name).exists():
+            register_schedule(
+                WEBHOOK_RECOVERY_TASK_PATH,
+                defaults={
+                    "name": "Webhook Delivery Recovery",
+                    "schedule_type": Schedule.MINUTES,
+                    "minutes": 1,
+                    "repeats": -1,
+                },
+                using=using,
+            )
 
     def _register_capabilities(self):
         """Declare the reporting, alerting, and automation slices.

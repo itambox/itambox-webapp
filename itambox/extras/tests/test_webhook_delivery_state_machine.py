@@ -15,6 +15,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import close_old_connections, connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.operations.special import RunPython
+from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 from django.utils import timezone
 from django_q.models import Schedule
@@ -385,6 +386,116 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertIsNone(delivery.claim_token)
         self.assertIsNone(delivery.claim_expires_at)
 
+    def test_recovery_sweep_requeues_stranded_pending_once(self):
+        from extras.tasks import webhooks as webhook_tasks
+
+        now = timezone.now()
+        kwargs = self._task_kwargs()
+        delivery = self._task_delivery(kwargs)
+        WebhookDelivery._base_manager.filter(pk=delivery.pk).update(created_at=now - timedelta(minutes=5))
+
+        with (
+            patch("extras.tasks.webhooks.timezone.now", return_value=now),
+            patch("extras.tasks.webhooks.async_task") as async_task,
+        ):
+            result = webhook_tasks.recover_pending_webhook_deliveries()
+            repeated = webhook_tasks.recover_pending_webhook_deliveries()
+
+        self.assertEqual(result, {"dispatched": 1})
+        self.assertEqual(repeated, {"dispatched": 0})
+        async_task.assert_called_once()
+        delivery.refresh_from_db()
+        self.assertGreater(delivery.dispatch_stale_at, now)
+        self.assertEqual(async_task.call_args.args[0], "extras.tasks.webhooks.send_webhook_task")
+        self.assertEqual(async_task.call_args.args[1].delivery_pk, delivery.pk)
+
+    def test_recovery_sweep_skips_live_claim_and_requeues_expired_claim(self):
+        from extras.tasks import webhooks as webhook_tasks
+
+        now = timezone.now()
+        live_kwargs = self._task_kwargs(
+            claim_token=uuid4(),
+            claim_expires_at=now + timedelta(minutes=5),
+        )
+        expired_kwargs = self._task_kwargs(
+            claim_token=uuid4(),
+            claim_expires_at=now - timedelta(seconds=1),
+            attempted_at=now - timedelta(minutes=2),
+            attempt=2,
+        )
+        live = self._task_delivery(live_kwargs)
+        expired = self._task_delivery(expired_kwargs)
+        WebhookDelivery._base_manager.filter(pk__in=(live.pk, expired.pk)).update(created_at=now - timedelta(minutes=5))
+
+        with (
+            patch("extras.tasks.webhooks.timezone.now", return_value=now),
+            patch("extras.tasks.webhooks.async_task") as async_task,
+        ):
+            result = webhook_tasks.recover_pending_webhook_deliveries()
+
+        self.assertEqual(result, {"dispatched": 1})
+        async_task.assert_called_once()
+        self.assertEqual(async_task.call_args.args[1].delivery_pk, expired.pk)
+        self.assertEqual(async_task.call_args.kwargs["attempt"], 2)
+        live.refresh_from_db()
+        self.assertIsNone(live.dispatch_stale_at)
+
+    def test_recovery_enqueue_failure_releases_lease_and_redacts_error(self):
+        from extras.tasks import webhooks as webhook_tasks
+
+        now = timezone.now()
+        kwargs = self._task_kwargs(
+            status=WebhookDelivery.STATUS_FAILED,
+            attempted_at=now - timedelta(minutes=2),
+            next_retry_at=now - timedelta(seconds=1),
+        )
+        delivery = self._task_delivery(kwargs)
+        canary = "issue445-recovery-broker-secret"
+        with (
+            patch("extras.tasks.webhooks.timezone.now", return_value=now),
+            patch("extras.tasks.webhooks.async_task", side_effect=RuntimeError(canary)),
+            self.assertLogs("extras.tasks.webhooks", level="ERROR") as captured,
+        ):
+            result = webhook_tasks.recover_pending_webhook_deliveries()
+
+        self.assertEqual(result, {"dispatched": 1})
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.dispatch_stale_at, now)
+        rendered = " ".join(captured.output)
+        self.assertIn("RuntimeError", rendered)
+        self.assertNotIn(canary, rendered)
+
+    def test_unexpected_runtime_failure_releases_claim_and_schedules_retry(self):
+        kwargs = self._task_kwargs()
+        canary = "issue445-unexpected-secret-canary"
+        with (
+            patch("extras.tasks.webhooks._dispatch_webhook_request", side_effect=OSError(canary)),
+            self.assertLogs("extras.tasks.webhooks", level="ERROR") as captured,
+        ):
+            result = send_webhook_task(**kwargs)
+
+        delivery = self._task_delivery(kwargs)
+        self.assertEqual(result.disposition, DeliveryDisposition.RETRYABLE)
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_FAILED)
+        self.assertIsNone(delivery.claim_token)
+        self.assertIsNone(delivery.claim_expires_at)
+        self.assertTrue(Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").exists())
+        self.assertNotIn(canary, " ".join(captured.output))
+        self.assertIn("OSError", " ".join(captured.output))
+
+    def test_expired_pending_claim_can_be_manually_redelivered(self):
+        kwargs = self._task_kwargs(
+            claim_token=uuid4(),
+            claim_expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        source = self._task_delivery(kwargs)
+        with patch("extras.tasks.webhooks.async_task") as async_task:
+            redelivery = redeliver_webhook_delivery(source.pk, actor_id=self.actor.pk)
+
+        self.assertEqual(redelivery.redelivered_from_id, source.pk)
+        self.assertEqual(redelivery.target_url, source.target_url)
+        async_task.assert_called_once()
+
     def test_malformed_target_secrets_and_headers_fail_closed(self):
         self.assertIsNone(_decrypt_target_secret("plaintext-secret"))
         self.assertIsNone(_decrypt_target_secret("enc$malformed-ciphertext"))
@@ -513,6 +624,26 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(payload["object_id"], self.endpoint.pk)
         self.assertEqual(payload["data"], {})
         self.assertEqual(delivery.status, WebhookDelivery.STATUS_SUCCESS)
+
+    def test_test_send_retry_preserves_payload_timestamp(self):
+        fixed_timestamp = timezone.now() - timedelta(days=1)
+        kwargs = self._task_kwargs(
+            event=None,
+            test_send=True,
+            payload_timestamp=fixed_timestamp,
+        )
+        responses = (self._response(503), self._response(200))
+        with patch("core.http.request_pinned", side_effect=responses) as request_pinned:
+            first = send_webhook_task(**kwargs)
+            schedule = Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").latest("pk")
+            retry_kwargs = ast.literal_eval(schedule.kwargs)
+            second = send_webhook_task(**retry_kwargs)
+
+        self.assertEqual(first.disposition, DeliveryDisposition.RETRYABLE)
+        self.assertEqual(second.disposition, DeliveryDisposition.SUCCESS)
+        payloads = [json.loads(call.kwargs["data"]) for call in request_pinned.call_args_list]
+        self.assertEqual([payload["timestamp"] for payload in payloads], [fixed_timestamp.isoformat()] * 2)
+        self.assertEqual([payload["attempt"] for payload in payloads], [1, 2])
 
     def test_failure_records_never_persist_url_secret_headers_or_response_text(self):
         secret = self.endpoint.secret_decrypted
@@ -659,6 +790,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             delivery_id=str(uuid4()),
             status=WebhookDelivery.STATUS_DEAD,
             test_send=True,
+            payload_timestamp=timezone.now(),
             target_url=self.endpoint.url,
             target_http_method=self.endpoint.http_method,
             target_headers=self.endpoint.headers,
@@ -804,6 +936,15 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertIn(delivery.status, str(delivery))
 
 
+def _prepare_historical_extras_migration_state():
+    recorder = MigrationRecorder(connection)
+    if recorder.migration_qs.filter(
+        app="extras",
+        name="0113_upgrade_legacy_webhook_retry_schedules",
+    ).exists():
+        recorder.record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
+
+
 @pytest.mark.serial_only
 class WebhookDeliveryMigrationTests(TransactionTestCase):
     """Migration 0109 creates only the durable table and reverses cleanly."""
@@ -813,6 +954,7 @@ class WebhookDeliveryMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        _prepare_historical_extras_migration_state()
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):
@@ -855,6 +997,7 @@ class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        _prepare_historical_extras_migration_state()
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):
@@ -881,11 +1024,22 @@ class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
             retry_backoff=23,
         )
         linked = Delivery.objects.create(endpoint_id=endpoint.pk, delivery_id=str(uuid4()), status="pending")
+        plaintext_endpoint = Endpoint.objects.create(
+            name="Legacy plaintext migration endpoint",
+            url="https://example.invalid/plaintext-target",
+            secret="legacy-plaintext-secret",
+        )
+        plaintext = Delivery.objects.create(
+            endpoint_id=plaintext_endpoint.pk,
+            delivery_id=str(uuid4()),
+            status="pending",
+        )
         endpointless = Delivery.objects.create(delivery_id=str(uuid4()), status="pending")
 
         new_apps = self._migrate(self.migrate_to).apps
         MigratedDelivery = new_apps.get_model("extras", "WebhookDelivery")
         linked = MigratedDelivery.objects.get(pk=linked.pk)
+        plaintext = MigratedDelivery.objects.get(pk=plaintext.pk)
         endpointless = MigratedDelivery.objects.get(pk=endpointless.pk)
         self.assertEqual(linked.target_url, endpoint.url)
         self.assertEqual(linked.target_http_method, "PATCH")
@@ -893,6 +1047,8 @@ class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
         self.assertEqual(linked.target_secret, "enc$migration-ciphertext")
         self.assertEqual(linked.target_retry_count, 7)
         self.assertEqual(linked.target_retry_backoff, 23)
+        self.assertTrue(plaintext.target_secret.startswith("enc$"))
+        self.assertEqual(_decrypt_target_secret(plaintext.target_secret), "legacy-plaintext-secret")
         self.assertEqual(endpointless.target_url, "")
         self.assertEqual(endpointless.target_secret, "")
 
@@ -900,4 +1056,121 @@ class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
         reapplied_apps = self._migrate(self.migrate_to).apps
         ReappliedDelivery = reapplied_apps.get_model("extras", "WebhookDelivery")
         self.assertEqual(ReappliedDelivery.objects.get(pk=linked.pk).target_url, endpoint.url)
+        reapplied_plaintext = ReappliedDelivery.objects.get(pk=plaintext.pk)
+        self.assertEqual(_decrypt_target_secret(reapplied_plaintext.target_secret), "legacy-plaintext-secret")
         self.assertEqual(ReappliedDelivery.objects.get(pk=endpointless.pk).target_url, "")
+
+
+@pytest.mark.serial_only
+class WebhookRetryScheduleMigrationTests(TransactionTestCase):
+    """Legacy delayed retries become assertion-only schedules with no target secrets."""
+
+    migrate_from = ("extras", "0112_backfill_webhookdelivery_targets")
+    migrate_to = ("extras", "0113_upgrade_legacy_webhook_retry_schedules")
+
+    def setUp(self):
+        super().setUp()
+        _prepare_historical_extras_migration_state()
+
+    def _migrate(self, target):
+        executor = MigrationExecutor(connection)
+        return executor.migrate([target])
+
+    def tearDown(self):
+        try:
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())
+        finally:
+            super().tearDown()
+
+    def test_forward_executes_legacy_retry_and_reverse_is_refused(self):
+        old_apps = self._migrate(self.migrate_from).apps
+        Delivery = old_apps.get_model("extras", "WebhookDelivery")
+        HistoricalSchedule = old_apps.get_model("django_q", "Schedule")
+        delivery = Delivery.objects.create(
+            delivery_id=str(uuid4()),
+            status="failed",
+            test_send=True,
+        )
+        legacy = {
+            "url": "https://example.invalid/legacy-retry",
+            "method": "POST",
+            "headers": {"Authorization": "Bearer legacy-header-secret"},
+            "secret": "legacy-hmac-secret",
+            "webhook_endpoint_id": None,
+            "event_id": None,
+            "delivery_id": delivery.delivery_id,
+            "tenant_id": None,
+            "event_action": "test",
+            "event_model_app_label": "extras",
+            "event_model_name": "webhookendpoint",
+            "event_object_id": 1,
+            "event_timestamp_iso": "2026-01-01T00:00:00+00:00",
+            "event_data": {},
+            "attempt": 1,
+            "retry_count": 3,
+            "retry_backoff": 60,
+            "actor_id": None,
+            "request_id": "issue445-migration",
+            "test_send": True,
+        }
+        schedule = HistoricalSchedule.objects.create(
+            name="Legacy webhook retry",
+            func="extras.tasks.webhooks.send_webhook_task",
+            kwargs=repr(legacy),
+            schedule_type="O",
+            repeats=1,
+        )
+        non_kwargs = {
+            field: getattr(schedule, field)
+            for field in ("pk", "name", "func", "schedule_type", "repeats", "hook", "args")
+        }
+
+        new_apps = self._migrate(self.migrate_to).apps
+        NewDelivery = new_apps.get_model("extras", "WebhookDelivery")
+        NewSchedule = new_apps.get_model("django_q", "Schedule")
+        upgraded_delivery = NewDelivery.objects.get(pk=delivery.pk)
+        upgraded_schedule = NewSchedule.objects.get(pk=schedule.pk)
+        parsed = ast.literal_eval(upgraded_schedule.kwargs)
+        self.assertEqual(set(parsed), {"assertions", "attempt", "actor_id", "request_id"})
+        self.assertEqual(parsed["assertions"]["delivery_pk"], delivery.pk)
+        self.assertEqual(parsed["assertions"]["delivery_id"], delivery.delivery_id)
+        self.assertNotIn("url", upgraded_schedule.kwargs)
+        self.assertNotIn("legacy-header-secret", upgraded_schedule.kwargs)
+        self.assertNotIn("legacy-hmac-secret", upgraded_schedule.kwargs)
+        self.assertEqual(upgraded_delivery.target_url, legacy["url"])
+        self.assertEqual(upgraded_delivery.payload_timestamp.isoformat(), legacy["event_timestamp_iso"])
+        self.assertEqual(_decrypt_target_secret(upgraded_delivery.target_secret), "legacy-hmac-secret")
+        for field, value in non_kwargs.items():
+            self.assertEqual(getattr(upgraded_schedule, field), value)
+
+        response = MagicMock(status_code=200)
+        response.raise_for_status.return_value = None
+        with patch("core.http.request_pinned", return_value=response) as request_pinned:
+            result = send_webhook_task(
+                parsed["assertions"],
+                attempt=parsed["attempt"],
+                actor_id=parsed["actor_id"],
+                request_id=parsed["request_id"],
+            )
+        self.assertEqual(result.disposition, DeliveryDisposition.SUCCESS)
+        request_pinned.assert_called_once()
+        upgraded_delivery.refresh_from_db()
+        self.assertEqual(upgraded_delivery.status, WebhookDelivery.STATUS_SUCCESS)
+
+        with self.assertRaisesRegex(RuntimeError, r"^issue445\.webhook_retry_upgrade\.reverse_refused$"):
+            self._migrate(self.migrate_from)
+
+    def test_malformed_legacy_retry_payload_fails_closed(self):
+        old_apps = self._migrate(self.migrate_from).apps
+        HistoricalSchedule = old_apps.get_model("django_q", "Schedule")
+        HistoricalSchedule.objects.create(
+            name="Malformed legacy webhook retry",
+            func="extras.tasks.webhooks.send_webhook_task",
+            kwargs=repr({"url": "https://example.invalid/leaks-secret", "secret": "must-not-appear"}),
+            schedule_type="O",
+            repeats=1,
+        )
+        with self.assertRaisesRegex(RuntimeError, r"^issue445\.webhook_retry_upgrade\."):
+            self._migrate(self.migrate_to)
+        HistoricalSchedule.objects.filter(name="Malformed legacy webhook retry").delete()

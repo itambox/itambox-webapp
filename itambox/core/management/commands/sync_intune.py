@@ -10,7 +10,7 @@ Usage:
 Schedule example (nightly at 03:00) using django-q2:
   from django_q.models import Schedule
   Schedule.objects.create(
-      func='core.tasks.sync_tenant_intune',
+      func='assets.tasks.intune_sync.sync_tenant_intune',
       # kwargs are serialised into the task call
       kwargs={'tenant_id': <tenant.pk>, 'user_id': <admin_user.pk>,
               'job_id': ...},  # create a Job first, then pass its pk
@@ -99,7 +99,7 @@ class Command(BaseCommand):
 
             def _enqueue():
                 async_task(
-                    "core.tasks.sync_tenant_intune",
+                    "assets.tasks.intune_sync.sync_tenant_intune",
                     tenant_id=tenant.pk,
                     user_id=admin_user.pk,
                     job_id=job.pk,

@@ -307,7 +307,7 @@ def bulk_checkin_assets(request):
 
     _enqueue(
         job,
-        "core.tasks.bulk_checkin_task",
+        "assets.tasks.checkin.bulk_checkin_task",
         job.pk,
         object_pks,
         request.user.pk,
@@ -376,7 +376,7 @@ def bulk_dispose_assets(request):
 
     _enqueue(
         job,
-        "core.tasks.bulk_dispose_task",
+        "assets.tasks.disposal.bulk_dispose_task",
         job.pk,
         object_pks,
         request.user.pk,
@@ -436,7 +436,7 @@ def bulk_checkout_assets(request):
 
     _enqueue(
         job,
-        "core.tasks.bulk_checkout_task",
+        "assets.tasks.checkout.bulk_checkout_task",
         job.pk,
         object_pks,
         target_type_str,

@@ -856,9 +856,11 @@ class ResourceGrantExpiryServiceGuardTests(TenantTestMixin, TestCase):
     def test_revoke_unauthorized_operator_is_denied(self):
         grant = self._grant()
         user = get_user_model().objects.create_user(username="service-guard-noperm", password="test-password-123")
-        # The principal needs a membership so the task scope resolves; the
-        # missing revocation permission is what must fail the authorization.
-        Membership.objects.create(user=user, tenant=self.tenant)
+        # A canonical live RoleGrant proves tenant access; the empty role keeps
+        # the revocation permission absent so the domain service remains the
+        # authorization boundary exercised by this test.
+        role = Role.objects.create(tenant=self.tenant, name="Service Guard No Revoke", permissions=[])
+        self.grant(user, self.tenant, role)
         with TaskContext(tenant_id=self.tenant.pk, user_id=user.pk, operation="rollback") as context:
             with self.assertRaises(PermissionDenied):
                 revoke_resource_grant(grant.pk, user=context.user, active_tenant=context.tenant)
