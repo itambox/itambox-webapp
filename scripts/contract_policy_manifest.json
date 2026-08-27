@@ -15,7 +15,7 @@
     "automation.webhooks": {
       "activation": "opt-in",
       "contract_class": "beta-opt-in",
-      "exclusions": "Generic payload schema is frozen at wire version 1; Slack/Teams use a reduced unsigned vendor envelope. Delivery is at-least-once, retains only the current attempt count/latest outcome, requires consumer deduplication, and manual redelivery requires a retained source event",
+      "exclusions": "Event-specific data contents are not frozen; Slack/Teams use reduced vendor-specific envelopes without X-Hub-Signature-256 but retain schema_version/event_id/delivery_id/attempt/tenant. Delivery is at-least-once, retains only the current attempt count/latest outcome, requires consumer deduplication, and manual redelivery requires a retained source event with no pending or future-retry work live",
       "scope": "Event rules and webhook endpoints"
     },
     "organization.resource_grants": {
