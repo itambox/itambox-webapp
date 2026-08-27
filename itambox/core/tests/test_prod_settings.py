@@ -107,6 +107,7 @@ def _restore_settings_modules():
     suite (and any code importing those module attributes) sees the true values.
     """
     yield
+    sys.modules.pop("core.settings.queue_drain", None)
     sys.modules.pop("core.settings.prod", None)
     base = importlib.import_module("core.settings.base")
     with warnings.catch_warnings():
@@ -139,6 +140,17 @@ class TestProdSettingsPosture:
     def test_ssl_redirect_enabled(self):
         prod = _load_prod({})
         assert prod.SECURE_SSL_REDIRECT is True
+
+    def test_queue_drain_is_prod_with_only_scheduler_disabled(self):
+        prod = _load_prod({})
+        sys.modules.pop("core.settings.queue_drain", None)
+        drain = importlib.import_module("core.settings.queue_drain")
+        prod_names = {name for name in vars(prod) if name.isupper()}
+        drain_names = {name for name in vars(drain) if name.isupper()}
+        assert drain_names == prod_names
+        for name in sorted(prod_names - {"Q_CLUSTER"}):
+            assert getattr(drain, name) == getattr(prod, name), name
+        assert drain.Q_CLUSTER == {**prod.Q_CLUSTER, "scheduler": False}
 
     def test_forwarded_for_trust_is_disabled_by_default(self):
         prod = _load_prod({})

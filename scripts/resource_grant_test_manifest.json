@@ -1,12 +1,13 @@
 {
   "base_commit": "27f82ca4398d933b9017c2a2abdbd9d43ebf7284",
-  "provenance": "All Python test modules changed by issue #444 (generic-presentation architecture removal): the mechanical seams packet (tag model lookup, extras table ownership, scanner normalization, table-config owner), the tenancy packet (tenant picker, navigation, tenant switcher), the registry/orchestration packets (RED unit contracts plus generic list/detail provider parity), and the detail/list provider packets (features split, attachment parent-authorization matrix, saved-filter/custom-field/list-context provider behavior) relative to base_commit, which is the #444 integration base. The documented selector is: every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) that the git diff against base_commit changes or that appears as an untracked file in git status, matching the gate in itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
+  "provenance": "All Python test modules changed by issue #444 (generic-presentation architecture removal), plus the queue-drain production-settings regression required before issue #445: the mechanical seams packet (tag model lookup, extras table ownership, scanner normalization, table-config owner), the tenancy packet (tenant picker, navigation, tenant switcher), the registry/orchestration packets (RED unit contracts plus generic list/detail provider parity), and the detail/list provider packets (features split, attachment parent-authorization matrix, saved-filter/custom-field/list-context provider behavior) relative to base_commit, which is the #444 integration base. The documented selector is: every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) that the git diff against base_commit changes or that appears as an untracked file in git status, matching the gate in itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
     "itambox/core/tests/test_attachment_idor.py",
     "itambox/core/tests/test_bulk_edit_form_tags.py",
     "itambox/core/tests/test_global_label_template_permissions.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_navigation_tenancy.py",
+    "itambox/core/tests/test_prod_settings.py",
     "itambox/core/tests/test_tables.py",
     "itambox/core/tests/test_tenant_field_scoping.py",
     "itambox/extras/tests/test_journal_views.py",
@@ -31,6 +32,7 @@
     "itambox/core/tests/test_global_label_template_permissions.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_navigation_tenancy.py",
+    "itambox/core/tests/test_prod_settings.py",
     "itambox/core/tests/test_tables.py",
     "itambox/core/tests/test_tenant_field_scoping.py",
     "itambox/extras/tests/test_journal_views.py",
