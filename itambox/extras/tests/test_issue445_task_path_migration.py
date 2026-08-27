@@ -78,6 +78,11 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
 
     def _seed_schedules(self, apps_state):
         Schedule = apps_state.get_model("django_q", "Schedule")
+        # The test databases carry the three production schedules created by
+        # post_migrate during test-suite setup; they would collide with the
+        # reset sequences underneath this rehearsal, so the table is cleared
+        # first. PK-based field comparisons below therefore stay exact.
+        Schedule.objects.all().delete()
         rows = {}
         for old_path in TASK_PATH_MAP:
             for variant in (1, 2):

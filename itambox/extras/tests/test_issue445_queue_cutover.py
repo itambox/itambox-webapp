@@ -6,6 +6,7 @@ plus the all-or-nothing historical resubmission guard. No network access;
 the queue broker used here is the ORM broker on the test database.
 """
 
+import uuid
 from unittest import mock
 
 import pytest
@@ -100,6 +101,7 @@ class Issue445ResubmissionGuardTests(TransactionTestCase):
 
         now = timezone.now()
         return Failure.objects.create(
+            id=uuid.uuid4().hex[:32],
             name="historical failure",
             func=func,
             args="[]",
