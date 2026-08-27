@@ -346,12 +346,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/tasks.py",
-      "context": "FunctionDef:notify_new_request_task",
-      "statement": "from assets.models import AssetRequest",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/views/asset_request_views.py",
       "context": "ClassDef:AssetRequestEditView/FunctionDef:form_valid",
       "statement": "from core.models import Notification",
@@ -421,18 +415,6 @@
       "path": "itambox/assets/views/asset_views.py",
       "context": "ClassDef:AssetDetailView/FunctionDef:get_context_data",
       "statement": "from licenses.tables import LicenseSeatAssignmentTable",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "context": "FunctionDef:asset_label_print",
-      "statement": "from core.tasks.labels import _default_label_card, generate_base64_barcode",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "context": "FunctionDef:asset_label_print",
-      "statement": "from core.tasks.labels import render_labels_pdf",
       "count": 1
     },
     {
@@ -1188,12 +1170,6 @@
     {
       "path": "itambox/core/management/commands/sync_intune.py",
       "context": "ClassDef:Command/FunctionDef:handle",
-      "statement": "from core.tasks.intune_sync import sync_tenant_intune",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_intune.py",
-      "context": "ClassDef:Command/FunctionDef:handle",
       "statement": "from django.db import transaction",
       "count": 1
     },
@@ -1339,144 +1315,6 @@
       "path": "itambox/core/tables/object_change.py",
       "context": "ClassDef:ObjectChangeTable/FunctionDef:render_action",
       "statement": "from core.choices import ObjectChangeActionChoices",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkin.py",
-      "context": "FunctionDef:bulk_checkin_task",
-      "statement": "from assets.models import Asset, StatusLabel",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkin.py",
-      "context": "FunctionDef:bulk_checkin_task",
-      "statement": "from assets.services import checkin_asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkin.py",
-      "context": "FunctionDef:bulk_checkin_task",
-      "statement": "from organization.models import Location",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkout.py",
-      "context": "FunctionDef:bulk_checkout_task",
-      "statement": "from assets.models import Asset, StatusLabel",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkout.py",
-      "context": "FunctionDef:bulk_checkout_task",
-      "statement": "from assets.services import checkout_asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/disposal.py",
-      "context": "FunctionDef:bulk_dispose_task",
-      "statement": "from assets.models import Asset, AssetDisposal",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/disposal.py",
-      "context": "FunctionDef:bulk_dispose_task",
-      "statement": "from assets.services import dispose_asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_create_asset",
-      "statement": "from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_run_sync",
-      "statement": "from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_run_sync",
-      "statement": "from django.conf import settings as _settings",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_run_sync",
-      "statement": "from organization.models import AssetHolder, Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_stamp_discovery_facts",
-      "statement": "from organization.models import AssetHolder",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_sync_device_software",
-      "statement": "from assets.models import Manufacturer",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "context": "FunctionDef:_sync_device_software",
-      "statement": "from software.models import InstalledSoftware, Software",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_base64_barcode",
-      "statement": "from barcode.writer import ImageWriter",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_base64_barcode",
-      "statement": "import barcode",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_base64_barcode",
-      "statement": "import segno",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_label_batch_task",
-      "statement": "from assets.models import Asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_label_pdf_batch_task",
-      "statement": "from assets.models import Asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_label_pdf_batch_task",
-      "statement": "from extras.models import LabelTemplate",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_single_label_graphic",
-      "statement": "from barcode.writer import ImageWriter",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_single_label_graphic",
-      "statement": "import barcode",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:generate_single_label_graphic",
-      "statement": "import segno",
       "count": 1
     },
     {

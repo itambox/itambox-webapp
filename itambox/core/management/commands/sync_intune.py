@@ -26,6 +26,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from assets.tasks.intune_sync import sync_tenant_intune
 from core.models import Job
 from organization.models import Tenant
 
@@ -81,8 +82,6 @@ class Command(BaseCommand):
         self.stdout.write(f"Created Job #{job.pk}: {job.name}")
 
         if run_now:
-            from core.tasks.intune_sync import sync_tenant_intune
-
             self.stdout.write("Running synchronously…")
             sync_tenant_intune(
                 tenant_id=tenant.pk,

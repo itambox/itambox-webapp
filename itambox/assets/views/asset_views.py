@@ -16,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
+from assets.tasks.labels import _default_label_card, generate_base64_barcode, render_labels_pdf
 from compliance.services import scope_custody_receipts
 
 logger = logging.getLogger(__name__)
@@ -478,7 +479,6 @@ def asset_label_print(request, pk, template_id=None):
         raise PermissionDenied
 
     if template_id:
-        from core.tasks.labels import render_labels_pdf
         from extras.models import LabelTemplate
 
         label_template = get_object_or_404(LabelTemplate, pk=template_id)
@@ -490,7 +490,6 @@ def asset_label_print(request, pk, template_id=None):
 
     # No template chosen — render the on-screen preview using the SAME label card
     # the print engine produces, so the preview matches the printed (bulk) output.
-    from core.tasks.labels import _default_label_card, generate_base64_barcode
 
     barcode_uri = generate_base64_barcode(asset, "qr")
     context = {
@@ -596,7 +595,7 @@ def bulk_print_labels(request):
 
     if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
         async_task(
-            "core.tasks.labels.generate_label_pdf_batch_task",
+            "assets.tasks.labels.generate_label_pdf_batch_task",
             job.pk,
             object_pks,
             template_id,
@@ -607,7 +606,7 @@ def bulk_print_labels(request):
     else:
         transaction.on_commit(
             lambda: async_task(
-                "core.tasks.labels.generate_label_pdf_batch_task",
+                "assets.tasks.labels.generate_label_pdf_batch_task",
                 job.pk,
                 object_pks,
                 template_id,

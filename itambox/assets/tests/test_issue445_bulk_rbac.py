@@ -29,7 +29,7 @@ User = get_user_model()
 FAMILIES = {
     "checkin": {
         "module": "assets.tasks.checkin",
-        "old_module": "core.tasks.checkin",
+        "old_module": "assets.tasks.checkin",
         "callable": "bulk_checkin_task",
         "permission": "assets.change_asset",
         "code": "checkin.permission_revoked",
@@ -37,7 +37,7 @@ FAMILIES = {
     },
     "checkout": {
         "module": "assets.tasks.checkout",
-        "old_module": "core.tasks.checkout",
+        "old_module": "assets.tasks.checkout",
         "callable": "bulk_checkout_task",
         "permission": "assets.change_asset",
         "code": "checkout.permission_revoked",
@@ -45,7 +45,7 @@ FAMILIES = {
     },
     "disposal": {
         "module": "assets.tasks.disposal",
-        "old_module": "core.tasks.disposal",
+        "old_module": "assets.tasks.disposal",
         "callable": "bulk_dispose_task",
         "permission": "assets.add_assetdisposal",
         "code": "disposal.permission_revoked",

@@ -104,7 +104,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={})
     def test_missing_tenant_configuration_is_terminal_and_typed(self):
-        from core.tasks.intune_sync import _run_sync
+        from assets.tasks.intune_sync import _run_sync
 
         tenant = MagicMock(slug="missing", pk=17)
         with self.assertRaises(IntegrationConfigurationError) as raised:
@@ -115,7 +115,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={"tenant-a": {"azure_tenant_id": "azure-tenant"}})
     def test_incomplete_tenant_configuration_is_terminal_and_typed(self):
-        from core.tasks.intune_sync import _run_sync
+        from assets.tasks.intune_sync import _run_sync
 
         tenant = MagicMock(slug="tenant-a", pk=17)
         with self.assertRaises(IntegrationConfigurationError) as raised:
@@ -134,7 +134,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         }
     )
     def test_blank_credential_configuration_is_terminal_and_typed(self):
-        from core.tasks.intune_sync import _run_sync
+        from assets.tasks.intune_sync import _run_sync
 
         tenant = MagicMock(slug="tenant-a", pk=17)
         with self.assertRaises(IntegrationConfigurationError) as raised:
@@ -317,7 +317,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
 
         with (
             patch("assets.models.Asset") as asset_model,
-            patch("core.tasks.intune_sync.IntuneClient") as client_model,
+            patch("assets.tasks.intune_sync.IntuneClient") as client_model,
             patch.object(intune_sync, "_sync_device_software", return_value=(0, True)),
         ):
             asset_model.objects.filter.return_value.select_related.return_value.first.return_value = asset

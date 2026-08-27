@@ -17,9 +17,10 @@ import re
 from collections.abc import Mapping
 from typing import Any, Protocol, TypedDict
 
-from django.conf import settings
+from django.conf import settings as _settings
 from django.utils import timezone
 
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from core.context import get_current_request_id
 from core.errors import (
     IntegrationAuthenticationError,
@@ -32,6 +33,8 @@ from core.errors import (
 from core.integrations.intune import IntuneClient
 from core.models import Job
 from core.tasks.context import TaskContext
+from organization.models import AssetHolder
+from software.models import InstalledSoftware, Software
 
 logger = logging.getLogger(__name__)
 
@@ -185,10 +188,6 @@ def _run_sync(
     job: Job,
     integration_context: IntegrationContext | None = None,
 ) -> IntuneSyncResult:
-    from django.conf import settings as _settings
-
-    from assets.models import Asset, AssetType, Manufacturer, StatusLabel
-    from organization.models import AssetHolder, Tenant
 
     integration_context = integration_context or IntegrationContext(
         provider="microsoft-graph",
@@ -277,7 +276,6 @@ def _stamp_discovery_facts(
     dry_run: bool,
 ) -> None:
     """Write Intune discovery metadata into custom_field_data."""
-    from organization.models import AssetHolder
 
     facts = {
         "intune_device_id": device.get("id", ""),
@@ -306,7 +304,6 @@ def _create_asset(
     dry_run: bool,
 ) -> _IntuneAsset | None:
     """Create a Manufacturer, AssetType (get_or_create), and Asset for a new device."""
-    from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 
     serial = (device.get("serialNumber") or "").strip()
     device_name = (device.get("deviceName") or serial or "Unknown").strip()
@@ -422,8 +419,6 @@ def _sync_device_software(
     dry_run: bool,
 ) -> tuple[int, bool]:
     """Upsert InstalledSoftware records for all detected apps on a device."""
-    from assets.models import Manufacturer
-    from software.models import InstalledSoftware, Software
 
     device_id = device.get("id")
     if not device_id:

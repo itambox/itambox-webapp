@@ -3,6 +3,7 @@ import logging
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
+from assets.models import AssetRequest
 from core.models import Notification
 from core.tasks.context import TaskContext
 
@@ -11,8 +12,6 @@ User = get_user_model()
 
 
 def notify_new_request_task(request_id):
-    from assets.models import AssetRequest
-
     # Resolve the request unscoped first to learn its tenant, then run the rest
     # under that tenant's context: the fetch is tenant-scoped, the change-log is
     # attributed correctly, and — critically — recipients are limited to that

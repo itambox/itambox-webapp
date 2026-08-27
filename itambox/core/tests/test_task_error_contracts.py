@@ -63,9 +63,9 @@ class TaskResultContractTests(SimpleTestCase):
 
 
 class DepreciationTaskContractTests(SimpleTestCase):
-    @patch("core.tasks.depreciation.Asset.objects.bulk_update")
-    @patch("core.tasks.depreciation.Asset.objects.select_related")
-    @patch("core.tasks.depreciation.compute_book_value")
+    @patch("assets.tasks.depreciation.Asset.objects.bulk_update")
+    @patch("assets.tasks.depreciation.Asset.objects.select_related")
+    @patch("assets.tasks.depreciation.compute_book_value")
     def test_updates_only_changed_computable_values(self, compute, select_related, bulk_update):
         unchanged = SimpleNamespace(current_book_value=100, depreciation_updated_at=None)
         changed = SimpleNamespace(current_book_value=50, depreciation_updated_at=None)
@@ -75,7 +75,7 @@ class DepreciationTaskContractTests(SimpleTestCase):
         select_related.return_value = queryset
         compute.side_effect = [100, 25, None]
 
-        from core.tasks.depreciation import calculate_depreciation
+        from assets.tasks.depreciation import calculate_depreciation
 
         updated = calculate_depreciation()
 
@@ -87,24 +87,24 @@ class DepreciationTaskContractTests(SimpleTestCase):
             [changed], ["current_book_value", "depreciation_updated_at"], batch_size=1000
         )
 
-    @patch("core.tasks.depreciation.Asset.objects.bulk_update")
-    @patch("core.tasks.depreciation.Asset.objects.select_related")
-    @patch("core.tasks.depreciation.compute_book_value", return_value=100)
+    @patch("assets.tasks.depreciation.Asset.objects.bulk_update")
+    @patch("assets.tasks.depreciation.Asset.objects.select_related")
+    @patch("assets.tasks.depreciation.compute_book_value", return_value=100)
     def test_does_not_write_when_values_are_unchanged(self, _compute, select_related, bulk_update):
         queryset = MagicMock()
         queryset.filter.return_value = [SimpleNamespace(current_book_value=100)]
         select_related.return_value = queryset
 
-        from core.tasks.depreciation import calculate_depreciation
+        from assets.tasks.depreciation import calculate_depreciation
 
         self.assertEqual(calculate_depreciation(), 0)
         bulk_update.assert_not_called()
 
-    @patch("core.tasks.depreciation.Asset.objects.select_related", side_effect=OperationalError("database-secret"))
+    @patch("assets.tasks.depreciation.Asset.objects.select_related", side_effect=OperationalError("database-secret"))
     def test_database_failure_becomes_redacted_retryable_error(self, _select_related):
-        from core.tasks.depreciation import calculate_depreciation
+        from assets.tasks.depreciation import calculate_depreciation
 
-        with self.assertLogs("core.tasks.depreciation", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.depreciation", level="ERROR") as captured:
             with self.assertRaises(RetryableTaskError) as raised:
                 calculate_depreciation()
 
@@ -112,14 +112,14 @@ class DepreciationTaskContractTests(SimpleTestCase):
         self.assertNotIn("database-secret", str(raised.exception))
         self.assertNotIn("database-secret", " ".join(captured.output))
 
-    @patch("core.tasks.depreciation.compute_book_value", side_effect=ValueError("asset-secret"))
-    @patch("core.tasks.depreciation.Asset.objects.select_related")
+    @patch("assets.tasks.depreciation.compute_book_value", side_effect=ValueError("asset-secret"))
+    @patch("assets.tasks.depreciation.Asset.objects.select_related")
     def test_data_failure_becomes_redacted_terminal_error(self, select_related, _compute):
         queryset = MagicMock()
         queryset.filter.return_value = [SimpleNamespace(current_book_value=100)]
         select_related.return_value = queryset
 
-        from core.tasks.depreciation import calculate_depreciation
+        from assets.tasks.depreciation import calculate_depreciation
 
         with self.assertRaises(TerminalTaskError) as raised:
             calculate_depreciation()

@@ -10,8 +10,8 @@ from django.urls import reverse
 from pypdf import PdfReader
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
+from assets.tasks.labels import generate_label_batch_task, generate_label_pdf_batch_task
 from core.models import Job, Notification
-from core.tasks.labels import generate_label_batch_task, generate_label_pdf_batch_task
 from core.tasks.utils import TaskStatus
 from core.tests.mixins import grant
 from extras.models import FileAttachment, LabelTemplate
@@ -81,7 +81,7 @@ class BulkActionsTestCase(TestCase):
         # Verify async_task was called
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.labels.generate_label_pdf_batch_task")
+        self.assertEqual(args[0], "assets.tasks.labels.generate_label_pdf_batch_task")
         self.assertEqual(args[1], job.pk)
         self.assertEqual(args[2], [str(self.asset1.pk), str(self.asset2.pk)])
         self.assertEqual(args[3], self.label_template.pk)
@@ -131,11 +131,11 @@ class BulkActionsTestCase(TestCase):
         self.assertEqual((no_assets.status, no_assets.code), (TaskStatus.SKIPPED, "labels.no_assets"))
         self.assertEqual(no_assets_job.result, {"status": "no_assets"})
 
-    @patch("core.tasks.labels.generate_base64_barcode", side_effect=RuntimeError("secret-asset-label"))
+    @patch("assets.tasks.labels.generate_base64_barcode", side_effect=RuntimeError("secret-asset-label"))
     def test_pdf_task_all_render_failures_are_terminal_and_redacted(self, _barcode):
         job = self._job()
 
-        with self.assertLogs("core.tasks.labels", level="WARNING") as captured:
+        with self.assertLogs("assets.tasks.labels", level="WARNING") as captured:
             result = generate_label_pdf_batch_task(
                 job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
             )
@@ -146,10 +146,10 @@ class BulkActionsTestCase(TestCase):
         self.assertNotIn(self.asset1.asset_tag, job.logs)
         self.assertNotIn(self.asset1.name, job.logs)
 
-    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-test")
-    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("assets.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-test")
+    @patch("assets.tasks.labels.render_label_html", return_value="<div>safe</div>")
     @patch(
-        "core.tasks.labels.generate_base64_barcode", side_effect=["data:image/png;base64,AAAA", ValueError("secret")]
+        "assets.tasks.labels.generate_base64_barcode", side_effect=["data:image/png;base64,AAAA", ValueError("secret")]
     )
     def test_pdf_task_returns_partial_without_exposing_asset_labels(self, _barcode, _render, _pdf):
         job = self._job()
@@ -170,9 +170,9 @@ class BulkActionsTestCase(TestCase):
         self.assertNotIn(self.asset1.asset_tag, job.logs)
         self.assertNotIn(self.asset1.name, job.logs)
 
-    @patch("core.tasks.labels._html_to_pdf_bytes", side_effect=OperationalError("secret-pdf-payload"))
-    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
-    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    @patch("assets.tasks.labels._html_to_pdf_bytes", side_effect=OperationalError("secret-pdf-payload"))
+    @patch("assets.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("assets.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
     def test_pdf_boundary_database_failure_is_retryable_and_redacted(self, _barcode, _render, _pdf):
         job = self._job()
 
@@ -214,11 +214,11 @@ class BulkActionsTestCase(TestCase):
             ).exists()
         )
 
-    @patch("core.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-notify"))
+    @patch("assets.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-notify"))
     def test_pdf_task_success_notification_failure_does_not_fail_completed_job(self, _notify):
         job = self._job()
 
-        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.labels", level="ERROR") as captured:
             result = generate_label_pdf_batch_task(
                 job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
             )
@@ -235,11 +235,11 @@ class BulkActionsTestCase(TestCase):
         self.assertIn("(phase=notification)", job.logs)
         self.assertNotIn("secret-notify", " ".join(captured.output) + " " + job.logs)
 
-    @patch("core.tasks.labels._html_to_pdf_bytes", side_effect=RuntimeError("secret-render-payload"))
+    @patch("assets.tasks.labels._html_to_pdf_bytes", side_effect=RuntimeError("secret-render-payload"))
     def test_pdf_task_render_failure_is_terminal_phased_and_redacted(self, _render):
         job = self._job()
 
-        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.labels", level="ERROR") as captured:
             result = generate_label_pdf_batch_task(
                 job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
             )
@@ -255,27 +255,27 @@ class BulkActionsTestCase(TestCase):
         self.assertIsNotNone(notification)
         self.assertNotIn("secret-render-payload", notification.message)
 
-    @patch("core.tasks.labels.Job.objects.get", side_effect=OperationalError("secret-database"))
+    @patch("assets.tasks.labels.Job.objects.get", side_effect=OperationalError("secret-database"))
     def test_pdf_entry_database_failure_is_retryable_and_not_masked(self, _get):
         # The PDF task's single task boundary also covers Job resolution: a
         # transient failure there must be classified, with the boundary state
         # (phase/attachment) bound — never replaced by an UnboundLocalError.
-        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.labels", level="ERROR") as captured:
             result = generate_label_pdf_batch_task(17, [], self.label_template.pk, "roll", self.user.pk, self.tenant.pk)
 
         self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "labels.pdf_failed"))
         self.assertNotIn("secret-database", " ".join(captured.output))
         self.assertTrue(any(getattr(record, "phase", None) == "job_resolve" for record in captured.records))
 
-    @patch("core.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-notify"))
-    @patch("core.tasks.labels._html_to_pdf_bytes", side_effect=RuntimeError("secret-render"))
+    @patch("assets.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-notify"))
+    @patch("assets.tasks.labels._html_to_pdf_bytes", side_effect=RuntimeError("secret-render"))
     def test_pdf_task_failure_notification_failure_does_not_mask_task_outcome(self, _render, _notify):
         # The failure notification is best-effort: even if BOTH the render and
         # the notification delivery fail, the original task outcome and job
         # state must survive, redacted.
         job = self._job()
 
-        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.labels", level="ERROR") as captured:
             result = generate_label_pdf_batch_task(
                 job.pk, [self.asset1.pk], self.label_template.pk, "roll", self.user.pk, self.tenant.pk
             )
@@ -304,7 +304,7 @@ class BulkActionsTestCase(TestCase):
             raise OperationalError("secret-storage")
 
         with (
-            self.assertLogs("core.tasks.labels", level="ERROR") as captured,
+            self.assertLogs("assets.tasks.labels", level="ERROR") as captured,
             patch.object(FileAttachment, "save", new=flaky_save),
         ):
             result = generate_label_pdf_batch_task(
@@ -337,7 +337,7 @@ class BulkActionsTestCase(TestCase):
             raise OperationalError("secret-storage")
 
         with (
-            self.assertLogs("core.tasks.labels", level="ERROR") as captured,
+            self.assertLogs("assets.tasks.labels", level="ERROR") as captured,
             patch.object(FileAttachment, "save", new=flaky_save),
         ):
             result = generate_label_pdf_batch_task(
@@ -353,11 +353,11 @@ class BulkActionsTestCase(TestCase):
         self.assertNotIn("secret-cleanup", " ".join(captured.output) + " " + job.logs)
         self.assertTrue(any(record.phase == "attachment_cleanup" for record in captured.records))
 
-    @patch("core.tasks.labels.generate_single_label_graphic", side_effect=RuntimeError("secret-zip-label"))
+    @patch("assets.tasks.labels.generate_single_label_graphic", side_effect=RuntimeError("secret-zip-label"))
     def test_zip_item_failure_is_isolated_and_redacted(self, _graphic):
         job = self._job()
 
-        with self.assertLogs("core.tasks.labels", level="WARNING") as captured:
+        with self.assertLogs("assets.tasks.labels", level="WARNING") as captured:
             result = generate_label_batch_task(job.pk, [self.asset1.pk], "qr", self.user.pk, self.tenant.pk)
 
         job.refresh_from_db()
@@ -366,7 +366,7 @@ class BulkActionsTestCase(TestCase):
         self.assertNotIn(self.asset1.asset_tag, job.logs)
         self.assertNotIn(self.asset1.name, job.logs)
 
-    @patch("core.tasks.labels.generate_single_label_graphic", return_value=b"safe-image")
+    @patch("assets.tasks.labels.generate_single_label_graphic", return_value=b"safe-image")
     def test_zip_success_returns_counts_without_exposing_asset_labels(self, _graphic):
         job = self._job()
 
@@ -378,12 +378,12 @@ class BulkActionsTestCase(TestCase):
         self.assertNotIn(self.asset1.asset_tag, job.logs)
         self.assertNotIn(self.asset1.name, job.logs)
 
-    @patch("core.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-zip-notify"))
-    @patch("core.tasks.labels.generate_single_label_graphic", return_value=b"safe-image")
+    @patch("assets.tasks.labels.Notification.objects.create", side_effect=OperationalError("secret-zip-notify"))
+    @patch("assets.tasks.labels.generate_single_label_graphic", return_value=b"safe-image")
     def test_zip_success_notification_failure_does_not_fail_completed_job(self, _graphic, _notify):
         job = self._job()
 
-        with self.assertLogs("core.tasks.labels", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.labels", level="ERROR") as captured:
             result = generate_label_batch_task(job.pk, [self.asset1.pk], "qr", self.user.pk, self.tenant.pk)
 
         job.refresh_from_db()
@@ -393,7 +393,7 @@ class BulkActionsTestCase(TestCase):
         self.assertNotIn("secret-zip-notify", " ".join(captured.output) + " " + job.logs)
 
     @patch(
-        "core.tasks.labels.generate_single_label_graphic",
+        "assets.tasks.labels.generate_single_label_graphic",
         side_effect=[b"safe-image", RuntimeError("secret-second-label")],
     )
     def test_zip_item_failure_after_success_returns_partial(self, _graphic):
@@ -416,7 +416,7 @@ class BulkActionsTestCase(TestCase):
         self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "labels.zip_failed"))
         self.assertNotIn("secret-assets-query", job.logs)
 
-    @patch("core.tasks.labels.Job.objects.get", side_effect=OperationalError("secret-database"))
+    @patch("assets.tasks.labels.Job.objects.get", side_effect=OperationalError("secret-database"))
     def test_zip_entry_database_failure_is_retryable(self, _get):
         result = generate_label_batch_task(17, [], "qr", self.user.pk, self.tenant.pk)
 
@@ -589,9 +589,9 @@ class LabelBulkScopeTests(TestCase):
         self.assertEqual(mock_async.call_args.args[6], self.tenant_a.pk)
         self.assertEqual(self.client.get(response.url).status_code, 200)
 
-    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
-    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
-    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    @patch("assets.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
+    @patch("assets.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("assets.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
     def test_pdf_task_uses_persisted_multi_tenant_scope(self, _barcode, _render, _pdf):
         job = Job.objects.create(
             name="multi-tenant labels",
@@ -614,9 +614,9 @@ class LabelBulkScopeTests(TestCase):
         self.assertEqual(job.status, Job.STATUS_COMPLETED)
         self.assertEqual(FileAttachment.objects.filter(object_id=job.pk).count(), 1)
 
-    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
-    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
-    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    @patch("assets.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
+    @patch("assets.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("assets.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
     def test_pdf_task_rejects_assets_outside_persisted_scope(self, _barcode, _render, _pdf):
         job = Job.objects.create(
             name="scoped labels",
@@ -639,9 +639,9 @@ class LabelBulkScopeTests(TestCase):
         self.assertEqual(job.status, Job.STATUS_FAILED)
         self.assertEqual(FileAttachment.objects.filter(object_id=job.pk).count(), 0)
 
-    @patch("core.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
-    @patch("core.tasks.labels.render_label_html", return_value="<div>safe</div>")
-    @patch("core.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
+    @patch("assets.tasks.labels._html_to_pdf_bytes", return_value=b"%PDF-scope-test")
+    @patch("assets.tasks.labels.render_label_html", return_value="<div>safe</div>")
+    @patch("assets.tasks.labels.generate_base64_barcode", return_value="data:image/png;base64,AAAA")
     def test_pdf_task_rejects_asset_after_view_access_is_revoked(self, _barcode, _render, _pdf):
         Role.objects.filter(tenant=self.tenant_b).update(permissions=["core.view_job"])
         job = Job.objects.create(

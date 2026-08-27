@@ -158,7 +158,7 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_match_updates_discovery_facts(self, MockClient):
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
         atype = AssetType.objects.create(manufacturer=mfr, model="XPS 15")
@@ -174,7 +174,7 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
         instance.get_detected_apps.return_value = []
 
         job = _make_job("tenant-a")
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
@@ -218,14 +218,14 @@ class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_create_missing_true(self, MockClient):
         instance = MockClient.return_value
         instance.get_managed_devices.return_value = [FAKE_DEVICE]
         instance.get_detected_apps.return_value = []
 
         job = _make_job("tenant-a")
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
@@ -242,14 +242,14 @@ class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):
         self.assertTrue(AssetType.objects.filter(model="XPS 15").exists())
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={"tenant-a": {**INTUNE_CONF_A, "create_missing": False}})
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_create_missing_false_skips(self, MockClient):
         instance = MockClient.return_value
         instance.get_managed_devices.return_value = [FAKE_DEVICE]
         instance.get_detected_apps.return_value = []
 
         job = _make_job("tenant-a")
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
@@ -272,7 +272,7 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_software_upserted(self, MockClient):
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
         atype = AssetType.objects.create(manufacturer=mfr, model="XPS 15")
@@ -288,7 +288,7 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
         instance.get_detected_apps.return_value = [FAKE_APP]
 
         job = _make_job("tenant-a")
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
@@ -309,7 +309,7 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
         )
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_software_rerun_no_duplicate(self, MockClient):
         """Second sync run must not raise on the unique_asset_software_version constraint."""
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
@@ -325,7 +325,7 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
         instance.get_managed_devices.return_value = [FAKE_DEVICE]
         instance.get_detected_apps.return_value = [FAKE_APP]
 
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         job1 = _make_job("tenant-a")
         sync_tenant_intune(tenant_id=self.tenant.pk, user_id=self.tenant_admin.pk, job_id=job1.pk)
@@ -353,14 +353,14 @@ class IntuneSyncDryRunTest(TenantTestMixin, TransactionTestCase):
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_dry_run_no_writes(self, MockClient):
         instance = MockClient.return_value
         instance.get_managed_devices.return_value = [FAKE_DEVICE]
         instance.get_detected_apps.return_value = [FAKE_APP]
 
         job = _make_job("tenant-a")
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
@@ -391,12 +391,12 @@ class IntuneSyncTenantIsolationTest(TenantTestMixin, TransactionTestCase):
         self.admin_b = User.objects.create_superuser(username="admin_b", email="admin_b@example.com", password="pw")
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
-    @patch("core.tasks.intune_sync.IntuneClient")
+    @patch("assets.tasks.intune_sync.IntuneClient")
     def test_assets_land_in_correct_tenant(self, MockClient):
         device_a = {**FAKE_DEVICE, "id": "dev-a", "serialNumber": "SNA001", "deviceName": "A-LAPTOP"}
         device_b = {**FAKE_DEVICE, "id": "dev-b", "serialNumber": "SNB001", "deviceName": "B-LAPTOP"}
 
-        from core.tasks.intune_sync import sync_tenant_intune
+        from assets.tasks.intune_sync import sync_tenant_intune
 
         # Sync for tenant A
         instance = MockClient.return_value

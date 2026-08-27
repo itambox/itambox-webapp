@@ -4070,72 +4070,8 @@
     {
       "path": "itambox/core/tasks/__init__.py",
       "code": "F401",
-      "message": "'.checkin.bulk_checkin_task' imported but unused",
-      "source": "from .checkin import bulk_checkin_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.checkout.bulk_checkout_task' imported but unused",
-      "source": "from .checkout import bulk_checkout_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
       "message": "'.csv_import.import_csv_task' imported but unused",
       "source": "from .csv_import import import_csv_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.depreciation.calculate_depreciation' imported but unused",
-      "source": "from .depreciation import calculate_depreciation",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.disposal.bulk_dispose_task' imported but unused",
-      "source": "from .disposal import bulk_dispose_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.intune_sync.sync_tenant_intune' imported but unused",
-      "source": "from .intune_sync import sync_tenant_intune",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.labels.generate_label_batch_task' imported but unused",
-      "source": "from .labels import generate_label_batch_task, generate_label_pdf_batch_task, generate_single_label_graphic",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.labels.generate_label_pdf_batch_task' imported but unused",
-      "source": "from .labels import generate_label_batch_task, generate_label_pdf_batch_task, generate_single_label_graphic",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.labels.generate_single_label_graphic' imported but unused",
-      "source": "from .labels import generate_label_batch_task, generate_label_pdf_batch_task, generate_single_label_graphic",
       "context": "Module:body",
       "count": 1
     },
@@ -4156,107 +4092,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/checkin.py",
-      "code": "C901",
-      "message": "'bulk_checkin_task' is too complex (13)",
-      "source": "def bulk_checkin_task(",
-      "context": "Module:body/FunctionDef:bulk_checkin_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkout.py",
-      "code": "C901",
-      "message": "'bulk_checkout_task' is too complex (12)",
-      "source": "def bulk_checkout_task(",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/csv_import.py",
       "code": "C901",
       "message": "'import_csv_task' is too complex (12)",
       "source": "def import_csv_task(",
       "context": "Module:body/FunctionDef:import_csv_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/disposal.py",
-      "code": "C901",
-      "message": "'bulk_dispose_task' is too complex (14)",
-      "source": "def bulk_dispose_task(",
-      "context": "Module:body/FunctionDef:bulk_dispose_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/disposal.py",
-      "code": "F401",
-      "message": "'django.db.transaction' imported but unused",
-      "source": "from django.db import transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'assets.models.AssetType' imported but unused",
-      "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'assets.models.Manufacturer' imported but unused",
-      "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'assets.models.StatusLabel' imported but unused",
-      "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'django.conf.settings' imported but unused",
-      "source": "from django.conf import settings",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'organization.models.AssetHolder' imported but unused",
-      "source": "    from organization.models import AssetHolder, Tenant",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'organization.models.Tenant' imported but unused",
-      "source": "    from organization.models import AssetHolder, Tenant",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "C901",
-      "message": "'generate_label_batch_task' is too complex (11)",
-      "source": "def generate_label_batch_task(",
-      "context": "Module:body/FunctionDef:generate_label_batch_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "C901",
-      "message": "'generate_label_pdf_batch_task' is too complex (14)",
-      "source": "def generate_label_pdf_batch_task(",
-      "context": "Module:body/FunctionDef:generate_label_pdf_batch_task:self",
       "count": 1
     },
     {

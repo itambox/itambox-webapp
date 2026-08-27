@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 64,
-  "policy_sha256": "a62177da14fff6f426d1d32c30993c35111aa86088d978c1fbc9ee5fe968a5b4",
+  "next_sequence": 70,
+  "policy_sha256": "766beef6a7e5fd5935198d03f01842fd7be79cbf55dc7f013554a4b81047ddc2",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -50,6 +50,92 @@
         "AssetCheckOutAPISerializer",
         "AssetSerializer",
         "StatusLabelSerializer"
+      ]
+    },
+    {
+      "sequence": 64,
+      "path": "itambox/assets/tasks/checkin.py",
+      "module": "assets.tasks.checkin",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the bulk check-in task entry envelope and its date parser -- the Job id, the asset pk list, the acting user/tenant, the optional status/location overrides, the check-in date, and the notes a scanner submits, plus the implicit None outcome the worker reports. Asset pks and status/location ids stay int | str because the enqueuing view forwards raw POST values; the ORM lookups, the checkin_asset service call, and the notification bodies remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_parse_date",
+        "bulk_checkin_task"
+      ]
+    },
+    {
+      "sequence": 65,
+      "path": "itambox/assets/tasks/checkout.py",
+      "module": "assets.tasks.checkout",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the bulk checkout task entry envelope and its date parser -- the Job id, the asset pk list, the target discriminator and target pk, the acting user/tenant, notes, optional status override, and the expected-check-in/checkout dates, plus the implicit None outcome. Target and status ids stay int | str because the enqueuing view forwards raw POST values; ContentType resolution, row locking, and the checkout_asset service call remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_parse_date",
+        "bulk_checkout_task"
+      ]
+    },
+    {
+      "sequence": 66,
+      "path": "itambox/assets/tasks/depreciation.py",
+      "module": "assets.tasks.depreciation",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the nightly depreciation materialisation task entry point -- no arguments, and the count of assets whose book value actually changed as int. The cross-tenant asset query, compute_book_value, and the bulk_update write remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "calculate_depreciation"
+      ]
+    },
+    {
+      "sequence": 67,
+      "path": "itambox/assets/tasks/disposal.py",
+      "module": "assets.tasks.disposal",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the bulk disposal task entry envelope and its two pure parsers -- the Job id, the asset pk list, the acting user/tenant, the shared disposal payload, and the per-asset proceeds map, plus the implicit None outcome. Both JSON-ish maps are declared as Mapping[str, object] because they arrive as a serialised task payload; _parse_proceeds therefore takes object and answers a non-negative Decimal or None. Narrowing the payload values, the already-disposed skip rule, and the dispose_asset service call remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_parse_date",
+        "_parse_proceeds",
+        "bulk_dispose_task"
+      ]
+    },
+    {
+      "sequence": 68,
+      "path": "itambox/assets/tasks/intune_sync.py",
+      "module": "assets.tasks.intune_sync",
+      "issue": "#93",
+      "note": "Slice 10 symbol admission: the Intune discovery task's named Graph payload and persisted result contracts and its task/service boundaries. IntuneDevicePayload and IntuneAppPayload describe the selected string fields consumed from the external Graph JSON; IntuneSyncResult fixes the seven integer count keys Job.result stores after a run; tenant, asset, and service internals remain outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "IntuneAppPayload",
+        "IntuneDevicePayload",
+        "IntuneSyncResult",
+        "_IntuneAsset",
+        "_IntuneTenant",
+        "_create_asset",
+        "_run_sync",
+        "_slugify",
+        "_stamp_discovery_facts",
+        "_sync_device_software",
+        "sync_tenant_intune"
+      ]
+    },
+    {
+      "sequence": 69,
+      "path": "itambox/assets/tasks/labels.py",
+      "module": "assets.tasks.labels",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the label generation boundary -- the authored print CSS loader, the bounded CSS measurement helper, the PNG-bytes and base64 data-URI barcode producers, the generic chunk_list pager, and the two label batch task entry envelopes with their implicit None outcomes. Asset instances are typed as object so the projection does not import the asset model graph; the HTML card renderer, the Jinja2 sandbox, the document builder, and the xhtml2pdf emitters remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_label_print_css",
+        "_safe_label_measurement",
+        "chunk_list",
+        "generate_base64_barcode",
+        "generate_label_batch_task",
+        "generate_label_pdf_batch_task",
+        "generate_single_label_graphic"
       ]
     },
     {
@@ -178,30 +264,6 @@
       "symbols": []
     },
     {
-      "sequence": 11,
-      "path": "itambox/core/tasks/checkin.py",
-      "module": "core.tasks.checkin",
-      "issue": "#93",
-      "note": "Slice 7 symbol admission: the bulk check-in task entry envelope and its date parser -- the Job id, the asset pk list, the acting user/tenant, the optional status/location overrides, the check-in date, and the notes a scanner submits, plus the implicit None outcome the worker reports. Asset pks and status/location ids stay int | str because the enqueuing view forwards raw POST values; the ORM lookups, the checkin_asset service call, and the notification bodies remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "_parse_date",
-        "bulk_checkin_task"
-      ]
-    },
-    {
-      "sequence": 12,
-      "path": "itambox/core/tasks/checkout.py",
-      "module": "core.tasks.checkout",
-      "issue": "#93",
-      "note": "Slice 7 symbol admission: the bulk checkout task entry envelope and its date parser -- the Job id, the asset pk list, the target discriminator and target pk, the acting user/tenant, notes, optional status override, and the expected-check-in/checkout dates, plus the implicit None outcome. Target and status ids stay int | str because the enqueuing view forwards raw POST values; ContentType resolution, row locking, and the checkout_asset service call remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "_parse_date",
-        "bulk_checkout_task"
-      ]
-    },
-    {
       "sequence": 4,
       "path": "itambox/core/tasks/context.py",
       "module": "core.tasks.context",
@@ -221,68 +283,6 @@
       "scope": "symbols",
       "symbols": [
         "import_csv_task"
-      ]
-    },
-    {
-      "sequence": 17,
-      "path": "itambox/core/tasks/depreciation.py",
-      "module": "core.tasks.depreciation",
-      "issue": "#93",
-      "note": "Slice 8 symbol admission: the nightly depreciation materialisation task entry point -- no arguments, and the count of assets whose book value actually changed as int. The cross-tenant asset query, compute_book_value, and the bulk_update write remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "calculate_depreciation"
-      ]
-    },
-    {
-      "sequence": 13,
-      "path": "itambox/core/tasks/disposal.py",
-      "module": "core.tasks.disposal",
-      "issue": "#93",
-      "note": "Slice 7 symbol admission: the bulk disposal task entry envelope and its two pure parsers -- the Job id, the asset pk list, the acting user/tenant, the shared disposal payload, and the per-asset proceeds map, plus the implicit None outcome. Both JSON-ish maps are declared as Mapping[str, object] because they arrive as a serialised task payload; _parse_proceeds therefore takes object and answers a non-negative Decimal or None. Narrowing the payload values, the already-disposed skip rule, and the dispose_asset service call remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "_parse_date",
-        "_parse_proceeds",
-        "bulk_dispose_task"
-      ]
-    },
-    {
-      "sequence": 29,
-      "path": "itambox/core/tasks/intune_sync.py",
-      "module": "core.tasks.intune_sync",
-      "issue": "#93",
-      "note": "Slice 10 symbol admission: the Intune discovery task's named Graph payload and persisted result contracts and its task/service boundaries. IntuneDevicePayload and IntuneAppPayload describe the selected string fields consumed from the external Graph JSON; IntuneSyncResult fixes the seven integer count keys Job.result stores after a run; tenant, asset, and service internals remain outside the projection.",
-      "scope": "symbols",
-      "symbols": [
-        "IntuneAppPayload",
-        "IntuneDevicePayload",
-        "IntuneSyncResult",
-        "_IntuneAsset",
-        "_IntuneTenant",
-        "_create_asset",
-        "_run_sync",
-        "_slugify",
-        "_stamp_discovery_facts",
-        "_sync_device_software",
-        "sync_tenant_intune"
-      ]
-    },
-    {
-      "sequence": 14,
-      "path": "itambox/core/tasks/labels.py",
-      "module": "core.tasks.labels",
-      "issue": "#93",
-      "note": "Slice 7 symbol admission: the label generation boundary -- the authored print CSS loader, the bounded CSS measurement helper, the PNG-bytes and base64 data-URI barcode producers, the generic chunk_list pager, and the two label batch task entry envelopes with their implicit None outcomes. Asset instances are typed as object so the projection does not import the asset model graph; the HTML card renderer, the Jinja2 sandbox, the document builder, and the xhtml2pdf emitters remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "_label_print_css",
-        "_safe_label_measurement",
-        "chunk_list",
-        "generate_base64_barcode",
-        "generate_label_batch_task",
-        "generate_label_pdf_batch_task",
-        "generate_single_label_graphic"
       ]
     },
     {
@@ -815,6 +815,48 @@
       "module": "core.tasks.alerts",
       "issue": "#93",
       "reason": "moved to extras.tasks.alerts by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 11,
+      "path": "itambox/core/tasks/checkin.py",
+      "module": "core.tasks.checkin",
+      "issue": "#93",
+      "reason": "moved to assets.tasks.checkin by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 12,
+      "path": "itambox/core/tasks/checkout.py",
+      "module": "core.tasks.checkout",
+      "issue": "#93",
+      "reason": "moved to assets.tasks.checkout by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 17,
+      "path": "itambox/core/tasks/depreciation.py",
+      "module": "core.tasks.depreciation",
+      "issue": "#93",
+      "reason": "moved to assets.tasks.depreciation by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 13,
+      "path": "itambox/core/tasks/disposal.py",
+      "module": "core.tasks.disposal",
+      "issue": "#93",
+      "reason": "moved to assets.tasks.disposal by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 29,
+      "path": "itambox/core/tasks/intune_sync.py",
+      "module": "core.tasks.intune_sync",
+      "issue": "#93",
+      "reason": "moved to assets.tasks.intune_sync by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 14,
+      "path": "itambox/core/tasks/labels.py",
+      "module": "core.tasks.labels",
+      "issue": "#93",
+      "reason": "moved to assets.tasks.labels by issue #445 ownership cutover; admission continues under the new record"
     },
     {
       "sequence": 5,
