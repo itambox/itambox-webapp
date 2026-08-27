@@ -61,6 +61,13 @@ class RecordingProvider:
         return {}
 
 
+def _copy_with(params, values):
+    """Return a mutable copy of ``params`` with ``values`` applied (test helper)."""
+    changed = params.copy()
+    changed.update(values)
+    return changed
+
+
 def register_provider(
     name,
     provider,
@@ -69,7 +76,7 @@ def register_provider(
     list_params=False,
     list_filter=False,
     list_context=False,
-    priority,
+    priority=100,
 ):
     registry.register_generic_presentation(
         name,
@@ -377,11 +384,13 @@ class TestImmutableParameterIsolation:
 
         def filters(input):
             assert input.params.getlist("name") == ["Immutable group"]
+            assert input.params._mutable is False
             assert input.params is not resolution.params
             return input.queryset
 
         def context(input):
             assert input.params.getlist("name") == ["Immutable group"]
+            assert input.params._mutable is False
             assert input.params is not resolution.params
             return {}
 
@@ -395,11 +404,18 @@ class TestImmutableParameterIsolation:
             filter_list_provider_queryset(resolution, Group.objects.all())
             build_list_provider_context(resolution, {})
 
+        assert [phase for phase, _ in provider.calls] == ["params", "filter", "context"]
+
     def test_in_place_mutation_of_received_params_raises_and_names_provider_and_key(self):
+        # Original attack shape: provider A legitimately owns ``shared``,
+        # provider B re-enables mutability and overwrites it in place to
+        # defeat last-writer-wins detection.
         with registry.isolated_generic_presentation_for_tests():
             register_provider(
                 "first",
-                RecordingProvider(params=lambda input: ListParamsResult(input.params.copy(), {})),
+                RecordingProvider(
+                    params=lambda input: ListParamsResult(_copy_with(input.params, {"shared": ["first"]}), {})
+                ),
                 list_params=True,
                 priority=100,
             )
@@ -414,21 +430,22 @@ class TestImmutableParameterIsolation:
                 resolve_list_provider_params(make_request(), Group, partial=False)
 
     def test_in_place_mutation_left_mutable_also_raises(self):
+        # Only the ``_mutable`` operand triggers: no key drift at all.
         def mutate(input):
             input.params._mutable = True
-            input.params["shared"] = "second"
-            return ListParamsResult(input.params, {})
+            return ListParamsResult(input.params.copy(), {})
 
         with registry.isolated_generic_presentation_for_tests():
             register_provider("second", RecordingProvider(params=mutate), list_params=True, priority=100)
 
-            with pytest.raises(ImproperlyConfigured, match="second.*mutated parameters"):
+            with pytest.raises(ImproperlyConfigured, match=r"second.*mutated parameters \(keys: \[\]\)"):
                 resolve_list_provider_params(make_request(), Group, partial=False)
 
     def test_filter_phase_params_are_private_copies(self):
         seen_by_later_context = []
 
         def sabotage(input):
+            assert input.params._mutable is False
             input.params._mutable = True
             input.params["sabotage"] = "yes"
             input.params._mutable = False
@@ -454,6 +471,7 @@ class TestImmutableParameterIsolation:
         seen_by_later_context = []
 
         def sabotage(input):
+            assert input.params._mutable is False
             input.params._mutable = True
             input.params["sabotage"] = "yes"
             input.params._mutable = False
@@ -473,6 +491,28 @@ class TestImmutableParameterIsolation:
         assert resolution.params.getlist("q") == ["needle"]
         assert "sabotage" not in resolution.params
         assert seen_by_later_context == [["needle"]]
+
+
+@pytest.mark.django_db
+class TestValidatedParamsResultRejections:
+    """Every rejection branch of ``_validated_params_result`` is pinned."""
+
+    @pytest.mark.parametrize(
+        ("result", "message"),
+        (
+            (object(), "ListParamsResult"),
+            (ListParamsResult(params={"a": "b"}, state={}), "QueryDict"),
+            (ListParamsResult(params=QueryDict("a=1"), state=[]), "state"),
+            (ListParamsResult(params=QueryDict("a=1"), state={1: "x"}), "state key"),
+        ),
+    )
+    def test_rejects_invalid_provider_results(self, result, message):
+        provider = RecordingProvider(params=lambda _input: result)
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider("invalid", provider, list_params=True, priority=100)
+
+            with pytest.raises(ImproperlyConfigured, match=f"invalid.*{message}"):
+                resolve_list_provider_params(make_request(), Group, partial=False)
 
 
 @pytest.mark.django_db

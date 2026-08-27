@@ -44,12 +44,12 @@ def _changed_param_keys(before: QueryDict, after: QueryDict) -> set[str]:
 
 def _validated_params_result(
     registration: GenericPresentationRegistration,
-    current: QueryDict,
+    provider_params: QueryDict,
     result: object,
 ) -> tuple[QueryDict, Mapping[str, object]]:
     if not isinstance(result, ListParamsResult):
         raise ImproperlyConfigured(f"Generic presentation provider {registration.name!r} must return ListParamsResult")
-    if result.params is not current and not isinstance(result.params, QueryDict):
+    if not isinstance(result.params, QueryDict):
         raise ImproperlyConfigured(
             f"Generic presentation provider {registration.name!r} must return QueryDict parameters"
         )
@@ -83,7 +83,6 @@ def resolve_list_provider_params(
         # cannot rewrite the collision-detection baseline or smuggle in
         # last-writer-wins behavior.
         provider_params = _freeze_params(current)
-        provider_params_before = _freeze_params(provider_params)
 
         result = registration.provider.resolve_list_params(
             ListParamsInput(
@@ -95,7 +94,7 @@ def resolve_list_provider_params(
             )
         )
 
-        mutated_keys = _changed_param_keys(provider_params_before, provider_params)
+        mutated_keys = _changed_param_keys(current, provider_params)
         if getattr(provider_params, "_mutable", False) or mutated_keys:
             raise ImproperlyConfigured(
                 f"Generic presentation provider {registration.name!r} mutated parameters "
@@ -135,7 +134,14 @@ def filter_list_provider_queryset(
     resolution: ResolvedListPresentation,
     queryset: QuerySet[Model],
 ) -> QuerySet[Model]:
-    """Apply every opted-in provider to the supplied validated queryset."""
+    """Apply every opted-in provider to the supplied validated queryset.
+
+    Phase asymmetry (intentional, mirrors the design): the parameter phase
+    raises on in-place mutation because its providers compose; here and in
+    the context phase each provider receives a private frozen copy and a
+    mutated copy is simply discarded, so later providers always observe the
+    pristine resolution parameters.
+    """
     current = queryset
     for registration in registry.generic_presentation_registrations():
         if not registration.list_filter:

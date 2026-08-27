@@ -123,19 +123,24 @@ def run_params_phase(target, params):
         # Mirror the production orchestrator: the provider only ever sees a
         # private frozen copy, never the comparison baseline.
         provider_params = frozen_params(current)
-        provider_params_before = frozen_params(provider_params)
 
         result = registration.provider.resolve_list_params(
             ListParamsInput(request, model, provider_params, content_type, False)
         )
         if not isinstance(result, ListParamsResult):
             raise ImproperlyConfigured(f"Generic presentation provider {registration.name!r} returned invalid params")
-        if result.params is not provider_params and not isinstance(result.params, QueryDict):
+        if not isinstance(result.params, QueryDict):
             raise ImproperlyConfigured(f"Generic presentation provider {registration.name!r} returned invalid params")
-        if getattr(provider_params, "_mutable", False) or changed_param_keys(provider_params_before, provider_params):
+        if not isinstance(result.state, Mapping):
+            raise ImproperlyConfigured(f"Generic presentation provider {registration.name!r} returned invalid state")
+        if any(not isinstance(key, str) for key in result.state):
+            raise ImproperlyConfigured(
+                f"Generic presentation provider {registration.name!r} returned an invalid state key"
+            )
+        if getattr(provider_params, "_mutable", False) or changed_param_keys(current, provider_params):
             raise ImproperlyConfigured(
                 f"Generic presentation provider {registration.name!r} mutated parameters "
-                f"in place (keys: {sorted(changed_param_keys(provider_params_before, provider_params))})"
+                f"in place (keys: {sorted(changed_param_keys(current, provider_params))})"
             )
 
         next_params = frozen_params(result.params)
@@ -571,6 +576,30 @@ class TestPluralListPhases:
             list_params=True,
         )
         with pytest.raises(AttributeError):
+            run_params_phase(target, QueryDict())
+
+    def test_harness_detects_in_place_mutation_through_re_enabled_mutability(self):
+        target = Registry()
+
+        def mutate(input):
+            input.params._mutable = True
+            input.params["shared"] = "second"
+            input.params._mutable = False
+            return ListParamsResult(input.params, {})
+
+        register_provider(target, "second", RecordingProvider(params=mutate), detail_features=(), list_params=True)
+        with pytest.raises(ImproperlyConfigured, match="second.*mutated parameters.*shared"):
+            run_params_phase(target, QueryDict())
+
+    def test_harness_detects_pure_mutability_re_enable_without_key_drift(self):
+        target = Registry()
+
+        def mutate(input):
+            input.params._mutable = True
+            return ListParamsResult(input.params.copy(), {})
+
+        register_provider(target, "second", RecordingProvider(params=mutate), detail_features=(), list_params=True)
+        with pytest.raises(ImproperlyConfigured, match=r"second.*in place \(keys: \[\]\)"):
             run_params_phase(target, QueryDict())
 
     def test_provider_state_is_copied_private_and_request_local(self):
