@@ -176,8 +176,10 @@ class ExtrasConfig(AppConfig):
                 owns=("extras.EventRule", "extras.WebhookEndpoint"),
                 docs_url=DOCS,
                 limitations=(
-                    "The outbound payload schema is not frozen and may change between minor releases.",
-                    "Deliveries are fire-and-forget; there is no delivery log or replay.",
+                    "The outbound payload schema is frozen at wire version 1 and changes only "
+                    "with a new schema_version.",
+                    "Deliveries are durable: every delivery is recorded with a stable identity "
+                    "and per-attempt outcomes, and operators can redeliver past deliveries.",
                 ),
                 contract_version=CONTRACT_VERSION,
             ),
