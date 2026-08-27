@@ -46,8 +46,8 @@ def _attachment_parent_for_change(request, content_type, object_id):
 
     Upload/delete/journal writes keep the historical object-bound
     ``change_<parent>`` authorization: the parent is resolved through its
-    tenant-scoping default manager (so a guessed cross-tenant object_id cannot
-    select a row outside the active tenant), and ``has_perm(..., obj=parent)``
+    tenant-scoping ``objects`` manager (so a guessed cross-tenant object_id
+    cannot select a row outside the active tenant), and ``has_perm(..., obj=parent)``
     requires the object-bound permission from ``TenantMembershipBackend``.
     Every failure is a 404 so attachment IDs are not enumerable.
     """
@@ -71,8 +71,11 @@ def _attachment_parent_for_view(request, content_type, object_id):
     server, so the attachment rows themselves are the only authorization point:
     without this check a file would be reachable purely by guessing its pk
     (cross-tenant file IDOR). Reads resolve the parent through its default
-    (scoped) manager and require the object-bound ``view_<parent>`` permission;
-    every failure is a 404. This intentionally replaces the old
+    (scoped) manager and require the object-bound ``view_<parent>`` permission
+    (for a tenant-less parent the permission falls back to the user's ambient
+    tenant, which is strictly stronger than the removed active-tenant-equality
+    check that required no permission at all); every failure is a 404. This
+    intentionally replaces the old
     active-tenant-equality check (which allowed any authenticated user to read
     an unscoped global parent's attachment and denied authorized aggregate-
     scope Job attachments when no single active tenant was set) with the

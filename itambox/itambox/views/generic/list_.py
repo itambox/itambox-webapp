@@ -129,7 +129,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         if self.filterset:
             self.filter = self.filter_form.filterset if self.filter_form else self.filterset(filter_params, queryset)
-            if not validate_generic_display_form(self.filter_form, self.filter, filter_params):
+            if not validate_generic_display_form(self.filter_form, self.filter):
                 self.filter_validation_failed = True
                 logger.warning("Invalid filter params for %s: %s", self.__class__.__name__, self.filter.errors)
                 queryset = queryset.none()

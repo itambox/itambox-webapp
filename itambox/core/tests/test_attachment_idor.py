@@ -160,14 +160,17 @@ class JobAttachmentAuthorizationTests(TestCase):
         permission semantics of ``TenantMembershipBackend`` instead of the old
         active-tenant-equality check.
 
-        A user with memberships in both tenants holds ``view_job`` bound to a Job
-        in either tenant, so the read succeeds even while the active workspace is
-        the other tenant. This is the deliberate replacement mandated by Design
-        v1.1 section 8: the old check denied authorized aggregate-scope Job
-        attachments (no single active tenant) and permitted unscoped global
-        parents without any permission at all; the new check binds reads to the
-        object-bound permission for every parent, while tenant-scoped parents
-        keep ordinary cross-tenant denial through their scoped default manager.
+        The user already holds the object-bound ``view_job`` permission through
+        the tenant_a membership from ``setUp``; activation of the unrelated
+        tenant_b membership only switches the ACTIVE workspace. The read still
+        succeeds, pinning that the workspace no longer decides attachment
+        access — only the object-bound permission does. This is the deliberate
+        replacement mandated by Design v1.1 section 8: the old check denied
+        authorized aggregate-scope Job attachments (no single active tenant)
+        and permitted unscoped global parents without any permission at all;
+        the new check binds reads to the object permission for every parent,
+        while tenant-scoped parents keep ordinary cross-tenant denial through
+        their scoped default manager.
         """
         job = Job.objects.create(name="A-side parent", tenant=self.tenant_a)
         attachment = self.make_attachment(job, "a-side-parent.txt")

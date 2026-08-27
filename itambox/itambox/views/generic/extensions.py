@@ -155,7 +155,7 @@ def _merge_filterset_errors_into_form(filterset_form, filterset) -> None:
                 existing_messages.update(error_messages)
 
 
-def validate_generic_display_form(filterset_form, filterset, params: QueryDict) -> bool:
+def validate_generic_display_form(filterset_form, filterset) -> bool:
     """Validate the bound generic filters and preserve divergent form errors."""
     filter_is_valid = filterset.is_valid() if filterset is not None else True
     form_is_valid = filterset_form.is_valid() if filterset_form is not None else True
