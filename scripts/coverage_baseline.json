@@ -4,22 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 48222,
-    "covered_lines": 42913,
-    "line_rate": 88.99,
-    "num_branches": 12612,
-    "covered_branches": 9440,
-    "branch_rate": 74.85,
-    "excluded_lines": 37,
-    "measured_files": 537
+    "num_statements": 48676,
+    "covered_lines": 43446,
+    "line_rate": 89.26,
+    "num_branches": 12714,
+    "covered_branches": 9571,
+    "branch_rate": 75.28,
+    "excluded_lines": 41,
+    "measured_files": 546
   },
   "decline_justification": {
-    "reason": "One measured statement was deliberately deleted when MATRIX_MODELS stopped filtering presentation compatibility through active optional-app targets; line, branch, and excluded-line coverage did not decline.",
+    "reason": "TYPE_CHECKING import block added to itambox/registry.py for the #444 generic-presentation SPI (design-mandated: Django model/request/queryset types import only under TYPE_CHECKING); the 4 excluded lines are the import-time-only block explicitly covered by the exclude_also policy",
     "previous_line_rate": 88.99,
     "previous_branch_rate": 74.85,
     "previous_excluded_lines": 37,
     "previous_measured_files": 537,
-    "previous_num_statements": 48223,
+    "previous_num_statements": 48222,
     "previous_num_branches": 12612
   }
 }
