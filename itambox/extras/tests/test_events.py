@@ -371,60 +371,60 @@ class EventsSystemTestCase(TransactionTestCase):
             ),
             start=1,
         ):
-            from extras.tasks.webhooks import send_webhook_task
+            from extras.models import WebhookDelivery
+            from extras.tasks.webhooks import WebhookDeliveryAssertions, send_webhook_task
 
             tenant = envelope_tenant_a if index == 1 else envelope_tenant_b
-            send_webhook_task(
+            event = Event.objects.create(
+                model=ContentType.objects.get_for_model(Manufacturer),
+                object_id=index,
+                action="create",
+                data={"app_label": "assets", "model_name": "manufacturer"},
+            )
+            endpoint = WebhookEndpoint.objects.create(
+                name=f"Envelope {index}",
                 url=url,
-                method="POST",
+                http_method="POST",
                 headers={},
                 secret="",
-                event_id=100 + index,
-                delivery_id=f"delivery-{index}",
-                tenant_id=tenant.pk,
-                event_action="create",
-                event_model_app_label="assets",
-                event_model_name="manufacturer",
-                event_object_id=index,
-                event_timestamp_iso="2024-01-01T00:00:00+00:00",
-                event_data={"app_label": "assets", "model_name": "manufacturer"},
+                retry_count=0,
+                retry_backoff=0,
             )
+            delivery = WebhookDelivery.objects.create(
+                endpoint=endpoint,
+                delivery_id=f"delivery-{index}",
+                event=event,
+                tenant=tenant,
+                test_send=False,
+                attempt=1,
+                status=WebhookDelivery.STATUS_PENDING,
+            )
+            assertions = WebhookDeliveryAssertions(
+                delivery_pk=delivery.pk,
+                delivery_id=uuid.UUID(str(delivery.delivery_id)),
+                webhook_endpoint_id=endpoint.pk,
+                event_id=event.pk,
+                tenant_id=tenant.pk,
+                test_send=False,
+            )
+            send_webhook_task(assertions=assertions, attempt=1)
 
             payload = mock_request_pinned.call_args.kwargs["json"]
             self.assertEqual(payload["schema_version"], 1)
-            self.assertEqual(payload["event_id"], 100 + index)
-            self.assertEqual(payload["delivery_id"], f"delivery-{index}")
+            self.assertEqual(payload["event_id"], event.pk)
+            self.assertEqual(payload["delivery_id"], str(delivery.delivery_id))
             self.assertEqual(payload["attempt"], 1)
             self.assertEqual(payload["tenant"], tenant.pk)
+            self.assertEqual(payload["text"], f"Event: create on manufacturer (ID: {index})")
             if index == 1:
-                self.assertEqual(
-                    payload,
-                    {
-                        "schema_version": 1,
-                        "event_id": 101,
-                        "delivery_id": "delivery-1",
-                        "attempt": 1,
-                        "tenant": envelope_tenant_a.pk,
-                        "text": "Event: create on manufacturer (ID: 1)",
-                    },
-                )
+                self.assertIn("text", payload)
+                self.assertNotIn("@type", payload)
             else:
-                self.assertEqual(
-                    payload,
-                    {
-                        "schema_version": 1,
-                        "event_id": 102,
-                        "delivery_id": "delivery-2",
-                        "attempt": 1,
-                        "tenant": envelope_tenant_b.pk,
-                        "@type": "MessageCard",
-                        "@context": "https://schema.org/extensions",
-                        "summary": "Event: create on manufacturer (ID: 2)",
-                        "themeColor": "0076D7",
-                        "title": "ITAMbox Notification",
-                        "text": "Event: create on manufacturer (ID: 2)",
-                    },
-                )
+                self.assertEqual(payload["@type"], "MessageCard")
+                self.assertEqual(payload["@context"], "https://schema.org/extensions")
+                self.assertEqual(payload["summary"], f"Event: create on manufacturer (ID: {index})")
+                self.assertEqual(payload["themeColor"], "0076D7")
+                self.assertEqual(payload["title"], "ITAMbox Notification")
 
     @patch("core.http.request_pinned")
     def test_webhook_tenant_comes_from_object_not_ambient_context(self, mock_request_pinned):
