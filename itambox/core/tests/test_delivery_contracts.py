@@ -8,6 +8,7 @@ import requests
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 
 from core.events import (
     DeliveryDisposition,
@@ -60,6 +61,7 @@ class DeliveryContractTests(TestCase):
             tenant=self.tenant,
             endpoint=endpoint,
             event=event,
+            payload_timestamp=event.timestamp if event is not None else timezone.now(),
             delivery_id=str(delivery_id),
             test_send=test_send,
             attempt=1,

@@ -17,6 +17,7 @@ import pytest
 from django.apps import apps as django_apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 from django.db.models.signals import post_migrate
 from django.test import TransactionTestCase
 
@@ -64,11 +65,27 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
 
     reset_sequences = True
 
+    def setUp(self):
+        super().setUp()
+        # This class rehearses 0110 in isolation, as it existed before the
+        # upgrade-only 0113 release. The current test database starts at the
+        # graph leaf, so remove only 0113's data-migration record before asking
+        # MigrationExecutor to construct that historical state. Production
+        # reverse remains refused and is tested separately.
+        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
+
     def _migrate(self, target):
         executor = MigrationExecutor(connection)
         return executor.migrate([target] if isinstance(target, tuple) else target)
 
     def _restore_leaves(self):
+        # The 0110 rehearsal seeds synthetic path-only webhook rows with empty
+        # kwargs. They are deliberately not 0113 lifecycle fixtures, so remove
+        # all test-owned schedules before restoring the graph leaf; otherwise
+        # 0113 correctly rejects the synthetic payload as missing its durable
+        # delivery identity.
+        Schedule = django_apps.get_model("django_q", "Schedule")
+        Schedule.objects.all().delete()
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
 
