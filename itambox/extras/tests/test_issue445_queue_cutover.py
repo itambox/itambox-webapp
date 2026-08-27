@@ -10,6 +10,7 @@ from unittest import mock
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TransactionTestCase
 
 LEGACY = "core.tasks.evaluate_alert_rules_task"
@@ -21,6 +22,13 @@ ALIAS = "core.tasks.alerts.evaluate_alert_rules_task.extra"
 @pytest.mark.serial_only
 class Issue445QueueCutoverTests(TransactionTestCase):
     reset_sequences = True
+
+    def setUp(self):
+        super().setUp()
+        from django_q.models import OrmQ, Schedule
+
+        Schedule.objects.all().delete()
+        OrmQ.objects.all().delete()
 
     def _schedule(self, func, hook=None):
         from django_q.models import Schedule
@@ -37,8 +45,8 @@ class Issue445QueueCutoverTests(TransactionTestCase):
         )
 
     def _ormq(self, func):
-        from django_q.brokers import SignedPackage
         from django_q.models import OrmQ
+        from django_q.signing import SignedPackage
 
         OrmQ.objects.create(key="issue445-test-key", package=SignedPackage.dumps([func, (), {}, None]))
 
@@ -49,7 +57,7 @@ class Issue445QueueCutoverTests(TransactionTestCase):
 
     def test_forward_preflight_rejects_cutover_paths(self):
         self._schedule(CUTOVER)
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(CommandError):
             call_command("verify_issue445_task_cutover", phase="forward-preflight", strict=True)
 
     def test_forward_postmigrate_accepts_cutover_paths(self):
@@ -59,12 +67,12 @@ class Issue445QueueCutoverTests(TransactionTestCase):
 
     def test_forward_postmigrate_rejects_predecessor_hook(self):
         self._schedule(CUTOVER, hook=LEGACY)
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(CommandError):
             call_command("verify_issue445_task_cutover", phase="forward-postmigrate", strict=True)
 
     def test_noncanonical_alias_is_a_strict_failure(self):
         self._schedule(ALIAS)
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(CommandError):
             call_command("verify_issue445_task_cutover", phase="forward-preflight", strict=True)
 
     def test_ormq_package_surfaces_are_inventoried(self):
@@ -75,7 +83,7 @@ class Issue445QueueCutoverTests(TransactionTestCase):
         from django_q.models import OrmQ
 
         OrmQ.objects.create(key="issue445-bad", package=b"not-a-package")
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(CommandError):
             call_command("verify_issue445_task_cutover", phase="forward-preflight", strict=True)
 
     def test_reverse_postmigrate_accepts_predecessor_paths_again(self):

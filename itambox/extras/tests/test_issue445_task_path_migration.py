@@ -6,6 +6,9 @@ predecessor state, forward mapping with byte-equal non-func fields and row
 multiplicity, migration-aware post-migrate schedule registration (exactly one
 canonical daily alert schedule; none on reverse), reverse restoration of every
 predecessor path, one repeated forward, and teardown back to the graph leaves.
+
+The whole lifecycle runs in one serial test so schema/tabular state can never
+leak between TransactionTestCase methods.
 """
 
 import pytest
@@ -36,6 +39,7 @@ MIGRATE_FROM = [
     ("users", "0100_issue88_shard_62_users_relations"),
 ]
 MIGRATE_TO = ("extras", "0110_issue445_task_paths")
+ALERT_PATH = "extras.tasks.alerts.evaluate_alert_rules_task"
 NON_FUNC_FIELDS = (
     "name",
     "hook",
@@ -58,23 +62,19 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
 
     reset_sequences = True
 
-    def _executor(self):
-        return MigrationExecutor(connection)
-
     def _migrate(self, target):
-        executor = self._executor()
+        executor = MigrationExecutor(connection)
         return executor.migrate([target] if isinstance(target, tuple) else target)
 
-    def setUp(self):
-        super().setUp()
-        self.executor = self._executor()
-
-    def tearDown(self):
-        try:
-            executor = self._executor()
-            executor.migrate(executor.loader.graph.leaf_nodes())
-        finally:
-            super().tearDown()
+    def _send_post_migrate(self):
+        extras_config = django_apps.get_app_config("extras")
+        post_migrate.send(
+            sender=extras_config,
+            app_config=extras_config,
+            verbosity=0,
+            interactive=False,
+            using=connection.alias,
+        )
 
     def _seed_schedules(self, apps_state):
         Schedule = apps_state.get_model("django_q", "Schedule")
@@ -98,15 +98,21 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
                 rows[schedule.pk] = schedule
         return rows
 
-    def test_forward_and_reverse_preserve_every_non_func_field_and_multiplicity(self):
+    def test_complete_forward_reverse_forward_lifecycle(self):
         try:
+            # 1+2) exact predecessor state; at least two distinct rows per path
             old_apps = self._migrate(list(MIGRATE_FROM)).apps
             seeded = self._seed_schedules(old_apps)
             self.assertEqual(len(seeded), 24)
 
+            # 3a) post-migrate on the PREDECESSOR state stays silent
+            old_schedule = old_apps.get_model("django_q", "Schedule")
+            self._send_post_migrate()
+            self.assertFalse(old_schedule.objects.filter(func=ALERT_PATH).exists())
+
+            # 3b) forward mapping: multiplicity and byte-equal non-func fields
             new_apps = self._migrate([MIGRATE_TO]).apps
             NewSchedule = new_apps.get_model("django_q", "Schedule")
-            # multiplicity: every predecessor row moved onto the canonical path
             for old_path, new_path in TASK_PATH_MAP.items():
                 expected = sum(1 for s in seeded.values() if s.func == old_path)
                 self.assertEqual(
@@ -114,7 +120,6 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
                     expected,
                     f"multiplicity drift on {new_path}",
                 )
-            # non-func fields: byte-equal per row
             for pk, old_row in seeded.items():
                 new_row = NewSchedule.objects.get(pk=pk)
                 self.assertEqual(new_row.func, TASK_PATH_MAP[old_row.func])
@@ -125,6 +130,12 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
                         f"field {field} drifted on schedule {pk}",
                     )
 
+            # 4) post-migrate creates exactly one canonical daily alert schedule
+            self._send_post_migrate()
+            self._send_post_migrate()
+            self.assertEqual(NewSchedule.objects.filter(func=ALERT_PATH).count(), 1)
+
+            # 5) reverse restores every exact predecessor path
             reversed_apps = self._migrate(list(MIGRATE_FROM)).apps
             ReversedSchedule = reversed_apps.get_model("django_q", "Schedule")
             for old_path in TASK_PATH_MAP:
@@ -134,46 +145,19 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
                 self.assertEqual(back.func, old_row.func)
                 for field in NON_FUNC_FIELDS:
                     self.assertEqual(getattr(back, field), getattr(old_row, field), f"reverse drift {field} on {pk}")
+            # reverse does not recreate the new-path schedule, even on post-migrate
+            self.assertFalse(ReversedSchedule.objects.filter(func=ALERT_PATH).exists())
+            self._send_post_migrate()
+            self.assertFalse(ReversedSchedule.objects.filter(func=ALERT_PATH).exists())
 
-            # a second forward succeeds identically
+            # 6) a second forward succeeds identically
             again_apps = self._migrate([MIGRATE_TO]).apps
             AgainSchedule = again_apps.get_model("django_q", "Schedule")
             for old_path, new_path in TASK_PATH_MAP.items():
                 expected = sum(1 for s in seeded.values() if s.func == old_path)
                 self.assertEqual(AgainSchedule.objects.filter(func=new_path).count(), expected)
+            self.assertEqual(AgainSchedule.objects.filter(func=ALERT_PATH).count(), 1)
         finally:
-            # ensure teardown always reaches the leaves even on failure
-            self._migrate(self._executor().loader.graph.leaf_nodes())
-
-    def test_post_migrate_registers_exactly_one_alert_schedule_only_after_cutover(self):
-        try:
-            # on the predecessor state the handler must stay silent
-            old_apps = self._migrate(list(MIGRATE_FROM)).apps
-            OldSchedule = old_apps.get_model("django_q", "Schedule")
-            extras_config = django_apps.get_app_config("extras")
-            post_migrate.send(sender=extras_config, using=connection.alias)
-            self.assertFalse(OldSchedule.objects.filter(func="extras.tasks.alerts.evaluate_alert_rules_task").exists())
-
-            # after the cutover migration the handler creates exactly one schedule
-            new_apps = self._migrate([MIGRATE_TO]).apps
-            NewSchedule = new_apps.get_model("django_q", "Schedule")
-            post_migrate.send(sender=extras_config, using=connection.alias)
-            post_migrate.send(sender=extras_config, using=connection.alias)
-            self.assertEqual(
-                NewSchedule.objects.filter(func="extras.tasks.alerts.evaluate_alert_rules_task").count(),
-                1,
-            )
-
-            # reverse: no new-path schedule may remain; a repeated post-migrate
-            # on the reversed state must not recreate the cutover path
-            reversed_apps = self._migrate(list(MIGRATE_FROM)).apps
-            ReversedSchedule = reversed_apps.get_model("django_q", "Schedule")
-            self.assertFalse(
-                ReversedSchedule.objects.filter(func="extras.tasks.alerts.evaluate_alert_rules_task").exists()
-            )
-            post_migrate.send(sender=extras_config, using=connection.alias)
-            self.assertFalse(
-                ReversedSchedule.objects.filter(func="extras.tasks.alerts.evaluate_alert_rules_task").exists()
-            )
-        finally:
-            self._migrate(self._executor().loader.graph.leaf_nodes())
+            # 7) teardown restores the graph leaves even when an assertion fails
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())

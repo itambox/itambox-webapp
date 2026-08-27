@@ -29,7 +29,7 @@ from django.apps import apps as django_apps
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
-from django_q.brokers import SignedPackage
+from django_q.signing import SignedPackage
 from django_q.utils import get_func_repr
 
 LEGACY_PATHS = frozenset(
