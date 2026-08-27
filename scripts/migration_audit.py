@@ -30,6 +30,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0107_scheduledreportscopeauthorization_revocation",
     "extras.0108_alertlog_delivery_outcome",
     "extras.0109_webhookdelivery",
+    "extras.0110_issue445_task_paths",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -92,6 +93,14 @@ SEMANTIC_DISPOSITIONS = {
             "correlation fields while preserving legacy principals for the 1.x dual-read window."
         ),
         {"users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Rewrites the twelve canonical django-q Schedule.func values to their issue-#445 domain-owner "
+            "paths forward and back, preserving every other schedule field, PK and row multiplicity."
+        ),
+        {"extras.0110_issue445_task_paths"},
     ),
     **_dispositions(
         "required-fresh",

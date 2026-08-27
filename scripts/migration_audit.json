@@ -11339,6 +11339,50 @@
     },
     {
       "dependencies": [
+        "django_q.0019_alter_task_options_alter_ormq_key_alter_ormq_lock_and_more",
+        "extras.0109_webhookdelivery",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0110_issue445_task_paths",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0110_issue445_task_paths.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Rewrites the twelve canonical django-q Schedule.func values to their issue-#445 domain-owner paths forward and back, preserving every other schedule field, PK and row multiplicity."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -17857,6 +17901,7 @@
     "extras.0107_scheduledreportscopeauthorization_revocation",
     "extras.0108_alertlog_delivery_outcome",
     "extras.0109_webhookdelivery",
+    "extras.0110_issue445_task_paths",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -17941,6 +17986,7 @@
       "extras.0103_remove_reporttemplate_advanced_mode_and_more",
       "extras.0104_issue183_alert_tenant_reconciliation",
       "extras.0105_reporttemplate_advanced_mode_and_more",
+      "extras.0110_issue445_task_paths",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -18140,7 +18186,7 @@
         ]
       }
     },
-    "post_transition_migrations": 23,
+    "post_transition_migrations": 24,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

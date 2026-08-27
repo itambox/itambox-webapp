@@ -35,6 +35,8 @@
     "itambox/extras/tests/test_issue183_alerts.py",
     "itambox/extras/tests/test_issue185_alert_delivery.py",
     "itambox/extras/tests/test_issue445_event_semantics.py",
+    "itambox/extras/tests/test_issue445_queue_cutover.py",
+    "itambox/extras/tests/test_issue445_task_path_migration.py",
     "itambox/extras/tests/test_issue445_webhook_assertions.py",
     "itambox/extras/tests/test_journal_views.py",
     "itambox/extras/tests/test_saved_filters.py",
@@ -50,7 +52,11 @@
     "itambox/itambox/tests/test_generic_view_foundations.py",
     "itambox/itambox/tests/test_scanning.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",
-    "itambox/users/tests/test_table_config_views.py"
+    "itambox/users/tests/test_table_config_views.py",
+    "scripts/tests/test_exception_policy.py",
+    "scripts/tests/test_inline_styles.py",
+    "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_typing_policy.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -89,6 +95,8 @@
     "itambox/extras/tests/test_issue183_alerts.py",
     "itambox/extras/tests/test_issue185_alert_delivery.py",
     "itambox/extras/tests/test_issue445_event_semantics.py",
+    "itambox/extras/tests/test_issue445_queue_cutover.py",
+    "itambox/extras/tests/test_issue445_task_path_migration.py",
     "itambox/extras/tests/test_issue445_webhook_assertions.py",
     "itambox/extras/tests/test_journal_views.py",
     "itambox/extras/tests/test_saved_filters.py",
@@ -105,7 +113,11 @@
     "itambox/itambox/tests/test_generic_view_foundations.py",
     "itambox/itambox/tests/test_scanning.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",
-    "itambox/users/tests/test_table_config_views.py"
+    "itambox/users/tests/test_table_config_views.py",
+    "scripts/tests/test_exception_policy.py",
+    "scripts/tests/test_inline_styles.py",
+    "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_typing_policy.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

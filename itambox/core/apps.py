@@ -15,12 +15,26 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         # Monkey-patch ModelChoiceField.queryset to dynamically apply tenant scoping at request time
+        # Issue #445: replace the vendor Success/Failure resubmission action
+        # with the all-or-nothing guarded variant. Importing the guard module
+        # here runs no ORM queries.
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
+        from django.contrib import admin
         from django.forms.models import ModelChoiceField
+        from django_q.models import Failure, Success
 
         import core.signals  # noqa: F401
 
         # inline import: app-registry: register the production configuration checks after app loading
         from core import checks  # noqa: F401
+
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
+        from core.django_q_task_resubmission import GuardedFailAdmin, GuardedTaskAdmin
+
+        admin.site.unregister(Success)
+        admin.site.unregister(Failure)
+        admin.site.register(Success, GuardedTaskAdmin)
+        admin.site.register(Failure, GuardedFailAdmin)
 
         original_queryset_getter = ModelChoiceField.queryset.fget
 

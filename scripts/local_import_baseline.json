@@ -798,12 +798,6 @@
     {
       "path": "itambox/core/apps.py",
       "context": "ClassDef:CoreConfig/FunctionDef:ready",
-      "statement": "from django.forms.models import ModelChoiceField",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
-      "context": "ClassDef:CoreConfig/FunctionDef:ready",
       "statement": "import core.signals",
       "count": 1
     },
