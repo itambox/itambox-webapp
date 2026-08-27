@@ -13,8 +13,8 @@ from collections.abc import Sequence
 from django.db import transaction
 from django.utils.translation import gettext as _
 
+from assets import services
 from assets.models import Asset, StatusLabel
-from assets.services import checkin_asset
 from core.models import Job, Notification
 from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
@@ -53,7 +53,7 @@ def _checkin_item(
         with transaction.atomic():
             asset = Asset.objects.select_for_update().get(pk=pk)
             # location=None → checkin_asset() preserves the asset's current location.
-            result = checkin_asset(
+            result = services.checkin_asset(
                 asset,
                 user=ctx.user,
                 status=status,
@@ -212,8 +212,16 @@ def bulk_checkin_task(
             # resolved or mutated. No Notification is created on denial.
             if ctx.user is None or ctx.tenant is None or not ctx.user.has_perm("assets.change_asset", obj=ctx.tenant):
                 logger.warning(
-                    "Bulk check-in denied: worker permission revoked",
-                    extra={**log_extra, "code": "checkin.permission_revoked"},
+                    "Bulk check-in denied [checkin.permission_revoked] tenant_id=%s actor_id=%s job_id=%s",
+                    ctx.tenant_id,
+                    ctx.user_id,
+                    job_id,
+                    extra={
+                        "tenant_id": ctx.tenant_id,
+                        "actor_id": ctx.user_id,
+                        "job_id": job_id,
+                        "code": "checkin.permission_revoked",
+                    },
                 )
                 job.mark_failed("[terminal] checkin.permission_revoked")
                 return TaskResult(TaskStatus.TERMINAL, "checkin.permission_revoked")

@@ -53,7 +53,9 @@ FAMILIES = {
     },
 }
 
-STANDARD_LOG_RECORD_KEYS = set(logging.makeLogRecord({}).__dict__)
+# ``assertLogs`` formats each captured record before returning it, which adds
+# the standard derived ``message`` attribute after ``makeLogRecord`` runs.
+STANDARD_LOG_RECORD_KEYS = set(logging.makeLogRecord({}).__dict__) | {"message"}
 
 
 def _task_module(config):

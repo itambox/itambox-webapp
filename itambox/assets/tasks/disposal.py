@@ -14,8 +14,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.utils.translation import gettext as _
 
+from assets import services
 from assets.models import Asset, AssetDisposal
-from assets.services import dispose_asset
 from core.models import Job, Notification
 from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
@@ -62,7 +62,7 @@ def _dispose_item(
             return "skipped"
 
         proceeds = _parse_proceeds(proceeds_map.get(str(pk)))
-        dispose_asset(asset=asset, user=ctx.user, proceeds=proceeds, **shared)
+        services.dispose_asset(asset=asset, user=ctx.user, proceeds=proceeds, **shared)
         return "success"
     # broad except: boundary-isolation: one asset failure must not abort the requested batch
     except Exception as ex:
@@ -214,8 +214,16 @@ def bulk_dispose_task(
                 or not ctx.user.has_perm("assets.add_assetdisposal", obj=ctx.tenant)
             ):
                 logger.warning(
-                    "Bulk disposal denied: worker permission revoked",
-                    extra={**log_extra, "code": "disposal.permission_revoked"},
+                    "Bulk disposal denied [disposal.permission_revoked] tenant_id=%s actor_id=%s job_id=%s",
+                    ctx.tenant_id,
+                    ctx.user_id,
+                    job_id,
+                    extra={
+                        "tenant_id": ctx.tenant_id,
+                        "actor_id": ctx.user_id,
+                        "job_id": job_id,
+                        "code": "disposal.permission_revoked",
+                    },
                 )
                 job.mark_failed("[terminal] disposal.permission_revoked")
                 return TaskResult(TaskStatus.TERMINAL, "disposal.permission_revoked")

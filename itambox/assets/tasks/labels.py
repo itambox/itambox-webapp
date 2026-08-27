@@ -533,11 +533,18 @@ def _render_label_cards(job, assets, label_template, log_extra):
 def _finalize_label_pdf(job, user, log_extra, pdf_bytes, assets, rendered_cards):
     """Persist the PDF attachment, notify, and return the terminal result."""
     ct = ContentType.objects.get_for_model(Job)
-    attachment = FileAttachment.objects.create(
+    attachment = FileAttachment(
         model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.pdf", mime_type="application/pdf"
     )
-    attachment.file.save(f"labels_batch_{job.pk}.pdf", ContentFile(pdf_bytes))
-    attachment.save()
+    try:
+        attachment.save()
+        attachment.file.save(f"labels_batch_{job.pk}.pdf", ContentFile(pdf_bytes))
+        attachment.save()
+    # broad except: cleanup-reraise: persistence is all-or-nothing across the database
+    # row and storage object, while the outer task boundary retains error classification
+    except Exception:
+        _cleanup_partial_attachment(job, attachment, log_extra)
+        raise
 
     job.append_log("PDF document generated and saved successfully.")
     job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})

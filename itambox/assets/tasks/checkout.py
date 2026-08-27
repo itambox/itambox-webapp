@@ -14,8 +14,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
+from assets import services
 from assets.models import Asset, StatusLabel
-from assets.services import checkout_asset
 from core.models import Job, Notification
 from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
@@ -53,7 +53,7 @@ def _checkout_item(
     try:
         with transaction.atomic():
             asset = Asset.objects.select_for_update().get(pk=pk)
-            checkout_asset(
+            services.checkout_asset(
                 asset=asset,
                 **{target_kwarg: target},
                 user=ctx.user,
@@ -209,8 +209,16 @@ def bulk_checkout_task(
             # or mutated. No Notification is created on denial.
             if ctx.user is None or ctx.tenant is None or not ctx.user.has_perm("assets.change_asset", obj=ctx.tenant):
                 logger.warning(
-                    "Bulk checkout denied: worker permission revoked",
-                    extra={**log_extra, "code": "checkout.permission_revoked"},
+                    "Bulk checkout denied [checkout.permission_revoked] tenant_id=%s actor_id=%s job_id=%s",
+                    ctx.tenant_id,
+                    ctx.user_id,
+                    job_id,
+                    extra={
+                        "tenant_id": ctx.tenant_id,
+                        "actor_id": ctx.user_id,
+                        "job_id": job_id,
+                        "code": "checkout.permission_revoked",
+                    },
                 )
                 job.mark_failed("[terminal] checkout.permission_revoked")
                 return TaskResult(TaskStatus.TERMINAL, "checkout.permission_revoked")
