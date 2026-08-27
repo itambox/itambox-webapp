@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
@@ -261,7 +261,17 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         ):
             context = view.get_context_data(object=self.asset)
 
-        get_for_model.assert_called_once_with(self.asset)
+        get_for_model.assert_has_calls(
+            [
+                call(self.asset),
+                call(Asset),
+            ]
+        )
+        # Exactly two lookups: the view's shared ContentType for the object, and
+        # the model hook's own internal lookup inside
+        # ``ChangeLoggingMixin.get_changelog_url`` (the restored object hook
+        # precedence). No provider re-resolves the ContentType.
+        self.assertEqual(get_for_model.call_count, 2)
         self.assertIs(changelog_filter.call_args.kwargs["changed_object_type"], self.content_type)
         self.assertIs(extras_detail.call_args.args[0].content_type, self.content_type)
         self.assertIs(subscriptions_detail.call_args.args[0].content_type, self.content_type)
