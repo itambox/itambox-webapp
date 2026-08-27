@@ -850,14 +850,17 @@ class TestCoverageGapBranches:
     them directly so the changed-code budget records them as covered.
     """
 
-    def test_protocol_placeholder_bodies_are_directly_invokable(self):
+    def test_protocol_placeholder_bodies_are_directly_invokable_noop_sentinels(self):
         from itambox.registry import GenericPresentationProvider
 
+        # The protocol bodies are spec placeholders; their implied contract is
+        # that they are directly invokable no-ops returning None.
+        provider = object()
         input_ = object()
-        GenericPresentationProvider.resolve_list_params(object(), input_)
-        GenericPresentationProvider.filter_list_queryset(object(), input_)
-        GenericPresentationProvider.build_list_context(object(), input_)
-        GenericPresentationProvider.build_detail_context(object(), input_)
+        assert GenericPresentationProvider.resolve_list_params(provider, input_) is None
+        assert GenericPresentationProvider.filter_list_queryset(provider, input_) is None
+        assert GenericPresentationProvider.build_list_context(provider, input_) is None
+        assert GenericPresentationProvider.build_detail_context(provider, input_) is None
 
     def test_validated_params_result_rejects_non_conforming_provider_output(self):
         from itambox.views.generic.extensions import _validated_params_result
@@ -887,18 +890,17 @@ class TestCoverageGapBranches:
     def test_build_detail_provider_context_fails_for_owner_without_registration(self):
         from itambox.views.generic.extensions import build_detail_provider_context
 
-        previous_features = dict(registry._model_features)
-        previous_owners = dict(registry._generic_presentation_feature_owners)
-        try:
-            registry._model_features[_SpecModel] = {"bookmarkable"}
-            registry._generic_presentation_feature_owners["bookmarkable"] = "ghost"
-            with pytest.raises(ImproperlyConfigured, match="ghost"):
-                build_detail_provider_context(SimpleNamespace(user=None), _SpecModel(), None)
-        finally:
-            registry._model_features.clear()
-            registry._model_features.update(previous_features)
-            registry._generic_presentation_feature_owners.clear()
-            registry._generic_presentation_feature_owners.update(previous_owners)
+        # The owner map has no public write API by design, so the ghost owner is
+        # planted directly; the model feature and the owner map are restored by
+        # the sanctioned test seam and the feature APIs.
+        with registry.isolated_generic_presentation_for_tests():
+            registry.register_feature(_SpecModel, "bookmarkable")
+            try:
+                registry._generic_presentation_feature_owners["bookmarkable"] = "ghost"
+                with pytest.raises(ImproperlyConfigured, match="ghost"):
+                    build_detail_provider_context(SimpleNamespace(user=None), _SpecModel(), None)
+            finally:
+                registry.unregister_feature(_SpecModel, "bookmarkable")
 
     def test_subscriptions_provider_pass_through_phases_are_directly_callable(self):
         from subscriptions.feature_views import SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER
