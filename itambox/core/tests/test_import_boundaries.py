@@ -539,7 +539,7 @@ class MembershipServiceLayerTests(SimpleTestCase):
             with self.subTest(module=module):
                 self.assertFalse(
                     _imports("organization.services", module),
-                    f"organization.services.__init__ must not import {module}: itambox.views.features "
+                    f"organization.services.__init__ must not import {module}: extras.export_views "
                     "imports the package at module scope and would gain an edge to core.auth",
                 )
 
@@ -880,7 +880,7 @@ class TenantResourceGrantBoundaryTests(SimpleTestCase):
             PROJECT_ROOT / "inventory" / "views" / "component_views.py",
             PROJECT_ROOT / "inventory" / "views" / "consumable_views.py",
             PROJECT_ROOT / "itambox" / "api" / "permissions.py",
-            PROJECT_ROOT / "itambox" / "views" / "features.py",
+            PROJECT_ROOT / "extras" / "export_views.py",
         )
         bypasses = []
         for path in boundary_files:
