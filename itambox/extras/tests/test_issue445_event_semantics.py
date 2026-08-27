@@ -3,10 +3,15 @@
 import importlib
 import inspect
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.db import DatabaseError, IntegrityError, close_old_connections
+from django.test import TestCase, TransactionTestCase
 
 from assets.models import Manufacturer
 from core.models import Notification
@@ -64,14 +69,31 @@ class Issue445EventSemanticsTests(TestCase):
     def test_each_eligible_rule_is_attempted_once_and_sibling_success_survives(self):
         service, attempts, execute = self._dispatch_with_canary()
         with self.assertLogs(service.__name__, level="ERROR"), self.subTest("isolated actions"):
-            from unittest.mock import patch
-
             with patch.object(service, "_execute_event_action", side_effect=execute):
                 service.process_event_rules(self.event)
         self.event.refresh_from_db()
         self.assertCountEqual(attempts, [self.failing_rule.pk, self.success_rule.pk])
         self.assertEqual(Notification.objects.filter(subject="issue445-success").count(), 1)
         self.assertTrue(self.event.processed)
+
+    def test_database_failure_uses_savepoint_and_does_not_block_sibling(self):
+        service = _event_service()
+        attempts = []
+
+        def execute(rule, _event, _tenant_id=None):
+            attempts.append(rule.pk)
+            if rule.pk == self.failing_rule.pk:
+                raise IntegrityError("issue445 savepoint canary")
+            Notification.objects.create(user=self.user, subject="issue445-db-sibling", message="safe")
+
+        with self.assertLogs(service.__name__, level="ERROR"):
+            with patch.object(service, "_execute_event_action", side_effect=execute):
+                service.process_event_rules(self.event)
+
+        self.event.refresh_from_db()
+        self.assertTrue(self.event.processed)
+        self.assertCountEqual(attempts, [self.failing_rule.pk, self.success_rule.pk])
+        self.assertEqual(Notification.objects.filter(subject="issue445-db-sibling").count(), 1)
 
     def test_no_eligible_rule_marks_event_processed(self):
         service = _event_service()
@@ -85,7 +107,6 @@ class Issue445EventSemanticsTests(TestCase):
 
     def test_caught_failure_is_terminal_and_second_dispatch_does_not_replay(self):
         service, attempts, execute = self._dispatch_with_canary()
-        from unittest.mock import patch
 
         with patch.object(service, "_execute_event_action", side_effect=execute):
             service.process_event_rules(self.event)
@@ -105,7 +126,6 @@ class Issue445EventSemanticsTests(TestCase):
 
     def test_rule_failure_log_has_only_safe_ids_and_exception_class(self):
         service, _attempts, execute = self._dispatch_with_canary()
-        from unittest.mock import patch
 
         logger = logging.getLogger(service.__name__)
         with self.assertLogs(logger, level="ERROR") as captured:
@@ -130,3 +150,95 @@ class Issue445EventSemanticsTests(TestCase):
             source,
             "missing issue445 logger.exception prohibition at the event-rule boundary",
         )
+
+
+class Issue445EventConcurrencyTests(TransactionTestCase):
+    """The processed flag and every durable rule side effect commit atomically."""
+
+    reset_sequences = True
+
+    def setUp(self):
+        super().setUp()
+        self.content_type = ContentType.objects.get_for_model(Manufacturer)
+        self.user = get_user_model().objects.create_user(username="issue445-event-race-user", password="pw")
+        self.event = Event.objects.create(
+            model=self.content_type,
+            object_id=446,
+            action=Event.ACTION_CREATE,
+            data={"app_label": "assets", "model_name": "manufacturer"},
+        )
+        self.rule = EventRule.objects.create(
+            name="Issue445 concurrency rule",
+            model=self.content_type,
+            events=[self.event.action],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            enabled=True,
+        )
+
+    def _worker(self, service):
+        close_old_connections()
+        try:
+            return service.process_event_rules(Event._base_manager.get(pk=self.event.pk))
+        finally:
+            close_old_connections()
+
+    def test_concurrent_dispatchers_create_one_side_effect(self):
+        service = _event_service()
+        first_action_started = threading.Event()
+        release_first_action = threading.Event()
+        calls = []
+        calls_lock = threading.Lock()
+
+        def execute(rule, event, _tenant_id=None):
+            with calls_lock:
+                calls.append((rule.pk, event.pk))
+            first_action_started.set()
+            if not release_first_action.wait(timeout=10):
+                raise AssertionError("timed out waiting to release first event action")
+            Notification.objects.create(user_id=self.user.pk, subject="issue445-race", message="safe")
+
+        with patch.object(service, "_execute_event_action", side_effect=execute):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                first = executor.submit(self._worker, service)
+                self.assertTrue(first_action_started.wait(timeout=10))
+                duplicate = executor.submit(self._worker, service)
+                with self.assertRaises(FutureTimeoutError):
+                    duplicate.result(timeout=0.5)
+                release_first_action.set()
+                first.result(timeout=10)
+                duplicate.result(timeout=10)
+
+        self.event.refresh_from_db()
+        self.assertTrue(self.event.processed)
+        self.assertEqual(calls, [(self.rule.pk, self.event.pk)])
+        self.assertEqual(Notification.objects.filter(subject="issue445-race").count(), 1)
+
+    def test_final_processed_save_failure_rolls_back_side_effect(self):
+        service = _event_service()
+
+        def execute(_rule, _event, _tenant_id=None):
+            Notification.objects.create(user_id=self.user.pk, subject="issue445-rollback", message="safe")
+
+        original_save = Event.save
+
+        def fail_terminal_save(instance, *args, **kwargs):
+            if kwargs.get("update_fields") == ["processed"]:
+                raise DatabaseError("issue445 terminal save canary")
+            return original_save(instance, *args, **kwargs)
+
+        with (
+            patch.object(service, "_execute_event_action", side_effect=execute),
+            patch.object(Event, "save", new=fail_terminal_save),
+            self.assertRaises(DatabaseError),
+        ):
+            service.process_event_rules(self.event)
+
+        self.event.refresh_from_db()
+        self.assertFalse(self.event.processed)
+        self.assertFalse(Notification.objects.filter(subject="issue445-rollback").exists())
+
+        with patch.object(service, "_execute_event_action", side_effect=execute):
+            service.process_event_rules(self.event)
+        self.event.refresh_from_db()
+        self.assertTrue(self.event.processed)
+        self.assertEqual(Notification.objects.filter(subject="issue445-rollback").count(), 1)

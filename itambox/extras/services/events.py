@@ -113,32 +113,47 @@ def _eligible_rules(event, instance_tenant_id):
 def process_event_rules(event, instance_tenant_id=None):
     """Attempt every eligible rule exactly once, then mark the event terminal.
 
+    The event row is locked for the complete rule-attempt transaction. Concurrent
+    dispatchers therefore serialize before reading ``processed``; all database
+    side effects and the terminal flag commit together. Queue dispatches registered
+    by rule actions remain ``transaction.on_commit`` callbacks, so a failed final
+    save rolls back the durable side effects and never publishes work.
+
     Each eligible rule gets one attempt; a rule action that raises is caught,
     reported with identifiers only, and is terminal for that rule on this event.
     Once every eligible rule has reached a terminal attempt — including the case
     where none was eligible — the event is marked processed so a caught failure
     can never be replayed into duplicate deliveries or notifications.
     """
-    if event.processed:
+    if event.pk is None:
         return
 
-    for rule in _eligible_rules(event, instance_tenant_id):
-        # Per-rule isolation: one rule's action raising must not abort the remaining
-        # rules for this event. Only identifiers and the exception class may be logged
-        # on this boundary — action config, event data, endpoints and secrets must not.
-        try:
-            _execute_event_action(rule, event, instance_tenant_id)
-        # broad except: task-isolation: one failing rule must not prevent other eligible rules
-        except Exception as error:
-            logger.error(
-                "operation=events.rule_action disposition=terminal event_id=%s rule_id=%s error_class=%s",
-                event.pk,
-                rule.pk,
-                type(error).__name__,
-            )
+    with transaction.atomic():
+        locked_event = Event._base_manager.select_for_update(of=("self",)).get(pk=event.pk)
+        if locked_event.processed:
+            return
 
-    event.processed = True
-    event.save(update_fields=["processed"])
+        for rule in _eligible_rules(locked_event, instance_tenant_id):
+            # Per-rule isolation: one rule's action raising must not abort the remaining
+            # rules for this event. Only identifiers and the exception class may be logged
+            # on this boundary — action config, event data, endpoints and secrets must not.
+            try:
+                # A per-rule savepoint keeps database errors terminal for this
+                # rule without poisoning the outer event-lock transaction or
+                # preventing later eligible rules from being attempted.
+                with transaction.atomic():
+                    _execute_event_action(rule, locked_event, instance_tenant_id)
+            # broad except: task-isolation: one failing rule must not prevent other eligible rules
+            except Exception as error:
+                logger.error(
+                    "operation=events.rule_action disposition=terminal event_id=%s rule_id=%s error_class=%s",
+                    locked_event.pk,
+                    rule.pk,
+                    type(error).__name__,
+                )
+
+        locked_event.processed = True
+        locked_event.save(update_fields=["processed"])
 
 
 def _check_conditions(conditions, event):
