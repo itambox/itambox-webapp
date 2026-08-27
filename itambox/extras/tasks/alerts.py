@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, Category, Warranty
+from core import context
 from core.events import DeliveryDisposition, delivery_log_context, delivery_log_message, send_notification_to_channel
 from core.tasks.context import TaskContext
 from extras.models import AlertLog, AlertRule
@@ -327,10 +328,14 @@ def _dispatch_channels(rule, match, alert_log, delivery_id=None):
             result = send_notification_to_channel(channel, match["subject"], match["message"])
             delivery[str(channel.pk)] = _delivery_entry(result, delivery_id)
             if not result:
-                context = delivery_log_context(result.operation, tenant_id=rule.tenant_id)
+                log_context = delivery_log_context(
+                    result.operation,
+                    tenant_id=rule.tenant_id,
+                    request_id=context.get_current_request_id(),
+                )
                 logger.warning(
                     "%s disposition=%s user_visible=%s",
-                    delivery_log_message(context),
+                    delivery_log_message(log_context),
                     result.disposition.value,
                     result.user_visible,
                 )
@@ -343,10 +348,14 @@ def _dispatch_channels(rule, match, alert_log, delivery_id=None):
                 "attempted_at": timezone.now().isoformat(),
                 "error_class": "unexpected_channel_error",
             }
-            context = delivery_log_context("alert.channel.dispatch", tenant_id=rule.tenant_id)
+            log_context = delivery_log_context(
+                "alert.channel.dispatch",
+                tenant_id=rule.tenant_id,
+                request_id=context.get_current_request_id(),
+            )
             logger.error(
                 "%s disposition=terminal reason=unexpected_channel_error channel_id=%s",
-                delivery_log_message(context),
+                delivery_log_message(log_context),
                 channel.pk,
             )
     return delivery

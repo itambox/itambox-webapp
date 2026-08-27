@@ -77,9 +77,9 @@ class AppConfigScheduleRegistrationTests(TestCase):
         # post_migrate handlers receive (sender, **kwargs).
         handler(sender=config)
 
-    def test_core_handler_is_idempotent(self):
-        self._run_handler("core", "_register_alert_schedule")
-        self._run_handler("core", "_register_alert_schedule")
+    def test_extras_alert_handler_is_idempotent(self):
+        self._run_handler("extras", "_register_alert_schedule")
+        self._run_handler("extras", "_register_alert_schedule")
         self.assertEqual(Schedule.objects.filter(func=CORE_FUNC).count(), 1)
 
     def test_subscriptions_handler_is_idempotent(self):
@@ -89,9 +89,9 @@ class AppConfigScheduleRegistrationTests(TestCase):
 
     def test_no_duplicate_schedules_across_funcs(self):
         # Run every registering handler twice; each func must end with one row.
-        self._run_handler("core", "_register_alert_schedule")
+        self._run_handler("extras", "_register_alert_schedule")
         self._run_handler("subscriptions", "_register_subscription_tasks")
-        self._run_handler("core", "_register_alert_schedule")
+        self._run_handler("extras", "_register_alert_schedule")
         self._run_handler("subscriptions", "_register_subscription_tasks")
 
         for func in (CORE_FUNC, SUBSCRIPTION_FUNC):

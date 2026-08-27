@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import translation
 from django_q.models import Schedule
 
+from core.tasks.utils import TaskResult, TaskStatus
 from extras.models import (
     NotificationChannel,
     ReportGenerationArchive,
@@ -409,7 +410,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertContains(response, reverse("extras:reporttemplate_list"))
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("extras.tasks.reports.generate_scheduled_report_task", return_value=False)
+    @patch(
+        "extras.views.generate_scheduled_report_task",
+        return_value=TaskResult(TaskStatus.TERMINAL, "report.delivery_failed", user_visible=True),
+    )
     def test_trigger_reports_delivery_failure_after_successful_generation(self, mock_generate):
         sched = ScheduledReport.objects.create(
             name="Delivery Failure UI",

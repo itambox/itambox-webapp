@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 
+from core import tenant_scope
 from core.context import (
     _current_user,
     _issued_system_authorizations,
@@ -101,6 +102,8 @@ class Issue445TaskContextWrapperTests(TestCase):
         revoked_user = User.objects.create_user(username="issue445-revoked-user", password="pw")
         revoked_role = Role.objects.create(tenant=revoked_tenant, name="Revoked", permissions=[])
         revoked_grant = grant(revoked_user, revoked_tenant, revoked_role)
+        self.assertIn(revoked_tenant.pk, tenant_scope.accessible_tenant_ids(revoked_user))
+        self.assertTrue(tenant_scope.role_grant_covers_tenant(revoked_user, revoked_tenant))
         revoked_grant.delete()
         cases.append(("revoked grant", revoked_tenant.pk, revoked_user.pk))
 
@@ -108,6 +111,8 @@ class Issue445TaskContextWrapperTests(TestCase):
         deleted_user = User.objects.create_user(username="issue445-deleted-role-user", password="pw")
         deleted_role = Role.objects.create(tenant=deleted_tenant, name="Deleted", permissions=[])
         grant(deleted_user, deleted_tenant, deleted_role)
+        self.assertIn(deleted_tenant.pk, tenant_scope.accessible_tenant_ids(deleted_user))
+        self.assertTrue(tenant_scope.role_grant_covers_tenant(deleted_user, deleted_tenant))
         deleted_role.delete()
         cases.append(("deleted role", deleted_tenant.pk, deleted_user.pk))
 

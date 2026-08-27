@@ -1,8 +1,7 @@
 import uuid
-from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from django.test import override_settings
+from django.test import TestCase, override_settings
 
 from core.errors import (
     FailureDisposition,
@@ -273,9 +272,9 @@ class IntuneTaskBoundaryContractTests(TestCase):
         ]
 
         with (
-            patch("assets.models.Manufacturer") as manufacturer_model,
-            patch("software.models.Software") as software_model,
-            patch("software.models.InstalledSoftware") as installed_model,
+            patch.object(intune_sync, "Manufacturer") as manufacturer_model,
+            patch.object(intune_sync, "Software") as software_model,
+            patch.object(intune_sync, "InstalledSoftware") as installed_model,
             patch.object(intune_sync.logger, "warning") as log_warning,
         ):
             manufacturer_model.objects.get_or_create.return_value = (MagicMock(), False)
@@ -316,8 +315,8 @@ class IntuneTaskBoundaryContractTests(TestCase):
         asset.objects = MagicMock()
 
         with (
-            patch("assets.models.Asset") as asset_model,
-            patch("assets.tasks.intune_sync.IntuneClient") as client_model,
+            patch.object(intune_sync, "Asset") as asset_model,
+            patch.object(intune_sync, "IntuneClient") as client_model,
             patch.object(intune_sync, "_sync_device_software", return_value=(0, True)),
         ):
             asset_model.objects.filter.return_value.select_related.return_value.first.return_value = asset
