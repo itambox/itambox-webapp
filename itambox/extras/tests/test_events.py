@@ -398,6 +398,14 @@ class EventsSystemTestCase(TransactionTestCase):
                 test_send=False,
                 attempt=1,
                 status=WebhookDelivery.STATUS_PENDING,
+                target_url=endpoint.url,
+                target_http_method=endpoint.http_method,
+                target_headers=endpoint.headers,
+                target_secret=endpoint.secret,
+                target_enabled=True,
+                target_tenant_id=endpoint.tenant_id,
+                target_retry_count=endpoint.retry_count,
+                target_retry_backoff=endpoint.retry_backoff,
             )
             assertions = WebhookDeliveryAssertions(
                 delivery_pk=delivery.pk,

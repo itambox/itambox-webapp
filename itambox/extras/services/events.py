@@ -18,8 +18,9 @@ from django.utils.translation import gettext_lazy as _
 from django_q.tasks import async_task
 
 from core.context import get_current_request_id, get_current_user
+from core.crypto import encrypt_string
 from core.models import ChangeLoggingMixin, Notification
-from extras.models import Event, EventRule, WebhookDelivery, has_authored_conditions
+from extras.models import Event, EventRule, WebhookDelivery, WebhookEndpoint, has_authored_conditions
 from extras.tasks.webhooks import WEBHOOK_TASK_PATH, WebhookDeliveryAssertions
 
 logger = logging.getLogger(__name__)
@@ -206,37 +207,93 @@ def _execute_event_action(rule, event, instance_tenant_id=None):
 def _send_webhook(rule, event, instance_tenant_id=None):
     """Create the durable delivery row for the rule and enqueue its dispatch.
 
-    Prefers the linked WebhookEndpoint (``rule.webhook``) — its URL, method, headers,
-    decrypted secret and retry policy. Falls back to the legacy ``action_config`` JSON
-    (``url``/``method``/``headers``/``secret``) for rules created before endpoints could
-    be linked.
-
-    The task receives identity assertions only: the durable row it names is the sole
-    authority for endpoint, event, tenant and test-send state, so neither the endpoint
-    secret nor the payload ever enters a django-q package or a retry ``Schedule``.
+    The exact rule provenance and target configuration are snapshotted before
+    enqueue. The task receives identity assertions only, so later rule or
+    endpoint mutation cannot redirect the delivery and sensitive target state
+    never enters a django-q package or retry schedule.
     """
 
-    config = rule.action_config or {}
-    endpoint = rule.webhook
-
-    if endpoint is not None:
-        if not endpoint.enabled:
-            return
-        url = endpoint.url
-    else:
-        url = config.get("url")
-
-    if not url:
+    target = _event_rule_target_snapshot(rule, instance_tenant_id)
+    if target is None:
         return
 
     delivery = WebhookDelivery._base_manager.create(
         tenant_id=instance_tenant_id,
-        endpoint=endpoint,
+        endpoint=rule.webhook,
         event=event,
         delivery_id=str(uuid4()),
         status=WebhookDelivery.STATUS_PENDING,
+        **target,
     )
     _enqueue_delivery(delivery)
+
+
+def _encrypted_target_secret(secret):
+    """Return an encrypted target snapshot without putting plaintext in a task."""
+    if not isinstance(secret, str):
+        raise ValueError("Webhook secrets must be strings.")
+    if not secret or secret.startswith("enc$"):
+        return secret
+    return encrypt_string(secret)
+
+
+def _legacy_retry_policy(url, tenant_id):
+    """Resolve the historical same-URL retry policy once, at row creation."""
+    matches = WebhookEndpoint._base_manager.filter(url=url, enabled=True, deleted_at__isnull=True)
+    if tenant_id is None:
+        match = matches.filter(tenant__isnull=True).order_by("pk").first()
+    else:
+        match = matches.filter(tenant_id=tenant_id).order_by("pk").first()
+        if match is None:
+            match = matches.filter(tenant__isnull=True).order_by("pk").first()
+    if match is None:
+        return 3, 60
+    return match.retry_count, match.retry_backoff
+
+
+def _event_rule_target_snapshot(rule, instance_tenant_id):
+    """Return immutable target fields for the delivery created by ``rule``."""
+    endpoint = rule.webhook
+    if endpoint is not None:
+        if (
+            not endpoint.enabled
+            or endpoint.deleted_at is not None
+            or (endpoint.tenant_id is not None and endpoint.tenant_id != instance_tenant_id)
+        ):
+            return None
+        url = endpoint.url
+        method = endpoint.http_method or WebhookEndpoint.HTTP_POST
+        headers = endpoint.headers or {}
+        secret = endpoint.secret
+        target_enabled = endpoint.enabled
+        target_tenant_id = endpoint.tenant_id
+        retry_count = endpoint.retry_count
+        retry_backoff = endpoint.retry_backoff
+    else:
+        config = rule.action_config or {}
+        url = config.get("url")
+        method = config.get("method") or WebhookEndpoint.HTTP_POST
+        headers = config.get("headers") or {}
+        secret = config.get("secret", "")
+        target_enabled = True
+        target_tenant_id = None
+        if not url:
+            return None
+        retry_count, retry_backoff = _legacy_retry_policy(url, instance_tenant_id)
+
+    if not isinstance(url, str) or not isinstance(method, str) or not isinstance(headers, dict):
+        return None
+    return {
+        "event_rule_id": rule.pk,
+        "target_url": url,
+        "target_http_method": method.upper(),
+        "target_headers": dict(headers),
+        "target_secret": _encrypted_target_secret(secret),
+        "target_enabled": target_enabled,
+        "target_tenant_id": target_tenant_id,
+        "target_retry_count": retry_count,
+        "target_retry_backoff": retry_backoff,
+    }
 
 
 def _delivery_assertions(delivery):

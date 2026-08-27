@@ -11383,6 +11383,89 @@
     },
     {
       "dependencies": [
+        "extras.0110_issue445_task_paths",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0111_webhookdelivery_target_claim",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0111_webhookdelivery_target_claim.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "extras.0111_webhookdelivery_target_claim",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0112_backfill_webhookdelivery_targets",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0112_backfill_webhookdelivery_targets.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Copies endpoint configuration into immutable webhook delivery target snapshots; endpoint-less history remains unbound because exact legacy rule provenance cannot be reconstructed safely."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -17902,6 +17985,8 @@
     "extras.0108_alertlog_delivery_outcome",
     "extras.0109_webhookdelivery",
     "extras.0110_issue445_task_paths",
+    "extras.0111_webhookdelivery_target_claim",
+    "extras.0112_backfill_webhookdelivery_targets",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -17987,6 +18072,7 @@
       "extras.0104_issue183_alert_tenant_reconciliation",
       "extras.0105_reporttemplate_advanced_mode_and_more",
       "extras.0110_issue445_task_paths",
+      "extras.0112_backfill_webhookdelivery_targets",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -18186,7 +18272,7 @@
         ]
       }
     },
-    "post_transition_migrations": 24,
+    "post_transition_migrations": 26,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

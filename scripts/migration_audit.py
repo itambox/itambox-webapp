@@ -31,6 +31,8 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0108_alertlog_delivery_outcome",
     "extras.0109_webhookdelivery",
     "extras.0110_issue445_task_paths",
+    "extras.0111_webhookdelivery_target_claim",
+    "extras.0112_backfill_webhookdelivery_targets",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -101,6 +103,14 @@ SEMANTIC_DISPOSITIONS = {
             "paths forward and back, preserving every other schedule field, PK and row multiplicity."
         ),
         {"extras.0110_issue445_task_paths"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Copies endpoint configuration into immutable webhook delivery target snapshots; endpoint-less "
+            "history remains unbound because exact legacy rule provenance cannot be reconstructed safely."
+        ),
+        {"extras.0112_backfill_webhookdelivery_targets"},
     ),
     **_dispositions(
         "required-fresh",

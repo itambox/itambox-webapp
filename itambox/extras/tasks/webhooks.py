@@ -22,13 +22,13 @@ import requests
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from django_q.models import Schedule
 from django_q.tasks import async_task
 
+from core.crypto import encrypt_string, get_fernet
 from core.events import DeliveryDisposition, DeliveryResult, delivery_log_context, delivery_log_message
-from extras.models import EventRule, WebhookDelivery, WebhookEndpoint
+from extras.models import Event, WebhookDelivery, WebhookEndpoint
 
 logger = logging.getLogger(__name__)
 WEBHOOK_ENVELOPE_SCHEMA_VERSION = 1
@@ -46,8 +46,10 @@ _UNAVAILABLE_ERROR_CLASS = "integration.unavailable"
 _RETRY_EXHAUSTED_ERROR_CLASS = "integration.retry_budget_exhausted"
 _IDENTITY_ERROR_CLASS = "integration.delivery_identity_rejected"
 
-_DEFAULT_RETRY_COUNT = 3
-_DEFAULT_RETRY_BACKOFF = 60
+# The default django-q worker timeout is 600 seconds and its broker retry is
+# 660 seconds. A crashed worker therefore loses this lease before redelivery,
+# while a still-live task remains fenced for its entire allowed runtime.
+_CLAIM_LEASE_SECONDS = 600
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +273,8 @@ def _mark_dead_locked(delivery, *, error_class: str, error_message: str, respons
     delivery.error_message = error_message
     delivery.next_retry_at = None
     delivery.completed_at = now
+    delivery.claim_token = None
+    delivery.claim_expires_at = None
     delivery.save(
         update_fields=[
             "status",
@@ -279,45 +283,24 @@ def _mark_dead_locked(delivery, *, error_class: str, error_message: str, respons
             "error_message",
             "next_retry_at",
             "completed_at",
+            "claim_token",
+            "claim_expires_at",
             "updated_at",
         ]
     )
 
 
-def _legacy_config_for_delivery(delivery):
-    """Legacy ``action_config`` that owns an endpoint-less delivery.
-
-    Pre-endpoint rules keep URL/method/headers/secret in the rule JSON, so the
-    worker re-derives them from the delivery's own event and tenant instead of
-    trusting a task payload.
-    """
-    if delivery.event_id is None:
-        return {}
-    rules = (
-        EventRule._base_manager.filter(action_type=EventRule.ACTION_WEBHOOK, webhook__isnull=True)
-        .filter(Q(tenant_id=delivery.tenant_id) | Q(tenant__isnull=True))
-        .order_by("pk")
-    )
-    for rule in rules:
-        if delivery.event.action in (rule.events or []):
-            config = rule.action_config or {}
-            if config.get("url"):
-                return config
-    return {}
-
-
-def _event_payload_fields(delivery, endpoint):
+def _event_payload_fields(delivery, event):
     """Payload provenance for the locked row: test envelope or its own event."""
     if delivery.test_send:
         return (
             "test",
             "extras",
             "WebhookEndpoint",
-            endpoint.pk if endpoint is not None else "",
+            delivery.endpoint_id or "",
             timezone.now().isoformat(),
             {},
         )
-    event = delivery.event
     if event is None:
         return None
     return (
@@ -330,39 +313,47 @@ def _event_payload_fields(delivery, endpoint):
     )
 
 
-def _execution_plan(delivery, endpoint) -> _ExecutionPlan | None:
-    """Derive the whole send from the locked row and its locked relations."""
-    payload_fields = _event_payload_fields(delivery, endpoint)
+def _decrypt_target_secret(value):
+    """Decrypt a durable secret snapshot without logging malformed ciphertext."""
+    if not value:
+        return ""
+    if not isinstance(value, str) or not value.startswith("enc$"):
+        return None
+    try:
+        return get_fernet().decrypt(value[4:].encode("ascii")).decode("utf-8")
+    # broad except: boundary-isolation: opaque ciphertext/keyring failures must fail closed without details
+    except Exception:
+        return None
+
+
+def _execution_plan(delivery, event) -> _ExecutionPlan | None:
+    """Derive the whole send only from the locked row and its event payload."""
+    payload_fields = _event_payload_fields(delivery, event)
     if payload_fields is None:
         return None
 
-    if endpoint is not None:
-        url = endpoint.url
-        method = (endpoint.http_method or "POST").upper()
-        headers = endpoint.headers or {}
-        secret = endpoint.secret_decrypted
-        retry_count = endpoint.retry_count
-        retry_backoff = endpoint.retry_backoff
-    else:
-        config = _legacy_config_for_delivery(delivery)
-        url = config.get("url") or ""
-        method = (config.get("method") or "POST").upper()
-        headers = config.get("headers") or {}
-        secret = config.get("secret", "")
-        # Legacy rules borrow the retry policy of an endpoint registered for the
-        # same URL, exactly as the pre-cutover enqueue path did.
-        match = WebhookEndpoint.objects.filter(url=url, enabled=True).first() if url else None
-        retry_count = match.retry_count if match else _DEFAULT_RETRY_COUNT
-        retry_backoff = match.retry_backoff if match else _DEFAULT_RETRY_BACKOFF
+    url = delivery.target_url
+    method = (delivery.target_http_method or WebhookEndpoint.HTTP_POST).upper()
+    headers = delivery.target_headers
+    secret = _decrypt_target_secret(delivery.target_secret)
+    if (
+        not url
+        or not delivery.target_enabled
+        or (delivery.target_tenant_id is not None and delivery.target_tenant_id != delivery.tenant_id)
+        or method not in dict(WebhookEndpoint.METHOD_CHOICES)
+        or not isinstance(headers, Mapping)
+        or secret is None
+    ):
+        return None
 
     action, app_label, model_name, object_id, timestamp_iso, data = payload_fields
     return _ExecutionPlan(
         url=url,
         method=method,
-        headers=headers,
+        headers=dict(headers),
         secret=secret,
-        retry_count=retry_count,
-        retry_backoff=retry_backoff,
+        retry_count=delivery.target_retry_count,
+        retry_backoff=delivery.target_retry_backoff,
         event_action=action,
         event_model_app_label=app_label,
         event_model_name=model_name,
@@ -372,16 +363,9 @@ def _execution_plan(delivery, endpoint) -> _ExecutionPlan | None:
     )
 
 
-def _invalid_target(delivery, endpoint, plan) -> bool:
-    """Whether the locked row's target is missing, disabled, or crossed tenants."""
-    if delivery.endpoint_id is not None and endpoint is None:
-        return True
-    if endpoint is not None:
-        if not endpoint.enabled or (endpoint.tenant_id is not None and delivery.tenant_id != endpoint.tenant_id):
-            return True
-    if plan is None or (endpoint is None and not plan.url):
-        return True
-    return False
+def _invalid_target(plan) -> bool:
+    """Whether the locked row lacks a complete immutable target snapshot."""
+    return plan is None
 
 
 def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
@@ -392,10 +376,7 @@ def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
     """
     with transaction.atomic():
         delivery = (
-            WebhookDelivery._base_manager.select_for_update(of=("self",))
-            .select_related("endpoint", "event", "event__model")
-            .filter(pk=assertions.delivery_pk)
-            .first()
+            WebhookDelivery._base_manager.select_for_update(of=("self",)).filter(pk=assertions.delivery_pk).first()
         )
         if delivery is None:
             return None, None, _reject_identity(assertions, None, "delivery_unknown", ())
@@ -407,13 +388,16 @@ def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
         if delivery.status in ("success", "dead"):
             return delivery, None, DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
 
-        endpoint = delivery.endpoint
-        if endpoint is not None and endpoint.deleted_at is not None:
-            # A soft-deleted endpoint is not a live target.
-            endpoint = None
+        now = timezone.now()
+        if delivery.claim_token is not None and delivery.claim_expires_at is not None:
+            if delivery.claim_expires_at > now:
+                return delivery, None, DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
 
-        plan = _execution_plan(delivery, endpoint)
-        if _invalid_target(delivery, endpoint, plan):
+        event = None
+        if delivery.event_id is not None:
+            event = Event._base_manager.select_related("model").filter(pk=delivery.event_id).first()
+        plan = _execution_plan(delivery, event)
+        if _invalid_target(plan):
             _mark_dead_locked(
                 delivery,
                 error_class=_CONFIGURATION_ERROR_CLASS,
@@ -421,10 +405,21 @@ def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
             )
             return delivery, None, _configuration_result()
 
+        delivery.claim_token = uuid4()
+        delivery.claim_expires_at = now + datetime.timedelta(seconds=_CLAIM_LEASE_SECONDS)
         delivery.attempt = max(delivery.attempt, attempt + 1)
-        delivery.attempted_at = timezone.now()
+        delivery.attempted_at = now
         delivery.next_retry_at = None
-        delivery.save(update_fields=["attempt", "attempted_at", "next_retry_at", "updated_at"])
+        delivery.save(
+            update_fields=[
+                "claim_token",
+                "claim_expires_at",
+                "attempt",
+                "attempted_at",
+                "next_retry_at",
+                "updated_at",
+            ]
+        )
         return delivery, plan, None
 
 
@@ -445,6 +440,7 @@ def _retry_kwargs(assertions: WebhookDeliveryAssertions, delivery, *, actor_id, 
 def _finish_delivery(
     *,
     delivery_pk: int,
+    claim_token: UUID,
     result: DeliveryResult,
     response_code: int | None,
     retry_count: int,
@@ -454,7 +450,12 @@ def _finish_delivery(
     immediate_retry = False
     with transaction.atomic():
         delivery = WebhookDelivery._base_manager.select_for_update().get(pk=delivery_pk)
+        if delivery.claim_token != claim_token:
+            return DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
+        delivery.claim_token = None
+        delivery.claim_expires_at = None
         if delivery.status in ("success", "dead"):
+            delivery.save(update_fields=["claim_token", "claim_expires_at", "updated_at"])
             return DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
 
         now = timezone.now()
@@ -473,6 +474,8 @@ def _finish_delivery(
                     "error_message",
                     "next_retry_at",
                     "completed_at",
+                    "claim_token",
+                    "claim_expires_at",
                     "updated_at",
                 ]
             )
@@ -492,6 +495,8 @@ def _finish_delivery(
                     "error_message",
                     "next_retry_at",
                     "completed_at",
+                    "claim_token",
+                    "claim_expires_at",
                     "updated_at",
                 ]
             )
@@ -511,6 +516,8 @@ def _finish_delivery(
                     "error_message",
                     "next_retry_at",
                     "completed_at",
+                    "claim_token",
+                    "claim_expires_at",
                     "updated_at",
                 ]
             )
@@ -533,6 +540,8 @@ def _finish_delivery(
                     "error_class",
                     "error_message",
                     "next_retry_at",
+                    "claim_token",
+                    "claim_expires_at",
                     "updated_at",
                 ]
             )
@@ -552,6 +561,8 @@ def _finish_delivery(
                     "error_class",
                     "error_message",
                     "next_retry_at",
+                    "claim_token",
+                    "claim_expires_at",
                     "updated_at",
                 ]
             )
@@ -652,6 +663,7 @@ def send_webhook_task(
     delivery, plan, result = _claim_delivery(parsed, attempt=attempt)
     if result is not None:
         return result
+    claim_token = delivery.claim_token
 
     operation = "webhook.deliver"
     context = delivery_log_context(
@@ -659,7 +671,6 @@ def send_webhook_task(
         tenant_id=delivery.tenant_id,
         actor_id=actor_id,
         request_id=request_id,
-        endpoint=plan.url,
     )
     response_code = None
     try:
@@ -711,6 +722,7 @@ def send_webhook_task(
             )
             return _finish_delivery(
                 delivery_pk=delivery.pk,
+                claim_token=claim_token,
                 result=result,
                 response_code=response_code,
                 retry_count=plan.retry_count,
@@ -721,6 +733,7 @@ def send_webhook_task(
         logger.info("%s disposition=success", delivery_log_message(context))
         return _finish_delivery(
             delivery_pk=delivery.pk,
+            claim_token=claim_token,
             result=DeliveryResult(operation, DeliveryDisposition.SUCCESS),
             response_code=response_code,
             retry_count=plan.retry_count,
@@ -735,6 +748,7 @@ def send_webhook_task(
         result = _configuration_result()
         return _finish_delivery(
             delivery_pk=delivery.pk,
+            claim_token=claim_token,
             result=result,
             response_code=response_code,
             retry_count=plan.retry_count,
@@ -767,6 +781,7 @@ def send_webhook_task(
             retry_kwargs = _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id)
         return _finish_delivery(
             delivery_pk=delivery.pk,
+            claim_token=claim_token,
             result=result,
             response_code=response_code,
             retry_count=plan.retry_count,
@@ -806,9 +821,34 @@ def _enqueue_task(delivery, *, actor_id: int | None) -> None:
         transaction.on_commit(lambda: async_task(WEBHOOK_TASK_PATH, assertions, actor_id=actor_id))
 
 
+def _encrypted_secret_snapshot(secret):
+    if not isinstance(secret, str):
+        raise ValidationError(_SAFE_CONFIGURATION_MESSAGE)
+    if not secret or secret.startswith("enc$"):
+        return secret
+    return encrypt_string(secret)
+
+
+def _endpoint_target_snapshot(endpoint) -> dict[str, object]:
+    """Copy an endpoint target into a delivery before its task is enqueued."""
+    headers = endpoint.headers or {}
+    if not isinstance(headers, Mapping):
+        raise ValidationError(_SAFE_CONFIGURATION_MESSAGE)
+    return {
+        "target_url": endpoint.url,
+        "target_http_method": (endpoint.http_method or WebhookEndpoint.HTTP_POST).upper(),
+        "target_headers": dict(headers),
+        "target_secret": _encrypted_secret_snapshot(endpoint.secret),
+        "target_enabled": endpoint.enabled and endpoint.deleted_at is None,
+        "target_tenant_id": endpoint.tenant_id,
+        "target_retry_count": endpoint.retry_count,
+        "target_retry_backoff": endpoint.retry_backoff,
+    }
+
+
 def _validate_redelivery_source(delivery) -> None:
     """A non-test delivery without an event has no payload provenance to replay."""
-    if not delivery.test_send and delivery.event_id is None:
+    if not delivery.target_url or (not delivery.test_send and delivery.event_id is None):
         raise ValidationError(_SAFE_CONFIGURATION_MESSAGE)
 
 
@@ -840,6 +880,15 @@ def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None)
             tenant_id=source.tenant_id,
             endpoint_id=source.endpoint_id,
             event_id=source.event_id,
+            event_rule_id=source.event_rule_id,
+            target_url=source.target_url,
+            target_http_method=source.target_http_method,
+            target_headers=source.target_headers,
+            target_secret=source.target_secret,
+            target_enabled=source.target_enabled,
+            target_tenant_id=source.target_tenant_id,
+            target_retry_count=source.target_retry_count,
+            target_retry_backoff=source.target_retry_backoff,
             delivery_id=str(uuid4()),
             status="pending",
             test_send=source.test_send,
@@ -869,6 +918,7 @@ def send_webhook_test(endpoint_pk: int, *, actor_id: int | None = None):
             delivery_id=str(uuid4()),
             status="pending",
             test_send=True,
+            **_endpoint_target_snapshot(endpoint),
         )
         _enqueue_task(delivery, actor_id=actor_id)
     return delivery

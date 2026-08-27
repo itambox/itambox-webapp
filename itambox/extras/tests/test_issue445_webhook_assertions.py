@@ -63,14 +63,14 @@ class Issue445WebhookAssertionTests(TestCase):
         self.endpoint = WebhookEndpoint._base_manager.create(
             name="Issue445 endpoint",
             tenant=self.tenant,
-            url="https://example.invalid/issue445-private-url",
+            url="https://8.8.8.8/issue445-private-url",
             headers={"Authorization": "issue445-private-header"},
             secret="issue445-private-secret",
         )
         self.other_endpoint = WebhookEndpoint._base_manager.create(
             name="Issue445 other endpoint",
             tenant=self.tenant,
-            url="https://other.example.invalid/hook",
+            url="https://1.1.1.1/other-hook",
         )
         self.event = Event.objects.create(
             model=ContentType.objects.get_for_model(Manufacturer),
@@ -96,6 +96,14 @@ class Issue445WebhookAssertionTests(TestCase):
             error_class="safe.prior" if status == WebhookDelivery.STATUS_FAILED else "",
             error_message="safe prior" if status == WebhookDelivery.STATUS_FAILED else "",
             test_send=test_send,
+            target_url=self.endpoint.url,
+            target_http_method=self.endpoint.http_method,
+            target_headers=self.endpoint.headers,
+            target_secret=self.endpoint.secret,
+            target_enabled=True,
+            target_tenant_id=None if nullable else self.endpoint.tenant_id,
+            target_retry_count=self.endpoint.retry_count,
+            target_retry_backoff=self.endpoint.retry_backoff,
         )
 
     @staticmethod
@@ -238,7 +246,7 @@ class Issue445WebhookAssertionTests(TestCase):
     def test_exact_none_claims_and_false_true_test_send_are_accepted(self):
         module = _webhook_module()
         assertion_type = _assertion_type(module)
-        EventRule.objects.create(
+        legacy_rule = EventRule.objects.create(
             name="Issue445 legacy exact-None rule",
             tenant=self.tenant,
             model=self.event.model,
@@ -254,6 +262,14 @@ class Issue445WebhookAssertionTests(TestCase):
                 event=None,
                 delivery_id=str(uuid4()),
                 test_send=True,
+                target_url=self.endpoint.url,
+                target_http_method=self.endpoint.http_method,
+                target_headers=self.endpoint.headers,
+                target_secret=self.endpoint.secret,
+                target_enabled=True,
+                target_tenant_id=self.endpoint.tenant_id,
+                target_retry_count=self.endpoint.retry_count,
+                target_retry_backoff=self.endpoint.retry_backoff,
             ),
             WebhookDelivery._base_manager.create(
                 tenant=self.tenant,
@@ -261,6 +277,15 @@ class Issue445WebhookAssertionTests(TestCase):
                 event=self.event,
                 delivery_id=str(uuid4()),
                 test_send=False,
+                event_rule_id=legacy_rule.pk,
+                target_url="https://legacy.example.invalid/hook",
+                target_http_method="POST",
+                target_headers={},
+                target_secret="",
+                target_enabled=True,
+                target_tenant_id=None,
+                target_retry_count=3,
+                target_retry_backoff=60,
             ),
         )
         response = mock.MagicMock(status_code=200)

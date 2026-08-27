@@ -34,6 +34,14 @@ class WebhookRetryTestCase(TransactionTestCase):
             test_send=True,
             attempt=1,
             status=WebhookDelivery.STATUS_PENDING,
+            target_url=endpoint.url,
+            target_http_method=endpoint.http_method,
+            target_headers=endpoint.headers,
+            target_secret=endpoint.secret,
+            target_enabled=True,
+            target_tenant_id=endpoint.tenant_id,
+            target_retry_count=endpoint.retry_count,
+            target_retry_backoff=endpoint.retry_backoff,
         )
         assertions = WebhookDeliveryAssertions(
             delivery_pk=delivery.pk,
@@ -164,8 +172,8 @@ class WebhookRetryTestCase(TransactionTestCase):
     @patch("extras.tasks.webhooks.async_task")
     @patch("extras.tasks.webhooks.Schedule")
     def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request_pinned):
-        """WS5-4: an endpoint-linked retry must re-derive the secret from the endpoint, never
-        write it into Schedule.kwargs (which django-q stores plaintext)."""
+        """WS5-4: a retry must read encrypted durable state, never persist its secret
+        in Schedule.kwargs (which django-q stores plaintext)."""
         from extras.tasks.webhooks import send_webhook_task
 
         delivery, assertions = self._plan(secret="top-secret", retry_backoff=60)
@@ -175,7 +183,7 @@ class WebhookRetryTestCase(TransactionTestCase):
 
         send_webhook_task(assertions=assertions, attempt=0)
 
-        # The HMAC was still computed (secret re-derived from the endpoint at run time).
+        # The HMAC was still computed from the encrypted delivery snapshot.
         self.assertIn("X-Hub-Signature-256", mock_request_pinned.call_args[1]["headers"])
         # The retry Schedule.kwargs must NOT contain the secret — only identity claims.
         mock_schedule.objects.create.assert_called_once()
