@@ -13,6 +13,8 @@ Kept in its own module so imports of django-q models can never be drawn into
 an admin default-site resolution cycle.
 """
 
+import json
+
 from django.utils.translation import gettext_lazy as _
 from django_q.admin import FailAdmin, TaskAdmin
 from django_q.models import Failure
@@ -82,6 +84,18 @@ def is_blocked_task_path(func):
     return any(func.startswith(prefix) for prefix in MOVED_NEIGHBORHOOD_PREFIXES)
 
 
+def _task_payload(task):
+    """Parse django-q2's JSON-encoded args/kwargs; None when malformed."""
+    try:
+        args = json.loads(task.args) if isinstance(task.args, str) else (task.args or ())
+        kwargs = json.loads(task.kwargs) if isinstance(task.kwargs, str) else (task.kwargs or {})
+        if not isinstance(args, list) or not isinstance(kwargs, dict):
+            raise ValueError
+        return args, kwargs
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
 def resubmit_task_guarded(model_admin, request, queryset):
     """Resubmit selected tasks only when every selected path is still live.
 
@@ -91,21 +105,24 @@ def resubmit_task_guarded(model_admin, request, queryset):
     stable error code and the blocked path identities.
     """
     blocked = sorted({task.func for task in queryset if is_blocked_task_path(task.func)})
-    if blocked:
+    invalid = [task for task in queryset if _task_payload(task) is None]
+    if blocked or invalid:
         model_admin.message_user(
             request,
-            f"[{BLOCKED_RESUBMISSION_CODE}] blocked paths: {', '.join(blocked)}",
+            f"[{BLOCKED_RESUBMISSION_CODE}] blocked paths: {', '.join(blocked)}"
+            + (f" | invalid payloads: {len(invalid)}" if invalid else ""),
             level="warning",
         )
         return
     for task in queryset:
+        args, kwargs = _task_payload(task)
         async_task(
             task.func,
-            *task.args or (),
+            *args,
             hook=task.hook,
             group=task.group,
             cluster=task.cluster,
-            **task.kwargs or {},
+            **kwargs,
         )
         if model_admin.model is Failure:
             task.delete()

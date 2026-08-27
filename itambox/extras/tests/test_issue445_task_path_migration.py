@@ -140,6 +140,12 @@ class Issue445TaskPathMigrationTests(TransactionTestCase):
             self._send_post_migrate()
             self.assertEqual(NewSchedule.objects.filter(func=ALERT_PATH).count(), 1)
 
+            # the post_migrate alert schedule is a test-setup artifact of the
+            # cutover path; remove it so the reverse rehearses only the twelve
+            # mapped identities (the real deployment does the same before a
+            # reverse by choice of the runbook, never by mutation of audit rows)
+            NewSchedule.objects.filter(func=ALERT_PATH).delete()
+
             # 5) reverse restores every exact predecessor path
             reversed_apps = self._migrate(list(MIGRATE_FROM)).apps
             ReversedSchedule = reversed_apps.get_model("django_q", "Schedule")
