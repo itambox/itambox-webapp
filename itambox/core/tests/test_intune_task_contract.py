@@ -24,7 +24,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.job.mark_running.return_value = True
 
     def _run_task_with_error(self, error):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         with (
             patch.object(intune_sync, "TaskContext", return_value=self.context_manager),
@@ -143,7 +143,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.assertEqual(raised.exception.disposition, FailureDisposition.TERMINAL)
 
     def test_unknown_failure_is_not_persisted_or_logged_with_exception_text(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         with (
             patch.object(intune_sync, "TaskContext", return_value=self.context_manager),
@@ -162,7 +162,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         )
 
     def test_task_propagates_actor_tenant_and_request_context(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         request_id = uuid.uuid4()
         with (
@@ -181,7 +181,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.assertEqual(context.request_id, str(request_id))
 
     def test_optional_authentication_failure_is_not_silently_degraded(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         client = MagicMock()
         client.get_detected_apps.side_effect = IntegrationAuthenticationError(
@@ -197,7 +197,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
             intune_sync._sync_device_software(client, {"id": "device-17"}, MagicMock(), dry_run=False)
 
     def test_optional_configuration_and_untrusted_link_failures_are_not_degraded(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         errors = (
             IntegrationConfigurationError(
@@ -223,7 +223,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
                     intune_sync._sync_device_software(client, {"id": "device-17"}, MagicMock(), dry_run=False)
 
     def test_retryable_optional_detected_apps_failure_is_reported_as_degradation(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         client = MagicMock()
         client.context = IntegrationContext(
@@ -258,7 +258,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.assertEqual(extra["disposition"], FailureDisposition.RETRYABLE.value)
 
     def test_persistence_degradation_is_counted_and_redacted(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         client = MagicMock()
         client.context = IntegrationContext(
@@ -308,7 +308,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         }
     )
     def test_run_sync_persists_nonzero_software_degradation(self):
-        from core.tasks import intune_sync
+        from assets.tasks import intune_sync
 
         tenant = MagicMock(slug="tenant-a", pk=17)
         job = MagicMock()
