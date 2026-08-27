@@ -13,7 +13,7 @@ from django_q.models import Schedule
 
 from core.schedules import register_schedule
 
-CORE_FUNC = "core.tasks.evaluate_alert_rules_task"
+CORE_FUNC = "extras.tasks.alerts.evaluate_alert_rules_task"
 SUBSCRIPTION_FUNC = "subscriptions.tasks.check_subscription_expiries_and_reminders"
 
 

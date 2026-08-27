@@ -22,6 +22,7 @@ from django_tables2 import RequestConfig
 from assets.tables import AssetTable  # Import AssetTable
 from core.managers import get_current_tenant
 from core.reports.rendering import render_report_csv, render_report_html
+from extras.tasks.reports import generate_scheduled_report_task
 from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.utils import get_model_viewname, get_paginate_count  # Import the utility function
@@ -455,7 +456,7 @@ class AlertRuleRunNowView(SimplePostView):
         from django_q.tasks import async_task
 
         rule_id = rule.pk
-        async_task("core.tasks.run_alert_rule_now", rule_id)
+        async_task("extras.tasks.alerts.run_alert_rule_now", rule_id)
         return {"message": f"Evaluation queued for '{rule.name}'. New alerts will appear shortly."}
 
     def get_success_redirect(self, obj, result):
@@ -871,7 +872,7 @@ def handle_report_scheduling(sched_report):
         q_freq = freq_mapping.get(sched_report.frequency, Schedule.WEEKLY)
 
         defaults = {
-            "func": "core.tasks.generate_scheduled_report_task",
+            "func": "extras.tasks.reports.generate_scheduled_report_task",
             "args": str(sched_report.pk),
             "schedule_type": q_freq,
             "repeats": -1,
@@ -1139,8 +1140,6 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
         sched = get_object_or_404(ScheduledReport, pk=pk)
 
         # Trigger report generation synchronously for immediate visual feedback in the UI
-        from core.tasks import generate_scheduled_report_task
-
         success = generate_scheduled_report_task(sched.pk)
         sched.refresh_from_db()
         archive = sched.archives.first()

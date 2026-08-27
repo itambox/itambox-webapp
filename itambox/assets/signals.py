@@ -7,7 +7,7 @@ from django_q.tasks import async_task
 
 from assets.choices import RequestStatusChoices
 from assets.models import AssetAssignment, AssetRequest
-from core.events import dispatch_event
+from extras.services.events import dispatch_event
 
 logger = logging.getLogger(__name__)
 

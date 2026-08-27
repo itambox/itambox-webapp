@@ -1,6 +1,10 @@
 from django.apps import AppConfig
+from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.migrations.recorder import MigrationRecorder
+from django.db.models.signals import post_migrate
 
 from core.features import object_enabled_probe, report_designer_probe
+from core.schedules import register_schedule
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
@@ -22,6 +26,13 @@ from itambox.registry import registry as generic_presentation_registry
 
 DOCS = CAPABILITY_REGISTRY_DOC_URL
 
+# The daily alert schedule may only be registered once the cutover migration that
+# rewrites persisted task paths has actually been applied on the database being
+# migrated; before that, the canonical path does not exist for this database.
+ISSUE445_CUTOVER = ("extras", "0110_issue445_task_paths")
+ALERT_DISPATCH_UID = "extras.issue445.register_daily_alert_schedule.v1"
+ALERT_TASK_PATH = "extras.tasks.alerts.evaluate_alert_rules_task"
+
 
 def _scheduled_reports_probe():
     """Report schedules only when the designer gate and a live row agree."""
@@ -38,12 +49,49 @@ class ExtrasConfig(AppConfig):
     name = "extras"
 
     def ready(self):
-        # inline imports: app-registry: extras.search and extras.feature_views register after app population
+        # inline imports: app-registry: extras.signals, extras.search and extras.feature_views
+        # register after app population
         import extras.search
+        import extras.signals  # noqa: F401 -- side-effect import connects the event/watcher receivers
         from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
 
         self._register_capabilities()
         self._register_generic_presentation(EXTRAS_GENERIC_PRESENTATION_PROVIDER)
+        # ready() must stay query-free: the applied-migration probe below belongs
+        # to the post_migrate handler, never to app loading.
+        post_migrate.connect(
+            self._register_alert_schedule,
+            sender=self,
+            dispatch_uid=ALERT_DISPATCH_UID,
+            weak=False,
+        )
+
+    def _register_alert_schedule(self, sender, using=DEFAULT_DB_ALIAS, **kwargs):
+        """Ensure the daily alert evaluation schedule exists on the migrated database.
+
+        Registration is deliberately gated on the cutover migration being applied:
+        a database still on a predecessor state (or one just reversed back to it)
+        must not gain a schedule row pointing at the cutover task path.
+        """
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
+        from django_q.models import Schedule
+
+        connection = connections[using]
+        recorder = MigrationRecorder(connection)
+        if not recorder.has_table():
+            return
+        app, name = ISSUE445_CUTOVER
+        if not recorder.migration_qs.filter(app=app, name=name).exists():
+            return
+        register_schedule(
+            ALERT_TASK_PATH,
+            defaults={
+                "name": "Daily Alert Rule Evaluation",
+                "schedule_type": Schedule.DAILY,
+                "repeats": -1,
+            },
+            using=using,
+        )
 
     def _register_capabilities(self):
         """Declare the reporting, alerting, and automation slices.

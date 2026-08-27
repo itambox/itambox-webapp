@@ -115,7 +115,7 @@ class AlertAuditAndDisclosureTests(TenantTestMixin, TestCase):
 class GlobalComponentMatcherTests(TestCase):
     def test_global_rule_attributes_component_alert_to_component_tenant(self):
         from assets.models import Manufacturer
-        from core.tasks.alerts import _evaluate_rule, _match_low_stock
+        from extras.tasks.alerts import _evaluate_rule, _match_low_stock
         from inventory.models import Component, ComponentStock
         from organization.models import Location, Site
 
@@ -163,7 +163,7 @@ class GlobalComponentMatcherTests(TestCase):
 class AlertTaskAuditTests(TestCase):
     def test_task_creation_with_delivery_metadata_writes_one_create_change(self):
         from assets.models import Manufacturer
-        from core.tasks.alerts import _evaluate_rule
+        from extras.tasks.alerts import _evaluate_rule
         from inventory.models import Accessory, AccessoryStock
         from organization.models import Location, Site
 
@@ -210,7 +210,7 @@ class AlertDeliveryFailureTests(TransactionTestCase):
         from unittest.mock import patch
 
         from assets.models import Manufacturer
-        from core.tasks.alerts import _evaluate_rule
+        from extras.tasks.alerts import _evaluate_rule
         from inventory.models import Accessory, AccessoryStock
         from organization.models import Location, Site
 
@@ -238,7 +238,7 @@ class AlertDeliveryFailureTests(TransactionTestCase):
             tenant=tenant,
         )
 
-        with patch("core.tasks.alerts._dispatch_channels", side_effect=RuntimeError("delivery failure")):
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=RuntimeError("delivery failure")):
             with TaskContext(tenant_id=tenant.pk):
                 _evaluate_rule(rule, timezone.now().date(), {})
 
@@ -254,7 +254,7 @@ class AlertDeliveryFailureTests(TransactionTestCase):
         from unittest.mock import patch
 
         from assets.models import Manufacturer
-        from core.tasks.alerts import _evaluate_rule
+        from extras.tasks.alerts import _evaluate_rule
         from inventory.models import Accessory, AccessoryStock
         from organization.models import Location, Site
 
@@ -282,7 +282,7 @@ class AlertDeliveryFailureTests(TransactionTestCase):
             tenant=tenant,
         )
 
-        with patch("core.tasks.alerts._dispatch_channels", return_value={"7": "ok"}) as dispatch:
+        with patch("extras.tasks.alerts._dispatch_channels", return_value={"7": "ok"}) as dispatch:
             with TaskContext(tenant_id=tenant.pk):
                 _evaluate_rule(rule, timezone.now().date(), {})
 
@@ -313,7 +313,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
     def test_metadata_update_failure_does_not_block_later_dispatch_callback(self):
         from unittest.mock import Mock, patch
 
-        from core.tasks.alerts import _schedule_alert_dispatch
+        from extras.tasks.alerts import _schedule_alert_dispatch
 
         tenant = Tenant.objects.create(name="Issue 183 Callback Tenant", slug="issue-183-callback-tenant")
         rule = AlertRule.objects.create(
@@ -357,7 +357,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
                 return real_filter(*args, **kwargs)
 
         with (
-            patch("core.tasks.alerts._dispatch_channels", return_value={"7": "ok"}),
+            patch("extras.tasks.alerts._dispatch_channels", return_value={"7": "ok"}),
             patch.object(AlertLog.unscoped, "filter", side_effect=flaky_filter),
         ):
             with transaction.atomic():
@@ -377,7 +377,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
     def test_duplicate_match_schedules_only_one_pending_dispatch(self):
         from unittest.mock import patch
 
-        from core.tasks.alerts import _evaluate_rule
+        from extras.tasks.alerts import _evaluate_rule
 
         tenant = Tenant.objects.create(name="Issue 183 Duplicate Tenant", slug="issue-183-duplicate-tenant")
         rule = AlertRule.objects.create(
@@ -398,8 +398,8 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
         )
         match = {"obj": rule, "tenant": tenant, "subject": "duplicate", "message": "duplicate"}
         with (
-            patch("core.tasks.alerts._collect_matches", return_value=[match, match]),
-            patch("core.tasks.alerts._dispatch_channels", return_value={"7": "ok"}) as dispatch,
+            patch("extras.tasks.alerts._collect_matches", return_value=[match, match]),
+            patch("extras.tasks.alerts._dispatch_channels", return_value={"7": "ok"}) as dispatch,
         ):
             with TaskContext(tenant_id=tenant.pk):
                 _evaluate_rule(rule, timezone.now().date(), {(rule.pk, alert.content_type_id, alert.object_id): alert})
@@ -408,7 +408,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
     def test_pending_alert_is_retried_on_next_evaluation(self):
         from unittest.mock import patch
 
-        from core.tasks.alerts import _evaluate_rule
+        from extras.tasks.alerts import _evaluate_rule
 
         tenant = Tenant.objects.create(name="Issue 183 Pending Tenant", slug="issue-183-pending-tenant")
         rule = AlertRule.objects.create(
@@ -426,7 +426,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
             object_id=rule.pk,
             delivery_status={"__dispatch__": "pending"},
         )
-        with patch("core.tasks.alerts._collect_matches", return_value=[]):
+        with patch("extras.tasks.alerts._collect_matches", return_value=[]):
             # A pending row without a current match remains safe and untouched.
             with TaskContext(tenant_id=tenant.pk):
                 _evaluate_rule(rule, timezone.now().date(), {(rule.pk, alert.content_type_id, alert.object_id): alert})
@@ -437,7 +437,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
         from unittest.mock import patch
 
         from assets.models import Manufacturer
-        from core.tasks.alerts import _evaluate_rule
+        from extras.tasks.alerts import _evaluate_rule
         from inventory.models import Accessory, AccessoryStock
         from organization.models import Location, Site
 
@@ -485,7 +485,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
         AlertLog.unscoped.filter(pk=alert.pk).update(last_notified_at=old)
         alert.refresh_from_db()
 
-        with patch("core.tasks.alerts._dispatch_channels", side_effect=RuntimeError("renotify failure")) as dispatch:
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=RuntimeError("renotify failure")) as dispatch:
             with transaction.atomic():
                 with TaskContext(tenant_id=tenant.pk):
                     _evaluate_rule(

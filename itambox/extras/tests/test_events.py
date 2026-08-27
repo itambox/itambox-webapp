@@ -5,16 +5,16 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 from django.contrib.contenttypes.models import ContentType
-from django.core import mail
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.test import TransactionTestCase
 from django.utils import timezone
 
 from assets.models import Manufacturer
-from core.events import _check_conditions, _evaluate_condition, dispatch_event, send_notification_to_channel
+from core.events import send_notification_to_channel
 from core.models import Notification
 from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
+from extras.services.events import _check_conditions, _evaluate_condition, dispatch_event
 from organization.models import Location, Tenant
 
 
@@ -235,7 +235,7 @@ class EventsSystemTestCase(TransactionTestCase):
 
         from core.managers import set_current_tenant
         from core.tests.mixins import grant
-        from organization.models import Location, Membership, Role, Tenant
+        from organization.models import Location, Role, Tenant
 
         tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
@@ -372,7 +372,7 @@ class EventsSystemTestCase(TransactionTestCase):
             ),
             start=1,
         ):
-            from core.tasks.webhooks import send_webhook_task
+            from extras.tasks.webhooks import send_webhook_task
 
             tenant = envelope_tenant_a if index == 1 else envelope_tenant_b
             send_webhook_task(
@@ -656,9 +656,9 @@ class WebhookRetryTestCase(TransactionTestCase):
     )
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.async_task")
     def test_5xx_retries(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
@@ -672,9 +672,9 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(kw["retry_count"], 2)
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.async_task")
     def test_retry_preserves_event_and_delivery_identity_and_advances_attempt(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         failed_response = MagicMock(status_code=503)
         failed_response.raise_for_status.side_effect = __import__("requests").HTTPError(response=failed_response)
@@ -696,9 +696,9 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(second_payload["attempt"], 2)
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.async_task")
     def test_5xx_gives_up_after_max_attempts(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
@@ -709,9 +709,9 @@ class WebhookRetryTestCase(TransactionTestCase):
         mock_async.assert_not_called()
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.async_task")
     def test_4xx_does_not_retry(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         resp = MagicMock(status_code=422)
         resp.raise_for_status.return_value = None
@@ -722,9 +722,9 @@ class WebhookRetryTestCase(TransactionTestCase):
         mock_async.assert_not_called()
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.async_task")
     def test_2xx_no_retry(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         resp = MagicMock(status_code=200)
         resp.raise_for_status.return_value = None
@@ -735,15 +735,15 @@ class WebhookRetryTestCase(TransactionTestCase):
         mock_async.assert_not_called()
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    @patch("core.tasks.webhooks.Schedule")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
     def test_5xx_with_backoff_schedules_delayed_retry(self, mock_schedule, mock_async, mock_request_pinned):
         """A positive retry_backoff must defer the retry via a one-off Schedule,
         not re-enqueue immediately. The kwargs must round-trip through the same
         ast.literal_eval the django-q2 scheduler uses."""
         import ast
 
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
@@ -764,14 +764,14 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(retry["url"], self.BASE_KWARGS["url"])
 
     @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    @patch("core.tasks.webhooks.Schedule")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
     def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request_pinned):
         """WS5-4: an endpoint-linked retry must re-derive the secret from the endpoint, never
         write it into Schedule.kwargs (which django-q stores plaintext)."""
         import ast
 
-        from core.tasks.webhooks import send_webhook_task
+        from extras.tasks.webhooks import send_webhook_task
 
         endpoint = WebhookEndpoint.objects.create(
             name="WH",

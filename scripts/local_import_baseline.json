@@ -354,12 +354,6 @@
     {
       "path": "itambox/assets/views/asset_request_views.py",
       "context": "ClassDef:AssetRequestEditView/FunctionDef:form_valid",
-      "statement": "from core.events import dispatch_event",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
-      "context": "ClassDef:AssetRequestEditView/FunctionDef:form_valid",
       "statement": "from core.models import Notification",
       "count": 1
     },
@@ -749,12 +743,6 @@
     },
     {
       "path": "itambox/compliance/views.py",
-      "context": "FunctionDef:_safe_dispatch_custody",
-      "statement": "from core.events import dispatch_event",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
       "context": "FunctionDef:custody_eula_sign",
       "statement": "from django.conf import settings",
       "count": 1
@@ -815,12 +803,6 @@
     },
     {
       "path": "itambox/core/apps.py",
-      "context": "ClassDef:CoreConfig/FunctionDef:_register_alert_schedule",
-      "statement": "from core.schedules import register_schedule",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
       "context": "ClassDef:CoreConfig/FunctionDef:_register_prune_schedule",
       "statement": "from core.schedules import register_schedule",
       "count": 1
@@ -865,36 +847,6 @@
       "path": "itambox/core/events.py",
       "context": "FunctionDef:_post_pinned",
       "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:_send_notification",
-      "statement": "from core.models import Notification",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:_send_webhook",
-      "statement": "from django.conf import settings",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:_send_webhook",
-      "statement": "from django.db import transaction",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:_send_webhook",
-      "statement": "from django_q.tasks import async_task",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:send_notification_to_channel",
-      "statement": "from core.models import Notification",
       "count": 1
     },
     {
@@ -1360,30 +1312,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/signals.py",
-      "context": "FunctionDef:_notify_watchers",
-      "statement": "from core.models import Notification",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "context": "FunctionDef:_notify_watchers",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "context": "FunctionDef:_notify_watchers",
-      "statement": "from extras.models import ObjectWatch",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "context": "FunctionDef:_table_exists",
-      "statement": "from django.db import connection",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tables/base.py",
       "context": "ClassDef:BaseTable/FunctionDef:configure",
       "statement": "from django.apps import apps",
@@ -1411,78 +1339,6 @@
       "path": "itambox/core/tables/object_change.py",
       "context": "ClassDef:ObjectChangeTable/FunctionDef:render_action",
       "statement": "from core.choices import ObjectChangeActionChoices",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_collect_matches",
-      "statement": "from django.db.models import OuterRef, Q, Subquery, Sum",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_collect_matches",
-      "statement": "from django.db.models.functions import Coalesce",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_evaluate_rule",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_audit_overdue",
-      "statement": "from assets.models import Asset, Category",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_audit_overdue",
-      "statement": "from django.db.models import Q",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_license_expiry",
-      "statement": "from licenses.models import License",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_low_stock",
-      "statement": "from django.db.models import OuterRef, Subquery, Sum",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_low_stock",
-      "statement": "from django.db.models.functions import Coalesce",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_low_stock",
-      "statement": "from inventory.models import Accessory, AccessoryAssignment, AccessoryStock, Component, ComponentAllocation, ComponentStock, Consumable, ConsumableAssignment, ConsumableStock",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_renewal_due",
-      "statement": "from subscriptions.models import Subscription",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_upcoming_eol",
-      "statement": "from assets.models import Asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:_match_warranty_expiry",
-      "statement": "from assets.models import Warranty",
       "count": 1
     },
     {
@@ -1930,12 +1786,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/forms.py",
-      "context": "FunctionDef:logged_content_types",
-      "statement": "from core.signals import _SIGNAL_SKIP_MODELS",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/models.py",
       "context": "ClassDef:AlertRule/FunctionDef:get_absolute_url",
       "statement": "from django.urls import reverse",
@@ -2030,12 +1880,6 @@
       "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
       "statement": "from organization.models import Tenant",
       "count": 2
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTriggerImmediateView/FunctionDef:post",
-      "statement": "from core.tasks import generate_scheduled_report_task",
-      "count": 1
     },
     {
       "path": "itambox/extras/views.py",

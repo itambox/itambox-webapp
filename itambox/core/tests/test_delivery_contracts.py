@@ -14,8 +14,8 @@ from core.events import (
     send_email_notification,
     send_notification_to_channel,
 )
-from core.tasks.alerts import _dispatch_channels
-from core.tasks.webhooks import send_webhook_task
+from extras.tasks.alerts import _dispatch_channels
+from extras.tasks.webhooks import send_webhook_task
 from organization.models import Tenant
 
 
@@ -66,7 +66,7 @@ class DeliveryContractTests(TestCase):
         response.raise_for_status.side_effect = requests.HTTPError(response=response)
         with (
             patch("core.http.request_pinned", return_value=response),
-            patch("core.tasks.webhooks.async_task"),
+            patch("extras.tasks.webhooks.async_task"),
         ):
             result = send_webhook_task(
                 url="https://example.com/hook?token=secret-query",
@@ -110,7 +110,7 @@ class DeliveryContractTests(TestCase):
         response = MagicMock(status_code=422)
         with (
             patch("core.http.request_pinned", return_value=response),
-            self.assertLogs("core.tasks.webhooks", logging.WARNING) as captured,
+            self.assertLogs("extras.tasks.webhooks", logging.WARNING) as captured,
         ):
             send_webhook_task(
                 url="https://example.com/hook?token=secret-query",
@@ -349,8 +349,8 @@ class DeliveryContractTests(TestCase):
         rule = SimpleNamespace(channels=manager, tenant_id=7)
 
         with (
-            patch("core.tasks.alerts.send_notification_to_channel", side_effect=RuntimeError("secret detail")),
-            self.assertLogs("core.tasks.alerts", logging.ERROR) as captured,
+            patch("extras.tasks.alerts.send_notification_to_channel", side_effect=RuntimeError("secret detail")),
+            self.assertLogs("extras.tasks.alerts", logging.ERROR) as captured,
         ):
             result = _dispatch_channels(rule, {"subject": "secret subject", "message": "secret body"}, None)
 
@@ -375,7 +375,7 @@ class DeliveryContractTests(TestCase):
             DeliveryResult("channel.deliver", DeliveryDisposition.RETRYABLE),
         ]
 
-        with patch("core.tasks.alerts.send_notification_to_channel", side_effect=results):
+        with patch("extras.tasks.alerts.send_notification_to_channel", side_effect=results):
             delivery = _dispatch_channels(rule, {"subject": "subject", "message": "body"}, None)
 
         self.assertEqual(delivery["23"]["disposition"], DeliveryDisposition.SUCCESS.value)

@@ -2676,30 +2676,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/events.py",
-      "code": "F401",
-      "message": "'hashlib' imported but unused",
-      "source": "import hashlib",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "code": "F401",
-      "message": "'hmac' imported but unused",
-      "source": "import hmac",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/filters.py",
       "code": "B007",
       "message": "Loop control variable 'field_name' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -4094,22 +4070,6 @@
     {
       "path": "itambox/core/tasks/__init__.py",
       "code": "F401",
-      "message": "'.alerts.evaluate_alert_rules_task' imported but unused",
-      "source": "from .alerts import evaluate_alert_rules_task, run_alert_rule_now",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.alerts.run_alert_rule_now' imported but unused",
-      "source": "from .alerts import evaluate_alert_rules_task, run_alert_rule_now",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
       "message": "'.checkin.bulk_checkin_task' imported but unused",
       "source": "from .checkin import bulk_checkin_task",
       "context": "Module:body",
@@ -4190,81 +4150,9 @@
     {
       "path": "itambox/core/tasks/__init__.py",
       "code": "F401",
-      "message": "'.reports.generate_scheduled_report_task' imported but unused",
-      "source": "from .reports import generate_scheduled_report_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
       "message": "'.retention.prune_changelog_task' imported but unused",
       "source": "from .retention import prune_changelog_task",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.webhooks.send_webhook_task' imported but unused",
-      "source": "from .webhooks import send_webhook_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "C901",
-      "message": "'_evaluate_rule' is too complex (11)",
-      "source": "def _evaluate_rule(rule, today, existing_logs):",
-      "context": "Module:body/FunctionDef:_evaluate_rule:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "C901",
-      "message": "'_match_low_stock' is too complex (14)",
-      "source": "def _match_low_stock(rule):",
-      "context": "Module:body/FunctionDef:_match_low_stock:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.OuterRef' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.Q' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.Subquery' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.Sum' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.functions.Coalesce' imported but unused",
-      "source": "    from django.db.models.functions import Coalesce",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
       "count": 1
     },
     {
@@ -4465,22 +4353,6 @@
       "message": "line too long (142 > 120 characters)",
       "source": "        \"\"\"Test that the rotate_encryption_keys management command successfully decrypts with old key and re-encrypts with new primary key.\"\"\"",
       "context": "Module:body/ClassDef:CoreCryptoTestCase:body/FunctionDef:test_rotate_encryption_keys_command:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F401",
-      "message": "'django.core.mail' imported but unused",
-      "source": "from django.core import mail",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "        from organization.models import Location, Membership, Role, Tenant",
-      "context": "Module:body/ClassDef:EventsSystemTestCase:body/FunctionDef:test_event_rules_scoped_to_instance_tenant_in_system_context:body",
       "count": 1
     },
     {
@@ -5041,14 +4913,6 @@
       "message": "'user_id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "print(f\"Error: user_id must be a numeric value, got '{user_id}'\", file=sys.stderr)",
       "context": "Module:body/FunctionDef:main:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='user_id', ctx=Load()), attr='isdigit', ctx=Load()), args=[], keywords=[])):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/apps.py",
-      "code": "F401",
-      "message": "'extras.search' imported but unused",
-      "source": "        import extras.search",
-      "context": "Module:body/ClassDef:ExtrasConfig:body/FunctionDef:ready:body",
       "count": 1
     },
     {

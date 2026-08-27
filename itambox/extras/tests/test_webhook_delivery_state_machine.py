@@ -18,15 +18,15 @@ from django.utils import timezone
 from django_q.models import Schedule
 
 from assets.models import Manufacturer
-from core.events import process_event_rules
 from core.managers import set_current_membership, set_current_tenant
-from core.tasks.webhooks import (
+from core.tests.mixins import TenantTestMixin, grant
+from extras.models import Event, EventRule, WebhookDelivery, WebhookEndpoint
+from extras.services.events import process_event_rules
+from extras.tasks.webhooks import (
     redeliver_webhook_delivery,
     send_webhook_task,
     send_webhook_test,
 )
-from core.tests.mixins import TenantTestMixin, grant
-from extras.models import Event, EventRule, WebhookDelivery, WebhookEndpoint
 from organization.models import Role, Tenant
 
 User = get_user_model()
@@ -118,13 +118,13 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         before = timezone.now()
         with (
             patch("core.http.request_pinned", return_value=response),
-            patch("core.tasks.webhooks.random.uniform", return_value=1.0),
-            patch("core.tasks.webhooks.async_task"),
+            patch("extras.tasks.webhooks.random.uniform", return_value=1.0),
+            patch("extras.tasks.webhooks.async_task"),
         ):
             result = send_webhook_task(**kwargs)
 
         delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
-        schedule = Schedule.objects.filter(func="core.tasks.send_webhook_task").latest("pk")
+        schedule = Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").latest("pk")
         retry_kwargs = ast.literal_eval(schedule.kwargs)
         after = timezone.now()
         self.assertEqual(result.disposition.value, "retryable")
@@ -146,7 +146,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         response = self._response(503)
         with (
             patch("core.http.request_pinned", return_value=response),
-            patch("core.tasks.webhooks.async_task"),
+            patch("extras.tasks.webhooks.async_task"),
         ):
             send_webhook_task(**kwargs, attempt=0)
             send_webhook_task(**kwargs, attempt=1)
@@ -157,7 +157,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
         self.assertEqual(delivery.attempt, self.endpoint.retry_count + 1)
         self.assertIsNotNone(delivery.completed_at)
-        self.assertEqual(Schedule.objects.filter(func="core.tasks.send_webhook_task").count(), 0)
+        self.assertEqual(Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").count(), 0)
 
     def test_http_4xx_and_ssrf_validation_are_terminal_without_schedule(self):
         for side_effect, status_code in ((None, 422), (ValidationError("private secret"), None)):
@@ -168,7 +168,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
                     request_patch = patch("core.http.request_pinned", return_value=response)
                 else:
                     request_patch = patch("core.http.request_pinned", side_effect=side_effect)
-                with request_patch, patch("core.tasks.webhooks.async_task"):
+                with request_patch, patch("extras.tasks.webhooks.async_task"):
                     result = send_webhook_task(**kwargs)
 
                 delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
@@ -178,7 +178,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
                 self.assertIsNotNone(delivery.completed_at)
                 self.assertNotIn("private secret", delivery.error_message)
                 self.assertNotIn(self.endpoint.url, delivery.error_message)
-        self.assertEqual(Schedule.objects.filter(func="core.tasks.send_webhook_task").count(), 0)
+        self.assertEqual(Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").count(), 0)
 
     def test_success_replay_is_a_noop_and_does_not_change_attempt(self):
         kwargs = self._task_kwargs()
@@ -261,7 +261,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             response_code=200,
             completed_at=timezone.now(),
         )
-        with patch("core.tasks.webhooks.async_task") as async_task:
+        with patch("extras.tasks.webhooks.async_task") as async_task:
             redelivery = redeliver_webhook_delivery(source.pk, actor_id=self.actor.pk)
 
         source.refresh_from_db()
@@ -315,7 +315,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             redeliver_webhook_delivery(source.pk, actor_id=operator.pk)
 
     def test_test_send_creates_record_and_uses_test_payload(self):
-        with patch("core.tasks.webhooks.async_task") as async_task:
+        with patch("extras.tasks.webhooks.async_task") as async_task:
             delivery = send_webhook_test(self.endpoint.pk, actor_id=self.actor.pk)
             _, task_kwargs = async_task.call_args
 
@@ -347,7 +347,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
                 kwargs = self._task_kwargs(headers={"Authorization": secret}, secret="")
                 if isinstance(failure, requests.HTTPError):
                     http_response._content = response_body.encode()
-                with patch("core.http.request_pinned", side_effect=failure), patch("core.tasks.webhooks.async_task"):
+                with patch("core.http.request_pinned", side_effect=failure), patch("extras.tasks.webhooks.async_task"):
                     send_webhook_task(**kwargs)
                 delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
                 self.assertNotIn(self.endpoint.url, delivery.error_message)
@@ -445,7 +445,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
     def test_broken_actor_permission_guard_fails_closed(self):
         from types import SimpleNamespace
 
-        from core.tasks.webhooks import _is_platform_actor
+        from extras.tasks.webhooks import _is_platform_actor
 
         broken = SimpleNamespace(is_authenticated=True, is_superuser=False)
         self.assertFalse(_is_platform_actor(broken))
@@ -472,7 +472,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
                     url=host,
                     tenant=self.tenant,
                 )
-                with patch("core.tasks.webhooks.async_task") as async_task:
+                with patch("extras.tasks.webhooks.async_task") as async_task:
                     delivery = send_webhook_test(endpoint.pk, actor_id=self.actor.pk)
                     _, task_kwargs = async_task.call_args
                 with patch("core.http.request_pinned", return_value=self._response()) as request_pinned:
@@ -492,7 +492,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             status=WebhookDelivery.STATUS_DEAD,
             test_send=True,
         )
-        with patch("core.tasks.webhooks.async_task") as async_task:
+        with patch("extras.tasks.webhooks.async_task") as async_task:
             redelivery = redeliver_webhook_delivery(test_delivery.pk, actor_id=self.actor.pk)
         _, task_kwargs = async_task.call_args
         self.assertTrue(redelivery.test_send)
@@ -514,7 +514,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             delivery_id=str(uuid4()),
             status=WebhookDelivery.STATUS_DEAD,
         )
-        with patch("core.tasks.webhooks.async_task") as async_task:
+        with patch("extras.tasks.webhooks.async_task") as async_task:
             redeliver_webhook_delivery(legacy_delivery.pk, actor_id=self.actor.pk)
         _, task_kwargs = async_task.call_args
         self.assertEqual(task_kwargs["url"], "http://8.8.8.8/legacy")
@@ -548,7 +548,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             delivery_id=str(uuid4()),
             status=WebhookDelivery.STATUS_DEAD,
         )
-        with patch("core.tasks.webhooks.async_task") as async_task:
+        with patch("extras.tasks.webhooks.async_task") as async_task:
             redelivery = redeliver_webhook_delivery(global_delivery.pk, actor_id=platform_user.pk)
         self.assertEqual(redelivery.redelivered_by_id, platform_user.pk)
         self.assertEqual(redelivery.tenant_id, None)
@@ -574,7 +574,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
                 permissions=["extras.view_webhookdelivery", "extras.change_webhookendpoint"],
             ),
         )
-        with patch("core.tasks.webhooks.async_task"):
+        with patch("extras.tasks.webhooks.async_task"):
             delivery = send_webhook_test(global_endpoint.pk, actor_id=platform_user.pk)
         self.assertTrue(delivery.test_send)
         self.assertIsNone(delivery.tenant_id)

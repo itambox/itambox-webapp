@@ -9,7 +9,14 @@ from django.urls import reverse
 from django.utils import translation
 from django_q.models import Schedule
 
-from core.tasks.reports import (
+from extras.models import (
+    NotificationChannel,
+    ReportGenerationArchive,
+    ReportTemplate,
+    ScheduledReport,
+    ScheduledReportScopeAuthorization,
+)
+from extras.tasks.reports import (
     _archive_report_output,
     _deliver_report_channels,
     _deliver_report_email,
@@ -19,13 +26,6 @@ from core.tasks.reports import (
     _ReportOutput,
     _resolve_report_recipients,
     _resolve_report_scope,
-)
-from extras.models import (
-    NotificationChannel,
-    ReportGenerationArchive,
-    ReportTemplate,
-    ScheduledReport,
-    ScheduledReportScopeAuthorization,
 )
 
 User = get_user_model()
@@ -185,7 +185,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
         sched.channels.add(failed_channel, healthy_channel)
 
-        with patch("core.tasks.reports.send_notification_to_channel", side_effect=[False, True]) as send_channel:
+        with patch("extras.tasks.reports.send_notification_to_channel", side_effect=[False, True]) as send_channel:
             from core.tasks import generate_scheduled_report_task
 
             self.assertTrue(generate_scheduled_report_task(sched.pk))
@@ -247,7 +247,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             format=ScheduledReport.FORMAT_HTML,
         )
         sched.channels.add(disabled_channel)
-        with patch("core.tasks.reports.send_notification_to_channel") as send_channel:
+        with patch("extras.tasks.reports.send_notification_to_channel") as send_channel:
             outcome = _deliver_report_channels(sched, [], 0)
             send_channel.assert_not_called()
         self.assertEqual(outcome.status, "success")
@@ -320,7 +320,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertFalse(Schedule.objects.filter(name=f"scheduled_report_{sched.pk}").exists())
 
     @override_settings(REPORT_DESIGNER_ENABLED=False)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_disabled_designer_skips_existing_scheduled_report_task(self, mock_process):
         sched = ScheduledReport.objects.create(
             name="Paused Schedule",
@@ -333,7 +333,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         q_schedule = Schedule.objects.create(
             name=f"scheduled_report_{sched.pk}",
-            func="core.tasks.generate_scheduled_report_task",
+            func="extras.tasks.reports.generate_scheduled_report_task",
             schedule_type=Schedule.ONCE,
             repeats=-1,
         )
@@ -353,7 +353,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(sched.schedule.repeats, -1)
 
     @override_settings(REPORT_DESIGNER_ENABLED=False)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_disabled_designer_preserves_existing_recurring_schedule(self, mock_process):
         sched = ScheduledReport.objects.create(
             name="Paused Recurring Schedule",
@@ -364,7 +364,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
         q_schedule = Schedule.objects.create(
             name=f"scheduled_report_{sched.pk}",
-            func="core.tasks.generate_scheduled_report_task",
+            func="extras.tasks.reports.generate_scheduled_report_task",
             schedule_type=Schedule.WEEKLY,
             repeats=-1,
         )
@@ -409,7 +409,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertContains(response, reverse("extras:reporttemplate_list"))
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.generate_scheduled_report_task", return_value=False)
+    @patch("extras.tasks.reports.generate_scheduled_report_task", return_value=False)
     def test_trigger_reports_delivery_failure_after_successful_generation(self, mock_generate):
         sched = ScheduledReport.objects.create(
             name="Delivery Failure UI",
@@ -478,7 +478,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertIsNotNone(chart_svg)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports.build_report_context")
+    @patch("extras.tasks.reports.build_report_context")
     def test_pre_archive_failure_preserves_status(self, mock_compile):
         """build_report_context raising before archive_entry is assigned must
         preserve the original failure — no UnboundLocalError."""
@@ -508,7 +508,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         template = SimpleNamespace(name="Helper Report")
         context_data = {"report": "context"}
 
-        with patch("core.tasks.reports._render_report_html", return_value="<html>report</html>"):
+        with patch("extras.tasks.reports._render_report_html", return_value="<html>report</html>"):
             html_output = _render_report_output(
                 SimpleNamespace(format=ScheduledReport.FORMAT_HTML),
                 template,
@@ -519,7 +519,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(html_output.email_body, "<html>report</html>")
 
         with (
-            patch("core.tasks.reports._render_report_html", return_value="<html>pdf</html>"),
+            patch("extras.tasks.reports._render_report_html", return_value="<html>pdf</html>"),
             patch("core.reports.exporters.report_pdf_bytes", return_value=b"pdf-bytes"),
         ):
             pdf_output = _render_report_output(
@@ -570,8 +570,8 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         email_config = SimpleNamespace(enabled=True, from_address="from@example.com")
         with (
-            patch("core.tasks.reports.EmailSettings.load", return_value=email_config),
-            patch("core.tasks.reports.EmailMessage") as email_factory,
+            patch("extras.tasks.reports.EmailSettings.load", return_value=email_config),
+            patch("extras.tasks.reports.EmailMessage") as email_factory,
         ):
             sched.recipients = " recipient@example.com, "
             _deliver_report_email(sched, self.template, output)
@@ -583,13 +583,13 @@ class ScheduledReportingAndAlertsTests(TestCase):
         sched.format = ScheduledReport.FORMAT_HTML
         html_output = _ReportOutput(email_body="<html>body</html>")
         with (
-            patch("core.tasks.reports.EmailSettings.load", return_value=email_config),
-            patch("core.tasks.reports.EmailMessage") as email_factory,
+            patch("extras.tasks.reports.EmailSettings.load", return_value=email_config),
+            patch("extras.tasks.reports.EmailMessage") as email_factory,
         ):
             _deliver_report_email(sched, self.template, html_output)
         self.assertEqual(email_factory.return_value.content_subtype, "html")
 
-        with patch("core.tasks.reports.EmailSettings.load", return_value=None):
+        with patch("extras.tasks.reports.EmailSettings.load", return_value=None):
             with self.assertRaises(ValidationError):
                 _deliver_report_email(sched, self.template, html_output)
 
@@ -618,7 +618,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             channels=SimpleNamespace(all=lambda: channels),
         )
         with patch(
-            "core.tasks.reports.send_notification_to_channel",
+            "extras.tasks.reports.send_notification_to_channel",
             side_effect=[True, RuntimeError("webhook down"), False],
         ):
             outcome = _deliver_report_channels(sched, [{"label": "Rows", "value": "2"}], 2)
@@ -638,12 +638,12 @@ class ScheduledReportingAndAlertsTests(TestCase):
         archive = MagicMock()
         output = _ReportOutput(email_body="body")
         with (
-            patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
-            patch("core.tasks.reports._render_report_output", return_value=output),
-            patch("core.tasks.reports._archive_report_output", return_value=archive),
-            patch("core.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
-            patch("core.tasks.reports._deliver_report_email", side_effect=RuntimeError("smtp down")),
-            patch("core.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
+            patch("extras.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
+            patch("extras.tasks.reports._render_report_output", return_value=output),
+            patch("extras.tasks.reports._archive_report_output", return_value=archive),
+            patch("extras.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
+            patch("extras.tasks.reports._deliver_report_email", side_effect=RuntimeError("smtp down")),
+            patch("extras.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
         ):
             success = _process_scheduled_report(sched, self.tenant, [])
 
@@ -661,12 +661,12 @@ class ScheduledReportingAndAlertsTests(TestCase):
         archive = None
         output = _ReportOutput(email_body="body")
         with (
-            patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
-            patch("core.tasks.reports._render_report_output", return_value=output),
-            patch("core.tasks.reports._archive_report_output", return_value=archive),
-            patch("core.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
-            patch("core.tasks.reports._deliver_report_email", return_value=False),
-            patch("core.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
+            patch("extras.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
+            patch("extras.tasks.reports._render_report_output", return_value=output),
+            patch("extras.tasks.reports._archive_report_output", return_value=archive),
+            patch("extras.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
+            patch("extras.tasks.reports._deliver_report_email", return_value=False),
+            patch("extras.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
         ):
             success = _process_scheduled_report(sched, self.tenant, [])
 
@@ -698,10 +698,10 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_unauthorized_broad_schedule_is_rejected_before_generation(self, mock_process):
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         result = generate_scheduled_report_task(self.sched.pk)
 
@@ -712,10 +712,10 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertIsNone(self.sched.last_run)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_scope_tenants_all_soft_deleted_fails_closed(self, mock_process):
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         deleted_scope = ScheduledReport.objects.create(
             name="Deleted-Scope Schedule",
@@ -738,10 +738,10 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertIsNone(deleted_scope.last_run)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_principal_lacking_one_persisted_tenant_is_rejected(self, mock_process):
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
         from organization.models import Membership, Role, RoleGrant, RoleGrantScope
 
         limited_user = User.objects.create_user(username="limited-scope-authorizer", password="password123")
@@ -763,11 +763,11 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertIsNone(self.sched.last_run)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_authorized_broad_schedule_runs_as_approved_principal_and_exact_scope(self, mock_process):
         from core.context import get_current_all_accessible, get_current_tenant, get_current_user
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
         from organization.models import Membership, Role, RoleGrant, RoleGrantScope
 
         authorized_user = User.objects.create_user(username="non-superuser-authorizer", password="password123")
@@ -807,10 +807,10 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         mock_process.assert_called_once()
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_scope_change_after_approval_fails_closed_without_cross_tenant_expansion(self, mock_process):
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         ScheduledReportScopeAuthorization.approve(self.sched, self.user)
         self.sched.filter_tenants.add(self.tenant_c)
@@ -822,11 +822,11 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         mock_process.assert_not_called()
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_ordinary_single_tenant_schedule_does_not_require_approval(self, mock_process):
         from core.context import get_current_all_accessible, get_current_tenant
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         self.sched.filter_tenants.clear()
 
@@ -844,10 +844,10 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         mock_process.assert_called_once()
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_revoked_approval_fails_closed_at_generation(self, mock_process):
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         authorization = ScheduledReportScopeAuthorization.approve(self.sched, self.user)
         approved_at = authorization.approved_at
@@ -865,11 +865,11 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertIsNone(self.sched.last_run)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_revoked_schedule_wound_back_to_single_tenant_runs_normally(self, mock_process):
         from core.context import get_current_tenant
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         ScheduledReportScopeAuthorization.approve(self.sched, self.user)
         ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
@@ -888,11 +888,11 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         mock_process.assert_called_once()
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_schedule_wound_back_with_a_live_approval_runs_single_tenant(self, mock_process):
         from core.context import get_current_all_accessible, get_current_tenant
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         ScheduledReportScopeAuthorization.approve(self.sched, self.user)
         self.sched.filter_tenants.clear()
@@ -911,10 +911,10 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         mock_process.assert_called_once()
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
-    @patch("core.tasks.reports._process_scheduled_report")
+    @patch("extras.tasks.reports._process_scheduled_report")
     def test_approve_after_revoke_restores_generation(self, mock_process):
-        from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
+        from extras.tasks.reports import generate_scheduled_report_task
 
         ScheduledReportScopeAuthorization.approve(self.sched, self.user)
         ScheduledReportScopeAuthorization.revoke(self.sched, self.user)

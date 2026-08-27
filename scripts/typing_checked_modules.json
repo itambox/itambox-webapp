@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 61,
-  "policy_sha256": "343ce8c35272ea2fc859f88bcd01a259f766f1bb922458b69e521bc8e7812925",
+  "next_sequence": 64,
+  "policy_sha256": "a62177da14fff6f426d1d32c30993c35111aa86088d978c1fbc9ee5fe968a5b4",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -178,18 +178,6 @@
       "symbols": []
     },
     {
-      "sequence": 15,
-      "path": "itambox/core/tasks/alerts.py",
-      "module": "core.tasks.alerts",
-      "issue": "#93",
-      "note": "Slice 8 symbol admission: the two alert-evaluation task entry points -- the scheduled sweep over every active rule and the single-rule 'Run now' action, both answering the count of freshly triggered alerts as int, and the AlertRule pk the action is handed. Rule matching, the open-log dedup prefetch, channel dispatch, and auto-resolution helpers remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "evaluate_alert_rules_task",
-        "run_alert_rule_now"
-      ]
-    },
-    {
       "sequence": 11,
       "path": "itambox/core/tasks/checkin.py",
       "module": "core.tasks.checkin",
@@ -309,18 +297,6 @@
       ]
     },
     {
-      "sequence": 5,
-      "path": "itambox/core/tasks/reports.py",
-      "module": "core.tasks.reports",
-      "issue": "#93",
-      "note": "Slice 4 symbol admission: the _ReportOutput scheduled-report result contract -- the rendered email body plus the optional attachment content, filename, and MIME type a renderer hands to the archive and delivery steps. Slice 5 adds generate_scheduled_report_task, the scheduled-report task entry envelope: the ScheduledReport id a worker is handed, and the bool | None outcome it reports back -- True or False for a report that was processed, None for a schedule with no resolvable tenant scope. The renderer and helper functions between the two, and the report-provider architecture behind build_report_context, remain outside this slice; report-provider contracts stay owned by #83.",
-      "scope": "symbols",
-      "symbols": [
-        "_ReportOutput",
-        "generate_scheduled_report_task"
-      ]
-    },
-    {
       "sequence": 19,
       "path": "itambox/core/tasks/retention.py",
       "module": "core.tasks.retention",
@@ -340,17 +316,6 @@
       "scope": "symbols",
       "symbols": [
         "reverse_job_detail"
-      ]
-    },
-    {
-      "sequence": 21,
-      "path": "itambox/core/tasks/webhooks.py",
-      "module": "core.tasks.webhooks",
-      "issue": "#93",
-      "note": "Slice 8 symbol admission: the webhook dispatch task entry envelope -- the target URL and HTTP method, the request headers, the optional shared secret (empty for an endpoint-linked send that re-derives it), the event action/model/object/timestamp fields of the published envelope, the JSON event data, the attempt and retry/backoff counters, the optional WebhookEndpoint pk, and the implicit None outcome. event_object_id stays int | str because the event payload carries whatever pk type the source model uses; headers and event data are Mappings because they arrive as a serialised task payload. The SSRF-guarded send, the signature computation, and the retry Schedule/async_task re-enqueue remain outside this slice.",
-      "scope": "symbols",
-      "symbols": [
-        "send_webhook_task"
       ]
     },
     {
@@ -374,6 +339,41 @@
         "JournalEntrySerializer",
         "NotificationChannelSerializer",
         "WebhookEndpointSerializer"
+      ]
+    },
+    {
+      "sequence": 61,
+      "path": "itambox/extras/tasks/alerts.py",
+      "module": "extras.tasks.alerts",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the two alert-evaluation task entry points -- the scheduled sweep over every active rule and the single-rule 'Run now' action, both answering the count of freshly triggered alerts as int, and the AlertRule pk the action is handed. Rule matching, the open-log dedup prefetch, channel dispatch, and auto-resolution helpers remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "evaluate_alert_rules_task",
+        "run_alert_rule_now"
+      ]
+    },
+    {
+      "sequence": 62,
+      "path": "itambox/extras/tasks/reports.py",
+      "module": "extras.tasks.reports",
+      "issue": "#93",
+      "note": "Slice 4 symbol admission: the _ReportOutput scheduled-report result contract -- the rendered email body plus the optional attachment content, filename, and MIME type a renderer hands to the archive and delivery steps. Slice 5 adds generate_scheduled_report_task, the scheduled-report task entry envelope: the ScheduledReport id a worker is handed, and the bool | None outcome it reports back -- True or False for a report that was processed, None for a schedule with no resolvable tenant scope. The renderer and helper functions between the two, and the report-provider architecture behind build_report_context, remain outside this slice; report-provider contracts stay owned by #83.",
+      "scope": "symbols",
+      "symbols": [
+        "_ReportOutput",
+        "generate_scheduled_report_task"
+      ]
+    },
+    {
+      "sequence": 63,
+      "path": "itambox/extras/tasks/webhooks.py",
+      "module": "extras.tasks.webhooks",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the webhook dispatch task entry envelope -- the target URL and HTTP method, the request headers, the optional shared secret (empty for an endpoint-linked send that re-derives it), the event action/model/object/timestamp fields of the published envelope, the JSON event data, the attempt and retry/backoff counters, the optional WebhookEndpoint pk, and the implicit None outcome. event_object_id stays int | str because the event payload carries whatever pk type the source model uses; headers and event data are Mappings because they arrive as a serialised task payload. The SSRF-guarded send, the signature computation, and the retry Schedule/async_task re-enqueue remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "send_webhook_task"
       ]
     },
     {
@@ -808,5 +808,27 @@
       ]
     }
   ],
-  "withdrawn": []
+  "withdrawn": [
+    {
+      "sequence": 15,
+      "path": "itambox/core/tasks/alerts.py",
+      "module": "core.tasks.alerts",
+      "issue": "#93",
+      "reason": "moved to extras.tasks.alerts by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 5,
+      "path": "itambox/core/tasks/reports.py",
+      "module": "core.tasks.reports",
+      "issue": "#93",
+      "reason": "moved to extras.tasks.reports by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 21,
+      "path": "itambox/core/tasks/webhooks.py",
+      "module": "core.tasks.webhooks",
+      "issue": "#93",
+      "reason": "moved to extras.tasks.webhooks by issue #445 ownership cutover; admission continues under the new record"
+    }
+  ]
 }

@@ -41,7 +41,7 @@ def _webhook_module():
     try:
         return importlib.import_module("extras.tasks.webhooks")
     except ImportError:
-        return importlib.import_module("core.tasks.webhooks")
+        return importlib.import_module("extras.tasks.webhooks")
 
 
 def _assertion_type(module):

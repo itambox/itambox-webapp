@@ -1,33 +1,51 @@
-import hashlib
-import hmac
-import json
+"""Domain-blind notification delivery contracts and transports.
+
+This module owns the reusable delivery primitives only: the typed
+``DeliveryResult`` contract, the sanitized correlation-log helpers, the
+SSRF-pinned Slack/Teams transports, the explicit-recipient e-mail transport and
+the structural notification-channel boundary. Event/EventRule persistence,
+rule evaluation and webhook orchestration belong to their owning domain and
+live in ``extras.services.events`` / ``extras.tasks.webhooks``.
+"""
+
 import logging
 import smtplib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from types import SimpleNamespace
+from typing import Final, Literal, Protocol
 from urllib.parse import urlsplit
-from uuid import uuid4
 
 import requests
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
 from django.core.mail import BadHeaderError, EmailMessage, get_connection
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id, get_current_tenant, get_current_user
-from core.models import ChangeLoggingMixin, EmailSettings
-from extras.models import (
-    Event,
-    EventRule,
-    NotificationChannel,
-    WebhookDelivery,
-    WebhookEndpoint,
-    has_authored_conditions,
-)
+from core.models import EmailSettings, Notification
 
 logger = logging.getLogger(__name__)
+
+# Closed structural vocabulary of serialized notification-channel types. The
+# owning domain model (``extras.NotificationChannel``) keeps its own enum; a
+# parity test in extras proves the two never drift. Importing the model here
+# would make a platform service depend on a domain model.
+ChannelType = Literal["email", "in_app", "slack", "teams"]
+NOTIFICATION_CHANNEL_TYPES: Final[frozenset[str]] = frozenset({"email", "in_app", "slack", "teams"})
+
+CHANNEL_TYPE_EMAIL: Final[ChannelType] = "email"
+CHANNEL_TYPE_IN_APP: Final[ChannelType] = "in_app"
+CHANNEL_TYPE_SLACK: Final[ChannelType] = "slack"
+CHANNEL_TYPE_TEAMS: Final[ChannelType] = "teams"
+
+
+class NotificationChannelRef(Protocol):
+    """Structural shape a delivery target must provide (no domain import)."""
+
+    channel_type: str
+    config: Mapping[str, object]
+    tenant_id: int | None
+    name: str
 
 
 class DeliveryDisposition(StrEnum):
@@ -78,330 +96,6 @@ def delivery_log_message(context):
         "operation=%(operation)s actor_id=%(actor_id)s tenant_id=%(tenant_id)s "
         "request_id=%(request_id)s endpoint=%(endpoint)s"
     ) % context
-
-
-def _resolve_instance_tenant_id(instance):
-    """Resolve the tenant that owns ``instance`` so event rules are matched against the
-    object's OWN tenant rather than the ambient tenant contextvar.
-
-    The contextvar is unset in system contexts (management commands, the django-q worker
-    after a ``TaskContext`` exits, the shell). There the tenant-scoping manager fails *open*
-    (``filter_by_tenant`` returns the unscoped queryset), so matching rules by the contextvar
-    would fire EVERY tenant's rules for the object's ContentType — a cross-tenant dispatch
-    (foreign webhooks/notifications about another tenant's object). Resolving the tenant from
-    the instance itself closes that regardless of context. Returns the tenant pk, or ``None``
-    for a tenant-less/global object (in which case only global ``tenant=None`` rules fire).
-    """
-    tenant_id = getattr(instance, "tenant_id", None)
-    if tenant_id is not None:
-        return tenant_id
-    # Models that derive their tenant through a relation (assignments/stock) declare a
-    # ``tenant_lookup`` ORM path (e.g. 'asset__tenant'); walk it to the owning tenant.
-    # Fall back to ``changelog_tenant_lookup`` (used by models such as AssetAudit that
-    # only declare the changelog attribute) so their events match tenant EventRules.
-    lookup = getattr(type(instance), "tenant_lookup", None) or getattr(type(instance), "changelog_tenant_lookup", None)
-    if lookup:
-        obj = instance
-        for part in lookup.split("__"):
-            obj = getattr(obj, part, None)
-            if obj is None:
-                return None
-        return getattr(obj, "pk", None)
-    return None
-
-
-def dispatch_event(sender, instance, action, created=None):
-    """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted."""
-
-    if not issubclass(sender, ChangeLoggingMixin):
-        return
-
-    ct = ContentType.objects.get_for_model(sender)
-
-    event = Event.objects.create(
-        model=ct,
-        object_id=instance.pk,
-        action=action,
-        data={"app_label": ct.app_label, "model_name": ct.model},
-    )
-
-    process_event_rules(event, _resolve_instance_tenant_id(instance))
-
-
-def process_event_rules(event, instance_tenant_id=None):
-    """Match and execute event rules for the given event.
-
-    Rules are scoped to the triggering object's OWN tenant (plus global ``tenant=None``
-    rules), read through the unscoped ``_base_manager`` so the result NEVER depends on the
-    ambient tenant contextvar (which fails open in system contexts). See
-    ``_resolve_instance_tenant_id``.
-    """
-    rules = (
-        EventRule._base_manager.filter(
-            model=event.model,
-            enabled=True,
-            deleted_at__isnull=True,
-        )
-        .filter(Q(tenant_id=instance_tenant_id) | Q(tenant__isnull=True))
-        .select_related("webhook")
-    )
-
-    if not rules.exists():
-        event.processed = True
-        event.save(update_fields=["processed"])
-        return
-
-    for rule in rules:
-        events_list = rule.events or []
-        if event.action not in events_list:
-            continue
-
-        if rule.conditions_withdrawn:
-            logger.info(
-                "Skipping event rule pk=%s tenant=%s: conditions withdrawn for 1.0",
-                rule.pk,
-                rule.tenant_id,
-            )
-            continue
-
-        if not _check_conditions(rule.conditions, event):
-            continue
-
-        # Per-rule isolation: one rule's action raising must not abort the remaining rules
-        # for this event.
-        try:
-            _execute_event_action(rule, event, instance_tenant_id)
-        except Exception:
-            logger.exception("Event rule %s action failed for event %s", rule.pk, event.pk)
-
-    event.processed = True
-    event.save(update_fields=["processed"])
-
-
-def _check_conditions(conditions, event):
-    """Fail-closed evaluation of optional JSON conditions on the event.
-
-    WP-15 (D4): the condition feature is withdrawn for 1.0. Any authored
-    condition expression (or an unexpected, non-dict payload) fails closed so
-    the rule never matches on the near-empty v1 event envelope. Truly empty
-    condition payloads (``None``, ``{}``, or a dict whose ``rules`` list is
-    empty) preserve the historical unconditional-match behavior.
-    """
-
-    if conditions is None or conditions == {}:
-        return True
-    if not isinstance(conditions, dict):
-        return False
-    return not has_authored_conditions(conditions)
-
-
-def _evaluate_condition(rule, event):
-    """Evaluate a single condition rule against the event."""
-
-    if not isinstance(rule, dict):
-        return False
-
-    field = rule.get("field")
-    op = rule.get("op")
-    value = rule.get("value")
-
-    if not field or not op:
-        return False
-
-    data = event.data or {}
-    actual = data.get(field)
-
-    if op == "eq":
-        return actual == value
-    elif op == "neq":
-        return actual != value
-    elif op == "contains":
-        return str(value) in str(actual) if actual else False
-    elif op == "in":
-        return actual in (value if isinstance(value, list) else [value])
-    elif op in ("gt", "lt"):
-        try:
-            lhs = float(actual)
-            rhs = float(value)
-        except (TypeError, ValueError):
-            return False
-        return lhs > rhs if op == "gt" else lhs < rhs
-
-    return False
-
-
-def _execute_event_action(rule, event, instance_tenant_id=None):
-    """Execute the action specified by an event rule."""
-
-    if rule.action_type == EventRule.ACTION_WEBHOOK:
-        _send_webhook(rule, event, instance_tenant_id)
-    elif rule.action_type == EventRule.ACTION_NOTIFICATION:
-        _send_notification(rule, event)
-    # 'script' action_type was removed; existing rows are silently skipped.
-    # Scripts may return as a proper plugin hook post-1.0.
-
-
-def _send_webhook(rule, event, instance_tenant_id=None):
-    """Send a webhook request for the rule.
-
-    Prefers the linked WebhookEndpoint (``rule.webhook``) — its URL, method, headers,
-    decrypted secret and retry policy. Falls back to the legacy ``action_config`` JSON
-    (``url``/``method``/``headers``/``secret``) for rules created before endpoints could
-    be linked; in that case retry settings are borrowed from an endpoint registered for
-    the same URL, if any.
-    """
-
-    config = rule.action_config or {}
-    endpoint = rule.webhook
-
-    if endpoint is not None:
-        if not endpoint.enabled:
-            return
-        url = endpoint.url
-        method = endpoint.http_method
-        headers = endpoint.headers or {}
-        secret = endpoint.secret_decrypted
-        retry_count = endpoint.retry_count
-        retry_backoff = endpoint.retry_backoff
-        # Allow header overrides from action_config without leaking the secret into JSON.
-        headers = {**headers, **(config.get("headers") or {})}
-    else:
-        url = config.get("url")
-        if not url:
-            return
-        method = config.get("method", "POST")
-        headers = config.get("headers", {})
-        secret = config.get("secret", "")
-        match = WebhookEndpoint.objects.filter(url=url, enabled=True).first()
-        retry_count = match.retry_count if match else 3
-        retry_backoff = match.retry_backoff if match else 60
-
-    if not url:
-        return
-    method = (method or "POST").upper()
-
-    from django.conf import settings
-    from django.db import transaction
-    from django_q.tasks import async_task
-
-    # For an endpoint-linked webhook, pass the endpoint pk (NOT the decrypted secret) so the
-    # task re-derives it at run time — this keeps the secret out of the django_q payload /
-    # the retry Schedule.kwargs (which are stored plaintext). Legacy action_config webhooks
-    # have no endpoint and their secret already lives plaintext in the rule config.
-    task_kwargs = dict(
-        url=url,
-        method=method,
-        headers=headers,
-        secret="" if endpoint is not None else secret,
-        webhook_endpoint_id=endpoint.pk if endpoint is not None else None,
-        event_id=event.pk,
-        delivery_id=str(uuid4()),
-        tenant_id=instance_tenant_id,
-        event_action=event.action,
-        event_model_app_label=event.model.app_label,
-        event_model_name=event.model.model,
-        event_object_id=event.object_id,
-        event_timestamp_iso=event.timestamp.isoformat(),
-        event_data=event.data,
-        retry_count=retry_count,
-        retry_backoff=retry_backoff,
-        actor_id=getattr(get_current_user(), "pk", None),
-        request_id=str(get_current_request_id()) if get_current_request_id() is not None else None,
-    )
-
-    WebhookDelivery._base_manager.create(
-        tenant_id=instance_tenant_id,
-        endpoint=endpoint,
-        event=event,
-        delivery_id=task_kwargs["delivery_id"],
-        status=WebhookDelivery.STATUS_PENDING,
-    )
-
-    if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
-        async_task("core.tasks.send_webhook_task", **task_kwargs)
-    else:
-        transaction.on_commit(lambda: async_task("core.tasks.send_webhook_task", **task_kwargs))
-
-
-def _render_template(template, event):
-    """Render an admin-supplied notification template.
-
-    Preserves the historical ``{event.action}`` / ``{event.model.model}`` /
-    ``{data[...]}`` placeholder syntax, but binds ``event`` to a sanitized
-    namespace of plain scalars instead of the live ORM instance. ``str.format``
-    permits attribute/index traversal of its arguments (e.g.
-    ``{event.save.__func__.__globals__[...]}``), so handing it the ORM object is
-    an information-disclosure vector for anyone who can edit a rule's
-    ``action_config``. A nested SimpleNamespace of strings has no such gadget.
-    """
-    if not template:
-        return template
-
-    safe_event = SimpleNamespace(
-        action=str(event.action),
-        object_id=str(event.object_id),
-        model=SimpleNamespace(
-            model=str(event.model.model),
-            app_label=str(event.model.app_label),
-        ),
-        data=event.data,
-    )
-    try:
-        return template.format(event=safe_event, data=event.data)
-    except (KeyError, ValueError, IndexError, AttributeError):
-        return template
-
-
-def _send_notification(rule, event):
-    """Create an in-app notification based on the rule's action_config."""
-
-    from core.models import Notification
-
-    config = rule.action_config or {}
-    level = config.get("level", "info")
-    subject = config.get(
-        "subject",
-        _("Event: %(action)s on %(model)s")
-        % {
-            "action": event.action,
-            "model": event.model.model,
-        },
-    )
-    body = config.get("body", str(event.data))
-
-    # Render against a sanitized namespace (see _render_template) so an
-    # attacker-editable action_config can't traverse a live ORM object.
-    subject = _render_template(subject, event)
-    body = _render_template(body, event)
-
-    target_url = ""
-    try:
-        model_class = event.model.model_class()
-        if model_class and hasattr(model_class, "get_absolute_url"):
-            instance = model_class.objects.filter(pk=event.object_id).first()
-            if instance:
-                target_url = instance.get_absolute_url()
-    except Exception:
-        pass
-
-    if rule.tenant_id:
-        # A tenant-scoped rule must fan out to the rule's tenant members, NOT create a global
-        # user=None row that any authenticated user could open by pk (cross-tenant leak of the
-        # rule's subject/body + the target object's URL). Mirrors the IN_APP channel branch.
-        User = get_user_model()
-        users = User.objects.filter(memberships__tenant_id=rule.tenant_id, is_active=True).distinct()
-        Notification.objects.bulk_create(
-            [Notification(user=u, subject=subject, message=body, level=level, target_url=target_url) for u in users]
-        )
-    else:
-        # Truly system-wide (tenant=None) rule may broadcast.
-        Notification.objects.create(
-            user=None,
-            subject=subject,
-            message=body,
-            level=level,
-            target_url=target_url,
-        )
 
 
 def _post_pinned(webhook_url, payload):
@@ -575,33 +269,39 @@ def _send_email_notification(channel, subject, body):
     )
 
 
-def send_notification_to_channel(channel, subject, body):
-    """Deliver a notification via the given channel.
+def send_notification_to_channel(channel: NotificationChannelRef, subject, body):
+    """Deliver a notification via the given structural channel.
 
-    Supported channel types: email, in_app, slack, teams.
-    Webhooks are NOT an alert-delivery channel; they belong to the EventRule system.
-    Returns a typed result whose truth value preserves the historical success contract.
+    Supported channel types are the closed ``NOTIFICATION_CHANNEL_TYPES``
+    vocabulary: email, in_app, slack, teams. Webhooks are NOT an alert-delivery
+    channel; they belong to the EventRule system. Returns a typed result whose
+    truth value preserves the historical success contract.
     """
-    if channel.channel_type == NotificationChannel.TYPE_SLACK:
+    channel_type = getattr(channel, "channel_type", None)
+    if channel_type not in NOTIFICATION_CHANNEL_TYPES:
+        logger.warning("send_notification_to_channel: unhandled channel type '%s'.", channel_type)
+        return DeliveryResult(
+            "channel.deliver", DeliveryDisposition.TERMINAL, True, str(_("Unsupported notification channel."))
+        )
+
+    if channel_type == CHANNEL_TYPE_SLACK:
         return _send_slack_notification(
             webhook_url=channel.config.get("webhook_url", ""),
             message_text=body,
             title=subject,
         )
 
-    elif channel.channel_type == NotificationChannel.TYPE_TEAMS:
+    if channel_type == CHANNEL_TYPE_TEAMS:
         return _send_teams_notification(
             webhook_url=channel.config.get("webhook_url", ""),
             message_text=body,
             title=subject,
         )
 
-    elif channel.channel_type == NotificationChannel.TYPE_EMAIL:
+    if channel_type == CHANNEL_TYPE_EMAIL:
         return _send_email_notification(channel, subject, body)
 
-    elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
-        from core.models import Notification
-
+    if channel_type == CHANNEL_TYPE_IN_APP:
         User = get_user_model()
 
         # Resolve target users: explicit list in config → tenant members → global staff
@@ -630,7 +330,9 @@ def send_notification_to_channel(channel, subject, body):
         Notification.objects.bulk_create([Notification(user=user, subject=subject, message=body) for user in users])
         return DeliveryResult("in_app.deliver", DeliveryDisposition.SUCCESS)
 
-    logger.warning("send_notification_to_channel: unhandled channel type '%s'.", channel.channel_type)
+    # Unreachable while the closed vocabulary above and these branches agree;
+    # kept so a future vocabulary entry fails closed rather than falling off the end.
+    logger.warning("send_notification_to_channel: unhandled channel type '%s'.", channel_type)
     return DeliveryResult(
         "channel.deliver", DeliveryDisposition.TERMINAL, True, str(_("Unsupported notification channel."))
     )

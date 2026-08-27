@@ -1,3 +1,11 @@
+"""Durable webhook delivery state machine owned by the extras domain.
+
+A producer always persists the ``WebhookDelivery`` row before enqueueing; the
+worker receives identity assertions only. The locked row — never the task
+payload — is the sole authority for endpoint, event, tenant, test-send state
+and the execution payload it derives from them.
+"""
+
 from __future__ import annotations
 
 import datetime
@@ -7,10 +15,10 @@ import json
 import logging
 import random
 from collections.abc import Mapping
-from uuid import uuid4
+from dataclasses import dataclass
+from uuid import UUID, uuid4
 
 import requests
-from django.apps import apps as django_apps
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -20,19 +28,81 @@ from django_q.models import Schedule
 from django_q.tasks import async_task
 
 from core.events import DeliveryDisposition, DeliveryResult, delivery_log_context, delivery_log_message
+from extras.models import EventRule, WebhookDelivery, WebhookEndpoint
 
 logger = logging.getLogger(__name__)
 WEBHOOK_ENVELOPE_SCHEMA_VERSION = 1
+WEBHOOK_TASK_PATH = "extras.tasks.webhooks.send_webhook_task"
 
 _SAFE_REJECTED_MESSAGE = "Webhook delivery was rejected."
 _SAFE_CONFIGURATION_MESSAGE = "Invalid webhook configuration."
 _SAFE_UNAVAILABLE_MESSAGE = "The external integration is temporarily unavailable."
 _SAFE_RETRY_EXHAUSTED_MESSAGE = "The external integration remained unavailable; retry the operation later."
 _SAFE_IN_PROGRESS_MESSAGE = "Delivery is still in progress."
+_SAFE_IDENTITY_MESSAGE = "Webhook delivery was rejected."
 _CONFIGURATION_ERROR_CLASS = "integration.configuration"
 _REQUEST_ERROR_CLASS = "integration.request_rejected"
 _UNAVAILABLE_ERROR_CLASS = "integration.unavailable"
 _RETRY_EXHAUSTED_ERROR_CLASS = "integration.retry_budget_exhausted"
+_IDENTITY_ERROR_CLASS = "integration.delivery_identity_rejected"
+
+_DEFAULT_RETRY_COUNT = 3
+_DEFAULT_RETRY_BACKOFF = 60
+
+
+@dataclass(frozen=True, slots=True)
+class WebhookDeliveryAssertions:
+    """Immutable identity claims a task makes about its durable delivery row.
+
+    Every field is required and compared exactly — including ``None`` and type —
+    against the locked row before any lookup, mutation, DNS resolution or send.
+    """
+
+    delivery_pk: int
+    delivery_id: UUID
+    webhook_endpoint_id: int | None
+    event_id: int | None
+    tenant_id: int | None
+    test_send: bool
+
+    def as_task_value(self) -> dict[str, object]:
+        """Literal-only representation for a django-q ``Schedule.kwargs`` payload."""
+        return {
+            "delivery_pk": self.delivery_pk,
+            "delivery_id": str(self.delivery_id),
+            "webhook_endpoint_id": self.webhook_endpoint_id,
+            "event_id": self.event_id,
+            "tenant_id": self.tenant_id,
+            "test_send": self.test_send,
+        }
+
+
+_ASSERTION_FIELDS = (
+    "delivery_pk",
+    "delivery_id",
+    "webhook_endpoint_id",
+    "event_id",
+    "tenant_id",
+    "test_send",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _ExecutionPlan:
+    """Everything a send needs, derived from the locked row and its relations."""
+
+    url: str
+    method: str
+    headers: Mapping[str, str]
+    secret: str
+    retry_count: int
+    retry_backoff: int
+    event_action: str
+    event_model_app_label: str
+    event_model_name: str
+    event_object_id: int | str
+    event_timestamp_iso: str
+    event_data: Mapping[str, object]
 
 
 def _webhook_envelope(*, event_id, delivery_id, attempt, tenant_id):
@@ -68,12 +138,6 @@ def _actor_for_id(actor_id: int | None):
     return get_user_model()._default_manager.filter(pk=actor_id).first()
 
 
-def _tenant_exists(tenant_id: int | str) -> bool:
-    """Return whether the tenant reference exists, resolved lazily via the app registry."""
-    tenant_model = django_apps.get_model("organization", "Tenant")
-    return tenant_model._base_manager.filter(pk=tenant_id).exists()
-
-
 def _has_permission(user, permission: str) -> bool:
     try:
         return bool(user and getattr(user, "is_authenticated", False) and user.has_perm(permission))
@@ -99,6 +163,106 @@ def _configuration_result(message: str = _SAFE_CONFIGURATION_MESSAGE) -> Deliver
     )
 
 
+def _identity_result() -> DeliveryResult:
+    return DeliveryResult(
+        "webhook.deliver",
+        DeliveryDisposition.TERMINAL,
+        True,
+        _SAFE_IDENTITY_MESSAGE,
+        _IDENTITY_ERROR_CLASS,
+    )
+
+
+def _supplied_field(value, name):
+    """Read one claimed field from a value object or mapping without raising."""
+    if isinstance(value, Mapping):
+        return value.get(name)
+    return getattr(value, name, None)
+
+
+def _parse_assertions(value):
+    """Return the typed assertions for ``value``, or ``(None, reason)``.
+
+    Normalization is confined to this parser and never touches the database: a
+    string UUID becomes a ``UUID`` for comparison, and nothing else is coerced —
+    ``"1"`` is not integer ``1``.
+    """
+    if isinstance(value, WebhookDeliveryAssertions):
+        claimed = {name: getattr(value, name) for name in _ASSERTION_FIELDS}
+    elif isinstance(value, Mapping) and set(value) == set(_ASSERTION_FIELDS):
+        claimed = dict(value)
+    else:
+        return None, "assertions_missing"
+
+    delivery_pk = claimed["delivery_pk"]
+    if not isinstance(delivery_pk, int) or isinstance(delivery_pk, bool):
+        return None, "delivery_pk_invalid"
+
+    raw_delivery_id = claimed["delivery_id"]
+    if isinstance(raw_delivery_id, UUID):
+        delivery_id = raw_delivery_id
+    elif isinstance(raw_delivery_id, str):
+        try:
+            delivery_id = UUID(raw_delivery_id)
+        except ValueError:
+            return None, "delivery_id_invalid"
+    else:
+        return None, "delivery_id_invalid"
+
+    return (
+        WebhookDeliveryAssertions(
+            delivery_pk=delivery_pk,
+            delivery_id=delivery_id,
+            webhook_endpoint_id=claimed["webhook_endpoint_id"],
+            event_id=claimed["event_id"],
+            tenant_id=claimed["tenant_id"],
+            test_send=claimed["test_send"],
+        ),
+        None,
+    )
+
+
+def _identity_mismatches(assertions: WebhookDeliveryAssertions, delivery) -> tuple[str, ...]:
+    """Field names whose claimed value differs from the locked row (exact, typed)."""
+    try:
+        canonical_delivery_id = UUID(str(delivery.delivery_id))
+    except (TypeError, ValueError):
+        canonical_delivery_id = None
+    claimed = (
+        ("delivery_id", assertions.delivery_id, canonical_delivery_id),
+        ("webhook_endpoint_id", assertions.webhook_endpoint_id, delivery.endpoint_id),
+        ("event_id", assertions.event_id, delivery.event_id),
+        ("tenant_id", assertions.tenant_id, delivery.tenant_id),
+        ("test_send", assertions.test_send, delivery.test_send),
+    )
+    return tuple(
+        name for name, supplied, canonical in claimed if type(supplied) is not type(canonical) or supplied != canonical
+    )
+
+
+def _reject_identity(supplied, delivery, reason: str, mismatched: tuple[str, ...]) -> DeliveryResult:
+    """Emit one sanitized security-audit record and return the terminal result.
+
+    Only stable codes, parseable identities and mismatched field names may appear:
+    never a URL, header, payload, exception text or secret.
+    """
+    supplied_pk = _supplied_field(supplied, "delivery_pk")
+    supplied_uuid = _supplied_field(supplied, "delivery_id")
+    logger.warning(
+        "operation=webhook.identity_assert disposition=terminal error_class=%s reason=%s "
+        "supplied_delivery_pk=%s supplied_delivery_id=%s canonical_delivery_pk=%s canonical_delivery_id=%s "
+        "mismatched_fields=%s",
+        _IDENTITY_ERROR_CLASS,
+        reason,
+        supplied_pk if isinstance(supplied_pk, int) and not isinstance(supplied_pk, bool) else "",
+        supplied_uuid if isinstance(supplied_uuid, UUID) else "",
+        getattr(delivery, "pk", ""),
+        getattr(delivery, "delivery_id", ""),
+        ",".join(mismatched),
+    )
+    return _identity_result()
+
+
 def _mark_dead_locked(delivery, *, error_class: str, error_message: str, response_code: int | None = None) -> None:
     now = timezone.now()
     delivery.status = "dead"
@@ -120,188 +284,176 @@ def _mark_dead_locked(delivery, *, error_class: str, error_message: str, respons
     )
 
 
-def _reject_mismatched_delivery(delivery, *, webhook_endpoint_id, event_id, tenant_id):
-    """Return a terminal result when the locked record contradicts the task identity.
+def _legacy_config_for_delivery(delivery):
+    """Legacy ``action_config`` that owns an endpoint-less delivery.
 
-    A replayed or re-targeted task must never deliver under a mismatched identity:
-    the record is marked dead (fail closed) and the task short-circuits.
+    Pre-endpoint rules keep URL/method/headers/secret in the rule JSON, so the
+    worker re-derives them from the delivery's own event and tenant instead of
+    trusting a task payload.
     """
-    mismatched = False
-    if webhook_endpoint_id is not None and delivery.endpoint_id != webhook_endpoint_id:
-        mismatched = True
-    if event_id is not None and delivery.event_id is not None and delivery.event_id != event_id:
-        mismatched = True
-    if tenant_id is not None and delivery.tenant_id != tenant_id:
-        mismatched = True
-    if not mismatched:
-        return None
-    _mark_dead_locked(
-        delivery,
-        error_class=_CONFIGURATION_ERROR_CLASS,
-        error_message=_SAFE_CONFIGURATION_MESSAGE,
+    if delivery.event_id is None:
+        return {}
+    rules = (
+        EventRule._base_manager.filter(action_type=EventRule.ACTION_WEBHOOK, webhook__isnull=True)
+        .filter(Q(tenant_id=delivery.tenant_id) | Q(tenant__isnull=True))
+        .order_by("pk")
     )
-    return _configuration_result()
+    for rule in rules:
+        if delivery.event.action in (rule.events or []):
+            config = rule.action_config or {}
+            if config.get("url"):
+                return config
+    return {}
 
 
-def _reject_invalid_delivery(delivery, *, webhook_endpoint_id, endpoint, url):
-    """Return a terminal result when the target is missing, disabled, or crossed tenants."""
-    invalid = False
-    if webhook_endpoint_id is not None and endpoint is None:
-        invalid = True
+def _event_payload_fields(delivery, endpoint):
+    """Payload provenance for the locked row: test envelope or its own event."""
+    if delivery.test_send:
+        return (
+            "test",
+            "extras",
+            "WebhookEndpoint",
+            endpoint.pk if endpoint is not None else "",
+            timezone.now().isoformat(),
+            {},
+        )
+    event = delivery.event
+    if event is None:
+        return None
+    return (
+        event.action,
+        event.model.app_label,
+        event.model.model,
+        event.object_id,
+        event.timestamp.isoformat(),
+        event.data,
+    )
+
+
+def _execution_plan(delivery, endpoint) -> _ExecutionPlan | None:
+    """Derive the whole send from the locked row and its locked relations."""
+    payload_fields = _event_payload_fields(delivery, endpoint)
+    if payload_fields is None:
+        return None
+
+    if endpoint is not None:
+        url = endpoint.url
+        method = (endpoint.http_method or "POST").upper()
+        headers = endpoint.headers or {}
+        secret = endpoint.secret_decrypted
+        retry_count = endpoint.retry_count
+        retry_backoff = endpoint.retry_backoff
+    else:
+        config = _legacy_config_for_delivery(delivery)
+        url = config.get("url") or ""
+        method = (config.get("method") or "POST").upper()
+        headers = config.get("headers") or {}
+        secret = config.get("secret", "")
+        # Legacy rules borrow the retry policy of an endpoint registered for the
+        # same URL, exactly as the pre-cutover enqueue path did.
+        match = WebhookEndpoint.objects.filter(url=url, enabled=True).first() if url else None
+        retry_count = match.retry_count if match else _DEFAULT_RETRY_COUNT
+        retry_backoff = match.retry_backoff if match else _DEFAULT_RETRY_BACKOFF
+
+    action, app_label, model_name, object_id, timestamp_iso, data = payload_fields
+    return _ExecutionPlan(
+        url=url,
+        method=method,
+        headers=headers,
+        secret=secret,
+        retry_count=retry_count,
+        retry_backoff=retry_backoff,
+        event_action=action,
+        event_model_app_label=app_label,
+        event_model_name=model_name,
+        event_object_id=object_id,
+        event_timestamp_iso=timestamp_iso,
+        event_data=data,
+    )
+
+
+def _invalid_target(delivery, endpoint, plan) -> bool:
+    """Whether the locked row's target is missing, disabled, or crossed tenants."""
+    if delivery.endpoint_id is not None and endpoint is None:
+        return True
     if endpoint is not None:
         if not endpoint.enabled or (endpoint.tenant_id is not None and delivery.tenant_id != endpoint.tenant_id):
-            invalid = True
-    if endpoint is None and not url:
-        invalid = True
-    if not invalid:
-        return None
-    _mark_dead_locked(
-        delivery,
-        error_class=_CONFIGURATION_ERROR_CLASS,
-        error_message=_SAFE_CONFIGURATION_MESSAGE,
-    )
-    return _configuration_result()
+            return True
+    if plan is None or (endpoint is None and not plan.url):
+        return True
+    return False
 
 
-def _start_delivery(
-    *,
-    delivery_id: str | None,
-    webhook_endpoint_id: int | None,
-    event_id: int | str | None,
-    tenant_id: int | str | None,
-    attempt: int,
-    test_send: bool,
-    url: str,
-    retry_count: int,
-):
-    # inline import: app-registry: worker-side delivery rows and endpoint validation are lazy
-    from extras.models import Event, WebhookDelivery, WebhookEndpoint
+def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
+    """Lock the claimed row, prove exact identity parity, then claim the attempt.
 
-    stable_delivery_id = delivery_id or str(uuid4())
+    Returns ``(delivery, plan, result)``: ``result`` is ``None`` when the caller
+    should send, and otherwise the terminal/no-op result to return unchanged.
+    """
     with transaction.atomic():
-        delivery = WebhookDelivery._base_manager.select_for_update().filter(delivery_id=stable_delivery_id).first()
-        if delivery is not None:
-            if delivery.status in ("success", "dead"):
-                return delivery, None, False
-
-            reject = _reject_mismatched_delivery(
-                delivery,
-                webhook_endpoint_id=webhook_endpoint_id,
-                event_id=event_id,
-                tenant_id=tenant_id,
-            )
-            if reject is not None:
-                return delivery, reject, False
-
-            effective_endpoint_id = delivery.endpoint_id
-            endpoint = (
-                WebhookEndpoint._base_manager.filter(pk=effective_endpoint_id, deleted_at__isnull=True).first()
-                if effective_endpoint_id is not None
-                else None
-            )
-        else:
-            endpoint = (
-                WebhookEndpoint._base_manager.filter(pk=webhook_endpoint_id, deleted_at__isnull=True).first()
-                if webhook_endpoint_id is not None
-                else None
-            )
-            effective_endpoint_id = endpoint.pk if endpoint is not None else None
-            effective_tenant_id = tenant_id
-            if effective_tenant_id is None and endpoint is not None:
-                effective_tenant_id = endpoint.tenant_id
-            # Fail closed on unknown tenant references: a stale or tampered task
-            # payload must never crash the worker on a foreign-key violation.
-            if effective_tenant_id is not None and not _tenant_exists(effective_tenant_id):
-                effective_tenant_id = None
-            event_link_id = (
-                event_id if event_id is not None and Event._base_manager.filter(pk=event_id).exists() else None
-            )
-            delivery = WebhookDelivery._base_manager.create(
-                tenant_id=effective_tenant_id,
-                endpoint_id=effective_endpoint_id,
-                event_id=event_link_id,
-                delivery_id=stable_delivery_id,
-                status="pending",
-                attempt=1,
-                test_send=test_send,
-            )
-
-        reject = _reject_invalid_delivery(
-            delivery,
-            webhook_endpoint_id=webhook_endpoint_id,
-            endpoint=endpoint,
-            url=url,
+        delivery = (
+            WebhookDelivery._base_manager.select_for_update(of=("self",))
+            .select_related("endpoint", "event", "event__model")
+            .filter(pk=assertions.delivery_pk)
+            .first()
         )
-        if reject is not None:
-            return delivery, reject, False
+        if delivery is None:
+            return None, None, _reject_identity(assertions, None, "delivery_unknown", ())
+
+        mismatched = _identity_mismatches(assertions, delivery)
+        if mismatched:
+            return delivery, None, _reject_identity(assertions, delivery, "identity_mismatch", mismatched)
+
+        if delivery.status in ("success", "dead"):
+            return delivery, None, DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
+
+        endpoint = delivery.endpoint
+        if endpoint is not None and endpoint.deleted_at is not None:
+            # A soft-deleted endpoint is not a live target.
+            endpoint = None
+
+        plan = _execution_plan(delivery, endpoint)
+        if _invalid_target(delivery, endpoint, plan):
+            _mark_dead_locked(
+                delivery,
+                error_class=_CONFIGURATION_ERROR_CLASS,
+                error_message=_SAFE_CONFIGURATION_MESSAGE,
+            )
+            return delivery, None, _configuration_result()
 
         delivery.attempt = max(delivery.attempt, attempt + 1)
         delivery.attempted_at = timezone.now()
         delivery.next_retry_at = None
         delivery.save(update_fields=["attempt", "attempted_at", "next_retry_at", "updated_at"])
-        return delivery, endpoint, True
+        return delivery, plan, None
 
 
-def _retry_kwargs(
-    *,
-    url: str,
-    method: str,
-    headers: Mapping[str, str],
-    secret: str | None,
-    webhook_endpoint_id: int | None,
-    event_id: int | str | None,
-    delivery,
-    tenant_id: int | str | None,
-    event_action: str,
-    event_model_app_label: str,
-    event_model_name: str,
-    event_object_id: int | str,
-    event_timestamp_iso: str,
-    event_data: Mapping[str, object],
-    retry_count: int,
-    retry_backoff: int,
-    actor_id: int | None,
-    request_id: str | None,
-) -> dict[str, object]:
-    return dict(
-        url=url,
-        method=method,
-        headers=headers,
-        secret="" if webhook_endpoint_id else secret,
-        webhook_endpoint_id=webhook_endpoint_id,
-        event_id=event_id,
-        delivery_id=delivery.delivery_id,
-        tenant_id=tenant_id,
-        event_action=event_action,
-        event_model_app_label=event_model_app_label,
-        event_model_name=event_model_name,
-        event_object_id=event_object_id,
-        event_timestamp_iso=event_timestamp_iso,
-        event_data=event_data,
-        attempt=delivery.attempt,
-        retry_count=retry_count,
-        retry_backoff=retry_backoff,
-        actor_id=actor_id,
-        request_id=request_id,
-        test_send=delivery.test_send,
-    )
+def _retry_kwargs(assertions: WebhookDeliveryAssertions, delivery, *, actor_id, request_id) -> dict[str, object]:
+    """Kwargs for one more attempt at the same durable row.
+
+    The assertions travel as literal primitives so a delayed ``Schedule`` row
+    stays representable; the worker's typed parser normalizes them back.
+    """
+    return {
+        "assertions": assertions.as_task_value(),
+        "attempt": delivery.attempt,
+        "actor_id": actor_id,
+        "request_id": request_id,
+    }
 
 
 def _finish_delivery(
     *,
-    delivery_id: str,
+    delivery_pk: int,
     result: DeliveryResult,
     response_code: int | None,
     retry_count: int,
     retry_backoff: int,
     retry_kwargs: dict[str, object] | None,
 ) -> DeliveryResult:
-    # inline import: app-registry: finalization only needs the delivery model after task startup
-    from extras.models import WebhookDelivery
-
     immediate_retry = False
     with transaction.atomic():
-        delivery = WebhookDelivery._base_manager.select_for_update().get(delivery_id=delivery_id)
+        delivery = WebhookDelivery._base_manager.select_for_update().get(pk=delivery_pk)
         if delivery.status in ("success", "dead"):
             return DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
 
@@ -386,7 +538,7 @@ def _finish_delivery(
             )
             if retry_kwargs is not None:
                 Schedule.objects.create(
-                    func="core.tasks.send_webhook_task",
+                    func=WEBHOOK_TASK_PATH,
                     kwargs=repr(retry_kwargs),
                     schedule_type=Schedule.ONCE,
                     next_run=delivery.next_retry_at,
@@ -406,7 +558,7 @@ def _finish_delivery(
             immediate_retry = retry_kwargs is not None
 
     if immediate_retry:
-        async_task("core.tasks.send_webhook_task", **retry_kwargs)
+        async_task(WEBHOOK_TASK_PATH, **retry_kwargs)
     return result
 
 
@@ -486,55 +638,20 @@ def _dispatch_webhook_request(
 
 
 def send_webhook_task(
-    url: str,
-    method: str,
-    headers: Mapping[str, str],
-    secret: str | None,
-    event_action: str,
-    event_model_app_label: str,
-    event_model_name: str,
-    event_object_id: int | str,
-    event_timestamp_iso: str,
-    event_data: Mapping[str, object],
+    assertions: object | None = None,
+    *,
     attempt: int = 0,
-    retry_count: int = 3,
-    retry_backoff: int = 60,
-    webhook_endpoint_id: int | None = None,
-    event_id: int | str | None = None,
-    delivery_id: str | None = None,
-    tenant_id: int | str | None = None,
     actor_id: int | None = None,
     request_id: str | None = None,
-    *,
-    test_send: bool = False,
 ) -> DeliveryResult:
-    """Dispatch a webhook event and persist its durable delivery state."""
-    delivery, endpoint_or_result, should_send = _start_delivery(
-        delivery_id=delivery_id,
-        webhook_endpoint_id=webhook_endpoint_id,
-        event_id=event_id,
-        tenant_id=tenant_id,
-        attempt=attempt,
-        test_send=test_send,
-        url=url,
-        retry_count=retry_count,
-    )
-    if not should_send:
-        if isinstance(endpoint_or_result, DeliveryResult):
-            return endpoint_or_result
-        return DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
+    """Dispatch one durable webhook delivery named by ``assertions``."""
+    parsed, parse_error = _parse_assertions(assertions)
+    if parsed is None:
+        return _reject_identity(assertions, None, parse_error, ())
 
-    endpoint = endpoint_or_result
-    if endpoint is not None:
-        url = endpoint.url
-        method = endpoint.http_method
-        secret = endpoint.secret_decrypted
-        retry_count = endpoint.retry_count
-        retry_backoff = endpoint.retry_backoff
-        headers = headers or endpoint.headers or {}
-
-    # inline import: heavy-import: core.http imports core.validators; defer it off the task module import path.
-    from core.http import webhook_target_kind
+    delivery, plan, result = _claim_delivery(parsed, attempt=attempt)
+    if result is not None:
+        return result
 
     operation = "webhook.deliver"
     context = delivery_log_context(
@@ -542,41 +659,44 @@ def send_webhook_task(
         tenant_id=delivery.tenant_id,
         actor_id=actor_id,
         request_id=request_id,
-        endpoint=url,
+        endpoint=plan.url,
     )
     response_code = None
     try:
-        target_kind = webhook_target_kind(url)
+        # inline import: heavy-import: core.http imports core.validators; defer it off the task module import path.
+        from core.http import webhook_target_kind
+
+        target_kind = webhook_target_kind(plan.url)
         envelope = _webhook_envelope(
-            event_id=event_id,
+            event_id=delivery.event_id,
             delivery_id=delivery.delivery_id,
             attempt=delivery.attempt - 1,
             tenant_id=delivery.tenant_id,
         )
-        summary = f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"
+        summary = f"Event: {plan.event_action} on {plan.event_model_name} (ID: {plan.event_object_id})"
         test_fields = {
             "event": "test",
             "model": "extras.WebhookEndpoint",
-            "object_id": event_object_id,
-            "timestamp": event_timestamp_iso,
+            "object_id": plan.event_object_id,
+            "timestamp": plan.event_timestamp_iso,
             "data": {},
         }
         response = _dispatch_webhook_request(
             target_kind=target_kind,
-            url=url,
-            method=method,
-            headers=headers,
-            secret=secret,
+            url=plan.url,
+            method=plan.method,
+            headers=plan.headers,
+            secret=plan.secret,
             envelope=envelope,
             summary=summary,
             test_send=delivery.test_send,
             test_fields=test_fields,
-            event_action=event_action,
-            event_model_app_label=event_model_app_label,
-            event_model_name=event_model_name,
-            event_object_id=event_object_id,
-            event_timestamp_iso=event_timestamp_iso,
-            event_data=event_data,
+            event_action=plan.event_action,
+            event_model_app_label=plan.event_model_app_label,
+            event_model_name=plan.event_model_name,
+            event_object_id=plan.event_object_id,
+            event_timestamp_iso=plan.event_timestamp_iso,
+            event_data=plan.event_data,
         )
 
         response_code = _safe_response_code(response)
@@ -590,21 +710,21 @@ def send_webhook_task(
                 _REQUEST_ERROR_CLASS,
             )
             return _finish_delivery(
-                delivery_id=delivery.delivery_id,
+                delivery_pk=delivery.pk,
                 result=result,
                 response_code=response_code,
-                retry_count=retry_count,
-                retry_backoff=retry_backoff,
+                retry_count=plan.retry_count,
+                retry_backoff=plan.retry_backoff,
                 retry_kwargs=None,
             )
         response.raise_for_status()
         logger.info("%s disposition=success", delivery_log_message(context))
         return _finish_delivery(
-            delivery_id=delivery.delivery_id,
+            delivery_pk=delivery.pk,
             result=DeliveryResult(operation, DeliveryDisposition.SUCCESS),
             response_code=response_code,
-            retry_count=retry_count,
-            retry_backoff=retry_backoff,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
             retry_kwargs=None,
         )
 
@@ -614,17 +734,17 @@ def send_webhook_task(
         logger.error("%s disposition=terminal reason=invalid_target", delivery_log_message(context))
         result = _configuration_result()
         return _finish_delivery(
-            delivery_id=delivery.delivery_id,
+            delivery_pk=delivery.pk,
             result=result,
             response_code=response_code,
-            retry_count=retry_count,
-            retry_backoff=retry_backoff,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
             retry_kwargs=None,
         )
     except requests.RequestException as exc:
         exception_response = getattr(exc, "response", None)
         response_code = response_code or _safe_response_code(exception_response)
-        if attempt >= retry_count:
+        if attempt >= plan.retry_count:
             logger.error("%s disposition=retryable reason=attempt_limit", delivery_log_message(context))
             result = DeliveryResult(
                 operation,
@@ -637,47 +757,25 @@ def send_webhook_task(
                 "%s disposition=retryable action=retry attempt=%d retry_count=%d",
                 delivery_log_message(context),
                 delivery.attempt,
-                retry_count,
+                plan.retry_count,
             )
             result = DeliveryResult(
                 operation,
                 DeliveryDisposition.RETRYABLE,
                 error_class=_UNAVAILABLE_ERROR_CLASS,
             )
-            retry_kwargs = _retry_kwargs(
-                url=url,
-                method=method,
-                headers=headers,
-                secret=secret,
-                webhook_endpoint_id=delivery.endpoint_id,
-                event_id=event_id,
-                delivery=delivery,
-                tenant_id=delivery.tenant_id,
-                event_action=event_action,
-                event_model_app_label=event_model_app_label,
-                event_model_name=event_model_name,
-                event_object_id=event_object_id,
-                event_timestamp_iso=event_timestamp_iso,
-                event_data=event_data,
-                retry_count=retry_count,
-                retry_backoff=retry_backoff,
-                actor_id=actor_id,
-                request_id=request_id,
-            )
+            retry_kwargs = _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id)
         return _finish_delivery(
-            delivery_id=delivery.delivery_id,
+            delivery_pk=delivery.pk,
             result=result,
             response_code=response_code,
-            retry_count=retry_count,
-            retry_backoff=retry_backoff,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
             retry_kwargs=retry_kwargs,
         )
 
 
 def _load_delivery_for_actor(delivery_pk: int, actor_id: int | None):
-    # inline import: app-registry: manual operations resolve operational models lazily in workers.
-    from extras.models import WebhookDelivery
-
     actor = _actor_for_id(actor_id)
     if actor is None:
         raise PermissionDenied("Delivery not found.")
@@ -689,111 +787,33 @@ def _load_delivery_for_actor(delivery_pk: int, actor_id: int | None):
     return delivery, actor
 
 
-def _legacy_config_for_delivery(delivery):
-    # inline import: app-registry: legacy rule lookup is only needed for redelivery of pre-endpoint records.
-    from extras.models import EventRule
-
-    if delivery.event is None:
-        return {}
-    rules = (
-        EventRule._base_manager.filter(action_type=EventRule.ACTION_WEBHOOK, webhook__isnull=True)
-        .filter(Q(tenant_id=delivery.tenant_id) | Q(tenant__isnull=True))
-        .order_by("pk")
-    )
-    for rule in rules:
-        if delivery.event.action in (rule.events or []):
-            config = rule.action_config or {}
-            if config.get("url"):
-                return config
-    return {}
-
-
-def _redelivery_task_kwargs(delivery, *, actor_id: int | None) -> dict[str, object]:
-    endpoint = delivery.endpoint
-    event = delivery.event
-    now = timezone.now()
-    if delivery.test_send:
-        event_id = None
-        event_action = "test"
-        event_model_app_label = "extras"
-        event_model_name = "WebhookEndpoint"
-        event_object_id = endpoint.pk if endpoint is not None else ""
-        event_timestamp_iso = now.isoformat()
-        event_data = {}
-    elif event is not None:
-        event_id = event.pk
-        event_action = event.action
-        event_model_app_label = event.model.app_label
-        event_model_name = event.model.model
-        event_object_id = event.object_id
-        event_timestamp_iso = event.timestamp.isoformat()
-        event_data = event.data
-    else:
-        raise ValidationError(_SAFE_CONFIGURATION_MESSAGE)
-
-    if endpoint is not None:
-        return dict(
-            url=endpoint.url,
-            method=endpoint.http_method,
-            headers=endpoint.headers or {},
-            secret="",
-            webhook_endpoint_id=endpoint.pk,
-            event_id=event_id,
-            delivery_id=str(uuid4()),
-            tenant_id=delivery.tenant_id,
-            event_action=event_action,
-            event_model_app_label=event_model_app_label,
-            event_model_name=event_model_name,
-            event_object_id=event_object_id,
-            event_timestamp_iso=event_timestamp_iso,
-            event_data=event_data,
-            retry_count=endpoint.retry_count,
-            retry_backoff=endpoint.retry_backoff,
-            actor_id=actor_id,
-            request_id=None,
-            test_send=delivery.test_send,
-        )
-
-    config = _legacy_config_for_delivery(delivery)
-    url = config.get("url", "")
-    method = (config.get("method") or "POST").upper()
-    headers = config.get("headers") or {}
-    secret = config.get("secret", "")
-    return dict(
-        url=url,
-        method=method,
-        headers=headers,
-        secret=secret,
-        webhook_endpoint_id=None,
-        event_id=event_id,
-        delivery_id=str(uuid4()),
+def _assertions_for(delivery) -> WebhookDeliveryAssertions:
+    return WebhookDeliveryAssertions(
+        delivery_pk=delivery.pk,
+        delivery_id=UUID(str(delivery.delivery_id)),
+        webhook_endpoint_id=delivery.endpoint_id,
+        event_id=delivery.event_id,
         tenant_id=delivery.tenant_id,
-        event_action=event_action,
-        event_model_app_label=event_model_app_label,
-        event_model_name=event_model_name,
-        event_object_id=event_object_id,
-        event_timestamp_iso=event_timestamp_iso,
-        event_data=event_data,
-        retry_count=3,
-        retry_backoff=60,
-        actor_id=actor_id,
-        request_id=None,
-        test_send=False,
+        test_send=delivery.test_send,
     )
 
 
-def _enqueue_task(task_kwargs: dict[str, object]) -> None:
+def _enqueue_task(delivery, *, actor_id: int | None) -> None:
+    assertions = _assertions_for(delivery)
     if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
-        async_task("core.tasks.send_webhook_task", **task_kwargs)
+        async_task(WEBHOOK_TASK_PATH, assertions, actor_id=actor_id)
     else:
-        transaction.on_commit(lambda task_kwargs=task_kwargs: async_task("core.tasks.send_webhook_task", **task_kwargs))
+        transaction.on_commit(lambda: async_task(WEBHOOK_TASK_PATH, assertions, actor_id=actor_id))
+
+
+def _validate_redelivery_source(delivery) -> None:
+    """A non-test delivery without an event has no payload provenance to replay."""
+    if not delivery.test_send and delivery.event_id is None:
+        raise ValidationError(_SAFE_CONFIGURATION_MESSAGE)
 
 
 def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None):
     """Create and enqueue a fresh delivery for an existing delivery outcome."""
-    # inline import: app-registry: creation of the redelivery row stays lazy for django-q loading.
-    from extras.models import WebhookDelivery
-
     source, actor = _load_delivery_for_actor(delivery_pk, actor_id)
     if source.tenant_id is None and not _is_platform_actor(actor):
         raise PermissionDenied("Delivery not found.")
@@ -815,27 +835,24 @@ def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None)
         if source.status == "pending" or (source.next_retry_at is not None and source.next_retry_at > now):
             raise ValidationError(_SAFE_IN_PROGRESS_MESSAGE)
 
-        task_kwargs = _redelivery_task_kwargs(source, actor_id=actor_id)
+        _validate_redelivery_source(source)
         new_delivery = WebhookDelivery._base_manager.create(
             tenant_id=source.tenant_id,
             endpoint_id=source.endpoint_id,
             event_id=source.event_id,
-            delivery_id=task_kwargs["delivery_id"],
+            delivery_id=str(uuid4()),
             status="pending",
             test_send=source.test_send,
             redelivered_from=source,
             redelivered_by=actor,
             redelivered_at=now,
         )
-        _enqueue_task(task_kwargs)
+        _enqueue_task(new_delivery, actor_id=actor_id)
     return new_delivery
 
 
 def send_webhook_test(endpoint_pk: int, *, actor_id: int | None = None):
     """Create and enqueue a test delivery for an endpoint."""
-    # inline import: app-registry: endpoint and delivery models are resolved only for this operation.
-    from extras.models import WebhookDelivery, WebhookEndpoint
-
     actor = _actor_for_id(actor_id)
     if actor is not None and _is_platform_actor(actor):
         endpoint = WebhookEndpoint._base_manager.filter(pk=endpoint_pk, deleted_at__isnull=True).first()
@@ -844,37 +861,14 @@ def send_webhook_test(endpoint_pk: int, *, actor_id: int | None = None):
     if endpoint is None or (endpoint.tenant_id is None and not _is_platform_actor(actor)):
         raise PermissionDenied("Webhook endpoint not found.")
 
-    now = timezone.now()
-    delivery_id = str(uuid4())
-    task_kwargs = dict(
-        url=endpoint.url,
-        method=endpoint.http_method,
-        headers=endpoint.headers or {},
-        secret="",
-        webhook_endpoint_id=endpoint.pk,
-        event_id=None,
-        delivery_id=delivery_id,
-        tenant_id=endpoint.tenant_id,
-        event_action="test",
-        event_model_app_label="extras",
-        event_model_name="WebhookEndpoint",
-        event_object_id=endpoint.pk,
-        event_timestamp_iso=now.isoformat(),
-        event_data={},
-        retry_count=endpoint.retry_count,
-        retry_backoff=endpoint.retry_backoff,
-        actor_id=actor_id,
-        request_id=None,
-        test_send=True,
-    )
     with transaction.atomic():
         delivery = WebhookDelivery._base_manager.create(
             tenant_id=endpoint.tenant_id,
             endpoint=endpoint,
             event=None,
-            delivery_id=delivery_id,
+            delivery_id=str(uuid4()),
             status="pending",
             test_send=True,
         )
-        _enqueue_task(task_kwargs)
+        _enqueue_task(delivery, actor_id=actor_id)
     return delivery

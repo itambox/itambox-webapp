@@ -7,7 +7,7 @@ from compliance.views import _safe_dispatch_custody
 
 
 class CustodyEventBoundaryTests(SimpleTestCase):
-    @patch("core.events.dispatch_event", side_effect=RuntimeError("event backend offline"))
+    @patch("extras.services.events.dispatch_event", side_effect=RuntimeError("event backend offline"))
     def test_dispatch_failure_is_logged_with_non_secret_context(self, dispatch):
         receipt = SimpleNamespace(pk=31)
 

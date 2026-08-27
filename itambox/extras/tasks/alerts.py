@@ -1,14 +1,30 @@
 import logging
 from uuid import uuid4
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import F, OuterRef, Q, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from assets.models import Asset, Category, Warranty
 from core.events import DeliveryDisposition, delivery_log_context, delivery_log_message, send_notification_to_channel
 from core.tasks.context import TaskContext
 from extras.models import AlertLog, AlertRule
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    AccessoryStock,
+    Component,
+    ComponentAllocation,
+    ComponentStock,
+    Consumable,
+    ConsumableAssignment,
+    ConsumableStock,
+)
+from licenses.models import License
+from subscriptions.models import Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -147,108 +163,20 @@ def _evaluate_rule(rule, today, existing_logs):
 
     Returns the count of freshly-created alerts. Mutates ``existing_logs`` in place.
     """
-    from django.contrib.contenttypes.models import ContentType
-
     now = timezone.now()
     fresh_count = 0
     matched_keys = set()  # (content_type_id, object_id) for this rule run
     scheduled_dispatch_keys = set()  # at most one callback per alert in this pass
 
-    try:
-        matches = _collect_matches(rule, today)
-    except Exception:
-        logger.exception("Error collecting matches for rule %s", rule.name)
-        matches = []
-
-    for match in matches:
-        obj = match["obj"]
-        ct = ContentType.objects.get_for_model(obj)
-        key = (rule.id, ct.id, obj.pk)
-        matched_keys.add((ct.id, obj.pk))
-
-        existing = existing_logs.get(key)
-
-        if existing is None:
-            # New alert. Guard the create with a savepoint: the partial unique
-            # constraint (one open alert per rule+object) can fire if the
-            # prefetch missed an open row (a concurrent evaluation, or a context
-            # that scoped the prefetch out). On conflict, adopt the existing open
-            # row instead of crashing the task and poisoning the transaction.
-            try:
-                with transaction.atomic():
-                    alert_log = AlertLog.objects.create(
-                        rule=rule,
-                        subject=match["subject"],
-                        message=match["message"],
-                        severity=rule.severity,
-                        content_type=ct,
-                        object_id=obj.pk,
-                        tenant=match.get("tenant"),
-                        delivery_status=({"__dispatch__": "pending"} if not rule.is_muted else {}),
-                        delivery_outcome=(
-                            AlertLog.DELIVERY_OUTCOME_PENDING if not rule.is_muted else AlertLog.DELIVERY_OUTCOME_NONE
-                        ),
-                    )
-            except IntegrityError:
-                # The partial unique constraint fired (or, rarely, another
-                # integrity error). Adopt the existing open row so the task does
-                # not crash; log so a non-constraint conflict is never silent.
-                logger.warning(
-                    "AlertLog create conflicted for rule '%s' on '%s'; adopting existing open row.",
-                    rule.name,
-                    obj,
-                )
-                alert_log = (
-                    AlertLog.unscoped.filter(
-                        rule=rule,
-                        content_type=ct,
-                        object_id=obj.pk,
-                        status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED],
-                    )
-                    .order_by("created_at")
-                    .first()
-                )
-                if alert_log is None:
-                    # No open row to adopt: the conflict was not the expected
-                    # open-alert constraint (or the row vanished). Skip this
-                    # match rather than mask the cause silently.
-                    logger.error(
-                        "AlertLog create failed for rule '%s' on '%s' with no open row to adopt; skipping.",
-                        rule.name,
-                        obj,
-                    )
-                    continue
-                existing_logs[key] = alert_log
-                # Treat the adopted row as the existing alert (re-notify below).
-                existing = alert_log
-            else:
-                existing_logs[key] = alert_log
-                fresh_count += 1
-                logger.info("Triggered AlertLog %s for '%s' on '%s'.", alert_log.pk, match["subject"], obj)
-                if not rule.is_muted:
-                    # Mark the in-memory row as scheduled so duplicate matches in
-                    # one evaluation cannot immediately re-notify it before commit.
-                    alert_log.last_notified_at = now
-
-                    _schedule_alert_dispatch(rule, match, alert_log)
-                    scheduled_dispatch_keys.add(key)
-
-        if existing is not None and not rule.is_muted:
-            # Retry a committed-but-undelivered alert, or re-notify on cadence.
-            pending = (existing.delivery_status or {}).get("__dispatch__") == "pending"
-            ref = existing.last_notified_at or existing.created_at
-            due = ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days)
-            if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:
-                AlertLog.unscoped.filter(pk=existing.pk).update(
-                    delivery_status={"__dispatch__": "pending"},
-                    delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
-                )
-                existing.delivery_status = {"__dispatch__": "pending"}
-                existing.delivery_outcome = AlertLog.DELIVERY_OUTCOME_PENDING
-                existing.last_notified_at = now
-                _schedule_alert_dispatch(rule, match, existing)
-                scheduled_dispatch_keys.add(key)
-                logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
+    for match in _collect_matches_safely(rule, today):
+        fresh_count += _process_rule_match(
+            rule,
+            match,
+            now,
+            existing_logs,
+            matched_keys,
+            scheduled_dispatch_keys,
+        )
 
     # Auto-resolve logs whose conditions have cleared.
     _auto_resolve_cleared(rule, matched_keys)
@@ -257,6 +185,128 @@ def _evaluate_rule(rule, today, existing_logs):
     AlertRule.objects.filter(pk=rule.pk).update(last_fired_at=now)
 
     return fresh_count
+
+
+def _collect_matches_safely(rule, today):
+    """Collect this rule's matches; a collector failure yields no matches."""
+    try:
+        return _collect_matches(rule, today)
+    # broad except: task-isolation: one rule's collector failure must not abort the batch
+    except Exception:
+        logger.exception("Error collecting matches for rule %s", rule.name)
+        return []
+
+
+def _process_rule_match(rule, match, now, existing_logs, matched_keys, scheduled_dispatch_keys):
+    """Persist/renotify one matched object. Returns 1 when a fresh alert was created."""
+    obj = match["obj"]
+    ct = ContentType.objects.get_for_model(obj)
+    key = (rule.id, ct.id, obj.pk)
+    matched_keys.add((ct.id, obj.pk))
+
+    existing = existing_logs.get(key)
+    fresh_count = 0
+
+    if existing is None:
+        alert_log, created = _create_or_adopt_alert_log(rule, match, ct, obj)
+        if alert_log is None:
+            # The conflict was not the expected open-alert constraint (or the row
+            # vanished): skip this match rather than mask the cause silently.
+            return 0
+        existing_logs[key] = alert_log
+        if created:
+            fresh_count = 1
+            logger.info("Triggered AlertLog %s for '%s' on '%s'.", alert_log.pk, match["subject"], obj)
+            if not rule.is_muted:
+                # Mark the in-memory row as scheduled so duplicate matches in
+                # one evaluation cannot immediately re-notify it before commit.
+                alert_log.last_notified_at = now
+
+                _schedule_alert_dispatch(rule, match, alert_log)
+                scheduled_dispatch_keys.add(key)
+        else:
+            # Treat the adopted row as the existing alert (re-notify below).
+            existing = alert_log
+
+    if existing is not None and not rule.is_muted:
+        _renotify_when_due(rule, match, existing, now, key, scheduled_dispatch_keys)
+
+    return fresh_count
+
+
+def _create_or_adopt_alert_log(rule, match, ct, obj):
+    """Create the open alert for this match, or adopt the one that already exists.
+
+    Returns ``(alert_log, created)``; ``(None, False)`` when neither was possible.
+    """
+    # New alert. Guard the create with a savepoint: the partial unique
+    # constraint (one open alert per rule+object) can fire if the
+    # prefetch missed an open row (a concurrent evaluation, or a context
+    # that scoped the prefetch out). On conflict, adopt the existing open
+    # row instead of crashing the task and poisoning the transaction.
+    try:
+        with transaction.atomic():
+            alert_log = AlertLog.objects.create(
+                rule=rule,
+                subject=match["subject"],
+                message=match["message"],
+                severity=rule.severity,
+                content_type=ct,
+                object_id=obj.pk,
+                tenant=match.get("tenant"),
+                delivery_status=({"__dispatch__": "pending"} if not rule.is_muted else {}),
+                delivery_outcome=(
+                    AlertLog.DELIVERY_OUTCOME_PENDING if not rule.is_muted else AlertLog.DELIVERY_OUTCOME_NONE
+                ),
+            )
+    except IntegrityError:
+        # The partial unique constraint fired (or, rarely, another
+        # integrity error). Adopt the existing open row so the task does
+        # not crash; log so a non-constraint conflict is never silent.
+        logger.warning(
+            "AlertLog create conflicted for rule '%s' on '%s'; adopting existing open row.",
+            rule.name,
+            obj,
+        )
+        adopted = (
+            AlertLog.unscoped.filter(
+                rule=rule,
+                content_type=ct,
+                object_id=obj.pk,
+                status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED],
+            )
+            .order_by("created_at")
+            .first()
+        )
+        if adopted is None:
+            # No open row to adopt: the conflict was not the expected
+            # open-alert constraint (or the row vanished).
+            logger.error(
+                "AlertLog create failed for rule '%s' on '%s' with no open row to adopt; skipping.",
+                rule.name,
+                obj,
+            )
+            return None, False
+        return adopted, False
+    return alert_log, True
+
+
+def _renotify_when_due(rule, match, existing, now, key, scheduled_dispatch_keys):
+    """Retry a committed-but-undelivered alert, or re-notify on cadence."""
+    pending = (existing.delivery_status or {}).get("__dispatch__") == "pending"
+    ref = existing.last_notified_at or existing.created_at
+    due = ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days)
+    if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:
+        AlertLog.unscoped.filter(pk=existing.pk).update(
+            delivery_status={"__dispatch__": "pending"},
+            delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
+        )
+        existing.delivery_status = {"__dispatch__": "pending"}
+        existing.delivery_outcome = AlertLog.DELIVERY_OUTCOME_PENDING
+        existing.last_notified_at = now
+        _schedule_alert_dispatch(rule, match, existing)
+        scheduled_dispatch_keys.add(key)
+        logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
 
 
 def _dispatch_channels(rule, match, alert_log, delivery_id=None):
@@ -403,9 +453,6 @@ def _auto_resolve_cleared(rule, matched_keys):
 
 def _collect_matches(rule, today):
     """Return list of match dicts for the given rule and date."""
-    from django.db.models import OuterRef, Q, Subquery, Sum
-    from django.db.models.functions import Coalesce
-
     matches = []
 
     if rule.alert_type == AlertRule.ALERT_TYPE_LOW_STOCK:
@@ -429,25 +476,16 @@ def _collect_matches(rule, today):
     return matches
 
 
+def _low_stock_threshold(item, rule):
+    """Per-item safety limit, falling back to the rule threshold."""
+    return item.min_qty if (item.min_qty and item.min_qty > 0) else rule.threshold_value
+
+
 def _match_low_stock(rule):
-    from django.db.models import OuterRef, Subquery, Sum
-    from django.db.models.functions import Coalesce
+    return _match_low_stock_accessories(rule) + _match_low_stock_consumables(rule) + _match_low_stock_components(rule)
 
-    from inventory.models import (
-        Accessory,
-        AccessoryAssignment,
-        AccessoryStock,
-        Component,
-        ComponentAllocation,
-        ComponentStock,
-        Consumable,
-        ConsumableAssignment,
-        ConsumableStock,
-    )
 
-    matches = []
-
-    # --- Accessories ---
+def _match_low_stock_accessories(rule):
     acc_stocks_sub = AccessoryStock.objects.filter(accessory=OuterRef("pk"))
     if rule.tenant:
         acc_stocks_sub = acc_stocks_sub.filter(location__tenant=rule.tenant)
@@ -466,9 +504,10 @@ def _match_low_stock(rule):
     if rule.tenant:
         acc_qs = acc_qs.filter(tenant=rule.tenant)
 
+    matches = []
     for acc in acc_qs:
         available = max(0, acc.annotated_total_stock - acc.annotated_undeducted_qty)
-        threshold = acc.min_qty if (acc.min_qty and acc.min_qty > 0) else rule.threshold_value
+        threshold = _low_stock_threshold(acc, rule)
         if available <= threshold:
             matches.append(
                 {
@@ -482,8 +521,10 @@ def _match_low_stock(rule):
                     % {"name": acc.name, "available": available, "threshold": threshold},
                 }
             )
+    return matches
 
-    # --- Consumables ---
+
+def _match_low_stock_consumables(rule):
     con_stocks_sub = ConsumableStock.objects.filter(consumable=OuterRef("pk"))
     if rule.tenant:
         con_stocks_sub = con_stocks_sub.filter(location__tenant=rule.tenant)
@@ -502,9 +543,10 @@ def _match_low_stock(rule):
     if rule.tenant:
         con_qs = con_qs.filter(tenant=rule.tenant)
 
+    matches = []
     for con in con_qs:
         available = max(0, con.annotated_total_stock - con.annotated_undeducted_qty)
-        threshold = con.min_qty if (con.min_qty and con.min_qty > 0) else rule.threshold_value
+        threshold = _low_stock_threshold(con, rule)
         if available <= threshold:
             matches.append(
                 {
@@ -518,8 +560,10 @@ def _match_low_stock(rule):
                     % {"name": con.name, "available": available, "threshold": threshold},
                 }
             )
+    return matches
 
-    # --- Components ---
+
+def _match_low_stock_components(rule):
     comp_stocks_sub = ComponentStock.objects.filter(component=OuterRef("pk"))
     if rule.tenant:
         comp_stocks_sub = comp_stocks_sub.filter(location__tenant=rule.tenant)
@@ -541,9 +585,10 @@ def _match_low_stock(rule):
     if rule.tenant:
         comp_qs = comp_qs.filter(tenant=rule.tenant)
 
+    matches = []
     for comp in comp_qs:
         available = max(0, comp.annotated_total_stock - comp.annotated_target_only_allocated)
-        threshold = comp.min_qty if (comp.min_qty and comp.min_qty > 0) else rule.threshold_value
+        threshold = _low_stock_threshold(comp, rule)
         if available <= threshold:
             matches.append(
                 {
@@ -557,13 +602,10 @@ def _match_low_stock(rule):
                     % {"name": comp.name, "available": available, "threshold": threshold},
                 }
             )
-
     return matches
 
 
 def _match_upcoming_eol(rule, today):
-    from assets.models import Asset
-
     deadline = today + timezone.timedelta(days=rule.threshold_value)
     assets = Asset.objects.filter(
         deleted_at__isnull=True,
@@ -596,8 +638,6 @@ def _match_upcoming_eol(rule, today):
 
 
 def _match_license_expiry(rule, today):
-    from licenses.models import License
-
     deadline = today + timezone.timedelta(days=rule.threshold_value)
     qs = License.objects.filter(
         deleted_at__isnull=True,
@@ -623,8 +663,6 @@ def _match_license_expiry(rule, today):
 
 
 def _match_renewal_due(rule, today):
-    from subscriptions.models import Subscription
-
     deadline = today + timezone.timedelta(days=rule.threshold_value)
     qs = Subscription.objects.filter(
         deleted_at__isnull=True,
@@ -654,8 +692,6 @@ def _match_renewal_due(rule, today):
 
 
 def _match_warranty_expiry(rule, today):
-    from assets.models import Warranty
-
     deadline = today + timezone.timedelta(days=rule.threshold_value)
     qs = Warranty.objects.filter(
         deleted_at__isnull=True,
@@ -697,10 +733,6 @@ def _match_audit_overdue(rule, today):
     set on an asset's category; otherwise falls back to rule.threshold_value days.
     Assets that have never been audited and have a cadence are always included.
     """
-    from django.db.models import Q
-
-    from assets.models import Asset, Category
-
     cutoff = today - timezone.timedelta(days=rule.threshold_value)
 
     # Also pull in assets overdue per a category-level cadence that's shorter
