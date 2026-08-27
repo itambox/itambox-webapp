@@ -117,7 +117,7 @@ class StockAlertsTests(TestCase):
         self.stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=4)
 
     def test_low_stock_threshold_alert(self):
-        from core.tasks import evaluate_alert_rules_task
+        from extras.tasks.alerts import evaluate_alert_rules_task
 
         # Create low stock alert rule
         rule = AlertRule.objects.create(

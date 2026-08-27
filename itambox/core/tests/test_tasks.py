@@ -9,8 +9,9 @@ from django.utils import timezone
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from core.models import Job, Notification
-from core.tasks import evaluate_alert_rules_task, import_csv_task, run_alert_rule_now
+from core.tasks import import_csv_task
 from extras.models import AlertLog, AlertRule, NotificationChannel
+from extras.tasks.alerts import evaluate_alert_rules_task, run_alert_rule_now
 from subscriptions.models import Subscription
 
 User = get_user_model()

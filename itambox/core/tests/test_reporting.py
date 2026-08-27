@@ -140,7 +140,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         mock_request_pinned.return_value = mock_response
 
         # Execute task
-        from core.tasks import generate_scheduled_report_task
+        from extras.tasks.reports import generate_scheduled_report_task
 
         success = generate_scheduled_report_task(sched.pk)
 
@@ -186,7 +186,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         sched.channels.add(failed_channel, healthy_channel)
 
         with patch("extras.tasks.reports.send_notification_to_channel", side_effect=[False, True]) as send_channel:
-            from core.tasks import generate_scheduled_report_task
+            from extras.tasks.reports import generate_scheduled_report_task
 
             self.assertTrue(generate_scheduled_report_task(sched.pk))
 
@@ -340,7 +340,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         sched.schedule = q_schedule
         sched.save(update_fields=["schedule"])
 
-        from core.tasks import generate_scheduled_report_task
+        from extras.tasks.reports import generate_scheduled_report_task
 
         self.assertFalse(generate_scheduled_report_task(sched.pk))
         mock_process.assert_not_called()
@@ -371,7 +371,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         sched.schedule = q_schedule
         sched.save(update_fields=["schedule"])
 
-        from core.tasks import generate_scheduled_report_task
+        from extras.tasks.reports import generate_scheduled_report_task
 
         self.assertFalse(generate_scheduled_report_task(sched.pk))
         mock_process.assert_not_called()
@@ -482,7 +482,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
     def test_pre_archive_failure_preserves_status(self, mock_compile):
         """build_report_context raising before archive_entry is assigned must
         preserve the original failure — no UnboundLocalError."""
-        from core.tasks import generate_scheduled_report_task
+        from extras.tasks.reports import generate_scheduled_report_task
         from organization.models import Tenant
 
         tenant = Tenant.objects.create(name="Fail Tenant", slug="fail-tenant")
