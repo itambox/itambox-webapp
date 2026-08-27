@@ -671,6 +671,7 @@ def send_webhook_task(
         tenant_id=delivery.tenant_id,
         actor_id=actor_id,
         request_id=request_id,
+        endpoint=plan.url,
     )
     response_code = None
     try:

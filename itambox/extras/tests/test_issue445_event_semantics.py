@@ -155,8 +155,6 @@ class Issue445EventSemanticsTests(TestCase):
 class Issue445EventConcurrencyTests(TransactionTestCase):
     """The processed flag and every durable rule side effect commit atomically."""
 
-    reset_sequences = True
-
     def setUp(self):
         super().setUp()
         self.content_type = ContentType.objects.get_for_model(Manufacturer)
