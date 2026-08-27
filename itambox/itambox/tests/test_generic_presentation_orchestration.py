@@ -438,7 +438,7 @@ class TestImmutableParameterIsolation:
         with registry.isolated_generic_presentation_for_tests():
             register_provider("second", RecordingProvider(params=mutate), list_params=True, priority=100)
 
-            with pytest.raises(ImproperlyConfigured, match=r"second.*mutated parameters \(keys: \[\]\)"):
+            with pytest.raises(ImproperlyConfigured, match=r"second.*in place \(keys: \[\]\)"):
                 resolve_list_provider_params(make_request(), Group, partial=False)
 
     def test_filter_phase_params_are_private_copies(self):
