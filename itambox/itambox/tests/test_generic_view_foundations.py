@@ -1255,3 +1255,21 @@ class OobFilterCountTargetParityTests(_CatalogFixtureMixin, TenantTestMixin, Tes
             set(),
             "Filter-UI OOB emitter(s) without a full-page target: %r" % (sorted(missing),),
         )
+
+
+class ChangelogUrlFallbackTests(TestCase):
+    """Generic changelog URL fallback for models without a ``get_changelog_url`` hook."""
+
+    def test_changelog_url_falls_back_to_the_generic_objectchange_url(self):
+        view = ObjectDetailView()
+        view.request = RequestFactory().get("/")
+        obj = SimpleNamespace(pk=4243)
+        content_type = ContentType.objects.get_for_model(Asset)
+
+        with patch("itambox.views.generic.detail.reverse", wraps=reverse) as reverse_mock:
+            context = view._build_changelog_context(obj, content_type)
+
+        expected = reverse("objectchange_list")
+        self.assertTrue(context["changelog_url"].startswith(expected + "?"))
+        self.assertIn("changed_object_type", context["changelog_url"])
+        reverse_mock.assert_any_call("objectchange_list")

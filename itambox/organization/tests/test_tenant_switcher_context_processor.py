@@ -160,3 +160,15 @@ class TenantSwitcherContextProcessorTests(TestCase):
             [customer.pk],
         )
         self.assertEqual(len(queries), 8)
+
+
+class TenantSwitcherLazyEvaluationTests(TestCase):
+    """Evaluating the lazy switcher values for a plain user reaches the empty branches."""
+
+    def test_regular_user_lazy_values_evaluate_to_exact_empty_lists(self):
+        user = User.objects.create_user(username="plain-switcher-user")
+
+        context = tenant_switcher_processor(_request(user))
+
+        for key in SWITCHER_KEYS:
+            self.assertEqual(list(context[key]), [])

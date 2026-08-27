@@ -399,3 +399,24 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
                 with CaptureQueriesContext(connection) as queries:
                     self._run_view(params, partial=partial)
                 self.assertLessEqual(len(queries), base_counts[label])
+
+
+class ResolveContextModelFallbackTests(TestCase):
+    """``_resolve_context_model`` falls back to the resolved rows when no model is declared."""
+
+    def test_object_list_model_is_used_and_missing_model_fails_closed(self):
+        from django.core.exceptions import ImproperlyConfigured
+
+        from itambox.views.generic.list_ import ObjectListView
+
+        class BareView(ObjectListView):
+            pass
+
+        fallback = BareView()
+        fallback.object_list = Asset.objects.none()
+        self.assertIs(fallback._resolve_context_model(), Asset)
+
+        empty = BareView()
+        empty.object_list = None
+        with self.assertRaises(ImproperlyConfigured):
+            empty._resolve_context_model()
