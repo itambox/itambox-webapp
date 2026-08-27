@@ -140,7 +140,7 @@ class Command(BaseCommand):
                 raise CommandError(f"unsupported broker type: {kind}")
             db_alias = alias or database
             OrmQ = django_apps.get_model("django_q", "OrmQ")
-            for key, package in OrmQ.objects.using(db_alias).values_list("key", "package"):
+            for key, package in OrmQ.objects.using(db_alias).values_list("key", "payload"):
                 self._inspect_package(package, f"ormq.{key[:8]}", expected, state)
 
         failures = self._report(state)

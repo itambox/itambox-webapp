@@ -48,7 +48,7 @@ class Issue445QueueCutoverTests(TransactionTestCase):
         from django_q.models import OrmQ
         from django_q.signing import SignedPackage
 
-        OrmQ.objects.create(key="issue445-test-key", package=SignedPackage.dumps([func, (), {}, None]))
+        OrmQ.objects.create(key="issue445-test-key", payload=SignedPackage.dumps([func, (), {}, None]))
 
     def test_forward_preflight_passes_only_on_predecessor_paths(self):
         self._schedule(LEGACY)
@@ -82,7 +82,7 @@ class Issue445QueueCutoverTests(TransactionTestCase):
     def test_ormq_package_with_unknown_form_is_undecodable(self):
         from django_q.models import OrmQ
 
-        OrmQ.objects.create(key="issue445-bad", package=b"not-a-package")
+        OrmQ.objects.create(key="issue445-bad", payload=b"not-a-package")
         with self.assertRaises(CommandError):
             call_command("verify_issue445_task_cutover", phase="forward-preflight", strict=True)
 
@@ -95,15 +95,17 @@ class Issue445ResubmissionGuardTests(TransactionTestCase):
     """All-or-nothing historical resubmission guard (no queue writes)."""
 
     def _task_row(self, func):
+        from django.utils import timezone
         from django_q.models import Failure
 
+        now = timezone.now()
         return Failure.objects.create(
             name="historical failure",
             func=func,
             args="[]",
             kwargs="{}",
-            started=None,
-            stopped=None,
+            started=now,
+            stopped=now,
         )
 
     def test_blocked_paths_are_all_or_nothing(self):
