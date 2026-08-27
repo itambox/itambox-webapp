@@ -32,9 +32,14 @@ and `manage.py check` must pass before the cutover continues.
 
 ## Forward cutover
 
-1. **Freeze producers and scheduler** — stop the deployment's normal qcluster
-   processes (systemd/docker-compose scale) and the scheduler-enabling entry
-   points. Web/API traffic may stay up: it only enqueues; nothing executes.
+1. **Enter maintenance/no-enqueue mode and freeze every producer** — stop the
+   deployment's normal qcluster processes (systemd/docker-compose scale), then
+   block web and API traffic at ingress and pause every action endpoint,
+   importer, scheduler, timer, retry dispatcher, and other process that can
+   call `async_task`. Record process and ingress evidence for the change log.
+   This complete producer freeze remains in force through the strict
+   `forward-postmigrate` verification in step 6. The preflight must be refused
+   if the operator cannot prove that all enqueueing producers are frozen.
 2. **Drain** — start exactly one drain worker with the scheduler disabled:
 
    ```bash
@@ -47,7 +52,9 @@ and `manage.py check` must pass before the cutover continues.
    (e.g. `systemctl status itambox-qcluster`, `ps`), not list emptiness alone.
 3. **Snapshot** — one more database dump per `backup-restore.md` (the
    pre-cutover restore point).
-4. **Strict preflight**:
+4. **Strict preflight** — first re-check the maintenance/no-enqueue evidence;
+   refuse to run this command or continue if web/API/actions/importers/retries,
+   any scheduler, or any other enqueue producer is active:
 
    ```bash
    python manage.py verify_issue445_task_cutover --database default \
@@ -82,9 +89,10 @@ and `manage.py check` must pass before the cutover continues.
 
    It must start real child processes and exit without import, registry,
    migration, broker, or signature errors.
-8. **Canary** — start one new-normal qcluster against the cutover code, watch
-   one scheduled-report/alert/webhook round trip, then resume the full
-   producer set. Old and new normal qclusters must never overlap.
+8. **Canary and controlled unfreeze** — only after step 6 is green, start one
+   new-normal qcluster against the cutover code, enable one controlled producer,
+   and watch one scheduled-report/alert/webhook round trip. Then resume the
+   remaining producer set. Old and new normal qclusters must never overlap.
 
 ## Reverse (rollback of a cutover that must be undone)
 

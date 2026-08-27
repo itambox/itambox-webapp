@@ -71,6 +71,24 @@ MOVED_NEIGHBORHOOD_MODULES = (
 )
 
 BLOCKED_RESUBMISSION_CODE = "task_resubmission.blocked_moved_path"
+RESERVED_ASYNC_TASK_KWARGS = frozenset(
+    {
+        "ack_failure",
+        "broker",
+        "cached",
+        "chain",
+        "cluster",
+        "group",
+        "hook",
+        "iter_cached",
+        "iter_count",
+        "q_options",
+        "save",
+        "sync",
+        "task_name",
+        "timeout",
+    }
+)
 
 
 def is_blocked_task_path(func):
@@ -85,11 +103,15 @@ def is_blocked_task_path(func):
 
 
 def _task_payload(task):
-    """Parse django-q2's JSON-encoded args/kwargs; None when malformed."""
+    """Normalize native q2 values and the guarded action's legacy JSON form."""
     try:
-        args = json.loads(task.args) if isinstance(task.args, str) else (task.args or ())
-        kwargs = json.loads(task.kwargs) if isinstance(task.kwargs, str) else (task.kwargs or {})
-        if not isinstance(args, list) or not isinstance(kwargs, dict):
+        if not isinstance(task.func, str) or not task.func:
+            raise ValueError
+        args = json.loads(task.args) if isinstance(task.args, str) and task.args else task.args or ()
+        kwargs = json.loads(task.kwargs) if isinstance(task.kwargs, str) and task.kwargs else task.kwargs or {}
+        if not isinstance(args, (list, tuple)) or not isinstance(kwargs, dict):
+            raise ValueError
+        if any(not isinstance(key, str) or key in RESERVED_ASYNC_TASK_KWARGS for key in kwargs):
             raise ValueError
         return args, kwargs
     except (TypeError, ValueError, json.JSONDecodeError):
@@ -104,8 +126,10 @@ def resubmit_task_guarded(model_admin, request, queryset):
     enqueue or Failure deletion. The rejection message carries only the
     stable error code and the blocked path identities.
     """
-    blocked = sorted({task.func for task in queryset if is_blocked_task_path(task.func)})
-    invalid = [task for task in queryset if _task_payload(task) is None]
+    tasks = list(queryset)
+    blocked = sorted({task.func for task in tasks if is_blocked_task_path(task.func)})
+    payloads = [(task, _task_payload(task)) for task in tasks]
+    invalid = [task for task, payload in payloads if payload is None]
     if blocked or invalid:
         model_admin.message_user(
             request,
@@ -114,8 +138,8 @@ def resubmit_task_guarded(model_admin, request, queryset):
             level="warning",
         )
         return
-    for task in queryset:
-        args, kwargs = _task_payload(task)
+    for task, payload in payloads:
+        args, kwargs = payload
         async_task(
             task.func,
             *args,

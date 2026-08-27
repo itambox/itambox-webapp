@@ -10,9 +10,9 @@ Phases::
     reverse-postmigrate   every executable surface must be the predecessor
                           path again
 
-Inventories Schedule ``func``/``hook``, every OrmQ row regardless of lock,
-optional Redis/Valkey list packages, executable ``q_options`` and every nested
-chain entry. Packages are decoded only with django-q2's ``SignedPackage.loads``
+Inventories Schedule ``func``/``hook``, every supported ORM-broker row
+regardless of lock, executable ``q_options`` and every nested chain entry.
+Packages are decoded only with django-q2's ``SignedPackage.loads``
 and resolved with ``django_q.utils.get_func_repr``. Any bad signature,
 decompression/pickle/shape failure, invalid ``q_options``, unknown executable
 form, noncanonical alias, phase mismatch, undeclared cluster, or unsupported
@@ -23,12 +23,14 @@ It never prints IDs, packages, payloads, args, kwargs, results, URLs, headers,
 tokens, secrets, DSNs, or raw exception text.
 """
 
+import ast
+import inspect
 from collections import Counter, defaultdict
 
 from django.apps import apps as django_apps
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connections
+from django.db import DatabaseError, connections
 from django_q.signing import SignedPackage
 from django_q.utils import get_func_repr
 
@@ -129,25 +131,20 @@ class Command(BaseCommand):
         state = {
             "surfaces": defaultdict(Counter),
             "undecodable": Counter(),
-            "mismatches": [],
-            "problems": [],
+            "mismatches": Counter(),
+            "problems": Counter(),
         }
 
-        self._scan_schedules(database, expected, state)
         clusters = self._cluster_matrix()
-        for kind, alias in clusters:
-            if not kind.startswith("orm"):
-                raise CommandError(f"unsupported broker type: {kind}")
-            db_alias = alias or database
-            OrmQ = django_apps.get_model("django_q", "OrmQ")
-            for key, package in OrmQ.objects.using(db_alias).values_list("key", "payload"):
-                self._inspect_package(package, f"ormq.{key[:8]}", expected, state)
+        self._inventory_schedules(clusters, expected, state)
+        self._inventory_ormq(clusters, expected, state)
 
         failures = self._report(state)
         if failures and options["strict"]:
             raise CommandError(
-                f"strict failure: {len(state['mismatches'])} phase mismatch(es), "
-                f"{len(state['problems'])} invalid form(s), {sum(state['undecodable'].values())} undecodable"
+                f"strict failure: {sum(state['mismatches'].values())} phase mismatch(es), "
+                f"{sum(state['problems'].values())} invalid form(s), "
+                f"{sum(state['undecodable'].values())} undecodable"
             )
         if failures:
             raise CommandError("surface verification failed")
@@ -156,34 +153,119 @@ class Command(BaseCommand):
     # Inventory helpers
     # ------------------------------------------------------------------
 
+    def _inventory_schedules(self, clusters, expected, state):
+        database_aliases = set(connections)
+        database_aliases.update(cluster[0] for cluster in clusters)
+        for db_alias in sorted(database_aliases):
+            if db_alias not in connections:
+                raise CommandError("undeclared database alias in queue configuration")
+            try:
+                self._scan_schedules(db_alias, expected, state)
+            except DatabaseError:
+                self._problem("database.schedule", "inventory-failed", state)
+
+    def _inventory_ormq(self, clusters, expected, state):
+        clusters_by_database = defaultdict(set)
+        for alias, key in clusters:
+            clusters_by_database[alias].add(key)
+        for db_alias, declared_keys in sorted(clusters_by_database.items()):
+            OrmQ = django_apps.get_model("django_q", "OrmQ")
+            try:
+                packages = list(OrmQ.objects.using(db_alias).values_list("key", "payload"))
+            except DatabaseError:
+                self._problem("database.ormq", "inventory-failed", state)
+                continue
+            for key, package in packages:
+                if key not in declared_keys:
+                    self._problem("ormq.cluster", "undeclared-cluster", state)
+                    continue
+                self._inspect_package(package, "ormq.package", expected, state)
+
     def _scan_schedules(self, database, expected, state):
         Schedule = django_apps.get_model("django_q", "Schedule")
-        for field in ("func", "hook"):
-            for value in Schedule.objects.using(database).values_list(field, flat=True):
-                if not value:
-                    continue
-                self._classify_surface(value, f"schedule.{field}", expected, state)
+        for func, hook, args, kwargs in Schedule.objects.using(database).values_list("func", "hook", "args", "kwargs"):
+            self._classify_surface(func, "schedule.func", expected, state)
+            if hook:
+                self._inspect_hook(hook, "schedule.hook", expected, state)
+            if args:
+                try:
+                    ast.literal_eval(args)
+                except (SyntaxError, TypeError, ValueError):
+                    self._problem("schedule.args", "invalid-literal", state)
+            parsed_kwargs = self._parse_schedule_kwargs(kwargs)
+            if parsed_kwargs is None:
+                self._problem("schedule.kwargs", "invalid-literal", state)
+                continue
+            self._inspect_kwargs(parsed_kwargs, "schedule.kwargs", expected, state)
 
     def _cluster_matrix(self):
-        clusters = []
         q_cluster = dict(getattr(settings, "Q_CLUSTER", {}) or {})
-        if q_cluster.get("orm"):
-            clusters.append(("orm", q_cluster["orm"]))
-        for config in (getattr(settings, "ALT_Q_CLUSTERS", {}) or {}).values():
-            if config.get("orm"):
-                clusters.append(("orm", config["orm"]))
-        if not clusters and q_cluster:
-            raise CommandError("unsupported broker: no ORM broker in Q_CLUSTER")
+        nested_alternates = q_cluster.pop("ALT_CLUSTERS", {})
+        legacy_alternates = getattr(settings, "ALT_Q_CLUSTERS", {}) or {}
+        if not isinstance(nested_alternates, dict) or not isinstance(legacy_alternates, dict):
+            raise CommandError("invalid alternate queue-cluster configuration")
+        configs = [(None, q_cluster)]
+        configs.extend(nested_alternates.items())
+        configs.extend(legacy_alternates.items())
+        clusters = []
+        for alternate_name, overrides in configs:
+            if not isinstance(overrides, dict):
+                raise CommandError("invalid queue-cluster configuration")
+            config = dict(q_cluster)
+            config.update(overrides)
+            if self._broker_kind(config) != "orm":
+                raise CommandError("unsupported broker type in queue configuration")
+            database = config.get("orm")
+            if not isinstance(database, str) or not database:
+                raise CommandError("invalid ORM broker database alias")
+            if alternate_name is None:
+                queue_key = config.get("cluster_name") or config.get("name") or "default"
+            else:
+                queue_key = alternate_name
+            if not isinstance(queue_key, str) or not queue_key:
+                raise CommandError("invalid queue-cluster name")
+            clusters.append((database, queue_key))
         return clusters
 
-    def _decode_package_spec(self, decoded):
-        """Normalize a decoded package into (func, hook, chain)."""
-        spec = decoded[0] if isinstance(decoded, (list, tuple)) and decoded else decoded
-        if isinstance(spec, dict):
-            return spec.get("func"), spec.get("hook"), spec.get("chain")
-        if isinstance(spec, str):
-            return spec, None, None
-        return None, None, None
+    def _broker_kind(self, config):
+        if config.get("broker_class"):
+            return "custom"
+        if config.get("iron_mq"):
+            return "iron-mq"
+        if isinstance(config.get("sqs"), dict):
+            return "sqs"
+        if config.get("orm"):
+            return "orm"
+        if config.get("mongo"):
+            return "mongo"
+        return "redis"
+
+    def _parse_schedule_kwargs(self, value):
+        if not value:
+            return {}
+        if not isinstance(value, str):
+            return None
+        try:
+            parsed = ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            parsed = self._parse_schedule_keyword_syntax(value)
+        if not isinstance(parsed, dict) or any(not isinstance(key, str) for key in parsed):
+            return None
+        return parsed
+
+    def _parse_schedule_keyword_syntax(self, value):
+        try:
+            call = ast.parse(f"f({value})", mode="eval").body
+            if not isinstance(call, ast.Call) or call.args:
+                return None
+            parsed = {}
+            for keyword in call.keywords:
+                if keyword.arg is None or keyword.arg in parsed:
+                    return None
+                parsed[keyword.arg] = ast.literal_eval(keyword.value)
+            return parsed
+        except (SyntaxError, TypeError, ValueError):
+            return None
 
     def _inspect_package(self, package, surface, expected, state):
         try:
@@ -192,18 +274,88 @@ class Command(BaseCommand):
         except Exception:
             state["undecodable"][surface] += 1
             return
-        func, hook, chain = self._decode_package_spec(decoded)
-        if func is None:
-            state["undecodable"][surface] += 1
+        if not self._valid_package_shape(decoded):
+            self._problem(surface, "invalid-package-shape", state)
             return
-        self._classify_surface(func, surface, expected, state)
-        if isinstance(hook, str) and hook:
-            self._classify_surface(hook, f"{surface}.hook", expected, state)
-        elif hook:
-            self._inspect_package(hook, f"{surface}.hook", expected, state)
-        if isinstance(chain, list):
-            for entry in chain:
-                self._inspect_package(entry, f"{surface}.chain", expected, state)
+        self._classify_surface(decoded["func"], surface, expected, state)
+        if "hook" in decoded:
+            self._inspect_hook(decoded["hook"], f"{surface}.hook", expected, state)
+        if "chain" in decoded:
+            self._inspect_chain(decoded["chain"], f"{surface}.chain", expected, state, set())
+        self._inspect_kwargs(decoded["kwargs"], f"{surface}.kwargs", expected, state)
+
+    def _valid_package_shape(self, decoded):
+        required = ("id", "name", "func", "args", "kwargs", "started")
+        return (
+            isinstance(decoded, dict)
+            and all(key in decoded for key in required)
+            and isinstance(decoded["id"], str)
+            and bool(decoded["id"])
+            and isinstance(decoded["name"], str)
+            and self._is_executable(decoded["func"])
+            and isinstance(decoded["args"], (list, tuple))
+            and self._valid_kwargs(decoded["kwargs"])
+        )
+
+    def _inspect_kwargs(self, kwargs, surface, expected, state, ancestors=None):
+        if not self._valid_kwargs(kwargs):
+            self._problem(surface, "invalid-kwargs", state)
+            return
+        ancestors = set() if ancestors is None else ancestors
+        if id(kwargs) in ancestors:
+            self._problem(surface, "recursive-options", state)
+            return
+        ancestors = ancestors | {id(kwargs)}
+        if "hook" in kwargs:
+            self._inspect_hook(kwargs["hook"], f"{surface}.hook", expected, state)
+        if "chain" in kwargs:
+            self._inspect_chain(kwargs["chain"], f"{surface}.chain", expected, state, ancestors)
+        if "q_options" not in kwargs:
+            return
+        q_options = kwargs["q_options"]
+        if not self._valid_kwargs(q_options):
+            self._problem(f"{surface}.q_options", "invalid-q-options", state)
+            return
+        self._inspect_kwargs(q_options, f"{surface}.q_options", expected, state, ancestors)
+
+    def _inspect_hook(self, hook, surface, expected, state):
+        if not hook:
+            return
+        if not self._is_executable(hook):
+            self._problem(surface, "invalid-hook", state)
+            return
+        self._classify_surface(hook, surface, expected, state)
+
+    def _inspect_chain(self, chain, surface, expected, state, ancestors):
+        if not isinstance(chain, list):
+            self._problem(surface, "invalid-chain", state)
+            return
+        if id(chain) in ancestors:
+            self._problem(surface, "recursive-chain", state)
+            return
+        ancestors = ancestors | {id(chain)}
+        for entry in chain:
+            if self._is_executable(entry):
+                self._classify_surface(entry, surface, expected, state)
+                continue
+            if not isinstance(entry, tuple) or len(entry) != 3:
+                self._problem(surface, "invalid-chain-entry", state)
+                continue
+            func, args, kwargs = entry
+            if not self._is_executable(func) or not isinstance(args, (list, tuple)) or not self._valid_kwargs(kwargs):
+                self._problem(surface, "invalid-chain-entry", state)
+                continue
+            self._classify_surface(func, surface, expected, state)
+            self._inspect_kwargs(kwargs, f"{surface}.kwargs", expected, state, ancestors)
+
+    def _valid_kwargs(self, value):
+        return isinstance(value, dict) and all(isinstance(key, str) for key in value)
+
+    def _is_executable(self, value):
+        return (isinstance(value, str) and bool(value)) or inspect.isfunction(value) or inspect.ismethod(value)
+
+    def _problem(self, surface, code, state, path=None):
+        state["problems"][(surface, code, path)] += 1
 
     def _classify_surface(self, path, surface, expected, state):
         resolved = self._resolve(path)
@@ -211,10 +363,10 @@ class Command(BaseCommand):
         if classification in ("legacy", "cutover"):
             state["surfaces"][surface][resolved] += 1
             if classification != expected:
-                state["mismatches"].append((surface, resolved))
+                state["mismatches"][(surface, resolved)] += 1
             return
         if classification == "alias":
-            state["problems"].append((surface, resolved, "noncanonical alias"))
+            self._problem(surface, "noncanonical-alias", state, resolved)
             return
         if classification == "unknown-form":
             state["undecodable"][surface] += 1
@@ -223,14 +375,17 @@ class Command(BaseCommand):
         state["surfaces"][surface][resolved] += 1
 
     def _report(self, state):
-        failures = len(state["mismatches"]) + len(state["problems"]) + sum(state["undecodable"].values())
-        for surface, path in state["mismatches"]:
-            self.stderr.write(f"{surface}: phase mismatch {path}")
-        for surface, path, reason in state["problems"]:
-            self.stderr.write(f"{surface}: {reason} {path}")
+        failures = (
+            sum(state["mismatches"].values()) + sum(state["problems"].values()) + sum(state["undecodable"].values())
+        )
         for surface in sorted(state["surfaces"]):
             for path, count in sorted(state["surfaces"][surface].items()):
                 self.stdout.write(f"{surface} | {path} | {count}")
+        for (surface, path), count in sorted(state["mismatches"].items()):
+            self.stdout.write(f"{surface} | <phase-mismatch:{path}> | {count}")
+        for (surface, code, path), count in sorted(state["problems"].items()):
+            identity = f"{code}:{path}" if path else code
+            self.stdout.write(f"{surface} | <{identity}> | {count}")
         for surface, count in sorted(state["undecodable"].items()):
             self.stdout.write(f"{surface} | <undecodable> | {count}")
         return failures
