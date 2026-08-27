@@ -356,6 +356,126 @@ class TestContextCollisionsAndFailures:
 
 
 @pytest.mark.django_db
+class TestImmutableParameterIsolation:
+    """Providers never see the collision-detection baseline and cannot defeat
+    last-writer-wins protection by re-enabling QueryDict mutability."""
+
+    def mutation_provider(self, params):
+        def mutate(input):
+            input.params._mutable = True
+            input.params.update(params)
+            input.params._mutable = False
+            return ListParamsResult(input.params, {})
+
+        return mutate
+
+    def test_received_params_are_private_frozen_copies_that_never_alias_resolution(self):
+        def params(input):
+            changed = input.params.copy()
+            changed["name"] = "Immutable group"
+            return ListParamsResult(changed, {})
+
+        def filters(input):
+            assert input.params.getlist("name") == ["Immutable group"]
+            assert input.params is not resolution.params
+            return input.queryset
+
+        def context(input):
+            assert input.params.getlist("name") == ["Immutable group"]
+            assert input.params is not resolution.params
+            return {}
+
+        provider = RecordingProvider(params=params, filters=filters, context=context)
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider(
+                "isolation", provider, list_params=True, list_filter=True, list_context=True, priority=100
+            )
+            resolution = resolve_list_provider_params(make_request(), Group, partial=False)
+            assert "name" in resolution.params
+            filter_list_provider_queryset(resolution, Group.objects.all())
+            build_list_provider_context(resolution, {})
+
+    def test_in_place_mutation_of_received_params_raises_and_names_provider_and_key(self):
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider(
+                "first",
+                RecordingProvider(params=lambda input: ListParamsResult(input.params.copy(), {})),
+                list_params=True,
+                priority=100,
+            )
+            register_provider(
+                "second",
+                RecordingProvider(params=self.mutation_provider({"shared": "second"})),
+                list_params=True,
+                priority=200,
+            )
+
+            with pytest.raises(ImproperlyConfigured, match="second.*mutated parameters.*shared"):
+                resolve_list_provider_params(make_request(), Group, partial=False)
+
+    def test_in_place_mutation_left_mutable_also_raises(self):
+        def mutate(input):
+            input.params._mutable = True
+            input.params["shared"] = "second"
+            return ListParamsResult(input.params, {})
+
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider("second", RecordingProvider(params=mutate), list_params=True, priority=100)
+
+            with pytest.raises(ImproperlyConfigured, match="second.*mutated parameters"):
+                resolve_list_provider_params(make_request(), Group, partial=False)
+
+    def test_filter_phase_params_are_private_copies(self):
+        seen_by_later_context = []
+
+        def sabotage(input):
+            input.params._mutable = True
+            input.params["sabotage"] = "yes"
+            input.params._mutable = False
+            return input.queryset
+
+        def observing_context(input):
+            seen_by_later_context.append(input.params.getlist("q"))
+            return {}
+
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider("saboteur", RecordingProvider(filters=sabotage), list_filter=True, priority=100)
+            register_provider("observer", RecordingProvider(context=observing_context), list_context=True, priority=200)
+            resolution = resolve_list_provider_params(make_request(params={"q": "needle"}), Group, partial=False)
+
+            filter_list_provider_queryset(resolution, Group.objects.all())
+            build_list_provider_context(resolution, {})
+
+        assert resolution.params.getlist("q") == ["needle"]
+        assert "sabotage" not in resolution.params
+        assert seen_by_later_context == [["needle"]]
+
+    def test_context_phase_params_are_private_copies(self):
+        seen_by_later_context = []
+
+        def sabotage(input):
+            input.params._mutable = True
+            input.params["sabotage"] = "yes"
+            input.params._mutable = False
+            return {}
+
+        def observing_context(input):
+            seen_by_later_context.append(input.params.getlist("q"))
+            return {}
+
+        with registry.isolated_generic_presentation_for_tests():
+            register_provider("saboteur", RecordingProvider(context=sabotage), list_context=True, priority=100)
+            register_provider("observer", RecordingProvider(context=observing_context), list_context=True, priority=200)
+            resolution = resolve_list_provider_params(make_request(params={"q": "needle"}), Group, partial=False)
+
+            build_list_provider_context(resolution, {})
+
+        assert resolution.params.getlist("q") == ["needle"]
+        assert "sabotage" not in resolution.params
+        assert seen_by_later_context == [["needle"]]
+
+
+@pytest.mark.django_db
 class TestDetailPipeline:
     def test_detail_view_resolves_once_and_calls_one_provider_for_many_features(self):
         group = Group.objects.create(name="Detail pipeline group")

@@ -120,13 +120,23 @@ def run_params_phase(target, params):
     for registration in target.generic_presentation_registrations():
         if not registration.list_params:
             continue
+        # Mirror the production orchestrator: the provider only ever sees a
+        # private frozen copy, never the comparison baseline.
+        provider_params = frozen_params(current)
+        provider_params_before = frozen_params(provider_params)
+
         result = registration.provider.resolve_list_params(
-            ListParamsInput(request, model, current, content_type, False)
+            ListParamsInput(request, model, provider_params, content_type, False)
         )
         if not isinstance(result, ListParamsResult):
             raise ImproperlyConfigured(f"Generic presentation provider {registration.name!r} returned invalid params")
-        if result.params is not current and not isinstance(result.params, QueryDict):
+        if result.params is not provider_params and not isinstance(result.params, QueryDict):
             raise ImproperlyConfigured(f"Generic presentation provider {registration.name!r} returned invalid params")
+        if getattr(provider_params, "_mutable", False) or changed_param_keys(provider_params_before, provider_params):
+            raise ImproperlyConfigured(
+                f"Generic presentation provider {registration.name!r} mutated parameters "
+                f"in place (keys: {sorted(changed_param_keys(provider_params_before, provider_params))})"
+            )
 
         next_params = frozen_params(result.params)
         for key in changed_param_keys(current, next_params):
@@ -153,7 +163,7 @@ def run_filter_phase(target, queryset, params, states):
             ListFilterInput(
                 request,
                 queryset.model,
-                params,
+                frozen_params(params),
                 current,
                 content_type,
                 False,
@@ -178,7 +188,7 @@ def run_context_phase(target, core_context, params, states):
             ListContextInput(
                 request,
                 model,
-                params,
+                frozen_params(params),
                 content_type,
                 False,
                 states.get(registration.name, MappingProxyType({})),

@@ -78,16 +78,31 @@ def resolve_list_provider_params(
     for registration in registry.generic_presentation_registrations():
         if not registration.list_params:
             continue
+        # `current` remains the unexposed semantic baseline. The provider
+        # only ever receives a private frozen copy, so an in-place mutation
+        # cannot rewrite the collision-detection baseline or smuggle in
+        # last-writer-wins behavior.
+        provider_params = _freeze_params(current)
+        provider_params_before = _freeze_params(provider_params)
+
         result = registration.provider.resolve_list_params(
             ListParamsInput(
                 request=request,
                 model=model,
-                params=current,
+                params=provider_params,
                 content_type=content_type,
                 partial=partial,
             )
         )
-        next_params, state = _validated_params_result(registration, current, result)
+
+        mutated_keys = _changed_param_keys(provider_params_before, provider_params)
+        if getattr(provider_params, "_mutable", False) or mutated_keys:
+            raise ImproperlyConfigured(
+                f"Generic presentation provider {registration.name!r} mutated parameters "
+                f"in place (keys: {sorted(mutated_keys)})"
+            )
+
+        next_params, state = _validated_params_result(registration, provider_params, result)
         for key in _changed_param_keys(current, next_params):
             previous_owner = changed_by.get(key)
             if previous_owner is not None:
@@ -129,7 +144,7 @@ def filter_list_provider_queryset(
             ListFilterInput(
                 request=resolution.request,
                 model=resolution.model,
-                params=resolution.params,
+                params=_freeze_params(resolution.params),
                 queryset=current,
                 content_type=resolution.content_type,
                 partial=resolution.partial,
@@ -202,7 +217,7 @@ def build_list_provider_context(
             ListContextInput(
                 request=resolution.request,
                 model=resolution.model,
-                params=resolution.params,
+                params=_freeze_params(resolution.params),
                 content_type=resolution.content_type,
                 partial=resolution.partial,
                 state=_provider_state_for(resolution, registration),
