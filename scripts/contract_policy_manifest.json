@@ -15,7 +15,7 @@
     "automation.webhooks": {
       "activation": "opt-in",
       "contract_class": "beta-opt-in",
-      "exclusions": "Payload schema is not frozen; deliveries are fire-and-forget with no delivery log or replay",
+      "exclusions": "Outbound payload schema is frozen at wire version 1 and changes only with a new schema_version; deliveries are durable with a recorded per-delivery history and manual redelivery",
       "scope": "Event rules and webhook endpoints"
     },
     "organization.resource_grants": {
@@ -362,8 +362,8 @@
     },
     {
       "document": "policy",
-      "identifier": "P-WIRE-TODAY",
-      "text": "carries no wire version, no event identifier, and no idempotency key"
+      "identifier": "P-WIRE-V1",
+      "text": "carries an explicit `schema_version`, `event_id`, `delivery_id`, `attempt`, `tenant`, `event`, `model`, `object_id`, `timestamp`, and `data` field"
     },
     {
       "document": "policy",

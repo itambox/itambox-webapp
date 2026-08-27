@@ -301,8 +301,9 @@ CAPABILITY_LIMITATIONS = {
         "Channel delivery failures are logged, not retried.",
     ),
     "automation.webhooks": (
-        "The outbound payload schema is not frozen and may change between minor releases.",
-        "Deliveries are fire-and-forget; there is no delivery log or replay.",
+        "The outbound payload schema is frozen at wire version 1 and changes only with a new schema_version.",
+        "Deliveries are durable: every delivery is recorded with a stable identity "
+        "and per-attempt outcomes, and operators can redeliver past deliveries.",
     ),
     "organization.role_grants": (),
     "organization.resource_grants": (),
@@ -394,7 +395,12 @@ REQUIRED_STATEMENTS = (
     _statement("P-BETA-OPT-IN-INERT", POLICY_DOC, "inert on a fresh deployment"),
     _statement("P-BETA-OPT-IN-ACTIVATION", POLICY_DOC, "activation surface itself is held to the Stable standard"),
     _statement("P-BETA-OPT-IN-WIRE", POLICY_DOC, "must carry its own independent wire version"),
-    _statement("P-WIRE-TODAY", POLICY_DOC, "carries no wire version, no event identifier, and no idempotency key"),
+    _statement(
+        "P-WIRE-V1",
+        POLICY_DOC,
+        "carries an explicit `schema_version`, `event_id`, `delivery_id`, `attempt`, `tenant`, "
+        "`event`, `model`, `object_id`, `timestamp`, and `data` field",
+    ),
     _statement("P-WIRE-NOT-CONTRACT-VERSION", POLICY_DOC, "`contract_version` versions the registry declaration"),
     _statement("P-EXPERIMENTAL-OPT-IN", POLICY_DOC, "reached only through an explicit configuration opt-in"),
     _statement("P-EXPERIMENTAL-CHANGE", POLICY_DOC, "may change in any release, including a patch"),
