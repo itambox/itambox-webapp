@@ -176,11 +176,12 @@ class ExtrasConfig(AppConfig):
                 owns=("extras.EventRule", "extras.WebhookEndpoint"),
                 docs_url=DOCS,
                 limitations=(
-                    "The generic outbound payload schema is frozen at wire version 1; Slack and Teams "
-                    "targets receive a reduced vendor envelope and no X-Hub-Signature-256 header.",
+                    "Event-specific data contents are not frozen. Slack and Teams use reduced vendor-specific "
+                    "envelopes without X-Hub-Signature-256 but retain schema_version, event_id, delivery_id, "
+                    "attempt, and tenant.",
                     "Delivery is at-least-once: one durable row keeps the current attempt count and latest "
-                    "outcome, consumers must deduplicate, and completed deliveries can be redelivered only "
-                    "while the source event is retained.",
+                    "outcome, consumers must deduplicate, and manual redelivery requires a retained source event "
+                    "with no pending or future-retry work live.",
                 ),
                 contract_version=CONTRACT_VERSION,
             ),

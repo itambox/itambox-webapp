@@ -350,11 +350,18 @@ still carry the same `schema_version`, `event_id`, `delivery_id`, `attempt`, and
 ### Envelope version and compatibility
 
 This is webhook envelope **v1**, independent of the ITAMbox product release.
-The marker changes only when the wire semantics change. The additions are
-compatible with consumers that ignore unknown JSON members, but strict JSON
-validators or schemas that reject additional properties may fail after the
-upgrade and must be updated to accept the five v1 fields. Existing events and
-deliveries from before the upgrade are not backfilled and have no v1 marker.
+The generic top-level field set is frozen for v1 even while the capability is
+Beta; changing that field set requires a new integer `schema_version`. The
+event-specific contents of `data` are not a frozen schema. Slack and Teams keep
+the five identity/version fields listed above but use reduced vendor-specific
+bodies. Consumers must select a decoder by `schema_version` and reject versions
+they do not support rather than interpreting them as v1.
+
+The v1 additions are compatible with consumers that ignore unknown JSON
+members, but strict JSON validators or schemas that reject additional properties
+may fail after the upgrade and must be updated to accept the five v1 metadata
+fields. Existing events and deliveries from before the upgrade are not backfilled
+and have no v1 marker.
 
 The envelope deliberately contains no full object snapshot, domain serializer
 output, secret, encrypted value, or custom-field snapshot. A system-wide rule or
