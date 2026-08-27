@@ -156,7 +156,11 @@ class ObjectDetailView(
     def _build_changelog_context(self, obj, content_type):
         context = {}
         object_change_type_exists = ContentType.objects.filter(app_label="core", model="objectchange").exists()
-        if hasattr(obj, "get_changelog_url") or object_change_type_exists:
+        if hasattr(obj, "get_changelog_url"):
+            # An object's explicit changelog hook wins over the generic route:
+            # models or integrations may override it with a specialized URL.
+            context["changelog_url"] = obj.get_changelog_url()
+        elif object_change_type_exists:
             context["changelog_url"] = (
                 reverse("objectchange_list")
                 + "?"

@@ -7,6 +7,7 @@
     "itambox/core/tests/test_global_label_template_permissions.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_navigation_tenancy.py",
+    "itambox/core/tests/test_tables.py",
     "itambox/core/tests/test_tenant_field_scoping.py",
     "itambox/extras/tests/test_journal_views.py",
     "itambox/extras/tests/test_saved_filters.py",
@@ -16,6 +17,7 @@
     "itambox/itambox/tests/test_generic_list_providers.py",
     "itambox/itambox/tests/test_generic_presentation_orchestration.py",
     "itambox/itambox/tests/test_generic_presentation_registry.py",
+    "itambox/itambox/tests/test_generic_view_foundations.py",
     "itambox/itambox/tests/test_scanning.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",
     "itambox/users/tests/test_table_config_views.py"
@@ -29,6 +31,7 @@
     "itambox/core/tests/test_global_label_template_permissions.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_navigation_tenancy.py",
+    "itambox/core/tests/test_tables.py",
     "itambox/core/tests/test_tenant_field_scoping.py",
     "itambox/extras/tests/test_journal_views.py",
     "itambox/extras/tests/test_saved_filters.py",
@@ -39,6 +42,7 @@
     "itambox/itambox/tests/test_generic_list_providers.py",
     "itambox/itambox/tests/test_generic_presentation_orchestration.py",
     "itambox/itambox/tests/test_generic_presentation_registry.py",
+    "itambox/itambox/tests/test_generic_view_foundations.py",
     "itambox/itambox/tests/test_scanning.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",
     "itambox/users/tests/test_table_config_views.py"
