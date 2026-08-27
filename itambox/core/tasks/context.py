@@ -25,6 +25,7 @@ from core.context import (
     set_current_tenant,
     set_current_tenant_group,
 )
+from core.tenant_scope import accessible_tenant_ids
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +216,6 @@ class TaskContext:
         # A user-bound tenant task must prove canonical access to the target.
         # System tasks (no user) and superusers retain their explicit paths.
         if self.tenant is not None and self.user is not None and not self.user.is_superuser:
-            from organization.access import accessible_tenant_ids
-
             if self.tenant.pk not in accessible_tenant_ids(self.user):
                 raise PermissionDenied("Task principal cannot access target tenant")
 

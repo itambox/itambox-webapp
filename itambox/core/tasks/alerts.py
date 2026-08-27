@@ -6,7 +6,6 @@ from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.context import _current_user, set_current_membership, set_current_tenant
 from core.events import DeliveryDisposition, delivery_log_context, delivery_log_message, send_notification_to_channel
 from core.tasks.context import TaskContext
 from extras.models import AlertLog, AlertRule
@@ -21,67 +20,53 @@ def evaluate_alert_rules_task() -> int:
     unresolved alerts on the configured cadence, and dispatch channel
     notifications (unless the rule is muted).
     """
-    # Run as a true system context: clear any ambient tenant/membership AND the
-    # current user. A non-superuser principal left bound here makes the tenant-
-    # scoping managers fail closed (both the rule query and the open-log
-    # prefetch return nothing), silently breaking evaluation and dedup.
-    set_current_tenant(None)
-    set_current_membership(None)
-    _current_user.set(None)
+    with TaskContext(tenant_id=None, user_id=None):
+        active_rules = AlertRule.objects.filter(is_active=True).select_related("tenant")
+        logger.info("Evaluating %d active alert rules...", active_rules.count())
 
-    active_rules = AlertRule.objects.filter(is_active=True).select_related("tenant")
-    logger.info("Evaluating %d active alert rules...", active_rules.count())
+        today = timezone.now().date()
+        existing_logs = _prefetch_open_logs()
+        alerts_triggered_count = 0
 
-    today = timezone.now().date()
-    existing_logs = _prefetch_open_logs()
-    alerts_triggered_count = 0
+        for rule in active_rules:
+            logger.info(
+                "Evaluating rule: %s (type=%s, threshold=%s, muted=%s, renotify=%s)",
+                rule.name,
+                rule.alert_type,
+                rule.threshold_value,
+                rule.is_muted,
+                rule.renotify_interval_days,
+            )
+            # Use a system-level TaskContext; no specific user_id for scheduled tasks.
+            with TaskContext(tenant_id=rule.tenant_id):
+                alerts_triggered_count += _evaluate_rule(rule, today, existing_logs)
 
-    for rule in active_rules:
         logger.info(
-            "Evaluating rule: %s (type=%s, threshold=%s, muted=%s, renotify=%s)",
-            rule.name,
-            rule.alert_type,
-            rule.threshold_value,
-            rule.is_muted,
-            rule.renotify_interval_days,
+            "Alert evaluation complete. Triggered %d fresh alert(s).",
+            alerts_triggered_count,
         )
-        # Use a system-level TaskContext; no specific user_id for scheduled tasks.
-        with TaskContext(tenant_id=rule.tenant_id):
-            alerts_triggered_count += _evaluate_rule(rule, today, existing_logs)
-
-    logger.info(
-        "Alert evaluation complete. Triggered %d fresh alert(s).",
-        alerts_triggered_count,
-    )
-    return alerts_triggered_count
+        return alerts_triggered_count
 
 
 def run_alert_rule_now(rule_id: int) -> int:
     """Evaluate a single AlertRule immediately (used by the 'Run now' UI action).
 
-    Runs as a system context: the tenant, membership and current-user
-    contextvars are cleared (and NOT restored) so rule selection and open-log
-    dedup are not constrained by an ambient (possibly non-superuser) principal.
-    Because the contextvars are not restored, callers must run this standalone
-    in a worker (the 'Run now' view enqueues it via async_task) rather than
-    inline inside a request.
+    Runs in a restoring system context so rule selection and open-log dedup are
+    not constrained by an ambient (possibly non-superuser) principal.
 
     Returns the number of fresh alerts triggered.
     """
-    set_current_tenant(None)
-    set_current_membership(None)
-    _current_user.set(None)
+    with TaskContext(tenant_id=None, user_id=None):
+        rule = AlertRule.objects.filter(pk=rule_id, is_active=True).select_related("tenant").first()
+        if not rule:
+            logger.warning("run_alert_rule_now: rule %s not found or inactive.", rule_id)
+            return 0
 
-    rule = AlertRule.objects.filter(pk=rule_id, is_active=True).select_related("tenant").first()
-    if not rule:
-        logger.warning("run_alert_rule_now: rule %s not found or inactive.", rule_id)
-        return 0
+        today = timezone.now().date()
+        existing_logs = _prefetch_open_logs(rule_id=rule.pk)
 
-    today = timezone.now().date()
-    existing_logs = _prefetch_open_logs(rule_id=rule.pk)
-
-    with TaskContext(tenant_id=rule.tenant_id):
-        return _evaluate_rule(rule, today, existing_logs)
+        with TaskContext(tenant_id=rule.tenant_id):
+            return _evaluate_rule(rule, today, existing_logs)
 
 
 def _prefetch_open_logs(rule_id=None):

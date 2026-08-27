@@ -14,42 +14,10 @@ Symbol placement and number formatting follow the currency:
 
 from django import template
 from django.conf import settings
-from django.utils import formats
+
+from core.reports.formatting import format_money, resolve_currency_code
 
 register = template.Library()
-
-_SYMBOL_AFTER = {
-    "EUR": "€",
-    "CHF": "CHF",
-    "SEK": "kr",
-    "NOK": "kr",
-    "DKK": "kr",
-}
-_SYMBOL_BEFORE = {
-    "USD": "$",
-    "GBP": "£",
-    "CAD": "CA$",
-    "AUD": "A$",
-    "JPY": "¥",
-}
-
-
-def _get_currency(obj):
-    if obj is None:
-        return getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR"
-    # Prefer an explicit per-record currency (core.currency.CurrencyField) when
-    # the model carries one and it is set; blank falls back to the tenant.
-    own = getattr(obj, "currency", None)
-    if own:
-        return own
-    tenant = getattr(obj, "tenant", None)
-    if tenant is None:
-        asset = getattr(obj, "asset", None)
-        if asset is not None:
-            tenant = getattr(asset, "tenant", None)
-    if tenant is not None:
-        return getattr(tenant, "currency", None) or getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR")
-    return getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR"
 
 
 @register.filter
@@ -58,16 +26,21 @@ def money(value, obj=None):
     if value is None:
         return ""
     try:
-        currency = _get_currency(obj).upper()
+        record_currency = getattr(obj, "currency", None) if obj is not None else None
+        tenant_currency = None
+        if not (isinstance(record_currency, str) and record_currency.strip()) and obj is not None:
+            tenant = getattr(obj, "tenant", None)
+            if tenant is None:
+                asset = getattr(obj, "asset", None)
+                if asset is not None:
+                    tenant = getattr(asset, "tenant", None)
+            if tenant is not None:
+                tenant_currency = getattr(tenant, "currency", None)
+        currency = resolve_currency_code(
+            record_currency,
+            tenant_currency,
+            getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR"),
+        )
     except Exception:
         currency = "EUR"
-
-    # Locale-aware number formatting (respects USE_L10N, USE_THOUSAND_SEPARATOR).
-    formatted = formats.number_format(value, decimal_pos=2, use_l10n=True, force_grouping=True)
-
-    if currency in _SYMBOL_AFTER:
-        return f"{formatted}\xa0{_SYMBOL_AFTER[currency]}"
-    if currency in _SYMBOL_BEFORE:
-        return f"{_SYMBOL_BEFORE[currency]}{formatted}"
-    # Unknown currency — use ISO code as suffix.
-    return f"{formatted}\xa0{currency}"
+    return format_money(value, currency_code=currency)

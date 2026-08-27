@@ -1516,12 +1516,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/context.py",
-      "context": "ClassDef:TaskContext/FunctionDef:_resolve_principal_and_tenant",
-      "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/disposal.py",
       "context": "FunctionDef:bulk_dispose_task",
       "statement": "from assets.models import Asset, AssetDisposal",

@@ -305,21 +305,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-S2|core.reports.formatting|extras.templatetags.money|function-body",
-      "rule": "R-S2",
-      "source": "core.reports.formatting",
-      "source_layer": "platform-service",
-      "target": "extras.templatetags.money",
-      "target_layer": "presentation",
-      "kind": "function-body",
-      "count": 2,
-      "owner": "area:operations",
-      "disposition": "debt",
-      "removal_issue": 445,
-      "removal_direction": "Move the shared money template filter behind a platform-owned, non-presentation formatting boundary so platform report formatting stops importing extras.templatetags.money.",
-      "accepted_reason": "Currency formatting remains a deliberate platform-to-presentation dependency until the shared money template filter is moved behind a platform-owned formatting boundary."
-    },
-    {
       "id": "R-S3|core.tasks.checkin|assets.services|function-body",
       "rule": "R-S3",
       "source": "core.tasks.checkin",
@@ -347,21 +332,6 @@
       "disposition": "debt",
       "removal_issue": 445,
       "removal_direction": "Expose the assets entry point core.tasks.checkout calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-S3|core.tasks.context|organization.access|function-body",
-      "rule": "R-S3",
-      "source": "core.tasks.context",
-      "source_layer": "platform-service",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:operations",
-      "disposition": "debt",
-      "removal_issue": 445,
-      "removal_direction": "Expose the organization entry point core.tasks.context calls through a registry the platform service reads at run time, or move the shared logic down into the platform layer.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
