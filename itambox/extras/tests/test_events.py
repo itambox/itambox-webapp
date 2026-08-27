@@ -392,7 +392,7 @@ class EventsSystemTestCase(TransactionTestCase):
             )
             delivery = WebhookDelivery.objects.create(
                 endpoint=endpoint,
-                delivery_id=f"delivery-{index}",
+                delivery_id=str(uuid.uuid4()),
                 event=event,
                 tenant=tenant,
                 test_send=False,

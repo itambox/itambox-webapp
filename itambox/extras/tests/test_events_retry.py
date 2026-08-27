@@ -31,7 +31,7 @@ class WebhookRetryTestCase(TransactionTestCase):
             delivery_id=str(uuid.uuid4()),
             event_id=None,
             tenant_id=None,
-            test_send=False,
+            test_send=True,
             attempt=1,
             status=WebhookDelivery.STATUS_PENDING,
         )
@@ -41,7 +41,7 @@ class WebhookRetryTestCase(TransactionTestCase):
             webhook_endpoint_id=endpoint.pk,
             event_id=None,
             tenant_id=None,
-            test_send=False,
+            test_send=True,
         )
         return delivery, assertions
 
