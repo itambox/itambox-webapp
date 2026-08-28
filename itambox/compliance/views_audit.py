@@ -6,7 +6,7 @@ import django_tables2 as tables
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -21,6 +21,7 @@ from compliance.audit_services import (
     _audit_to_dict,
     _missing_asset_to_dict,
     audit_asset,
+    classify_session_after_scan,
     classify_session_audits,
     close_audit_session,
     expected_assets_queryset,
@@ -39,6 +40,14 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _read_report_or_deny(session, user):
+    """Turn malformed frozen reports into a handled HTTP denial."""
+    try:
+        return read_reconciliation_report(session, user=user)
+    except ValidationError as exc:
+        raise PermissionDenied(_("The stored audit report is unavailable.")) from exc
 
 
 def _classify_audit_scan(session, asset, expected_ids, observed_location):
@@ -138,7 +147,7 @@ class AuditSessionDetailView(ObjectDetailView):
 
         if session.status == "completed" and session.reconciliation_report is not None:
             # Render from the frozen stored report after applying the current actor scope.
-            report = read_reconciliation_report(session, user=self.request.user)
+            report = _read_report_or_deny(session, self.request.user)
             rows = report["rows"]
             ctx["total_expected"] = report["total_expected"]
             ctx["total_scanned"] = report["total_scanned"]
@@ -321,6 +330,7 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
                         status=asset.status,
                         verification_method="barcode",
                     )
+                classified = classify_session_after_scan(session, user=request.user)
         except ValidationError as err:
             msg = err.message if hasattr(err, "message") else str(err)
             # 204 → no swap, basket preserved; surface the failure as a toast.
@@ -336,7 +346,8 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
         # Return the updated reconciliation container using a helper-like template render
         from compliance.forms_audit import AuditBarcodeScanForm
 
-        classified = classify_session_audits(session, user=request.user)
+        # Classification is performed inside the atomic write above using the
+        # actor-only scan permission, rather than the separate read permission.
         expected_loc_name = session.location.name if session.location else "Global"
         ctx = {
             "total_expected": len(classified["matching"])
@@ -394,7 +405,7 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
     def get(self, request, pk, *args, **kwargs):
         session = get_object_or_404(AuditSession, pk=pk, status="completed")
-        report = read_reconciliation_report(session, user=request.user)
+        report = _read_report_or_deny(session, request.user)
         rows = report["rows"]
 
         response = HttpResponse(content_type="text/csv")
@@ -456,7 +467,7 @@ class AuditSessionFlagMissingView(GenericTransactionView):
         context = super().get_context_data(**kwargs)
         session = self.get_object()
         if session.reconciliation_report is not None:
-            report = read_reconciliation_report(session, user=self.request.user)
+            report = _read_report_or_deny(session, self.request.user)
             context["missing_count"] = sum(row["category"] == "missing" for row in report["rows"])
         else:
             context["missing_count"] = 0

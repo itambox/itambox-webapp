@@ -190,19 +190,13 @@ class ClassificationTests(unittest.TestCase):
             with self.subTest(module=module):
                 self.assertEqual(layer_of(module), "composition")
 
-    def test_a_mixed_module_is_classified_so_both_crossings_stay_visible(self):
-        """``inventory.mixins`` holds a model mixin *and* two table classes.
-
-        Module granularity forces one layer. ``presentation`` would make
-        ``inventory.abstract_models -> inventory.mixins`` an ``R-M1`` edge and
-        ``domain-model`` would make its own ``core.tables`` import one; ``R-M1``
-        has no baseline representation, so either choice is unshippable. The
-        classification below keeps both crossings recordable and visible.
-        """
-        self.assertEqual(layer_of("inventory.mixins"), "domain-service")
-        self.assertEqual(layer_of("inventory.abstract_models"), "domain-model")
-        self.assertEqual(is_allowed("inventory.abstract_models", "inventory.mixins").rule, "R-X1")
-        self.assertEqual(is_allowed("inventory.mixins", "core.tables.base").rule, "R-V1")
+    def test_inventory_model_and_table_modules_have_native_layers(self):
+        self.assertEqual(layer_of("inventory.models_mixins"), "domain-model")
+        self.assertEqual(layer_of("inventory.models_stock"), "domain-model")
+        self.assertEqual(layer_of("inventory.models_kit_checkout"), "domain-model")
+        self.assertEqual(layer_of("inventory.tables"), "presentation")
+        self.assertIsNone(is_allowed("inventory.abstract_models", "inventory.models_mixins").rule)
+        self.assertIsNone(is_allowed("inventory.tables", "core.tables.base").rule)
 
     def test_suffix_named_siblings_classify_like_the_bare_name(self):
         self.assertEqual(layer_of("assets.views_scan"), "presentation")

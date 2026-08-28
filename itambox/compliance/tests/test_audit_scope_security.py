@@ -2,24 +2,25 @@
 
 import copy
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 from django.utils import timezone
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import (
-    CLOSE_PERMISSION,
     close_audit_session,
     expected_assets_queryset,
     read_reconciliation_report,
     rehome_audit_session_mismatches,
 )
 from compliance.models import AssetAudit, AuditSession
-from core.context import get_current_tenant, set_current_tenant
+from core.context import set_current_tenant
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Location, Role, Tenant
@@ -219,6 +220,54 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 ):
                     read_reconciliation_report(self.session, user=self.user)
 
+    def test_v1_invalid_category_fails_closed_through_all_report_consumers(self):
+        malformed = {"rows": [{"category": "forged", "asset_id": self.asset_a.pk}]}
+        self.session.status = "completed"
+        self.session.reconciliation_report = malformed
+        self.session.save(update_fields=["status", "reconciliation_report"])
+
+        with self.assertRaisesMessage(ValidationError, "The stored reconciliation report cannot be read safely."):
+            read_reconciliation_report(self.session, user=self.user)
+        with self.assertRaisesMessage(ValidationError, "The stored reconciliation report cannot be read safely."):
+            rehome_audit_session_mismatches(self.session, user=self.user)
+        with self.assertRaisesMessage(ValidationError, "The stored reconciliation report cannot be read safely."):
+            from compliance.audit_services import flag_missing_assets
+
+            flag_missing_assets(self.session, user=self.user)
+
+    def test_malformed_report_detail_and_csv_paths_return_handled_denial(self):
+        self.session.status = "completed"
+        self.session.reconciliation_report = {"rows": [{"category": "forged", "asset_id": self.asset_a.pk}]}
+        self.session.save(update_fields=["status", "reconciliation_report"])
+        self.client_login_to_tenant(self.user, self.tenant_a)
+
+        for url in (
+            reverse("compliance:auditsession_detail", kwargs={"pk": self.session.pk}),
+            reverse("compliance:auditsession_report_csv", kwargs={"pk": self.session.pk}),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 403)
+
+    def test_commit_uses_scan_authorization_inside_transaction(self):
+        scan_user = baker.make("users.User", username="scan-only", is_active=True)
+        scan_role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Scan-only role",
+            permissions=["compliance.add_assetaudit"],
+        )
+        scan_grant = grant(scan_user, self.tenant_a, scan_role)
+        self.client_login_to_tenant(scan_user, self.tenant_a)
+
+        response = self.client.post(
+            reverse("compliance:auditsession_commit", kwargs={"pk": self.session.pk}),
+            {"pk": [self.asset_a.pk]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(AssetAudit.objects.filter(session=self.session, asset=self.asset_a).exists())
+        self.assertIsNotNone(scan_grant)
+
     def test_v1_reader_resolves_provenance_in_one_bulk_query_and_filters_rows(self):
         deleted = baker.make(Asset, tenant=self.tenant_a, location=self.location_a, status=self.status)
         deleted.delete()
@@ -281,11 +330,12 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
 
     def test_expiring_grant_is_not_a_permission_map_shortcut(self):
         grant_row = self.grant
-        type(grant_row).objects.filter(pk=grant_row.pk).update(valid_until=timezone.now() - timedelta(seconds=1))
-        self.user.__dict__.pop("_applicable_grants", None)
-        self.user.__dict__.pop("_tenant_permissions_map", None)
+        expiry = timezone.now() + timedelta(seconds=1)
+        type(grant_row).objects.filter(pk=grant_row.pk).update(valid_until=expiry)
+        self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 1)
         with self.assertRaises(PermissionDenied):
-            expected_assets_queryset(self.session, user=self.user)
+            with patch("compliance.audit_services.timezone.now", return_value=expiry + timedelta(seconds=1)):
+                expected_assets_queryset(self.session, user=self.user)
 
 
 if __name__ == "__main__":

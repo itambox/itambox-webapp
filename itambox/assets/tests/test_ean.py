@@ -13,8 +13,7 @@ from django.urls import reverse
 
 from assets.filters import AssetFilterSet
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
-from compliance.audit_services import audit_asset, expected_assets_queryset
-from compliance.models import AssetAudit, AuditSession
+from compliance.audit_services import expected_assets_queryset
 from core.tests.mixins import TenantTestMixin, grant
 from inventory.models import Accessory, Component, Consumable
 

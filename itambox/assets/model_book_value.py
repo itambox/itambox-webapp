@@ -9,7 +9,6 @@ package initializer.
 import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
-
 _CENT = Decimal("0.01")
 
 
@@ -99,11 +98,23 @@ def compute_book_value(asset, on_date=None):
     on_date = on_date or datetime.date.today()
     months_held = _months_held(clock_start, on_date, getattr(policy, "convention", "exclude_purchase_month"))
 
+    # Method ``none`` and non-positive schedules are intentionally non-depreciating.
+    # This guard must precede the immediate-expense threshold: the threshold only
+    # changes a depreciation schedule, not a policy that explicitly disables it.
+    method = getattr(policy, "method", "straight_line")
+    months = getattr(policy, "months", 0)
+    if method == "none" or not months or months <= 0:
+        return _round(purchase_cost)
+
     threshold_value = _threshold_value(
         purchase_cost,
         salvage,
         getattr(policy, "immediate_expense_threshold", None),
         months_held,
     )
-    value = threshold_value if threshold_value is not None else _policy_value(asset, purchase_cost, salvage, policy, months_held)
+    value = (
+        threshold_value
+        if threshold_value is not None
+        else _policy_value(asset, purchase_cost, salvage, policy, months_held)
+    )
     return _round(value)

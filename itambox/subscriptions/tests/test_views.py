@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 from django.test import Client, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from assets.models import Asset
@@ -48,6 +50,15 @@ class SubscriptionViewTests(TestCase):
         self.assertContains(resp, "Test Subscription")
         self.assertContains(resp, "999.99")
         self.assertContains(resp, "EUR")
+
+    def test_detail_renders_seat_usage_with_one_assignment_count_query(self):
+        url = reverse("subscriptions:subscription_detail", kwargs={"pk": self.sub.pk})
+        with CaptureQueriesContext(connection) as queries:
+            resp = self.client.get(url)
+
+        self.assertEqual(resp.status_code, 200)
+        seat_queries = [query for query in queries.captured_queries if "licenseseatassignment" in query["sql"].lower()]
+        self.assertEqual(len(seat_queries), 1, queries.captured_queries)
 
     def test_create_view_get(self):
         url = reverse("subscriptions:subscription_create")

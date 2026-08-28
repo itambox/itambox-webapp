@@ -11,7 +11,8 @@ if TYPE_CHECKING:
 
 
 class SubscriptionSeatUsageProvider(Protocol):
-    def __call__(self, subscription: Subscription) -> int: ...
+    def __call__(self, subscription: Subscription) -> int:
+        pass
 
 
 _provider = SingleProviderSlot[SubscriptionSeatUsageProvider]("subscription seat usage")

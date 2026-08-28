@@ -27,6 +27,7 @@ SCAN_PERMISSION = "compliance.add_assetaudit"
 
 EXPECTED_ASSET_OPERATION = "compliance.audit.expected_assets"
 CLASSIFY_OPERATION = "compliance.audit.classify"
+SCAN_OPERATION = "compliance.audit.scan"
 REPORT_READ_OPERATION = "compliance.audit.report.read"
 CLOSE_OPERATION = "compliance.audit.close"
 REHOME_OPERATION = "compliance.audit.rehome"
@@ -65,32 +66,25 @@ def _live_permission_tenants(user: Any, permission: str) -> frozenset[int]:
     )
 
 
-def _authorize_session(
+def _authorize_human_session(session: AuditSession, user: Any, permission: str) -> frozenset[int]:
+    if not _is_authenticated_user(user):
+        raise PermissionDenied("An authenticated audit actor is required.")
+    allowed = _live_permission_tenants(user, permission)
+    if session.tenant_id is not None:
+        if session.tenant_id not in allowed:
+            raise PermissionDenied("The actor is not authorized for this audit session tenant.")
+        return frozenset({session.tenant_id})
+    if not allowed:
+        raise PermissionDenied("The actor is not authorized for any tenant in this audit session.")
+    return allowed
+
+
+def _authorize_system_session(
     session: AuditSession,
-    *,
-    user: Any,
-    system_authorization: SystemAuthorizationContext | None,
+    system_authorization: SystemAuthorizationContext,
     permission: str,
     operation: str,
-    allow_actorless_global: bool = False,
 ) -> frozenset[int]:
-    if (user is None) == (system_authorization is None):
-        raise PermissionDenied("Audit authorization requires exactly one actor or system authorization.")
-
-    if user is not None:
-        if not _is_authenticated_user(user):
-            raise PermissionDenied("An authenticated audit actor is required.")
-        allowed = _live_permission_tenants(user, permission)
-        if session.tenant_id is not None:
-            if session.tenant_id not in allowed:
-                raise PermissionDenied("The actor is not authorized for this audit session tenant.")
-            return frozenset({session.tenant_id})
-        if not allowed:
-            raise PermissionDenied("The actor is not authorized for any tenant in this audit session.")
-        return allowed
-
-    if not allow_actorless_global and session.tenant_id is None:
-        raise PermissionDenied("Actorless global audit operations are not supported.")
     if not isinstance(system_authorization, SystemAuthorizationContext):
         raise PermissionDenied("A valid issued system authorization is required.")
     current_tenant = get_current_tenant()
@@ -106,6 +100,23 @@ def _authorize_session(
     ):
         raise PermissionDenied("The system authorization is not valid for this audit operation.")
     return frozenset({session.tenant_id})
+
+
+def _authorize_session(
+    session: AuditSession,
+    *,
+    user: Any,
+    system_authorization: SystemAuthorizationContext | None,
+    permission: str,
+    operation: str,
+) -> frozenset[int]:
+    if (user is None) == (system_authorization is None):
+        raise PermissionDenied("Audit authorization requires exactly one actor or system authorization.")
+    if user is not None:
+        return _authorize_human_session(session, user, permission)
+    if session.tenant_id is None:
+        raise PermissionDenied("Actorless global audit operations are not supported.")
+    return _authorize_system_session(session, system_authorization, permission, operation)
 
 
 def _expected_assets_for_tenants(session: AuditSession, tenant_ids: frozenset[int]) -> QuerySet[Asset]:
@@ -189,6 +200,18 @@ def classify_session_audits(
         system_authorization=system_authorization,
         permission=EXPECTED_ASSET_PERMISSION,
         operation=CLASSIFY_OPERATION,
+    )
+    return _classify_authorized(session, tenant_ids)
+
+
+def classify_session_after_scan(session: AuditSession, *, user: Any) -> AuditClassification:
+    """Classify a basket under the actor-only scan permission."""
+    tenant_ids = _authorize_session(
+        session,
+        user=user,
+        system_authorization=None,
+        permission=SCAN_PERMISSION,
+        operation=SCAN_OPERATION,
     )
     return _classify_authorized(session, tenant_ids)
 
@@ -357,57 +380,71 @@ def _validated_report(report: Any) -> tuple[int, list[Any]]:
     return version, report["rows"]
 
 
+def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[dict[str, Any]]:
+    asset_ids = {
+        row.get("asset_id")
+        for row in stored_rows
+        if isinstance(row, dict) and type(row.get("asset_id")) is int and row["asset_id"] > 0
+    }
+    assets = {
+        asset.pk: asset
+        for asset in Asset._base_manager.filter(
+            pk__in=asset_ids,
+            tenant_id__in=tenant_ids,
+            deleted_at__isnull=True,
+        )
+    }
+    rows: list[dict[str, Any]] = []
+    for stored_row in stored_rows:
+        if not isinstance(stored_row, dict):
+            continue
+        category = stored_row.get("category")
+        if category not in {"matching", "mismatched", "missing", "surprise"}:
+            raise _stored_report_error()
+        asset = assets.get(stored_row.get("asset_id"))
+        if asset is None:
+            continue
+        row = dict(stored_row)
+        row["tenant_id"] = asset.tenant_id
+        rows.append(row)
+    return rows
+
+
+def _read_v2_report(session: AuditSession, stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for stored_row in stored_rows:
+        if not isinstance(stored_row, dict):
+            raise _stored_report_error()
+        tenant_id = stored_row.get("tenant_id")
+        asset_id = stored_row.get("asset_id")
+        category = stored_row.get("category")
+        if type(tenant_id) is not int or tenant_id <= 0 or type(asset_id) is not int or asset_id <= 0:
+            raise _stored_report_error()
+        if category not in {"matching", "mismatched", "missing", "surprise"}:
+            raise _stored_report_error()
+        if tenant_id not in tenant_ids or (session.tenant_id is not None and tenant_id != session.tenant_id):
+            continue
+        rows.append(dict(stored_row))
+    return rows
+
+
+def _report_with_derived_totals(rows: list[dict[str, Any]]) -> ReconciliationReportV2:
+    return {
+        "schema_version": 2,
+        "total_expected": sum(row.get("category") in {"matching", "mismatched", "missing"} for row in rows),
+        "total_scanned": sum(row.get("category") in {"matching", "mismatched", "surprise"} for row in rows),
+        "rows": rows,
+    }
+
+
 def _read_report_for_tenants(session: AuditSession, tenant_ids: frozenset[int]) -> ReconciliationReportV2:
     if session.reconciliation_report is None:
         return _empty_report()
     version, stored_rows = _validated_report(session.reconciliation_report)
-    rows: list[dict[str, Any]] = []
-    if version == 1:
-        asset_ids = {
-            row.get("asset_id")
-            for row in stored_rows
-            if isinstance(row, dict) and type(row.get("asset_id")) is int and row["asset_id"] > 0
-        }
-        assets = {
-            asset.pk: asset
-            for asset in Asset._base_manager.filter(
-                pk__in=asset_ids,
-                tenant_id__in=tenant_ids,
-                deleted_at__isnull=True,
-            )
-        }
-        for stored_row in stored_rows:
-            if not isinstance(stored_row, dict):
-                continue
-            asset = assets.get(stored_row.get("asset_id"))
-            if asset is None:
-                continue
-            row = dict(stored_row)
-            row["tenant_id"] = asset.tenant_id
-            rows.append(row)
-    else:
-        for stored_row in stored_rows:
-            if not isinstance(stored_row, dict):
-                raise _stored_report_error()
-            tenant_id = stored_row.get("tenant_id")
-            asset_id = stored_row.get("asset_id")
-            category = stored_row.get("category")
-            if type(tenant_id) is not int or tenant_id <= 0 or type(asset_id) is not int or asset_id <= 0:
-                raise _stored_report_error()
-            if category not in {"matching", "mismatched", "missing", "surprise"}:
-                raise _stored_report_error()
-            if tenant_id not in tenant_ids or (session.tenant_id is not None and tenant_id != session.tenant_id):
-                continue
-            rows.append(dict(stored_row))
-
-    total_expected = sum(row.get("category") in {"matching", "mismatched", "missing"} for row in rows)
-    total_scanned = sum(row.get("category") in {"matching", "mismatched", "surprise"} for row in rows)
-    return {
-        "schema_version": 2,
-        "total_expected": total_expected,
-        "total_scanned": total_scanned,
-        "rows": rows,
-    }
+    rows = (
+        _read_v1_report(stored_rows, tenant_ids) if version == 1 else _read_v2_report(session, stored_rows, tenant_ids)
+    )
+    return _report_with_derived_totals(rows)
 
 
 def read_reconciliation_report(
@@ -445,11 +482,53 @@ def _close_represented_tenants(session: AuditSession) -> frozenset[int]:
         expected_queryset = _all_expected_assets(session)
     else:
         expected_queryset = _expected_assets_for_tenants(session, frozenset({session.tenant_id}))
-    expected_tenants = set(expected_queryset.values_list("tenant_id", flat=True))
+    expected_tenants = set(expected_queryset.values_list("tenant_id", flat=True).distinct())
     observed_tenants = set(
-        AssetAudit.objects.filter(session=session, asset__isnull=False).values_list("asset__tenant_id", flat=True)
+        AssetAudit.objects.filter(session=session, asset__isnull=False)
+        .values_list("asset__tenant_id", flat=True)
+        .distinct()
     )
     return frozenset(expected_tenants | observed_tenants)
+
+
+def _build_close_report(
+    session: AuditSession, classified: AuditClassification
+) -> tuple[ReconciliationReportV2, list[dict[str, Any]], list[Asset]]:
+    expected_location_name = session.location.name if session.location_id else "Global"
+    rows: list[dict[str, Any]] = []
+    for audit in classified["matching"]:
+        row = _audit_to_dict(audit, "matching")
+        if row is not None:
+            rows.append(row)
+    for audit in classified["mismatched"]:
+        row = _audit_to_dict(audit, "mismatched", expected_location_name)
+        if row is not None:
+            rows.append(row)
+    for audit in classified["surprise"]:
+        row = _audit_to_dict(audit, "surprise")
+        if row is not None:
+            rows.append(row)
+    missing_assets = list(classified["missing"])
+    for asset in missing_assets:
+        row = _missing_asset_to_dict(asset, session.location if session.location_id else None)
+        if row is not None:
+            rows.append(row)
+    return _report_with_derived_totals(rows), rows, missing_assets
+
+
+def _close_result(
+    classified: AuditClassification,
+    report: ReconciliationReportV2,
+    missing_assets: list[Asset],
+) -> dict[str, Any]:
+    return {
+        "total_expected": report["total_expected"],
+        "total_scanned": report["total_scanned"],
+        "matching_count": sum(row["category"] == "matching" for row in report["rows"]),
+        "mismatch_list": [audit.asset for audit in classified["mismatched"] if audit.asset is not None],
+        "surprise_list": [audit.asset for audit in classified["surprise"] if audit.asset is not None],
+        "missing_list": missing_assets,
+    }
 
 
 @transaction.atomic
@@ -480,46 +559,12 @@ def close_audit_session(
         raise PermissionDenied("The actor is not authorized for every tenant represented by this audit.")
 
     classified = _classify_authorized(session, tenant_ids)
-    expected_location_name = session.location.name if session.location_id else "Global"
-    rows: list[dict[str, Any]] = []
-    for audit in classified["matching"]:
-        row = _audit_to_dict(audit, "matching")
-        if row is not None:
-            rows.append(row)
-    for audit in classified["mismatched"]:
-        row = _audit_to_dict(audit, "mismatched", expected_location_name)
-        if row is not None:
-            rows.append(row)
-    for audit in classified["surprise"]:
-        row = _audit_to_dict(audit, "surprise")
-        if row is not None:
-            rows.append(row)
-    missing_assets = list(classified["missing"])
-    for asset in missing_assets:
-        row = _missing_asset_to_dict(asset, session.location if session.location_id else None)
-        if row is not None:
-            rows.append(row)
-
-    total_expected = sum(row["category"] in {"matching", "mismatched", "missing"} for row in rows)
-    total_scanned = sum(row["category"] in {"matching", "mismatched", "surprise"} for row in rows)
-    report: ReconciliationReportV2 = {
-        "schema_version": 2,
-        "total_expected": total_expected,
-        "total_scanned": total_scanned,
-        "rows": rows,
-    }
+    report, _rows, missing_assets = _build_close_report(session, classified)
     session.status = "completed"
     session.completed_at = timezone.now()
     session.reconciliation_report = report
     session.save(update_fields=["status", "completed_at", "reconciliation_report"])
-    return {
-        "total_expected": total_expected,
-        "total_scanned": total_scanned,
-        "matching_count": len([row for row in rows if row["category"] == "matching"]),
-        "mismatch_list": [audit.asset for audit in classified["mismatched"] if audit.asset is not None],
-        "surprise_list": [audit.asset for audit in classified["surprise"] if audit.asset is not None],
-        "missing_list": missing_assets,
-    }
+    return _close_result(classified, report, missing_assets)
 
 
 def _authorize_asset_mutation(

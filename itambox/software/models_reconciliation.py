@@ -24,7 +24,8 @@ class SoftwareReconciliationResult(TypedDict):
 
 
 class SoftwareReconciliationProvider(Protocol):
-    def __call__(self, software: Software) -> SoftwareReconciliationResult: ...
+    def __call__(self, software: Software) -> SoftwareReconciliationResult:
+        pass
 
 
 _provider = SingleProviderSlot[SoftwareReconciliationProvider]("software reconciliation")

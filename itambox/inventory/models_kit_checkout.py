@@ -21,7 +21,8 @@ class KitCheckoutProvider(Protocol):
         request: Any = None,
         system_authorizations: Mapping[str, SystemAuthorizationContext] | None = None,
         **kwargs: Any,
-    ) -> Any: ...
+    ) -> Any:
+        pass
 
 
 _provider = SingleProviderSlot[KitCheckoutProvider]("inventory kit checkout")

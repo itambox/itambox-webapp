@@ -12,7 +12,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.model_book_value import compute_book_value
-
 from core.currency import CurrencyField
 from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
 from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SoftDeleteMixin, SubscribableMixin
