@@ -123,6 +123,7 @@
                           <div class="col text-truncate">
                             <a href="{% url 'users:view_notification' pk=notif.pk %}"
                                class="text-body d-block font-weight-bold"
+                               hx-boost="false"
                                hx-target="#page-content-wrapper">{{ notif.subject }}</a>
                             <div class="d-block text-muted text-truncate mt-n1 small">{{ notif.message }}</div>
                           </div>
