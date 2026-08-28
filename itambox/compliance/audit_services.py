@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.models import Asset, StatusLabel
 from compliance.models import AssetAudit, AuditSession
 from core import tenant_scope
+from core.authorization_cache import force_authorization_generation_check
 from core.context import (
     SystemAuthorizationContext,
     get_current_request_id,
@@ -409,7 +410,18 @@ def _validated_report(report: Any) -> tuple[int, list[Any]]:
     return version, report["rows"]
 
 
+def _validated_report_category(row: object) -> str:
+    if not isinstance(row, dict):
+        raise _stored_report_error()
+    category = row.get("category")
+    if type(category) is not str or category not in {"matching", "mismatched", "missing", "surprise"}:
+        raise _stored_report_error()
+    return category
+
+
 def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[dict[str, Any]]:
+    for stored_row in stored_rows:
+        _validated_report_category(stored_row)
     asset_ids = {
         row.get("asset_id")
         for row in stored_rows
@@ -425,11 +437,7 @@ def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[
     }
     rows: list[dict[str, Any]] = []
     for stored_row in stored_rows:
-        if not isinstance(stored_row, dict):
-            continue
-        category = stored_row.get("category")
-        if category not in {"matching", "mismatched", "missing", "surprise"}:
-            raise _stored_report_error()
+        category = _validated_report_category(stored_row)
         asset = assets.get(stored_row.get("asset_id"))
         if asset is None:
             continue
@@ -442,14 +450,10 @@ def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[
 def _read_v2_report(session: AuditSession, stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for stored_row in stored_rows:
-        if not isinstance(stored_row, dict):
-            raise _stored_report_error()
+        category = _validated_report_category(stored_row)
         tenant_id = stored_row.get("tenant_id")
         asset_id = stored_row.get("asset_id")
-        category = stored_row.get("category")
         if type(tenant_id) is not int or tenant_id <= 0 or type(asset_id) is not int or asset_id <= 0:
-            raise _stored_report_error()
-        if category not in {"matching", "mismatched", "missing", "surprise"}:
             raise _stored_report_error()
         if tenant_id not in tenant_ids or (session.tenant_id is not None and tenant_id != session.tenant_id):
             continue
@@ -494,7 +498,11 @@ def read_reconciliation_report(
 
 
 def _all_expected_assets(session: AuditSession) -> QuerySet[Asset]:
-    queryset = Asset._base_manager.filter(deleted_at__isnull=True).exclude(status__type=StatusLabel.TYPE_ARCHIVED)
+    queryset = Asset._base_manager.filter(
+        deleted_at__isnull=True,
+        tenant_id__isnull=False,
+        tenant__deleted_at__isnull=True,
+    ).exclude(status__type=StatusLabel.TYPE_ARCHIVED)
     if session.location_id is not None:
         return queryset.filter(location_id=session.location_id)
     return queryset.filter(
@@ -513,7 +521,13 @@ def _close_represented_tenants(session: AuditSession) -> frozenset[int]:
         expected_queryset = _expected_assets_for_tenants(session, frozenset({session.tenant_id}))
     expected_tenants = set(expected_queryset.values_list("tenant_id", flat=True).distinct())
     observed_tenants = set(
-        AssetAudit.objects.filter(session=session, asset__isnull=False)
+        AssetAudit.objects.filter(
+            session=session,
+            asset__isnull=False,
+            asset__deleted_at__isnull=True,
+            asset__tenant_id__isnull=False,
+            asset__tenant__deleted_at__isnull=True,
+        )
         .values_list("asset__tenant_id", flat=True)
         .distinct()
     )
@@ -639,6 +653,8 @@ def rehome_audit_session_mismatches(
             tenant_id__in=tenant_ids,
         )
     )
+    if user is not None:
+        force_authorization_generation_check(user)
     _authorize_asset_mutation(
         session,
         user=user,
@@ -689,6 +705,8 @@ def flag_missing_assets(
             tenant_id__in=tenant_ids,
         ).select_related("status")
     }
+    if user is not None:
+        force_authorization_generation_check(user)
     _authorize_asset_mutation(
         session,
         user=user,

@@ -4,6 +4,7 @@ import copy
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.test import TestCase
@@ -16,6 +17,7 @@ from assets.models import Asset, StatusLabel
 from compliance.audit_services import (
     close_audit_session,
     expected_assets_queryset,
+    flag_missing_assets,
     read_reconciliation_report,
     rehome_audit_session_mismatches,
 )
@@ -156,12 +158,143 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         with self.assertRaises(PermissionDenied):
             expected_assets_queryset(self.session, user=self.user)
 
+    def test_rehome_generation_recheck_rejects_external_revocation_before_asset_mutation(self):
+        self.session.status = "completed"
+        self.session.reconciliation_report = {
+            "schema_version": 2,
+            "total_expected": 1,
+            "total_scanned": 1,
+            "rows": [
+                {
+                    "tenant_id": self.tenant_a.pk,
+                    "category": "mismatched",
+                    "asset_id": self.asset_a.pk,
+                }
+            ],
+        }
+        self.session.save(update_fields=["status", "reconciliation_report"])
+        self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 1)
+        before = self.asset_a.location_id
+
+        def external_report(_session, _tenant_ids):
+            Role._base_manager.filter(pk=self.role.pk).update(permissions=[])
+            cache.set(f"itambox:authz-version:{self.user.pk}", "external-revocation")
+            return self.session.reconciliation_report
+
+        with patch("compliance.audit_services._read_report_for_tenants", side_effect=external_report):
+            with self.assertRaises(PermissionDenied):
+                rehome_audit_session_mismatches(self.session, user=self.user)
+
+        self.asset_a.refresh_from_db()
+        self.assertEqual(self.asset_a.location_id, before)
+
+    def test_flag_generation_recheck_rejects_external_revocation_before_asset_mutation(self):
+        self.session.status = "completed"
+        self.session.reconciliation_report = {
+            "schema_version": 2,
+            "total_expected": 1,
+            "total_scanned": 0,
+            "rows": [
+                {
+                    "tenant_id": self.tenant_a.pk,
+                    "category": "missing",
+                    "asset_id": self.asset_a.pk,
+                    "status_id": self.asset_a.status_id,
+                }
+            ],
+        }
+        self.session.save(update_fields=["status", "reconciliation_report"])
+        self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 1)
+        before = self.asset_a.status_id
+
+        def external_report(_session, _tenant_ids):
+            Role._base_manager.filter(pk=self.role.pk).update(permissions=[])
+            cache.set(f"itambox:authz-version:{self.user.pk}", "external-flag-revocation")
+            return self.session.reconciliation_report
+
+        with patch("compliance.audit_services._read_report_for_tenants", side_effect=external_report):
+            with self.assertRaises(PermissionDenied):
+                flag_missing_assets(self.session, user=self.user)
+
+        self.asset_a.refresh_from_db()
+        self.assertEqual(self.asset_a.status_id, before)
+
     def test_partial_global_close_denies_before_any_session_mutation(self):
         global_session = AuditSession.objects.create(
             name="Partial global audit",
             tenant=None,
             status="active",
             created_by=self.user,
+        )
+        before = (global_session.status, global_session.completed_at, global_session.reconciliation_report)
+        with self.assertRaises(PermissionDenied):
+            close_audit_session(global_session, user=self.user)
+        global_session.refresh_from_db()
+        self.assertEqual(
+            (global_session.status, global_session.completed_at, global_session.reconciliation_report),
+            before,
+        )
+
+    def test_global_close_ignores_tenantless_and_soft_deleted_tenant_contamination(self):
+        global_session = AuditSession.objects.create(
+            name="Contaminated global audit",
+            tenant=None,
+            location=self.location_a,
+            status="active",
+            created_by=self.user,
+        )
+        tenantless_asset = baker.make(
+            Asset,
+            tenant=None,
+            location=self.location_a,
+            status=self.status,
+            name="Tenantless contamination",
+        )
+        deleted_tenant = Tenant.objects.create(name="Deleted owner", slug="deleted-owner")
+        deleted_location = baker.make(Location, tenant=deleted_tenant, name="Deleted room")
+        deleted_asset = baker.make(
+            Asset,
+            tenant=deleted_tenant,
+            location=deleted_location,
+            status=self.status,
+            name="Deleted-tenant contamination",
+        )
+        Tenant._base_manager.filter(pk=deleted_tenant.pk).update(deleted_at=timezone.now())
+        for asset, location in ((tenantless_asset, self.location_a), (deleted_asset, deleted_location)):
+            AssetAudit.objects.create(
+                session=global_session,
+                asset=asset,
+                auditor=self.user,
+                location=location,
+                status=self.status,
+            )
+
+        close_audit_session(global_session, user=self.user)
+        global_session.refresh_from_db()
+        self.assertEqual(global_session.status, "completed")
+
+    def test_global_close_still_denies_live_foreign_tenant_contamination(self):
+        global_session = AuditSession.objects.create(
+            name="Foreign global audit",
+            tenant=None,
+            location=self.location_a,
+            status="active",
+            created_by=self.user,
+        )
+        foreign_location = baker.make(Location, tenant=self.tenant_b, name="Live foreign room")
+        foreign_asset = baker.make(
+            Asset,
+            tenant=self.tenant_b,
+            location=foreign_location,
+            status=self.status,
+            name="Live foreign contamination",
+        )
+        AssetAudit.objects.create(
+            session=global_session,
+            asset=foreign_asset,
+            auditor=self.user,
+            location=foreign_location,
+            status=self.status,
         )
         before = (global_session.status, global_session.completed_at, global_session.reconciliation_report)
         with self.assertRaises(PermissionDenied):
@@ -211,6 +344,14 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             {"schema_version": "2", "rows": []},
             {"schema_version": 99, "rows": []},
             {"schema_version": 2, "rows": [{"category": "matching"}]},
+            {
+                "schema_version": 2,
+                "rows": [{"category": [], "tenant_id": self.tenant_a.pk, "asset_id": self.asset_a.pk}],
+            },
+            {
+                "schema_version": 2,
+                "rows": [{"category": {}, "tenant_id": self.tenant_a.pk, "asset_id": self.asset_a.pk}],
+            },
         ):
             with self.subTest(report=report):
                 self.session.reconciliation_report = report
@@ -220,34 +361,53 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 ):
                     read_reconciliation_report(self.session, user=self.user)
 
-    def test_v1_invalid_category_fails_closed_through_all_report_consumers(self):
-        malformed = {"rows": [{"category": "forged", "asset_id": self.asset_a.pk}]}
+    def test_v1_malformed_rows_fail_closed_through_all_report_consumers(self):
+        malformed_reports = (
+            {"rows": [None]},
+            {"rows": [{"category": [], "asset_id": self.asset_a.pk}]},
+            {"rows": [{"category": {}, "asset_id": self.asset_a.pk}]},
+            {"rows": [{"category": "forged", "asset_id": self.asset_a.pk}]},
+        )
         self.session.status = "completed"
-        self.session.reconciliation_report = malformed
-        self.session.save(update_fields=["status", "reconciliation_report"])
-
-        with self.assertRaisesMessage(ValidationError, "The stored reconciliation report cannot be read safely."):
-            read_reconciliation_report(self.session, user=self.user)
-        with self.assertRaisesMessage(ValidationError, "The stored reconciliation report cannot be read safely."):
-            rehome_audit_session_mismatches(self.session, user=self.user)
-        with self.assertRaisesMessage(ValidationError, "The stored reconciliation report cannot be read safely."):
-            from compliance.audit_services import flag_missing_assets
-
-            flag_missing_assets(self.session, user=self.user)
+        for malformed in malformed_reports:
+            with self.subTest(report=malformed):
+                self.session.reconciliation_report = malformed
+                self.session.save(update_fields=["status", "reconciliation_report"])
+                with self.assertRaisesMessage(
+                    ValidationError,
+                    "The stored reconciliation report cannot be read safely.",
+                ):
+                    read_reconciliation_report(self.session, user=self.user)
+                with self.assertRaisesMessage(
+                    ValidationError,
+                    "The stored reconciliation report cannot be read safely.",
+                ):
+                    rehome_audit_session_mismatches(self.session, user=self.user)
+                with self.assertRaisesMessage(
+                    ValidationError,
+                    "The stored reconciliation report cannot be read safely.",
+                ):
+                    flag_missing_assets(self.session, user=self.user)
 
     def test_malformed_report_detail_and_csv_paths_return_handled_denial(self):
+        malformed_reports = (
+            {"rows": [None]},
+            {"rows": [{"category": [], "asset_id": self.asset_a.pk}]},
+            {"rows": [{"category": {}, "asset_id": self.asset_a.pk}]},
+        )
         self.session.status = "completed"
-        self.session.reconciliation_report = {"rows": [{"category": "forged", "asset_id": self.asset_a.pk}]}
-        self.session.save(update_fields=["status", "reconciliation_report"])
         self.client_login_to_tenant(self.user, self.tenant_a)
-
-        for url in (
-            reverse("compliance:auditsession_detail", kwargs={"pk": self.session.pk}),
-            reverse("compliance:auditsession_report_csv", kwargs={"pk": self.session.pk}),
-        ):
-            with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, 403)
+        for malformed in malformed_reports:
+            with self.subTest(report=malformed):
+                self.session.reconciliation_report = malformed
+                self.session.save(update_fields=["status", "reconciliation_report"])
+                for url in (
+                    reverse("compliance:auditsession_detail", kwargs={"pk": self.session.pk}),
+                    reverse("compliance:auditsession_report_csv", kwargs={"pk": self.session.pk}),
+                ):
+                    with self.subTest(url=url):
+                        response = self.client.get(url)
+                        self.assertEqual(response.status_code, 403)
 
     def test_commit_uses_scan_authorization_inside_transaction(self):
         scan_user = baker.make("users.User", username="scan-only", is_active=True)

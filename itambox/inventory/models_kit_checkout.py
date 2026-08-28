@@ -28,9 +28,10 @@ class KitCheckoutProvider(Protocol):
 _provider = SingleProviderSlot[KitCheckoutProvider]("inventory kit checkout")
 
 
-def register_kit_checkout(provider: KitCheckoutProvider) -> None:
+def register_kit_checkout(provider: KitCheckoutProvider) -> KitCheckoutProvider:
     """Register the assets-owned implementation once the apps are ready."""
     _provider.register(provider)
+    return provider
 
 
 def get_kit_checkout() -> KitCheckoutProvider:
