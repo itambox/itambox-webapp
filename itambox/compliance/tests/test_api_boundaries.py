@@ -200,6 +200,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(str(response.data["detail"]), "You are not authorized to close this audit session.")
         session.refresh_from_db()
         self.assertEqual((session.status, session.completed_at, session.reconciliation_report), before)
         foreign_asset.refresh_from_db()
@@ -268,6 +269,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(str(response.data["detail"]), "You are not authorized to create this audit observation.")
         self.assertFalse(AssetAudit.objects.filter(session=active_session, asset=foreign_asset).exists())
 
 

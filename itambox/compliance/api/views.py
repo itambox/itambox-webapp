@@ -107,7 +107,7 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
             try:
                 close_audit_session(instance, user=self.request.user, request=self.request)
             except DjangoPermissionDenied as exc:
-                raise DRFPermissionDenied(str(exc)) from exc
+                raise DRFPermissionDenied("You are not authorized to close this audit session.") from exc
         serializer.instance = instance
 
 
@@ -133,7 +133,7 @@ class AssetAuditViewSet(ITAMBoxModelViewSet):
                 verification_method=values.get("verification_method", "manual"),
             )
         except DjangoPermissionDenied as exc:
-            raise DRFPermissionDenied(str(exc)) from exc
+            raise DRFPermissionDenied("You are not authorized to create this audit observation.") from exc
         serializer.instance = audit
 
     def perform_update(self, serializer):
