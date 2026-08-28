@@ -27,6 +27,19 @@ class GenericTransactionView(
     hx_trigger = "tableRefreshRequired"
     form_field_map = {}
     form_exclude_fields = ()
+
+    def get(self, request, *args, **kwargs):
+        try:
+            return super().get(request, *args, **kwargs)
+        except PermissionDenied as exc:
+            if is_htmx_request(request):
+                response = self._htmx_error_response(
+                    str(exc) or str(_("You do not have permission to perform this action."))
+                )
+                response.status_code = 403
+                return response
+            raise
+
     #: When True, successful HTMX submissions answer with HX-Redirect to the
     #: object's detail page instead of 204 + closeModal/refresh triggers.
     hx_redirect_on_success = False
@@ -146,7 +159,11 @@ class SimplePostView(SecuredObjectActionMixin, PermissionRequiredMixin, LoginReq
             # For HTMX, surface a toast instead of swapping a raw 403 page into the
             # modal; for full-page requests, let the standard 403 handler run.
             if is_htmx_request(request):
-                return self._htmx_error_response(str(e) or str(_("You do not have permission to perform this action.")))
+                response = self._htmx_error_response(
+                    str(e) or str(_("You do not have permission to perform this action."))
+                )
+                response.status_code = 403
+                return response
             raise
         except ValidationError as e:
             if hasattr(e, "message_dict"):

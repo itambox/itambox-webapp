@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from assets.models import AssetMaintenance
 from compliance.audit_services import audit_asset, authorized_asset_audit_queryset, close_audit_session
@@ -115,6 +116,11 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
             except DjangoPermissionDenied as exc:
                 raise DRFPermissionDenied("You are not authorized to close this audit session.") from exc
         serializer.instance = instance
+
+    def perform_destroy(self, instance):
+        if instance.status == "completed":
+            raise DRFValidationError("Completed audit sessions and their evidence cannot be deleted.")
+        return super().perform_destroy(instance)
 
 
 class AssetAuditViewSet(ITAMBoxModelViewSet):

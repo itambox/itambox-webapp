@@ -321,6 +321,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         self.session.status = "completed"
         self.session.reconciliation_report = {
             "schema_version": 2,
+            "rehome_location_id": self.location_a.pk,
             "total_expected": 1,
             "total_scanned": 1,
             "rows": [
@@ -328,6 +329,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                     "tenant_id": self.tenant_a.pk,
                     "category": "mismatched",
                     "asset_id": self.asset_a.pk,
+                    "observed_location_id": self.asset_a.location_id,
                 }
             ],
         }
@@ -822,10 +824,42 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         close_warm = len(queries)
 
         cold_rehome_actor = actor("query-cold-rehome")
-        rehome_report = {
+        rehome_observed = baker.make(Location, tenant=self.tenant_a, name="Query rehome observed")
+        rehome_cold_asset = baker.make(
+            Asset,
+            tenant=self.tenant_a,
+            location=rehome_observed,
+            status=self.status,
+        )
+        rehome_warm_asset = baker.make(
+            Asset,
+            tenant=self.tenant_a,
+            location=rehome_observed,
+            status=self.status,
+        )
+        rehome_cold_report = {
             "schema_version": 2,
             "rehome_location_id": self.location_a.pk,
-            "rows": [{"tenant_id": self.tenant_a.pk, "category": "mismatched", "asset_id": self.asset_a.pk}],
+            "rows": [
+                {
+                    "tenant_id": self.tenant_a.pk,
+                    "category": "mismatched",
+                    "asset_id": rehome_cold_asset.pk,
+                    "observed_location_id": rehome_observed.pk,
+                }
+            ],
+        }
+        rehome_warm_report = {
+            "schema_version": 2,
+            "rehome_location_id": self.location_a.pk,
+            "rows": [
+                {
+                    "tenant_id": self.tenant_a.pk,
+                    "category": "mismatched",
+                    "asset_id": rehome_warm_asset.pk,
+                    "observed_location_id": rehome_observed.pk,
+                }
+            ],
         }
         rehome_cold_session = AuditSession.objects.create(
             name="Query cold rehome",
@@ -833,7 +867,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             location=self.location_a,
             status="completed",
             created_by=self.user,
-            reconciliation_report=rehome_report,
+            reconciliation_report=rehome_cold_report,
         )
         rehome_warm_session = AuditSession.objects.create(
             name="Query warm rehome",
@@ -841,7 +875,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             location=self.location_a,
             status="completed",
             created_by=self.user,
-            reconciliation_report=rehome_report,
+            reconciliation_report=rehome_warm_report,
         )
         with CaptureQueriesContext(connection) as queries:
             rehome_audit_session_mismatches(rehome_cold_session, user=cold_rehome_actor)

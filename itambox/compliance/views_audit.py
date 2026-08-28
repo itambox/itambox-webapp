@@ -7,7 +7,6 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
@@ -22,9 +21,9 @@ from compliance.audit_services import (
     _missing_asset_to_dict,
     audit_asset,
     authorized_scan_assets_queryset,
-    classify_session_after_scan,
     classify_session_audits,
     close_audit_session,
+    commit_audit_basket,
     expected_scan_assets_queryset,
     flag_missing_assets,
     preview_missing_assets,
@@ -309,32 +308,13 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
             )
             return response
 
-        scan_assets = authorized_scan_assets_queryset(session, user=request.user)
-
         try:
-            with transaction.atomic():
-                for asset_pk in asset_pks:
-                    try:
-                        asset = scan_assets.select_for_update().get(pk=asset_pk)
-                    except scan_assets.model.DoesNotExist:
-                        raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {"pk": asset_pk}) from None
-
-                    # Skip an asset already verified in this session so re-committing
-                    # a basket is idempotent (audit_asset would otherwise raise on the
-                    # duplicate and abort the whole batch).
-                    if AssetAudit.objects.filter(session=session, asset=asset).exists():
-                        continue
-
-                    observed_location = session.location or asset.location
-                    audit_asset(
-                        asset=asset,
-                        user=request.user,
-                        session=session,
-                        location=observed_location,
-                        status=asset.status,
-                        verification_method="barcode",
-                    )
-                classified = classify_session_after_scan(session, user=request.user)
+            classified = commit_audit_basket(
+                session,
+                user=request.user,
+                asset_ids=asset_pks,
+                request=request,
+            )
         except ValidationError as err:
             msg = err.message if hasattr(err, "message") else str(err)
             # 204 → no swap, basket preserved; surface the failure as a toast.
@@ -395,10 +375,18 @@ class AuditSessionRehomeView(SimplePostView):
     permission_required = "assets.change_asset"
 
     def perform_action(self, session, request) -> dict:
-        rehome_audit_session_mismatches(session, user=request.user)
+        result = rehome_audit_session_mismatches(session, user=request.user)
         return {
-            "message": _("All mismatched assets in campaign '%(name)s' have been bulk re-homed to '%(location)s'.")
-            % {"name": session.name, "location": session.location.name if session.location else "Global"}
+            "message": _(
+                "Rehome complete: %(moved)s moved, %(already)s already correct, "
+                "%(conflicted)s changed since close, %(unavailable)s unavailable."
+            )
+            % {
+                "moved": result["moved"],
+                "already": result["already_correct"],
+                "conflicted": result["conflicted"],
+                "unavailable": result["unavailable"],
+            }
         }
 
 
@@ -490,6 +478,12 @@ class AuditSessionDeleteView(ObjectDeleteView):
     model = AuditSession
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("compliance:auditsession_list")
+
+    def get_object(self, queryset=None):
+        session = super().get_object(queryset)
+        if session.status == "completed":
+            raise PermissionDenied(_("Completed audit sessions and their evidence cannot be deleted."))
+        return session
 
 
 class AuditSessionStartView(SimplePostView):

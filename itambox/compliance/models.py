@@ -419,6 +419,21 @@ class AuditSession(StandardModel, SoftDeleteMixin):
         self._reject_completed_mutation()
         return super().save(*args, **kwargs)
 
+    def _reject_completed_delete(self):
+        if self.pk is None:
+            return
+        status = type(self)._base_manager.filter(pk=self.pk).values_list("status", flat=True).first()
+        if status == AuditSessionStatusChoices.COMPLETED:
+            raise ValidationError(_("Completed audit sessions and their evidence cannot be deleted."))
+
+    def soft_delete(self):
+        self._reject_completed_delete()
+        return super().soft_delete()
+
+    def delete(self, *args, **kwargs):
+        self._reject_completed_delete()
+        return super().delete(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse("compliance:auditsession_detail", kwargs={"pk": self.pk})
 

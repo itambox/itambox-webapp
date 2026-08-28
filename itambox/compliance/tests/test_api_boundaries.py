@@ -366,11 +366,19 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
         self.grant(scan_user, self.tenant, role_a)
         self.grant(scan_user, tenant_b, role_b)
         self.client_login_to_tenant(scan_user, tenant_b)
+        session = AuditSession.objects.create(
+            name="API foreign-location session",
+            tenant=None,
+            location=None,
+            status="active",
+            created_by=scan_user,
+        )
         before = AssetAudit.objects.count()
 
         response = self.client.post(
             self._audit_list_url(),
             {
+                "session": session.pk,
                 "asset_id": self.asset.pk,
                 "location_id": location_b.pk,
                 "status_id": self.status.pk,
@@ -379,10 +387,31 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             format="json",
         )
 
-        self.assertIn(response.status_code, (400, 403), response.data)
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(str(response.data["detail"]), "You are not authorized to create this audit observation.")
         self.assertEqual(AssetAudit.objects.count(), before)
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.location_id, self.location.pk)
+
+    def test_api_rejects_current_archived_asset_with_deployable_observed_status(self):
+        archived = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED, name="API archived current status")
+        self.asset.status = archived
+        self.asset.save(update_fields=["status"])
+        before = AssetAudit.objects.count()
+
+        response = self.client.post(
+            self._audit_list_url(),
+            {
+                "asset_id": self.asset.pk,
+                "location_id": self.location.pk,
+                "status_id": self.status.pk,
+                "verification_method": "manual",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(AssetAudit.objects.count(), before)
 
 
 class ComplianceScanScopeTests(TenantTestMixin, TestCase):
