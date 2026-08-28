@@ -122,14 +122,14 @@ class FlagMissingServiceTests(TestCase):
         self.assertEqual(result["flagged"], 0)
         self.assertEqual(result["skipped"], 0)
 
-    def test_missing_status_is_get_or_create(self):
-        """StatusLabel 'Missing' is reused if it already exists."""
-        existing = StatusLabel.objects.create(name="Missing", type=StatusLabel.TYPE_UNDEPLOYABLE, color="#000")
+    def test_missing_status_is_preprovisioned_and_reused(self):
+        """The canonical Missing label is seeded and never created by flagging."""
+        existing = StatusLabel._base_manager.get(slug="missing")
+        self.assertEqual(existing.type, StatusLabel.TYPE_UNDEPLOYABLE)
         self._close_with_missing(1)
         flag_missing_assets(self.session, user=self.user)
-        # Should not create a second 'Missing' label
-        self.assertEqual(StatusLabel.objects.filter(name="Missing").count(), 1)
-        self.assertEqual(StatusLabel.objects.get(name="Missing").pk, existing.pk)
+        self.assertEqual(StatusLabel._base_manager.filter(slug="missing").count(), 1)
+        self.assertEqual(StatusLabel._base_manager.get(slug="missing").pk, existing.pk)
 
 
 class FlagMissingViewTests(TenantTestMixin, TestCase):

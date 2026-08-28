@@ -108,6 +108,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             created_by=self.user,
             reconciliation_report={
                 "schema_version": 2,
+                "rehome_location_id": self.location_a.pk,
                 "rows": [
                     {
                         "tenant_id": self.tenant_a.pk,
@@ -125,6 +126,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             created_by=self.user,
             reconciliation_report={
                 "schema_version": 2,
+                "rehome_location_id": self.location_a.pk,
                 "rows": [
                     {
                         "tenant_id": self.tenant_a.pk,
@@ -152,9 +154,9 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         before_location = self.asset_a.location_id
         before_status = self.asset_a.status_id
         before_statuses = list(StatusLabel._base_manager.values_list("pk", "name", "type", "color"))
-        rehome_audit_session_mismatches(rehome_session, user=self.user)
+        with self.assertRaises(PermissionDenied):
+            rehome_audit_session_mismatches(rehome_session, user=self.user)
         self.assertEqual(flag_missing_assets(flag_session, user=self.user), {"flagged": 0, "skipped": 1})
-        self.asset_a.refresh_from_db()
         self.assertEqual(self.asset_a.location_id, before_location)
         self.assertEqual(self.asset_a.status_id, before_status)
         self.assertEqual(
@@ -563,7 +565,9 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         for malformed in malformed_reports:
             with self.subTest(report=malformed):
                 self.session.reconciliation_report = malformed
-                self.session.save(update_fields=["status", "reconciliation_report"])
+                AuditSession._base_manager.filter(pk=self.session.pk).update(
+                    status="completed", reconciliation_report=malformed
+                )
                 with self.assertRaisesMessage(
                     ValidationError,
                     "The stored reconciliation report cannot be read safely.",
@@ -591,7 +595,9 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         for malformed in malformed_reports:
             with self.subTest(report=malformed):
                 self.session.reconciliation_report = malformed
-                self.session.save(update_fields=["status", "reconciliation_report"])
+                AuditSession._base_manager.filter(pk=self.session.pk).update(
+                    status="completed", reconciliation_report=malformed
+                )
                 for url in (
                     reverse("compliance:auditsession_detail", kwargs={"pk": self.session.pk}),
                     reverse("compliance:auditsession_report_csv", kwargs={"pk": self.session.pk}),
@@ -682,9 +688,10 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             created_by=self.user,
             reconciliation_report={"rows": [{"category": "mismatched", "asset_id": self.asset_a.pk}]},
         )
-        rehome_audit_session_mismatches(rehome_session, user=self.user)
+        with self.assertRaises(ValidationError):
+            rehome_audit_session_mismatches(rehome_session, user=self.user)
         self.asset_a.refresh_from_db()
-        self.assertEqual(self.asset_a.location_id, self.location_a.pk)
+        self.assertEqual(self.asset_a.location_id, second_location.pk)
 
         flag_asset = baker.make(
             Asset,
@@ -738,6 +745,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         self.session.status = "completed"
         self.session.reconciliation_report = {
             "schema_version": 2,
+            "rehome_location_id": self.location_a.pk,
             "total_expected": 0,
             "total_scanned": 1,
             "rows": [
@@ -816,6 +824,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         cold_rehome_actor = actor("query-cold-rehome")
         rehome_report = {
             "schema_version": 2,
+            "rehome_location_id": self.location_a.pk,
             "rows": [{"tenant_id": self.tenant_a.pk, "category": "mismatched", "asset_id": self.asset_a.pk}],
         }
         rehome_cold_session = AuditSession.objects.create(
@@ -852,6 +861,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             created_by=self.user,
             reconciliation_report={
                 "schema_version": 2,
+                "rehome_location_id": self.location_a.pk,
                 "rows": [
                     {
                         "tenant_id": self.tenant_a.pk,
@@ -870,6 +880,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             created_by=self.user,
             reconciliation_report={
                 "schema_version": 2,
+                "rehome_location_id": self.location_a.pk,
                 "rows": [
                     {
                         "tenant_id": self.tenant_a.pk,
@@ -900,7 +911,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 flag_cold,
                 flag_warm,
             ),
-            (4, 1, 6, 3, 12, 12, 17, 14, 22, 15),
+            (4, 1, 6, 3, 14, 14, 19, 16, 19, 16),
         )
 
 

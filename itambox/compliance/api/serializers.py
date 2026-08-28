@@ -185,6 +185,23 @@ class AuditSessionSerializer(BaseModelSerializer):
             raise serializers.ValidationError(
                 {"completed_at": "The completion timestamp is assigned by the close service."}
             )
+        if self.instance is not None and self.instance.status == "completed":
+            persisted = (
+                AuditSession._base_manager.filter(pk=self.instance.pk).values("name", "location_id", "status").first()
+            )
+            immutable_changes = {
+                field
+                for field, persisted_value in (
+                    ("name", persisted["name"] if persisted else None),
+                    ("location", persisted["location_id"] if persisted else None),
+                    ("status", persisted["status"] if persisted else None),
+                )
+                if field in attrs
+                and (attrs[field].pk if field == "location" and attrs[field] is not None else attrs[field])
+                != persisted_value
+            }
+            if immutable_changes:
+                raise serializers.ValidationError("Completed audit sessions are immutable.")
         return attrs
 
 

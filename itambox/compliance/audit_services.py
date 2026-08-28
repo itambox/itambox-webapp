@@ -21,14 +21,13 @@ from core.context import (
     get_current_request_id,
     get_current_tenant,
 )
-from organization.models import Tenant
+from organization.models import Location, Tenant
 
 if (
     typing.TYPE_CHECKING  # Keep typing-only imports visible to coverage's denominator.
 ):
     from django.http import HttpRequest
 
-    from organization.models import Location
     from users.models import User
 
 EXPECTED_ASSET_PERMISSION = "compliance.view_auditsession"
@@ -73,7 +72,19 @@ class ReconciliationReportV2(TypedDict):
     schema_version: int
     total_expected: int
     total_scanned: int
+    rehome_location_id: int | None
     rows: list[dict[str, object]]
+
+
+def _lock_audit_session(session: AuditSession) -> AuditSession:
+    """Resolve and lock the current session before any other domain row."""
+    try:
+        locked = AuditSession._base_manager.select_for_update().get(pk=session.pk)
+    except AuditSession.DoesNotExist:
+        raise PermissionDenied("The audit session is no longer available.") from None
+    if locked.deleted_at is not None:
+        raise PermissionDenied("The audit session is no longer available.")
+    return locked
 
 
 def _stored_report_error() -> ValidationError:
@@ -304,45 +315,7 @@ def expected_scan_assets_queryset(session: AuditSession, *, user: User) -> Query
     return _expected_assets_for_tenants(session, tenant_ids)
 
 
-def _lock_and_validate_scan_asset(
-    asset: Asset,
-    *,
-    user: User,
-    session: AuditSession | None,
-    location: Location | None,
-    status: StatusLabel | None,
-) -> tuple[Asset, Location, StatusLabel]:
-    if session is not None:
-        allowed_tenants = _authorize_session(
-            session,
-            user=user,
-            system_authorization=None,
-            permission=SCAN_PERMISSION,
-            operation=SCAN_OPERATION,
-        )
-    else:
-        allowed_tenants = _authorized_asset_tenants(user)
-    try:
-        asset = Asset._base_manager.select_for_update().get(
-            pk=asset.pk,
-            tenant_id__in=allowed_tenants,
-            deleted_at__isnull=True,
-            tenant__deleted_at__isnull=True,
-        )
-    except ObjectDoesNotExist:
-        raise PermissionDenied("The asset is not authorized for this audit operation.") from None
-    if session is not None and session.status != "active":
-        raise ValidationError(_("Completed audit sessions cannot accept new observations."))
-    location = location or asset.location
-    status = status or asset.status
-    if not location:
-        raise ValidationError(_("Audit observed location must be specified."))
-    if not status:
-        raise ValidationError(_("Audit observed status must be specified."))
-    if location.tenant_id != asset.tenant_id:
-        raise PermissionDenied("The observed location is not in the asset's tenant.")
-    if status.type == StatusLabel.TYPE_ARCHIVED:
-        raise ValidationError(_("Archived assets cannot be audited."))
+def _validate_unique_session_audit(session: AuditSession | None, asset: Asset) -> None:
     if (
         session
         and AssetAudit.objects.filter(
@@ -353,6 +326,42 @@ def _lock_and_validate_scan_asset(
         ).exists()
     ):
         raise ValidationError(_("This asset has already been verified in this session."))
+
+
+def _lock_and_validate_scan_asset(
+    asset: Asset,
+    *,
+    user: User,
+    session: AuditSession | None,
+    allowed_tenants: frozenset[int],
+    location: Location | None,
+    status: StatusLabel | None,
+) -> tuple[Asset, Location, StatusLabel]:
+    try:
+        asset = Asset._base_manager.select_for_update().get(
+            pk=asset.pk,
+            tenant_id__in=allowed_tenants,
+            deleted_at__isnull=True,
+            tenant__deleted_at__isnull=True,
+        )
+    except ObjectDoesNotExist:
+        raise PermissionDenied("The asset is not authorized for this audit operation.") from None
+    if session is not None:
+        if session.status != "active":
+            raise ValidationError(_("Completed audit sessions cannot accept new observations."))
+        if session.tenant_id is not None and asset.tenant_id != session.tenant_id:
+            raise PermissionDenied("The asset is not associated with this audit session.")
+    location = location or asset.location
+    status = status or asset.status
+    if not location:
+        raise ValidationError(_("Audit observed location must be specified."))
+    if not status:
+        raise ValidationError(_("Audit observed status must be specified."))
+    if location.tenant_id != asset.tenant_id:
+        raise PermissionDenied("The observed location is not in the asset's tenant.")
+    if status.type == StatusLabel.TYPE_ARCHIVED:
+        raise ValidationError(_("Archived assets cannot be audited."))
+    _validate_unique_session_audit(session, asset)
     return asset, location, status
 
 
@@ -370,10 +379,26 @@ def audit_asset(
     **kwargs: object,
 ) -> AssetAudit:
     """Record one actor-bound audit observation."""
+    if session is not None:
+        # The session lock is deliberately the first domain-row lock. Every
+        # session-bound scan therefore serializes with close before it locks an
+        # Asset, using the same session-before-asset order as close.
+        session = _lock_audit_session(session)
+        allowed_tenants = _authorize_session(
+            session,
+            user=user,
+            system_authorization=None,
+            permission=SCAN_PERMISSION,
+            operation=SCAN_OPERATION,
+        )
+    else:
+        allowed_tenants = _authorized_asset_tenants(user)
+
     asset, location, status = _lock_and_validate_scan_asset(
         asset,
         user=user,
         session=session,
+        allowed_tenants=allowed_tenants,
         location=location,
         status=status,
     )
@@ -492,7 +517,7 @@ def _missing_asset_to_dict(asset: Asset, session_location: Any) -> dict[str, Any
 
 
 def _empty_report() -> ReconciliationReportV2:
-    return {"schema_version": 2, "total_expected": 0, "total_scanned": 0, "rows": []}
+    return {"schema_version": 2, "total_expected": 0, "total_scanned": 0, "rehome_location_id": None, "rows": []}
 
 
 def _validated_report(report: Any) -> tuple[int, list[Any]]:
@@ -556,11 +581,14 @@ def _read_v2_report(session: AuditSession, stored_rows: list[Any], tenant_ids: f
     return rows
 
 
-def _report_with_derived_totals(rows: list[dict[str, Any]]) -> ReconciliationReportV2:
+def _report_with_derived_totals(
+    rows: list[dict[str, Any]], rehome_location_id: int | None = None
+) -> ReconciliationReportV2:
     return {
         "schema_version": 2,
         "total_expected": sum(row.get("category") in {"matching", "mismatched", "missing"} for row in rows),
         "total_scanned": sum(row.get("category") in {"matching", "mismatched", "surprise"} for row in rows),
+        "rehome_location_id": rehome_location_id,
         "rows": rows,
     }
 
@@ -569,10 +597,16 @@ def _read_report_for_tenants(session: AuditSession, tenant_ids: frozenset[int]) 
     if session.reconciliation_report is None:
         return _empty_report()
     version, stored_rows = _validated_report(session.reconciliation_report)
+    rehome_location_id = None
+    if version == 2 and "rehome_location_id" in session.reconciliation_report:
+        candidate = session.reconciliation_report["rehome_location_id"]
+        if candidate is not None and (type(candidate) is not int or candidate <= 0):
+            raise _stored_report_error()
+        rehome_location_id = candidate
     rows = (
         _read_v1_report(stored_rows, tenant_ids) if version == 1 else _read_v2_report(session, stored_rows, tenant_ids)
     )
-    return _report_with_derived_totals(rows)
+    return _report_with_derived_totals(rows, rehome_location_id)
 
 
 def read_reconciliation_report(
@@ -592,6 +626,25 @@ def read_reconciliation_report(
     return _read_report_for_tenants(session, tenant_ids)
 
 
+def preview_missing_assets(
+    session: AuditSession,
+    *,
+    user: User | None,
+    system_authorization: SystemAuthorizationContext | None = None,
+) -> int:
+    """Return the missing-row count under the fixed asset-mutation boundary."""
+    tenant_ids = _authorize_asset_mutation(
+        session,
+        user=user,
+        system_authorization=system_authorization,
+        operation=FLAG_MISSING_OPERATION,
+    )
+    if session.status != "completed":
+        raise ValidationError(_("Audit session must be closed before previewing missing assets."))
+    report = _read_report_for_tenants(session, tenant_ids)
+    return sum(row["category"] == "missing" for row in report["rows"])
+
+
 def _all_expected_assets(session: AuditSession) -> QuerySet[Asset]:
     queryset = Asset._base_manager.filter(
         deleted_at__isnull=True,
@@ -609,24 +662,30 @@ def _all_expected_assets(session: AuditSession) -> QuerySet[Asset]:
     )
 
 
-def _close_represented_tenants(session: AuditSession) -> frozenset[int]:
-    if session.tenant_id is None:
-        expected_queryset = _all_expected_assets(session)
-    else:
-        expected_queryset = _expected_assets_for_tenants(session, frozenset({session.tenant_id}))
-    expected_tenants = set(expected_queryset.values_list("tenant_id", flat=True).distinct())
-    observed_tenants = set(
-        AssetAudit.objects.filter(
-            session=session,
-            asset__isnull=False,
-            asset__deleted_at__isnull=True,
-            asset__tenant_id__isnull=False,
-            asset__tenant__deleted_at__isnull=True,
-        )
-        .values_list("asset__tenant_id", flat=True)
-        .distinct()
+def _lock_close_assets(session: AuditSession) -> list[Asset]:
+    """Lock every live expected/observed asset in deterministic PK order."""
+    expected_queryset = (
+        _all_expected_assets(session)
+        if session.tenant_id is None
+        else _expected_assets_for_tenants(session, frozenset({session.tenant_id}))
     )
-    return frozenset(expected_tenants | observed_tenants)
+    expected_ids = expected_queryset.values_list("pk", flat=True)
+    observed_ids = AssetAudit.objects.filter(session=session, asset_id__isnull=False).values_list("asset_id", flat=True)
+    return list(
+        Asset._base_manager.select_for_update(of=("self",))
+        .filter(
+            Q(pk__in=expected_ids) | Q(pk__in=observed_ids),
+            deleted_at__isnull=True,
+            tenant_id__isnull=False,
+            tenant__deleted_at__isnull=True,
+        )
+        .select_related("tenant", "location", "status")
+        .order_by("pk")
+    )
+
+
+def _close_represented_tenants(locked_assets: list[Asset]) -> frozenset[int]:
+    return frozenset(asset.tenant_id for asset in locked_assets if type(asset.tenant_id) is int and asset.tenant_id > 0)
 
 
 def _build_close_report(
@@ -680,6 +739,8 @@ def close_audit_session(
     **kwargs: object,
 ) -> AuditCloseResult:
     """Close a session only after full represented-tenant authorization."""
+    caller_session = session
+    session = _lock_audit_session(session)
     tenant_ids = _authorize_session(
         session,
         user=user,
@@ -690,7 +751,8 @@ def close_audit_session(
     if session.status == "completed":
         raise ValidationError(_("This audit campaign is already closed."))
 
-    represented = _close_represented_tenants(session)
+    locked_assets = _lock_close_assets(session)
+    represented = _close_represented_tenants(locked_assets)
     if session.tenant_id is not None and (represented - {session.tenant_id}):
         raise PermissionDenied("A tenant-bound audit contains an observation outside its tenant.")
     if not represented.issubset(tenant_ids):
@@ -698,10 +760,15 @@ def close_audit_session(
 
     classified = _classify_authorized(session, tenant_ids)
     report, _rows, missing_assets = _build_close_report(session, classified)
+    report["rehome_location_id"] = session.location_id
     session.status = "completed"
     session.completed_at = timezone.now()
     session.reconciliation_report = report
-    session.save(update_fields=["status", "completed_at", "reconciliation_report"])
+    session.save(update_fields=["status", "completed_at", "reconciliation_report", "updated_at"])
+    caller_session.status = session.status
+    caller_session.completed_at = session.completed_at
+    caller_session.reconciliation_report = session.reconciliation_report
+    caller_session.updated_at = session.updated_at
     return _close_result(classified, report, missing_assets)
 
 
@@ -721,6 +788,40 @@ def _authorize_asset_mutation(
     )
 
 
+def _frozen_rehome_location(
+    session: AuditSession,
+    report: ReconciliationReportV2,
+    tenant_ids: frozenset[int],
+) -> Location:
+    if report["schema_version"] != 2 or "rehome_location_id" not in report:
+        raise ValidationError(_("Re-homing requires a v2 report with a frozen target location."))
+    location_id = report["rehome_location_id"]
+    if type(location_id) is not int or location_id <= 0:
+        raise ValidationError(_("The frozen re-home target is unavailable."))
+    location = (
+        Location._base_manager.filter(
+            pk=location_id,
+            deleted_at__isnull=True,
+            tenant_id__in=tenant_ids,
+            tenant__deleted_at__isnull=True,
+        )
+        .select_related("tenant")
+        .first()
+    )
+    if location is None:
+        raise PermissionDenied("The frozen re-home target is not live and authorized.")
+    if session.tenant_id is not None and location.tenant_id != session.tenant_id:
+        raise PermissionDenied("The frozen re-home target is not in the audit session tenant.")
+    return location
+
+
+def _canonical_missing_status() -> StatusLabel:
+    missing_status = StatusLabel._base_manager.filter(slug="missing", deleted_at__isnull=True).first()
+    if missing_status is None or missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
+        raise ValidationError(_("The canonical Missing status is unavailable or misconfigured."))
+    return missing_status
+
+
 @transaction.atomic
 def rehome_audit_session_mismatches(
     session: AuditSession,
@@ -730,7 +831,8 @@ def rehome_audit_session_mismatches(
     request: HttpRequest | None = None,
     **kwargs: object,
 ) -> None:
-    """Rehome only filtered, live report rows within the actor's scope."""
+    """Rehome only filtered, live report rows to the close-time target."""
+    session = _lock_audit_session(session)
     tenant_ids = _authorize_asset_mutation(
         session,
         user=user,
@@ -739,27 +841,39 @@ def rehome_audit_session_mismatches(
     )
     if session.status != "completed":
         raise ValidationError(_("Audit sessions must be closed before bulk re-homing reconciliation."))
+    if session.reconciliation_report is None:
+        raise ValidationError(_("A stored reconciliation report is required for re-homing."))
+    stored_version, stored_rows = _validated_report(session.reconciliation_report)
+    if stored_version != 2:
+        for row in stored_rows:
+            _validated_report_category(row)
+        raise ValidationError(_("Re-homing requires a v2 report with a frozen target location."))
     report = _read_report_for_tenants(session, tenant_ids)
     mismatch_ids = [row["asset_id"] for row in report["rows"] if row["category"] == "mismatched"]
-    assets = list(
-        Asset._base_manager.select_for_update().filter(
-            deleted_at__isnull=True,
-            pk__in=mismatch_ids,
-            tenant_id__in=tenant_ids,
-            tenant__deleted_at__isnull=True,
-        )
-    )
     if user is not None:
         force_authorization_generation_check(user)
-    _authorize_asset_mutation(
+    current_tenant_ids = _authorize_asset_mutation(
         session,
         user=user,
         system_authorization=system_authorization,
         operation=REHOME_OPERATION,
     )
+    assets = list(
+        Asset._base_manager.select_for_update()
+        .filter(
+            deleted_at__isnull=True,
+            pk__in=mismatch_ids,
+            tenant_id__in=current_tenant_ids,
+            tenant__deleted_at__isnull=True,
+        )
+        .order_by("pk")
+    )
+    target_location = _frozen_rehome_location(session, report, current_tenant_ids)
     for asset in assets:
+        if session.tenant_id is not None and asset.tenant_id != session.tenant_id:
+            raise PermissionDenied("A re-home asset is not in the audit session tenant.")
         asset.snapshot()
-        asset.location = session.location
+        asset.location = target_location
         asset.save(update_fields=["location"])
 
 
@@ -772,7 +886,8 @@ def flag_missing_assets(
     request: HttpRequest | None = None,
     **kwargs: object,
 ) -> AuditFlagResult:
-    """Flag filtered missing report rows while preserving changed targets."""
+    """Flag filtered missing report rows using the pre-provisioned status."""
+    session = _lock_audit_session(session)
     tenant_ids = _authorize_asset_mutation(
         session,
         user=user,
@@ -781,41 +896,34 @@ def flag_missing_assets(
     )
     if session.status != "completed":
         raise ValidationError(_("Audit session must be closed before flagging missing assets."))
+    if session.reconciliation_report is None:
+        raise ValidationError(_("A stored reconciliation report is required for flagging missing assets."))
     report = _read_report_for_tenants(session, tenant_ids)
     missing_rows = [row for row in report["rows"] if row["category"] == "missing"]
     if not missing_rows:
         return {"flagged": 0, "skipped": 0}
 
+    if user is not None:
+        force_authorization_generation_check(user)
+    current_tenant_ids = _authorize_asset_mutation(
+        session,
+        user=user,
+        system_authorization=system_authorization,
+        operation=FLAG_MISSING_OPERATION,
+    )
+    missing_status = _canonical_missing_status()
     assets = {
         asset.pk: asset
         for asset in Asset._base_manager.select_for_update(of=("self",))
         .filter(
             deleted_at__isnull=True,
             pk__in=[row["asset_id"] for row in missing_rows],
-            tenant_id__in=tenant_ids,
+            tenant_id__in=current_tenant_ids,
             tenant__deleted_at__isnull=True,
         )
         .select_related("status")
+        .order_by("pk")
     }
-    if user is not None:
-        force_authorization_generation_check(user)
-    _authorize_asset_mutation(
-        session,
-        user=user,
-        system_authorization=system_authorization,
-        operation=FLAG_MISSING_OPERATION,
-    )
-    if not assets:
-        return {"flagged": 0, "skipped": len(missing_rows)}
-
-    missing_status, _created = StatusLabel.objects.get_or_create(
-        name="Missing",
-        defaults={"type": StatusLabel.TYPE_UNDEPLOYABLE, "color": "dc3545"},
-    )
-    if missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
-        missing_status.type = StatusLabel.TYPE_UNDEPLOYABLE
-        missing_status.save(update_fields=["type"])
-
     flagged = 0
     skipped = 0
     for row in missing_rows:

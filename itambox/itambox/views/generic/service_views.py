@@ -87,6 +87,12 @@ class GenericTransactionView(
             messages.success(self.request, self.get_success_message(result))
             return redirect(obj.get_absolute_url())
 
+        except PermissionDenied as e:
+            if is_htmx_request(self.request):
+                response = self._htmx_error_response(str(e) or _("You do not have permission to perform this action."))
+                response.status_code = 403
+                return response
+            raise
         except ValidationError as e:
             for msg in e.messages:
                 form.add_error(None, msg)
@@ -110,6 +116,9 @@ class GenericTransactionView(
 
     def get_success_message(self, result=None):
         return self.success_message
+
+    def _htmx_error_response(self, message):
+        return error_response(message)
 
 
 class SimplePostView(SecuredObjectActionMixin, PermissionRequiredMixin, LoginRequiredMixin, View):

@@ -543,10 +543,11 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 27)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 28)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
+                "assets.0101_seed_canonical_missing_status",
                 "compliance.0101_alter_custodyreceipt_signed_at",
                 "compliance.0102_clear_unsigned_receipt_timestamps",
                 "compliance.0103_alter_custodyreceipt_options",
@@ -625,6 +626,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "assets.0051_assetreservation_assetreservation_no_overlap",
                 "assets.0100_issue88_shard_42_assets_relations",
                 "assets.0100_issue88_shard_43_assets_seed",
+                "assets.0101_seed_canonical_missing_status",
                 "extras.0108_alertlog_delivery_outcome",
             ],
         )

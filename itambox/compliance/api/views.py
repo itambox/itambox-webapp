@@ -98,9 +98,15 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
             raise ValidationError("Completed audit sessions cannot be reopened.")
         if requested_status != "completed":
             return super().perform_update(serializer)
+        if set(serializer.validated_data) != {"status"}:
+            raise ValidationError("Audit sessions must be closed without changing their scope or metadata.")
 
         with transaction.atomic():
             locked = AuditSession._base_manager.filter(pk=current.pk).select_for_update().get()
+            # The initial ETag check protects the normal update path; the close
+            # path must validate again against the row that the lock actually
+            # acquired, otherwise a concurrent close can be overwritten.
+            self._validate_etag(self.request, locked)
             serializer.instance = locked
             serializer.validated_data.pop("status", None)
             instance = serializer.save()

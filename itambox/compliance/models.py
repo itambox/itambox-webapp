@@ -4,6 +4,7 @@ from datetime import timedelta
 from django import conf
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -398,6 +399,25 @@ class AuditSession(StandardModel, SoftDeleteMixin):
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
+
+    def _reject_completed_mutation(self):
+        if self._state.adding or self.pk is None:
+            return
+        persisted = (
+            type(self)
+            ._base_manager.filter(pk=self.pk)
+            .values("tenant_id", "location_id", "name", "status", "completed_at", "reconciliation_report")
+            .first()
+        )
+        if persisted is None or persisted["status"] != AuditSessionStatusChoices.COMPLETED:
+            return
+        fields = ("tenant_id", "location_id", "name", "status", "completed_at", "reconciliation_report")
+        if any(getattr(self, field) != persisted[field] for field in fields):
+            raise ValidationError(_("Completed audit sessions are immutable."))
+
+    def save(self, *args, **kwargs):
+        self._reject_completed_mutation()
+        return super().save(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse("compliance:auditsession_detail", kwargs={"pk": self.pk})

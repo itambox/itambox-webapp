@@ -205,24 +205,25 @@ class AuditReconciliationTestCase(TestCase):
         missing_ids = [a.id for a in report["missing_list"]]
         self.assertIn(self.asset_expected_2.id, missing_ids)
 
-        # 7. Bulk re-home: scan asset_expected_2 (staging_room asset) at server_room to
-        # create a real mismatch (expected at session.location but observed elsewhere).
-        # Re-open and clear frozen report so classify_session_audits is re-run.
-        session.status = "active"
-        session.save(update_fields=["status"])
-        session.reconciliation_report = None
-        session.save(update_fields=["reconciliation_report"])
+        # 7. Bulk re-home: use a new active session; completed sessions cannot be reopened.
+        rehome_session = AuditSession.objects.create(
+            name="Rehome follow-up",
+            tenant=self.tenant,
+            location=self.staging_room,
+            status="active",
+            created_by=self.admin,
+        )
         audit_asset(
             asset=self.asset_expected_2,
             user=self.admin,
-            session=session,
+            session=rehome_session,
             location=self.server_room,  # observed at server_room (≠ session staging_room)
             status=self.status_deployable,
             verification_method="manual",
         )
-        close_audit_session(session, user=self.admin)  # re-freeze with the mismatch
-        session.refresh_from_db()
-        rehome_audit_session_mismatches(session, user=self.admin)
+        close_audit_session(rehome_session, user=self.admin)  # re-freeze with the mismatch
+        rehome_session.refresh_from_db()
+        rehome_audit_session_mismatches(rehome_session, user=self.admin)
         # Rehome moves the mismatched asset to session.location (staging_room).
         # asset_expected_2 was already registered at staging_room, so the location
         # remains staging_room — confirming rehome ran cleanly without error.
@@ -285,28 +286,28 @@ class AuditReconciliationTestCase(TestCase):
         session.refresh_from_db()
         self.assertEqual(session.status, "completed")
 
-        # 4. Bulk re-home via View: re-scan asset_mismatched (server_room asset, in
-        # expected_ids for server_room session) at staging_room to create a mismatch.
-        # Clear the old audit record and frozen report first so we can re-scan.
-        session.status = "active"
-        session.save()
-        AssetAudit.objects.filter(session=session, asset=self.asset_mismatched).delete()
-        session.reconciliation_report = None
-        session.save(update_fields=["reconciliation_report"])
+        # 4. Bulk re-home via a new active session; completed sessions cannot be reopened.
+        rehome_session = AuditSession.objects.create(
+            name="View rehome follow-up",
+            tenant=self.tenant,
+            location=self.server_room,
+            status="active",
+            created_by=self.admin,
+        )
         audit_asset(
             asset=self.asset_mismatched,
             user=self.admin,
-            session=session,
+            session=rehome_session,
             location=self.staging_room,  # observed at staging_room (≠ session server_room)
             status=self.status_deployable,
         )
-        close_audit_session(session, user=self.admin)  # re-freeze with the mismatch
-        session.refresh_from_db()
-        self.assertEqual(session.status, "completed")
+        close_audit_session(rehome_session, user=self.admin)  # re-freeze with the mismatch
+        rehome_session.refresh_from_db()
+        self.assertEqual(rehome_session.status, "completed")
 
         # Post to re-home endpoint
         response = self.client.post(
-            reverse("compliance:auditsession_rehome", kwargs={"pk": session.pk}), HTTP_HX_REQUEST="true"
+            reverse("compliance:auditsession_rehome", kwargs={"pk": rehome_session.pk}), HTTP_HX_REQUEST="true"
         )
         self.assertEqual(response.status_code, 204)
 

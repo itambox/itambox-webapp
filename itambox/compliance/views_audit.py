@@ -27,6 +27,7 @@ from compliance.audit_services import (
     close_audit_session,
     expected_scan_assets_queryset,
     flag_missing_assets,
+    preview_missing_assets,
     read_reconciliation_report,
     rehome_audit_session_mismatches,
 )
@@ -469,11 +470,10 @@ class AuditSessionFlagMissingView(GenericTransactionView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         session = self.get_object()
-        if session.reconciliation_report is not None:
-            report = _read_report_or_deny(session, self.request.user)
-            context["missing_count"] = sum(row["category"] == "missing" for row in report["rows"])
-        else:
-            context["missing_count"] = 0
+        try:
+            context["missing_count"] = preview_missing_assets(session, user=self.request.user)
+        except ValidationError as exc:
+            raise PermissionDenied(_("The stored audit report is unavailable.")) from exc
         return context
 
     def get_success_message(self, result=None):
