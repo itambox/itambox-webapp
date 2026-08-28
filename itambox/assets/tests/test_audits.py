@@ -323,6 +323,12 @@ class AuditAPIViewsTestCase(TestCase):
             username="apiuser", password="password123", is_staff=True, is_superuser=True
         )
         self.tenant = Tenant.objects.create(name="Audit API tenant", slug="audit-api-tenant")
+        audit_role = Role.objects.create(
+            tenant=self.tenant,
+            name="Audit API role",
+            permissions=["compliance.add_assetaudit"],
+        )
+        grant(self.user, self.tenant, audit_role)
         set_current_tenant(self.tenant)
         self.client.force_authenticate(user=self.user)
 
