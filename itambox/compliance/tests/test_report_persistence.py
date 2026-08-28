@@ -13,27 +13,42 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import close_audit_session, rehome_audit_session_mismatches
 from compliance.models import AssetAudit, AuditSession
-from core.tests.mixins import TenantTestMixin
-from organization.models import Location
+from core.managers import set_current_tenant
+from core.tests.mixins import TenantTestMixin, grant
+from organization.models import Location, Role, Tenant
 
 User = get_user_model()
 
 
-def _su():
-    return User.objects.create_superuser(username="report_su", email="r@test.com", password="pw")
+def _su(tenant, username="report_su"):
+    user = User.objects.create_user(username=username, email=f"{username}@test.com", password="pw")
+    role = Role.objects.create(
+        tenant=tenant,
+        name="Report test role",
+        permissions=[
+            "compliance.view_auditsession",
+            "compliance.change_auditsession",
+            "assets.change_asset",
+        ],
+    )
+    grant(user, tenant, role)
+    set_current_tenant(tenant)
+    return user
 
 
 class ReportPersistenceTests(TestCase):
     """close_audit_session writes a frozen reconciliation_report JSONField."""
 
     def setUp(self):
-        self.user = _su()
-        self.loc = baker.make(Location, name="Berlin")
-        self.loc2 = baker.make(Location, name="Munich")
+        self.tenant = Tenant.objects.create(name="Report tenant", slug="report-tenant")
+        self.user = _su(self.tenant)
+        self.loc = baker.make(Location, name="Berlin", tenant=self.tenant)
+        self.loc2 = baker.make(Location, name="Munich", tenant=self.tenant)
         self.session = AuditSession.objects.create(
             name="Berlin Campaign",
             status="active",
             location=self.loc,
+            tenant=self.tenant,
             created_by=self.user,
         )
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
@@ -50,7 +65,7 @@ class ReportPersistenceTests(TestCase):
         )
 
     def test_close_writes_report(self):
-        asset = baker.make(Asset, status=self.status, location=self.loc)
+        asset = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
         self._audit(asset, self.loc)
 
         close_audit_session(self.session, user=self.user)
@@ -63,10 +78,10 @@ class ReportPersistenceTests(TestCase):
         self.assertIn("total_scanned", report)
 
     def test_report_contains_all_categories(self):
-        matching_asset = baker.make(Asset, status=self.status, location=self.loc)
-        mismatch_asset = baker.make(Asset, status=self.status, location=self.loc)
-        surprise_asset = baker.make(Asset, status=self.archived, location=self.loc)
-        missing_asset = baker.make(Asset, status=self.status, location=self.loc)
+        matching_asset = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
+        mismatch_asset = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
+        surprise_asset = baker.make(Asset, status=self.archived, location=self.loc, tenant=self.tenant)
+        missing_asset = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
 
         self._audit(matching_asset, self.loc)  # matching
         self._audit(mismatch_asset, self.loc2)  # mismatched (observed Munich, expected Berlin)
@@ -87,7 +102,9 @@ class ReportPersistenceTests(TestCase):
 
     def test_report_row_is_denormalized(self):
         """Rows contain name/tag/location strings, not just IDs."""
-        asset = baker.make(Asset, status=self.status, location=self.loc, name="Test Server", asset_tag="TS-001")
+        asset = baker.make(
+            Asset, status=self.status, location=self.loc, tenant=self.tenant, name="Test Server", asset_tag="TS-001"
+        )
         self._audit(asset, self.loc)
 
         close_audit_session(self.session, user=self.user)
@@ -104,21 +121,23 @@ class RehomeFromStoredReportTests(TestCase):
     """rehome_audit_session_mismatches uses stored report, not live re-query."""
 
     def setUp(self):
-        self.user = _su()
-        self.loc_berlin = baker.make(Location, name="Berlin")
-        self.loc_munich = baker.make(Location, name="Munich")
+        self.tenant = Tenant.objects.create(name="Rehome tenant", slug="rehome-tenant")
+        self.user = _su(self.tenant, username="rehome_su")
+        self.loc_berlin = baker.make(Location, name="Berlin", tenant=self.tenant)
+        self.loc_munich = baker.make(Location, name="Munich", tenant=self.tenant)
         self.session = AuditSession.objects.create(
             name="Rehome Test",
             status="active",
             location=self.loc_berlin,
+            tenant=self.tenant,
             created_by=self.user,
         )
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
 
     def test_rehome_moves_stored_mismatches(self):
         # Mismatch: registered in Berlin (so it's in expected_ids) but scanned in Munich.
-        mismatch_asset = baker.make(Asset, status=self.status, location=self.loc_berlin)
-        matching_asset = baker.make(Asset, status=self.status, location=self.loc_berlin)
+        mismatch_asset = baker.make(Asset, status=self.status, location=self.loc_berlin, tenant=self.tenant)
+        matching_asset = baker.make(Asset, status=self.status, location=self.loc_berlin, tenant=self.tenant)
 
         # mismatch_asset scanned in Munich (wrong loc) → mismatched in report
         AssetAudit.objects.create(
@@ -157,11 +176,15 @@ class CsvExportTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name="CSV Tenant", slug="csv-tenant")
-        self.tenant_role.permissions = ["compliance.view_auditsession"]
+        self.tenant_role.permissions = [
+            "compliance.view_auditsession",
+            "compliance.change_auditsession",
+            "assets.change_asset",
+        ]
         self.tenant_role.save()
 
-        self.loc = baker.make(Location, name="TestLoc")
-        self.loc2 = baker.make(Location, name="OtherLoc")
+        self.loc = baker.make(Location, name="TestLoc", tenant=self.tenant)
+        self.loc2 = baker.make(Location, name="OtherLoc", tenant=self.tenant)
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
         self.archived = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED)
 
@@ -169,12 +192,13 @@ class CsvExportTests(TenantTestMixin, TestCase):
             name="CSV Campaign",
             status="active",
             location=self.loc,
+            tenant=self.tenant,
             created_by=self.tenant_admin,
         )
-        matching = baker.make(Asset, status=self.status, location=self.loc)
-        mismatched = baker.make(Asset, status=self.status, location=self.loc)
-        surprise = baker.make(Asset, status=self.archived, location=self.loc)
-        self._missing = baker.make(Asset, status=self.status, location=self.loc)
+        matching = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
+        mismatched = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
+        surprise = baker.make(Asset, status=self.archived, location=self.loc, tenant=self.tenant)
+        self._missing = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
 
         for asset, loc in [(matching, self.loc), (mismatched, self.loc2), (surprise, self.loc)]:
             AssetAudit.objects.create(
@@ -185,7 +209,7 @@ class CsvExportTests(TenantTestMixin, TestCase):
                 status=self.status,
                 verification_method="manual",
             )
-        close_audit_session(self.session, user=self.tenant_admin)
+        close_audit_session(self.session, user=self.tenant_user)
 
     def test_csv_contains_all_categories(self):
         self.client_login_to_tenant(self.tenant_user, self.tenant)

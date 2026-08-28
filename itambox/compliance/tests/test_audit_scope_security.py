@@ -281,8 +281,9 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
 
     def test_expiring_grant_is_not_a_permission_map_shortcut(self):
         grant_row = self.grant
-        grant_row.valid_until = timezone.now() - timedelta(seconds=1)
-        grant_row.save(update_fields=["valid_until"])
+        type(grant_row).objects.filter(pk=grant_row.pk).update(valid_until=timezone.now() - timedelta(seconds=1))
+        self.user.__dict__.pop("_applicable_grants", None)
+        self.user.__dict__.pop("_tenant_permissions_map", None)
         with self.assertRaises(PermissionDenied):
             expected_assets_queryset(self.session, user=self.user)
 

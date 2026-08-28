@@ -18,7 +18,9 @@ from compliance.audit_services import (
     rehome_audit_session_mismatches,
 )
 from compliance.models import AssetAudit, AuditSession
-from organization.models import Location, Site
+from core.managers import set_current_tenant
+from core.tests.mixins import grant
+from organization.models import Location, Role, Site, Tenant
 
 User = get_user_model()
 
@@ -32,11 +34,28 @@ class AuditReconciliationTestCase(TestCase):
         self.auditor = User.objects.create_user(
             username="auditoruser", password="password123", is_staff=True, is_superuser=False
         )
+        self.tenant = Tenant.objects.create(name="Audit test tenant", slug="audit-test-tenant")
+        audit_role = Role.objects.create(
+            tenant=self.tenant,
+            name="Audit test role",
+            permissions=[
+                "compliance.view_auditsession",
+                "compliance.add_assetaudit",
+                "compliance.change_auditsession",
+                "assets.change_asset",
+            ],
+        )
+        grant(self.admin, self.tenant, audit_role)
+        grant(self.auditor, self.tenant, audit_role)
 
         # Setup site and locations
-        self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq")
-        self.staging_room = Location.objects.create(name="Staging Room", slug="staging", site=self.site)
-        self.server_room = Location.objects.create(name="Server Room", slug="server", site=self.site)
+        self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq", tenant=self.tenant)
+        self.staging_room = Location.objects.create(
+            name="Staging Room", slug="staging", site=self.site, tenant=self.tenant
+        )
+        self.server_room = Location.objects.create(
+            name="Server Room", slug="server", site=self.site, tenant=self.tenant
+        )
 
         # Setup manufacturer, role and status labels
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
@@ -62,6 +81,7 @@ class AuditReconciliationTestCase(TestCase):
             asset_role=self.role,
             status=self.status_deployable,
             location=self.staging_room,
+            tenant=self.tenant,
         )
         self.asset_expected_2 = Asset.objects.create(
             name="Staging Laptop 2",
@@ -71,6 +91,7 @@ class AuditReconciliationTestCase(TestCase):
             asset_role=self.role,
             status=self.status_deployable,
             location=self.staging_room,
+            tenant=self.tenant,
         )
 
         # Setup mismatched asset (registered in Server Room but physically scanned in Staging Room)
@@ -82,6 +103,7 @@ class AuditReconciliationTestCase(TestCase):
             asset_role=self.role,
             status=self.status_deployable,
             location=self.server_room,
+            tenant=self.tenant,
         )
 
         # Setup archived asset (should fail validation during scan)
@@ -93,12 +115,17 @@ class AuditReconciliationTestCase(TestCase):
             asset_role=self.role,
             status=self.status_archived,
             location=self.staging_room,
+            tenant=self.tenant,
         )
 
     def test_campaign_lifecycle_and_verification(self):
         # 1. Plan and active a session in Staging Room
         session = AuditSession.objects.create(
-            name="Staging Room Audit Q2", location=self.staging_room, created_by=self.admin, status="active"
+            name="Staging Room Audit Q2",
+            location=self.staging_room,
+            tenant=self.tenant,
+            created_by=self.admin,
+            status="active",
         )
         self.assertEqual(session.status, "active")
 
@@ -216,7 +243,11 @@ class AuditReconciliationTestCase(TestCase):
         self.assertEqual(self.asset_mismatched.status, self.status_deployable)
 
     def test_views_endpoints(self):
-        self.client.login(username="adminuser", password="password123")
+        self.client.force_login(self.admin)
+        client_session = self.client.session
+        client_session["active_tenant_id"] = self.tenant.pk
+        client_session.save()
+        set_current_tenant(self.tenant)
 
         # 1. Create a campaign session (start_immediately=on activates it immediately)
         response = self.client.post(
@@ -291,10 +322,14 @@ class AuditAPIViewsTestCase(TestCase):
         self.user = User.objects.create_user(
             username="apiuser", password="password123", is_staff=True, is_superuser=True
         )
+        self.tenant = Tenant.objects.create(name="Audit API tenant", slug="audit-api-tenant")
+        set_current_tenant(self.tenant)
         self.client.force_authenticate(user=self.user)
 
-        self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq")
-        self.staging_room = Location.objects.create(name="Staging Room", slug="staging", site=self.site)
+        self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq", tenant=self.tenant)
+        self.staging_room = Location.objects.create(
+            name="Staging Room", slug="staging", site=self.site, tenant=self.tenant
+        )
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
         self.role = AssetRole.objects.create(name="Laptop", slug="laptop")
         self.status_deployable = StatusLabel.objects.create(
@@ -311,6 +346,7 @@ class AuditAPIViewsTestCase(TestCase):
             asset_role=self.role,
             status=self.status_deployable,
             location=self.staging_room,
+            tenant=self.tenant,
         )
 
     def test_audit_session_and_asset_audit_endpoints(self):

@@ -17,7 +17,9 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import audit_asset, classify_session_audits
 from compliance.models import AssetAudit, AuditSession
-from organization.models import Location
+from core.managers import set_current_tenant
+from core.tests.mixins import grant
+from organization.models import Location, Role, Tenant
 
 User = get_user_model()
 
@@ -27,16 +29,18 @@ class AuditDuplicateGuardTests(TestCase):
     surface the unique-constraint IntegrityError as a 500."""
 
     def setUp(self):
-        self.user = User.objects.create_superuser(username="dup_auditor", email="d@t.com", password="pw")
+        self.tenant = Tenant.objects.create(name="Duplicate tenant", slug="duplicate-tenant")
+        self.user, self.membership = _su(self.tenant)
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        self.loc = baker.make(Location, name="Berlin")
+        self.loc = baker.make(Location, name="Berlin", tenant=self.tenant)
         self.session = AuditSession.objects.create(
             name="Stocktake",
             status="active",
             location=self.loc,
+            tenant=self.tenant,
             created_by=self.user,
         )
-        self.asset = baker.make(Asset, status=self.status, location=self.loc)
+        self.asset = baker.make(Asset, status=self.status, location=self.loc, tenant=self.tenant)
 
     def test_duplicate_session_audit_raises_validationerror(self):
         audit_asset(self.asset, user=self.user, session=self.session)
@@ -45,22 +49,35 @@ class AuditDuplicateGuardTests(TestCase):
         self.assertEqual(AssetAudit.objects.filter(session=self.session, asset=self.asset).count(), 1)
 
 
-def _superuser():
-    u = User.objects.create_superuser(username="auditor_su", email="a@test.com", password="pw")
-    return u
+def _su(tenant):
+    user = User.objects.create_user(username="auditor_su", email="a@test.com", password="pw")
+    role = Role.objects.create(
+        tenant=tenant,
+        name="Audit test role",
+        permissions=[
+            "compliance.view_auditsession",
+            "compliance.add_assetaudit",
+            "compliance.change_auditsession",
+            "assets.change_asset",
+        ],
+    )
+    membership = grant(user, tenant, role).membership
+    set_current_tenant(tenant)
+    return user, membership
 
 
 class ClassifyGlobalSessionTests(TestCase):
     """Global session (no location): all scanned assets are matching."""
 
     def setUp(self):
-        self.user = _superuser()
+        self.tenant = Tenant.objects.create(name="Global audit tenant", slug="global-audit-tenant")
+        self.user, self.membership = _su(self.tenant)
         self.session = AuditSession.objects.create(
-            name="Global Stocktake", status="active", location=None, created_by=self.user
+            name="Global Stocktake", status="active", location=None, tenant=None, created_by=self.user
         )
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        self.loc_a = baker.make(Location, name="Berlin")
-        self.loc_b = baker.make(Location, name="Munich")
+        self.loc_a = baker.make(Location, name="Berlin", tenant=self.tenant)
+        self.loc_b = baker.make(Location, name="Munich", tenant=self.tenant)
 
     def _audit(self, asset, location):
         return AssetAudit.objects.create(
@@ -73,8 +90,8 @@ class ClassifyGlobalSessionTests(TestCase):
         )
 
     def test_located_assets_are_matching_in_global_session(self):
-        asset_a = baker.make(Asset, status=self.status, location=self.loc_a)
-        asset_b = baker.make(Asset, status=self.status, location=self.loc_b)
+        asset_a = baker.make(Asset, status=self.status, location=self.loc_a, tenant=self.tenant)
+        asset_b = baker.make(Asset, status=self.status, location=self.loc_b, tenant=self.tenant)
         self._audit(asset_a, self.loc_a)
         self._audit(asset_b, self.loc_b)
 
@@ -89,6 +106,7 @@ class ClassifyGlobalSessionTests(TestCase):
             Asset,
             status=self.status,
             location=self.loc_a,
+            tenant=self.tenant,
         )
         # Don't scan it — it should appear in missing
         result = classify_session_audits(self.session, user=self.user)
@@ -100,11 +118,12 @@ class ClassifyLocatedSessionTests(TestCase):
     """Located session: mismatch based on audit.location_id, not asset.location."""
 
     def setUp(self):
-        self.user = _superuser()
-        self.loc_berlin = baker.make(Location, name="Berlin")
-        self.loc_munich = baker.make(Location, name="Munich")
+        self.tenant = Tenant.objects.create(name="Located audit tenant", slug="located-audit-tenant")
+        self.user, self.membership = _su(self.tenant)
+        self.loc_berlin = baker.make(Location, name="Berlin", tenant=self.tenant)
+        self.loc_munich = baker.make(Location, name="Munich", tenant=self.tenant)
         self.session = AuditSession.objects.create(
-            name="Berlin Campaign", status="active", location=self.loc_berlin, created_by=self.user
+            name="Berlin Campaign", status="active", location=self.loc_berlin, tenant=self.tenant, created_by=self.user
         )
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
 
@@ -121,7 +140,7 @@ class ClassifyLocatedSessionTests(TestCase):
     def test_matching_when_audit_location_equals_session_location(self):
         """Asset in Berlin, scanned in Berlin: classified matching.
         Comparison uses audit.location_id (immutable), not asset.location."""
-        asset = baker.make(Asset, status=self.status, location=self.loc_berlin)
+        asset = baker.make(Asset, status=self.status, location=self.loc_berlin, tenant=self.tenant)
         self._audit(asset, self.loc_berlin)
 
         result = classify_session_audits(self.session, user=self.user)
@@ -132,7 +151,7 @@ class ClassifyLocatedSessionTests(TestCase):
     def test_mismatch_uses_audit_location_not_live_asset_location(self):
         """Asset was scanned in Munich (wrong location for Berlin campaign). Even if
         someone later moves asset.location to Berlin, mismatch must persist."""
-        asset = baker.make(Asset, status=self.status, location=self.loc_munich)
+        asset = baker.make(Asset, status=self.status, location=self.loc_munich, tenant=self.tenant)
         self._audit(asset, self.loc_munich)
 
         # Move the live asset back to Berlin AFTER the scan
@@ -146,7 +165,7 @@ class ClassifyLocatedSessionTests(TestCase):
     def test_surprise_find_not_in_expected(self):
         """An archived asset (excluded from expected) gets scanned — surprise."""
         archived_status = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED)
-        surprise_asset = baker.make(Asset, status=archived_status, location=self.loc_berlin)
+        surprise_asset = baker.make(Asset, status=archived_status, location=self.loc_berlin, tenant=self.tenant)
         self._audit(surprise_asset, self.loc_berlin)
 
         result = classify_session_audits(self.session, user=self.user)
@@ -156,7 +175,7 @@ class ClassifyLocatedSessionTests(TestCase):
         self.assertEqual(len(result["mismatched"]), 0)
 
     def test_missing_expected_not_scanned(self):
-        expected = baker.make(Asset, status=self.status, location=self.loc_berlin)
+        expected = baker.make(Asset, status=self.status, location=self.loc_berlin, tenant=self.tenant)
         # No audit created for expected
         result = classify_session_audits(self.session, user=self.user)
         missing_ids = set(result["missing"].values_list("id", flat=True))

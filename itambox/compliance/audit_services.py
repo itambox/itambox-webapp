@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -269,9 +269,10 @@ def audit_asset(
 def audit_asset_from_form(asset: Asset, user: Any, location: Any, status: Any, notes: str = "", **kwargs: Any) -> dict:
     """Record the standalone detail-page verification through the same boundary."""
     allowed_tenants = _authorized_asset_tenants(user)
+    session_scope = Q(tenant_id__isnull=True) | Q(tenant_id__in=allowed_tenants)
     session = (
-        AuditSession.objects.filter(status="active", tenant_id__in=allowed_tenants, location=location).first()
-        or AuditSession.objects.filter(status="active", tenant_id__in=allowed_tenants, location__isnull=True).first()
+        AuditSession.objects.filter(status="active", location=location).filter(session_scope).first()
+        or AuditSession.objects.filter(status="active", location__isnull=True).filter(session_scope).first()
     )
     audit_asset(
         asset,

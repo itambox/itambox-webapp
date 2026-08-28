@@ -10,32 +10,50 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import close_audit_session, flag_missing_assets
 from compliance.models import AssetAudit, AuditSession
-from core.tests.mixins import TenantTestMixin
-from organization.models import Location
+from core.managers import set_current_tenant
+from core.tests.mixins import TenantTestMixin, grant
+from organization.models import Location, Role, Tenant
 
 User = get_user_model()
 
 
-def _su():
-    return User.objects.create_superuser(username="flag_su", email="flag@test.com", password="pw")
+def _su(tenant):
+    user = User.objects.create_user(username="flag_su", email="flag@test.com", password="pw")
+    role = Role.objects.create(
+        tenant=tenant,
+        name="Flag test role",
+        permissions=[
+            "compliance.view_auditsession",
+            "compliance.change_auditsession",
+            "assets.change_asset",
+        ],
+    )
+    grant(user, tenant, role)
+    set_current_tenant(tenant)
+    return user
 
 
 class FlagMissingServiceTests(TestCase):
     """flag_missing_assets() service unit tests."""
 
     def setUp(self):
-        self.user = _su()
-        self.loc = baker.make(Location, name="Warehouse")
+        self.tenant = Tenant.objects.create(name="Flag tenant", slug="flag-service-tenant")
+        self.user = _su(self.tenant)
+        self.loc = baker.make(Location, name="Warehouse", tenant=self.tenant)
         self.deployable = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
         self.session = AuditSession.objects.create(
             name="Flag Test",
             status="active",
             location=self.loc,
+            tenant=self.tenant,
             created_by=self.user,
         )
 
     def _close_with_missing(self, missing_count=1):
-        assets = [baker.make(Asset, status=self.deployable, location=self.loc) for _ in range(missing_count)]
+        assets = [
+            baker.make(Asset, status=self.deployable, location=self.loc, tenant=self.tenant)
+            for _ in range(missing_count)
+        ]
         close_audit_session(self.session, user=self.user)
         self.session.refresh_from_db()
         return assets
@@ -88,7 +106,7 @@ class FlagMissingServiceTests(TestCase):
             flag_missing_assets(self.session, user=self.user)
 
     def test_no_missing_rows_returns_zero(self):
-        asset = baker.make(Asset, status=self.deployable, location=self.loc)
+        asset = baker.make(Asset, status=self.deployable, location=self.loc, tenant=self.tenant)
         AssetAudit.objects.create(
             session=self.session,
             asset=asset,
@@ -119,7 +137,11 @@ class FlagMissingViewTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name="FlagTenant", slug="flag-tenant")
-        self.tenant_role.permissions = ["assets.change_asset", "compliance.view_auditsession"]
+        self.tenant_role.permissions = [
+            "assets.change_asset",
+            "compliance.view_auditsession",
+            "compliance.change_auditsession",
+        ]
         self.tenant_role.save()
 
         self.loc = baker.make(Location, name="FlagRoom", tenant=self.tenant)
@@ -128,10 +150,11 @@ class FlagMissingViewTests(TenantTestMixin, TestCase):
             name="Flag View Test",
             status="active",
             location=self.loc,
+            tenant=self.tenant,
             created_by=self.tenant_admin,
         )
         self.missing_asset = baker.make(Asset, status=self.deployable, location=self.loc, tenant=self.tenant)
-        close_audit_session(self.session, user=self.tenant_admin)
+        close_audit_session(self.session, user=self.tenant_user)
         self.session.refresh_from_db()
         self.url = reverse("compliance:auditsession_flag_missing", kwargs={"pk": self.session.pk})
 
