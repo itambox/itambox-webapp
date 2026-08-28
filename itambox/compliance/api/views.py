@@ -100,7 +100,7 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
             return super().perform_update(serializer)
 
         with transaction.atomic():
-            locked = self.get_queryset().select_for_update().get(pk=current.pk)
+            locked = AuditSession._base_manager.filter(pk=current.pk).select_for_update().get()
             serializer.instance = locked
             serializer.validated_data.pop("status", None)
             instance = serializer.save()

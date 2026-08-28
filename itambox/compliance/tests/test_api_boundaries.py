@@ -18,6 +18,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             "compliance.view_auditsession",
             "compliance.add_auditsession",
             "compliance.add_assetaudit",
+            "compliance.change_assetaudit",
             "compliance.change_auditsession",
             "assets.change_asset",
         ]
