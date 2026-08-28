@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypedDict
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     from users.models import User
 
 EXPECTED_ASSET_PERMISSION = "compliance.view_auditsession"
+ASSET_AUDIT_READ_PERMISSION = "compliance.view_assetaudit"
 CLOSE_PERMISSION = "compliance.change_auditsession"
 ASSET_MUTATION_PERMISSION = "assets.change_asset"
 SCAN_PERMISSION = "compliance.add_assetaudit"
@@ -39,6 +41,8 @@ REPORT_READ_OPERATION = "compliance.audit.report.read"
 CLOSE_OPERATION = "compliance.audit.close"
 REHOME_OPERATION = "compliance.audit.rehome"
 FLAG_MISSING_OPERATION = "compliance.audit.flag_missing"
+
+ConfiguredUser = get_user_model()
 
 
 class AuditClassification(TypedDict):
@@ -74,7 +78,7 @@ def _stored_report_error() -> ValidationError:
 
 
 def _is_authenticated_user(user: Any) -> bool:
-    return user is not None and bool(getattr(user, "is_authenticated", False))
+    return isinstance(user, ConfiguredUser) and bool(user.is_active) and bool(user.is_authenticated)
 
 
 def _live_permission_tenants(user: Any, permission: str) -> frozenset[int]:
@@ -144,6 +148,7 @@ def _expected_assets_for_tenants(session: AuditSession, tenant_ids: frozenset[in
     queryset = Asset._base_manager.filter(
         deleted_at__isnull=True,
         tenant_id__in=tenant_ids,
+        tenant__deleted_at__isnull=True,
     ).exclude(status__type=StatusLabel.TYPE_ARCHIVED)
     if session.location_id is not None:
         return queryset.filter(location_id=session.location_id)
@@ -179,6 +184,7 @@ def _classify_authorized(session: AuditSession, tenant_ids: frozenset[int]) -> A
         session.audits.filter(
             asset__deleted_at__isnull=True,
             asset__tenant_id__in=tenant_ids,
+            asset__tenant__deleted_at__isnull=True,
         ).select_related("asset", "location", "status", "auditor")
     )
     scanned_ids = {audit.asset_id for audit in audits}
@@ -198,6 +204,7 @@ def _classify_authorized(session: AuditSession, tenant_ids: frozenset[int]) -> A
     missing = Asset._base_manager.filter(
         deleted_at__isnull=True,
         tenant_id__in=tenant_ids,
+        tenant__deleted_at__isnull=True,
         id__in=missing_ids,
     ).select_related("location", "status")
     return {
@@ -246,6 +253,26 @@ def _authorized_asset_tenants(user: Any) -> frozenset[int]:
     return allowed
 
 
+def authorized_asset_audit_queryset(queryset: QuerySet[AssetAudit], *, user: Any) -> QuerySet[AssetAudit]:
+    """Read AssetAudit rows only in the actor's live view-permission tenants.
+
+    This boundary intentionally does not honor the active tenant or a
+    superuser shortcut. A superuser without an explicit live
+    ``compliance.view_assetaudit`` grant receives an empty queryset, just like
+    any other actor without that permission.
+    """
+    if not _is_authenticated_user(user):
+        return queryset.none()
+    tenant_ids = _live_permission_tenants(user, ASSET_AUDIT_READ_PERMISSION)
+    if not tenant_ids:
+        return queryset.none()
+    return queryset.filter(
+        asset__deleted_at__isnull=True,
+        asset__tenant_id__in=tenant_ids,
+        asset__tenant__deleted_at__isnull=True,
+    )
+
+
 def authorized_scan_assets_queryset(session: AuditSession, *, user: User) -> QuerySet[Asset]:
     """Return live assets in the exact actor-authorized scan tenant set."""
     tenant_ids = _authorize_session(
@@ -288,13 +315,16 @@ def _lock_and_validate_scan_asset(
             user=user,
             system_authorization=None,
             permission=SCAN_PERMISSION,
-            operation=SCAN_PERMISSION,
+            operation=SCAN_OPERATION,
         )
     else:
         allowed_tenants = _authorized_asset_tenants(user)
     try:
         asset = Asset._base_manager.select_for_update().get(
-            pk=asset.pk, tenant_id__in=allowed_tenants, deleted_at__isnull=True
+            pk=asset.pk,
+            tenant_id__in=allowed_tenants,
+            deleted_at__isnull=True,
+            tenant__deleted_at__isnull=True,
         )
     except ObjectDoesNotExist:
         raise PermissionDenied("The asset is not authorized for this audit operation.") from None
@@ -306,9 +336,19 @@ def _lock_and_validate_scan_asset(
         raise ValidationError(_("Audit observed location must be specified."))
     if not status:
         raise ValidationError(_("Audit observed status must be specified."))
+    if location.tenant_id != asset.tenant_id:
+        raise PermissionDenied("The observed location is not in the asset's tenant.")
     if status.type == StatusLabel.TYPE_ARCHIVED:
         raise ValidationError(_("Archived assets cannot be audited."))
-    if session and AssetAudit.objects.filter(session=session, asset=asset).exists():
+    if (
+        session
+        and AssetAudit.objects.filter(
+            session=session,
+            asset=asset,
+            asset__deleted_at__isnull=True,
+            asset__tenant__deleted_at__isnull=True,
+        ).exists()
+    ):
         raise ValidationError(_("This asset has already been verified in this session."))
     return asset, location, status
 
@@ -484,6 +524,7 @@ def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[
             pk__in=asset_ids,
             tenant_id__in=tenant_ids,
             deleted_at__isnull=True,
+            tenant__deleted_at__isnull=True,
         )
     }
     rows: list[dict[str, Any]] = []
@@ -702,6 +743,7 @@ def rehome_audit_session_mismatches(
             deleted_at__isnull=True,
             pk__in=mismatch_ids,
             tenant_id__in=tenant_ids,
+            tenant__deleted_at__isnull=True,
         )
     )
     if user is not None:
@@ -741,20 +783,16 @@ def flag_missing_assets(
     if not missing_rows:
         return {"flagged": 0, "skipped": 0}
 
-    missing_status, _created = StatusLabel.objects.get_or_create(
-        name="Missing",
-        defaults={"type": StatusLabel.TYPE_UNDEPLOYABLE, "color": "dc3545"},
-    )
-    if missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
-        missing_status.type = StatusLabel.TYPE_UNDEPLOYABLE
-        missing_status.save(update_fields=["type"])
     assets = {
         asset.pk: asset
-        for asset in Asset._base_manager.filter(
+        for asset in Asset._base_manager.select_for_update(of=("self",))
+        .filter(
             deleted_at__isnull=True,
             pk__in=[row["asset_id"] for row in missing_rows],
             tenant_id__in=tenant_ids,
-        ).select_related("status")
+            tenant__deleted_at__isnull=True,
+        )
+        .select_related("status")
     }
     if user is not None:
         force_authorization_generation_check(user)
@@ -764,6 +802,17 @@ def flag_missing_assets(
         system_authorization=system_authorization,
         operation=FLAG_MISSING_OPERATION,
     )
+    if not assets:
+        return {"flagged": 0, "skipped": len(missing_rows)}
+
+    missing_status, _created = StatusLabel.objects.get_or_create(
+        name="Missing",
+        defaults={"type": StatusLabel.TYPE_UNDEPLOYABLE, "color": "dc3545"},
+    )
+    if missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
+        missing_status.type = StatusLabel.TYPE_UNDEPLOYABLE
+        missing_status.save(update_fields=["type"])
+
     flagged = 0
     skipped = 0
     for row in missing_rows:

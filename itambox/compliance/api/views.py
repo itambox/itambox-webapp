@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 
 from assets.models import AssetMaintenance
-from compliance.audit_services import audit_asset, close_audit_session
+from compliance.audit_services import audit_asset, authorized_asset_audit_queryset, close_audit_session
 from compliance.filters import (
     AssetAuditFilterSet,
     AssetMaintenanceFilterSet,
@@ -118,7 +118,7 @@ class AssetAuditViewSet(ITAMBoxModelViewSet):
     filterset_class = AssetAuditFilterSet
 
     def get_queryset(self):
-        return _scope_by_asset_tenant(super().get_queryset())
+        return authorized_asset_audit_queryset(super().get_queryset(), user=self.request.user)
 
     def perform_create(self, serializer):
         values = serializer.validated_data

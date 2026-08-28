@@ -18,6 +18,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             "compliance.view_auditsession",
             "compliance.add_auditsession",
             "compliance.add_assetaudit",
+            "compliance.view_assetaudit",
             "compliance.change_assetaudit",
             "compliance.change_auditsession",
             "assets.change_asset",
@@ -271,6 +272,117 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 403, response.data)
         self.assertEqual(str(response.data["detail"]), "You are not authorized to create this audit observation.")
         self.assertFalse(AssetAudit.objects.filter(session=active_session, asset=foreign_asset).exists())
+
+    def test_api_asset_audit_reads_use_exact_permission_tenant_set(self):
+        session_a, _response = self._create_session()
+        audit_a = self._create_audit(session_a)
+        tenant_b = Tenant.objects.create(name="API read tenant B", slug="api-read-tenant-b")
+        location_b = baker.make(Location, tenant=tenant_b, name="API read room B")
+        asset_b = baker.make(
+            Asset,
+            tenant=tenant_b,
+            location=location_b,
+            status=self.status,
+            asset_type=self.asset_type,
+            asset_role=self.asset_role,
+            asset_tag="API-READ-B",
+        )
+        audit_b = AssetAudit.objects.create(
+            session=session_a,
+            asset=asset_b,
+            auditor=self.tenant_user,
+            location=location_b,
+            status=self.status,
+        )
+        tenant_c = Tenant.objects.create(name="API read tenant C", slug="api-read-tenant-c")
+        location_c = baker.make(Location, tenant=tenant_c, name="API read room C")
+        asset_c = baker.make(
+            Asset,
+            tenant=tenant_c,
+            location=location_c,
+            status=self.status,
+            asset_type=self.asset_type,
+            asset_role=self.asset_role,
+            asset_tag="API-READ-C",
+        )
+        audit_c = AssetAudit.objects.create(
+            session=session_a,
+            asset=asset_c,
+            auditor=self.tenant_user,
+            location=location_c,
+            status=self.status,
+        )
+        reader = baker.make("users.User", username="api-audit-reader", is_active=True)
+        role_a = baker.make(
+            "organization.Role",
+            tenant=self.tenant,
+            name="API audit reader A",
+            permissions=["compliance.view_assetaudit"],
+        )
+        role_b = baker.make(
+            "organization.Role",
+            tenant=tenant_b,
+            name="API audit reader B",
+            permissions=["compliance.view_assetaudit"],
+        )
+        self.grant(reader, self.tenant, role_a)
+        self.grant(reader, tenant_b, role_b)
+        self.client_login_to_tenant(reader, self.tenant)
+
+        response = self.client.get(self._audit_list_url())
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual({row["id"] for row in response.data["results"]}, {audit_a.pk, audit_b.pk})
+        self.assertEqual(self.client.get(self._audit_detail_url(audit_b)).status_code, 200)
+        self.assertEqual(self.client.get(self._audit_detail_url(audit_c)).status_code, 404)
+
+        no_grant_superuser = baker.make(
+            "users.User",
+            username="api-audit-superuser-without-grant",
+            is_active=True,
+            is_superuser=True,
+        )
+        self.client_login_to_tenant(no_grant_superuser, self.tenant)
+        response = self.client.get(self._audit_list_url())
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["results"], [])
+        self.assertEqual(self.client.get(self._audit_detail_url(audit_a)).status_code, 404)
+
+    def test_all_accessible_api_actor_cannot_record_foreign_location_observation(self):
+        scan_user = baker.make("users.User", username="api-location-reader", is_active=True)
+        role_a = baker.make(
+            "organization.Role",
+            tenant=self.tenant,
+            name="API location role A",
+            permissions=["compliance.add_assetaudit"],
+        )
+        role_b = baker.make(
+            "organization.Role",
+            tenant=Tenant.objects.create(name="API location tenant B", slug="api-location-tenant-b"),
+            name="API location role B",
+            permissions=["compliance.add_assetaudit"],
+        )
+        tenant_b = role_b.tenant
+        location_b = baker.make(Location, tenant=tenant_b, name="API foreign observation room")
+        self.grant(scan_user, self.tenant, role_a)
+        self.grant(scan_user, tenant_b, role_b)
+        self.client_login_to_tenant(scan_user, tenant_b)
+        before = AssetAudit.objects.count()
+
+        response = self.client.post(
+            self._audit_list_url(),
+            {
+                "asset_id": self.asset.pk,
+                "location_id": location_b.pk,
+                "status_id": self.status.pk,
+                "verification_method": "manual",
+            },
+            format="json",
+        )
+
+        self.assertIn(response.status_code, (400, 403), response.data)
+        self.assertEqual(AssetAudit.objects.count(), before)
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.location_id, self.location.pk)
 
 
 class ComplianceScanScopeTests(TenantTestMixin, TestCase):

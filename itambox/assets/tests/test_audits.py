@@ -41,6 +41,7 @@ class AuditReconciliationTestCase(TestCase):
             permissions=[
                 "compliance.view_auditsession",
                 "compliance.add_assetaudit",
+                "compliance.view_assetaudit",
                 "compliance.change_auditsession",
                 "assets.change_asset",
             ],
@@ -326,7 +327,7 @@ class AuditAPIViewsTestCase(TestCase):
         audit_role = Role.objects.create(
             tenant=self.tenant,
             name="Audit API role",
-            permissions=["compliance.add_assetaudit"],
+            permissions=["compliance.add_assetaudit", "compliance.view_assetaudit"],
         )
         grant(self.user, self.tenant, audit_role)
         set_current_tenant(self.tenant)

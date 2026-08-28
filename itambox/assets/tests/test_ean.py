@@ -161,8 +161,8 @@ class EanScanTests(TenantTestMixin, TestCase):
         from compliance.models import AssetAudit, AuditSession
         from organization.models import Location, Site
 
-        site = Site.objects.create(name="EAN HQ", slug="ean-hq")
-        loc = Location.objects.create(name="EAN Room", slug="ean-room", site=site)
+        site = Site.objects.create(name="EAN HQ", slug="ean-hq", tenant=self.tenant)
+        loc = Location.objects.create(name="EAN Room", slug="ean-room", site=site, tenant=self.tenant)
         session = AuditSession.objects.create(
             name="EAN Audit", location=loc, status="active", created_by=self.tenant_admin
         )

@@ -16,6 +16,10 @@ from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import (
+    SCAN_OPERATION,
+    SCAN_PERMISSION,
+    audit_asset,
+    authorized_scan_assets_queryset,
     classify_session_audits,
     close_audit_session,
     expected_assets_queryset,
@@ -87,6 +91,77 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             {self.asset_a.pk},
         )
 
+    def test_tenant_deletion_after_authorization_filters_all_asset_paths(self):
+        v1_session = AuditSession.objects.create(
+            name="Deleted tenant v1 report",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={"rows": [{"category": "matching", "asset_id": self.asset_a.pk}]},
+        )
+        rehome_session = AuditSession.objects.create(
+            name="Deleted tenant rehome",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "tenant_id": self.tenant_a.pk,
+                        "category": "mismatched",
+                        "asset_id": self.asset_a.pk,
+                    }
+                ],
+            },
+        )
+        flag_session = AuditSession.objects.create(
+            name="Deleted tenant flag",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "tenant_id": self.tenant_a.pk,
+                        "category": "missing",
+                        "asset_id": self.asset_a.pk,
+                        "status_id": self.asset_a.status_id,
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 1)
+        self.assertEqual(authorized_scan_assets_queryset(self.session, user=self.user).count(), 1)
+        Tenant._base_manager.filter(pk=self.tenant_a.pk).update(deleted_at=timezone.now())
+
+        self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 0)
+        classified = classify_session_audits(self.session, user=self.user)
+        self.assertEqual(classified["matching"], [])
+        self.assertEqual(classified["mismatched"], [])
+        self.assertEqual(classified["surprise"], [])
+        self.assertEqual(classified["missing"].count(), 0)
+        self.assertEqual(authorized_scan_assets_queryset(self.session, user=self.user).count(), 0)
+        self.assertEqual(read_reconciliation_report(v1_session, user=self.user)["rows"], [])
+
+        before_location = self.asset_a.location_id
+        before_status = self.asset_a.status_id
+        before_statuses = list(StatusLabel._base_manager.values_list("pk", "name", "type", "color"))
+        rehome_audit_session_mismatches(rehome_session, user=self.user)
+        self.assertEqual(flag_missing_assets(flag_session, user=self.user), {"flagged": 0, "skipped": 1})
+        self.asset_a.refresh_from_db()
+        self.assertEqual(self.asset_a.location_id, before_location)
+        self.assertEqual(self.asset_a.status_id, before_status)
+        self.assertEqual(
+            list(StatusLabel._base_manager.values_list("pk", "name", "type", "color")),
+            before_statuses,
+        )
+
     def test_actorless_and_contradictory_authorization_are_denied(self):
         cases = (
             {"user": None},
@@ -97,6 +172,37 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         for kwargs in cases:
             with self.subTest(kwargs=kwargs), self.assertRaises(PermissionDenied):
                 expected_assets_queryset(self.session, **kwargs)
+
+    def test_authenticated_audit_actor_must_be_active_configured_user(self):
+        inactive = baker.make("users.User", username="inactive-audit-actor", is_active=False)
+        forged = type("ForgedUser", (), {"is_authenticated": True, "is_active": True})()
+        with patch("compliance.audit_services._live_permission_tenants") as permission_map:
+            for actor in (inactive, forged):
+                with self.subTest(actor=actor), self.assertRaises(PermissionDenied):
+                    expected_assets_queryset(self.session, user=actor)
+            permission_map.assert_not_called()
+
+    def test_scan_authorization_uses_distinct_operation_identity(self):
+        self.assertEqual(SCAN_OPERATION, "compliance.audit.scan")
+        self.assertNotEqual(SCAN_OPERATION, SCAN_PERMISSION)
+
+    def test_audit_asset_rejects_foreign_observed_location_without_mutation(self):
+        before_count = AssetAudit.objects.count()
+        before_asset = (self.asset_a.location_id, self.asset_a.status_id, self.asset_a.last_audited)
+        with self.assertRaises(PermissionDenied):
+            audit_asset(
+                self.asset_a,
+                user=self.user,
+                session=self.session,
+                location=self.location_b,
+                status=self.status,
+            )
+        self.asset_a.refresh_from_db()
+        self.assertEqual(AssetAudit.objects.count(), before_count)
+        self.assertEqual(
+            (self.asset_a.location_id, self.asset_a.status_id, self.asset_a.last_audited),
+            before_asset,
+        )
 
     def test_valid_issued_system_authorization_is_tenant_bound(self):
         with TaskContext(tenant_id=self.tenant_a.pk, user_id=None) as task:
@@ -257,6 +363,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         self.session.save(update_fields=["status", "reconciliation_report"])
         self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 1)
         before = self.asset_a.status_id
+        before_statuses = list(StatusLabel._base_manager.values_list("pk", "name", "type", "color"))
 
         def external_report(_session, _tenant_ids):
             Role._base_manager.filter(pk=self.role.pk).update(permissions=[])
@@ -269,6 +376,39 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
 
         self.asset_a.refresh_from_db()
         self.assertEqual(self.asset_a.status_id, before)
+        self.assertEqual(
+            list(StatusLabel._base_manager.values_list("pk", "name", "type", "color")),
+            before_statuses,
+        )
+
+    def test_flag_missing_locks_targets_before_frozen_status_comparison(self):
+        self.session.status = "completed"
+        self.session.reconciliation_report = {
+            "schema_version": 2,
+            "total_expected": 1,
+            "total_scanned": 0,
+            "rows": [
+                {
+                    "tenant_id": self.tenant_a.pk,
+                    "category": "missing",
+                    "asset_id": self.asset_a.pk,
+                    "status_id": self.asset_a.status_id,
+                }
+            ],
+        }
+        self.session.save(update_fields=["status", "reconciliation_report"])
+
+        with CaptureQueriesContext(connection) as queries:
+            result = flag_missing_assets(self.session, user=self.user)
+
+        self.assertEqual(result, {"flagged": 1, "skipped": 0})
+        self.assertTrue(
+            any(
+                "FOR UPDATE" in query["sql"].upper() and "ASSET" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            queries.captured_queries,
+        )
 
     def test_partial_global_close_denies_before_any_session_mutation(self):
         global_session = AuditSession.objects.create(
