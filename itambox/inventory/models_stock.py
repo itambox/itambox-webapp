@@ -5,8 +5,6 @@ the app registry so ``inventory.models`` can import the bookkeeping function at
 module scope without depending on the inventory service layer.
 """
 
-from typing import Any, Optional
-
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -15,7 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from .models_assignment_write import assignment_write_is_permitted
 
 
-def require_authorized_assignment_creation(assignment_instance: Any, is_delete: bool) -> None:
+def require_authorized_assignment_creation(assignment_instance: object, is_delete: bool) -> None:
     """Refuse an unpermitted assignment write before stock is touched."""
     if not assignment_write_is_permitted(assignment_instance):
         raise ValidationError(_("Assignments must be mutated through the authorized inventory service."))
@@ -88,7 +86,7 @@ def _adjust_existing_assignment(assignment_instance, stock_model, item_field, ol
 
 
 def adjust_inventory_stock(
-    assignment_instance: Any, is_delete: bool = False, old_instance: Optional[Any] = None
+    assignment_instance: object, is_delete: bool = False, old_instance: object | None = None
 ) -> None:
     """Adjust stock for an inventory assignment create, update, restore, or delete."""
     require_authorized_assignment_creation(assignment_instance, is_delete)

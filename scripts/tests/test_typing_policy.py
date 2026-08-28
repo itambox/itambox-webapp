@@ -1015,6 +1015,12 @@ class CommittedRecordTests(unittest.TestCase):
             sorted(
                 [
                     "itambox/assets/api/serializers.py",
+                    "itambox/assets/model_book_value.py",
+                    "itambox/compliance/audit_services.py",
+                    "itambox/inventory/models_kit_checkout.py",
+                    "itambox/inventory/models_stock.py",
+                    "itambox/software/models_reconciliation.py",
+                    "itambox/subscriptions/models_seat_usage.py",
                     "itambox/core/auth/oidc.py",
                     "itambox/core/context.py",
                     "itambox/core/identity_provisioning.py",
@@ -1087,6 +1093,25 @@ class CommittedRecordTests(unittest.TestCase):
                         "AssetCheckOutAPISerializer",
                         "AssetSerializer",
                         "StatusLabelSerializer",
+                    ],
+                ),
+                "itambox/assets/model_book_value.py": (
+                    "symbols",
+                    ["compute_book_value", "resolve_policy"],
+                ),
+                "itambox/compliance/audit_services.py": (
+                    "symbols",
+                    [
+                        "AuditClassification",
+                        "AuditCloseResult",
+                        "AuditFlagResult",
+                        "ReconciliationReportV2",
+                        "classify_session_audits",
+                        "close_audit_session",
+                        "expected_assets_queryset",
+                        "flag_missing_assets",
+                        "read_reconciliation_report",
+                        "rehome_audit_session_mismatches",
                     ],
                 ),
                 "itambox/core/auth/oidc.py": (
@@ -1185,6 +1210,11 @@ class CommittedRecordTests(unittest.TestCase):
                         "NotificationChannelSerializer",
                         "WebhookEndpointSerializer",
                     ],
+                ),
+                "itambox/inventory/models_kit_checkout.py": ("module", []),
+                "itambox/inventory/models_stock.py": (
+                    "symbols",
+                    ["adjust_inventory_stock", "require_authorized_assignment_creation"],
                 ),
                 "itambox/inventory/api/serializers.py": (
                     "symbols",
@@ -1306,6 +1336,8 @@ class CommittedRecordTests(unittest.TestCase):
                         "PurchaseOrderSerializer",
                     ],
                 ),
+                "itambox/software/models_reconciliation.py": ("module", []),
+                "itambox/subscriptions/models_seat_usage.py": ("module", []),
                 "itambox/subscriptions/api/serializers.py": (
                     "symbols",
                     ["ProviderSerializer", "SubscriptionAssignmentSerializer", "SubscriptionSerializer"],

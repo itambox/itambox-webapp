@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
@@ -19,6 +19,12 @@ from core.context import (
     get_current_tenant,
 )
 from organization.models import Tenant
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
+
+    from organization.models import Location
+    from users.models import User
 
 EXPECTED_ASSET_PERMISSION = "compliance.view_auditsession"
 CLOSE_PERMISSION = "compliance.change_auditsession"
@@ -41,11 +47,25 @@ class AuditClassification(TypedDict):
     missing: QuerySet[Asset]
 
 
+class AuditCloseResult(TypedDict):
+    total_expected: int
+    total_scanned: int
+    matching_count: int
+    mismatch_list: list[Asset]
+    surprise_list: list[Asset]
+    missing_list: list[Asset]
+
+
+class AuditFlagResult(TypedDict):
+    flagged: int
+    skipped: int
+
+
 class ReconciliationReportV2(TypedDict):
     schema_version: int
     total_expected: int
     total_scanned: int
-    rows: list[dict[str, Any]]
+    rows: list[dict[str, object]]
 
 
 def _stored_report_error() -> ValidationError:
@@ -105,7 +125,7 @@ def _authorize_system_session(
 def _authorize_session(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None,
     permission: str,
     operation: str,
@@ -138,7 +158,7 @@ def _expected_assets_for_tenants(session: AuditSession, tenant_ids: frozenset[in
 def expected_assets_queryset(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None = None,
 ) -> QuerySet[Asset]:
     """Return the explicitly authorized, still-lazy expected-asset queryset."""
@@ -190,7 +210,7 @@ def _classify_authorized(session: AuditSession, tenant_ids: frozenset[int]) -> A
 def classify_session_audits(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None = None,
 ) -> AuditClassification:
     """Classify only assets and observations in the actor's current scope."""
@@ -204,7 +224,7 @@ def classify_session_audits(
     return _classify_authorized(session, tenant_ids)
 
 
-def classify_session_after_scan(session: AuditSession, *, user: Any) -> AuditClassification:
+def classify_session_after_scan(session: AuditSession, *, user: User) -> AuditClassification:
     """Classify a basket under the actor-only scan permission."""
     tenant_ids = _authorize_session(
         session,
@@ -229,14 +249,14 @@ def _authorized_asset_tenants(user: Any) -> frozenset[int]:
 def audit_asset(
     asset: Asset,
     *,
-    user: Any,
+    user: User,
     session: AuditSession | None = None,
-    location: Any = None,
-    status: Any = None,
+    location: Location | None = None,
+    status: StatusLabel | None = None,
     notes: str = "",
     verification_method: str = "manual",
-    request: Any = None,
-    **kwargs: Any,
+    request: HttpRequest | None = None,
+    **kwargs: object,
 ) -> AssetAudit:
     """Record one actor-bound audit observation."""
     if session is not None:
@@ -289,7 +309,14 @@ def audit_asset(
     return audit_record
 
 
-def audit_asset_from_form(asset: Asset, user: Any, location: Any, status: Any, notes: str = "", **kwargs: Any) -> dict:
+def audit_asset_from_form(
+    asset: Asset,
+    user: User,
+    location: Location,
+    status: StatusLabel,
+    notes: str = "",
+    **kwargs: object,
+) -> dict[str, object]:
     """Record the standalone detail-page verification through the same boundary."""
     allowed_tenants = _authorized_asset_tenants(user)
     session_scope = Q(tenant_id__isnull=True) | Q(tenant_id__in=allowed_tenants)
@@ -452,7 +479,7 @@ def _read_report_for_tenants(session: AuditSession, tenant_ids: frozenset[int]) 
 def read_reconciliation_report(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None = None,
 ) -> ReconciliationReportV2:
     """Read and scope a stored v1/v2 report for the current actor."""
@@ -522,7 +549,7 @@ def _close_result(
     classified: AuditClassification,
     report: ReconciliationReportV2,
     missing_assets: list[Asset],
-) -> dict[str, Any]:
+) -> AuditCloseResult:
     return {
         "total_expected": report["total_expected"],
         "total_scanned": report["total_scanned"],
@@ -537,12 +564,12 @@ def _close_result(
 def close_audit_session(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None = None,
-    request: Any = None,
+    request: HttpRequest | None = None,
     notes: str = "",
-    **kwargs: Any,
-) -> dict[str, Any]:
+    **kwargs: object,
+) -> AuditCloseResult:
     """Close a session only after full represented-tenant authorization."""
     tenant_ids = _authorize_session(
         session,
@@ -572,7 +599,7 @@ def close_audit_session(
 def _authorize_asset_mutation(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None,
     operation: str,
 ) -> frozenset[int]:
@@ -589,10 +616,10 @@ def _authorize_asset_mutation(
 def rehome_audit_session_mismatches(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None = None,
-    request: Any = None,
-    **kwargs: Any,
+    request: HttpRequest | None = None,
+    **kwargs: object,
 ) -> None:
     """Rehome only filtered, live report rows within the actor's scope."""
     tenant_ids = _authorize_asset_mutation(
@@ -628,11 +655,11 @@ def rehome_audit_session_mismatches(
 def flag_missing_assets(
     session: AuditSession,
     *,
-    user: Any,
+    user: User | None,
     system_authorization: SystemAuthorizationContext | None = None,
-    request: Any = None,
-    **kwargs: Any,
-) -> dict[str, int]:
+    request: HttpRequest | None = None,
+    **kwargs: object,
+) -> AuditFlagResult:
     """Flag filtered missing report rows while preserving changed targets."""
     tenant_ids = _authorize_asset_mutation(
         session,

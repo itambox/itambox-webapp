@@ -1,7 +1,7 @@
 """Model-owned port for kit checkout behavior."""
 
 from collections.abc import Mapping
-from typing import Any, Protocol
+from typing import Protocol
 
 from core.context import SystemAuthorizationContext
 from core.provider_slot import SingleProviderSlot
@@ -12,16 +12,16 @@ class KitCheckoutProvider(Protocol):
 
     def __call__(
         self,
-        kit: Any,
-        holder: Any = None,
-        location: Any = None,
-        user: Any = None,
+        kit: object,
+        holder: object | None = None,
+        location: object | None = None,
+        user: object | None = None,
         notes: str = "",
-        source_location: Any = None,
-        request: Any = None,
+        source_location: object | None = None,
+        request: object | None = None,
         system_authorizations: Mapping[str, SystemAuthorizationContext] | None = None,
-        **kwargs: Any,
-    ) -> Any:
+        **kwargs: object,
+    ) -> object:
         pass
 
 
@@ -39,16 +39,16 @@ def get_kit_checkout() -> KitCheckoutProvider:
 
 
 def checkout_kit(
-    kit: Any,
-    holder: Any = None,
-    location: Any = None,
-    user: Any = None,
+    kit: object,
+    holder: object | None = None,
+    location: object | None = None,
+    user: object | None = None,
     notes: str = "",
-    source_location: Any = None,
-    request: Any = None,
+    source_location: object | None = None,
+    request: object | None = None,
     system_authorizations: Mapping[str, SystemAuthorizationContext] | None = None,
-    **kwargs: Any,
-) -> Any:
+    **kwargs: object,
+) -> object:
     """Invoke the registered assets-owned kit checkout implementation."""
     return get_kit_checkout()(
         kit,

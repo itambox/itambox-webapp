@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Protocol, TypedDict
 
 from core.provider_slot import SingleProviderSlot
@@ -41,7 +42,9 @@ def get_software_reconciliation_provider() -> SoftwareReconciliationProvider:
     return _provider.get()
 
 
-def override_software_reconciliation(provider: SoftwareReconciliationProvider):
+def override_software_reconciliation(
+    provider: SoftwareReconciliationProvider,
+) -> AbstractContextManager[None]:
     """Temporarily override the provider in the current execution context."""
     return _provider.override(provider)
 

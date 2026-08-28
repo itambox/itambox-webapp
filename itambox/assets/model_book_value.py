@@ -12,7 +12,7 @@ from decimal import ROUND_HALF_UP, Decimal
 _CENT = Decimal("0.01")
 
 
-def _to_decimal(value):
+def _to_decimal(value: Decimal | int | float | str | None) -> Decimal | None:
     """Coerce a money-ish value to Decimal without binary float artefacts."""
     if value is None or isinstance(value, Decimal):
         return value
@@ -23,7 +23,7 @@ def _round(value):
     return value.quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
-def resolve_policy(asset):
+def resolve_policy(asset: object) -> tuple[object | None, str | None]:
     """Resolve the asset override, tenant default, or asset-type schedule."""
     override = getattr(asset, "depreciation_override", None)
     if override is not None:
@@ -43,7 +43,7 @@ def resolve_policy(asset):
     return None, None
 
 
-def _clock_start(asset):
+def _clock_start(asset: object) -> object | None:
     return getattr(asset, "in_service_date", None) or asset.purchase_date
 
 
@@ -74,7 +74,7 @@ def _policy_value(asset, purchase_cost, salvage, policy, months_held):
     return max(current, salvage)
 
 
-def compute_book_value(asset, on_date=None):
+def compute_book_value(asset: object, on_date: datetime.date | None = None) -> Decimal | None:
     """Return the straight-line depreciated book value of ``asset``.
 
     Disposal values are frozen, absent purchase costs return ``None``, and all

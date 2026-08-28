@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Protocol
 
 from core.provider_slot import SingleProviderSlot
@@ -28,7 +29,7 @@ def get_seat_usage_provider() -> SubscriptionSeatUsageProvider:
     return _provider.get()
 
 
-def override_seat_usage(provider: SubscriptionSeatUsageProvider):
+def override_seat_usage(provider: SubscriptionSeatUsageProvider) -> AbstractContextManager[None]:
     """Temporarily override seat usage in the current execution context."""
     return _provider.override(provider)
 

@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 70,
-  "policy_sha256": "766beef6a7e5fd5935198d03f01842fd7be79cbf55dc7f013554a4b81047ddc2",
+  "next_sequence": 76,
+  "policy_sha256": "300a8f6e7a11b20d3d2da09c0e150f7c378adb3974cb07373c7fa18054a6a275",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -50,6 +50,18 @@
         "AssetCheckOutAPISerializer",
         "AssetSerializer",
         "StatusLabelSerializer"
+      ]
+    },
+    {
+      "sequence": 70,
+      "path": "itambox/assets/model_book_value.py",
+      "module": "assets.model_book_value",
+      "issue": "#446",
+      "note": "Issue #446 bounded model-support admission: the pure depreciation policy resolver and book-value calculation contract. The implementation remains ORM-free and preserves disposal freezing, threshold ordering, schedule conventions, salvage floors, and rounding; private arithmetic helpers remain outside this admission.",
+      "scope": "symbols",
+      "symbols": [
+        "compute_book_value",
+        "resolve_policy"
       ]
     },
     {
@@ -136,6 +148,26 @@
         "generate_label_batch_task",
         "generate_label_pdf_batch_task",
         "generate_single_label_graphic"
+      ]
+    },
+    {
+      "sequence": 71,
+      "path": "itambox/compliance/audit_services.py",
+      "module": "compliance.audit_services",
+      "issue": "#446",
+      "note": "Issue #446 bounded public service admission: typed audit result contracts and explicit actor/system authorization boundaries for expected-set, classification, frozen-report read, close, rehome, and flag operations. Private ORM/query/parser internals remain outside the projection; the existing SystemAuthorizationContext contract is reused unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "AuditClassification",
+        "AuditCloseResult",
+        "AuditFlagResult",
+        "ReconciliationReportV2",
+        "classify_session_audits",
+        "close_audit_session",
+        "expected_assets_queryset",
+        "flag_missing_assets",
+        "read_reconciliation_report",
+        "rehome_audit_session_mismatches"
       ]
     },
     {
@@ -394,6 +426,27 @@
       ]
     },
     {
+      "sequence": 72,
+      "path": "itambox/inventory/models_kit_checkout.py",
+      "module": "inventory.models_kit_checkout",
+      "issue": "#446",
+      "note": "Issue #446 whole-module admission for the model-owned checkout port. The SingleProviderSlot lifecycle, exact callable contract, and app-ready provider registration are covered without admitting the concrete assets service implementation.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
+      "sequence": 73,
+      "path": "itambox/inventory/models_stock.py",
+      "module": "inventory.models_stock",
+      "issue": "#446",
+      "note": "Issue #446 bounded model-support admission for the authorized stock-write guard and stock adjustment entry point. Private ORM locking, model resolution, and quantity helpers remain outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "adjust_inventory_stock",
+        "require_authorized_assignment_creation"
+      ]
+    },
+    {
       "sequence": 35,
       "path": "itambox/itambox/api/base.py",
       "module": "itambox.api.base",
@@ -632,6 +685,15 @@
       ]
     },
     {
+      "sequence": 74,
+      "path": "itambox/software/models_reconciliation.py",
+      "module": "software.models_reconciliation",
+      "issue": "#446",
+      "note": "Issue #446 whole-module admission for the model-owned software reconciliation port. The port remains domain-blind, provider registration is composition-owned by LicensesConfig.ready(), and the concrete ORM implementation stays outside the projection.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
       "sequence": 28,
       "path": "itambox/subscriptions/api/serializers.py",
       "module": "subscriptions.api.serializers",
@@ -654,6 +716,15 @@
       "symbols": [
         "SubscriptionStatusCompatibilitySerializer"
       ]
+    },
+    {
+      "sequence": 75,
+      "path": "itambox/subscriptions/models_seat_usage.py",
+      "module": "subscriptions.models_seat_usage",
+      "issue": "#446",
+      "note": "Issue #446 whole-module admission for the model-owned subscription seat-usage port. The SingleProviderSlot wrapper is checked independently from the concrete license query adapter and preserves zero-query lookup semantics.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 47,
