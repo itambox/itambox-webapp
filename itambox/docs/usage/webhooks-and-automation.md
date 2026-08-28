@@ -17,7 +17,7 @@ object is created, updated, or deleted.
 
 ```mermaid
 graph TD
-    A[Model save / delete] --> B[core.signals post_save / post_delete]
+    A[Model save / delete] --> B[extras.signals post_save / post_delete]
     B --> C[dispatch_event]
     C --> D[Event row created]
     D --> E[process_event_rules]
@@ -50,9 +50,11 @@ graph TD
     style R fill:#744210,stroke:#f6e05e,color:#fff
 ```
 
-The pipeline lives in `core/events.py` (event dispatch and rule matching),
-`core/tasks/webhooks.py` (outbound HTTP delivery + retry logic), and
-`extras/models.py` (the `WebhookEndpoint` and `EventRule` models).
+The domain pipeline lives in `extras/signals.py` (model receivers),
+`extras/services/events.py` (event dispatch and rule processing),
+`extras/tasks/webhooks.py` (durable outbound delivery and retries), and
+`extras/models.py` (the `WebhookEndpoint`, `EventRule`, and delivery records).
+Reusable domain-blind transport contracts remain in `core/events.py`.
 
 ---
 
