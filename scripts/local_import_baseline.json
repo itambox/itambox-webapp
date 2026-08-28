@@ -179,20 +179,8 @@
     },
     {
       "path": "itambox/assets/models/asset.py",
-      "context": "ClassDef:Asset/FunctionDef:current_value",
-      "statement": "from assets.depreciation import compute_book_value",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/models/asset.py",
       "context": "ClassDef:Asset/FunctionDef:eol_date",
       "statement": "from dateutil.relativedelta import relativedelta",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/models/asset.py",
-      "context": "ClassDef:Asset/FunctionDef:save",
-      "statement": "from assets.depreciation import compute_book_value",
       "count": 1
     },
     {
@@ -652,42 +640,6 @@
       "count": 1
     },
     {
-      "path": "itambox/compliance/models.py",
-      "context": "ClassDef:AuditSession/FunctionDef:expected_assets_queryset",
-      "statement": "from assets.models import Asset, StatusLabel",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/models.py",
-      "context": "ClassDef:AuditSession/FunctionDef:expected_assets_queryset",
-      "statement": "from django.db.models import QuerySet",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
-      "context": "FunctionDef:_audit_to_dict",
-      "statement": "from django.urls import reverse",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
-      "context": "FunctionDef:classify_session_audits",
-      "statement": "from django.db.models import QuerySet as _RawQS",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
-      "context": "FunctionDef:flag_missing_assets",
-      "statement": "from django.db.models import QuerySet as _RawQS",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
-      "context": "FunctionDef:rehome_audit_session_mismatches",
-      "statement": "from django.db.models import QuerySet as _RawQS",
-      "count": 1
-    },
-    {
       "path": "itambox/compliance/tables.py",
       "context": "ClassDef:CustodyReceiptTable/FunctionDef:render_acceptance_status",
       "statement": "from django.utils.html import format_html",
@@ -757,18 +709,6 @@
       "path": "itambox/compliance/views_audit.py",
       "context": "ClassDef:AuditSessionCommitView/FunctionDef:post",
       "statement": "from compliance.forms_audit import AuditBarcodeScanForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
-      "context": "ClassDef:AuditSessionCommitView/FunctionDef:post",
-      "statement": "from compliance.reconciliation import _audit_to_dict, _missing_asset_to_dict, classify_session_audits",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
-      "context": "ClassDef:AuditSessionDetailView/FunctionDef:get_context_data",
-      "statement": "from compliance.reconciliation import _audit_to_dict, _missing_asset_to_dict, classify_session_audits",
       "count": 1
     },
     {
@@ -2533,12 +2473,6 @@
       "path": "itambox/subscriptions/forms.py",
       "context": "ClassDef:SubscriptionRenewForm/FunctionDef:__init__",
       "statement": "from django.utils import timezone",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "context": "ClassDef:Subscription/FunctionDef:assigned_seats",
-      "statement": "from licenses.models import LicenseSeatAssignment",
       "count": 1
     },
     {

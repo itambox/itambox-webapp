@@ -320,6 +320,7 @@ def _audit_to_dict(
         return None
     try:
         asset_url = asset.get_absolute_url()
+    # broad except: render-degrade: an unavailable asset URL must not prevent the report row from rendering
     except Exception:
         asset_url = None
     return {
@@ -345,6 +346,7 @@ def _missing_asset_to_dict(asset: Asset, session_location: Any) -> dict[str, Any
         return None
     try:
         asset_url = asset.get_absolute_url()
+    # broad except: render-degrade: an unavailable asset URL must not prevent the report row from rendering
     except Exception:
         asset_url = None
     return {
