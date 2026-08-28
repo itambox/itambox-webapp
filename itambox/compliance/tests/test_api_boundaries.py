@@ -16,6 +16,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(name="Audit API tenant", slug="audit-api-boundary")
         self.tenant_role.permissions = [
             "compliance.view_auditsession",
+            "compliance.add_auditsession",
             "compliance.add_assetaudit",
             "compliance.change_auditsession",
             "assets.change_asset",
