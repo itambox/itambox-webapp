@@ -73,6 +73,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
     def _etag(self, session):
         response = self.client.get(self._session_detail_url(session))
         self.assertEqual(response.status_code, 200, response.data)
+        self.set_active_tenant(self.tenant, self.tenant_membership)
         return response["ETag"]
 
     def _create_audit(self, session, asset=None):
