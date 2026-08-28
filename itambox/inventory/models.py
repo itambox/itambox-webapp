@@ -29,9 +29,9 @@ from core.mixins import (
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
 
 from .abstract_models import AbstractAssignment, AbstractInventoryItem, AbstractStock
-from .kit_checkout import checkout_kit
 from .models_assignment_write import assignment_hard_purge_is_permitted
-from .stock import adjust_inventory_stock
+from .models_kit_checkout import checkout_kit
+from .models_stock import adjust_inventory_stock
 
 
 class AssignmentWriteProtectionMixin:

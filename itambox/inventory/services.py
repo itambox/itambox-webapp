@@ -21,10 +21,10 @@ from .models import (
 )
 from .models_assignment_write import authorized_assignment_hard_purge, authorized_assignment_write
 
-# Compatibility re-export: adjust_inventory_stock moved to the leaf module
-# inventory.stock so inventory.models can call it without importing this
-# module (issue #87, phase D). The published import path stays valid.
-from .stock import adjust_inventory_stock  # noqa: F401  isort:skip
+# Compatibility re-export: adjust_inventory_stock moved to the model-support
+# leaf inventory.models_stock so inventory.models can call it without importing
+# this module (issue #87, phase D). The published call path stays valid.
+from .models_stock import adjust_inventory_stock  # noqa: F401  isort:skip
 
 # Audit operation names. An actorless caller must hold a TaskContext system
 # authorization issued for exactly one of these; the string is part of the
