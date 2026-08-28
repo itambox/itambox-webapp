@@ -449,6 +449,12 @@ class LicensingBoundaryTests(SimpleTestCase):
             "software.models must not defer a licenses import into a function body",
         )
 
+    def test_licenses_config_registers_exact_reconciliation_function(self):
+        from licenses.reconciliation import reconcile_software
+        from software.models_reconciliation import get_software_reconciliation_provider
+
+        self.assertIs(get_software_reconciliation_provider(), reconcile_software)
+
 
 class InventoryStockBoundaryTests(SimpleTestCase):
     """``inventory.models`` <-> ``inventory.services``.
