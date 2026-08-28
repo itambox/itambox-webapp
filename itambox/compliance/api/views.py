@@ -88,6 +88,7 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
     def perform_create(self, serializer):
         if serializer.validated_data.get("status") == "completed":
             raise ValidationError("Audit sessions must be closed through the close service.")
+        serializer.validated_data["created_by"] = self.request.user
         return super().perform_create(serializer)
 
     def perform_update(self, serializer):
