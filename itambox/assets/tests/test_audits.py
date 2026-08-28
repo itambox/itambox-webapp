@@ -360,7 +360,7 @@ class AuditAPIViewsTestCase(TestCase):
         from django.urls import reverse
 
         # 1. Create audit session via API
-        session_data = {"name": "API Q2 Audit Session", "location_id": self.staging_room.pk, "status": "planned"}
+        session_data = {"name": "API Q2 Audit Session", "location_id": self.staging_room.pk, "status": "active"}
         create_url = reverse("api:compliance_api:auditsession-list")
         response = self.client.post(create_url, session_data, format="json")
         self.assertEqual(response.status_code, 201)
