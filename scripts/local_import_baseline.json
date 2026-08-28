@@ -702,12 +702,6 @@
     {
       "path": "itambox/compliance/views_audit.py",
       "context": "ClassDef:AuditSessionCommitView/FunctionDef:post",
-      "statement": "from assets.models import Asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
-      "context": "ClassDef:AuditSessionCommitView/FunctionDef:post",
       "statement": "from compliance.forms_audit import AuditBarcodeScanForm",
       "count": 1
     },
