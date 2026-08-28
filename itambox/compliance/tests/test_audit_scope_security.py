@@ -517,6 +517,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 ]
             },
         )
+        expected_assets_queryset(self.session, user=self.user).count()
         with CaptureQueriesContext(connection) as queries:
             report = read_reconciliation_report(detail_session, user=self.user)
         self.assertEqual(len(queries), 1)
