@@ -177,8 +177,15 @@ class AuditSessionSerializer(BaseModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["started_at", "completed_at", "created_at", "updated_at"]
+        read_only_fields = ["started_at", "created_at", "updated_at"]
         brief_fields = ["id", "name", "status", "started_at"]
+
+    def validate(self, attrs):
+        if "completed_at" in attrs:
+            raise serializers.ValidationError(
+                {"completed_at": "The completion timestamp is assigned by the close service."}
+            )
+        return attrs
 
 
 class AssetAuditSerializer(serializers.ModelSerializer):

@@ -105,6 +105,19 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             HTTP_IF_MATCH=self._etag(session),
         )
 
+        self.assertEqual(response.status_code, 400, response.data)
+        session.refresh_from_db()
+        self.assertEqual(session.status, "active")
+        self.assertIsNone(session.completed_at)
+        self.assertIsNone(session.reconciliation_report)
+
+        response = self.client.patch(
+            self._session_detail_url(session),
+            {"status": "completed"},
+            format="json",
+            HTTP_IF_MATCH=self._etag(session),
+        )
+
         self.assertEqual(response.status_code, 200, response.data)
         session.refresh_from_db()
         self.assertEqual(session.status, "completed")

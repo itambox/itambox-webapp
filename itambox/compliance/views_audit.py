@@ -25,7 +25,6 @@ from compliance.audit_services import (
     classify_session_after_scan,
     classify_session_audits,
     close_audit_session,
-    expected_assets_queryset,
     expected_scan_assets_queryset,
     flag_missing_assets,
     read_reconciliation_report,

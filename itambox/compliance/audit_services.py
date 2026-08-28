@@ -274,20 +274,14 @@ def expected_scan_assets_queryset(session: AuditSession, *, user: User) -> Query
     return _expected_assets_for_tenants(session, tenant_ids)
 
 
-@transaction.atomic
-def audit_asset(
+def _lock_and_validate_scan_asset(
     asset: Asset,
     *,
     user: User,
-    session: AuditSession | None = None,
-    location: Location | None = None,
-    status: StatusLabel | None = None,
-    notes: str = "",
-    verification_method: str = "manual",
-    request: HttpRequest | None = None,
-    **kwargs: object,
-) -> AssetAudit:
-    """Record one actor-bound audit observation."""
+    session: AuditSession | None,
+    location: Location | None,
+    status: StatusLabel | None,
+) -> tuple[Asset, Location, StatusLabel]:
     if session is not None:
         allowed_tenants = _authorize_session(
             session,
@@ -316,6 +310,30 @@ def audit_asset(
         raise ValidationError(_("Archived assets cannot be audited."))
     if session and AssetAudit.objects.filter(session=session, asset=asset).exists():
         raise ValidationError(_("This asset has already been verified in this session."))
+    return asset, location, status
+
+
+@transaction.atomic
+def audit_asset(
+    asset: Asset,
+    *,
+    user: User,
+    session: AuditSession | None = None,
+    location: Location | None = None,
+    status: StatusLabel | None = None,
+    notes: str = "",
+    verification_method: str = "manual",
+    request: HttpRequest | None = None,
+    **kwargs: object,
+) -> AssetAudit:
+    """Record one actor-bound audit observation."""
+    asset, location, status = _lock_and_validate_scan_asset(
+        asset,
+        user=user,
+        session=session,
+        location=location,
+        status=status,
+    )
 
     try:
         audit_record = AssetAudit.objects.create(

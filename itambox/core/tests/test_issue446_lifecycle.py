@@ -109,8 +109,13 @@ class Issue446ProviderLifecycleTests(TestCase):
             register_software_reconciliation,
         )
 
+        def replacement(software):
+            return {"software_id": software.pk}
+
+        def competing(software):
+            return {"software_id": software.pk}
+
         original = get_software_reconciliation_provider()
-        replacement = lambda software: {"software_id": software.pk}
         with override_software_reconciliation(replacement):
             self.assertIs(get_software_reconciliation_provider(), replacement)
         self.assertIs(get_software_reconciliation_provider(), original)
@@ -118,7 +123,7 @@ class Issue446ProviderLifecycleTests(TestCase):
             ImproperlyConfigured,
             "software reconciliation provider is already configured with a different object",
         ):
-            register_software_reconciliation(lambda software: {"software_id": software.pk})
+            register_software_reconciliation(competing)
 
     def test_subscription_application_port_override_and_conflict_are_identity_safe(self):
         from subscriptions.models_seat_usage import (
@@ -127,8 +132,13 @@ class Issue446ProviderLifecycleTests(TestCase):
             register_seat_usage,
         )
 
+        def replacement(subscription):
+            return 17
+
+        def competing(subscription):
+            return 19
+
         original = get_seat_usage_provider()
-        replacement = lambda subscription: 17
         with override_seat_usage(replacement):
             self.assertIs(get_seat_usage_provider(), replacement)
         self.assertIs(get_seat_usage_provider(), original)
@@ -136,4 +146,4 @@ class Issue446ProviderLifecycleTests(TestCase):
             ImproperlyConfigured,
             "subscription seat usage provider is already configured with a different object",
         ):
-            register_seat_usage(lambda subscription: 19)
+            register_seat_usage(competing)
