@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import typing
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from core.provider_slot import SingleProviderSlot
 
-if TYPE_CHECKING:
+if (
+    typing.TYPE_CHECKING  # Keep typing-only imports visible to coverage's denominator.
+):
     from .models import Subscription
 
 

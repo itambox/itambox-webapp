@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypedDict
+import typing
+from typing import Any, TypedDict
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
@@ -22,7 +23,9 @@ from core.context import (
 )
 from organization.models import Tenant
 
-if TYPE_CHECKING:
+if (
+    typing.TYPE_CHECKING  # Keep typing-only imports visible to coverage's denominator.
+):
     from django.http import HttpRequest
 
     from organization.models import Location
