@@ -7,7 +7,7 @@ from django_q.tasks import async_task
 
 from assets.choices import RequestStatusChoices
 from assets.models import AssetAssignment, AssetRequest
-from core.events import dispatch_event
+from extras.services.events import dispatch_event
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def on_asset_request_save(sender, instance, created, **kwargs):
             # Only notify admins for parent requests or standalone requests, avoiding N+1 queries
             if instance.parent is None:
                 request_id = instance.pk
-                transaction.on_commit(lambda: async_task("assets.tasks.notify_new_request_task", request_id))
+                transaction.on_commit(lambda: async_task("assets.tasks.requests.notify_new_request_task", request_id))
     except DatabaseError as e:
         logger.exception("Database error occurred while processing asset request notification: %s", e)
     except Exception as e:

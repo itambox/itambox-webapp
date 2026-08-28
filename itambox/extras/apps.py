@@ -1,6 +1,10 @@
 from django.apps import AppConfig
+from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.migrations.recorder import MigrationRecorder
+from django.db.models.signals import post_migrate
 
 from core.features import object_enabled_probe, report_designer_probe
+from core.schedules import register_schedule
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
@@ -22,6 +26,15 @@ from itambox.registry import registry as generic_presentation_registry
 
 DOCS = CAPABILITY_REGISTRY_DOC_URL
 
+# Canonical schedules are registered only after their owning cutover migrations
+# are applied on the database being migrated; predecessor states must never gain
+# task paths that their code cannot execute.
+ISSUE445_CUTOVER = ("extras", "0110_issue445_task_paths")
+ISSUE445_WEBHOOK_DURABILITY = ("extras", "0113_upgrade_legacy_webhook_retry_schedules")
+ALERT_DISPATCH_UID = "extras.issue445.register_daily_alert_schedule.v1"
+ALERT_TASK_PATH = "extras.tasks.alerts.evaluate_alert_rules_task"
+WEBHOOK_RECOVERY_TASK_PATH = "extras.tasks.webhooks.recover_pending_webhook_deliveries"
+
 
 def _scheduled_reports_probe():
     """Report schedules only when the designer gate and a live row agree."""
@@ -38,12 +51,61 @@ class ExtrasConfig(AppConfig):
     name = "extras"
 
     def ready(self):
-        # inline imports: app-registry: extras.search and extras.feature_views register after app population
+        # inline imports: app-registry: extras.signals, extras.search and extras.feature_views
+        # register after app population
         import extras.search
+        import extras.signals  # noqa: F401 -- side-effect import connects the event/watcher receivers
         from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
 
         self._register_capabilities()
         self._register_generic_presentation(EXTRAS_GENERIC_PRESENTATION_PROVIDER)
+        # ready() must stay query-free: the applied-migration probe below belongs
+        # to the post_migrate handler, never to app loading.
+        post_migrate.connect(
+            self._register_alert_schedule,
+            sender=self,
+            dispatch_uid=ALERT_DISPATCH_UID,
+            weak=False,
+        )
+
+    def _register_alert_schedule(self, sender, using=DEFAULT_DB_ALIAS, **kwargs):
+        """Ensure issue-#445 periodic tasks exist only after their migrations.
+
+        The alert schedule appears after the task-path cutover; the webhook
+        recovery schedule appears only after legacy retry payloads have been
+        upgraded. A predecessor database gains neither successor-only path.
+        """
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
+        from django_q.models import Schedule
+
+        connection = connections[using]
+        recorder = MigrationRecorder(connection)
+        if not recorder.has_table():
+            return
+        applied = recorder.migration_qs
+        app, name = ISSUE445_CUTOVER
+        if applied.filter(app=app, name=name).exists():
+            register_schedule(
+                ALERT_TASK_PATH,
+                defaults={
+                    "name": "Daily Alert Rule Evaluation",
+                    "schedule_type": Schedule.DAILY,
+                    "repeats": -1,
+                },
+                using=using,
+            )
+        app, name = ISSUE445_WEBHOOK_DURABILITY
+        if applied.filter(app=app, name=name).exists():
+            register_schedule(
+                WEBHOOK_RECOVERY_TASK_PATH,
+                defaults={
+                    "name": "Webhook Delivery Recovery",
+                    "schedule_type": Schedule.MINUTES,
+                    "minutes": 1,
+                    "repeats": -1,
+                },
+                using=using,
+            )
 
     def _register_capabilities(self):
         """Declare the reporting, alerting, and automation slices.

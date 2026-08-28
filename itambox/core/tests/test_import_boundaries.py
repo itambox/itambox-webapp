@@ -169,7 +169,7 @@ class RequestContextLeafTests(SimpleTestCase):
         )
 
     def test_both_sides_read_the_context_leaf_at_module_scope(self):
-        for module in ("core.managers", "itambox.middleware", "core.auth", "core.tasks.context", "core.tasks.alerts"):
+        for module in ("core.managers", "itambox.middleware", "core.auth", "core.tasks.context", "extras.tasks.alerts"):
             with self.subTest(module=module):
                 self.assertTrue(
                     _imports(module, "core.context", top_level_only=True),

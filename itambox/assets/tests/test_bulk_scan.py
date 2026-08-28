@@ -17,7 +17,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages import get_messages
 from django.db import OperationalError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from assets.models import (
@@ -29,10 +29,10 @@ from assets.models import (
     StatusLabel,
 )
 from assets.services import checkout_asset, dispose_asset
+from assets.tasks.checkin import bulk_checkin_task
+from assets.tasks.checkout import bulk_checkout_task
+from assets.tasks.disposal import bulk_dispose_task
 from core.models import Job
-from core.tasks.checkin import bulk_checkin_task
-from core.tasks.checkout import bulk_checkout_task
-from core.tasks.disposal import bulk_dispose_task
 from core.tasks.utils import TaskStatus
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder, Location, Site, Tenant
@@ -242,11 +242,27 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
         self.assertEqual(job.status, Job.STATUS_PENDING)
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.bulk_checkin_task")
+        self.assertEqual(args[0], "assets.tasks.checkin.bulk_checkin_task")
         self.assertEqual(args[1], job.pk)
         self.assertEqual(args[2], [str(self.a1.pk), str(self.a2.pk)])
         self.assertEqual(args[3], self.tenant_admin.pk)
         self.assertEqual(args[4], self.tenant.pk)
+
+    @override_settings(Q_CLUSTER={"sync": False})
+    @patch("django_q.tasks.async_task")
+    def test_bulk_checkin_async_enqueue_waits_for_commit(self, mock_async):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            response = self.client.post(
+                reverse("assets:asset_bulk_checkin"),
+                {"pk": [self.a1.pk], "notes": "queued after commit"},
+            )
+            self.assertEqual(response.status_code, 302)
+            mock_async.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args.args[0], "assets.tasks.checkin.bulk_checkin_task")
 
     @patch("django_q.tasks.async_task")
     def test_bulk_dispose_enqueues_with_proceeds_map(self, mock_async):
@@ -268,7 +284,7 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
         self.assertIsNotNone(job)
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.bulk_dispose_task")
+        self.assertEqual(args[0], "assets.tasks.disposal.bulk_dispose_task")
         disposal_kwargs = args[5]
         proceeds_map = args[6]
         self.assertEqual(disposal_kwargs["disposal_method"], "recycle")
@@ -413,7 +429,7 @@ class BulkCheckinTaskTests(TenantTestMixin, TestCase):
     def test_item_failures_are_terminal_and_redacted(self, _checkin):
         job = self._job()
 
-        with self.assertLogs("core.tasks.checkin", level="WARNING") as captured:
+        with self.assertLogs("assets.tasks.checkin", level="WARNING") as captured:
             result = bulk_checkin_task(job.pk, [str(self.checked_out.pk)], self.tenant_admin.pk, self.tenant.pk)
 
         job.refresh_from_db()
@@ -448,9 +464,9 @@ class BulkCheckinTaskTests(TenantTestMixin, TestCase):
         self.assertEqual(job.status, Job.STATUS_FAILED)
         self.assertNotIn("secret-boundary", job.logs)
 
-    @patch("core.tasks.checkin.Job.objects.get", side_effect=OperationalError("secret-database"))
+    @patch("assets.tasks.checkin.Job.objects.get", side_effect=OperationalError("secret-database"))
     def test_entry_database_failure_is_retryable_and_redacted(self, _get):
-        with self.assertLogs("core.tasks.checkin", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.checkin", level="ERROR") as captured:
             result = bulk_checkin_task(17, [], self.tenant_admin.pk, self.tenant.pk)
 
         self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "checkin.entry_failed"))
@@ -555,7 +571,7 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
     def test_item_failures_are_terminal_and_redacted(self, _dispose):
         job = self._job()
 
-        with self.assertLogs("core.tasks.disposal", level="WARNING") as captured:
+        with self.assertLogs("assets.tasks.disposal", level="WARNING") as captured:
             result = bulk_dispose_task(
                 job.pk,
                 [str(self.a1.pk)],
@@ -584,7 +600,7 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
         self.assertEqual((result.status, result.code), (TaskStatus.PARTIAL, "disposal.partial"))
         self.assertEqual(dict(result.counts), {"disposed": 1, "skipped": 0, "failed": 1})
 
-    @patch("core.tasks.disposal._parse_date", side_effect=ValueError("secret-date"))
+    @patch("assets.tasks.disposal._parse_date", side_effect=ValueError("secret-date"))
     def test_boundary_failure_returns_terminal_result(self, _parse):
         job = self._job()
 
@@ -594,11 +610,11 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
         self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "disposal.boundary_failed"))
         self.assertNotIn("secret-date", job.logs)
 
-    @patch("core.tasks.disposal.Notification.objects.create", side_effect=ValueError("secret-notification"))
+    @patch("assets.tasks.disposal.Notification.objects.create", side_effect=ValueError("secret-notification"))
     def test_boundary_notification_failure_is_redacted(self, _create):
         job = self._job()
 
-        with self.assertLogs("core.tasks.disposal", level="ERROR") as captured:
+        with self.assertLogs("assets.tasks.disposal", level="ERROR") as captured:
             result = bulk_dispose_task(
                 job.pk,
                 [str(self.a1.pk)],
@@ -611,7 +627,7 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
         self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "disposal.entry_failed"))
         self.assertNotIn("secret-notification", " ".join(captured.output) + " " + job.logs)
 
-    @patch("core.tasks.disposal.Job.objects.get", side_effect=OperationalError("secret-database"))
+    @patch("assets.tasks.disposal.Job.objects.get", side_effect=OperationalError("secret-database"))
     def test_entry_database_failure_is_retryable(self, _get):
         result = bulk_dispose_task(17, [], self.tenant_admin.pk, self.tenant.pk)
 
@@ -939,7 +955,7 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         self.assertIsNotNone(job)
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], "core.tasks.bulk_checkout_task")
+        self.assertEqual(args[0], "assets.tasks.checkout.bulk_checkout_task")
         self.assertEqual(args[1], job.pk)
         self.assertEqual(args[2], [str(self.asset.pk)])
         self.assertEqual(args[3], "assetholder")
@@ -1041,7 +1057,7 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
     def test_task_item_failures_are_terminal_and_redacted(self, _checkout):
         job = self._job()
 
-        with self.assertLogs("core.tasks.checkout", level="WARNING") as captured:
+        with self.assertLogs("assets.tasks.checkout", level="WARNING") as captured:
             result = bulk_checkout_task(
                 job.pk,
                 [str(self.asset.pk)],
@@ -1075,7 +1091,7 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         self.assertEqual((result.status, result.code), (TaskStatus.PARTIAL, "checkout.partial"))
         self.assertEqual(dict(result.counts), {"checked_out": 1, "failed": 1})
 
-    @patch("core.tasks.checkout.ContentType.objects.get", side_effect=ValueError("secret-target"))
+    @patch("assets.tasks.checkout.ContentType.objects.get", side_effect=ValueError("secret-target"))
     def test_task_boundary_failure_is_terminal_and_redacted(self, _get):
         job = self._job()
 
@@ -1094,7 +1110,7 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         self.assertEqual(job.status, Job.STATUS_FAILED)
         self.assertNotIn("secret-target", job.logs)
 
-    @patch("core.tasks.checkout.Job.objects.get", side_effect=OperationalError("secret-database"))
+    @patch("assets.tasks.checkout.Job.objects.get", side_effect=OperationalError("secret-database"))
     def test_task_entry_database_failure_is_retryable(self, _get):
         result = bulk_checkout_task(
             17, [], "assetholder", self.holder.pk, self.tenant_admin.pk, "", tenant_id=self.tenant.pk

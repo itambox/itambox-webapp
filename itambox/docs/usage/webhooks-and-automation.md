@@ -17,7 +17,7 @@ object is created, updated, or deleted.
 
 ```mermaid
 graph TD
-    A[Model save / delete] --> B[core.signals post_save / post_delete]
+    A[Model save / delete] --> B[extras.signals post_save / post_delete]
     B --> C[dispatch_event]
     C --> D[Event row created]
     D --> E[process_event_rules]
@@ -50,9 +50,11 @@ graph TD
     style R fill:#744210,stroke:#f6e05e,color:#fff
 ```
 
-The pipeline lives in `core/events.py` (event dispatch and rule matching),
-`core/tasks/webhooks.py` (outbound HTTP delivery + retry logic), and
-`extras/models.py` (the `WebhookEndpoint` and `EventRule` models).
+The domain pipeline lives in `extras/signals.py` (model receivers),
+`extras/services/events.py` (event dispatch and rule processing),
+`extras/tasks/webhooks.py` (durable outbound delivery and retries), and
+`extras/models.py` (the `WebhookEndpoint`, `EventRule`, and delivery records).
+Reusable domain-blind transport contracts remain in `core/events.py`.
 
 ---
 
@@ -111,18 +113,23 @@ retry policy:
 | **Connection error** (DNS, timeout, TLS) | Same as 5xx — retried. |
 | **SSRF guard rejection** | **Final failure** — blocked URLs are never retried. |
 
-Retries use a one-shot `django-q2` `Schedule` row. The first retry starts at
-`retry_backoff` seconds, then the delay doubles for each later retry, is capped
-at 3600 seconds, and receives ±20% jitter. The schedule means the delay is
-honoured even if the worker pool is busy.
+Retries with a positive backoff use a one-shot `django-q2` `Schedule` row.
+The first retry starts at `retry_backoff` seconds, then the delay doubles for
+each later retry, is capped at 3600 seconds, and receives ±20% jitter (with a
+minimum positive delay of one second). A zero-backoff retry is immediately due;
+its durable delivery row remains recoverable if broker publication fails. The
+schedule means positive delays are honoured even if the worker pool is busy.
 
 > [!IMPORTANT]
-> The `secret` field is stored encrypted at rest (`enc$...` ciphertext) and is
-> **never** written to the django-q2 payload or the retry `Schedule.kwargs`
-> (which are stored plaintext). Endpoint-linked webhooks re-derive the secret
-> from the database on each delivery attempt. Legacy webhooks that don't link
-> to an endpoint store their secret in the rule config and are not protected
-> this way — migrate them to endpoints.
+> The endpoint target is snapshotted into the durable delivery before enqueue.
+> Its `secret` is stored encrypted at rest (`enc$...` ciphertext) and is **never**
+> written to the django-q2 payload or retry `Schedule.kwargs` (which are stored
+> plaintext). Queue packages contain delivery identity assertions only. Editing
+> or rotating an endpoint changes new deliveries, not an already-enqueued
+> delivery or its retries. During upgrade, reconstructable endpoint-less legacy
+> retry schedules are converted to the same encrypted snapshot/assertion form;
+> historical rows without a trustworthy target remain unavailable for redelivery
+> and fail closed.
 
 ## Delivery tracking, retries and redelivery
 

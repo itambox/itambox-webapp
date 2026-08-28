@@ -5,7 +5,7 @@ from django.test import SimpleTestCase, TestCase
 from pypdf import PdfReader
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
-from core.tasks.labels import (
+from assets.tasks.labels import (
     _build_labels_document,
     _default_label_card,
     _label_print_css,
@@ -104,7 +104,7 @@ class LabelRendererHTMLTests(SimpleTestCase):
             barcode_format="qr",
         )
 
-        with self.assertLogs("core.tasks.labels", level="WARNING") as captured:
+        with self.assertLogs("assets.tasks.labels", level="WARNING") as captured:
             rendered = render_label_html(self.asset, label_template, self.barcode_uri)
 
         log_output = " ".join(captured.output)

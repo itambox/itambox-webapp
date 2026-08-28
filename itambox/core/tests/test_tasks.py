@@ -9,8 +9,9 @@ from django.utils import timezone
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from core.models import Job, Notification
-from core.tasks import evaluate_alert_rules_task, import_csv_task, run_alert_rule_now
+from core.tasks import import_csv_task
 from extras.models import AlertLog, AlertRule, NotificationChannel
+from extras.tasks.alerts import evaluate_alert_rules_task, run_alert_rule_now
 from subscriptions.models import Subscription
 
 User = get_user_model()
@@ -231,7 +232,7 @@ class AlertDedupRegressionTests(TransactionTestCase):
         # The tenant-scoping default manager fails closed under a non-superuser
         # context with no active tenant; the prefetch must use the unscoped manager and
         # still see the open log (otherwise dedup re-creates it every pass).
-        from core.tasks.alerts import _prefetch_open_logs
+        from extras.tasks.alerts import _prefetch_open_logs
         from itambox.middleware import _current_user
 
         rule = self._low_stock_rule()
@@ -338,8 +339,8 @@ class AlertDedupRegressionTests(TransactionTestCase):
     def test_evaluate_rule_tolerates_prefetch_miss(self):
         # A prefetch miss (empty map) must not crash or create a duplicate; the
         # defensive create adopts the existing open row via the unscoped manager.
-        from core.tasks.alerts import _evaluate_rule
         from core.tasks.context import TaskContext
+        from extras.tasks.alerts import _evaluate_rule
 
         rule = self._low_stock_rule()
         self._make_low_stock_accessory()
@@ -360,7 +361,7 @@ class AlertDedupRegressionTests(TransactionTestCase):
         # logs even under a bound non-superuser with no active tenant (the
         # scoping manager fails closed to .none()). Call it directly to exercise
         # that context: a reverted unscoped->objects would leave the log ACTIVE.
-        from core.tasks.alerts import _auto_resolve_cleared
+        from extras.tasks.alerts import _auto_resolve_cleared
         from itambox.middleware import _current_user
 
         rule = self._low_stock_rule()
@@ -448,7 +449,7 @@ class AlertChannelFanOutTests(TransactionTestCase):
 
     def test_empty_channels_delivers_nothing(self):
         """A rule with no channels delivers to zero channels — no implicit fan-out."""
-        from core.tasks.alerts import _dispatch_channels
+        from extras.tasks.alerts import _dispatch_channels
 
         delivery = _dispatch_channels(self.rule, self.match, None)
         self.assertEqual(
@@ -459,7 +460,7 @@ class AlertChannelFanOutTests(TransactionTestCase):
 
     def test_empty_channels_records_reason(self):
         """When no channels are attached, delivery status records the reason."""
-        from core.tasks.alerts import _dispatch_channels
+        from extras.tasks.alerts import _dispatch_channels
 
         delivery = _dispatch_channels(self.rule, self.match, None)
         self.assertIn("__no_channels__", delivery, "delivery status must record the no-channels reason")
@@ -468,7 +469,7 @@ class AlertChannelFanOutTests(TransactionTestCase):
         """An explicitly attached channel is still dispatched normally."""
         self.rule.channels.add(self.channel)
         self.match["recipients"] = []  # empty recipients = no actual send, but channel is iterated
-        from core.tasks.alerts import _dispatch_channels
+        from extras.tasks.alerts import _dispatch_channels
 
         delivery = _dispatch_channels(self.rule, self.match, None)
         str_pk = str(self.channel.pk)

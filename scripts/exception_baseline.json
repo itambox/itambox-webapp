@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "policy_sha256": "408508fc80cff6d032a0f157b64ab2f956bcc14dd6fcfaf3e7e1166a9073bffe",
+  "policy_sha256": "a1884d3bf44c2befd07ba001949baa321f6519a6fa5005585c94aeedc37f9b52",
   "findings": [
     {
       "path": "itambox/assets/api/serializers.py",
@@ -148,22 +148,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/events.py",
-      "scope": "FunctionDef:_send_notification",
-      "handler_type": "Exception",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "scope": "FunctionDef:process_event_rules",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "d3e9269e34183c5c6e7f91d7894940a5b519a12761fdc8d13ea9d1e334d3bda3",
-      "count": 1
-    },
-    {
       "path": "itambox/core/forms/mixins.py",
       "scope": "ClassDef:ConfirmationForm/FunctionDef:__init__",
       "handler_type": "Exception",
@@ -268,54 +252,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/signals.py",
-      "scope": "FunctionDef:_defer_notify_watchers",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "377a81ef59bc1c21611526868d8fa99d4ce9409796822ec82d26af2314df7abb",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "scope": "FunctionDef:_defer_notify_watchers",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "c215f488c5820ce035fb7d5a6ed83d55f5a731733692081c00bd4d40b19ee5b3",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "scope": "FunctionDef:_notify_watchers",
-      "handler_type": "Exception",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "scope": "FunctionDef:_safe_dispatch",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "4915e03754be15563606911c8b7d7af3b8ef764a880cd57c470ee54c63e8acbe",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "scope": "FunctionDef:event_on_delete",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "06591fea7ae06a2ab587e34f0f8efb092afcc57fdbd99e36d66f693c0e7ae488",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/signals.py",
-      "scope": "FunctionDef:event_on_save",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "af1bee26fe579289b6abbd268990c1798c924aedf059e13000ccb196e787621b",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tables/base.py",
       "scope": "ClassDef:BaseTable/FunctionDef:_apply_prefetching",
       "handler_type": "Exception",
@@ -361,14 +297,6 @@
       "handler_type": "Exception",
       "classification": "silent",
       "body_sha256": "122cdb7faad01863e33bd02c5849da4de23b6bf625c24d27706e642f57ed9aa3",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "scope": "FunctionDef:_evaluate_rule",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "f1e8349d25cba173babc9265fd236df164612f53490afc4e46a299d496606975",
       "count": 1
     },
     {
@@ -489,6 +417,62 @@
       "handler_type": "Exception",
       "classification": "pass-only",
       "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/services/events.py",
+      "scope": "FunctionDef:_send_notification",
+      "handler_type": "Exception",
+      "classification": "pass-only",
+      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/signals.py",
+      "scope": "FunctionDef:_defer_notify_watchers",
+      "handler_type": "Exception",
+      "classification": "log-only",
+      "body_sha256": "377a81ef59bc1c21611526868d8fa99d4ce9409796822ec82d26af2314df7abb",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/signals.py",
+      "scope": "FunctionDef:_defer_notify_watchers",
+      "handler_type": "Exception",
+      "classification": "log-only",
+      "body_sha256": "c215f488c5820ce035fb7d5a6ed83d55f5a731733692081c00bd4d40b19ee5b3",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/signals.py",
+      "scope": "FunctionDef:_notify_watchers",
+      "handler_type": "Exception",
+      "classification": "pass-only",
+      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/signals.py",
+      "scope": "FunctionDef:_safe_dispatch",
+      "handler_type": "Exception",
+      "classification": "log-only",
+      "body_sha256": "4915e03754be15563606911c8b7d7af3b8ef764a880cd57c470ee54c63e8acbe",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/signals.py",
+      "scope": "FunctionDef:event_on_delete",
+      "handler_type": "Exception",
+      "classification": "silent",
+      "body_sha256": "06591fea7ae06a2ab587e34f0f8efb092afcc57fdbd99e36d66f693c0e7ae488",
+      "count": 1
+    },
+    {
+      "path": "itambox/extras/signals.py",
+      "scope": "FunctionDef:event_on_save",
+      "handler_type": "Exception",
+      "classification": "silent",
+      "body_sha256": "af1bee26fe579289b6abbd268990c1798c924aedf059e13000ccb196e787621b",
       "count": 1
     },
     {

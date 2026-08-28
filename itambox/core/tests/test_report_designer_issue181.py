@@ -16,7 +16,10 @@ from core.reports.rendering import (
     render_report_csv,
     render_report_html,
 )
-from core.tasks.reports import (
+from extras.apps import _scheduled_reports_probe
+from extras.forms import ReportTemplateForm
+from extras.models import ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
+from extras.tasks.reports import (
     _parse_authorized_scope,
     _principal_can_authorize_scope,
     _render_report_output,
@@ -27,9 +30,6 @@ from core.tasks.reports import (
     _tenant_scope_permission_is_valid,
     generate_scheduled_report_task,
 )
-from extras.apps import _scheduled_reports_probe
-from extras.forms import ReportTemplateForm
-from extras.models import ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
 from extras.views import ReportTemplateDetailView, ReportTemplateDownloadView, ReportTemplatePreviewView
 from itambox.capabilities import ActivationState
 from organization.models import Tenant
@@ -140,9 +140,9 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         schedule = SimpleNamespace(pk=123)
 
         with (
-            patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects", authorization_manager),
-            patch("core.tasks.reports.TaskContext") as task_context,
-            patch("core.tasks.reports.get_current_user", return_value=principal),
+            patch("extras.tasks.reports.ScheduledReportScopeAuthorization.objects", authorization_manager),
+            patch("extras.tasks.reports.TaskContext") as task_context,
+            patch("extras.tasks.reports.get_current_user", return_value=principal),
         ):
             result = _resolve_scope_authorization(schedule, tenant_a, [tenant_a, tenant_b])
 
@@ -300,22 +300,22 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         worker = Mock()
         worker.has_perm.return_value = False
         with (
-            patch("core.tasks.reports.TaskContext"),
-            patch("core.tasks.reports.get_current_user", return_value=worker),
+            patch("extras.tasks.reports.TaskContext"),
+            patch("extras.tasks.reports.get_current_user", return_value=worker),
         ):
             assert _tenant_scope_permission_is_valid(principal, tenant) is False
             worker.has_perm.return_value = True
             assert _tenant_scope_permission_is_valid(principal, tenant) is True
 
-        with patch("core.tasks.reports.TaskContext", side_effect=PermissionDenied):
+        with patch("extras.tasks.reports.TaskContext", side_effect=PermissionDenied):
             assert _tenant_scope_permission_is_valid(principal, tenant) is False
         with (
-            patch("core.tasks.reports.TaskContext"),
-            patch("core.tasks.reports.get_current_user", side_effect=ObjectDoesNotExist),
+            patch("extras.tasks.reports.TaskContext"),
+            patch("extras.tasks.reports.get_current_user", side_effect=ObjectDoesNotExist),
         ):
             assert _tenant_scope_permission_is_valid(principal, tenant) is False
 
-        with patch("core.tasks.reports._tenant_scope_permission_is_valid", side_effect=[True, False]) as check:
+        with patch("extras.tasks.reports._tenant_scope_permission_is_valid", side_effect=[True, False]) as check:
             assert _principal_can_authorize_scope(principal, [tenant, SimpleNamespace(pk=8)]) is False
             assert check.call_count == 2
         assert _principal_can_authorize_scope(principal, []) is True
@@ -326,24 +326,24 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         schedule = SimpleNamespace(pk=123)
         manager = Mock()
         manager.filter.return_value.select_related.return_value.first.return_value = None
-        with patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
+        with patch("extras.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
             assert _resolve_scope_authorization(schedule, tenant_a, [tenant_a, tenant_b]) is None
 
         authorization = SimpleNamespace(scope_tenant_ids=[1], authorized_by=SimpleNamespace(is_active=True, pk=8))
         manager.filter.return_value.select_related.return_value.first.return_value = authorization
-        with patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
+        with patch("extras.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
             assert _resolve_scope_authorization(schedule, tenant_a, [tenant_a, tenant_b]) is None
 
         authorization.scope_tenant_ids = [1, 2]
         authorization.authorized_by = SimpleNamespace(is_active=False, pk=8)
-        with patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
+        with patch("extras.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
             assert _resolve_scope_authorization(schedule, tenant_a, [tenant_a, tenant_b]) is None
 
-        with patch("core.tasks.reports._principal_can_authorize_scope", return_value=False):
-            with patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
+        with patch("extras.tasks.reports._principal_can_authorize_scope", return_value=False):
+            with patch("extras.tasks.reports.ScheduledReportScopeAuthorization.objects", manager):
                 assert _resolve_scope_authorization(schedule, tenant_a, [tenant_a, tenant_b]) is None
 
-        with patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects") as unused:
+        with patch("extras.tasks.reports.ScheduledReportScopeAuthorization.objects") as unused:
             assert _resolve_scope_authorization(schedule, tenant_a, [tenant_a]) is None
             unused.filter.assert_not_called()
 
@@ -356,8 +356,8 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         manager = Mock()
         manager.get.return_value = inactive_schedule
         with (
-            patch("core.tasks.reports.ScheduledReport.objects", manager),
-            patch("core.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=False)),
+            patch("extras.tasks.reports.ScheduledReport.objects", manager),
+            patch("extras.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=False)),
         ):
             result = generate_scheduled_report_task(1)
         assert result.status.value == "skipped"
@@ -372,11 +372,11 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         tenant_a = SimpleNamespace(pk=1, id=1)
         tenant_b = SimpleNamespace(pk=2, id=2)
         with (
-            patch("core.tasks.reports.ScheduledReport.objects", manager),
-            patch("core.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
-            patch("core.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
-            patch("core.tasks.reports._resolve_scope_authorization", return_value=None),
-            patch("core.tasks.reports._scope_requires_authorization", return_value=True),
+            patch("extras.tasks.reports.ScheduledReport.objects", manager),
+            patch("extras.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
+            patch("extras.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
+            patch("extras.tasks.reports._resolve_scope_authorization", return_value=None),
+            patch("extras.tasks.reports._scope_requires_authorization", return_value=True),
         ):
             result = generate_scheduled_report_task(2)
         assert result.status.value == "terminal"
@@ -397,13 +397,13 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         manager.get.return_value = schedule
 
         with (
-            patch("core.tasks.reports.ScheduledReport.objects", manager),
-            patch("core.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
-            patch("core.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
-            patch("core.tasks.reports._resolve_scope_authorization", return_value=authorized_principal_id),
-            patch("core.tasks.reports._scope_requires_authorization", return_value=True),
-            patch("core.tasks.reports.TaskContext") as task_context,
-            patch("core.tasks.reports._process_scheduled_report", return_value=expected_result) as process_report,
+            patch("extras.tasks.reports.ScheduledReport.objects", manager),
+            patch("extras.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
+            patch("extras.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
+            patch("extras.tasks.reports._resolve_scope_authorization", return_value=authorized_principal_id),
+            patch("extras.tasks.reports._scope_requires_authorization", return_value=True),
+            patch("extras.tasks.reports.TaskContext") as task_context,
+            patch("extras.tasks.reports._process_scheduled_report", return_value=expected_result) as process_report,
         ):
             result = generate_scheduled_report_task(schedule.pk)
 

@@ -17,12 +17,12 @@ from django_tables2 import RequestConfig
 
 from core.events import _send_slack_notification, _send_teams_notification
 from core.http import request_pinned, webhook_target_kind
-from core.tasks.webhooks import redeliver_webhook_delivery, send_webhook_test
 from core.validators import validate_external_url
 from core.worker_status import get_worker_status
 from extras.forms import WebhookEndpointForm
 from extras.models import WebhookDelivery, WebhookEndpoint
 from extras.tables import WebhookDeliveryTable, WebhookEndpointTable
+from extras.tasks.webhooks import redeliver_webhook_delivery, send_webhook_test
 from itambox.panels import Panel
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.utils import safe_return_url

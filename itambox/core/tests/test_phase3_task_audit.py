@@ -17,8 +17,8 @@ from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
 from core.models import ObjectChange
-from core.tasks.reports import generate_scheduled_report_task
 from extras.models import ReportTemplate, ScheduledReport
+from extras.tasks.reports import generate_scheduled_report_task
 from subscriptions.models import (
     Provider,
     Subscription,

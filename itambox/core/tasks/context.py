@@ -8,6 +8,7 @@ from typing import Protocol, Self
 from django.apps import apps
 from django.core.exceptions import PermissionDenied
 
+from core import tenant_scope
 from core.context import (
     SystemAuthorizationContext,
     _current_user,
@@ -215,9 +216,9 @@ class TaskContext:
         # A user-bound tenant task must prove canonical access to the target.
         # System tasks (no user) and superusers retain their explicit paths.
         if self.tenant is not None and self.user is not None and not self.user.is_superuser:
-            from organization.access import accessible_tenant_ids
-
-            if self.tenant.pk not in accessible_tenant_ids(self.user):
+            if self.tenant.pk not in tenant_scope.accessible_tenant_ids(
+                self.user
+            ) or not tenant_scope.role_grant_covers_tenant(self.user, self.tenant):
                 raise PermissionDenied("Task principal cannot access target tenant")
 
     def _restore_context(self) -> None:

@@ -543,7 +543,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 23)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 27)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -561,6 +561,10 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0107_scheduledreportscopeauthorization_revocation",
                 "extras.0108_alertlog_delivery_outcome",
                 "extras.0109_webhookdelivery",
+                "extras.0110_issue445_task_paths",
+                "extras.0111_webhookdelivery_target_claim",
+                "extras.0112_backfill_webhookdelivery_targets",
+                "extras.0113_upgrade_legacy_webhook_retry_schedules",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",

@@ -15,12 +15,26 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         # Monkey-patch ModelChoiceField.queryset to dynamically apply tenant scoping at request time
+        # Issue #445: replace the vendor Success/Failure resubmission action
+        # with the all-or-nothing guarded variant. Importing the guard module
+        # here runs no ORM queries.
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
+        from django.contrib import admin
         from django.forms.models import ModelChoiceField
+        from django_q.models import Failure, Success
 
         import core.signals  # noqa: F401
 
         # inline import: app-registry: register the production configuration checks after app loading
         from core import checks  # noqa: F401
+
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
+        from core.django_q_task_resubmission import GuardedFailAdmin, GuardedTaskAdmin
+
+        admin.site.unregister(Success)
+        admin.site.unregister(Failure)
+        admin.site.register(Success, GuardedTaskAdmin)
+        admin.site.register(Failure, GuardedFailAdmin)
 
         original_queryset_getter = ModelChoiceField.queryset.fget
 
@@ -77,24 +91,7 @@ class CoreConfig(AppConfig):
 
         BaseForm.__init__ = scoped_baseform_init
 
-        post_migrate.connect(self._register_alert_schedule, sender=self)
         post_migrate.connect(self._register_prune_schedule, sender=self)
-
-    def _register_alert_schedule(self, sender, **kwargs):
-        """Ensure the daily alert evaluation schedule exists in django-q2."""
-        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
-        from django_q.models import Schedule
-
-        from core.schedules import register_schedule
-
-        register_schedule(
-            "core.tasks.evaluate_alert_rules_task",
-            defaults={
-                "name": "Daily Alert Rule Evaluation",
-                "schedule_type": Schedule.DAILY,
-                "repeats": -1,
-            },
-        )
 
     def _register_prune_schedule(self, sender, **kwargs):
         """Ensure the daily changelog/operational-data retention prune schedule exists."""

@@ -503,6 +503,33 @@ class WebhookDelivery(BaseModel):
         related_name="deliveries",
         verbose_name=_("Event"),
     )
+    event_rule_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name=_("Event Rule ID"),
+        help_text=_("Immutable identifier of the event rule execution that created this delivery."),
+    )
+    payload_timestamp = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Payload Timestamp"),
+        help_text=_("Immutable timestamp used in every attempt of this delivery."),
+    )
+    target_url = models.URLField(max_length=2000, blank=True, verbose_name=_("Target URL"))
+    target_http_method = models.CharField(
+        max_length=10,
+        choices=WebhookEndpoint.METHOD_CHOICES,
+        default=WebhookEndpoint.HTTP_POST,
+        verbose_name=_("Target HTTP Method"),
+    )
+    target_headers = models.JSONField(default=dict, blank=True, verbose_name=_("Target Headers"))
+    target_secret = models.CharField(max_length=1024, blank=True, verbose_name=_("Target Secret"))
+    target_enabled = models.BooleanField(default=True, verbose_name=_("Target Enabled"))
+    target_tenant_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("Target Tenant ID"))
+    target_retry_count = models.PositiveSmallIntegerField(default=3, verbose_name=_("Target Retry Count"))
+    target_retry_backoff = models.PositiveSmallIntegerField(default=60, verbose_name=_("Target Retry Backoff"))
     delivery_id = models.CharField(max_length=36, unique=True, db_index=True, verbose_name=_("Delivery ID"))
     attempt = models.PositiveIntegerField(default=1, verbose_name=_("Attempt"))
     status = models.CharField(
@@ -536,6 +563,22 @@ class WebhookDelivery(BaseModel):
     redelivered_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Redelivered At"))
     attempted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Attempted At"))
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Completed At"))
+    claim_token = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Claim Token"))
+    claim_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        editable=False,
+        verbose_name=_("Claim Expires At"),
+    )
+    dispatch_stale_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        editable=False,
+        verbose_name=_("Dispatch Stale At"),
+        help_text=_("Recovery coordinator lease for a queued durable delivery."),
+    )
 
     class Meta:
         ordering = ["-created_at"]

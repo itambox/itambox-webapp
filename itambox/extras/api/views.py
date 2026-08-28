@@ -9,7 +9,6 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
-from core.tasks.webhooks import redeliver_webhook_delivery, send_webhook_test
 from extras.filters import (
     AlertLogFilterSet,
     AlertRuleFilterSet,
@@ -35,6 +34,7 @@ from extras.models import (
     WebhookDelivery,
     WebhookEndpoint,
 )
+from extras.tasks.webhooks import redeliver_webhook_delivery, send_webhook_test
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 

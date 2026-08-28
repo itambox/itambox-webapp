@@ -14,9 +14,9 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 
 from assets.models import Manufacturer
-from core.tasks.alerts import _match_low_stock
 from core.tests.mixins import TenantTestMixin
 from extras.dashboard.widgets import LowStockWidget
+from extras.tasks.alerts import _match_low_stock
 from inventory.api.serializers import AccessorySerializer, ComponentSerializer, ConsumableSerializer
 from inventory.api.views import AccessoryViewSet, ComponentViewSet, ConsumableViewSet
 from inventory.models import (

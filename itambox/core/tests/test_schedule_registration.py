@@ -13,7 +13,8 @@ from django_q.models import Schedule
 
 from core.schedules import register_schedule
 
-CORE_FUNC = "core.tasks.evaluate_alert_rules_task"
+CORE_FUNC = "extras.tasks.alerts.evaluate_alert_rules_task"
+WEBHOOK_RECOVERY_FUNC = "extras.tasks.webhooks.recover_pending_webhook_deliveries"
 SUBSCRIPTION_FUNC = "subscriptions.tasks.check_subscription_expiries_and_reminders"
 
 
@@ -77,10 +78,14 @@ class AppConfigScheduleRegistrationTests(TestCase):
         # post_migrate handlers receive (sender, **kwargs).
         handler(sender=config)
 
-    def test_core_handler_is_idempotent(self):
-        self._run_handler("core", "_register_alert_schedule")
-        self._run_handler("core", "_register_alert_schedule")
+    def test_extras_alert_handler_is_idempotent(self):
+        self._run_handler("extras", "_register_alert_schedule")
+        self._run_handler("extras", "_register_alert_schedule")
         self.assertEqual(Schedule.objects.filter(func=CORE_FUNC).count(), 1)
+        self.assertEqual(Schedule.objects.filter(func=WEBHOOK_RECOVERY_FUNC).count(), 1)
+        recovery = Schedule.objects.get(func=WEBHOOK_RECOVERY_FUNC)
+        self.assertEqual(recovery.schedule_type, Schedule.MINUTES)
+        self.assertEqual(recovery.minutes, 1)
 
     def test_subscriptions_handler_is_idempotent(self):
         self._run_handler("subscriptions", "_register_subscription_tasks")
@@ -89,12 +94,12 @@ class AppConfigScheduleRegistrationTests(TestCase):
 
     def test_no_duplicate_schedules_across_funcs(self):
         # Run every registering handler twice; each func must end with one row.
-        self._run_handler("core", "_register_alert_schedule")
+        self._run_handler("extras", "_register_alert_schedule")
         self._run_handler("subscriptions", "_register_subscription_tasks")
-        self._run_handler("core", "_register_alert_schedule")
+        self._run_handler("extras", "_register_alert_schedule")
         self._run_handler("subscriptions", "_register_subscription_tasks")
 
-        for func in (CORE_FUNC, SUBSCRIPTION_FUNC):
+        for func in (CORE_FUNC, WEBHOOK_RECOVERY_FUNC, SUBSCRIPTION_FUNC):
             self.assertEqual(
                 Schedule.objects.filter(func=func).count(),
                 1,

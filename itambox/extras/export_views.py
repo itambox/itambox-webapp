@@ -17,8 +17,8 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
+from assets.tasks.labels import render_labels_pdf
 from core.csv_utils import csv_safe
-from core.tasks.labels import render_labels_pdf
 from extras.forms import ExportTemplateForm, LabelTemplateForm
 from extras.models import ExportTemplate, LabelTemplate
 from extras.tables import ExportTemplateTable, LabelTemplateTable

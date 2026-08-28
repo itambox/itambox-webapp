@@ -172,6 +172,7 @@ LAYER_RULES = (
             "itambox/core/events.py",
             "itambox/core/schedules.py",
             "*/tasks.py",
+            "*/tasks/*",
             "*/signals.py",
         ),
     ),

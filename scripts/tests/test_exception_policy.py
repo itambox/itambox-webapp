@@ -840,7 +840,7 @@ class LayerTests(unittest.TestCase):
         cases = {
             "itambox/assets/models/asset.py": "domain",
             "itambox/assets/services.py": "domain",
-            "itambox/core/tasks/checkout.py": "task",
+            "itambox/assets/tasks/checkout.py": "task",
             "itambox/assets/signals.py": "task",
             "itambox/core/importers/snipeit.py": "integration",
             "itambox/assets/api/serializers.py": "integration",

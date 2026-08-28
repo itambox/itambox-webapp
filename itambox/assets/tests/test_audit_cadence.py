@@ -162,8 +162,8 @@ class AlertRuleCadenceTests(TestCase):
 
     def test_category_cadence_overrides_rule_threshold(self):
         """Asset is within rule threshold but overdue per its category cadence."""
-        from core.tasks.alerts import _match_audit_overdue
         from extras.models import AlertRule
+        from extras.tasks.alerts import _match_audit_overdue
 
         # Global rule: 180-day threshold
         rule = baker.make(
@@ -183,8 +183,8 @@ class AlertRuleCadenceTests(TestCase):
 
     def test_category_cadence_suppresses_false_positive(self):
         """Asset is beyond rule threshold but NOT overdue per its category cadence."""
-        from core.tasks.alerts import _match_audit_overdue
         from extras.models import AlertRule
+        from extras.tasks.alerts import _match_audit_overdue
 
         # Global rule: 30-day threshold
         rule = baker.make(

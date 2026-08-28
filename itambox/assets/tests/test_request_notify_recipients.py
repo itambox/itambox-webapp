@@ -41,7 +41,7 @@ class NewRequestNotifyRecipientTests(TenantTestMixin, TestCase):
 
     def test_only_same_tenant_staff_notified(self):
         self.clear_tenant_context()
-        from assets.tasks import notify_new_request_task
+        from assets.tasks.requests import notify_new_request_task
 
         notify_new_request_task(self.request_obj.pk)
 

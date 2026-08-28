@@ -344,7 +344,7 @@ CAPABILITY_LIMITATIONS = {
 CAPABILITY_APP_CONFIG_GLOB = "itambox/*/apps.py"
 CAPABILITY_REGISTRY_MODULE = "itambox/itambox/capabilities.py"
 MODEL_GLOBS = ("itambox/*/models.py", "itambox/*/models/*.py")
-WEBHOOK_TASK_MODULE = "itambox/core/tasks/webhooks.py"
+WEBHOOK_TASK_MODULE = "itambox/extras/tasks/webhooks.py"
 WEBHOOK_SIGNATURE_HEADER = "X-Hub-Signature-256"
 SCIM_URL_MODULES = ("itambox/users/api/scim/urls.py", "itambox/users/api/scim/provider_urls.py")
 

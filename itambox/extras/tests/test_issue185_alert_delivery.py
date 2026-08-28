@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection, transaction
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -21,17 +22,17 @@ from rest_framework.test import APITestCase
 
 from core.events import DeliveryDisposition, DeliveryResult
 from core.models import Notification
-from core.tasks.alerts import (
+from core.tests.mixins import TenantTestMixin
+from extras.filters import AlertLogFilterSet
+from extras.models import AlertLog, AlertRule, NotificationChannel
+from extras.tables import AlertLogTable
+from extras.tasks.alerts import (
     _delivery_error,
     _delivery_outcome,
     _dispatch_channels,
     _evaluate_rule,
     _schedule_alert_dispatch,
 )
-from core.tests.mixins import TenantTestMixin
-from extras.filters import AlertLogFilterSet
-from extras.models import AlertLog, AlertRule, NotificationChannel
-from extras.tables import AlertLogTable
 from organization.models import Tenant
 
 User = get_user_model()
@@ -178,8 +179,8 @@ class ChannelDeliveryOutcomeTests(TestCase):
         from unittest.mock import patch
 
         if isinstance(result, BaseException):
-            return patch("core.tasks.alerts.send_notification_to_channel", side_effect=result)
-        return patch("core.tasks.alerts.send_notification_to_channel", return_value=result)
+            return patch("extras.tasks.alerts.send_notification_to_channel", side_effect=result)
+        return patch("extras.tasks.alerts.send_notification_to_channel", return_value=result)
 
 
 class AlertDispatchObservabilityTests(TransactionTestCase):
@@ -225,7 +226,7 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
         )
         AccessoryStock.objects.create(accessory=accessory, location=location, qty=1)
 
-        with patch("core.tasks.alerts.uuid4", return_value="run-42"):
+        with patch("extras.tasks.alerts.uuid4", return_value="run-42"):
             with transaction.atomic():
                 from core.tasks.context import TaskContext
 
@@ -262,7 +263,7 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
 
         # Both scheduled runs claim the SAME delivery id (simulates a replayed
         # on_commit callback): the second invocation must be skipped entirely.
-        with patch("core.tasks.alerts.uuid4", side_effect=["run-1", "run-1"]):
+        with patch("extras.tasks.alerts.uuid4", side_effect=["run-1", "run-1"]):
             with TaskContext(tenant_id=tenant.pk):
                 with transaction.atomic():
                     _schedule_alert_dispatch(rule, match, alert)
@@ -302,8 +303,8 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
         existing = {(rule.pk, alert.content_type_id, alert.object_id): alert}
 
         with (
-            patch("core.tasks.alerts.uuid4", return_value="fresh-run"),
-            patch("core.tasks.alerts._collect_matches", return_value=[match]),
+            patch("extras.tasks.alerts.uuid4", return_value="fresh-run"),
+            patch("extras.tasks.alerts._collect_matches", return_value=[match]),
         ):
             with TaskContext(tenant_id=tenant.pk):
                 with transaction.atomic():
@@ -511,7 +512,7 @@ class AlertLifecycleIndependentOfDeliveryTests(TransactionTestCase):
         AccessoryStock.objects.create(accessory=accessory, location=location, qty=1)
 
         failure = DeliveryResult("in_app.deliver", DeliveryDisposition.TERMINAL, True, "backend down", "timeout")
-        with patch("core.tasks.alerts.send_notification_to_channel", return_value=failure):
+        with patch("extras.tasks.alerts.send_notification_to_channel", return_value=failure):
             with TaskContext(tenant_id=tenant.pk):
                 with transaction.atomic():
                     fresh = _evaluate_rule(rule, timezone.now().date(), {})
@@ -620,6 +621,7 @@ class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):

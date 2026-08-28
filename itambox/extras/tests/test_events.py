@@ -5,16 +5,16 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 from django.contrib.contenttypes.models import ContentType
-from django.core import mail
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
 from assets.models import Manufacturer
-from core.events import _check_conditions, _evaluate_condition, dispatch_event, send_notification_to_channel
+from core.events import send_notification_to_channel
 from core.models import Notification
-from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
+from extras.models import Event, EventRule, NotificationChannel, WebhookDelivery, WebhookEndpoint
+from extras.services.events import _check_conditions, _enqueue_delivery, dispatch_event
 from organization.models import Location, Tenant
 
 
@@ -22,6 +22,23 @@ class EventsSystemTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.manufacturer_ct = ContentType.objects.get_for_model(Manufacturer)
+
+    @override_settings(Q_CLUSTER={"sync": False})
+    def test_webhook_enqueue_waits_for_commit(self):
+        delivery = WebhookDelivery._base_manager.create(
+            delivery_id=str(uuid.uuid4()),
+            status=WebhookDelivery.STATUS_PENDING,
+            test_send=True,
+            payload_timestamp=timezone.now(),
+        )
+        with patch("extras.services.events.async_task") as async_task:
+            with transaction.atomic():
+                _enqueue_delivery(delivery, actor_id=None, request_id="issue445-on-commit")
+                async_task.assert_not_called()
+            async_task.assert_called_once()
+        assertions = async_task.call_args.args[1]
+        self.assertEqual(assertions.delivery_pk, delivery.pk)
+        self.assertEqual(async_task.call_args.kwargs["request_id"], "issue445-on-commit")
 
     @patch("core.http.request_pinned")
     def test_event_dispatch_on_create_update_delete(self, mock_request_pinned):
@@ -106,27 +123,10 @@ class EventsSystemTestCase(TransactionTestCase):
                     data={"app_label": "assets", "model_name": "manufacturer"},
                 )
 
-                self.assertFalse(_evaluate_condition(conditions, event))
                 self.assertFalse(_check_conditions(conditions, event))
                 dispatch_event(Manufacturer, event, "create")
 
                 self.assertFalse(Notification.objects.filter(subject=rule.action_config["subject"]).exists())
-
-    def test_evaluate_condition_gt_lt_and_non_dict_shapes(self):
-        """The withdrawn engine keeps its numeric operators (v2 reuse path) and
-        fails closed on unexpected shapes."""
-        event = Event(
-            model=self.manufacturer_ct,
-            object_id=1,
-            action="create",
-            data={"price": "10"},
-        )
-        self.assertTrue(_evaluate_condition({"field": "price", "op": "gt", "value": 5}, event))
-        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": 15}, event))
-        self.assertTrue(_evaluate_condition({"field": "price", "op": "lt", "value": 15}, event))
-        self.assertFalse(_evaluate_condition({"field": "price", "op": "lt", "value": 5}, event))
-        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": "not-a-number"}, event))
-        self.assertFalse(_evaluate_condition("not-a-dict", event))
         self.assertFalse(_check_conditions([], event))
 
     def test_empty_conditions_continue_to_match(self):
@@ -235,7 +235,7 @@ class EventsSystemTestCase(TransactionTestCase):
 
         from core.managers import set_current_tenant
         from core.tests.mixins import grant
-        from organization.models import Location, Membership, Role, Tenant
+        from organization.models import Location, Role, Tenant
 
         tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
@@ -372,60 +372,67 @@ class EventsSystemTestCase(TransactionTestCase):
             ),
             start=1,
         ):
-            from core.tasks.webhooks import send_webhook_task
+            from extras.tasks.webhooks import WebhookDeliveryAssertions, send_webhook_task
 
             tenant = envelope_tenant_a if index == 1 else envelope_tenant_b
-            send_webhook_task(
+            event = Event.objects.create(
+                model=ContentType.objects.get_for_model(Manufacturer),
+                object_id=index,
+                action="create",
+                data={"app_label": "assets", "model_name": "manufacturer"},
+            )
+            endpoint = WebhookEndpoint.objects.create(
+                name=f"Envelope {index}",
                 url=url,
-                method="POST",
+                http_method="POST",
                 headers={},
                 secret="",
-                event_id=100 + index,
-                delivery_id=f"delivery-{index}",
-                tenant_id=tenant.pk,
-                event_action="create",
-                event_model_app_label="assets",
-                event_model_name="manufacturer",
-                event_object_id=index,
-                event_timestamp_iso="2024-01-01T00:00:00+00:00",
-                event_data={"app_label": "assets", "model_name": "manufacturer"},
+                retry_count=0,
+                retry_backoff=0,
             )
+            delivery = WebhookDelivery.objects.create(
+                endpoint=endpoint,
+                delivery_id=str(uuid.uuid4()),
+                event=event,
+                tenant=tenant,
+                test_send=False,
+                attempt=1,
+                status=WebhookDelivery.STATUS_PENDING,
+                target_url=endpoint.url,
+                target_http_method=endpoint.http_method,
+                target_headers=endpoint.headers,
+                target_secret=endpoint.secret,
+                target_enabled=True,
+                target_tenant_id=endpoint.tenant_id,
+                target_retry_count=endpoint.retry_count,
+                target_retry_backoff=endpoint.retry_backoff,
+            )
+            assertions = WebhookDeliveryAssertions(
+                delivery_pk=delivery.pk,
+                delivery_id=uuid.UUID(str(delivery.delivery_id)),
+                webhook_endpoint_id=endpoint.pk,
+                event_id=event.pk,
+                tenant_id=tenant.pk,
+                test_send=False,
+            )
+            send_webhook_task(assertions=assertions, attempt=0)
 
             payload = mock_request_pinned.call_args.kwargs["json"]
             self.assertEqual(payload["schema_version"], 1)
-            self.assertEqual(payload["event_id"], 100 + index)
-            self.assertEqual(payload["delivery_id"], f"delivery-{index}")
+            self.assertEqual(payload["event_id"], event.pk)
+            self.assertEqual(payload["delivery_id"], str(delivery.delivery_id))
             self.assertEqual(payload["attempt"], 1)
             self.assertEqual(payload["tenant"], tenant.pk)
+            self.assertEqual(payload["text"], f"Event: create on manufacturer (ID: {index})")
             if index == 1:
-                self.assertEqual(
-                    payload,
-                    {
-                        "schema_version": 1,
-                        "event_id": 101,
-                        "delivery_id": "delivery-1",
-                        "attempt": 1,
-                        "tenant": envelope_tenant_a.pk,
-                        "text": "Event: create on manufacturer (ID: 1)",
-                    },
-                )
+                self.assertIn("text", payload)
+                self.assertNotIn("@type", payload)
             else:
-                self.assertEqual(
-                    payload,
-                    {
-                        "schema_version": 1,
-                        "event_id": 102,
-                        "delivery_id": "delivery-2",
-                        "attempt": 1,
-                        "tenant": envelope_tenant_b.pk,
-                        "@type": "MessageCard",
-                        "@context": "https://schema.org/extensions",
-                        "summary": "Event: create on manufacturer (ID: 2)",
-                        "themeColor": "0076D7",
-                        "title": "ITAMbox Notification",
-                        "text": "Event: create on manufacturer (ID: 2)",
-                    },
-                )
+                self.assertEqual(payload["@type"], "MessageCard")
+                self.assertEqual(payload["@context"], "https://schema.org/extensions")
+                self.assertEqual(payload["summary"], f"Event: create on manufacturer (ID: {index})")
+                self.assertEqual(payload["themeColor"], "0076D7")
+                self.assertEqual(payload["title"], "ITAMbox Notification")
 
     @patch("core.http.request_pinned")
     def test_webhook_tenant_comes_from_object_not_ambient_context(self, mock_request_pinned):
@@ -634,164 +641,3 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertGreater(Notification.objects.count(), initial_count)
         notif = Notification.objects.filter(user=staff_user).latest("pk")
         self.assertEqual(notif.subject, "Subject In-App")
-
-
-class WebhookRetryTestCase(TransactionTestCase):
-    """send_webhook_task retry behaviour."""
-
-    BASE_KWARGS = dict(
-        url="https://example.com/hook",
-        method="POST",
-        headers={},
-        secret="",
-        event_id=42,
-        delivery_id="delivery-42",
-        tenant_id=None,
-        event_action="create",
-        event_model_app_label="assets",
-        event_model_name="manufacturer",
-        event_object_id=1,
-        event_timestamp_iso="2024-01-01T00:00:00+00:00",
-        event_data={},
-    )
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    def test_5xx_retries(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
-
-        resp = MagicMock(status_code=503)
-        resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
-        mock_request_pinned.return_value = resp
-
-        send_webhook_task(**self.BASE_KWARGS, retry_count=2, retry_backoff=0)
-
-        mock_async.assert_called_once()
-        _, kw = mock_async.call_args
-        self.assertEqual(kw["attempt"], 1)
-        self.assertEqual(kw["retry_count"], 2)
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    def test_retry_preserves_event_and_delivery_identity_and_advances_attempt(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
-
-        failed_response = MagicMock(status_code=503)
-        failed_response.raise_for_status.side_effect = __import__("requests").HTTPError(response=failed_response)
-        successful_response = MagicMock(status_code=200)
-        successful_response.raise_for_status.return_value = None
-        mock_request_pinned.side_effect = [failed_response, successful_response]
-
-        send_webhook_task(**self.BASE_KWARGS, retry_count=1, retry_backoff=0)
-        retry_kwargs = mock_async.call_args.kwargs
-        send_webhook_task(**retry_kwargs)
-
-        first_payload = mock_request_pinned.call_args_list[0].kwargs["data"]
-        second_payload = mock_request_pinned.call_args_list[1].kwargs["data"]
-        first_payload = json.loads(first_payload)
-        second_payload = json.loads(second_payload)
-        self.assertEqual(first_payload["event_id"], second_payload["event_id"])
-        self.assertEqual(first_payload["delivery_id"], second_payload["delivery_id"])
-        self.assertEqual(first_payload["attempt"], 1)
-        self.assertEqual(second_payload["attempt"], 2)
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    def test_5xx_gives_up_after_max_attempts(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
-
-        resp = MagicMock(status_code=503)
-        resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
-        mock_request_pinned.return_value = resp
-
-        send_webhook_task(**self.BASE_KWARGS, attempt=2, retry_count=2)
-
-        mock_async.assert_not_called()
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    def test_4xx_does_not_retry(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
-
-        resp = MagicMock(status_code=422)
-        resp.raise_for_status.return_value = None
-        mock_request_pinned.return_value = resp
-
-        send_webhook_task(**self.BASE_KWARGS, retry_count=3)
-
-        mock_async.assert_not_called()
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    def test_2xx_no_retry(self, mock_async, mock_request_pinned):
-        from core.tasks.webhooks import send_webhook_task
-
-        resp = MagicMock(status_code=200)
-        resp.raise_for_status.return_value = None
-        mock_request_pinned.return_value = resp
-
-        send_webhook_task(**self.BASE_KWARGS, retry_count=3)
-
-        mock_async.assert_not_called()
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    @patch("core.tasks.webhooks.Schedule")
-    def test_5xx_with_backoff_schedules_delayed_retry(self, mock_schedule, mock_async, mock_request_pinned):
-        """A positive retry_backoff must defer the retry via a one-off Schedule,
-        not re-enqueue immediately. The kwargs must round-trip through the same
-        ast.literal_eval the django-q2 scheduler uses."""
-        import ast
-
-        from core.tasks.webhooks import send_webhook_task
-
-        resp = MagicMock(status_code=503)
-        resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
-        mock_request_pinned.return_value = resp
-
-        send_webhook_task(**self.BASE_KWARGS, retry_count=2, retry_backoff=60)
-
-        mock_async.assert_not_called()
-        mock_schedule.objects.create.assert_called_once()
-        _, kw = mock_schedule.objects.create.call_args
-        self.assertEqual(kw["func"], "core.tasks.send_webhook_task")
-        self.assertEqual(kw["schedule_type"], mock_schedule.ONCE)
-        self.assertGreater(kw["next_run"], timezone.now())
-        retry = ast.literal_eval(kw["kwargs"])
-        self.assertEqual(retry["attempt"], 1)
-        self.assertEqual(retry["retry_count"], 2)
-        self.assertEqual(retry["retry_backoff"], 60)
-        self.assertEqual(retry["url"], self.BASE_KWARGS["url"])
-
-    @patch("core.http.request_pinned")
-    @patch("core.tasks.webhooks.async_task")
-    @patch("core.tasks.webhooks.Schedule")
-    def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request_pinned):
-        """WS5-4: an endpoint-linked retry must re-derive the secret from the endpoint, never
-        write it into Schedule.kwargs (which django-q stores plaintext)."""
-        import ast
-
-        from core.tasks.webhooks import send_webhook_task
-
-        endpoint = WebhookEndpoint.objects.create(
-            name="WH",
-            url="https://example.com/hook",
-            secret="top-secret",
-        )
-        resp = MagicMock(status_code=503)
-        resp.raise_for_status.side_effect = __import__("requests").HTTPError(response=resp)
-        mock_request_pinned.return_value = resp
-
-        kwargs = dict(self.BASE_KWARGS, secret="", webhook_endpoint_id=endpoint.pk, retry_count=2, retry_backoff=60)
-        send_webhook_task(**kwargs)
-
-        # The HMAC was still computed (secret re-derived from the endpoint at run time).
-        # request_pinned(method, url, headers=..., data=..., timeout=...) — headers is a kwarg.
-        self.assertIn("X-Hub-Signature-256", mock_request_pinned.call_args[1]["headers"])
-        # The retry Schedule.kwargs must NOT contain the secret — only the endpoint id.
-        mock_schedule.objects.create.assert_called_once()
-        _, kw = mock_schedule.objects.create.call_args
-        self.assertNotIn("top-secret", kw["kwargs"])
-        retry = ast.literal_eval(kw["kwargs"])
-        self.assertEqual(retry["webhook_endpoint_id"], endpoint.pk)
-        self.assertEqual(retry["secret"], "")

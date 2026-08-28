@@ -2676,30 +2676,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/events.py",
-      "code": "F401",
-      "message": "'hashlib' imported but unused",
-      "source": "import hashlib",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "code": "F401",
-      "message": "'hmac' imported but unused",
-      "source": "import hmac",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/filters.py",
       "code": "B007",
       "message": "Loop control variable 'field_name' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -4094,88 +4070,8 @@
     {
       "path": "itambox/core/tasks/__init__.py",
       "code": "F401",
-      "message": "'.alerts.evaluate_alert_rules_task' imported but unused",
-      "source": "from .alerts import evaluate_alert_rules_task, run_alert_rule_now",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.alerts.run_alert_rule_now' imported but unused",
-      "source": "from .alerts import evaluate_alert_rules_task, run_alert_rule_now",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.checkin.bulk_checkin_task' imported but unused",
-      "source": "from .checkin import bulk_checkin_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.checkout.bulk_checkout_task' imported but unused",
-      "source": "from .checkout import bulk_checkout_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
       "message": "'.csv_import.import_csv_task' imported but unused",
       "source": "from .csv_import import import_csv_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.depreciation.calculate_depreciation' imported but unused",
-      "source": "from .depreciation import calculate_depreciation",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.disposal.bulk_dispose_task' imported but unused",
-      "source": "from .disposal import bulk_dispose_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.intune_sync.sync_tenant_intune' imported but unused",
-      "source": "from .intune_sync import sync_tenant_intune",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.labels.generate_label_batch_task' imported but unused",
-      "source": "from .labels import generate_label_batch_task, generate_label_pdf_batch_task, generate_single_label_graphic",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.labels.generate_label_pdf_batch_task' imported but unused",
-      "source": "from .labels import generate_label_batch_task, generate_label_pdf_batch_task, generate_single_label_graphic",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.labels.generate_single_label_graphic' imported but unused",
-      "source": "from .labels import generate_label_batch_task, generate_label_pdf_batch_task, generate_single_label_graphic",
       "context": "Module:body",
       "count": 1
     },
@@ -4190,97 +4086,9 @@
     {
       "path": "itambox/core/tasks/__init__.py",
       "code": "F401",
-      "message": "'.reports.generate_scheduled_report_task' imported but unused",
-      "source": "from .reports import generate_scheduled_report_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
       "message": "'.retention.prune_changelog_task' imported but unused",
       "source": "from .retention import prune_changelog_task",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.webhooks.send_webhook_task' imported but unused",
-      "source": "from .webhooks import send_webhook_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "C901",
-      "message": "'_evaluate_rule' is too complex (11)",
-      "source": "def _evaluate_rule(rule, today, existing_logs):",
-      "context": "Module:body/FunctionDef:_evaluate_rule:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "C901",
-      "message": "'_match_low_stock' is too complex (14)",
-      "source": "def _match_low_stock(rule):",
-      "context": "Module:body/FunctionDef:_match_low_stock:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.OuterRef' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.Q' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.Subquery' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.Sum' imported but unused",
-      "source": "    from django.db.models import OuterRef, Q, Subquery, Sum",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "code": "F401",
-      "message": "'django.db.models.functions.Coalesce' imported but unused",
-      "source": "    from django.db.models.functions import Coalesce",
-      "context": "Module:body/FunctionDef:_collect_matches:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkin.py",
-      "code": "C901",
-      "message": "'bulk_checkin_task' is too complex (13)",
-      "source": "def bulk_checkin_task(",
-      "context": "Module:body/FunctionDef:bulk_checkin_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/checkout.py",
-      "code": "C901",
-      "message": "'bulk_checkout_task' is too complex (12)",
-      "source": "def bulk_checkout_task(",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:self",
       "count": 1
     },
     {
@@ -4289,86 +4097,6 @@
       "message": "'import_csv_task' is too complex (12)",
       "source": "def import_csv_task(",
       "context": "Module:body/FunctionDef:import_csv_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/disposal.py",
-      "code": "C901",
-      "message": "'bulk_dispose_task' is too complex (14)",
-      "source": "def bulk_dispose_task(",
-      "context": "Module:body/FunctionDef:bulk_dispose_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/disposal.py",
-      "code": "F401",
-      "message": "'django.db.transaction' imported but unused",
-      "source": "from django.db import transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'assets.models.AssetType' imported but unused",
-      "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'assets.models.Manufacturer' imported but unused",
-      "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'assets.models.StatusLabel' imported but unused",
-      "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'django.conf.settings' imported but unused",
-      "source": "from django.conf import settings",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'organization.models.AssetHolder' imported but unused",
-      "source": "    from organization.models import AssetHolder, Tenant",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F401",
-      "message": "'organization.models.Tenant' imported but unused",
-      "source": "    from organization.models import AssetHolder, Tenant",
-      "context": "Module:body/FunctionDef:_run_sync:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "C901",
-      "message": "'generate_label_batch_task' is too complex (11)",
-      "source": "def generate_label_batch_task(",
-      "context": "Module:body/FunctionDef:generate_label_batch_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "C901",
-      "message": "'generate_label_pdf_batch_task' is too complex (14)",
-      "source": "def generate_label_pdf_batch_task(",
-      "context": "Module:body/FunctionDef:generate_label_pdf_batch_task:self",
       "count": 1
     },
     {
@@ -4465,22 +4193,6 @@
       "message": "line too long (142 > 120 characters)",
       "source": "        \"\"\"Test that the rotate_encryption_keys management command successfully decrypts with old key and re-encrypts with new primary key.\"\"\"",
       "context": "Module:body/ClassDef:CoreCryptoTestCase:body/FunctionDef:test_rotate_encryption_keys_command:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F401",
-      "message": "'django.core.mail' imported but unused",
-      "source": "from django.core import mail",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "        from organization.models import Location, Membership, Role, Tenant",
-      "context": "Module:body/ClassDef:EventsSystemTestCase:body/FunctionDef:test_event_rules_scoped_to_instance_tenant_in_system_context:body",
       "count": 1
     },
     {
@@ -5041,14 +4753,6 @@
       "message": "'user_id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "print(f\"Error: user_id must be a numeric value, got '{user_id}'\", file=sys.stderr)",
       "context": "Module:body/FunctionDef:main:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='user_id', ctx=Load()), attr='isdigit', ctx=Load()), args=[], keywords=[])):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/apps.py",
-      "code": "F401",
-      "message": "'extras.search' imported but unused",
-      "source": "        import extras.search",
-      "context": "Module:body/ClassDef:ExtrasConfig:body/FunctionDef:ready:body",
       "count": 1
     },
     {

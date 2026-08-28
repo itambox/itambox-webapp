@@ -17,6 +17,7 @@ from core.managers import get_current_tenant
 
 from .filters import TagFilter
 from .models import CustomField, CustomFieldset, ReportTemplate, SavedFilter, Tag
+from .signals import _SIGNAL_SKIP_MODELS
 
 
 class TagForm(ColorFieldFormMixin, forms.ModelForm):
@@ -235,7 +236,6 @@ def logged_content_types():
     to these keeps users out of that silent dead-end.
     """
     from core.models import ChangeLoggingMixin
-    from core.signals import _SIGNAL_SKIP_MODELS
 
     ids = []
     for ct in ContentType.objects.all():

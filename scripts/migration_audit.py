@@ -30,6 +30,10 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0107_scheduledreportscopeauthorization_revocation",
     "extras.0108_alertlog_delivery_outcome",
     "extras.0109_webhookdelivery",
+    "extras.0110_issue445_task_paths",
+    "extras.0111_webhookdelivery_target_claim",
+    "extras.0112_backfill_webhookdelivery_targets",
+    "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -92,6 +96,30 @@ SEMANTIC_DISPOSITIONS = {
             "correlation fields while preserving legacy principals for the 1.x dual-read window."
         ),
         {"users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Rewrites the twelve canonical django-q Schedule.func values to their issue-#445 domain-owner "
+            "paths forward and back, preserving every other schedule field, PK and row multiplicity."
+        ),
+        {"extras.0110_issue445_task_paths"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Copies endpoint configuration into immutable webhook delivery target snapshots; endpoint-less "
+            "history remains unbound because exact legacy rule provenance cannot be reconstructed safely."
+        ),
+        {"extras.0112_backfill_webhookdelivery_targets"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Validates and upgrades delayed legacy webhook retry schedules to assertion-only payloads, moves exact "
+            "endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue secrets."
+        ),
+        {"extras.0113_upgrade_legacy_webhook_retry_schedules"},
     ),
     **_dispositions(
         "required-fresh",

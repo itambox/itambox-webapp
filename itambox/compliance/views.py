@@ -20,6 +20,7 @@ from django.views.generic import View
 
 from core.context import get_current_request_id
 from core.reports.exporters import PDF_MIME, report_pdf_bytes
+from extras.services.events import dispatch_event
 from itambox.panels import Panel
 from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.htmx_responses import error_response, is_htmx_request, success_response
@@ -475,8 +476,6 @@ def custody_eula_sign(request, token):
 
 def _safe_dispatch_custody(receipt, *, actor_id=None, tenant_id=None):
     try:
-        from core.events import dispatch_event
-
         dispatch_event(CustodyReceipt, receipt, action="update")
     # broad except: boundary-isolation: event delivery failure must not invalidate accepted custody
     except Exception as exc:

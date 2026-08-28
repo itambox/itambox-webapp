@@ -12,13 +12,13 @@ from django.core.files.base import ContentFile
 from django.utils.html import escape, format_html
 from django.utils.translation import gettext_lazy as _
 
+from assets.models import Asset
 from core.html_sanitizer import sanitize_label_html_for_pdf
 from core.models import Job, Notification
 from core.pdf_renderer import html_to_pdf_bytes, pdf_safe_link_callback
+from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
-from extras.models import FileAttachment
-
-from .context import TaskContext
+from extras.models import FileAttachment, LabelTemplate
 
 logger = logging.getLogger(__name__)
 _LABEL_PRINT_CSS_PATH = Path(__file__).resolve().parents[2] / "static" / "src" / "styles" / "_label-print.scss"
@@ -134,13 +134,17 @@ def generate_single_label_graphic(asset: object, label_format: str) -> bytes:
     buffer = io.BytesIO()
 
     if label_format == "qr":
+        # inline import: heavy-import: load barcode/QR renderers only when generating graphics
         import segno
 
         # Generate clean QR code
         qr = segno.make_qr(f"itambox://asset/{asset.pk}")
         qr.save(buffer, kind="png", scale=10)
     else:
+        # inline import: heavy-import: load barcode/QR renderers only when generating graphics
         import barcode
+
+        # inline import: heavy-import: load barcode/QR renderers only when generating graphics
         from barcode.writer import ImageWriter
 
         # Generate barcode
@@ -185,6 +189,28 @@ def _finalize_label_zip(job, user, zip_buffer: io.BytesIO, rendered: int, total:
     )
 
 
+def _render_batch_zip(job, assets, label_format, log_extra):
+    """Render one PNG per asset into a ZIP buffer; one failure never aborts."""
+    zip_buffer = io.BytesIO()
+    rendered = 0
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for asset in assets:
+            try:
+                img_data = generate_single_label_graphic(asset, label_format)
+                filename = f"label_{asset.asset_tag}_{label_format}.png"
+                zip_file.writestr(filename, img_data)
+                rendered += 1
+                job.append_log(f" - Rendered label for asset PK {asset.pk}.")
+            # broad except: boundary-isolation: one label failure must not abort the requested batch
+            except Exception as ex:
+                job.append_log(f" - Asset PK {asset.pk} failed [labels.item_failed].")
+                logger.warning(
+                    "Label rendering failed",
+                    extra={**log_extra, "object_id": asset.pk, "exception_type": type(ex).__name__},
+                )
+    return zip_buffer, rendered
+
+
 def generate_label_batch_task(
     job_id: int,
     asset_pks: Sequence[int | str],
@@ -212,27 +238,8 @@ def generate_label_batch_task(
             job.append_log(f"Format: {label_format} | Total assets: {len(asset_pks)}")
 
             try:
-                from assets.models import Asset
-
                 assets = Asset.objects.filter(pk__in=asset_pks)
-
-                zip_buffer = io.BytesIO()
-                rendered = 0
-                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    for asset in assets:
-                        try:
-                            img_data = generate_single_label_graphic(asset, label_format)
-                            filename = f"label_{asset.asset_tag}_{label_format}.png"
-                            zip_file.writestr(filename, img_data)
-                            rendered += 1
-                            job.append_log(f" - Rendered label for asset PK {asset.pk}.")
-                        # broad except: boundary-isolation: one label failure must not abort the requested batch
-                        except Exception as ex:
-                            job.append_log(f" - Asset PK {asset.pk} failed [labels.item_failed].")
-                            logger.warning(
-                                "Label rendering failed",
-                                extra={**log_extra, "object_id": asset.pk, "exception_type": type(ex).__name__},
-                            )
+                zip_buffer, rendered = _render_batch_zip(job, assets, label_format, log_extra)
 
                 return _finalize_label_zip(job, ctx.user, zip_buffer, rendered, len(assets))
 
@@ -262,6 +269,7 @@ def generate_base64_barcode(asset: object, barcode_format: str | None) -> str:
 
     fmt = barcode_format.lower() if barcode_format else "code128"
     if fmt == "qr":
+        # inline import: heavy-import: load barcode/QR renderers only when generating graphics
         import segno
 
         # Encode the bare asset tag with the itambox: scheme so QR codes
@@ -275,7 +283,10 @@ def generate_base64_barcode(asset: object, barcode_format: str | None) -> str:
         # scan and its edge modules visually merge with neighbouring content.
         qr.save(buffer, kind="png", scale=6, border=4)
     else:
+        # inline import: heavy-import: load barcode/QR renderers only when generating graphics
         import barcode
+
+        # inline import: heavy-import: load barcode/QR renderers only when generating graphics
         from barcode.writer import ImageWriter
 
         if fmt not in barcode.PROVIDED_BARCODES:
@@ -500,6 +511,78 @@ def render_labels_pdf(assets, label_template, layout_mode="roll"):
     return _html_to_pdf_bytes(html_content)
 
 
+def _render_label_cards(job, assets, label_template, log_extra):
+    """Render one HTML card per asset; one failure never aborts the batch."""
+    rendered_cards = []
+    for asset in assets:
+        try:
+            barcode_data_uri = generate_base64_barcode(asset, label_template.barcode_format)
+            card_html = render_label_html(asset, label_template, barcode_data_uri)
+            rendered_cards.append(card_html)
+            job.append_log(f" - Rendered label for asset PK {asset.pk}.")
+        # broad except: boundary-isolation: one label failure must not abort the requested batch
+        except Exception as ex:
+            job.append_log(f" - Asset PK {asset.pk} failed [labels.item_failed].")
+            logger.warning(
+                "Label rendering failed",
+                extra={**log_extra, "object_id": asset.pk, "exception_type": type(ex).__name__},
+            )
+    return rendered_cards
+
+
+def _finalize_label_pdf(job, user, log_extra, pdf_bytes, assets, rendered_cards):
+    """Persist the PDF attachment, notify, and return the terminal result."""
+    ct = ContentType.objects.get_for_model(Job)
+    attachment = FileAttachment(
+        model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.pdf", mime_type="application/pdf"
+    )
+    try:
+        attachment.save()
+        attachment.file.save(f"labels_batch_{job.pk}.pdf", ContentFile(pdf_bytes))
+        attachment.save()
+    # broad except: cleanup-reraise: persistence is all-or-nothing across the database
+    # row and storage object, while the outer task boundary retains error classification
+    except Exception:
+        _cleanup_partial_attachment(job, attachment, log_extra)
+        raise
+
+    job.append_log("PDF document generated and saved successfully.")
+    job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
+
+    _try_create_notification(
+        user,
+        subject=_("Label Generation Complete"),
+        message=_("Successfully generated label PDF for %(count)s asset(s). Click to download.")
+        % {"count": len(assets)},
+        level=Notification.LEVEL_SUCCESS,
+        target_url=attachment.get_download_url(),
+        log_extra=log_extra,
+        job=job,
+    )
+    return TaskResult(
+        TaskStatus.PARTIAL if len(rendered_cards) < len(assets) else TaskStatus.SUCCESS,
+        "labels.pdf_partial" if len(rendered_cards) < len(assets) else "labels.pdf_completed",
+        {"rendered": len(rendered_cards), "failed": len(assets) - len(rendered_cards)},
+        user_visible=True,
+    )
+
+
+def _resolve_label_scope(job, tenant_id):
+    """Extract the persisted authorized label scope (fail-closed when absent)."""
+    scope_tenant_ids = job.data.get("scope_tenant_ids") or ([tenant_id] if tenant_id is not None else [])
+    return [int(scope_id) for scope_id in scope_tenant_ids]
+
+
+def _resolve_label_template(job, template_id, log_extra):
+    """Load the LabelTemplate for a PDF batch; terminal result when missing."""
+    try:
+        return LabelTemplate.objects.get(pk=template_id)
+    except LabelTemplate.DoesNotExist:
+        logger.error("Label template not found", extra={**log_extra, "template_id": template_id})
+        job.mark_failed("[terminal] labels.template_not_found")
+        return TaskResult(TaskStatus.TERMINAL, "labels.template_not_found", user_visible=True)
+
+
 def generate_label_pdf_batch_task(
     job_id: int,
     asset_pks: Sequence[int | str],
@@ -512,8 +595,6 @@ def generate_label_pdf_batch_task(
     Asynchronously generates a single compiled PDF of asset labels using the selected LabelTemplate
     and layout mode, and attaches it directly to the Job.
     """
-    from assets.models import Asset
-    from extras.models import LabelTemplate
 
     with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="labels.pdf_batch") as ctx:
         log_extra = {**ctx.log_context, "job_id": job_id}
@@ -535,40 +616,23 @@ def generate_label_pdf_batch_task(
                 return TaskResult(TaskStatus.SKIPPED, "labels.job_not_pending")
             job.append_log("Starting asynchronous PDF label batch generation...")
 
-            try:
-                phase = "template_resolve"
-                label_template = LabelTemplate.objects.get(pk=template_id)
-                job.append_log("Label template resolved.")
-            except LabelTemplate.DoesNotExist:
-                logger.error("Label template not found", extra={**log_extra, "template_id": template_id})
-                job.mark_failed("[terminal] labels.template_not_found")
-                return TaskResult(TaskStatus.TERMINAL, "labels.template_not_found", user_visible=True)
+            phase = "template_resolve"
+            label_template = _resolve_label_template(job, template_id, log_extra)
+            if isinstance(label_template, TaskResult):
+                return label_template
+            job.append_log("Label template resolved.")
 
             job.append_log(f"Layout mode: {layout_mode} | Total assets to print: {len(asset_pks)}")
 
             phase = "asset_resolve"
-            scope_tenant_ids = job.data.get("scope_tenant_ids") or ([tenant_id] if tenant_id is not None else [])
-            scope_tenant_ids = [int(scope_id) for scope_id in scope_tenant_ids]
+            scope_tenant_ids = _resolve_label_scope(job, tenant_id)
             assets, resolution = _resolve_label_task_assets(Asset, asset_pks, scope_tenant_ids, ctx.user)
             if resolution is not None:
                 return _finish_label_asset_resolution(job, resolution)
 
             # Render individual cards (with per-asset logging for the job trail)
             phase = "label_render"
-            rendered_cards = []
-            for asset in assets:
-                try:
-                    barcode_data_uri = generate_base64_barcode(asset, label_template.barcode_format)
-                    card_html = render_label_html(asset, label_template, barcode_data_uri)
-                    rendered_cards.append(card_html)
-                    job.append_log(f" - Rendered label for asset PK {asset.pk}.")
-                # broad except: boundary-isolation: one label failure must not abort the requested batch
-                except Exception as ex:
-                    job.append_log(f" - Asset PK {asset.pk} failed [labels.item_failed].")
-                    logger.warning(
-                        "Label rendering failed",
-                        extra={**log_extra, "object_id": asset.pk, "exception_type": type(ex).__name__},
-                    )
+            rendered_cards = _render_label_cards(job, assets, label_template, log_extra)
 
             if not rendered_cards:
                 job.mark_failed("[terminal] labels.no_labels_rendered")
@@ -581,36 +645,8 @@ def generate_label_pdf_batch_task(
             phase = "pdf_render"
             pdf_bytes = _html_to_pdf_bytes(html_content)
 
-            # Save FileAttachment
             phase = "attachment_persist"
-            ct = ContentType.objects.get_for_model(Job)
-            attachment = FileAttachment.objects.create(
-                model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.pdf", mime_type="application/pdf"
-            )
-            attachment.file.save(f"labels_batch_{job.pk}.pdf", ContentFile(pdf_bytes))
-            attachment.save()
-
-            phase = "job_finalize"
-            job.append_log("PDF document generated and saved successfully.")
-            job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
-
-            phase = "notification"
-            _try_create_notification(
-                ctx.user,
-                subject=_("Label Generation Complete"),
-                message=_("Successfully generated label PDF for %(count)s asset(s). Click to download.")
-                % {"count": len(assets)},
-                level=Notification.LEVEL_SUCCESS,
-                target_url=attachment.get_download_url(),
-                log_extra=log_extra,
-                job=job,
-            )
-            return TaskResult(
-                TaskStatus.PARTIAL if len(rendered_cards) < len(assets) else TaskStatus.SUCCESS,
-                "labels.pdf_partial" if len(rendered_cards) < len(assets) else "labels.pdf_completed",
-                {"rendered": len(rendered_cards), "failed": len(assets) - len(rendered_cards)},
-                user_visible=True,
-            )
+            return _finalize_label_pdf(job, ctx.user, log_extra, pdf_bytes, assets, rendered_cards)
 
         # broad except: task-isolation: record a safe typed task-boundary failure
         except Exception as e:

@@ -110,6 +110,17 @@ def applicable_grants(user):
     return _call("applicable_grants", user)
 
 
+def role_grant_covers_tenant(user, tenant) -> bool:
+    """Return whether a live direct or group grant covers ``tenant``.
+
+    ``accessible_tenant_ids`` deliberately includes active memberships for
+    workspace navigation.  Actor-bound task execution needs the stronger RBAC
+    proof: a membership left behind after its final grant is revoked must not
+    keep authorizing queued work.
+    """
+    return any(grant.covers_tenant(tenant) for grant in applicable_grants(user))
+
+
 def resolve_effective_permissions_with_expiry(user, tenant):
     return _call("resolve_effective_permissions_with_expiry", user, tenant)
 

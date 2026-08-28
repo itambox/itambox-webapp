@@ -2,6 +2,7 @@ import importlib
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 
 
@@ -20,6 +21,8 @@ class ReportDesignerMigrationTests(TransactionTestCase):
             super().tearDown()
 
     def setUp(self):
+        super().setUp()
+        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
         self.executor = MigrationExecutor(connection)
         self.executor.migrate([self.migrate_from])
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
