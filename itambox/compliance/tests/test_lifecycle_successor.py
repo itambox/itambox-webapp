@@ -132,9 +132,13 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
         audit_rows = list(
             AssetAudit.objects.filter(session=self.session).values(
                 "pk",
+                "session_id",
                 "asset_id",
+                "auditor_id",
+                "timestamp",
                 "location_id",
                 "status_id",
+                "notes",
                 "verification_method",
             )
         )
@@ -151,9 +155,13 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
                     list(
                         AssetAudit.objects.filter(session_id=self.session.pk).values(
                             "pk",
+                            "session_id",
                             "asset_id",
+                            "auditor_id",
+                            "timestamp",
                             "location_id",
                             "status_id",
+                            "notes",
                             "verification_method",
                         )
                     ),
@@ -181,9 +189,13 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
             list(
                 AssetAudit.objects.filter(session_id=self.session.pk).values(
                     "pk",
+                    "session_id",
                     "asset_id",
+                    "auditor_id",
+                    "timestamp",
                     "location_id",
                     "status_id",
+                    "notes",
                     "verification_method",
                 )
             ),
@@ -327,6 +339,19 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
         self.assertEqual(
             result,
             {"moved": 0, "already_correct": 0, "conflicted": 1, "unavailable": 0},
+        )
+
+    def test_rehome_reports_unavailable_asset_without_mutation(self):
+        self._close(with_audit=True)
+        Asset._base_manager.filter(pk=self.asset.pk).update(deleted_at=timezone.now())
+
+        result = rehome_audit_session_mismatches(self.session, user=self.tenant_user)
+
+        self.asset.refresh_from_db()
+        self.assertIsNotNone(self.asset.deleted_at)
+        self.assertEqual(
+            result,
+            {"moved": 0, "already_correct": 0, "conflicted": 0, "unavailable": 1},
         )
 
     def test_rehome_rejects_v1_without_mutation(self):

@@ -159,14 +159,15 @@ class RehomeFromStoredReportTests(TestCase):
         )
 
         close_audit_session(self.session, user=self.user)
-        # After close, move mismatch_asset back to Berlin so we can verify rehome works
-        # by driving from the stored report (not live asset.location).
-        rehome_audit_session_mismatches(self.session, user=self.user)
+        # Reproduce the frozen observed state before applying the stored action.
+        Asset._base_manager.filter(pk=mismatch_asset.pk).update(location=self.loc_munich)
+        result = rehome_audit_session_mismatches(self.session, user=self.user)
 
         mismatch_asset.refresh_from_db()
         matching_asset.refresh_from_db()
         # Rehome must move mismatch_asset to session.location (Berlin)
         self.assertEqual(mismatch_asset.location, self.loc_berlin)
+        self.assertEqual(result, {"moved": 1, "already_correct": 0, "conflicted": 0, "unavailable": 0})
         # Matching asset stays in Berlin (unchanged)
         self.assertEqual(matching_asset.location, self.loc_berlin)
 
