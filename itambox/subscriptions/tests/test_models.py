@@ -5,8 +5,9 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, close_old_connections
+from django.db import IntegrityError, close_old_connections, connection
 from django.test import TestCase, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from model_bakery import baker
 
@@ -48,6 +49,20 @@ class SubscriptionSeatRollupTests(TestCase):
         baker.make(LicenseSeatAssignment, license=l2, assigned_holder=holder, asset=None)
         self.assertEqual(sub.assigned_seats, 1)
         self.assertEqual(sub.available_seats, 14)
+
+    def test_assigned_seats_is_exactly_one_count_query(self):
+        sub = baker.make(Subscription, tenant=None)
+        software = baker.make(Software, manufacturer__name="Query Acme", manufacturer__slug="query-acme", tenant=None)
+        license_obj = baker.make(License, software=software, subscription=sub, seats=2, tenant=None)
+        holder = baker.make(AssetHolder, tenant=None)
+        baker.make(LicenseSeatAssignment, license=license_obj, assigned_holder=holder, asset=None)
+
+        with CaptureQueriesContext(connection) as queries:
+            assigned = sub.assigned_seats
+
+        self.assertEqual(assigned, 1)
+        self.assertEqual(len(queries), 1, queries.captured_queries)
+        self.assertIn("COUNT", queries[0]["sql"].upper())
 
     def test_license_rejects_cross_tenant_subscription(self):
         t_a = baker.make(Tenant, name="A", slug="a")

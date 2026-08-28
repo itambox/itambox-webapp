@@ -441,7 +441,11 @@ def _all_expected_assets(session: AuditSession) -> QuerySet[Asset]:
 
 
 def _close_represented_tenants(session: AuditSession) -> frozenset[int]:
-    expected_tenants = set(_all_expected_assets(session).values_list("tenant_id", flat=True))
+    if session.tenant_id is None:
+        expected_queryset = _all_expected_assets(session)
+    else:
+        expected_queryset = _expected_assets_for_tenants(session, frozenset({session.tenant_id}))
+    expected_tenants = set(expected_queryset.values_list("tenant_id", flat=True))
     observed_tenants = set(
         AssetAudit.objects.filter(session=session, asset__isnull=False).values_list("asset__tenant_id", flat=True)
     )

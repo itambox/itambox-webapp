@@ -136,7 +136,7 @@ class AuditSessionDetailView(ObjectDetailView):
         ctx = super().get_context_data(**kwargs)
         session = self.get_object()
 
-        if session.status == "completed" and session.reconciliation_report:
+        if session.status == "completed" and session.reconciliation_report is not None:
             # Render from the frozen stored report after applying the current actor scope.
             report = read_reconciliation_report(session, user=self.request.user)
             rows = report["rows"]
@@ -455,7 +455,7 @@ class AuditSessionFlagMissingView(GenericTransactionView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         session = self.get_object()
-        if session.reconciliation_report:
+        if session.reconciliation_report is not None:
             report = read_reconciliation_report(session, user=self.request.user)
             context["missing_count"] = sum(row["category"] == "missing" for row in report["rows"])
         else:

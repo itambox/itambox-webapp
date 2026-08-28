@@ -11,7 +11,9 @@ Covers:
 Uses TenantTestMixin + model_bakery per project conventions.
 """
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from model_bakery import baker
 
 from assets.models import Asset
@@ -69,7 +71,16 @@ class ReconcileSoftwareTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(name="Acme Corp", slug="acme-corp")
 
-    # ── compliant ─────────────────────────────────────────────────────────────
+    def test_reconcile_software_is_exactly_three_queries(self):
+        with self.tenant_context(self.tenant):
+            software = _make_software(tenant=self.tenant, name="Three Query App")
+            _make_license(software, self.tenant, seats=3)
+            _make_install(software, _make_asset(self.tenant))
+            with CaptureQueriesContext(connection) as queries:
+                result = reconcile_software(software)
+
+        self.assertEqual(len(queries), 3, queries.captured_queries)
+        self.assertEqual(result["installed_count"], 1)
 
     def test_compliant_installs_equal_seats(self):
         with self.tenant_context(self.tenant):
@@ -193,6 +204,18 @@ class ReconcileTenantLicensingTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name="Beta Inc", slug="beta-inc")
+
+    def test_bulk_reconciliation_uses_grouped_bulk_shape(self):
+        with self.tenant_context(self.tenant):
+            software = _make_software(tenant=self.tenant, name="Bulk App")
+            _make_license(software, self.tenant, seats=4)
+            _make_install(software, _make_asset(self.tenant))
+            with CaptureQueriesContext(connection) as queries:
+                results = reconcile_tenant_licensing()
+
+        self.assertEqual(len(queries), 4, queries.captured_queries)
+        self.assertEqual(len(results), 1)
+        self.assertTrue(any("GROUP BY" in query["sql"].upper() for query in queries.captured_queries))
 
     def test_empty_result_when_no_data(self):
         with self.tenant_context(self.tenant):
