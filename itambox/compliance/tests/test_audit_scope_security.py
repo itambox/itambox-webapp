@@ -622,6 +622,144 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             with patch("compliance.audit_services.timezone.now", return_value=expiry + timedelta(seconds=1)):
                 expected_assets_queryset(self.session, user=self.user)
 
+    def test_complete_operation_query_contract_probe(self):
+        def actor(username):
+            user = baker.make("users.User", username=username, is_active=True)
+            grant(user, self.tenant_a, self.role)
+            return user
+
+        def materialize(classified):
+            list(classified["matching"])
+            list(classified["mismatched"])
+            list(classified["surprise"])
+            classified["missing"].count()
+
+        cold_expected = actor("query-cold-expected")
+        with CaptureQueriesContext(connection) as queries:
+            expected_assets_queryset(self.session, user=cold_expected).count()
+        expected_cold = len(queries)
+        with CaptureQueriesContext(connection) as queries:
+            expected_assets_queryset(self.session, user=cold_expected).count()
+        expected_warm = len(queries)
+
+        cold_classify = actor("query-cold-classify")
+        with CaptureQueriesContext(connection) as queries:
+            materialize(classify_session_audits(self.session, user=cold_classify))
+        classify_cold = len(queries)
+        with CaptureQueriesContext(connection) as queries:
+            materialize(classify_session_audits(self.session, user=cold_classify))
+        classify_warm = len(queries)
+
+        close_cold_actor = actor("query-cold-close")
+        close_cold_session = AuditSession.objects.create(
+            name="Query cold close",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="active",
+            created_by=self.user,
+        )
+        close_warm_session = AuditSession.objects.create(
+            name="Query warm close",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="active",
+            created_by=self.user,
+        )
+        with CaptureQueriesContext(connection) as queries:
+            close_audit_session(close_cold_session, user=close_cold_actor)
+        close_cold = len(queries)
+        with CaptureQueriesContext(connection) as queries:
+            close_audit_session(close_warm_session, user=self.user)
+        close_warm = len(queries)
+
+        cold_rehome_actor = actor("query-cold-rehome")
+        rehome_report = {
+            "schema_version": 2,
+            "rows": [{"tenant_id": self.tenant_a.pk, "category": "mismatched", "asset_id": self.asset_a.pk}],
+        }
+        rehome_cold_session = AuditSession.objects.create(
+            name="Query cold rehome",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report=rehome_report,
+        )
+        rehome_warm_session = AuditSession.objects.create(
+            name="Query warm rehome",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report=rehome_report,
+        )
+        with CaptureQueriesContext(connection) as queries:
+            rehome_audit_session_mismatches(rehome_cold_session, user=cold_rehome_actor)
+        rehome_cold = len(queries)
+        with CaptureQueriesContext(connection) as queries:
+            rehome_audit_session_mismatches(rehome_warm_session, user=self.user)
+        rehome_warm = len(queries)
+
+        cold_flag_actor = actor("query-cold-flag")
+        flag_asset_cold = baker.make(Asset, tenant=self.tenant_a, location=self.location_a, status=self.status)
+        flag_asset_warm = baker.make(Asset, tenant=self.tenant_a, location=self.location_a, status=self.status)
+        flag_cold_session = AuditSession.objects.create(
+            name="Query cold flag",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "tenant_id": self.tenant_a.pk,
+                        "category": "missing",
+                        "asset_id": flag_asset_cold.pk,
+                        "status_id": self.status.pk,
+                    }
+                ],
+            },
+        )
+        flag_warm_session = AuditSession.objects.create(
+            name="Query warm flag",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "tenant_id": self.tenant_a.pk,
+                        "category": "missing",
+                        "asset_id": flag_asset_warm.pk,
+                        "status_id": self.status.pk,
+                    }
+                ],
+            },
+        )
+        with CaptureQueriesContext(connection) as queries:
+            flag_missing_assets(flag_cold_session, user=cold_flag_actor)
+        flag_cold = len(queries)
+        with CaptureQueriesContext(connection) as queries:
+            flag_missing_assets(flag_warm_session, user=self.user)
+        flag_warm = len(queries)
+
+        print(
+            "QUERY_COUNTS",
+            expected_cold,
+            expected_warm,
+            classify_cold,
+            classify_warm,
+            close_cold,
+            close_warm,
+            rehome_cold,
+            rehome_warm,
+            flag_cold,
+            flag_warm,
+        )
+
 
 if __name__ == "__main__":
     import unittest

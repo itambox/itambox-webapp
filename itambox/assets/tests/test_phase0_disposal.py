@@ -102,3 +102,31 @@ class DisposeAssetFreezesResidualTest(TenantTestMixin, TestCase):
         self.assertIsNotNone(asset.disposed_at)
         self.assertEqual(asset.disposal_value, expected_residual)
         self.assertTrue(asset.disposal_value > 0)
+
+    def test_dispose_method_none_with_threshold_freezes_exact_purchase_cost(self):
+        self.policy.method = "none"
+        self.policy.immediate_expense_threshold = Decimal("800.00")
+        self.policy.save(update_fields=["method", "immediate_expense_threshold"])
+        asset = Asset.objects.create(
+            name="Widget P0 No Depreciation",
+            asset_tag="TAG-P0-NONE-1",
+            asset_type=self.asset_type,
+            status=self.status_deployable,
+            purchase_cost=Decimal("750.00"),
+            salvage_value=Decimal("0.00"),
+            purchase_date=datetime.date(2024, 1, 1),
+            tenant=self.tenant,
+        )
+
+        expected_value = compute_book_value(asset, on_date=datetime.date(2025, 1, 1))
+        self.assertEqual(expected_value, Decimal("750.00"))
+        dispose_asset(
+            asset=asset,
+            disposal_method=DisposalMethodChoices.RECYCLE,
+            disposal_date=datetime.date(2025, 1, 1),
+            proceeds=None,
+            user=self.user,
+        )
+
+        asset.refresh_from_db()
+        self.assertEqual(asset.disposal_value, Decimal("750.00"))
