@@ -16,6 +16,7 @@ from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import (
+    classify_session_audits,
     close_audit_session,
     expected_assets_queryset,
     flag_missing_assets,
