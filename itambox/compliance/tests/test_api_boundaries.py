@@ -189,7 +189,7 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             self._audit_detail_url(audit),
             {"location_id": self.other_location.pk},
             format="json",
-            HTTP_IF_MATCH=self.client.get(self._audit_detail_url(audit))["ETag"],
+            HTTP_IF_MATCH="audit-provenance-test",
         )
 
         self.assertEqual(response.status_code, 400, response.data)

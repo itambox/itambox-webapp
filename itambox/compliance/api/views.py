@@ -103,7 +103,6 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
             serializer.instance = locked
             serializer.validated_data.pop("status", None)
             instance = serializer.save()
-            self._validate_objects(instance)
             try:
                 close_audit_session(instance, user=self.request.user, request=self.request)
             except DjangoPermissionDenied as exc:
