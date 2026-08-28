@@ -747,18 +747,20 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             flag_missing_assets(flag_warm_session, user=self.user)
         flag_warm = len(queries)
 
-        print(
-            "QUERY_COUNTS",
-            expected_cold,
-            expected_warm,
-            classify_cold,
-            classify_warm,
-            close_cold,
-            close_warm,
-            rehome_cold,
-            rehome_warm,
-            flag_cold,
-            flag_warm,
+        self.assertEqual(
+            (
+                expected_cold,
+                expected_warm,
+                classify_cold,
+                classify_warm,
+                close_cold,
+                close_warm,
+                rehome_cold,
+                rehome_warm,
+                flag_cold,
+                flag_warm,
+            ),
+            (4, 1, 6, 3, 12, 12, 17, 14, 22, 15),
         )
 
 
