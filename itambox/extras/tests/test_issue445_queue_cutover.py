@@ -345,7 +345,13 @@ class Issue445QueueCutoverTests(TransactionTestCase):
 
 
 class Issue445ResubmissionGuardTests(TransactionTestCase):
-    """All-or-nothing historical resubmission guard (no queue writes)."""
+    """All-or-nothing historical resubmission guard over the ORM broker."""
+
+    def setUp(self):
+        super().setUp()
+        sync_patcher = mock.patch("django_q.conf.Conf.SYNC", False)
+        sync_patcher.start()
+        self.addCleanup(sync_patcher.stop)
 
     def _task_row(self, func, *, args=(), kwargs=None, hook=None):
         from django.utils import timezone
@@ -411,18 +417,49 @@ class Issue445ResubmissionGuardTests(TransactionTestCase):
         model_admin.message_user.assert_not_called()
         self.assertFalse(good.__class__.objects.filter(pk=good.pk).exists())
 
-    def test_enqueue_failure_keeps_all_historical_failure_rows(self):
+    def test_enqueue_failure_rolls_back_queue_and_keeps_all_failure_rows(self):
+        from django_q.brokers.orm import ORM
+        from django_q.models import OrmQ
+
         from core.django_q_task_resubmission import resubmit_task_guarded
 
         rows = [self._task_row(UNRELATED), self._task_row(CUTOVER)]
         model_admin = mock.Mock(model=rows[0].__class__)
-        with mock.patch(
-            "core.django_q_task_resubmission.async_task",
-            side_effect=[None, RuntimeError("issue445 broker failure")],
-        ):
-            with self.assertRaises(RuntimeError):
-                resubmit_task_guarded(model_admin, mock.Mock(), rows)
+        request = mock.Mock()
+        original_enqueue = ORM.enqueue
+        calls = 0
+
+        def fail_second_enqueue(broker, package):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("issue445 broker secret")
+            return original_enqueue(broker, package)
+
+        with mock.patch.object(ORM, "enqueue", new=fail_second_enqueue):
+            resubmit_task_guarded(model_admin, request, rows)
+
+        self.assertEqual(calls, 2)
+        self.assertEqual(OrmQ.objects.count(), 0)
         self.assertEqual(rows[0].__class__.objects.filter(pk__in=[row.pk for row in rows]).count(), 2)
+        message = model_admin.message_user.call_args.args[1]
+        self.assertIn("task_resubmission.enqueue_failed", message)
+        self.assertNotIn("issue445 broker secret", message)
+
+    def test_unsupported_broker_fails_closed_without_queue_or_deletion(self):
+        from core.django_q_task_resubmission import resubmit_task_guarded
+
+        row = self._task_row(CUTOVER)
+        model_admin = mock.Mock(model=row.__class__)
+        with (
+            mock.patch("core.django_q_task_resubmission.Conf.ORM", None),
+            mock.patch("core.django_q_task_resubmission.async_task") as enqueue,
+        ):
+            resubmit_task_guarded(model_admin, mock.Mock(), [row])
+
+        enqueue.assert_not_called()
+        self.assertTrue(row.__class__.objects.filter(pk=row.pk).exists())
+        self.assertIn("task_resubmission.unsupported_broker", model_admin.message_user.call_args.args[1])
 
     def test_native_list_args_and_cutover_path_are_allowed(self):
         from core.django_q_task_resubmission import resubmit_task_guarded

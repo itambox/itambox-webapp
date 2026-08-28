@@ -370,7 +370,7 @@
       "path": "itambox/extras/tasks/webhooks.py",
       "module": "extras.tasks.webhooks",
       "issue": "#93",
-      "note": "Slice 8 symbol admission: the webhook dispatch task entry envelope -- the target URL and HTTP method, the request headers, the optional shared secret (empty for an endpoint-linked send that re-derives it), the event action/model/object/timestamp fields of the published envelope, the JSON event data, the attempt and retry/backoff counters, the optional WebhookEndpoint pk, and the implicit None outcome. event_object_id stays int | str because the event payload carries whatever pk type the source model uses; headers and event data are Mappings because they arrive as a serialised task payload. The SSRF-guarded send, the signature computation, and the retry Schedule/async_task re-enqueue remain outside this slice.",
+      "note": "Issue #445 symbol admission: send_webhook_task accepts a WebhookDeliveryAssertions identity envelope plus attempt, actor_id, and request_id metadata, and returns a typed DeliveryResult. The locked durable WebhookDelivery row is the sole source of snapshotted target URL, method, headers, encrypted secret, event identity, tenant, payload timestamp, and retry policy; none of those values is accepted from queue kwargs. Transport construction, claim fencing, retry scheduling, and recovery coordination remain outside this symbol slice.",
       "scope": "symbols",
       "symbols": [
         "send_webhook_task"

@@ -2,6 +2,7 @@
 
 import ast
 import importlib
+import json
 import os
 import subprocess
 import sys
@@ -104,55 +105,118 @@ def _producer_source_files(source_root):
             yield source
 
 
-def _async_task_literal(node):
-    if not isinstance(node, ast.Call) or not node.args:
-        return None
-    call_name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
-    value = node.args[0]
-    if call_name == "async_task" and isinstance(value, ast.Constant) and isinstance(value.value, str):
+def _module_string_constants(tree):
+    constants = {}
+    for statement in tree.body:
+        if (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and isinstance(statement.value, ast.Constant)
+            and isinstance(statement.value.value, str)
+        ):
+            constants[statement.targets[0].id] = statement.value.value
+        elif (
+            isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+            and isinstance(statement.value, ast.Constant)
+            and isinstance(statement.value.value, str)
+        ):
+            constants[statement.target.id] = statement.value.value
+    return constants
+
+
+def _string_literal(value, constants):
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
         return value
+    if isinstance(value, ast.Name) and value.id in constants:
+        return ast.Constant(value=constants[value.id], lineno=value.lineno)
     return None
 
 
-def _schedule_func_literal(node):
+def _producer_path_literal(node, constants):
+    if not isinstance(node, ast.Call):
+        return None
+    call_name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+    arg_index = 1 if call_name == "_enqueue" else 0
+    if call_name not in {"async_task", "_enqueue", "register_schedule"} or len(node.args) <= arg_index:
+        return None
+    return _string_literal(node.args[arg_index], constants)
+
+
+def _schedule_func_literal(node, constants):
     if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
         return None
     if node.func.attr != "create" or ast.unparse(node.func.value) != "Schedule.objects":
         return None
-    return next(
-        (
-            keyword.value
-            for keyword in node.keywords
-            if keyword.arg == "func"
-            and isinstance(keyword.value, ast.Constant)
-            and isinstance(keyword.value.value, str)
-        ),
-        None,
-    )
+    keyword = next((keyword for keyword in node.keywords if keyword.arg == "func"), None)
+    return _string_literal(keyword.value, constants) if keyword is not None else None
 
 
 def _literal_producer_paths():
     source_root = Path(__file__).resolve().parents[2]
     for source in _producer_source_files(source_root):
         tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        constants = _module_string_constants(tree)
         relative = source.relative_to(source_root).as_posix()
         for node in ast.walk(tree):
-            for value in (_async_task_literal(node), _schedule_func_literal(node)):
+            for value in (_producer_path_literal(node, constants), _schedule_func_literal(node, constants)):
                 if value is not None:
                     yield relative, value.lineno, value.value
 
 
+def test_literal_producer_scan_covers_wrappers_and_schedule_registration():
+    discovered = {task_path for _source, _line, task_path in _literal_producer_paths()}
+    expected = {
+        "assets.tasks.checkin.bulk_checkin_task",
+        "assets.tasks.checkout.bulk_checkout_task",
+        "assets.tasks.disposal.bulk_dispose_task",
+        "extras.tasks.alerts.evaluate_alert_rules_task",
+        "extras.tasks.webhooks.recover_pending_webhook_deliveries",
+    }
+    assert expected <= discovered, f"unscanned literal producer paths: {sorted(expected - discovered)}"
+
+
 def test_every_literal_task_producer_resolves_to_a_callable():
-    invalid = []
-    for source, line, task_path in _literal_producer_paths():
-        try:
-            resolved = _resolve(task_path)
-        except (ImportError, AttributeError, ValueError) as exc:
-            invalid.append(f"{source}:{line}: {task_path} ({type(exc).__name__})")
-            continue
-        if not callable(resolved):
-            invalid.append(f"{source}:{line}: {task_path} (not callable)")
-    assert not invalid, "unresolvable literal task producer(s):\n  " + "\n  ".join(sorted(invalid))
+    producers = list(_literal_producer_paths())
+    probe = r"""
+import importlib
+import json
+import sys
+
+import django
+
+django.setup()
+invalid = []
+for source, line, task_path in json.load(sys.stdin):
+    try:
+        module_name, attribute = task_path.rsplit(".", 1)
+        resolved = getattr(importlib.import_module(module_name), attribute)
+    except (ImportError, AttributeError, ValueError) as exc:
+        invalid.append(f"{source}:{line}: {task_path} ({type(exc).__name__})")
+        continue
+    if not callable(resolved):
+        invalid.append(f"{source}:{line}: {task_path} (not callable)")
+print("ISSUE445_PRODUCER_PROBE=" + json.dumps(invalid, sort_keys=True))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        input=json.dumps(producers),
+        cwd=Path(__file__).resolve().parents[2],
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    marker = next(
+        (line for line in result.stdout.splitlines() if line.startswith("ISSUE445_PRODUCER_PROBE=")),
+        None,
+    )
+    assert marker is not None, result.stdout
+    invalid = json.loads(marker.split("=", 1)[1])
+    assert not invalid, "unresolvable literal task producer(s):\n  " + "\n  ".join(invalid)
 
 
 class Issue445ZeroQueryImportTests(TestCase):

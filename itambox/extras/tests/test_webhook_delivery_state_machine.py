@@ -1,6 +1,7 @@
 import ast
 import importlib
 import json
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -182,6 +183,35 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(delivery.attempt, self.endpoint.retry_count + 1)
         self.assertIsNotNone(delivery.completed_at)
         self.assertEqual(Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").count(), 0)
+
+    def test_immediate_retry_enqueue_failure_remains_due_and_recoverable(self):
+        from extras.tasks import webhooks as webhook_tasks
+
+        self.endpoint.retry_backoff = 0
+        self.endpoint.save(update_fields=["retry_backoff"])
+        kwargs = self._task_kwargs()
+        with (
+            patch("core.http.request_pinned", return_value=self._response(503)),
+            patch(
+                "extras.tasks.webhooks.async_task",
+                side_effect=RuntimeError("broker secret detail"),
+            ),
+            self.assertLogs("extras.tasks.webhooks", logging.WARNING) as captured,
+        ):
+            result = send_webhook_task(**kwargs)
+
+        delivery = self._task_delivery(kwargs)
+        self.assertEqual(result.disposition, DeliveryDisposition.RETRYABLE)
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_FAILED)
+        self.assertIsNotNone(delivery.next_retry_at)
+        self.assertLessEqual(delivery.next_retry_at, timezone.now())
+        self.assertIsNone(delivery.claim_token)
+        self.assertNotIn("broker secret detail", " ".join(captured.output))
+
+        with patch("extras.tasks.webhooks.async_task") as enqueue:
+            recovered = webhook_tasks.recover_pending_webhook_deliveries()
+        self.assertEqual(recovered, {"dispatched": 1})
+        enqueue.assert_called_once()
 
     def test_http_4xx_and_ssrf_validation_are_terminal_without_schedule(self):
         for side_effect, status_code in ((None, 422), (ValidationError("private secret"), None)):

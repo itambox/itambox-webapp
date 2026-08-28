@@ -6,11 +6,11 @@ over, a historical row referencing a predecessor path (or a noncanonical
 moved alias) must never be re-enqueued — the path no longer resolves on the
 cutover branch, and silently re-enqueueing it would create queue debt instead
 of retrying work. ``GuardedTaskAdmin``/``GuardedFailAdmin`` replace the vendor
-admins via ``core.apps.CoreConfig.ready()``. The blocked/invalid selection
-screen is all-or-nothing: when ANY selected row is unsafe, NOTHING is enqueued
-and no Failure row is deleted. Enqueue transport failures may occur after an
-earlier broker submission, but historical Failure rows are deleted only after
-every selected enqueue succeeds.
+admins via ``core.apps.CoreConfig.ready()``. Validation, ORM-broker publication
+and Failure-row deletion are all-or-nothing: every selected row is validated
+before publication, and all queue inserts plus deletion share one database
+transaction. Unsupported/synchronous brokers fail closed because they cannot
+provide that transaction boundary.
 
 Kept in its own module so imports of django-q models can never be drawn into
 an admin default-site resolution cycle.
@@ -18,8 +18,10 @@ an admin default-site resolution cycle.
 
 import json
 
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from django_q.admin import FailAdmin, TaskAdmin
+from django_q.conf import Conf
 from django_q.models import Failure
 from django_q.tasks import async_task
 
@@ -91,6 +93,8 @@ MOVED_NEIGHBORHOOD_MODULES = (
 )
 
 BLOCKED_RESUBMISSION_CODE = "task_resubmission.blocked_moved_path"
+UNSUPPORTED_BROKER_CODE = "task_resubmission.unsupported_broker"
+ENQUEUE_FAILED_CODE = "task_resubmission.enqueue_failed"
 RESERVED_ASYNC_TASK_KWARGS = frozenset(
     {
         "ack_failure",
@@ -143,13 +147,7 @@ def _task_payload(task):
 
 
 def resubmit_task_guarded(model_admin, request, queryset):
-    """Resubmit selected tasks only when every selected path is still live.
-
-    All-or-nothing: when any selected row references a moved predecessor
-    path or noncanonical alias, the whole selection is rejected before any
-    enqueue or Failure deletion. The rejection message carries only the
-    stable error code and the blocked path identities.
-    """
+    """Atomically validate and republish a selected historical task set."""
     tasks = list(queryset)
     blocked = sorted({path for task in tasks for path in (task.func, task.hook) if is_blocked_task_path(path)})
     payloads = [(task, _task_payload(task)) for task in tasks]
@@ -162,18 +160,32 @@ def resubmit_task_guarded(model_admin, request, queryset):
             level="warning",
         )
         return
-    for task, payload in payloads:
-        args, kwargs = payload
-        async_task(
-            task.func,
-            *args,
-            hook=task.hook,
-            group=task.group,
-            cluster=task.cluster,
-            **kwargs,
-        )
-    if model_admin.model is Failure:
-        Failure.objects.filter(pk__in=[task.pk for task, _payload in payloads]).delete()
+    if not payloads:
+        return
+
+    database_aliases = {task._state.db or "default" for task, _payload in payloads}
+    if len(database_aliases) != 1 or not isinstance(Conf.ORM, str) or Conf.ORM not in database_aliases or Conf.SYNC:
+        model_admin.message_user(request, f"[{UNSUPPORTED_BROKER_CODE}]", level="warning")
+        return
+    database_alias = next(iter(database_aliases))
+
+    try:
+        with transaction.atomic(using=database_alias):
+            for task, payload in payloads:
+                args, kwargs = payload
+                async_task(
+                    task.func,
+                    *args,
+                    hook=task.hook,
+                    group=task.group,
+                    cluster=task.cluster,
+                    **kwargs,
+                )
+            if model_admin.model is Failure:
+                Failure.objects.using(database_alias).filter(pk__in=[task.pk for task, _payload in payloads]).delete()
+    # broad except: boundary-isolation: rollback ORM queue writes and report only a stable code
+    except Exception:
+        model_admin.message_user(request, f"[{ENQUEUE_FAILED_CODE}]", level="warning")
 
 
 resubmit_task_guarded.short_description = _("Resubmit selected tasks to queue")

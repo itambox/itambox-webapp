@@ -449,6 +449,18 @@ def _retry_kwargs(assertions: WebhookDeliveryAssertions, delivery, *, actor_id, 
     }
 
 
+def _enqueue_immediate_retry(delivery_pk: int, retry_kwargs: dict[str, object]) -> None:
+    try:
+        async_task(WEBHOOK_TASK_PATH, **retry_kwargs)
+    # broad except: boundary-isolation: the durable due row is recovered by the coordinator
+    except Exception as exc:
+        logger.error(
+            "operation=webhook.retry_enqueue disposition=retryable delivery_pk=%s error_class=%s",
+            delivery_pk,
+            type(exc).__name__,
+        )
+
+
 def _finish_delivery(
     *,
     delivery_pk: int,
@@ -459,7 +471,7 @@ def _finish_delivery(
     retry_backoff: int,
     retry_kwargs: dict[str, object] | None,
 ) -> DeliveryResult:
-    immediate_retry = False
+    immediate_retry_kwargs: dict[str, object] | None = None
     with transaction.atomic():
         delivery = WebhookDelivery._base_manager.select_for_update().get(pk=delivery_pk)
         if delivery.claim_token != claim_token:
@@ -565,7 +577,10 @@ def _finish_delivery(
                     next_run=delivery.next_retry_at,
                 )
         else:
-            delivery.next_retry_at = None
+            # A zero-backoff retry is still durable: persist it as immediately
+            # due before broker publication. If publication fails, the recovery
+            # coordinator can select the failed row and republish its identity.
+            delivery.next_retry_at = now
             delivery.save(
                 update_fields=[
                     "status",
@@ -578,10 +593,10 @@ def _finish_delivery(
                     "updated_at",
                 ]
             )
-            immediate_retry = retry_kwargs is not None
+            immediate_retry_kwargs = retry_kwargs
 
-    if immediate_retry:
-        async_task(WEBHOOK_TASK_PATH, **retry_kwargs)
+    if immediate_retry_kwargs is not None:
+        _enqueue_immediate_retry(delivery_pk, immediate_retry_kwargs)
     return result
 
 

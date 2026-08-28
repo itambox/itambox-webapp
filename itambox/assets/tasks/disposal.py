@@ -12,6 +12,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 
+from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
 
 from assets import services
@@ -177,6 +178,42 @@ def _run_disposal(
     )
 
 
+def _deny_permission(job, *, tenant_id, user_id) -> TaskResult:
+    logger.warning(
+        "Bulk disposal denied [disposal.permission_revoked] tenant_id=%s actor_id=%s job_id=%s",
+        tenant_id,
+        user_id,
+        job.pk,
+        extra={
+            "tenant_id": tenant_id,
+            "actor_id": user_id,
+            "job_id": job.pk,
+            "code": "disposal.permission_revoked",
+        },
+    )
+    job.mark_failed("[terminal] disposal.permission_revoked")
+    return TaskResult(TaskStatus.TERMINAL, "disposal.permission_revoked")
+
+
+def _claim_job(job_id, tenant_id, user_id, asset_count) -> tuple[Job | None, TaskResult | None]:
+    log_extra = {"tenant_id": tenant_id, "actor_id": user_id, "job_id": job_id}
+    try:
+        job = Job.objects.get(pk=job_id, tenant_id=tenant_id)
+    except Job.DoesNotExist:
+        logger.error("Bulk disposal job not found", extra=log_extra)
+        return None, TaskResult(TaskStatus.TERMINAL, "disposal.job_not_found")
+    # broad except: task-isolation: no Job can be persisted when the claim lookup itself fails
+    except Exception as exc:
+        logger.error("Bulk disposal entry failed", extra={**log_extra, "exception_type": type(exc).__name__})
+        return None, TaskResult(classify_task_error(exc), "disposal.entry_failed")
+    if not job.mark_running():
+        logger.info("Job %s is no longer pending (cancelled?); skipping disposal.", job_id)
+        return None, TaskResult(TaskStatus.SKIPPED, "disposal.job_not_pending")
+    job.append_log("Initializing asynchronous bulk disposal pipeline...")
+    job.append_log(f"Assets to process: {asset_count}")
+    return job, None
+
+
 def bulk_dispose_task(
     job_id: int,
     asset_pks: Sequence[int | str],
@@ -189,21 +226,15 @@ def bulk_dispose_task(
     disposal_kwargs = disposal_kwargs or {}
     proceeds_map = proceeds_map or {}
 
-    with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="assets.bulk_disposal") as ctx:
-        log_extra = {**ctx.log_context, "job_id": job_id}
-        try:
-            try:
-                job = Job.objects.get(pk=job_id)
-            except Job.DoesNotExist:
-                logger.error("Bulk disposal job not found", extra=log_extra)
-                return TaskResult(TaskStatus.TERMINAL, "disposal.job_not_found")
+    job, claim_result = _claim_job(job_id, tenant_id, user_id, len(asset_pks))
+    if claim_result is not None:
+        return claim_result
+    assert job is not None
+    entry_log_extra = {"tenant_id": tenant_id, "actor_id": user_id, "job_id": job_id}
 
-            if not job.mark_running():
-                logger.info("Job %s is no longer pending (cancelled?); skipping disposal.", job_id)
-                return TaskResult(TaskStatus.SKIPPED, "disposal.job_not_pending")
-            job.append_log("Initializing asynchronous bulk disposal pipeline...")
-            job.append_log(f"Assets to process: {len(asset_pks)}")
-
+    try:
+        with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="assets.bulk_disposal") as ctx:
+            log_extra = {**ctx.log_context, "job_id": job_id}
             # Execution-time RBAC recheck (issue #445): enqueue-time authorization
             # is not enough — a permission revoked between submission and worker
             # execution must fail closed before any asset/disposal state is
@@ -213,20 +244,7 @@ def bulk_dispose_task(
                 or ctx.tenant is None
                 or not ctx.user.has_perm("assets.add_assetdisposal", obj=ctx.tenant)
             ):
-                logger.warning(
-                    "Bulk disposal denied [disposal.permission_revoked] tenant_id=%s actor_id=%s job_id=%s",
-                    ctx.tenant_id,
-                    ctx.user_id,
-                    job_id,
-                    extra={
-                        "tenant_id": ctx.tenant_id,
-                        "actor_id": ctx.user_id,
-                        "job_id": job_id,
-                        "code": "disposal.permission_revoked",
-                    },
-                )
-                job.mark_failed("[terminal] disposal.permission_revoked")
-                return TaskResult(TaskStatus.TERMINAL, "disposal.permission_revoked")
+                return _deny_permission(job, tenant_id=tenant_id, user_id=user_id)
 
             try:
                 return _run_disposal(
@@ -251,7 +269,11 @@ def bulk_dispose_task(
                     target_url=reverse_job_detail(job.pk),
                 )
                 return TaskResult(status, "disposal.boundary_failed", user_visible=True)
-        # broad except: task-isolation: failures before Job resolution remain observable to the queue caller
-        except Exception as exc:
-            logger.error("Bulk disposal entry failed", extra={**log_extra, "exception_type": type(exc).__name__})
-            return TaskResult(classify_task_error(exc), "disposal.entry_failed")
+    except PermissionDenied:
+        return _deny_permission(job, tenant_id=tenant_id, user_id=user_id)
+    # broad except: task-isolation: persist failures after the Job claim
+    except Exception as exc:
+        status = classify_task_error(exc)
+        logger.error("Bulk disposal entry failed", extra={**entry_log_extra, "exception_type": type(exc).__name__})
+        job.mark_failed(f"[{status.value}] disposal.entry_failed")
+        return TaskResult(status, "disposal.entry_failed")

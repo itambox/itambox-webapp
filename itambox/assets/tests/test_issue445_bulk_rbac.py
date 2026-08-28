@@ -7,6 +7,7 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db import OperationalError
 from django.test import TestCase
 
 from assets.models import (
@@ -81,7 +82,7 @@ class Issue445BulkWorkerRBACBase:
             name=f"Issue445 {self.family} worker",
             permissions=["assets.change_asset", "assets.add_assetdisposal"],
         )
-        grant(self.user, self.tenant, self.role)
+        self.role_grant = grant(self.user, self.tenant, self.role)
         manufacturer = Manufacturer.objects.create(
             name=f"Issue445 {self.family} manufacturer", slug=f"issue445-{self.family}-manufacturer"
         )
@@ -128,12 +129,15 @@ class Issue445BulkWorkerRBACBase:
             return task(disposal_kwargs={}, **common)
         return task(**common)
 
-    def _assert_denied(self, *, revoke_after_warm):
+    def _assert_denied(self, *, revoke_after_warm, revoke_grant=False):
         required = self.config["permission"]
         if revoke_after_warm:
             self.assertTrue(self.user.has_perm(required, obj=self.tenant), "enqueue-time fixture must initially allow")
-            self.role.permissions = [permission for permission in self.role.permissions if permission != required]
-            self.role.save(update_fields=["permissions"])
+            if revoke_grant:
+                self.role_grant.delete()
+            else:
+                self.role.permissions = [permission for permission in self.role.permissions if permission != required]
+                self.role.save(update_fields=["permissions"])
         self.assertFalse(
             self.user.has_perm(required, obj=self.tenant), "live permission revocation fixture did not take effect"
         )
@@ -194,6 +198,31 @@ class Issue445BulkWorkerRBACBase:
 
     def test_revocation_after_enqueue_and_warm_cache_denies_before_domain_service(self):
         self._assert_denied(revoke_after_warm=True)
+
+    def test_role_grant_removal_after_enqueue_claims_job_and_denies(self):
+        self._assert_denied(revoke_after_warm=True, revoke_grant=True)
+
+    def test_taskcontext_database_failure_after_claim_marks_job_retryable(self):
+        module = _task_module(self.config)
+        task = getattr(module, self.config["callable"])
+        asset_before = _snapshot(self.asset)
+        with (
+            mock.patch.object(
+                module.TaskContext,
+                "__enter__",
+                side_effect=OperationalError("secret-database-detail"),
+            ),
+            self.assertLogs(module.__name__, level=logging.ERROR) as captured,
+        ):
+            result = self._invoke(task)
+
+        self.assertEqual(result.status, TaskStatus.RETRYABLE)
+        self.assertEqual(result.code, f"{self.family}.entry_failed")
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, Job.STATUS_FAILED)
+        self.asset.refresh_from_db()
+        self.assertEqual(_snapshot(self.asset), asset_before)
+        self.assertNotIn("secret-database-detail", " ".join(captured.output))
 
     def test_principal_missing_only_required_permission_denies(self):
         required = self.config["permission"]
