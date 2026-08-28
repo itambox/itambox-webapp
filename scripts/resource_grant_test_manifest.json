@@ -1,6 +1,6 @@
 {
   "base_commit": "27f82ca4398d933b9017c2a2abdbd9d43ebf7284",
-  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, and the issue #445 ownership-cutover characterization and implementation packets. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
+  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, and issue #446 domain-boundary implementation tests. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
     "itambox/assets/tests/test_audit_cadence.py",
     "itambox/assets/tests/test_bulk_actions.py",
@@ -20,6 +20,7 @@
     "itambox/core/tests/test_issue445_money_boundary.py",
     "itambox/core/tests/test_issue445_security_contracts.py",
     "itambox/core/tests/test_issue445_task_context_wrapper.py",
+    "itambox/core/tests/test_issue446_boundaries.py",
     "itambox/core/tests/test_label_renderer_html.py",
     "itambox/core/tests/test_navigation_tenancy.py",
     "itambox/core/tests/test_pdf_renderer.py",
@@ -86,6 +87,7 @@
     "itambox/core/tests/test_issue445_money_boundary.py",
     "itambox/core/tests/test_issue445_security_contracts.py",
     "itambox/core/tests/test_issue445_task_context_wrapper.py",
+    "itambox/core/tests/test_issue446_boundaries.py",
     "itambox/core/tests/test_label_renderer_html.py",
     "itambox/core/tests/test_navigation_tenancy.py",
     "itambox/core/tests/test_pdf_renderer.py",
