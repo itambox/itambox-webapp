@@ -177,7 +177,7 @@ class AuditSessionSerializer(BaseModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["started_at", "created_at", "updated_at"]
+        read_only_fields = ["started_at", "completed_at", "created_at", "updated_at"]
         brief_fields = ["id", "name", "status", "started_at"]
 
 
@@ -209,3 +209,4 @@ class AssetAuditSerializer(serializers.ModelSerializer):
             "verification_method",
             "verification_method_display",
         ]
+        read_only_fields = ["auditor", "timestamp"]

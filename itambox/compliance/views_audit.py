@@ -16,15 +16,17 @@ from django.views.generic import View
 from django_tables2.utils import A
 
 from assets.models import StatusLabel
-from assets.scanning import resolve_scanned_asset
+from assets.scanning import resolve_scanned_asset_in_queryset
 from compliance.audit_services import (
     _audit_to_dict,
     _missing_asset_to_dict,
     audit_asset,
+    authorized_scan_assets_queryset,
     classify_session_after_scan,
     classify_session_audits,
     close_audit_session,
     expected_assets_queryset,
+    expected_scan_assets_queryset,
     flag_missing_assets,
     read_reconciliation_report,
     rehome_audit_session_mismatches,
@@ -201,7 +203,8 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if form.is_valid():
             barcode = form.cleaned_data["barcode"].strip()
 
-            asset, ambiguous = resolve_scanned_asset(barcode)
+            scan_assets = authorized_scan_assets_queryset(session, user=request.user)
+            asset, ambiguous = resolve_scanned_asset_in_queryset(barcode, scan_assets)
 
             if not asset:
                 if ambiguous:
@@ -258,14 +261,15 @@ class AuditSessionValidateView(LoginRequiredMixin, PermissionRequiredMixin, View
         if not code:
             return JsonResponse({"found": False}, status=400)
 
-        asset, ambiguous = resolve_scanned_asset(code)
+        scan_assets = authorized_scan_assets_queryset(session, user=request.user)
+        asset, ambiguous = resolve_scanned_asset_in_queryset(code, scan_assets)
         if asset is None:
             payload = {"found": False}
             if ambiguous:
                 payload["ambiguous"] = True
             return JsonResponse(payload, status=404)
 
-        expected_ids = set(expected_assets_queryset(session, user=request.user).values_list("id", flat=True))
+        expected_ids = set(expected_scan_assets_queryset(session, user=request.user).values_list("id", flat=True))
         observed_location = session.location or asset.location
         eligible, warning, classification = _classify_audit_scan(session, asset, expected_ids, observed_location)
 
@@ -305,14 +309,14 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
             )
             return response
 
-        from assets.models import Asset
+        scan_assets = authorized_scan_assets_queryset(session, user=request.user)
 
         try:
             with transaction.atomic():
                 for asset_pk in asset_pks:
                     try:
-                        asset = Asset.objects.select_for_update().get(pk=asset_pk)
-                    except Asset.DoesNotExist:
+                        asset = scan_assets.select_for_update().get(pk=asset_pk)
+                    except scan_assets.model.DoesNotExist:
                         raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {"pk": asset_pk}) from None
 
                     # Skip an asset already verified in this session so re-committing

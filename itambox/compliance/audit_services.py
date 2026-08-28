@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
@@ -246,6 +246,34 @@ def _authorized_asset_tenants(user: Any) -> frozenset[int]:
     return allowed
 
 
+def authorized_scan_assets_queryset(session: AuditSession, *, user: User) -> QuerySet[Asset]:
+    """Return live assets in the exact actor-authorized scan tenant set."""
+    tenant_ids = _authorize_session(
+        session,
+        user=user,
+        system_authorization=None,
+        permission=SCAN_PERMISSION,
+        operation=SCAN_OPERATION,
+    )
+    return Asset._base_manager.filter(
+        deleted_at__isnull=True,
+        tenant_id__in=tenant_ids,
+        tenant__deleted_at__isnull=True,
+    )
+
+
+def expected_scan_assets_queryset(session: AuditSession, *, user: User) -> QuerySet[Asset]:
+    """Return expected assets under the actor-only scan authorization."""
+    tenant_ids = _authorize_session(
+        session,
+        user=user,
+        system_authorization=None,
+        permission=SCAN_PERMISSION,
+        operation=SCAN_OPERATION,
+    )
+    return _expected_assets_for_tenants(session, tenant_ids)
+
+
 @transaction.atomic
 def audit_asset(
     asset: Asset,
@@ -270,9 +298,14 @@ def audit_asset(
         )
     else:
         allowed_tenants = _authorized_asset_tenants(user)
-    asset = Asset._base_manager.select_for_update().get(
-        pk=asset.pk, tenant_id__in=allowed_tenants, deleted_at__isnull=True
-    )
+    try:
+        asset = Asset._base_manager.select_for_update().get(
+            pk=asset.pk, tenant_id__in=allowed_tenants, deleted_at__isnull=True
+        )
+    except ObjectDoesNotExist:
+        raise PermissionDenied("The asset is not authorized for this audit operation.") from None
+    if session is not None and session.status != "active":
+        raise ValidationError(_("Completed audit sessions cannot accept new observations."))
     location = location or asset.location
     status = status or asset.status
     if not location:
