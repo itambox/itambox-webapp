@@ -11,7 +11,7 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import classify_session_audits, expected_assets_queryset
 from compliance.models import AssetAudit, AuditSession
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Location, Tenant
 
 User = get_user_model()
@@ -74,6 +74,9 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name="StableCountTenant", slug="stc")
+        self.tenant_role.permissions = ["compliance.view_auditsession"]
+        self.tenant_role.save()
+        self.admin_grant = grant(self.tenant_admin, self.tenant, self.tenant_role)
         self.tenant_b = baker.make(Tenant, name="OtherTenant", slug="other-tenant")
 
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
