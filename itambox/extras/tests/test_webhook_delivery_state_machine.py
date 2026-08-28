@@ -162,6 +162,50 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(retry_kwargs["assertions"]["delivery_id"], str(kwargs["assertions"].delivery_id))
         self.assertEqual(retry_kwargs["attempt"], 1)
 
+    def test_failed_delivery_replay_waits_until_positive_backoff_is_due(self):
+        kwargs = self._task_kwargs()
+        responses = [self._response(503), self._response()]
+        with (
+            patch("core.http.request_pinned", side_effect=responses) as request_pinned,
+            patch("extras.tasks.webhooks.random.uniform", return_value=1.0),
+        ):
+            first = send_webhook_task(**kwargs)
+            delivery = self._task_delivery(kwargs)
+            schedule = Schedule.objects.get(func="extras.tasks.webhooks.send_webhook_task")
+            retry_kwargs = ast.literal_eval(schedule.kwargs)
+            state_fields = (
+                "status",
+                "attempt",
+                "attempted_at",
+                "next_retry_at",
+                "response_code",
+                "error_class",
+                "error_message",
+                "claim_token",
+                "claim_expires_at",
+            )
+            before_replay = {field: getattr(delivery, field) for field in state_fields}
+            schedule_ids = list(Schedule.objects.values_list("pk", flat=True))
+
+            replay = send_webhook_task(**kwargs)
+
+            delivery.refresh_from_db()
+            self.assertEqual(first.disposition, DeliveryDisposition.RETRYABLE)
+            self.assertEqual(replay.disposition, DeliveryDisposition.NOOP)
+            self.assertEqual(request_pinned.call_count, 1)
+            self.assertEqual({field: getattr(delivery, field) for field in state_fields}, before_replay)
+            self.assertEqual(list(Schedule.objects.values_list("pk", flat=True)), schedule_ids)
+
+            with patch("extras.tasks.webhooks.timezone.now", return_value=delivery.next_retry_at):
+                scheduled = send_webhook_task(**retry_kwargs)
+
+        delivery.refresh_from_db()
+        self.assertEqual(scheduled.disposition, DeliveryDisposition.SUCCESS)
+        self.assertEqual(request_pinned.call_count, 2)
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_SUCCESS)
+        self.assertEqual(delivery.attempt, 2)
+        self.assertEqual(Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").count(), 1)
+
     def test_retry_budget_exhaustion_marks_dead_after_initial_plus_budget(self):
         # The task reads retry configuration from the endpoint row, so the
         # endpoint must carry the immediate-retry policy this test exercises.
@@ -667,7 +711,9 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
             first = send_webhook_task(**kwargs)
             schedule = Schedule.objects.filter(func="extras.tasks.webhooks.send_webhook_task").latest("pk")
             retry_kwargs = ast.literal_eval(schedule.kwargs)
-            second = send_webhook_task(**retry_kwargs)
+            delivery = self._task_delivery(kwargs)
+            with patch("extras.tasks.webhooks.timezone.now", return_value=delivery.next_retry_at):
+                second = send_webhook_task(**retry_kwargs)
 
         self.assertEqual(first.disposition, DeliveryDisposition.RETRYABLE)
         self.assertEqual(second.disposition, DeliveryDisposition.SUCCESS)

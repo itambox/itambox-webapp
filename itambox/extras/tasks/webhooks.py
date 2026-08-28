@@ -399,6 +399,12 @@ def _claim_delivery(assertions: WebhookDeliveryAssertions, *, attempt: int):
             return delivery, None, DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
 
         now = timezone.now()
+        if (
+            delivery.status == WebhookDelivery.STATUS_FAILED
+            and delivery.next_retry_at is not None
+            and delivery.next_retry_at > now
+        ):
+            return delivery, None, DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
         if delivery.claim_token is not None and delivery.claim_expires_at is not None:
             if delivery.claim_expires_at > now:
                 return delivery, None, DeliveryResult("webhook.deliver", DeliveryDisposition.NOOP)
