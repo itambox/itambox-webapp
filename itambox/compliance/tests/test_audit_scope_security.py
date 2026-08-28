@@ -3,6 +3,7 @@
 import copy
 from datetime import timedelta
 from unittest.mock import patch
+from uuid import uuid4
 
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -150,6 +151,55 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             )
             with self.assertRaises(PermissionDenied):
                 expected_assets_queryset(self.session, user=None, system_authorization=authorization)
+
+    def test_system_authorization_matrix_is_exact_and_fail_closed(self):
+        with TaskContext(tenant_id=self.tenant_a.pk, user_id=None) as task:
+            wrong_permission = task.authorize_system(
+                permission="compliance.change_auditsession",
+                operation="compliance.audit.expected_assets",
+                reason="Wrong permission test",
+            )
+            with self.assertRaises(PermissionDenied):
+                expected_assets_queryset(self.session, user=None, system_authorization=wrong_permission)
+
+            authorization = task.authorize_system(
+                permission="compliance.view_auditsession",
+                operation="compliance.audit.expected_assets",
+                reason="Wrong request test",
+            )
+            with patch("compliance.audit_services.get_current_request_id", return_value=uuid4()):
+                with self.assertRaises(PermissionDenied):
+                    expected_assets_queryset(self.session, user=None, system_authorization=authorization)
+
+            with TaskContext(tenant_id=self.tenant_b.pk, user_id=None):
+                with self.assertRaises(PermissionDenied):
+                    expected_assets_queryset(self.session, user=None, system_authorization=authorization)
+
+        with self.assertRaises(PermissionDenied):
+            expected_assets_queryset(self.session, user=None, system_authorization=object())
+
+        with self.assertRaises(PermissionDenied):
+            TaskContext(tenant_id=self.tenant_a.pk, user_id=None).authorize_system(
+                permission="compliance.view_auditsession",
+                operation="compliance.audit.expected_assets",
+                reason="Unentered context test",
+            )
+
+        with TaskContext(tenant_id=self.tenant_a.pk, user_id=self.user.pk) as actor_task:
+            with self.assertRaises(PermissionDenied):
+                actor_task.authorize_system(
+                    permission="compliance.view_auditsession",
+                    operation="compliance.audit.expected_assets",
+                    reason="Actor-bound context test",
+                )
+
+        with TaskContext(tenant_id=None, user_id=None) as tenantless_task:
+            with self.assertRaises(PermissionDenied):
+                tenantless_task.authorize_system(
+                    permission="compliance.view_auditsession",
+                    operation="compliance.audit.expected_assets",
+                    reason="Tenantless context test",
+                )
 
     def test_permission_revocation_changes_the_next_read(self):
         self.assertEqual(expected_assets_queryset(self.session, user=self.user).count(), 1)
@@ -448,17 +498,89 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         self.assertEqual(report["rows"][0]["tenant_id"], self.tenant_a.pk)
         self.assertEqual((report["total_expected"], report["total_scanned"]), (1, 1))
 
+    def test_v1_report_routes_through_detail_csv_rehome_and_flag_paths(self):
+        second_location = baker.make(Location, tenant=self.tenant_a, name="Audit A second room")
+        detail_session = AuditSession.objects.create(
+            name="V1 detail session",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={
+                "rows": [
+                    {
+                        "category": "matching",
+                        "asset_id": self.asset_a.pk,
+                        "asset_tag": self.asset_a.asset_tag,
+                        "name": self.asset_a.name,
+                    }
+                ]
+            },
+        )
+        with CaptureQueriesContext(connection) as queries:
+            report = read_reconciliation_report(detail_session, user=self.user)
+        self.assertEqual(len(queries), 1)
+        self.assertEqual(report["rows"][0]["tenant_id"], self.tenant_a.pk)
+
+        self.client_login_to_tenant(self.user, self.tenant_a)
+        detail_response = self.client.get(reverse("compliance:auditsession_detail", kwargs={"pk": detail_session.pk}))
+        csv_response = self.client.get(reverse("compliance:auditsession_report_csv", kwargs={"pk": detail_session.pk}))
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn(self.asset_a.asset_tag, detail_response.content.decode())
+        self.assertIn(self.asset_a.asset_tag, csv_response.content.decode())
+
+        self.asset_a.location = second_location
+        self.asset_a.save(update_fields=["location"])
+        rehome_session = AuditSession.objects.create(
+            name="V1 rehome session",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={"rows": [{"category": "mismatched", "asset_id": self.asset_a.pk}]},
+        )
+        rehome_audit_session_mismatches(rehome_session, user=self.user)
+        self.asset_a.refresh_from_db()
+        self.assertEqual(self.asset_a.location_id, self.location_a.pk)
+
+        flag_asset = baker.make(
+            Asset,
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status=self.status,
+            name="V1 missing asset",
+        )
+        flag_session = AuditSession.objects.create(
+            name="V1 flag session",
+            tenant=self.tenant_a,
+            location=self.location_a,
+            status="completed",
+            created_by=self.user,
+            reconciliation_report={
+                "rows": [{"category": "missing", "asset_id": flag_asset.pk, "status_id": flag_asset.status_id}]
+            },
+        )
+        flag_missing_assets(flag_session, user=self.user)
+        flag_asset.refresh_from_db()
+        self.assertEqual(flag_asset.status.name, "Missing")
+
     def test_v2_reader_has_no_provenance_query_or_n_plus_one(self):
         self.session.reconciliation_report = {
             "schema_version": 2,
-            "total_expected": 1,
-            "total_scanned": 1,
+            "total_expected": 999,
+            "total_scanned": 999,
             "rows": [
                 {
                     "tenant_id": self.tenant_a.pk,
                     "category": "matching",
                     "asset_id": self.asset_a.pk,
-                }
+                },
+                {
+                    "tenant_id": self.tenant_b.pk,
+                    "category": "missing",
+                    "asset_id": self.asset_b.pk,
+                },
             ],
         }
         self.session.save(update_fields=["reconciliation_report"])
@@ -466,7 +588,9 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         with CaptureQueriesContext(connection) as queries:
             report = read_reconciliation_report(self.session, user=self.user)
         self.assertEqual(len(queries), 0)
+        self.assertEqual(len(report["rows"]), 1)
         self.assertEqual(report["rows"][0]["tenant_id"], self.tenant_a.pk)
+        self.assertEqual((report["total_expected"], report["total_scanned"]), (1, 1))
 
     def test_mutation_re_resolves_report_asset_ids_with_tenant_filter(self):
         self.session.status = "completed"

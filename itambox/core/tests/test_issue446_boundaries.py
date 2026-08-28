@@ -18,6 +18,52 @@ def _has_import_from(source: str, module: str) -> bool:
     return any(isinstance(node, ast.ImportFrom) and node.module == module for node in ast.walk(tree))
 
 
+def _report_receiver(node: ast.AST, aliases: set[str]) -> bool:
+    return (isinstance(node, ast.Attribute) and node.attr == "reconciliation_report") or (
+        isinstance(node, ast.Name) and node.id in aliases
+    )
+
+
+class _RawReportRowsVisitor(ast.NodeVisitor):
+    """Find row reads while allowing the owning parser/writer to handle the JSON."""
+
+    def __init__(self):
+        self.aliases: set[str] = set()
+        self.scopes: list[str] = []
+        self.offenders: list[tuple[int, tuple[str, ...]]] = []
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        previous_aliases = self.aliases
+        self.aliases = set()
+        self.scopes.append(node.name)
+        self.generic_visit(node)
+        self.scopes.pop()
+        self.aliases = previous_aliases
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_Assign(self, node: ast.Assign):
+        if _report_receiver(node.value, self.aliases):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    self.aliases.add(target.id)
+        self.generic_visit(node)
+
+    def visit_Subscript(self, node: ast.Subscript):
+        if _report_receiver(node.value, self.aliases):
+            self.offenders.append((node.lineno, tuple(self.scopes)))
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call):
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get"
+            and _report_receiver(node.func.value, self.aliases)
+        ):
+            self.offenders.append((node.lineno, tuple(self.scopes)))
+        self.generic_visit(node)
+
+
 class Issue446ModuleBoundaryRedTests(unittest.TestCase):
     def test_classifier_native_support_and_port_modules_exist(self):
         expected = (
@@ -83,15 +129,32 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
         self.assertNotIn("expected_assets_queryset", names)
 
     def test_production_consumers_do_not_read_raw_reconciliation_rows(self):
-        forbidden = '.reconciliation_report.get("rows", [])'
         offenders = []
         for path in ITAMBOX_ROOT.rglob("*.py"):
             if "tests" in path.parts or "migrations" in path.parts:
                 continue
             source = path.read_text(encoding="utf-8")
-            if forbidden in source:
-                offenders.append(path.relative_to(REPO_ROOT).as_posix())
+            visitor = _RawReportRowsVisitor()
+            visitor.visit(ast.parse(source))
+            for line, scopes in visitor.offenders:
+                parser_writer = path.relative_to(ITAMBOX_ROOT).as_posix() == "compliance/audit_services.py" and bool(
+                    set(scopes)
+                    & {"_read_v1_report", "_read_v2_report", "_read_report_for_tenants", "_validated_report"}
+                )
+                if not parser_writer:
+                    offenders.append(f"{path.relative_to(REPO_ROOT).as_posix()}:{line}")
         self.assertEqual(offenders, [], offenders)
+
+    def test_raw_report_rows_ast_guard_catches_direct_and_aliased_reads(self):
+        for source in (
+            "session.reconciliation_report['rows']",
+            "session.reconciliation_report.get('rows', [])",
+            "report = session.reconciliation_report\nreport['rows']",
+        ):
+            with self.subTest(source=source):
+                visitor = _RawReportRowsVisitor()
+                visitor.visit(ast.parse(source))
+                self.assertTrue(visitor.offenders)
 
     def test_license_registration_is_owned_by_licenses_config(self):
         licenses_source = _source("licenses/apps.py")
