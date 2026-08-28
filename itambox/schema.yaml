@@ -40004,7 +40004,6 @@ components:
         completed_at:
           type: string
           format: date-time
-          readOnly: true
           nullable: true
         created_by:
           type: string
@@ -40018,7 +40017,6 @@ components:
           format: date-time
           readOnly: true
       required:
-      - completed_at
       - created_at
       - created_by
       - id
@@ -40040,6 +40038,10 @@ components:
           nullable: true
         status:
           $ref: '#/components/schemas/AuditSessionStatusEnum'
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
       required:
       - name
     AuditSessionStatusEnum:
@@ -45745,6 +45747,10 @@ components:
           nullable: true
         status:
           $ref: '#/components/schemas/AuditSessionStatusEnum'
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
     PatchedCategoryRequest:
       type: object
       properties:
