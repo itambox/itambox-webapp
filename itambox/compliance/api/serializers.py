@@ -184,7 +184,7 @@ class AuditSessionSerializer(BaseModelSerializer):
 class AssetAuditSerializer(serializers.ModelSerializer):
     session = serializers.PrimaryKeyRelatedField(queryset=AuditSession.objects, required=False, allow_null=True)
     asset = NestedAssetSerializer(read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(queryset=Asset.objects, source="asset")
+    asset_id = serializers.PrimaryKeyRelatedField(queryset=Asset._base_manager.all(), source="asset")
     auditor = serializers.StringRelatedField(read_only=True)
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(queryset=Location.objects, source="location")

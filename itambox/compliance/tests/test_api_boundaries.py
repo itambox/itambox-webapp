@@ -162,11 +162,20 @@ class ComplianceAPIBoundaryTests(TenantTestMixin, TestCase):
             asset_tag="API-FOREIGN-1",
             name="Foreign API asset",
         )
+        global_actor = baker.make("users.User", username="api-global-actor", is_active=True, is_superuser=True)
+        global_role = baker.make(
+            "organization.Role",
+            tenant=self.tenant,
+            name="API global close role",
+            permissions=["compliance.view_auditsession", "compliance.change_auditsession"],
+        )
+        self.grant(global_actor, self.tenant, global_role)
+        self.client_login_to_tenant(global_actor, self.tenant)
         session = AuditSession.objects.create(
             name="API global partial session",
             tenant=None,
             status="active",
-            created_by=self.tenant_user,
+            created_by=global_actor,
         )
         before = (session.status, session.completed_at, session.reconciliation_report)
 
