@@ -11,8 +11,13 @@ from assets.models import (
     Manufacturer,
     StatusLabel,
 )
+from compliance.audit_services import (
+    audit_asset,
+    close_audit_session,
+    expected_assets_queryset,
+    rehome_audit_session_mismatches,
+)
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches
 from organization.models import Location, Site
 
 User = get_user_model()
@@ -98,7 +103,7 @@ class AuditReconciliationTestCase(TestCase):
         self.assertEqual(session.status, "active")
 
         # Check expected assets query helper
-        expected_assets = list(session.expected_assets_queryset.values_list("id", flat=True))
+        expected_assets = list(expected_assets_queryset(session, user=self.admin).values_list("id", flat=True))
         self.assertIn(self.asset_expected_1.id, expected_assets)
         self.assertIn(self.asset_expected_2.id, expected_assets)
         self.assertNotIn(self.asset_mismatched.id, expected_assets)
@@ -156,7 +161,7 @@ class AuditReconciliationTestCase(TestCase):
         self.assertEqual(self.asset_mismatched.location, self.server_room)  # Still registered at Server Room
 
         # 6. Close the session and run reconciliation reports
-        report = close_audit_session(session, self.admin)
+        report = close_audit_session(session, user=self.admin)
         self.assertEqual(session.status, "completed")
         self.assertEqual(report["total_expected"], 2)
         self.assertEqual(report["total_scanned"], 2)  # asset_expected_1 and asset_mismatched
@@ -187,9 +192,9 @@ class AuditReconciliationTestCase(TestCase):
             status=self.status_deployable,
             verification_method="manual",
         )
-        close_audit_session(session, self.admin)  # re-freeze with the mismatch
+        close_audit_session(session, user=self.admin)  # re-freeze with the mismatch
         session.refresh_from_db()
-        rehome_audit_session_mismatches(session, self.admin)
+        rehome_audit_session_mismatches(session, user=self.admin)
         # Rehome moves the mismatched asset to session.location (staging_room).
         # asset_expected_2 was already registered at staging_room, so the location
         # remains staging_room — confirming rehome ran cleanly without error.

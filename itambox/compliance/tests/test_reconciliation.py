@@ -15,8 +15,8 @@ from django.test import TestCase
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
+from compliance.audit_services import audit_asset, classify_session_audits
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import audit_asset, classify_session_audits
 from organization.models import Location
 
 User = get_user_model()
@@ -78,7 +78,7 @@ class ClassifyGlobalSessionTests(TestCase):
         self._audit(asset_a, self.loc_a)
         self._audit(asset_b, self.loc_b)
 
-        result = classify_session_audits(self.session)
+        result = classify_session_audits(self.session, user=self.user)
 
         self.assertEqual(len(result["matching"]), 2)
         self.assertEqual(len(result["mismatched"]), 0)
@@ -91,7 +91,7 @@ class ClassifyGlobalSessionTests(TestCase):
             location=self.loc_a,
         )
         # Don't scan it — it should appear in missing
-        result = classify_session_audits(self.session)
+        result = classify_session_audits(self.session, user=self.user)
         missing_ids = set(result["missing"].values_list("id", flat=True))
         self.assertIn(expected_asset.id, missing_ids)
 
@@ -124,7 +124,7 @@ class ClassifyLocatedSessionTests(TestCase):
         asset = baker.make(Asset, status=self.status, location=self.loc_berlin)
         self._audit(asset, self.loc_berlin)
 
-        result = classify_session_audits(self.session)
+        result = classify_session_audits(self.session, user=self.user)
         self.assertEqual(len(result["matching"]), 1)
         self.assertEqual(len(result["mismatched"]), 0)
         self.assertEqual(len(result["surprise"]), 0)
@@ -139,7 +139,7 @@ class ClassifyLocatedSessionTests(TestCase):
         asset.location = self.loc_berlin
         asset.save(update_fields=["location"])
 
-        result = classify_session_audits(self.session)
+        result = classify_session_audits(self.session, user=self.user)
         self.assertEqual(len(result["mismatched"]), 1)
         self.assertEqual(len(result["matching"]), 0)
 
@@ -149,7 +149,7 @@ class ClassifyLocatedSessionTests(TestCase):
         surprise_asset = baker.make(Asset, status=archived_status, location=self.loc_berlin)
         self._audit(surprise_asset, self.loc_berlin)
 
-        result = classify_session_audits(self.session)
+        result = classify_session_audits(self.session, user=self.user)
         surprise_ids = {a.asset_id for a in result["surprise"]}
         self.assertIn(surprise_asset.id, surprise_ids)
         self.assertEqual(len(result["matching"]), 0)
@@ -158,6 +158,6 @@ class ClassifyLocatedSessionTests(TestCase):
     def test_missing_expected_not_scanned(self):
         expected = baker.make(Asset, status=self.status, location=self.loc_berlin)
         # No audit created for expected
-        result = classify_session_audits(self.session)
+        result = classify_session_audits(self.session, user=self.user)
         missing_ids = set(result["missing"].values_list("id", flat=True))
         self.assertIn(expected.id, missing_ids)

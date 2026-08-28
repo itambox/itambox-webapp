@@ -17,16 +17,21 @@ from django_tables2.utils import A
 
 from assets.models import StatusLabel
 from assets.scanning import resolve_scanned_asset
+from compliance.audit_services import (
+    _audit_to_dict,
+    _missing_asset_to_dict,
+    audit_asset,
+    classify_session_audits,
+    close_audit_session,
+    expected_assets_queryset,
+    flag_missing_assets,
+    read_reconciliation_report,
+    rehome_audit_session_mismatches,
+)
 from compliance.filters import AuditSessionFilterSet
 from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSessionForm
 from compliance.forms_filter import AuditSessionFilterForm
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import (
-    audit_asset,
-    close_audit_session,
-    flag_missing_assets,
-    rehome_audit_session_mismatches,
-)
 from core.csv_utils import csv_safe
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
@@ -132,20 +137,18 @@ class AuditSessionDetailView(ObjectDetailView):
         session = self.get_object()
 
         if session.status == "completed" and session.reconciliation_report:
-            # Render from the frozen stored report; do not recompute.
-            report = session.reconciliation_report
-            rows = report.get("rows", [])
-            ctx["total_expected"] = report.get("total_expected", 0)
-            ctx["total_scanned"] = report.get("total_scanned", 0)
+            # Render from the frozen stored report after applying the current actor scope.
+            report = read_reconciliation_report(session, user=self.request.user)
+            rows = report["rows"]
+            ctx["total_expected"] = report["total_expected"]
+            ctx["total_scanned"] = report["total_scanned"]
             ctx["matching"] = [r for r in rows if r["category"] == "matching"]
             ctx["mismatches"] = [r for r in rows if r["category"] == "mismatched"]
             ctx["surprise_finds"] = [r for r in rows if r["category"] == "surprise"]
             ctx["missing_assets"] = [r for r in rows if r["category"] == "missing"]
             ctx["report_is_stored"] = True
         else:
-            from compliance.reconciliation import _audit_to_dict, _missing_asset_to_dict, classify_session_audits
-
-            classified = classify_session_audits(session)
+            classified = classify_session_audits(session, user=self.request.user)
             expected_loc_name = session.location.name if session.location else "Global"
             ctx["total_expected"] = (
                 len(classified["matching"]) + len(classified["mismatched"]) + classified["missing"].count()
@@ -253,7 +256,7 @@ class AuditSessionValidateView(LoginRequiredMixin, PermissionRequiredMixin, View
                 payload["ambiguous"] = True
             return JsonResponse(payload, status=404)
 
-        expected_ids = set(session.expected_assets_queryset.values_list("id", flat=True))
+        expected_ids = set(expected_assets_queryset(session, user=request.user).values_list("id", flat=True))
         observed_location = session.location or asset.location
         eligible, warning, classification = _classify_audit_scan(session, asset, expected_ids, observed_location)
 
@@ -332,9 +335,8 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
         # Return the updated reconciliation container using a helper-like template render
         from compliance.forms_audit import AuditBarcodeScanForm
-        from compliance.reconciliation import _audit_to_dict, _missing_asset_to_dict, classify_session_audits
 
-        classified = classify_session_audits(session)
+        classified = classify_session_audits(session, user=request.user)
         expected_loc_name = session.location.name if session.location else "Global"
         ctx = {
             "total_expected": len(classified["matching"])
@@ -378,7 +380,7 @@ class AuditSessionRehomeView(SimplePostView):
     permission_required = "assets.change_asset"
 
     def perform_action(self, session, request) -> dict:
-        rehome_audit_session_mismatches(session, request.user)
+        rehome_audit_session_mismatches(session, user=request.user)
         return {
             "message": _("All mismatched assets in campaign '%(name)s' have been bulk re-homed to '%(location)s'.")
             % {"name": session.name, "location": session.location.name if session.location else "Global"}
@@ -392,8 +394,8 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
     def get(self, request, pk, *args, **kwargs):
         session = get_object_or_404(AuditSession, pk=pk, status="completed")
-        report = session.reconciliation_report or {}
-        rows = report.get("rows", [])
+        report = read_reconciliation_report(session, user=request.user)
+        rows = report["rows"]
 
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename="audit-report-{session.pk}.csv"'
@@ -454,8 +456,8 @@ class AuditSessionFlagMissingView(GenericTransactionView):
         context = super().get_context_data(**kwargs)
         session = self.get_object()
         if session.reconciliation_report:
-            missing_rows = [r for r in session.reconciliation_report.get("rows", []) if r.get("category") == "missing"]
-            context["missing_count"] = len(missing_rows)
+            report = read_reconciliation_report(session, user=self.request.user)
+            context["missing_count"] = sum(row["category"] == "missing" for row in report["rows"])
         else:
             context["missing_count"] = 0
         return context

@@ -22,8 +22,8 @@ from compliance.services import scope_custody_receipts
 logger = logging.getLogger(__name__)
 
 from assets.choices import RequestStatusChoices
+from compliance.audit_services import audit_asset_from_form
 from compliance.models import CustodyReceipt
-from compliance.reconciliation import audit_asset_from_form
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 from itambox.panels import Panel

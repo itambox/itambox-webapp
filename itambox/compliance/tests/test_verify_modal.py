@@ -7,8 +7,8 @@ from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
+from compliance.audit_services import audit_asset_from_form
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import audit_asset_from_form
 from core.tests.mixins import TenantTestMixin
 from organization.models import Location
 

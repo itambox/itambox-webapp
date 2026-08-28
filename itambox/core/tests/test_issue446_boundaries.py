@@ -2,9 +2,8 @@
 
 import ast
 import importlib.util
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ITAMBOX_ROOT = REPO_ROOT / "itambox"
@@ -16,10 +15,7 @@ def _source(relative_path: str) -> str:
 
 def _has_import_from(source: str, module: str) -> bool:
     tree = ast.parse(source)
-    return any(
-        isinstance(node, ast.ImportFrom) and node.module == module
-        for node in ast.walk(tree)
-    )
+    return any(isinstance(node, ast.ImportFrom) and node.module == module for node in ast.walk(tree))
 
 
 class Issue446ModuleBoundaryRedTests(unittest.TestCase):
@@ -55,15 +51,15 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
 
     def test_inventory_models_import_model_support_leaves(self):
         source = _source("inventory/models.py")
-        self.assertTrue(_has_import_from(source, "inventory.models_stock"))
-        self.assertTrue(_has_import_from(source, "inventory.models_kit_checkout"))
-        self.assertFalse(_has_import_from(source, "inventory.stock"))
-        self.assertFalse(_has_import_from(source, "inventory.kit_checkout"))
+        self.assertTrue(_has_import_from(source, "models_stock"))
+        self.assertTrue(_has_import_from(source, "models_kit_checkout"))
+        self.assertFalse(_has_import_from(source, "stock"))
+        self.assertFalse(_has_import_from(source, "kit_checkout"))
 
     def test_inventory_model_mixin_is_not_imported_from_presentation(self):
         source = _source("inventory/abstract_models.py")
-        self.assertTrue(_has_import_from(source, "inventory.models_mixins"))
-        self.assertFalse(_has_import_from(source, "inventory.mixins"))
+        self.assertTrue(_has_import_from(source, "models_mixins"))
+        self.assertFalse(_has_import_from(source, "mixins"))
 
     def test_asset_model_imports_book_value_leaf_at_module_top(self):
         source = _source("assets/models/asset.py")
@@ -83,11 +79,7 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
     def test_compliance_model_has_no_actorless_expected_assets_property(self):
         source = _source("compliance/models.py")
         tree = ast.parse(source)
-        names = {
-            node.name
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        }
+        names = {node.name for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
         self.assertNotIn("expected_assets_queryset", names)
 
     def test_production_consumers_do_not_read_raw_reconciliation_rows(self):

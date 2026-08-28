@@ -13,6 +13,8 @@ from django.urls import reverse
 
 from assets.filters import AssetFilterSet
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
+from compliance.audit_services import audit_asset, expected_assets_queryset
+from compliance.models import AssetAudit, AuditSession
 from core.tests.mixins import TenantTestMixin
 from inventory.models import Accessory, Component, Consumable
 
@@ -226,7 +228,9 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
             location=self.loc1,
             tenant=self.tenant,
         )
-        self.expected_ids = set(self.session.expected_assets_queryset.values_list("id", flat=True))
+        self.expected_ids = set(
+            expected_assets_queryset(self.session, user=self.tenant_admin).values_list("id", flat=True)
+        )
         self.validate_url = reverse("compliance:auditsession_validate", kwargs={"pk": self.session.pk})
         self.scan_url = reverse("compliance:auditsession_scan", kwargs={"pk": self.session.pk})
 
@@ -253,7 +257,7 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         self.assertEqual(classification, "unknown")
 
     def test_already_verified_not_expected_surprise(self):
-        from compliance.reconciliation import audit_asset
+        from compliance.audit_services import audit_asset
 
         other = Asset.objects.create(
             name="Other Audit Asset",
@@ -278,7 +282,7 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         self.assertIn("already", warning)
 
     def test_already_verified_matched(self):
-        from compliance.reconciliation import audit_asset
+        from compliance.audit_services import audit_asset
 
         audit_asset(
             asset=self.asset,
@@ -293,7 +297,7 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         self.assertEqual(classification, "matched")
 
     def test_already_verified_mismatch(self):
-        from compliance.reconciliation import audit_asset
+        from compliance.audit_services import audit_asset
 
         audit_asset(
             asset=self.asset,

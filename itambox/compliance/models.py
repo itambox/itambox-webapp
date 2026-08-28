@@ -402,29 +402,6 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     def get_absolute_url(self):
         return reverse("compliance:auditsession_detail", kwargs={"pk": self.pk})
 
-    @property
-    def expected_assets_queryset(self):
-        """Return the set of assets this session expects to audit.
-
-        Bypasses ambient tenant scoping: when the session is tenant-scoped it filters
-        explicitly by session.tenant; when global (tenant=None) no tenant filter is
-        applied, so the queryset is stable regardless of which viewer calls it.
-        """
-        from django.db.models import QuerySet
-
-        from assets.models import Asset, StatusLabel
-
-        # Raw queryset — bypasses TenantScopingSoftDeleteManager ambient filter.
-        qs = QuerySet(model=Asset).filter(deleted_at__isnull=True)
-        if self.tenant_id is not None:
-            qs = qs.filter(tenant_id=self.tenant_id)
-        qs = qs.exclude(status__type=StatusLabel.TYPE_ARCHIVED)
-        if not self.location:
-            return qs.filter(
-                status__type__in=[StatusLabel.TYPE_DEPLOYABLE, StatusLabel.TYPE_PENDING, StatusLabel.TYPE_DEPLOYED]
-            )
-        return qs.filter(location=self.location)
-
 
 class AssetAudit(ChangeLoggingMixin, models.Model):
     # Tenant scoping is enforced at the API layer (AssetAuditViewSet uses
