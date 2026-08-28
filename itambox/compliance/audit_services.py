@@ -437,7 +437,7 @@ def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[
     }
     rows: list[dict[str, Any]] = []
     for stored_row in stored_rows:
-        category = _validated_report_category(stored_row)
+        _validated_report_category(stored_row)
         asset = assets.get(stored_row.get("asset_id"))
         if asset is None:
             continue
@@ -450,7 +450,7 @@ def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[
 def _read_v2_report(session: AuditSession, stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for stored_row in stored_rows:
-        category = _validated_report_category(stored_row)
+        _validated_report_category(stored_row)
         tenant_id = stored_row.get("tenant_id")
         asset_id = stored_row.get("asset_id")
         if type(tenant_id) is not int or tenant_id <= 0 or type(asset_id) is not int or asset_id <= 0:
