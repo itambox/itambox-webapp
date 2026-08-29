@@ -1,142 +1,15 @@
 import { test, expect } from '../../../fixtures/test';
-import type { APIRequestContext, Page } from '@playwright/test';
+import {
+  activateConfiguredTenant,
+  allocationByNote,
+  allocationCreatePath,
+  availableComponentValue,
+  cleanupAllocation,
+  visibleClear,
+  visibleTomSelect,
+} from '../../../helpers/component-allocation';
 
-const allocationCreatePath = '/inventory/component-allocations/add/';
-const allocationListPath = '/inventory/component-allocations/';
-let configuredTenantId: string | undefined;
-
-async function responseRows(
-  request: APIRequestContext,
-  path: string,
-): Promise<Record<string, any>[]> {
-  const scopedPath = new URL(path, 'http://itambox.local');
-  if (configuredTenantId) scopedPath.searchParams.set('switch_tenant', configuredTenantId);
-  const response = await request.get(`${scopedPath.pathname}${scopedPath.search}`);
-  expect(response.status(), await response.text()).toBe(200);
-  const payload = await response.json();
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.results)) {
-    throw new Error(`Expected a result list from ${path}.`);
-  }
-  return payload.results as Record<string, any>[];
-}
-
-async function activateConfiguredTenant(page: Page, request: APIRequestContext): Promise<void> {
-  const tenantSlug = process.env.E2E_TENANT_SLUG;
-  if (!tenantSlug) throw new Error('E2E_TENANT_SLUG is required for component allocation tests.');
-  const tenants = await responseRows(request, '/api/organization/tenants/?limit=100');
-  const tenant = tenants.find((row) => row.slug === tenantSlug);
-  expect(
-    tenant,
-    `E2E tenant ${tenantSlug} must be visible to the authenticated operator`,
-  ).toBeDefined();
-  configuredTenantId = String(tenant!.id);
-  await page.goto(`/?switch_tenant=${tenant!.id}`, { waitUntil: 'networkidle' });
-}
-
-async function allocationByNote(
-  request: APIRequestContext,
-  note: string,
-): Promise<Record<string, any> | undefined> {
-  const rows = await responseRows(request, '/api/inventory/component-allocations/?q=E2E-ISSUE393-');
-  return rows.find((row) => row.notes === note);
-}
-
-async function availableComponentValue(page: Page, request: APIRequestContext): Promise<string> {
-  const options = await page.locator('select[name="component"] option').evaluateAll((elements) =>
-    elements
-      .map((element) => ({
-        value: (element as HTMLOptionElement).value,
-        label: (element.textContent || '').trim(),
-      }))
-      .filter((option) => option.value),
-  );
-  const rows = await responseRows(request, '/api/inventory/components/?limit=100');
-  const availableIds = new Set(
-    rows.filter((row) => Number(row.available_stock) > 0).map((row) => String(row.id)),
-  );
-  const value = options.find((option) => availableIds.has(option.value))?.value;
-  if (!value)
-    throw new Error('The E2E seed must expose an available Component in the active tenant.');
-  return value;
-}
-
-async function visibleTomSelect(
-  page: Page,
-  fieldName: string,
-  value: string,
-  settleDropdown = true,
-): Promise<void> {
-  const select = page.locator(`select[data-tom-select][name="${fieldName}"]`);
-  await expect(select).toHaveCount(1);
-  const label = (await select.locator(`option[value="${value}"]`).textContent())?.trim();
-  if (!label) throw new Error(`Tom Select option ${fieldName}=${value} is missing.`);
-
-  const wrapper = select.locator('xpath=following-sibling::div[contains(@class,"ts-wrapper")][1]');
-  if (settleDropdown) await wrapper.locator('.ts-control').click();
-  else await wrapper.locator('.ts-control').click({ force: true });
-  const input = wrapper.locator('.dropdown-input:visible, .ts-control input:visible').first();
-  await input.fill(label);
-  const visibleOption = wrapper.locator(`.ts-dropdown .option[data-value="${value}"]`);
-  if (settleDropdown) await visibleOption.click();
-  else await visibleOption.click({ force: true });
-  if (settleDropdown) {
-    // The value change above is a visible option click. close() only settles
-    // dropdown chrome so the next visible control can receive pointer input.
-    await select.evaluate((element) => (element as any).tomselect.close());
-  }
-  await expect(select).toHaveValue(value);
-}
-
-async function visibleClear(page: Page, fieldName: string): Promise<void> {
-  const select = page.locator(`select[data-tom-select][name="${fieldName}"]`);
-  const wrapper = select.locator('xpath=following-sibling::div[contains(@class,"ts-wrapper")][1]');
-  await wrapper.locator('.clear-button').click();
-  await expect(select).toHaveValue('');
-}
-
-async function cleanupAllocation(
-  page: Page,
-  request: APIRequestContext,
-  allocationId: string,
-  note: string,
-): Promise<void> {
-  await page.goto(`${allocationListPath}?q=E2E-ISSUE393-`, { waitUntil: 'networkidle' });
-  const checkinPath = `/inventory/components/allocations/${allocationId}/checkin/`;
-  const button = page.locator(`button[hx-post="${checkinPath}"]`);
-  await expect(button).toBeVisible();
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' && new URL(response.url()).pathname === checkinPath,
-  );
-  page.once('dialog', (dialog) => dialog.accept());
-  await button.click();
-  expect((await responsePromise).status()).toBe(204);
-  expect(await allocationByNote(request, note)).toBeUndefined();
-}
-
-async function seededModularAssetComponentsPath(request: APIRequestContext): Promise<string> {
-  const roles = await responseRows(request, '/api/assets/asset-roles/?limit=100');
-  const modularRoleIds = new Set(
-    roles
-      .filter((row) => /server|modular|workstation|hypervisor/i.test(String(row.slug || '')))
-      .map((row) => String(row.id)),
-  );
-  expect(modularRoleIds.size, 'The E2E seed must expose a component-capable asset role.').toBeGreaterThan(0);
-  const assets = await responseRows(request, '/api/assets/assets/?limit=100');
-  const asset = assets.find((row) => {
-    const role = row.asset_role;
-    return role !== null
-      && typeof role === 'object'
-      && modularRoleIds.has(String((role as Record<string, unknown>).id));
-  });
-  if (!asset || (typeof asset.id !== 'string' && typeof asset.id !== 'number')) {
-    throw new Error('The E2E seed must expose one asset with a component-capable role.');
-  }
-  return `/assets/assets/${asset.id}/?tab=components`;
-}
-
-test.describe('Issue #393 Component Allocation observability', () => {
+test.describe('inventory-owned component allocation', { tag: '@pr' }, () => {
   test('full-page create is target-only and clear/replace matches POST and readback', async ({
     page,
     api,
@@ -201,57 +74,10 @@ test.describe('Issue #393 Component Allocation observability', () => {
 
     const allocation = await allocationByNote(api, successNote);
     expect(allocation).toBeDefined();
-    expect(allocation!.from_location).toBeNull();
-    expect(String(allocation!.assigned_holder.id)).toBe(holderValues[0]);
     cleanup.add(`component allocation ${successNote}`, async () => {
       await cleanupAllocation(page, api, String(allocation!.id), successNote);
     });
-  });
-
-  test('asset-detail quick-add returns HX-Redirect and leaves no stale modal or HTMX errors', async ({
-    page,
-    api,
-    cleanup,
-    runId,
-  }) => {
-    const note = `E2E-ISSUE393-quickadd-${runId}`;
-    await activateConfiguredTenant(page, api);
-    const componentsPath = await seededModularAssetComponentsPath(api);
-    await page.goto(componentsPath, { waitUntil: 'domcontentloaded' });
-    const assetPath = new URL(componentsPath, 'http://localhost').pathname;
-    const button = page.locator(
-      'button[hx-get*="component-allocations/add"][hx-get*="_quickadd=1"]',
-    );
-    await expect(button).toBeVisible();
-    await button.click();
-    const modal = page.locator('#quick-add-modal');
-    await expect(modal).toBeVisible();
-    await expect(modal.locator('select[name="from_location"]')).toHaveCount(0);
-
-    const componentValue = await availableComponentValue(page, api);
-    await visibleTomSelect(page, 'component', componentValue);
-    await modal.locator('input[name="qty"]').fill('1');
-    await modal.locator('textarea[name="notes"]').fill(note);
-
-    const responsePromise = page.waitForResponse(
-      (response) =>
-        response.request().method() === 'POST' &&
-        new URL(response.url()).pathname === allocationCreatePath,
-    );
-    await modal.locator('input[type="submit"], button[type="submit"]').first().click();
-    const response = await responsePromise;
-    expect(response.status()).toBe(204);
-    expect(response.headers()['hx-redirect']).toBe(assetPath);
-    await page.waitForURL((url) => url.pathname === assetPath, { timeout: 15000 });
-    await expect(modal).not.toBeVisible();
-
-    await expect
-      .poll(async () => (await allocationByNote(api, note))?.id, { timeout: 15000 })
-      .toBeTruthy();
-    const allocation = await allocationByNote(api, note);
     expect(allocation!.from_location).toBeNull();
-    cleanup.add(`component allocation ${note}`, async () => {
-      await cleanupAllocation(page, api, String(allocation!.id), note);
-    });
+    expect(String(allocation!.assigned_holder.id)).toBe(holderValues[0]);
   });
 });

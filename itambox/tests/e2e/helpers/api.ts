@@ -2,6 +2,17 @@ import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 export type JsonObject = Record<string, unknown>;
 
+export async function deleteOwnedResource(
+  request: APIRequestContext,
+  path: string,
+  label: string,
+  expectedStatus = 204,
+): Promise<void> {
+  const response = await request.delete(path, { headers: { 'If-Match': '*' } });
+  const body = await response.text();
+  expect(response.status(), `${label}: ${body}`).toBe(expectedStatus);
+}
+
 export async function jsonResponse(
   response: Awaited<ReturnType<APIRequestContext['get']>>,
   expectedStatus: number,

@@ -1,20 +1,41 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
+import { getJsonRows } from '../../../helpers/api';
 
-test.describe('tenant isolation contract', { tag: '@pr' }, () => {
-  test('REST tenant visibility and rendered tenant identity agree', async ({ page, request, activeTenant }) => {
-    const tenant = requireActiveTenant(activeTenant);
-    const response = await request.get('/api/organization/tenants/?limit=100');
-    expect(response.status(), 'Tenant visibility response').toBe(200);
-    const payload: unknown = await response.json();
-    const rows = Array.isArray(payload)
-      ? payload
-      : payload !== null && typeof payload === 'object' && Array.isArray((payload as { results?: unknown }).results)
-        ? (payload as { results: unknown[] }).results
-        : null;
-    if (!rows || rows.length === 0 || !rows.some((row) => row !== null && typeof row === 'object' && String((row as { id?: unknown }).id) === tenant.id)) {
-      throw new Error('REST visibility must include the attested active tenant.');
-    }
-    await expect(page.getByTestId('active-tenant')).toHaveAttribute('data-tenant-id', tenant.id);
+test.describe('tenant isolation contract', () => {
+  test.describe('operator', { tag: '@operator' }, () => {
+    test('foreign tenant is absent from REST and cannot replace the rendered active tenant', async ({
+      page,
+      api,
+      activeTenant,
+    }) => {
+      const tenant = requireActiveTenant(activeTenant);
+      const isolationSlug = process.env.E2E_ISOLATION_TENANT_SLUG;
+      if (!isolationSlug) throw new Error('E2E_ISOLATION_TENANT_SLUG is required.');
+
+      const visible = await getJsonRows(page.request, '/api/organization/tenants/?limit=100', 'operator tenant visibility');
+      expect(visible.some((row) => String(row.id) === tenant.id && row.slug === tenant.slug)).toBe(true);
+      expect(visible.some((row) => row.slug === isolationSlug)).toBe(false);
+
+      const allTenants = await getJsonRows(api, '/api/organization/tenants/?limit=100', 'admin tenant setup');
+      const isolation = allTenants.find((row) => row.slug === isolationSlug);
+      if (!isolation || (typeof isolation.id !== 'string' && typeof isolation.id !== 'number')) {
+        throw new Error(`Disposable isolation tenant ${isolationSlug} is missing.`);
+      }
+
+      const switchAttempt = await page.goto(`/?switch_tenant=${encodeURIComponent(String(isolation.id))}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      expect(switchAttempt?.status(), 'foreign tenant switch attempt').toBe(200);
+      await expect(page.getByTestId('active-tenant')).toHaveAttribute('data-tenant-id', tenant.id);
+      await expect(page.getByTestId('active-tenant')).toHaveAttribute('data-tenant-slug', tenant.slug);
+
+      const afterAttempt = await getJsonRows(
+        page.request,
+        '/api/organization/tenants/?limit=100',
+        'operator tenant visibility after switch attempt',
+      );
+      expect(afterAttempt.some((row) => row.slug === isolationSlug)).toBe(false);
+    });
   });
 });

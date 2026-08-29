@@ -1,6 +1,7 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
-import { jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse } from '../../../helpers/api';
+import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('compliance-owned custody template lifecycle', { tag: '@pr' }, () => {
   test('creates, edits, previews, reads back, and deletes a tenant custody template', async ({
@@ -21,9 +22,9 @@ test.describe('compliance-owned custody template lifecycle', { tag: '@pr' }, () 
     expect(createPage?.status(), `GET ${createPath}`).toBe(200);
     const createForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await expect(createForm).toHaveCount(1);
-    await createForm.getByLabel('Tenant').selectOption(tenant.id);
+    await selectTomOption(createForm, 'tenant', tenant.id);
     await createForm.getByLabel('Name').fill(originalName);
-    await createForm.getByLabel('Signature Provider').selectOption('local');
+    await selectTomOption(createForm, 'signature_provider', 'local');
     await createForm.getByLabel('Eula text').fill(originalTerms);
     await createForm.getByLabel('Disclaimer').fill(`Owned custody disclaimer ${runId}`);
     await createForm.getByLabel('Qms reference').fill(`E2E-QMS-${runId}`.slice(0, 90));
@@ -36,23 +37,28 @@ test.describe('compliance-owned custody template lifecycle', { tag: '@pr' }, () 
     await createForm.getByRole('button', { name: 'Create', exact: true }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.status(), 'custody template create response').toBe(302);
-    const detailLocation = createResponse.headers()['location'];
-    const detailMatch = detailLocation?.match(/^\/compliance\/custody-templates\/(\d+)\/$/);
-    if (!detailMatch) {
-      throw new Error(`Custody template create returned an unexpected location: ${detailLocation || '<missing>'}`);
-    }
-    const templateId = detailMatch[1];
+    expect(createResponse.headers()['location']).toBe('/compliance/custody-templates/');
+    const matches = (await getJsonRows(
+      api,
+      `/api/compliance/custody-templates/?q=${encodeURIComponent(originalName)}`,
+      'created custody template lookup',
+    )).filter((row) => row.name === originalName);
+    expect(matches).toHaveLength(1);
+    const templateId = String(matches[0].id);
     const detailPath = `/compliance/custody-templates/${templateId}/`;
 
     cleanup.add(`custody template ${originalName}`, async () => {
       const current = await api.get(`/api/compliance/custody-templates/${templateId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/compliance/custody-templates/${templateId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(
+        api,
+        `/api/compliance/custody-templates/${templateId}/`,
+        `delete custody template ${originalName}`,
+      );
     });
 
-    await page.waitForURL((url) => url.pathname === detailPath);
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(
       await api.get(`/api/compliance/custody-templates/${templateId}/`),
@@ -80,8 +86,10 @@ test.describe('compliance-owned custody template lifecycle', { tag: '@pr' }, () 
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
     await updateForm.getByRole('button', { name: 'Update', exact: true }).click();
-    expect((await updateResponsePromise).status(), 'custody template update response').toBe(302);
-    await page.waitForURL((url) => url.pathname === detailPath);
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.status(), 'custody template update response').toBe(302);
+    expect(updateResponse.headers()['location']).toBe('/compliance/custody-templates/');
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     const updated = await jsonResponse(
       await api.get(`/api/compliance/custody-templates/${templateId}/`),
       200,

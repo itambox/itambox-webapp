@@ -1,6 +1,7 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
-import { jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, jsonResponse } from '../../../helpers/api';
+import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
   test('creates, edits, reloads, reads back, and hard-deletes an owned site', async ({
@@ -22,8 +23,8 @@ test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
     await expect(createForm).toHaveCount(1);
     await createForm.getByLabel('Name').fill(originalName);
     await createForm.getByLabel('Slug').fill(slug);
-    await createForm.getByLabel('Status').selectOption('active');
-    await createForm.getByLabel('Tenant').selectOption(tenant.id);
+    await selectTomOption(createForm, 'status', 'active');
+    await selectTomOption(createForm, 'tenant', tenant.id);
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === createPath,
@@ -41,8 +42,7 @@ test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
       const current = await api.get(`/api/organization/sites/${siteId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/organization/sites/${siteId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(api, `/api/organization/sites/${siteId}/`, `delete organization site ${slug}`);
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);

@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
-import { jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse } from '../../../helpers/api';
 import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
@@ -31,8 +31,11 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
       const current = await api.get(`/api/subscriptions/providers/${providerId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/subscriptions/providers/${providerId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(
+        api,
+        `/api/subscriptions/providers/${providerId}/`,
+        `delete subscription provider ${providerSlug}`,
+      );
     });
 
     const createPath = '/subscriptions/subscriptions/add/';
@@ -45,10 +48,10 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     await createForm.getByLabel('Name').fill(name);
     await createForm.getByLabel('Slug').fill(slug);
     await selectTomOption(createForm, 'provider', providerId);
-    await createForm.getByLabel('Subscription Type').selectOption('saas');
+    await selectTomOption(createForm, 'type', 'saas');
     await createForm.getByLabel('Renewal Cost').fill('120.00');
     await createForm.getByLabel('Currency').fill('USD');
-    await createForm.getByLabel('Billing Cycle').selectOption('annual');
+    await selectTomOption(createForm, 'billing_cycle', 'annual');
     await createForm.getByLabel('Licensed Quantity').fill('5');
     await createForm.getByLabel('Description').fill(`Owned subscription lifecycle ${runId}`);
     await selectTomOption(createForm, 'tenant', tenant.id);
@@ -59,23 +62,28 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     await createForm.getByRole('button', { name: 'Create', exact: true }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.status(), 'subscription create response').toBe(302);
-    const detailLocation = createResponse.headers()['location'];
-    const detailMatch = detailLocation?.match(/^\/subscriptions\/subscriptions\/(\d+)\/$/);
-    if (!detailMatch) {
-      throw new Error(`Subscription create returned an unexpected location: ${detailLocation || '<missing>'}`);
-    }
-    const subscriptionId = detailMatch[1];
+    expect(createResponse.headers()['location']).toBe('/subscriptions/subscriptions/');
+    const matches = (await getJsonRows(
+      api,
+      `/api/subscriptions/subscriptions/?q=${encodeURIComponent(name)}`,
+      'created subscription lookup',
+    )).filter((row) => row.name === name);
+    expect(matches).toHaveLength(1);
+    const subscriptionId = String(matches[0].id);
     const detailPath = `/subscriptions/subscriptions/${subscriptionId}/`;
 
     cleanup.add(`subscription ${slug}`, async () => {
       const current = await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/subscriptions/subscriptions/${subscriptionId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(
+        api,
+        `/api/subscriptions/subscriptions/${subscriptionId}/`,
+        `delete subscription ${slug}`,
+      );
     });
 
-    await page.waitForURL((url) => url.pathname === detailPath);
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     const created = await jsonResponse(
       await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),

@@ -1,5 +1,5 @@
 import { test, expect } from '../../../fixtures/test';
-import { jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse } from '../../../helpers/api';
 
 test.describe('extras-owned tag lifecycle', { tag: '@pr' }, () => {
   test('creates, edits, reloads, reads back, and hard-deletes a metadata tag', async ({
@@ -28,21 +28,24 @@ test.describe('extras-owned tag lifecycle', { tag: '@pr' }, () => {
     await createForm.getByRole('button', { name: 'Create', exact: true }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.status(), 'tag create response').toBe(302);
-    const detailLocation = createResponse.headers()['location'];
-    const detailMatch = detailLocation?.match(/^\/extras\/tags\/(\d+)\/$/);
-    if (!detailMatch) throw new Error(`Tag create returned an unexpected location: ${detailLocation || '<missing>'}`);
-    const tagId = detailMatch[1];
+    expect(createResponse.headers()['location']).toBe('/extras/tags/');
+    const matches = (await getJsonRows(
+      api,
+      `/api/extras/tags/?q=${encodeURIComponent(slug)}`,
+      'created tag lookup',
+    )).filter((row) => row.slug === slug);
+    expect(matches).toHaveLength(1);
+    const tagId = String(matches[0].id);
     const detailPath = `/extras/tags/${tagId}/`;
 
     cleanup.add(`metadata tag ${slug}`, async () => {
       const current = await api.get(`/api/extras/tags/${tagId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/extras/tags/${tagId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(api, `/api/extras/tags/${tagId}/`, `delete metadata tag ${slug}`);
     });
 
-    await page.waitForURL((url) => url.pathname === detailPath);
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(await api.get(`/api/extras/tags/${tagId}/`), 200, 'created tag readback');
     expect(created).toMatchObject({
@@ -63,8 +66,10 @@ test.describe('extras-owned tag lifecycle', { tag: '@pr' }, () => {
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
     await updateForm.getByRole('button', { name: 'Update', exact: true }).click();
-    expect((await updateResponsePromise).status(), 'tag update response').toBe(302);
-    await page.waitForURL((url) => url.pathname === detailPath);
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.status(), 'tag update response').toBe(302);
+    expect(updateResponse.headers()['location']).toBe('/extras/tags/');
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
     const updated = await jsonResponse(await api.get(`/api/extras/tags/${tagId}/`), 200, 'updated tag readback');

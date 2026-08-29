@@ -105,6 +105,17 @@ class OwnedFoundationFilesTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, names)
 
+    def test_owned_rest_cleanup_uses_the_etag_aware_helper(self):
+        helper = (E2E_ROOT / "helpers" / "api.ts").read_text(encoding="utf-8")
+        self.assertIn("export async function deleteOwnedResource", helper)
+        self.assertIn("'If-Match': '*'", helper)
+        self.assertIn("expectedStatus", helper)
+
+        sources = list((E2E_ROOT / "fixtures" / "factories").rglob("*.ts"))
+        sources.extend(path for path in (E2E_ROOT / "spec" / "apps").rglob("*.ts") if path.name != "sso-scim.spec.ts")
+        contents = "\n".join(path.read_text(encoding="utf-8") for path in sources)
+        self.assertNotIn(".delete(", contents)
+
     def test_static_integration_examples_run_below_playwright(self):
         legacy_spec = E2E_ROOT / "spec" / "legacy-smoke" / "rest-guides.spec.ts"
         integration = REPO_ROOT / "itambox" / "docs" / "integration"
@@ -134,6 +145,25 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         self.assertTrue(all(len(row) == len(headers) for row in rows[1:]))
         for field in ("name", "asset_tag", "serial_number", "description"):
             self.assertIn(field, headers)
+
+    def test_contract_scopes_have_real_behavioral_evidence(self):
+        required_markers = {
+            "generic-object/generic-object.spec.ts": ("manufacturer create response", "updated manufacturer readback"),
+            "tenant-isolation/tenant-shell.spec.ts": ("foreign tenant", "@operator"),
+            "auth-rbac/role-boundary.spec.ts": ("viewer asset create boundary", "403"),
+            "auth-rbac/anonymous-login.spec.ts": ("maxRedirects: 0", "anonymous dashboard redirect"),
+            "asset-custody/asset-lifecycle.spec.ts": ("asset-checkout-action", "asset-checkin-action"),
+            "cross-app/asset-inventory.spec.ts": ("quick-add", "cleanupAllocation"),
+            "jobs/asset-scanner.spec.ts": ("Cancel job", "Bulk Check-in: 2 Assets"),
+            "soft-delete/live-assets.spec.ts": ("Restore", "Delete Permanently"),
+        }
+        contracts = E2E_ROOT / "spec" / "contracts"
+        for relative, markers in required_markers.items():
+            with self.subTest(contract=relative):
+                source = (contracts / relative).read_text(encoding="utf-8")
+                for marker in markers:
+                    self.assertIn(marker, source)
+                self.assertNotIn("openOwnedSurface", source)
 
     def test_reference_app_scopes_do_not_retain_surface_only_placeholders(self):
         for app in (

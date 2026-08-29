@@ -60,7 +60,7 @@ export const test = base.extend<E2EFixtures>({
   ],
 
   cleanup: [
-    async ({ page: _page, request: _request }, use, testInfo) => {
+    async ({ page: _page, request: _request, api: _api }, use, testInfo) => {
       const registry = createCleanupRegistry();
       try {
         await use(registry);

@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
-import { getJsonRows, jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse } from '../../../helpers/api';
 import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
@@ -36,21 +36,24 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     await createForm.getByRole('button', { name: 'Create', exact: true }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.status(), 'license create response').toBe(302);
-    const detailLocation = createResponse.headers()['location'];
-    const detailMatch = detailLocation?.match(/^\/licenses\/(\d+)\/$/);
-    if (!detailMatch) throw new Error(`License create returned an unexpected location: ${detailLocation || '<missing>'}`);
-    const licenseId = detailMatch[1];
+    expect(createResponse.headers()['location']).toBe('/licenses/');
+    const matches = (await getJsonRows(
+      api,
+      `/api/licenses/licenses/?q=${encodeURIComponent(originalName)}`,
+      'created license lookup',
+    )).filter((row) => row.name === originalName);
+    expect(matches).toHaveLength(1);
+    const licenseId = String(matches[0].id);
     const detailPath = `/licenses/${licenseId}/`;
 
     cleanup.add(`license ${originalName}`, async () => {
       const current = await api.get(`/api/licenses/licenses/${licenseId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/licenses/licenses/${licenseId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(api, `/api/licenses/licenses/${licenseId}/`, `delete license ${originalName}`);
     });
 
-    await page.waitForURL((url) => url.pathname === detailPath);
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(
       await api.get(`/api/licenses/licenses/${licenseId}/`),
@@ -78,8 +81,10 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
     await updateForm.getByRole('button', { name: 'Update', exact: true }).click();
-    expect((await updateResponsePromise).status(), 'license update response').toBe(302);
-    await page.waitForURL((url) => url.pathname === detailPath);
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.status(), 'license update response').toBe(302);
+    expect(updateResponse.headers()['location']).toBe('/licenses/');
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
     const updated = await jsonResponse(

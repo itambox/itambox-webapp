@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext } from '@playwright/test';
 import type { CleanupRegistry } from '../cleanup';
-import { jsonResponse } from '../../helpers/api';
+import { deleteOwnedResource, jsonResponse } from '../../helpers/api';
 
 export type OwnedAssetHolder = {
   id: string;
@@ -12,8 +12,14 @@ export async function createOwnedAssetHolder(
   request: APIRequestContext,
   cleanup: CleanupRegistry,
   tenant: string,
-  upn: string,
+  semantic: string,
 ): Promise<OwnedAssetHolder> {
+  const localPart = semantic
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  const upn = `${localPart || 'e2e-holder'}@example.invalid`;
   const payload = {
     tenant_id: tenant,
     first_name: 'E2E',
@@ -29,9 +35,11 @@ export async function createOwnedAssetHolder(
   }
   const owned: OwnedAssetHolder = { id: String(rawId), upn, tenant };
   cleanup.add(`asset holder ${upn}`, async () => {
-    const deletion = await request.delete(`/api/organization/asset-holders/${owned.id}/`);
-    const text = await deletion.text();
-    expect([204, 404], `delete owned asset holder ${upn}: ${text}`).toContain(deletion.status());
+    await deleteOwnedResource(
+      request,
+      `/api/organization/asset-holders/${owned.id}/`,
+      `delete owned asset holder ${upn}`,
+    );
   });
   return owned;
 }

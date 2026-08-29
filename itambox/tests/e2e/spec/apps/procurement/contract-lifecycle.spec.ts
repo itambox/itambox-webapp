@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
-import { getJsonRows, jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse } from '../../../helpers/api';
 import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
@@ -26,13 +26,13 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     await expect(createForm).toHaveCount(1);
     await createForm.getByLabel('Name').fill(originalName);
     await createForm.getByLabel('Contract number').fill(contractNumber);
-    await createForm.getByLabel('Contract type').selectOption('support');
-    await createForm.getByLabel('Status').selectOption('draft');
+    await selectTomOption(createForm, 'contract_type', 'support');
+    await selectTomOption(createForm, 'status', 'draft');
     await selectTomOption(createForm, 'tenant', tenant.id);
     await selectTomOption(createForm, 'supplier', supplierId);
     await createForm.getByLabel('Cost').fill('1200.00');
     await selectTomOption(createForm, 'currency', 'USD');
-    await createForm.getByLabel('Billing cycle').selectOption('annual');
+    await selectTomOption(createForm, 'billing_cycle', 'annual');
     await createForm.getByLabel('Start date').fill('2026-09-01');
     await createForm.getByLabel('End date').fill('2027-09-01');
     await createForm.getByLabel('Notes').fill(`Owned procurement lifecycle ${runId}`);
@@ -53,8 +53,11 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
       const current = await api.get(`/api/procurement/contracts/${contractId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/procurement/contracts/${contractId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(
+        api,
+        `/api/procurement/contracts/${contractId}/`,
+        `delete procurement contract ${contractNumber}`,
+      );
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);
@@ -84,7 +87,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     expect(updatePage?.status(), `GET ${updatePath}`).toBe(200);
     const updateForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await updateForm.getByLabel('Name').fill(renamedName);
-    await updateForm.getByLabel('Status').selectOption('active');
+    await selectTomOption(updateForm, 'status', 'active');
     await updateForm.getByLabel('Cost').fill('1500.00');
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,

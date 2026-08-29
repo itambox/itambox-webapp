@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
-import { getJsonRows, jsonResponse } from '../../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse } from '../../../helpers/api';
 import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
@@ -35,21 +35,24 @@ test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
     await createForm.getByRole('button', { name: 'Create', exact: true }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.status(), 'software create response').toBe(302);
-    const detailLocation = createResponse.headers()['location'];
-    const detailMatch = detailLocation?.match(/^\/software\/software\/(\d+)\/$/);
-    if (!detailMatch) throw new Error(`Software create returned an unexpected location: ${detailLocation || '<missing>'}`);
-    const softwareId = detailMatch[1];
+    expect(createResponse.headers()['location']).toBe('/software/software/');
+    const matches = (await getJsonRows(
+      api,
+      `/api/software/software/?q=${encodeURIComponent(originalName)}`,
+      'created software lookup',
+    )).filter((row) => row.name === originalName);
+    expect(matches).toHaveLength(1);
+    const softwareId = String(matches[0].id);
     const detailPath = `/software/software/${softwareId}/`;
 
     cleanup.add(`software ${originalName}`, async () => {
       const current = await api.get(`/api/software/software/${softwareId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await api.delete(`/api/software/software/${softwareId}/`);
-      expect(deletion.status(), await deletion.text()).toBe(204);
+      await deleteOwnedResource(api, `/api/software/software/${softwareId}/`, `delete software ${originalName}`);
     });
 
-    await page.waitForURL((url) => url.pathname === detailPath);
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(
       await api.get(`/api/software/software/${softwareId}/`),
@@ -75,8 +78,10 @@ test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
     await updateForm.getByRole('button', { name: 'Update', exact: true }).click();
-    expect((await updateResponsePromise).status(), 'software update response').toBe(302);
-    await page.waitForURL((url) => url.pathname === detailPath);
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.status(), 'software update response').toBe(302);
+    expect(updateResponse.headers()['location']).toBe('/software/software/');
+    await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
     const updated = await jsonResponse(

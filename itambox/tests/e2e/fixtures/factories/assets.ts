@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext } from '@playwright/test';
 import type { CleanupRegistry } from '../cleanup';
-import { getJsonRows, jsonResponse, type JsonObject } from '../../helpers/api';
+import { deleteOwnedResource, getJsonRows, jsonResponse, type JsonObject } from '../../helpers/api';
 
 export type OwnedAsset = {
   id: string;
@@ -39,9 +39,7 @@ export async function createOwnedAsset(
   expect(body.asset_tag, 'created asset must preserve its owned tag').toBe(assetTag);
   const owned = { id, assetTag, tenant };
   cleanup.add(`asset ${assetTag}`, async () => {
-    const deletion = await request.delete(`/api/assets/assets/${id}/`);
-    const text = await deletion.text();
-    expect(deletion.status(), `delete owned asset ${assetTag}: ${text}`).toBe(204);
+    await deleteOwnedResource(request, `/api/assets/assets/${id}/`, `delete owned asset ${assetTag}`);
   });
   return owned;
 }
