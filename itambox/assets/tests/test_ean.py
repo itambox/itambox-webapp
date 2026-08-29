@@ -187,10 +187,10 @@ class EanScanTests(TenantTestMixin, TestCase):
             status=self.status,
             tenant=self.tenant,
         )
-        site = Site.objects.create(name="EAN HQ 2", slug="ean-hq-2")
-        loc = Location.objects.create(name="EAN Room 2", slug="ean-room-2", site=site)
+        site = Site.objects.create(name="EAN HQ 2", slug="ean-hq-2", tenant=self.tenant)
+        loc = Location.objects.create(name="EAN Room 2", slug="ean-room-2", site=site, tenant=self.tenant)
         session = AuditSession.objects.create(
-            name="EAN Audit 2", location=loc, status="active", created_by=self.tenant_admin
+            name="EAN Audit 2", tenant=self.tenant, location=loc, status="active", created_by=self.tenant_admin
         )
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         resp = self.client.post(

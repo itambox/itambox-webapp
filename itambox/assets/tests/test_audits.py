@@ -404,16 +404,17 @@ class AuditSessionFilterSetTests(TestCase):
         from compliance.models import AuditSession
         from organization.models import Location, Site
 
-        self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq")
-        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
-        self.loc2 = Location.objects.create(name="Staging Room", slug="staging", site=self.site)
+        self.tenant = Tenant.objects.create(name="Filter tenant", slug="filter-tenant")
+        self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq", tenant=self.tenant)
+        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site, tenant=self.tenant)
+        self.loc2 = Location.objects.create(name="Staging Room", slug="staging", site=self.site, tenant=self.tenant)
 
         self.user = User.objects.create_user(username="testuser_filter", password="password123")
         self.session_active = AuditSession.objects.create(
-            name="Active Session", location=self.loc1, status="active", created_by=self.user
+            name="Active Session", tenant=self.tenant, location=self.loc1, status="active", created_by=self.user
         )
         self.session_planned = AuditSession.objects.create(
-            name="Planned Session", location=self.loc2, status="planned", created_by=self.user
+            name="Planned Session", tenant=self.tenant, location=self.loc2, status="planned", created_by=self.user
         )
 
     def test_filter_by_status(self):

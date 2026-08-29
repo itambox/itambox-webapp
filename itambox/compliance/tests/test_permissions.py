@@ -28,9 +28,10 @@ class AuditScanViewPermissionTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name="Perm Tenant", slug="perm-tenant")
-        loc = baker.make(Location, name="Warehouse")
+        loc = baker.make(Location, name="Warehouse", tenant=self.tenant)
         self.session = AuditSession.objects.create(
             name="Test Campaign",
+            tenant=self.tenant,
             status="active",
             location=loc,
             created_by=self.tenant_admin,
