@@ -23,6 +23,7 @@ on:
       - "setup.cfg"
       - "uv.lock"
       - "itambox/**/*.py"
+      - "itambox/core/migration_baseline_manifest.json"
       - "itambox/**/*.html"
       - "itambox/static/src/**/*.css"
       - "itambox/static/src/**/*.scss"
@@ -218,6 +219,11 @@ jobs:
         working-directory: ./itambox
         run: |
           uv run --locked --no-sync python manage.py migrate --noinput
+
+      - name: Verify migration baseline recognition
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync python manage.py migration_baseline_preflight --format=json
 
       - name: Run Django system checks
         working-directory: ./itambox
