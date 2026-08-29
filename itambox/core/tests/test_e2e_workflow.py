@@ -246,7 +246,10 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "console.log(process.env.ITAMBOX_TENANT_OIDC_CONFIGS)" not in preflight
     assert "Sign in with E2E OIDC (OIDC)" in positive
     assert "browser.newContext({ baseURL });" in positive
-    assert "test.setTimeout(120_000);" in positive
+    assert "test.setTimeout(" not in positive
+    assert "attachBrowserErrorCollection(page, browserErrors)" in positive
+    assert "assertNoUnexpectedBrowserErrors(browserErrors)" in positive
+    assert "console.error(" not in positive
     assert "await oidcContext.clearCookies();" in positive
     assert "await page.goto('about:blank', { waitUntil: 'commit' });" in positive
     assert "await page.close();" in positive
@@ -321,3 +324,12 @@ def test_e2e_uses_an_isolated_settings_module_with_a_bounded_login_budget():
     assert "from .dev import *" in settings
     assert "RATELIMIT_LIMIT = 100" in settings
     assert "RATELIMIT_PERIOD = 60" in settings
+
+
+def test_e2e_provisions_one_masked_tenant_bound_api_token():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split("Start Django dev server", 1)[0]
+
+    assert 'print(f"::add-mask::{plaintext}")' in provision
+    assert 'env_file.write(f"E2E_SCIM_TOKEN={plaintext}\\n")' in provision
+    assert 'env_file.write(f"E2E_API_TOKEN={plaintext}\\n")' in provision

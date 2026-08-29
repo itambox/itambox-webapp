@@ -6,13 +6,13 @@ import { selectTomOption } from '../../../helpers/forms';
 test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
   test('creates, edits, reloads, reads back, and hard-deletes tenant software', async ({
     page,
-    request,
+    api,
     activeTenant,
     cleanup,
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const manufacturers = await getJsonRows(request, '/api/assets/manufacturers/?limit=100', 'software manufacturer');
+    const manufacturers = await getJsonRows(api, '/api/assets/manufacturers/?limit=100', 'software manufacturer');
     expect(manufacturers, 'the seeded E2E database must provide a manufacturer').not.toHaveLength(0);
     const manufacturerId = String(manufacturers[0].id);
     const createPath = '/software/software/add/';
@@ -42,17 +42,17 @@ test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
     const detailPath = `/software/software/${softwareId}/`;
 
     cleanup.add(`software ${originalName}`, async () => {
-      const current = await request.get(`/api/software/software/${softwareId}/`);
+      const current = await api.get(`/api/software/software/${softwareId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await request.delete(`/api/software/software/${softwareId}/`);
+      const deletion = await api.delete(`/api/software/software/${softwareId}/`);
       expect(deletion.status(), await deletion.text()).toBe(204);
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(
-      await request.get(`/api/software/software/${softwareId}/`),
+      await api.get(`/api/software/software/${softwareId}/`),
       200,
       'created software readback',
     );
@@ -80,7 +80,7 @@ test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
     const updated = await jsonResponse(
-      await request.get(`/api/software/software/${softwareId}/`),
+      await api.get(`/api/software/software/${softwareId}/`),
       200,
       'updated software readback',
     );
@@ -99,8 +99,8 @@ test.describe('software-owned catalog lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
     expect((await deleteResponsePromise).status(), 'software delete response').toBe(302);
-    expect((await request.get(`/api/software/software/${softwareId}/`)).status()).toBe(404);
+    expect((await api.get(`/api/software/software/${softwareId}/`)).status()).toBe(404);
   });
 });

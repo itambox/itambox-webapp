@@ -1,4 +1,4 @@
-import { expect, test as base, type Page } from '@playwright/test';
+import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 import { createCleanupRegistry, type CleanupRegistry } from './cleanup';
 import { attestActiveTenant, assertSafeTarget, type ActiveTenant } from './tenant';
 import {
@@ -11,6 +11,7 @@ import { retrySafeName } from '../helpers/names';
 
 export type E2EFixtures = {
   activeTenant: ActiveTenant | null;
+  api: APIRequestContext;
   appErrors: BrowserErrors;
   cleanup: CleanupRegistry;
   runId: string;
@@ -29,6 +30,20 @@ export const test = base.extend<E2EFixtures>({
     },
     { auto: true },
   ],
+
+  api: async ({ playwright }, use) => {
+    const token = process.env.E2E_API_TOKEN;
+    if (!token) throw new Error('E2E_API_TOKEN is required for authenticated REST setup and readback.');
+    const api = await playwright.request.newContext({
+      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      extraHTTPHeaders: { Authorization: `Token ${token}` },
+    });
+    try {
+      await use(api);
+    } finally {
+      await api.dispose();
+    }
+  },
 
   appErrors: [
     async ({ page }, use) => {

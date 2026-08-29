@@ -6,7 +6,7 @@ import { selectTomOption } from '../../../helpers/forms';
 test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
   test('creates, suspends, resumes, reloads, reads back, and deletes a subscription', async ({
     page,
-    request,
+    api,
     activeTenant,
     cleanup,
     runId,
@@ -15,7 +15,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     const providerName = `E2E Provider ${runId}`;
     const providerSlug = `e2e-provider-${runId}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90);
     const provider = await jsonResponse(
-      await request.post('/api/subscriptions/providers/', {
+      await api.post('/api/subscriptions/providers/', {
         data: {
           name: providerName,
           slug: providerSlug,
@@ -28,10 +28,10 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     );
     const providerId = String(provider.id);
     cleanup.add(`subscription provider ${providerSlug}`, async () => {
-      const current = await request.get(`/api/subscriptions/providers/${providerId}/`);
+      const current = await api.get(`/api/subscriptions/providers/${providerId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await request.delete(`/api/subscriptions/providers/${providerId}/`);
+      const deletion = await api.delete(`/api/subscriptions/providers/${providerId}/`);
       expect(deletion.status(), await deletion.text()).toBe(204);
     });
 
@@ -68,17 +68,17 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     const detailPath = `/subscriptions/subscriptions/${subscriptionId}/`;
 
     cleanup.add(`subscription ${slug}`, async () => {
-      const current = await request.get(`/api/subscriptions/subscriptions/${subscriptionId}/`);
+      const current = await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await request.delete(`/api/subscriptions/subscriptions/${subscriptionId}/`);
+      const deletion = await api.delete(`/api/subscriptions/subscriptions/${subscriptionId}/`);
       expect(deletion.status(), await deletion.text()).toBe(204);
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     const created = await jsonResponse(
-      await request.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
+      await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
       200,
       'created subscription readback',
     );
@@ -105,7 +105,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     expect((await suspendResponsePromise).status(), 'subscription suspend response').toBe(204);
     expect(
       await jsonResponse(
-        await request.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
+        await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
         200,
         'suspended subscription readback',
       ),
@@ -122,7 +122,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     expect((await resumeResponsePromise).status(), 'subscription resume response').toBe(204);
     expect(
       await jsonResponse(
-        await request.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
+        await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
         200,
         'resumed subscription readback',
       ),
@@ -137,8 +137,8 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
     expect((await deleteResponsePromise).status(), 'subscription delete response').toBe(302);
-    expect((await request.get(`/api/subscriptions/subscriptions/${subscriptionId}/`)).status()).toBe(404);
+    expect((await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`)).status()).toBe(404);
   });
 });

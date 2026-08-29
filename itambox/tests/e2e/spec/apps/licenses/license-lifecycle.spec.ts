@@ -6,13 +6,13 @@ import { selectTomOption } from '../../../helpers/forms';
 test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
   test('creates, expands, reloads, reads back, and hard-deletes a tenant license', async ({
     page,
-    request,
+    api,
     activeTenant,
     cleanup,
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const softwareRows = await getJsonRows(request, '/api/software/software/?limit=100', 'license software');
+    const softwareRows = await getJsonRows(api, '/api/software/software/?limit=100', 'license software');
     expect(softwareRows, 'the seeded E2E database must provide software').not.toHaveLength(0);
     const softwareId = String(softwareRows[0].id);
     const createPath = '/licenses/add/';
@@ -43,17 +43,17 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     const detailPath = `/licenses/${licenseId}/`;
 
     cleanup.add(`license ${originalName}`, async () => {
-      const current = await request.get(`/api/licenses/licenses/${licenseId}/`);
+      const current = await api.get(`/api/licenses/licenses/${licenseId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await request.delete(`/api/licenses/licenses/${licenseId}/`);
+      const deletion = await api.delete(`/api/licenses/licenses/${licenseId}/`);
       expect(deletion.status(), await deletion.text()).toBe(204);
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(
-      await request.get(`/api/licenses/licenses/${licenseId}/`),
+      await api.get(`/api/licenses/licenses/${licenseId}/`),
       200,
       'created license readback',
     );
@@ -83,7 +83,7 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
     const updated = await jsonResponse(
-      await request.get(`/api/licenses/licenses/${licenseId}/`),
+      await api.get(`/api/licenses/licenses/${licenseId}/`),
       200,
       'updated license readback',
     );
@@ -103,8 +103,8 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
     expect((await deleteResponsePromise).status(), 'license delete response').toBe(302);
-    expect((await request.get(`/api/licenses/licenses/${licenseId}/`)).status()).toBe(404);
+    expect((await api.get(`/api/licenses/licenses/${licenseId}/`)).status()).toBe(404);
   });
 });

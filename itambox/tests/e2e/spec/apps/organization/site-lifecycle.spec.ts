@@ -5,7 +5,7 @@ import { jsonResponse } from '../../../helpers/api';
 test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
   test('creates, edits, reloads, reads back, and hard-deletes an owned site', async ({
     page,
-    request,
+    api,
     activeTenant,
     cleanup,
     runId,
@@ -38,17 +38,17 @@ test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
     const detailPath = `/organization/sites/${siteId}/`;
 
     cleanup.add(`organization site ${slug}`, async () => {
-      const current = await request.get(`/api/organization/sites/${siteId}/`);
+      const current = await api.get(`/api/organization/sites/${siteId}/`);
       if (current.status() === 404) return;
       expect(current.status(), await current.text()).toBe(200);
-      const deletion = await request.delete(`/api/organization/sites/${siteId}/`);
+      const deletion = await api.delete(`/api/organization/sites/${siteId}/`);
       expect(deletion.status(), await deletion.text()).toBe(204);
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);
     await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
     const created = await jsonResponse(
-      await request.get(`/api/organization/sites/${siteId}/`),
+      await api.get(`/api/organization/sites/${siteId}/`),
       200,
       'created site readback',
     );
@@ -74,7 +74,7 @@ test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
     const updated = await jsonResponse(
-      await request.get(`/api/organization/sites/${siteId}/`),
+      await api.get(`/api/organization/sites/${siteId}/`),
       200,
       'updated site readback',
     );
@@ -95,6 +95,6 @@ test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
     );
     await page.getByRole('button', { name: 'Confirm Delete', exact: true }).click();
     expect((await deleteResponsePromise).status(), 'site delete response').toBe(302);
-    expect((await request.get(`/api/organization/sites/${siteId}/`)).status()).toBe(404);
+    expect((await api.get(`/api/organization/sites/${siteId}/`)).status()).toBe(404);
   });
 });

@@ -7,14 +7,14 @@ import { jsonResponse } from '../../../helpers/api';
 test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
   test('creates owned prerequisites and checks an asset out and back in', async ({
     page,
-    request,
+    api,
     activeTenant,
     cleanup,
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const holder = await createOwnedAssetHolder(request, cleanup, tenant.id, `e2e-holder-${runId}`);
-    const asset = await createOwnedAsset(request, cleanup, tenant.id, runId);
+    const holder = await createOwnedAssetHolder(api, cleanup, tenant.id, `e2e-holder-${runId}`);
+    const asset = await createOwnedAsset(api, cleanup, tenant.id, runId);
     const detailPath = `/assets/assets/${asset.id}/`;
 
     const initial = await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
@@ -44,7 +44,7 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
     await page.waitForURL((url) => url.pathname === detailPath);
 
     const checkedOut = await jsonResponse(
-      await request.get(`/api/assets/assets/${asset.id}/`),
+      await api.get(`/api/assets/assets/${asset.id}/`),
       200,
       'asset checkout readback',
     );
@@ -73,7 +73,7 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
     await page.waitForURL((url) => url.pathname === detailPath);
 
     const checkedIn = await jsonResponse(
-      await request.get(`/api/assets/assets/${asset.id}/`),
+      await api.get(`/api/assets/assets/${asset.id}/`),
       200,
       'asset checkin readback',
     );

@@ -31,8 +31,6 @@ async function activateConfiguredTenant(page: Page, request: APIRequestContext):
     `E2E tenant ${tenantSlug} must be visible to the authenticated operator`,
   ).toBeDefined();
   configuredTenantId = String(tenant!.id);
-  const apiSwitch = await request.get(`/?switch_tenant=${tenant!.id}`);
-  expect(apiSwitch.status(), await apiSwitch.text()).toBe(200);
   await page.goto(`/?switch_tenant=${tenant!.id}`, { waitUntil: 'networkidle' });
 }
 
@@ -141,19 +139,19 @@ async function seededModularAssetComponentsPath(request: APIRequestContext): Pro
 test.describe('Issue #393 Component Allocation observability', () => {
   test('full-page create is target-only and clear/replace matches POST and readback', async ({
     page,
-    request,
+    api,
     cleanup,
     runId,
   }) => {
     const invalidNote = `E2E-ISSUE393-invalid-${runId}`;
     const successNote = `E2E-ISSUE393-success-${runId}`;
 
-    await activateConfiguredTenant(page, request);
+    await activateConfiguredTenant(page, api);
     await page.goto(allocationCreatePath, { waitUntil: 'networkidle' });
     await expect(page.locator('select[name="from_location"]')).toHaveCount(0);
     await expect(page.getByText('From Location', { exact: true })).toHaveCount(0);
 
-    const componentValue = await availableComponentValue(page, request);
+    const componentValue = await availableComponentValue(page, api);
     const holderValues = await page
       .locator('select[name="assigned_holder"] option')
       .evaluateAll((options) =>
@@ -182,7 +180,7 @@ test.describe('Issue #393 Component Allocation observability', () => {
     await expect(
       page.getByText(/select either an Asset Holder, a Location, or an Asset/i),
     ).toBeVisible();
-    expect(await allocationByNote(request, invalidNote)).toBeUndefined();
+    expect(await allocationByNote(api, invalidNote)).toBeUndefined();
 
     await visibleTomSelect(page, 'assigned_holder', holderValues[0], false);
     await visibleTomSelect(page, 'assigned_holder', holderValues[1], false);
@@ -201,24 +199,24 @@ test.describe('Issue #393 Component Allocation observability', () => {
     expect(successPost.get('assigned_holder')).toBe(holderValues[0]);
     expect(successPost.has('from_location')).toBe(false);
 
-    const allocation = await allocationByNote(request, successNote);
+    const allocation = await allocationByNote(api, successNote);
     expect(allocation).toBeDefined();
     expect(allocation!.from_location).toBeNull();
     expect(String(allocation!.assigned_holder.id)).toBe(holderValues[0]);
     cleanup.add(`component allocation ${successNote}`, async () => {
-      await cleanupAllocation(page, request, String(allocation!.id), successNote);
+      await cleanupAllocation(page, api, String(allocation!.id), successNote);
     });
   });
 
   test('asset-detail quick-add returns HX-Redirect and leaves no stale modal or HTMX errors', async ({
     page,
-    request,
+    api,
     cleanup,
     runId,
   }) => {
     const note = `E2E-ISSUE393-quickadd-${runId}`;
-    await activateConfiguredTenant(page, request);
-    const componentsPath = await seededModularAssetComponentsPath(request);
+    await activateConfiguredTenant(page, api);
+    const componentsPath = await seededModularAssetComponentsPath(api);
     await page.goto(componentsPath, { waitUntil: 'domcontentloaded' });
     const assetPath = new URL(componentsPath, 'http://localhost').pathname;
     const button = page.locator(
@@ -230,7 +228,7 @@ test.describe('Issue #393 Component Allocation observability', () => {
     await expect(modal).toBeVisible();
     await expect(modal.locator('select[name="from_location"]')).toHaveCount(0);
 
-    const componentValue = await availableComponentValue(page, request);
+    const componentValue = await availableComponentValue(page, api);
     await visibleTomSelect(page, 'component', componentValue);
     await modal.locator('input[name="qty"]').fill('1');
     await modal.locator('textarea[name="notes"]').fill(note);
@@ -248,12 +246,12 @@ test.describe('Issue #393 Component Allocation observability', () => {
     await expect(modal).not.toBeVisible();
 
     await expect
-      .poll(async () => (await allocationByNote(request, note))?.id, { timeout: 15000 })
+      .poll(async () => (await allocationByNote(api, note))?.id, { timeout: 15000 })
       .toBeTruthy();
-    const allocation = await allocationByNote(request, note);
+    const allocation = await allocationByNote(api, note);
     expect(allocation!.from_location).toBeNull();
     cleanup.add(`component allocation ${note}`, async () => {
-      await cleanupAllocation(page, request, String(allocation!.id), note);
+      await cleanupAllocation(page, api, String(allocation!.id), note);
     });
   });
 });
