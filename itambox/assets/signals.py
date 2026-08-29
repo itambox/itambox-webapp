@@ -1,15 +1,27 @@
 import logging
 
 from django.db import DatabaseError, transaction
+from django.db.models import signals as model_signals
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django_q.tasks import async_task
 
 from assets.choices import RequestStatusChoices
-from assets.models import AssetAssignment, AssetRequest
+from assets.models import AssetAssignment, AssetRequest, StatusLabel
 from extras.services.events import dispatch_event
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(model_signals.post_migrate, dispatch_uid="assets.ensure_canonical_missing_status")
+def ensure_canonical_missing_status(sender, using, **kwargs):
+    """Restore required reference data after migrate and test-database flushes."""
+    if sender.label != "assets":
+        return
+    StatusLabel._base_manager.using(using).get_or_create(
+        slug="missing",
+        defaults={"name": "Missing", "type": StatusLabel.TYPE_UNDEPLOYABLE, "color": "dc3545"},
+    )
 
 
 @receiver(post_save, sender=AssetAssignment)

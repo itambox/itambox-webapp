@@ -1050,7 +1050,7 @@ class SecuredActionResponseShapeTests(_ActionViewTestBase):
             request = self.make_request(htmx=True)
             response = _SelfAuthorizedAssetView.as_view()(request, pk=self.asset.pk)
 
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 403)
         trigger = json.loads(response["HX-Trigger"])
         self.assertEqual(trigger["showMessage"]["level"], "danger")
         self.assertIn("not yours", trigger["showMessage"]["message"])

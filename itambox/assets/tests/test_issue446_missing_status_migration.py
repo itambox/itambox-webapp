@@ -1,7 +1,11 @@
 import pytest
+from django.apps import apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
+
+from assets.models import StatusLabel
+from assets.signals import ensure_canonical_missing_status
 
 
 @pytest.mark.serial_only
@@ -35,3 +39,15 @@ class CanonicalMissingStatusMigrationTests(TransactionTestCase):
         reapplied_apps = executor.loader.project_state([self.migrate_to]).apps
         StatusLabel = reapplied_apps.get_model("assets", "StatusLabel")
         self.assertEqual(StatusLabel.objects.filter(slug="missing").count(), 1)
+
+
+@pytest.mark.serial_only
+class CanonicalMissingPostMigrateTests(TransactionTestCase):
+    def test_post_migrate_restores_reference_row_after_flush(self):
+        StatusLabel._base_manager.filter(slug="missing").delete()
+        self.assertFalse(StatusLabel._base_manager.filter(slug="missing").exists())
+
+        ensure_canonical_missing_status(sender=apps.get_app_config("assets"), using=connection.alias)
+
+        missing = StatusLabel._base_manager.get(slug="missing")
+        self.assertEqual((missing.name, missing.type, missing.color), ("Missing", "undeployable", "dc3545"))
