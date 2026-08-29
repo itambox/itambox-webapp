@@ -180,11 +180,39 @@ class AuditSessionSerializer(BaseModelSerializer):
         read_only_fields = ["started_at", "created_at", "updated_at"]
         brief_fields = ["id", "name", "status", "started_at"]
 
+    def validate(self, attrs):
+        if "completed_at" in attrs:
+            raise serializers.ValidationError(
+                {"completed_at": "The completion timestamp is assigned by the close service."}
+            )
+        if self.instance is not None and self.instance.status == "completed":
+            persisted = (
+                AuditSession._base_manager.filter(pk=self.instance.pk).values("name", "location_id", "status").first()
+            )
+            immutable_changes = {
+                field
+                for field, persisted_value in (
+                    ("name", persisted["name"] if persisted else None),
+                    ("location", persisted["location_id"] if persisted else None),
+                    ("status", persisted["status"] if persisted else None),
+                )
+                if field in attrs
+                and (attrs[field].pk if field == "location" and attrs[field] is not None else attrs[field])
+                != persisted_value
+            }
+            if immutable_changes:
+                raise serializers.ValidationError("Completed audit sessions are immutable.")
+        tenant = self.instance.tenant if self.instance is not None else None
+        location = attrs.get("location", self.instance.location if self.instance is not None else None)
+        if tenant is not None and location is not None and location.tenant_id != tenant.pk:
+            raise serializers.ValidationError({"location_id": "The audit location must belong to the session tenant."})
+        return attrs
+
 
 class AssetAuditSerializer(serializers.ModelSerializer):
     session = serializers.PrimaryKeyRelatedField(queryset=AuditSession.objects, required=False, allow_null=True)
     asset = NestedAssetSerializer(read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(queryset=Asset.objects, source="asset")
+    asset_id = serializers.PrimaryKeyRelatedField(queryset=Asset._base_manager.all(), source="asset")
     auditor = serializers.StringRelatedField(read_only=True)
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(queryset=Location.objects, source="location")
@@ -209,3 +237,4 @@ class AssetAuditSerializer(serializers.ModelSerializer):
             "verification_method",
             "verification_method_display",
         ]
+        read_only_fields = ["auditor", "timestamp"]

@@ -13,10 +13,10 @@ from core.managers import (
 from core.mixins import CustomFieldDataMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel
 from extras.models import Tag
+from software.models_reconciliation import reconcile_software
 
-# ``licenses.reconciliation`` resolves its models through the app registry, so
-# it carries no import edge back into this module (see its module docstring).
-from licenses.reconciliation import reconcile_software
+# The concrete licenses reconciliation implementation is registered by
+# LicensesConfig.ready() into the software-owned model port.
 
 
 class SoftwareCategoryChoices(models.TextChoices):

@@ -122,6 +122,14 @@ class AuditSessionForm(forms.ModelForm):
                 "location",
                 _("The selected location does not belong to the chosen tenant."),
             )
+        if self.instance.pk and self.instance.status == "completed":
+            immutable_changes = {
+                field
+                for field in ("name", "tenant", "location")
+                if field in cleaned and cleaned[field] != getattr(self.instance, field)
+            }
+            if immutable_changes:
+                self.add_error(None, _("Completed audit sessions are immutable."))
         return cleaned
 
 

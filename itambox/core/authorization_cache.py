@@ -160,6 +160,19 @@ def invalidate_authorization_topology(*, using=None):
     _repeat_after_commit(_publish_topology_version, using=using)
 
 
+def force_authorization_generation_check(user):
+    """Perform one fresh shared-generation check without discarding map data.
+
+    This is the narrow mutation-boundary hook: clearing only the local sync token
+    forces the next synchronization read, while an unchanged generation leaves
+    the cached permission map intact. A changed generation clears all local
+    authorization values through the normal synchronization path.
+    """
+    if hasattr(user, "__dict__"):
+        user.__dict__.pop(_LOCAL_SYNC_TOKEN_ATTR, None)
+    synchronize_authorization_cache(user)
+
+
 def synchronize_authorization_cache(user):
     """Clear local values when another model instance/process changed RBAC.
 

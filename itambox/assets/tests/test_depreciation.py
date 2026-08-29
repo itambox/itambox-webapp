@@ -59,6 +59,13 @@ class TestComputeBookValue(TestCase):
         result = compute_book_value(asset)
         self.assertEqual(result, Decimal("1000.00"))
 
+    def test_policy_without_clock_start_returns_rounded_purchase_cost(self):
+        policy = _policy(months=36)
+        asset_type = SimpleNamespace(depreciation_id=1, depreciation=policy)
+        asset = _asset(purchase_cost="1000.005", purchase_date=None, in_service_date=None, asset_type=asset_type)
+
+        self.assertEqual(compute_book_value(asset, on_date=datetime.date(2025, 1, 1)), Decimal("1000.01"))
+
     def test_mid_life_straight_line(self):
         # 36-month policy, purchased 18 months ago (exclude_purchase_month)
         # monthly = (1200-200)/36 = 27.77... per month
@@ -118,7 +125,16 @@ class TestComputeBookValue(TestCase):
         asset = _asset(purchase_cost=1000, purchase_date=purchase_date, asset_type=asset_type)
         self.assertEqual(compute_book_value(asset, on_date=on_date), Decimal("1000.00"))
 
-    # --- Convention tests ---
+    def test_method_none_ignores_immediate_expense_threshold_after_months_held(self):
+        policy = _policy(months=36, method="none", convention="include_purchase_month", threshold=Decimal("800"))
+        asset_type = SimpleNamespace(depreciation_id=1, depreciation=policy)
+        asset = _asset(
+            purchase_cost=750,
+            salvage_value=0,
+            purchase_date=datetime.date(2024, 1, 1),
+            asset_type=asset_type,
+        )
+        self.assertEqual(compute_book_value(asset, on_date=datetime.date(2024, 12, 1)), Decimal("750.00"))
 
     def test_exclude_purchase_month_same_month_no_depreciation(self):
         """Jan purchase, on_date still Jan → 0 months held → full cost."""
@@ -187,6 +203,20 @@ class TestComputeBookValue(TestCase):
         # Even calling many months later — frozen at 600
         result = compute_book_value(asset, on_date=datetime.date(2030, 1, 1))
         self.assertEqual(result, Decimal("600.00"))
+
+    def test_disposal_value_is_frozen_at_archive_time(self):
+        policy = _policy(months=12, convention="exclude_purchase_month")
+        asset_type = SimpleNamespace(depreciation_id=1, depreciation=policy)
+        asset = _asset(
+            purchase_cost=1200,
+            salvage_value=0,
+            purchase_date=datetime.date(2024, 1, 1),
+            asset_type=asset_type,
+            disposed_at=datetime.datetime(2025, 1, 15),
+            disposal_value=Decimal("100.00"),
+        )
+        policy.months = 1
+        self.assertEqual(compute_book_value(asset, on_date=datetime.date(2035, 1, 1)), Decimal("100.00"))
 
     def test_undisposed_does_not_return_disposal_value(self):
         policy = _policy(months=36, convention="exclude_purchase_month")

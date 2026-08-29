@@ -1,6 +1,12 @@
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from assets.models import AssetMaintenance
+from compliance.audit_services import audit_asset, authorized_asset_audit_queryset, close_audit_session
 from compliance.filters import (
     AssetAuditFilterSet,
     AssetMaintenanceFilterSet,
@@ -81,7 +87,40 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
     filterset_class = AuditSessionFilterSet
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        if serializer.validated_data.get("status") == "completed":
+            raise ValidationError("Audit sessions must be closed through the close service.")
+        serializer.validated_data["created_by"] = self.request.user
+        return super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        requested_status = serializer.validated_data.get("status")
+        current = serializer.instance
+        if current.status == "completed" and requested_status not in (None, "completed"):
+            raise ValidationError("Completed audit sessions cannot be reopened.")
+        if requested_status != "completed":
+            return super().perform_update(serializer)
+        if set(serializer.validated_data) != {"status"}:
+            raise ValidationError("Audit sessions must be closed without changing their scope or metadata.")
+
+        with transaction.atomic():
+            locked = AuditSession._base_manager.filter(pk=current.pk).select_for_update().get()
+            # The initial ETag check protects the normal update path; the close
+            # path must validate again against the row that the lock actually
+            # acquired, otherwise a concurrent close can be overwritten.
+            self._validate_etag(self.request, locked)
+            serializer.instance = locked
+            serializer.validated_data.pop("status", None)
+            instance = serializer.save()
+            try:
+                close_audit_session(instance, user=self.request.user, request=self.request)
+            except DjangoPermissionDenied as exc:
+                raise DRFPermissionDenied("You are not authorized to close this audit session.") from exc
+        serializer.instance = instance
+
+    def perform_destroy(self, instance):
+        if instance.status == "completed":
+            raise DRFValidationError("Completed audit sessions and their evidence cannot be deleted.")
+        return super().perform_destroy(instance)
 
 
 class AssetAuditViewSet(ITAMBoxModelViewSet):
@@ -91,7 +130,27 @@ class AssetAuditViewSet(ITAMBoxModelViewSet):
     filterset_class = AssetAuditFilterSet
 
     def get_queryset(self):
-        return _scope_by_asset_tenant(super().get_queryset())
+        return authorized_asset_audit_queryset(super().get_queryset(), user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(auditor=self.request.user)
+        values = serializer.validated_data
+        try:
+            audit = audit_asset(
+                values["asset"],
+                user=self.request.user,
+                session=values.get("session"),
+                location=values["location"],
+                status=values["status"],
+                notes=values.get("notes", ""),
+                verification_method=values.get("verification_method", "manual"),
+            )
+        except DjangoPermissionDenied as exc:
+            raise DRFPermissionDenied("You are not authorized to create this audit observation.") from exc
+        serializer.instance = audit
+
+    def perform_update(self, serializer):
+        immutable = {"session", "asset", "location", "status", "auditor", "timestamp", "verification_method"}
+        changed = immutable.intersection(serializer.validated_data)
+        if changed:
+            raise ValidationError("Audit observation provenance cannot be changed after creation.")
+        super().perform_update(serializer)

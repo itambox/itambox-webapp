@@ -36,14 +36,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/depreciation.py",
-      "code": "C901",
-      "message": "'compute_book_value' is too complex (13)",
-      "source": "def compute_book_value(asset, on_date=None):",
-      "context": "Module:body/FunctionDef:compute_book_value:self",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/filters.py",
       "code": "F401",
       "message": "'django.db.models.Case' imported but unused",
@@ -2215,14 +2207,6 @@
       "path": "itambox/assets/views/asset_views.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from compliance.reconciliation import audit_asset_from_form",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
       "source": "from inventory.models import AccessoryAssignment, ConsumableAssignment",
       "context": "Module:body",
       "count": 1
@@ -2561,14 +2545,6 @@
       "message": "'core.mixins.JournalingMixin' imported but unused",
       "source": "from core.mixins import (",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
-      "code": "F401",
-      "message": "'django.urls.reverse' imported but unused",
-      "source": "    from django.urls import reverse",
-      "context": "Module:body/FunctionDef:_audit_to_dict:body",
       "count": 1
     },
     {
@@ -5644,14 +5620,6 @@
       "count": 1
     },
     {
-      "path": "itambox/inventory/mixins.py",
-      "code": "F401",
-      "message": "'django.utils.safestring.mark_safe' imported but unused",
-      "source": "from django.utils.safestring import mark_safe",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/inventory/models.py",
       "code": "F401",
       "message": "'core.managers.AllObjectsManager' imported but unused",
@@ -5713,14 +5681,6 @@
       "message": "'django.utils.timezone' imported but unused",
       "source": "from django.utils import timezone",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/stock.py",
-      "code": "C901",
-      "message": "'adjust_inventory_stock' is too complex (16)",
-      "source": "def adjust_inventory_stock(",
-      "context": "Module:body/FunctionDef:adjust_inventory_stock:self",
       "count": 1
     },
     {

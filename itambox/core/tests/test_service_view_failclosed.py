@@ -71,9 +71,9 @@ class SimplePostViewPermissionDeniedTests(SimpleTestCase):
         request.htmx = htmx
         return request
 
-    def test_htmx_request_gets_error_toast_not_403_page(self):
+    def test_htmx_request_gets_exact_403_with_error_toast(self):
         response = _DenyingView.as_view()(self._make_request(htmx=True))
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 403)
         trigger = json.loads(response["HX-Trigger"])
         self.assertEqual(trigger["showMessage"]["level"], "danger")
         self.assertIn("nope", trigger["showMessage"]["message"])

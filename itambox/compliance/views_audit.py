@@ -6,8 +6,7 @@ import django_tables2 as tables
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
@@ -16,17 +15,25 @@ from django.views.generic import View
 from django_tables2.utils import A
 
 from assets.models import StatusLabel
-from assets.scanning import resolve_scanned_asset
+from assets.scanning import resolve_scanned_asset_in_queryset
+from compliance.audit_services import (
+    _audit_to_dict,
+    _missing_asset_to_dict,
+    audit_asset,
+    authorized_scan_assets_queryset,
+    classify_session_audits,
+    close_audit_session,
+    commit_audit_basket,
+    expected_scan_assets_queryset,
+    flag_missing_assets,
+    preview_missing_assets,
+    read_reconciliation_report,
+    rehome_audit_session_mismatches,
+)
 from compliance.filters import AuditSessionFilterSet
 from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSessionForm
 from compliance.forms_filter import AuditSessionFilterForm
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import (
-    audit_asset,
-    close_audit_session,
-    flag_missing_assets,
-    rehome_audit_session_mismatches,
-)
 from core.csv_utils import csv_safe
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
@@ -34,6 +41,14 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _read_report_or_deny(session, user):
+    """Turn malformed frozen reports into a handled HTTP denial."""
+    try:
+        return read_reconciliation_report(session, user=user)
+    except ValidationError as exc:
+        raise PermissionDenied(_("The stored audit report is unavailable.")) from exc
 
 
 def _classify_audit_scan(session, asset, expected_ids, observed_location):
@@ -131,21 +146,19 @@ class AuditSessionDetailView(ObjectDetailView):
         ctx = super().get_context_data(**kwargs)
         session = self.get_object()
 
-        if session.status == "completed" and session.reconciliation_report:
-            # Render from the frozen stored report; do not recompute.
-            report = session.reconciliation_report
-            rows = report.get("rows", [])
-            ctx["total_expected"] = report.get("total_expected", 0)
-            ctx["total_scanned"] = report.get("total_scanned", 0)
+        if session.status == "completed" and session.reconciliation_report is not None:
+            # Render from the frozen stored report after applying the current actor scope.
+            report = _read_report_or_deny(session, self.request.user)
+            rows = report["rows"]
+            ctx["total_expected"] = report["total_expected"]
+            ctx["total_scanned"] = report["total_scanned"]
             ctx["matching"] = [r for r in rows if r["category"] == "matching"]
             ctx["mismatches"] = [r for r in rows if r["category"] == "mismatched"]
             ctx["surprise_finds"] = [r for r in rows if r["category"] == "surprise"]
             ctx["missing_assets"] = [r for r in rows if r["category"] == "missing"]
             ctx["report_is_stored"] = True
         else:
-            from compliance.reconciliation import _audit_to_dict, _missing_asset_to_dict, classify_session_audits
-
-            classified = classify_session_audits(session)
+            classified = classify_session_audits(session, user=self.request.user)
             expected_loc_name = session.location.name if session.location else "Global"
             ctx["total_expected"] = (
                 len(classified["matching"]) + len(classified["mismatched"]) + classified["missing"].count()
@@ -189,7 +202,8 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if form.is_valid():
             barcode = form.cleaned_data["barcode"].strip()
 
-            asset, ambiguous = resolve_scanned_asset(barcode)
+            scan_assets = authorized_scan_assets_queryset(session, user=request.user)
+            asset, ambiguous = resolve_scanned_asset_in_queryset(barcode, scan_assets)
 
             if not asset:
                 if ambiguous:
@@ -246,14 +260,15 @@ class AuditSessionValidateView(LoginRequiredMixin, PermissionRequiredMixin, View
         if not code:
             return JsonResponse({"found": False}, status=400)
 
-        asset, ambiguous = resolve_scanned_asset(code)
+        scan_assets = authorized_scan_assets_queryset(session, user=request.user)
+        asset, ambiguous = resolve_scanned_asset_in_queryset(code, scan_assets)
         if asset is None:
             payload = {"found": False}
             if ambiguous:
                 payload["ambiguous"] = True
             return JsonResponse(payload, status=404)
 
-        expected_ids = set(session.expected_assets_queryset.values_list("id", flat=True))
+        expected_ids = set(expected_scan_assets_queryset(session, user=request.user).values_list("id", flat=True))
         observed_location = session.location or asset.location
         eligible, warning, classification = _classify_audit_scan(session, asset, expected_ids, observed_location)
 
@@ -293,31 +308,13 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
             )
             return response
 
-        from assets.models import Asset
-
         try:
-            with transaction.atomic():
-                for asset_pk in asset_pks:
-                    try:
-                        asset = Asset.objects.select_for_update().get(pk=asset_pk)
-                    except Asset.DoesNotExist:
-                        raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {"pk": asset_pk}) from None
-
-                    # Skip an asset already verified in this session so re-committing
-                    # a basket is idempotent (audit_asset would otherwise raise on the
-                    # duplicate and abort the whole batch).
-                    if AssetAudit.objects.filter(session=session, asset=asset).exists():
-                        continue
-
-                    observed_location = session.location or asset.location
-                    audit_asset(
-                        asset=asset,
-                        user=request.user,
-                        session=session,
-                        location=observed_location,
-                        status=asset.status,
-                        verification_method="barcode",
-                    )
+            classified = commit_audit_basket(
+                session,
+                user=request.user,
+                asset_ids=asset_pks,
+                request=request,
+            )
         except ValidationError as err:
             msg = err.message if hasattr(err, "message") else str(err)
             # 204 → no swap, basket preserved; surface the failure as a toast.
@@ -332,9 +329,9 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
         # Return the updated reconciliation container using a helper-like template render
         from compliance.forms_audit import AuditBarcodeScanForm
-        from compliance.reconciliation import _audit_to_dict, _missing_asset_to_dict, classify_session_audits
 
-        classified = classify_session_audits(session)
+        # Classification is performed inside the atomic write above using the
+        # actor-only scan permission, rather than the separate read permission.
         expected_loc_name = session.location.name if session.location else "Global"
         ctx = {
             "total_expected": len(classified["matching"])
@@ -378,10 +375,18 @@ class AuditSessionRehomeView(SimplePostView):
     permission_required = "assets.change_asset"
 
     def perform_action(self, session, request) -> dict:
-        rehome_audit_session_mismatches(session, request.user)
+        result = rehome_audit_session_mismatches(session, user=request.user)
         return {
-            "message": _("All mismatched assets in campaign '%(name)s' have been bulk re-homed to '%(location)s'.")
-            % {"name": session.name, "location": session.location.name if session.location else "Global"}
+            "message": _(
+                "Rehome complete: %(moved)s moved, %(already)s already correct, "
+                "%(conflicted)s changed since close, %(unavailable)s unavailable."
+            )
+            % {
+                "moved": result["moved"],
+                "already": result["already_correct"],
+                "conflicted": result["conflicted"],
+                "unavailable": result["unavailable"],
+            }
         }
 
 
@@ -392,8 +397,8 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
     def get(self, request, pk, *args, **kwargs):
         session = get_object_or_404(AuditSession, pk=pk, status="completed")
-        report = session.reconciliation_report or {}
-        rows = report.get("rows", [])
+        report = _read_report_or_deny(session, request.user)
+        rows = report["rows"]
 
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename="audit-report-{session.pk}.csv"'
@@ -453,11 +458,10 @@ class AuditSessionFlagMissingView(GenericTransactionView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         session = self.get_object()
-        if session.reconciliation_report:
-            missing_rows = [r for r in session.reconciliation_report.get("rows", []) if r.get("category") == "missing"]
-            context["missing_count"] = len(missing_rows)
-        else:
-            context["missing_count"] = 0
+        try:
+            context["missing_count"] = preview_missing_assets(session, user=self.request.user)
+        except ValidationError as exc:
+            raise PermissionDenied(_("The stored audit report is unavailable.")) from exc
         return context
 
     def get_success_message(self, result=None):
@@ -474,6 +478,12 @@ class AuditSessionDeleteView(ObjectDeleteView):
     model = AuditSession
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("compliance:auditsession_list")
+
+    def get_object(self, queryset=None):
+        session = super().get_object(queryset)
+        if session.status == "completed":
+            raise PermissionDenied(_("Completed audit sessions and their evidence cannot be deleted."))
+        return session
 
 
 class AuditSessionStartView(SimplePostView):

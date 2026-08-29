@@ -93,8 +93,8 @@
   {% endif %}
   <dt class="col-sm-3">{% translate "Seat Usage:" %}</dt>
   <dd class="col-sm-9">
-    <strong>{{ object.assigned_seats }}</strong> / {{ object.total_seats }}
-    <span class="text-muted ms-1">({{ object.available_seats }} {% translate "available" %})</span>
+    <strong>{{ assigned_seats }}</strong> / {{ total_seats }}
+    <span class="text-muted ms-1">({{ available_seats }} {% translate "available" %})</span>
   </dd>
   {% if assignment_count is not None %}
     <dt class="col-sm-3">{% translate "Linked Items:" %}</dt>

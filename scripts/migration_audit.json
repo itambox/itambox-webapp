@@ -6177,6 +6177,49 @@
     },
     {
       "dependencies": [
+        "assets.0100_issue88_shard_43_assets_seed",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0101_seed_canonical_missing_status",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0101_seed_canonical_missing_status.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "required-fresh",
+        "rationale": "Pre-provisions the canonical global Missing status outside tenant-scoped audit mutation paths."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -18014,6 +18057,7 @@
     }
   ],
   "post_transition_migrations": [
+    "assets.0101_seed_canonical_missing_status",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -18057,6 +18101,7 @@
       "assets.0051_assetreservation_assetreservation_no_overlap",
       "assets.0100_issue88_shard_42_assets_relations",
       "assets.0100_issue88_shard_43_assets_seed",
+      "assets.0101_seed_canonical_missing_status",
       "extras.0108_alertlog_delivery_outcome"
     ],
     "review_blocker": [
@@ -18318,7 +18363,7 @@
         ]
       }
     },
-    "post_transition_migrations": 27,
+    "post_transition_migrations": 28,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

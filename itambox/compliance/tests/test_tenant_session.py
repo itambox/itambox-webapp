@@ -3,14 +3,15 @@ Tests for Part 7: AuditSession tenant scoping + Planned status.
 """
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
+from compliance.audit_services import classify_session_audits, expected_assets_queryset
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import classify_session_audits
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Location, Tenant
 
 User = get_user_model()
@@ -69,19 +70,18 @@ class AuditSessionTenantScopingTests(TenantTestMixin, TestCase):
 
 
 class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
-    """expected_assets_queryset returns the same count regardless of which user calls it."""
+    """Expected assets are explicit actor-bound queries, not model properties."""
 
     def setUp(self):
         self.setup_tenant_context(name="StableCountTenant", slug="stc")
+        self.tenant_role.permissions = ["compliance.view_auditsession"]
+        self.tenant_role.save()
+        self.admin_grant = grant(self.tenant_admin, self.tenant, self.tenant_role)
         self.tenant_b = baker.make(Tenant, name="OtherTenant", slug="other-tenant")
 
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-
-        # 3 assets belonging to our tenant
         for _ in range(3):
             baker.make(Asset, status=self.status, tenant=self.tenant)
-
-        # 1 asset belonging to another tenant (should NOT be counted)
         baker.make(Asset, status=self.status, tenant=self.tenant_b)
 
         self.session = AuditSession.objects.create(
@@ -91,30 +91,32 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
             created_by=self.tenant_admin,
         )
 
-    def test_expected_count_same_from_both_tenant_contexts(self):
-        """Count must be stable regardless of which tenant context is active."""
+    def test_expected_assets_requires_an_authenticated_actor(self):
+        with self.assertRaises(PermissionDenied):
+            expected_assets_queryset(self.session, user=None)
+
+    def test_expected_count_is_explicit_and_ambient_independent(self):
         self.set_active_tenant(self.tenant)
-        count_a = self.session.expected_assets_queryset.count()
+        count_a = expected_assets_queryset(self.session, user=self.tenant_admin).count()
 
         self.set_active_tenant(self.tenant_b)
-        count_b = self.session.expected_assets_queryset.count()
+        count_b = expected_assets_queryset(self.session, user=self.tenant_admin).count()
 
         self.assertEqual(count_a, count_b)
         self.assertEqual(count_a, 3)
 
-    def test_global_session_counts_all_tenants(self):
+    def test_global_session_returns_only_current_actor_tenant_set(self):
         global_session = AuditSession.objects.create(
             name="Global Count",
             status="active",
             tenant=None,
             created_by=self.tenant_admin,
         )
-        # Global session has no tenant filter → counts assets from all tenants
-        all_count = global_session.expected_assets_queryset.count()
-        self.assertGreaterEqual(all_count, 4)  # 3 + 1 at minimum
+        expected = expected_assets_queryset(global_session, user=self.tenant_admin)
+        self.assertEqual(expected.count(), 3)
+        self.assertNotIn(self.tenant_b.pk, expected.values_list("tenant_id", flat=True))
 
-    def test_classification_stable_across_tenant_contexts(self):
-        """Missing/matching classification must be identical regardless of viewer tenant."""
+    def test_classification_is_stable_across_ambient_tenant_contexts(self):
         loc = baker.make(Location, tenant=self.tenant)
         scanned_status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
         session = AuditSession.objects.create(
@@ -124,10 +126,8 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
             location=loc,
             created_by=self.tenant_admin,
         )
-        # 2 assets at the location — one will be scanned, one missing
         asset_scanned = baker.make(Asset, status=scanned_status, tenant=self.tenant, location=loc)
         asset_missing = baker.make(Asset, status=scanned_status, tenant=self.tenant, location=loc)
-
         auditor = baker.make(User)
         AssetAudit.objects.create(
             session=session,
@@ -138,17 +138,14 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
         )
 
         self.set_active_tenant(self.tenant)
-        result_a = classify_session_audits(session)
+        result_a = classify_session_audits(session, user=self.tenant_admin)
         missing_ids_a = set(result_a["missing"].values_list("pk", flat=True))
         self.assertEqual(missing_ids_a, {asset_missing.pk})
 
         self.set_active_tenant(self.tenant_b)
-        result_b = classify_session_audits(session)
+        result_b = classify_session_audits(session, user=self.tenant_admin)
         missing_ids_b = set(result_b["missing"].values_list("pk", flat=True))
-
-        self.assertEqual(
-            missing_ids_a, missing_ids_b, "Missing asset set must be identical regardless of viewer tenant"
-        )
+        self.assertEqual(missing_ids_a, missing_ids_b)
 
 
 class PlannedSessionTests(TenantTestMixin, TestCase):

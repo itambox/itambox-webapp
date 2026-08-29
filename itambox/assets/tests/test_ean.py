@@ -13,7 +13,8 @@ from django.urls import reverse
 
 from assets.filters import AssetFilterSet
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
-from core.tests.mixins import TenantTestMixin
+from compliance.audit_services import expected_assets_queryset
+from core.tests.mixins import TenantTestMixin, grant
 from inventory.models import Accessory, Component, Consumable
 
 User = get_user_model()
@@ -22,6 +23,9 @@ User = get_user_model()
 class EanScanTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="ean")
+        self.tenant_role.permissions = ["compliance.view_auditsession", "compliance.add_assetaudit"]
+        self.tenant_role.save()
+        self.admin_grant = grant(self.tenant_admin, self.tenant, self.tenant_role)
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.mfr = Manufacturer.objects.create(name="EANMfr", slug="eanmfr")
         self.role = AssetRole.objects.create(name="EANRole", slug="eanrole")
@@ -157,8 +161,8 @@ class EanScanTests(TenantTestMixin, TestCase):
         from compliance.models import AssetAudit, AuditSession
         from organization.models import Location, Site
 
-        site = Site.objects.create(name="EAN HQ", slug="ean-hq")
-        loc = Location.objects.create(name="EAN Room", slug="ean-room", site=site)
+        site = Site.objects.create(name="EAN HQ", slug="ean-hq", tenant=self.tenant)
+        loc = Location.objects.create(name="EAN Room", slug="ean-room", site=site, tenant=self.tenant)
         session = AuditSession.objects.create(
             name="EAN Audit", location=loc, status="active", created_by=self.tenant_admin
         )
@@ -183,10 +187,10 @@ class EanScanTests(TenantTestMixin, TestCase):
             status=self.status,
             tenant=self.tenant,
         )
-        site = Site.objects.create(name="EAN HQ 2", slug="ean-hq-2")
-        loc = Location.objects.create(name="EAN Room 2", slug="ean-room-2", site=site)
+        site = Site.objects.create(name="EAN HQ 2", slug="ean-hq-2", tenant=self.tenant)
+        loc = Location.objects.create(name="EAN Room 2", slug="ean-room-2", site=site, tenant=self.tenant)
         session = AuditSession.objects.create(
-            name="EAN Audit 2", location=loc, status="active", created_by=self.tenant_admin
+            name="EAN Audit 2", tenant=self.tenant, location=loc, status="active", created_by=self.tenant_admin
         )
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         resp = self.client.post(
@@ -205,17 +209,20 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         from organization.models import Location, Site
 
         self.setup_tenant_context(slug="audit-class")
+        self.tenant_role.permissions = ["compliance.view_auditsession", "compliance.add_assetaudit"]
+        self.tenant_role.save()
+        self.admin_grant = grant(self.tenant_admin, self.tenant, self.tenant_role)
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.mfr = Manufacturer.objects.create(name="AuditMfr", slug="auditmfr")
         self.role = AssetRole.objects.create(name="AuditRole", slug="auditrole")
         self.status = StatusLabel.objects.create(name="Avail", slug="audit-avail", type="deployable")
         self.archived_status = StatusLabel.objects.create(name="Arch", slug="audit-arch", type="archived")
         self.atype = AssetType.objects.create(manufacturer=self.mfr, model="Audit Model", slug="audit-model")
-        self.site = Site.objects.create(name="Audit Site", slug="audit-site")
-        self.loc1 = Location.objects.create(name="Room 1", slug="audit-room-1", site=self.site)
-        self.loc2 = Location.objects.create(name="Room 2", slug="audit-room-2", site=self.site)
+        self.site = Site.objects.create(name="Audit Site", slug="audit-site", tenant=self.tenant)
+        self.loc1 = Location.objects.create(name="Room 1", slug="audit-room-1", site=self.site, tenant=self.tenant)
+        self.loc2 = Location.objects.create(name="Room 2", slug="audit-room-2", site=self.site, tenant=self.tenant)
         self.session = AuditSession.objects.create(
-            name="Audit S", location=self.loc1, status="active", created_by=self.tenant_admin
+            name="Audit S", location=self.loc1, tenant=self.tenant, status="active", created_by=self.tenant_admin
         )
         self.asset = Asset.objects.create(
             name="Audit A",
@@ -226,7 +233,9 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
             location=self.loc1,
             tenant=self.tenant,
         )
-        self.expected_ids = set(self.session.expected_assets_queryset.values_list("id", flat=True))
+        self.expected_ids = set(
+            expected_assets_queryset(self.session, user=self.tenant_admin).values_list("id", flat=True)
+        )
         self.validate_url = reverse("compliance:auditsession_validate", kwargs={"pk": self.session.pk})
         self.scan_url = reverse("compliance:auditsession_scan", kwargs={"pk": self.session.pk})
 
@@ -253,7 +262,7 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         self.assertEqual(classification, "unknown")
 
     def test_already_verified_not_expected_surprise(self):
-        from compliance.reconciliation import audit_asset
+        from compliance.audit_services import audit_asset
 
         other = Asset.objects.create(
             name="Other Audit Asset",
@@ -278,7 +287,7 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         self.assertIn("already", warning)
 
     def test_already_verified_matched(self):
-        from compliance.reconciliation import audit_asset
+        from compliance.audit_services import audit_asset
 
         audit_asset(
             asset=self.asset,
@@ -293,7 +302,7 @@ class AuditScanClassificationTests(TenantTestMixin, TestCase):
         self.assertEqual(classification, "matched")
 
     def test_already_verified_mismatch(self):
-        from compliance.reconciliation import audit_asset
+        from compliance.audit_services import audit_asset
 
         audit_asset(
             asset=self.asset,

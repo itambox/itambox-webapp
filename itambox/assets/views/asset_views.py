@@ -17,13 +17,13 @@ from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
 from assets.tasks.labels import _default_label_card, generate_base64_barcode, render_labels_pdf
+from compliance.audit_services import audit_asset_from_form
 from compliance.services import scope_custody_receipts
 
 logger = logging.getLogger(__name__)
 
 from assets.choices import RequestStatusChoices
 from compliance.models import CustodyReceipt
-from compliance.reconciliation import audit_asset_from_form
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 from itambox.panels import Panel

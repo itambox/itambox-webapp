@@ -27,7 +27,7 @@ An **Audit Session** represents a physical inventory reconciliation campaign —
 
 ### Expected Assets
 
-The `expected_assets_queryset` property determines which assets this session expects to audit:
+The `compliance.audit_services.expected_assets_queryset(session, user=...)` service operation determines which assets this session expects to audit. The actor is required explicitly; global sessions are limited to the actor's currently authorized tenants:
 - When a **location** is set, only assets physically assigned to that location are in scope.
 - When **global** (no location), all deployable, pending, and deployed assets (excluding archived) are in scope.
 - Tenant-scoped sessions additionally filter by the session's tenant.

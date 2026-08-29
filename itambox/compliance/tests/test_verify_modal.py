@@ -2,29 +2,38 @@
 Tests for Part 4: standalone verify-confirm modal (AssetAuditView).
 """
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
+from compliance.audit_services import audit_asset_from_form
 from compliance.models import AssetAudit, AuditSession
-from compliance.reconciliation import audit_asset_from_form
-from core.tests.mixins import TenantTestMixin
-from organization.models import Location
+from core.managers import set_current_tenant
+from core.tests.mixins import TenantTestMixin, grant
+from organization.models import Location, Role, Tenant
+
+User = get_user_model()
 
 
 class AuditAssetFromFormTests(TestCase):
     """audit_asset_from_form() session-attach logic (F2 fix)."""
 
     def setUp(self):
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-        self.user = User.objects.create_superuser(username="modal_su", email="m@test.com", password="pw")
-        self.loc_berlin = baker.make(Location, name="Berlin")
-        self.loc_munich = baker.make(Location, name="Munich")
+        self.tenant = Tenant.objects.create(name="Modal service tenant", slug="modal-service-tenant")
+        self.user = User.objects.create_user(username="modal_user", email="m@test.com", password="pw")
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="Modal test role",
+            permissions=["compliance.add_assetaudit", "compliance.view_auditsession"],
+        )
+        grant(self.user, self.tenant, role)
+        set_current_tenant(self.tenant)
+        self.loc_berlin = baker.make(Location, name="Berlin", tenant=self.tenant)
+        self.loc_munich = baker.make(Location, name="Munich", tenant=self.tenant)
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        self.asset = baker.make(Asset, status=self.status, location=self.loc_berlin)
+        self.asset = baker.make(Asset, status=self.status, location=self.loc_berlin, tenant=self.tenant)
 
     def test_attaches_to_location_session(self):
         """Asset at Berlin → attaches to Berlin campaign, not Munich campaign."""
@@ -32,12 +41,14 @@ class AuditAssetFromFormTests(TestCase):
             name="Berlin",
             status="active",
             location=self.loc_berlin,
+            tenant=self.tenant,
             created_by=self.user,
         )
         AuditSession.objects.create(
             name="Munich",
             status="active",
             location=self.loc_munich,
+            tenant=self.tenant,
             created_by=self.user,
         )
         result = audit_asset_from_form(self.asset, self.user, location=self.loc_berlin, status=self.status)
@@ -52,6 +63,7 @@ class AuditAssetFromFormTests(TestCase):
             name="Munich",
             status="active",
             location=self.loc_munich,
+            tenant=self.tenant,
             created_by=self.user,
         )
         result = audit_asset_from_form(self.asset, self.user, location=self.loc_berlin, status=self.status)
@@ -65,6 +77,7 @@ class AuditAssetFromFormTests(TestCase):
             name="Global Stocktake",
             status="active",
             location=None,
+            tenant=None,
             created_by=self.user,
         )
         result = audit_asset_from_form(self.asset, self.user, location=self.loc_munich, status=self.status)

@@ -116,22 +116,6 @@
       "count": 1
     },
     {
-      "path": "itambox/compliance/reconciliation.py",
-      "scope": "FunctionDef:_audit_to_dict",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "d06e2e80d9bdf5a9904c245165ceec745c0535cd93be46fb290653730ee52fcf",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
-      "scope": "FunctionDef:_missing_asset_to_dict",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "d06e2e80d9bdf5a9904c245165ceec745c0535cd93be46fb290653730ee52fcf",
-      "count": 1
-    },
-    {
       "path": "itambox/core/apps.py",
       "scope": "ClassDef:CoreConfig/FunctionDef:ready/FunctionDef:scoped_baseform_init",
       "handler_type": "Exception",

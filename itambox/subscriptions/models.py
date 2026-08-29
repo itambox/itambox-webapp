@@ -29,6 +29,7 @@ from core.mixins import (
 )
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
 from extras.models import Tag
+from subscriptions.models_seat_usage import get_assigned_seats
 
 
 class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -366,24 +367,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     @property
     def assigned_seats(self):
         """Seats currently assigned across this subscription's licenses."""
-        from licenses.models import LicenseSeatAssignment
-
-        return (
-            LicenseSeatAssignment._base_manager.filter(
-                license__subscription=self,
-                license__deleted_at__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .filter(
-                models.Q(asset__isnull=False, asset__deleted_at__isnull=True, asset__tenant_id=self.tenant_id)
-                | models.Q(
-                    assigned_holder__isnull=False,
-                    assigned_holder__deleted_at__isnull=True,
-                    assigned_holder__tenant_id=self.tenant_id,
-                )
-            )
-            .count()
-        )
+        return get_assigned_seats(self)
 
     @property
     def available_seats(self):

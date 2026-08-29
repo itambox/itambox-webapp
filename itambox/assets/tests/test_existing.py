@@ -30,7 +30,7 @@ from compliance.models import CustodyReceipt
 from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.serialization import serialize_object
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 from extras.models import CustomField, CustomFieldset
 from inventory.models import (
     Accessory,
@@ -45,7 +45,7 @@ from inventory.models import (
 from inventory.models_assignment_write import authorized_assignment_write
 from inventory.services import checkin_component, purge_inventory_assignment
 from inventory.tests.factories import create_assignment_fixture
-from organization.models import Contact, ContactAssignment, ContactRole, Location, Site, Tenant
+from organization.models import Contact, ContactAssignment, ContactRole, Location, Role, Site, Tenant
 
 User = get_user_model()
 
@@ -437,6 +437,25 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertEqual(acc.available, 10)
 
     def test_asset_audit_view(self):
+        # The audit service now enforces the operation's exact tenant permission;
+        # make this integration fixture an explicit tenant actor instead of
+        # relying on the historical superuser/global shortcut.
+        tenant = Tenant.objects.create(name="Audit view tenant", slug="audit-view-tenant")
+        role = Role.objects.create(
+            tenant=tenant,
+            name="Audit scanner",
+            permissions=["compliance.add_assetaudit"],
+        )
+        grant(self.user, tenant, role)
+        self.location.tenant = tenant
+        self.location.save(update_fields=["tenant"])
+        self.asset.tenant = tenant
+        self.asset.save(update_fields=["tenant"])
+        set_current_tenant(tenant)
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
         # GET renders the modal form.
         response = self.client.get(reverse("assets:asset_audit", kwargs={"pk": self.asset.pk}))
         self.assertEqual(response.status_code, 200)

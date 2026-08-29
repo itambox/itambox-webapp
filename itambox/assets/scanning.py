@@ -103,29 +103,18 @@ def _resolve_ean(raw, qs, match_ean):
     return None, False
 
 
-def resolve_scanned_asset(code, user=None, match_ean=True, tenant=None):
-    """Resolve a scanned code to an Asset, with ambiguity information.
+def resolve_scanned_asset_in_queryset(code, queryset, match_ean=True):
+    """Resolve a code using a queryset whose tenant scope was already authorized.
 
-    Returns ``(asset, ambiguous)``:
-
-    - ``(asset, False)`` — exactly one match: asset tag, serial number, a
-      PK-based deep link, or an AssetType EAN that maps to exactly one asset
-      in scope.
-    - ``(None, True)`` — the code is an AssetType EAN that maps to several
-      assets in scope; callers must surface this instead of a silent miss.
-    - ``(None, False)`` — nothing matched, or the user has no accessible
-      tenants (fail closed).
-
-    ``match_ean=False`` skips the AssetType-EAN step (used by the global
-    scan-to-find flow, which redirects EANs to the filtered asset list).
+    This keeps the parser and EAN behavior in one place while allowing audit
+    operations to bind resolution to their exact operation permission instead
+    of the broader global scanner scope.
     """
     raw = strip_itambox_prefix(code)
     if not raw:
         return None, False
 
-    qs = _accessible_model_queryset(Asset, user, tenant=tenant)
-    if qs is None:
-        return None, False
+    qs = queryset
 
     # itambox://asset/<pk>  — PK-based deep link
     if raw.lower().startswith("itambox://asset/"):
@@ -146,6 +135,28 @@ def resolve_scanned_asset(code, user=None, match_ean=True, tenant=None):
         return asset, False
 
     return _resolve_ean(raw, qs, match_ean)
+
+
+def resolve_scanned_asset(code, user=None, match_ean=True, tenant=None):
+    """Resolve a scanned code to an Asset, with ambiguity information.
+
+    Returns ``(asset, ambiguous)``:
+
+    - ``(asset, False)`` — exactly one match: asset tag, serial number, a
+      PK-based deep link, or an AssetType EAN that maps to exactly one asset
+      in scope.
+    - ``(None, True)`` — the code is an AssetType EAN that maps to several
+      assets in scope; callers must surface this instead of a silent miss.
+    - ``(None, False)`` — nothing matched, or the user has no accessible
+      tenants (fail closed).
+
+    ``match_ean=False`` skips the AssetType-EAN step (used by the global
+    scan-to-find flow, which redirects EANs to the filtered asset list).
+    """
+    qs = _accessible_model_queryset(Asset, user, tenant=tenant)
+    if qs is None:
+        return None, False
+    return resolve_scanned_asset_in_queryset(code, qs, match_ean=match_ean)
 
 
 def resolve_scanned_code(code, user=None, match_ean=True, tenant=None):

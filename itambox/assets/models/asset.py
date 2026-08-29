@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from assets.model_book_value import compute_book_value
 from core.currency import CurrencyField
 from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
 from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SoftDeleteMixin, SubscribableMixin
@@ -281,8 +282,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     @property
     def current_value(self):
         """Estimated book value — delegates to the pure compute_book_value function."""
-        from assets.depreciation import compute_book_value
-
         return compute_book_value(self)
 
     @property
@@ -383,8 +382,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
                 old_type = old.status.type if old.status else None
                 new_type = self.status.type if self.status else None
                 if old_type != "archived" and new_type == "archived":
-                    from assets.depreciation import compute_book_value
-
                     self.disposal_value = compute_book_value(self) or Decimal("0.00")
                     self.disposed_at = timezone.now()
                 elif old_type == "archived" and new_type != "archived":

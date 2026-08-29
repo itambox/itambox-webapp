@@ -14,8 +14,8 @@ from core.mixins import (
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from core.tenant_scope import get_ancestor_tenant_group_ids
 
-from .mixins import CheckableInventoryModelMixin
 from .models_assignment_write import assignment_write_is_authorized
+from .models_mixins import CheckableInventoryModelMixin
 
 
 class AbstractInventoryItem(

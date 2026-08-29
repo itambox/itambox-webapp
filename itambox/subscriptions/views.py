@@ -114,7 +114,14 @@ class SubscriptionDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         subscription = self.get_object()
 
-        # Prefetch generic foreign key content objects cleanly
+        # Resolve seat usage once for the detail template. The template displays it
+        # in both assigned and available values, so passing primitives prevents the
+        # model provider from being evaluated twice.
+        assigned_seats = subscription.assigned_seats
+        total_seats = subscription.total_seats
+        context["assigned_seats"] = assigned_seats
+        context["available_seats"] = max(0, total_seats - assigned_seats)
+
         assignments_qs = subscription.assignments.select_related("assigned_by", "content_type")
 
         # 1. Map content types to primary keys to batch load related models in 1 query per type

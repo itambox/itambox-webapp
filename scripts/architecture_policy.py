@@ -211,18 +211,6 @@ MODULE_LAYER_OVERRIDES = {
     "extras.dashboard.utils": "presentation",
     "extras.management.commands.eventrule_withdrawn_report": "composition",
     "extras.utils": "domain-service",
-    "inventory.kit_checkout": "domain-service",
-    # A genuinely mixed module: it holds an abstract model mixin *and* two
-    # django-tables2 classes. Neither extreme is true and both are unshippable.
-    # Calling it presentation makes inventory.abstract_models -> inventory.mixins
-    # an R-M1 edge; calling it domain-model makes its own core.tables import one.
-    # R-M1 has no baseline representation at any severity, so either choice
-    # leaves the gate permanently red. domain-service is honest about the
-    # model-behaviour half and leaves *both* crossings visible as recorded debt
-    # (R-X1 inbound, R-V1 outbound) whose removal direction is "split this
-    # module" -- which is strictly more informative than hiding one of them.
-    "inventory.mixins": "domain-service",
-    "inventory.stock": "domain-service",
     "organization.access": "domain-service",
     "organization.rbac": "domain-service",
 }

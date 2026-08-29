@@ -449,6 +449,12 @@ class LicensingBoundaryTests(SimpleTestCase):
             "software.models must not defer a licenses import into a function body",
         )
 
+    def test_licenses_config_registers_exact_reconciliation_function(self):
+        from licenses.reconciliation import reconcile_software
+        from software.models_reconciliation import get_software_reconciliation_provider
+
+        self.assertIs(get_software_reconciliation_provider(), reconcile_software)
+
 
 class InventoryStockBoundaryTests(SimpleTestCase):
     """``inventory.models`` <-> ``inventory.services``.
@@ -457,7 +463,7 @@ class InventoryStockBoundaryTests(SimpleTestCase):
     ``adjust_inventory_stock`` out of the service layer, while the service layer
     imports the models at module scope for the checkout/check-in flows -- so that
     is the load-bearing direction. The bookkeeping helper now lives in the leaf
-    module ``inventory.stock``, which resolves the stock model through the app
+    module ``inventory.models_stock``, which resolves the stock model through the app
     registry via the ``_stock_model_label`` hook already on
     ``AbstractAssignment``; ``inventory.services`` keeps re-exporting it.
     """
@@ -466,8 +472,8 @@ class InventoryStockBoundaryTests(SimpleTestCase):
         for target in ("inventory.models", "inventory.services", "inventory.abstract_models", "assets.services"):
             with self.subTest(target=target):
                 self.assertFalse(
-                    _imports("inventory.stock", target),
-                    f"inventory.stock must not import {target}; it is the leaf that breaks the cycle, "
+                    _imports("inventory.models_stock", target),
+                    f"inventory.models_stock must not import {target}; it is the leaf that breaks the cycle, "
                     "resolving the stock model through the app registry instead",
                 )
 
@@ -484,7 +490,7 @@ class InventoryStockBoundaryTests(SimpleTestCase):
         )
 
     def test_inventory_models_has_no_deferred_first_party_inventory_import(self):
-        for target in ("inventory.services", "inventory.stock", "inventory.kit_checkout"):
+        for target in ("inventory.services", "inventory.models_stock", "inventory.models_kit_checkout"):
             with self.subTest(target=target):
                 self.assertFalse(
                     _deferred_imports("inventory.models", target),
@@ -493,12 +499,12 @@ class InventoryStockBoundaryTests(SimpleTestCase):
 
     def test_services_still_exposes_adjust_inventory_stock(self):
         self.assertTrue(
-            _imports("inventory.services", "inventory.stock", top_level_only=True),
-            "inventory.services must keep re-exporting adjust_inventory_stock from inventory.stock",
+            _imports("inventory.services", "inventory.models_stock", top_level_only=True),
+            "inventory.services must keep re-exporting adjust_inventory_stock from inventory.models_stock",
         )
 
+        from inventory.models_stock import adjust_inventory_stock as via_leaf
         from inventory.services import adjust_inventory_stock as via_services
-        from inventory.stock import adjust_inventory_stock as via_leaf
 
         self.assertIs(via_services, via_leaf, "the published inventory.services call path must stay valid")
 
@@ -1162,7 +1168,7 @@ class KitCheckoutBoundaryTests(SimpleTestCase):
 
     ``assets.services`` imports only ``inventory.services`` for stock-family
     fulfillment; concrete inventory models stay behind that service boundary.
-    ``Kit.checkout_to_holder`` goes through the leaf ``inventory.kit_checkout``,
+    ``Kit.checkout_to_holder`` goes through the leaf ``inventory.models_kit_checkout``,
     whose implementation ``AssetsConfig.ready()`` registers once the app
     registry is populated.
     """
@@ -1171,8 +1177,8 @@ class KitCheckoutBoundaryTests(SimpleTestCase):
         for target in ("assets", "inventory.models", "inventory.services"):
             with self.subTest(target=target):
                 self.assertFalse(
-                    _imports("inventory.kit_checkout", target),
-                    f"inventory.kit_checkout must not import {target}; it is the seam that keeps "
+                    _imports("inventory.models_kit_checkout", target),
+                    f"inventory.models_kit_checkout must not import {target}; it is the seam that keeps "
                     "inventory.models independent of assets",
                 )
 
@@ -1190,7 +1196,7 @@ class KitCheckoutBoundaryTests(SimpleTestCase):
 
     def test_assets_app_config_registers_the_implementation(self):
         from assets.services import checkout_kit
-        from inventory.kit_checkout import get_kit_checkout
+        from inventory.models_kit_checkout import get_kit_checkout
 
         self.assertIs(
             get_kit_checkout(),

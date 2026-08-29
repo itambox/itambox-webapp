@@ -16,6 +16,7 @@ OPERATION_TYPES = (
     "BtreeGistExtension",
 )
 POST_TRANSITION_MIGRATIONS = {
+    "assets.0101_seed_canonical_missing_status",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -133,6 +134,11 @@ SEMANTIC_DISPOSITIONS = {
         "required-fresh",
         "Deterministically recreates the two required asset seed datasets on the replacement path.",
         {"assets.0100_issue88_shard_43_assets_seed"},
+    ),
+    **_dispositions(
+        "required-fresh",
+        "Pre-provisions the canonical global Missing status outside tenant-scoped audit mutation paths.",
+        {"assets.0101_seed_canonical_missing_status"},
     ),
     **_dispositions(
         "required-fresh",
