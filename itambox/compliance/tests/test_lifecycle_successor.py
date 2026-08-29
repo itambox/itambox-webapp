@@ -191,6 +191,39 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
         using.assert_called_once_with("audit_alias")
         location_queryset.filter.assert_called_once_with(pk=self.location_a.pk)
 
+    def test_location_integrity_rejects_missing_location_from_the_write_database_alias(self):
+        session = AuditSession(
+            pk=self.session.pk,
+            tenant_id=self.tenant.pk,
+            location_id=self.location_a.pk,
+        )
+        session._state.db = "audit_alias"
+        location_queryset = Mock()
+        location_queryset.filter.return_value.only.return_value.first.return_value = None
+
+        with (
+            patch.object(Location._base_manager, "using", return_value=location_queryset) as using,
+            self.assertRaisesMessage(ValidationError, "live tenant-owned location"),
+        ):
+            session.validate_location_integrity(using="audit_alias")
+
+        using.assert_called_once_with("audit_alias")
+        location_queryset.filter.assert_called_once_with(pk=self.location_a.pk)
+
+    def test_unsaved_session_delete_uses_the_normal_django_boundary(self):
+        session = AuditSession(name="Unsaved lifecycle session")
+
+        with self.assertRaisesMessage(TypeError, "without primary key value are unhashable"):
+            session.delete()
+
+    def test_unsaved_session_completed_delete_guard_does_not_query_persisted_state(self):
+        session = AuditSession(name="Unsaved lifecycle session")
+
+        with patch.object(AuditSession._base_manager, "using") as using:
+            session._reject_completed_delete()
+
+        using.assert_not_called()
+
     def test_completed_session_delete_is_denied_at_model_html_and_api_boundaries(self):
         self._close(with_audit=True)
         audit_rows = list(
