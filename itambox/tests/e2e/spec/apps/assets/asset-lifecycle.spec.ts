@@ -1,6 +1,7 @@
 import { test, expect } from '../../../fixtures/test';
 import { createOwnedAsset } from '../../../fixtures/factories/assets';
 import { createOwnedAssetHolder } from '../../../fixtures/factories/identity';
+import { requireActiveTenant } from '../../../fixtures/tenant';
 import { jsonResponse } from '../../../helpers/api';
 
 test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
@@ -11,8 +12,9 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
     cleanup,
     runId,
   }) => {
-    const holder = await createOwnedAssetHolder(request, cleanup, activeTenant.id, `e2e-holder-${runId}`);
-    const asset = await createOwnedAsset(request, cleanup, activeTenant.id, runId);
+    const tenant = requireActiveTenant(activeTenant);
+    const holder = await createOwnedAssetHolder(request, cleanup, tenant.id, `e2e-holder-${runId}`);
+    const asset = await createOwnedAsset(request, cleanup, tenant.id, runId);
     const detailPath = `/assets/assets/${asset.id}/`;
 
     const initial = await page.goto(detailPath, { waitUntil: 'domcontentloaded' });

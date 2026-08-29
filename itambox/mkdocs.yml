@@ -67,6 +67,7 @@ nav:
       - Resource Grant Expiry: 'operations/resource-grant-expiry.md'
       - Plugin Removal and Recovery: 'operations/plugin-runbook.md'
       - Management Commands: 'operations/management-commands.md'
+      - E2E Qualification: 'operations/e2e-qualification.md'
   - Usage:
       - Dashboard: 'dashboard.md'
       - Guides:

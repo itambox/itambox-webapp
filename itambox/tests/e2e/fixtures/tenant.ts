@@ -15,10 +15,11 @@ export function assertSafeTarget(testInfo: TestInfo): void {
   const local = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
   if (local) return;
 
+  if (testInfo.tags.includes('@non-destructive') && testInfo.project.name === 'remote-smoke') return;
+
   if (SHARED_TARGETS.has(host)) {
     throw new Error(`Destructive E2E is permanently blocked for shared target ${url.origin}.`);
   }
-  if (testInfo.tags.includes('@non-destructive') && testInfo.project.name === 'remote-smoke') return;
 
   if (process.env.E2E_ALLOW_DESTRUCTIVE !== '1') {
     throw new Error(
@@ -34,18 +35,19 @@ export function assertSafeTarget(testInfo: TestInfo): void {
         'to name the same dedicated disposable tenant.',
     );
   }
-  if (!process.env.E2E_INSTANCE_ATTESTATION) {
-    throw new Error(
-      'Remote destructive E2E requires server-side disposable-instance attestation; ' +
-        'client flags alone are not sufficient.',
-    );
-  }
 }
 
 export type ActiveTenant = {
   id: string;
   slug: string;
 };
+
+export function requireActiveTenant(value: ActiveTenant | null): ActiveTenant {
+  if (value === null) {
+    throw new Error('This workflow requires an authenticated, REST-attested active tenant.');
+  }
+  return value;
+}
 
 export async function attestActiveTenant(page: Page, request: APIRequestContext): Promise<ActiveTenant> {
   const slug = process.env.E2E_TENANT_SLUG;

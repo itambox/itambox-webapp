@@ -336,9 +336,11 @@ jobs:
         run: |
           uv run --locked --no-sync python manage.py shell <<'PY'
           import os
+          from datetime import timedelta
 
           from django.contrib.auth import get_user_model
           from django.db.models import Q
+          from django.utils import timezone
           from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
           from users.models import Token, UserGroup
 
@@ -447,7 +449,11 @@ jobs:
               grant, _ = RoleGrant._base_manager.get_or_create(
                   membership=membership,
                   role=role,
-                  defaults={"granted_by": user, "reason": "Disposable CI E2E role boundary."},
+                  defaults={
+                      "granted_by": user,
+                      "reason": "Disposable CI E2E role boundary.",
+                      "valid_until": timezone.now() + timedelta(hours=4),
+                  },
               )
               RoleGrantScope._base_manager.get_or_create(
                   role_grant=grant,

@@ -278,3 +278,36 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "finally" in positive
     assert "console.log" not in positive
     assert "soft-pass" not in positive.lower()
+
+
+def test_owned_scope_workflow_topology_is_stable():
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "e2e.yml").read_text(encoding="utf-8")
+    assert "detect-e2e-scope:" in workflow
+    assert "e2e-selected:" in workflow
+    assert "e2e-gate:" in workflow
+    assert "if: always()" in workflow
+    assert "node run-selected.mjs" in workflow
+    assert "python scripts/certify_e2e_run.py" in workflow
+    assert "python scripts/check_e2e_gate.py" in workflow
+    assert "fetch-depth: 0" in workflow
+    assert "workflow_call:" in workflow
+
+
+def test_release_preparation_awaits_reusable_full_e2e():
+    release = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "e2e-qualification:" in release
+    assert "uses: ./.github/workflows/e2e.yml" in release
+    assert "prepare-release:" in release
+    assert "e2e-qualification" in release
+
+
+def test_e2e_privileged_role_grants_are_reasoned_and_time_bounded():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split(
+        "Start Django dev server", 1
+    )[0]
+
+    assert "from datetime import timedelta" in provision
+    assert "from django.utils import timezone" in provision
+    assert '"reason": "Disposable CI E2E role boundary."' in provision
+    assert '"valid_until": timezone.now() + timedelta(hours=4)' in provision

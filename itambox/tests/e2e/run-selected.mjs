@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const E2E_ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = resolve(E2E_ROOT, '..', '..', '..');
@@ -378,6 +378,25 @@ function cleanupStatus(test) {
   return values;
 }
 
+function normaliseAttemptStatus(status) {
+  return String(status || 'unknown').replace('timedOut', 'timed_out');
+}
+
+export function finalPlaywrightStatus(test, attempts) {
+  const finalAttempt = attempts.at(-1)?.status;
+  if (finalAttempt) return normaliseAttemptStatus(finalAttempt);
+  const aggregate = normaliseAttemptStatus(test?.status);
+  return {
+    expected: 'unknown',
+    flaky: 'unknown',
+    interrupted: 'interrupted',
+    passed: 'passed',
+    skipped: 'skipped',
+    timed_out: 'timed_out',
+    unexpected: 'failed',
+  }[aggregate] || 'unknown';
+}
+
 function collectExecution(value, output, parentFile = null, parentProject = null) {
   if (!value || typeof value !== 'object') return;
   const titleFile = typeof value.title === 'string' && /\.(?:spec|test)\.(?:ts|tsx|js|mjs|cjs)$/.test(value.title.trim())
@@ -393,14 +412,14 @@ function collectExecution(value, output, parentFile = null, parentProject = null
         const results = Array.isArray(test.results) ? test.results : [];
         const attempts = results.map((result, index) => ({
           retry: Number.isInteger(result.retry) ? result.retry : index,
-          status: String(result.status || 'unknown').replace('timedOut', 'timed_out'),
+          status: normaliseAttemptStatus(result.status),
           identity: identityFromAttachments(result) || identityFromAnnotations(test),
         }));
         output.tests.push({
           id: String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`),
           spec: specFile,
           project: String(test.projectName || project),
-          status: String(test.status || attempts.at(-1)?.status || 'unknown').replace('timedOut', 'timed_out'),
+          status: finalPlaywrightStatus(test, attempts),
           expectedStatus: String(test.expectedStatus || 'passed'),
           attempts,
           cleanup: cleanupStatus(test),
@@ -415,14 +434,14 @@ function collectExecution(value, output, parentFile = null, parentProject = null
       const results = Array.isArray(test.results) ? test.results : [];
       const attempts = results.map((result, index) => ({
         retry: Number.isInteger(result.retry) ? result.retry : index,
-        status: String(result.status || 'unknown').replace('timedOut', 'timed_out'),
+        status: normaliseAttemptStatus(result.status),
         identity: identityFromAttachments(result) || identityFromAnnotations(test),
       }));
       output.tests.push({
         id: String(test.testId || `${testFile}::${test.title || 'test'}`),
         spec: testFile,
         project: String(test.projectName || project),
-        status: String(test.status || attempts.at(-1)?.status || 'unknown').replace('timedOut', 'timed_out'),
+        status: finalPlaywrightStatus(test, attempts),
         expectedStatus: String(test.expectedStatus || 'passed'),
         attempts,
         cleanup: cleanupStatus(test),
@@ -540,7 +559,9 @@ async function main() {
   console.log(`E2E execution: ${selection.mode}; checkout ${testedCheckoutSha}; discovered ${listing.tests.length} tests; executed ${report.tests.length} tests.`);
 }
 
-main().catch((error) => {
-  if (process.exitCode !== 1) process.exitCode = 1;
-  console.error(String(error));
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    if (process.exitCode !== 1) process.exitCode = 1;
+    console.error(String(error));
+  });
+}

@@ -73,7 +73,7 @@ export default defineConfig({
     {
       name: 'admin',
       dependencies: ['setup-admin', 'setup-aggregate'],
-      grepInvert: /@(non-destructive|operator|viewer)/,
+      grepInvert: /@(anonymous|non-destructive|operator|viewer)/,
       use: { ...browserDefaults, storageState: path.join(authDir, 'admin.json') },
     },
     {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('anonymous authentication contract', { tag: '@anonymous' }, () => {
   test('anonymous users are redirected to the login boundary', async ({ page }) => {

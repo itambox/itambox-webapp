@@ -10,7 +10,7 @@ import {
 import { retrySafeName } from '../helpers/names';
 
 export type E2EFixtures = {
-  activeTenant: ActiveTenant;
+  activeTenant: ActiveTenant | null;
   appErrors: BrowserErrors;
   cleanup: CleanupRegistry;
   runId: string;
@@ -72,8 +72,9 @@ export const test = base.extend<E2EFixtures>({
 
   activeTenant: [
     async ({ page, request }, use, testInfo) => {
-      if (testInfo.project.name === 'anonymous') {
-        throw new Error('The activeTenant fixture cannot be used by the anonymous project.');
+      if (['anonymous', 'remote-smoke'].includes(testInfo.project.name)) {
+        await use(null);
+        return;
       }
       await use(await attestActiveTenant(page, request));
     },

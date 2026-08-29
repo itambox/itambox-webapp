@@ -48,6 +48,32 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         self.assertIn("workers: 1", config)
         self.assertIn("fullyParallel: false", config)
 
+    def test_admin_project_does_not_rediscover_anonymous_or_remote_only_tests(self):
+        config = (E2E_ROOT / "playwright.config.ts").read_text(encoding="utf-8")
+        admin = config.split("name: 'admin'", 1)[1].split("name: 'operator'", 1)[0]
+
+        self.assertIn("grepInvert: /@(anonymous|non-destructive|operator|viewer)/", admin)
+
+    def test_anonymous_and_remote_smoke_keep_automatic_safety_without_tenant_attestation(self):
+        fixture = (E2E_ROOT / "fixtures" / "playwright-fixtures.ts").read_text(encoding="utf-8")
+        anonymous = (E2E_ROOT / "spec" / "contracts" / "auth-rbac" / "anonymous-login.spec.ts").read_text(
+            encoding="utf-8"
+        )
+        external = (E2E_ROOT / "spec" / "external" / "oidc-provider.spec.ts").read_text(encoding="utf-8")
+
+        self.assertIn("../../../fixtures/test", anonymous)
+        self.assertIn("../../fixtures/test", external)
+        self.assertIn("activeTenant: ActiveTenant | null", fixture)
+        self.assertIn("['anonymous', 'remote-smoke'].includes(testInfo.project.name)", fixture)
+        self.assertIn("await use(null)", fixture)
+
+    def test_remote_nondestructive_smoke_precedes_destructive_shared_target_block(self):
+        tenant = (E2E_ROOT / "fixtures" / "tenant.ts").read_text(encoding="utf-8")
+        remote = "testInfo.tags.includes('@non-destructive') && testInfo.project.name === 'remote-smoke'"
+
+        self.assertLess(tenant.index(remote), tenant.index("SHARED_TARGETS.has(host)"))
+        self.assertNotIn("E2E_INSTANCE_ATTESTATION", tenant)
+
     def test_automatic_fixture_contracts_are_fail_closed(self):
         fixture = (E2E_ROOT / "fixtures" / "test.ts").read_text(encoding="utf-8") + (
             E2E_ROOT / "fixtures" / "playwright-fixtures.ts"
