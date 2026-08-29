@@ -712,6 +712,130 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
     }
 
 
+_PREFLIGHT_MANIFEST_LIST_FIELDS = (
+    "first_party_apps",
+    "historical_ids",
+    "replacement_ids",
+    "replacement_target_ids",
+    "baseline_ids",
+    "post_transition_ids",
+    "post_transition_leaf_ids",
+    "current_leaf_ids",
+)
+_SHA256_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def load_preflight_manifest(path):
+    try:
+        manifest = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"unable to read migration preflight manifest: {path}") from exc
+    if not isinstance(manifest, dict):
+        raise ValueError("migration preflight manifest must be a JSON object")
+    return manifest
+
+
+def _manifest_list(manifest, key):
+    value = manifest.get(key)
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"migration preflight manifest field {key} must be a list of strings")
+    if value != sorted(set(value)):
+        raise ValueError(f"migration preflight manifest field {key} must be sorted and unique")
+    return value
+
+
+def _post_transition_graph(inventory):
+    post_ids = set(inventory["post_transition_migrations"])
+    effective_ids = set(inventory["effective_graph"]["nodes"])
+    edges = {tuple(edge) for edge in inventory["effective_graph"]["edges"]}
+    by_id = {migration["id"]: migration for migration in inventory["migrations"]}
+    for migration_id in post_ids:
+        migration = by_id[migration_id]
+        for dependency in migration["dependencies"]:
+            if dependency in effective_ids or dependency in post_ids:
+                edges.add((dependency, migration_id))
+        for target in migration["run_before"]:
+            if target in effective_ids or target in post_ids:
+                edges.add((migration_id, target))
+    return _graph_summary(effective_ids | post_ids, edges)
+
+
+def _assert_manifest_ids(manifest, key, expected):
+    actual = manifest.get(key)
+    if actual != expected:
+        actual_count = len(actual) if isinstance(actual, list) else "invalid"
+        raise ValueError(
+            f"migration preflight manifest field {key} mismatch: expected {len(expected)}, got {actual_count}"
+        )
+
+
+def _validate_manifest_predecessors(manifest):
+    transition_release_sha = manifest.get("transition_release_sha")
+    if not isinstance(transition_release_sha, str) or not _SHA256_RE.fullmatch(transition_release_sha):
+        raise ValueError("migration preflight manifest transition_release_sha must be a lowercase 40-character Git SHA")
+    predecessors = manifest.get("supported_predecessors")
+    if not isinstance(predecessors, list) or not predecessors:
+        raise ValueError("migration preflight manifest supported_predecessors must be a non-empty list")
+    names = []
+    revisions = set()
+    for predecessor in predecessors:
+        if not isinstance(predecessor, dict):
+            raise ValueError("migration preflight manifest predecessor entries must be objects")
+        name = predecessor.get("name")
+        revision = predecessor.get("revision")
+        state = predecessor.get("state")
+        if not isinstance(name, str) or not name.strip() or name in names:
+            raise ValueError("migration preflight manifest predecessor names must be unique and non-empty")
+        if not isinstance(revision, str) or not _SHA256_RE.fullmatch(revision):
+            raise ValueError(
+                "migration preflight manifest predecessor revisions must be lowercase 40-character Git SHAs"
+            )
+        if not isinstance(state, str) or not state.strip():
+            raise ValueError("migration preflight manifest predecessor states must be non-empty strings")
+        names.append(name)
+        revisions.add(revision)
+    if transition_release_sha not in revisions:
+        raise ValueError("migration preflight manifest transition release is not a named predecessor revision")
+
+
+def _preflight_manifest_expected_ids(inventory):
+    post_ids = set(inventory["post_transition_migrations"])
+    historical_ids = sorted(
+        migration["id"]
+        for migration in inventory["migrations"]
+        if not migration["is_replacement"] and migration["id"] not in post_ids
+    )
+    replacement_migrations = [migration for migration in inventory["migrations"] if migration["is_replacement"]]
+    replacement_ids = sorted(migration["id"] for migration in replacement_migrations)
+    replacement_target_ids = sorted(target for migration in replacement_migrations for target in migration["replaces"])
+    post_transition_ids = sorted(post_ids)
+    current_graph = _post_transition_graph(inventory)
+    post_transition_leaf_ids = sorted(post_ids - {source for source, _ in current_graph["edges"] if source in post_ids})
+    return {
+        "first_party_apps": sorted({migration["id"].split(".", 1)[0] for migration in inventory["migrations"]}),
+        "historical_ids": historical_ids,
+        "replacement_ids": replacement_ids,
+        "replacement_target_ids": replacement_target_ids,
+        "baseline_ids": replacement_ids,
+        "post_transition_ids": post_transition_ids,
+        "post_transition_leaf_ids": post_transition_leaf_ids,
+        "current_leaf_ids": current_graph["leaves"],
+    }
+
+
+def validate_preflight_manifest(inventory, manifest):
+    if manifest.get("schema_version") != 1:
+        raise ValueError("migration preflight manifest schema_version must be 1")
+    if manifest.get("layout") != "transitional":
+        raise ValueError("migration preflight manifest layout must match the current transitional source")
+    for key in _PREFLIGHT_MANIFEST_LIST_FIELDS:
+        _manifest_list(manifest, key)
+    for key, expected in _preflight_manifest_expected_ids(inventory).items():
+        _assert_manifest_ids(manifest, key, expected)
+    _validate_manifest_predecessors(manifest)
+    return manifest
+
+
 def render_inventory(inventory):
     return json.dumps(inventory, indent=2, sort_keys=True) + "\n"
 
@@ -720,12 +844,21 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if the audit is stale")
     parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--manifest", type=Path, help="checked runtime preflight manifest")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     repository_root = Path(__file__).resolve().parents[1]
     source_root = args.source_root or repository_root / "itambox"
     output = args.output or repository_root / "scripts" / "migration_audit.json"
-    rendered = render_inventory(build_inventory(source_root))
+    inventory = build_inventory(source_root)
+    if args.source_root is None or args.manifest is not None:
+        manifest_path = args.manifest or source_root / "core" / "migration_baseline_manifest.json"
+        try:
+            validate_preflight_manifest(inventory, load_preflight_manifest(manifest_path))
+        except ValueError as exc:
+            print(f"migration preflight manifest invalid: {exc}", file=sys.stderr)
+            return 1
+    rendered = render_inventory(inventory)
     if args.check:
         if not output.exists() or output.read_text(encoding="utf-8") != rendered:
             print(f"migration audit drift: regenerate with {Path(__file__).name}", file=sys.stderr)
