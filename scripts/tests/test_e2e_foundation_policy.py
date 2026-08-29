@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import csv
 import unittest
 from pathlib import Path
 
@@ -90,6 +92,9 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         self.assertIn("data-tenant-slug", shell)
         self.assertIn("assertSafeTarget", fixture)
         self.assertIn("activeTenant", fixture)
+        self.assertIn("api: APIRequestContext", fixture)
+        self.assertIn("E2E_API_TOKEN", fixture)
+        self.assertIn("Authorization: `Token ${token}`", fixture)
         self.assertIn("E2E_TENANT_SLUG", tenant)
         self.assertIn("console", errors)
         self.assertIn("pageerror", errors)
@@ -100,8 +105,51 @@ class OwnedFoundationFilesTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, names)
 
+    def test_static_integration_examples_run_below_playwright(self):
+        legacy_spec = E2E_ROOT / "spec" / "legacy-smoke" / "rest-guides.spec.ts"
+        integration = REPO_ROOT / "itambox" / "docs" / "integration"
+        developer_guide = integration / "developer_guide.md"
+        bulk_guide = integration / "bulk_import_guide.md"
+        offboard_script = integration / "offboard_user.py"
+        bulk_csv = integration / "bulk_assets.csv"
+
+        self.assertFalse(legacy_spec.exists())
+        for document in (developer_guide, bulk_guide):
+            content = document.read_text(encoding="utf-8")
+            self.assertGreater(len(content), 100)
+            self.assertTrue(content.startswith("#"))
+
+        script = offboard_script.read_text(encoding="utf-8")
+        ast.parse(script, filename=str(offboard_script))
+        self.assertIn("os.environ.get", script)
+        self.assertIn("try:", script)
+        self.assertIn("except", script)
+        self.assertIn("urllib.error.URLError", script)
+        self.assertNotIn('ITAMBOX_API_TOKEN = "', script)
+        self.assertNotIn("API_TOKEN = '", script)
+
+        rows = list(csv.reader(bulk_csv.read_text(encoding="utf-8").splitlines()))
+        self.assertGreater(len(rows), 1)
+        headers = rows[0]
+        self.assertTrue(all(len(row) == len(headers) for row in rows[1:]))
+        for field in ("name", "asset_tag", "serial_number", "description"):
+            self.assertIn(field, headers)
+
     def test_reference_app_scopes_do_not_retain_surface_only_placeholders(self):
-        for app in ("assets", "inventory", "licenses", "organization", "software", "subscriptions", "users"):
+        for app in (
+            "assets",
+            "compliance",
+            "core",
+            "extras",
+            "inventory",
+            "itambox",
+            "licenses",
+            "organization",
+            "procurement",
+            "software",
+            "subscriptions",
+            "users",
+        ):
             with self.subTest(app=app):
                 surfaces = sorted((E2E_ROOT / "spec" / "apps" / app).glob("*-surface.spec.ts"))
                 self.assertEqual(surfaces, [])
