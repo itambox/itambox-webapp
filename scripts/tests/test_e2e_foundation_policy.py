@@ -101,7 +101,7 @@ class OwnedFoundationFilesTests(unittest.TestCase):
                 self.assertIn(token, names)
 
     def test_reference_app_scopes_do_not_retain_surface_only_placeholders(self):
-        for app in ("assets", "inventory", "users"):
+        for app in ("assets", "inventory", "licenses", "organization", "software", "subscriptions", "users"):
             with self.subTest(app=app):
                 surfaces = sorted((E2E_ROOT / "spec" / "apps" / app).glob("*-surface.spec.ts"))
                 self.assertEqual(surfaces, [])
