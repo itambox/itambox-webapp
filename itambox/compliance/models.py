@@ -400,22 +400,36 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
 
+    def validate_location_integrity(self, allowed_tenant_ids=None):
+        if self.location_id is None:
+            return
+        location = self._state.fields_cache.get("location")
+        if location is None:
+            location_model = self._meta.get_field("location").remote_field.model
+            location = location_model._base_manager.filter(pk=self.location_id).only("tenant_id", "deleted_at").first()
+        if location is None or location.deleted_at is not None or location.tenant_id is None:
+            raise ValidationError({"location": _("Audit sessions require a live tenant-owned location.")})
+        if self.tenant_id is not None and location.tenant_id != self.tenant_id:
+            raise ValidationError({"location": _("The audit location must belong to the session tenant.")})
+        if allowed_tenant_ids is not None and location.tenant_id not in allowed_tenant_ids:
+            raise ValidationError({"location": _("The audit location is outside the authorized tenant scope.")})
+
     def _reject_completed_mutation(self):
         if self._state.adding or self.pk is None:
             return
-        persisted = (
-            type(self)
-            ._base_manager.filter(pk=self.pk)
-            .values("tenant_id", "location_id", "name", "status", "completed_at", "reconciliation_report")
-            .first()
+        fields = tuple(
+            field.attname
+            for field in self._meta.concrete_fields
+            if not field.primary_key and field.attname != "updated_at"
         )
+        persisted = type(self)._base_manager.filter(pk=self.pk).values(*fields).first()
         if persisted is None or persisted["status"] != AuditSessionStatusChoices.COMPLETED:
             return
-        fields = ("tenant_id", "location_id", "name", "status", "completed_at", "reconciliation_report")
         if any(getattr(self, field) != persisted[field] for field in fields):
             raise ValidationError(_("Completed audit sessions are immutable."))
 
     def save(self, *args, **kwargs):
+        self.validate_location_integrity()
         self._reject_completed_mutation()
         return super().save(*args, **kwargs)
 

@@ -202,6 +202,10 @@ class AuditSessionSerializer(BaseModelSerializer):
             }
             if immutable_changes:
                 raise serializers.ValidationError("Completed audit sessions are immutable.")
+        tenant = self.instance.tenant if self.instance is not None else None
+        location = attrs.get("location", self.instance.location if self.instance is not None else None)
+        if tenant is not None and location is not None and location.tenant_id != tenant.pk:
+            raise serializers.ValidationError({"location_id": "The audit location must belong to the session tenant."})
         return attrs
 
 

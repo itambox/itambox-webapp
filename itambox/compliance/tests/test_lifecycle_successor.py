@@ -22,6 +22,7 @@ from compliance.api.serializers import AuditSessionSerializer
 from compliance.audit_services import (
     audit_asset,
     close_audit_session,
+    expected_assets_queryset,
     flag_missing_assets,
     rehome_audit_session_mismatches,
 )
@@ -93,25 +94,59 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
 
         self.assertEqual(AssetAudit.objects.count(), before)
 
-    def test_completed_session_model_boundary_rejects_all_frozen_fields(self):
+    def test_model_rejects_tenant_bound_session_with_foreign_location(self):
+        tenant_b = Tenant.objects.create(name="Lifecycle location B", slug="lifecycle-location-b")
+        location_b = baker.make(Location, tenant=tenant_b, name="Lifecycle foreign location")
+        before = AuditSession._base_manager.count()
+
+        with self.assertRaisesMessage(ValidationError, "session tenant"):
+            AuditSession(
+                name="Foreign-location session",
+                tenant=self.tenant,
+                location=location_b,
+                status="active",
+                created_by=self.tenant_user,
+            ).save()
+
+        self.assertEqual(AuditSession._base_manager.count(), before)
+
+    def test_global_session_location_must_be_inside_actor_scope(self):
+        tenant_b = Tenant.objects.create(name="Lifecycle global B", slug="lifecycle-global-b")
+        location_b = baker.make(Location, tenant=tenant_b, name="Lifecycle unauthorized global location")
+        session = AuditSession.objects.create(
+            name="Global foreign-location session",
+            tenant=None,
+            location=location_b,
+            status="active",
+            created_by=self.tenant_user,
+        )
+
+        with self.assertRaisesMessage(PermissionDenied, "outside the authorized tenant scope"):
+            expected_assets_queryset(session, user=self.tenant_user)
+
+    def test_completed_session_model_boundary_rejects_every_persisted_field(self):
         self._close()
-        original = {
-            "tenant": self.session.tenant,
-            "location": self.session.location,
-            "name": self.session.name,
-            "status": self.session.status,
-            "completed_at": self.session.completed_at,
-            "reconciliation_report": self.session.reconciliation_report,
-        }
+        protected_fields = tuple(
+            field.attname
+            for field in self.session._meta.concrete_fields
+            if not field.primary_key and field.attname != "updated_at"
+        )
+        original = AuditSession._base_manager.filter(pk=self.session.pk).values(*protected_fields).get()
         tenant_b = Tenant.objects.create(name="Lifecycle B", slug="lifecycle-b")
+        other_creator = baker.make("users.User", username="lifecycle-other-creator", is_active=True)
         changes = {
-            "tenant": tenant_b,
-            "location": self.location_b,
+            "deleted_at": timezone.now(),
+            "created_at": self.session.created_at - timedelta(days=1),
+            "tenant_id": tenant_b.pk,
+            "location_id": self.location_b.pk,
             "name": "Tampered lifecycle session",
             "status": "active",
+            "started_at": self.session.started_at - timedelta(days=1),
             "completed_at": timezone.now() - timedelta(days=1),
+            "created_by_id": other_creator.pk,
             "reconciliation_report": {"schema_version": 2, "rows": []},
         }
+        self.assertEqual(set(changes), set(protected_fields))
 
         for field, value in changes.items():
             with self.subTest(field=field):
@@ -119,13 +154,10 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
                 setattr(session, field, value)
                 with self.assertRaises(ValidationError):
                     session.save()
-                session.refresh_from_db()
-                self.assertEqual(session.tenant, original["tenant"])
-                self.assertEqual(session.location, original["location"])
-                self.assertEqual(session.name, original["name"])
-                self.assertEqual(session.status, original["status"])
-                self.assertEqual(session.completed_at, original["completed_at"])
-                self.assertEqual(session.reconciliation_report, original["reconciliation_report"])
+                self.assertEqual(
+                    AuditSession._base_manager.filter(pk=self.session.pk).values(*protected_fields).get(),
+                    original,
+                )
 
     def test_completed_session_delete_is_denied_at_model_html_and_api_boundaries(self):
         self._close(with_audit=True)
@@ -890,6 +922,53 @@ class AuditLifecyclePostgresRaceTests(TransactionTestCase):
         self.assertEqual(AssetAudit.objects.filter(session=self.session, asset=self.asset).count(), 1)
         self.session.refresh_from_db()
         self.assertEqual(self.session.status, "active")
+
+    def test_missing_status_is_revalidated_after_waiting_for_asset_lock(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("This regression requires PostgreSQL row-lock semantics.")
+
+        close_audit_session(self.session, user=self.user)
+        self.session.refresh_from_db()
+        before_status = self.asset.status_id
+        missing = StatusLabel._base_manager.get(slug="missing")
+        locked = threading.Event()
+        release = threading.Event()
+        locker_errors = Queue()
+        flag_errors = Queue()
+        flag_pid = Queue()
+
+        def flag_worker():
+            db = connections["default"]
+            db.close()
+            db.ensure_connection()
+            flag_pid.put(db.connection.get_backend_pid())
+            try:
+                flag_missing_assets(self.session, user=self.user)
+            except Exception as exc:
+                flag_errors.put(exc)
+            finally:
+                db.close()
+
+        locker_thread = threading.Thread(target=self._asset_locker_worker, args=(locked, release, locker_errors))
+        flag_thread = threading.Thread(target=flag_worker)
+        locker_thread.start()
+        self.assertTrue(locked.wait(timeout=5))
+        flag_thread.start()
+        try:
+            self._wait_for_lock(flag_pid, "assets_asset", flag_errors)
+            StatusLabel._base_manager.filter(pk=missing.pk).update(type=StatusLabel.TYPE_DEPLOYABLE)
+        finally:
+            release.set()
+        locker_thread.join(timeout=10)
+        flag_thread.join(timeout=10)
+
+        self.assertFalse(locker_thread.is_alive())
+        self.assertFalse(flag_thread.is_alive())
+        self.assertTrue(locker_errors.empty(), list(locker_errors.queue))
+        self.assertFalse(flag_errors.empty())
+        self.assertIsInstance(flag_errors.get(), ValidationError)
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.status_id, before_status)
 
     def test_flag_rechecks_authorization_after_waiting_for_asset_lock(self):
         if connection.vendor != "postgresql":

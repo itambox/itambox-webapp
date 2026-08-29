@@ -86,7 +86,9 @@ class ReconciliationReportV2(TypedDict):
 def _lock_audit_session(session: AuditSession) -> AuditSession:
     """Resolve and lock the current session before any other domain row."""
     try:
-        locked = AuditSession._base_manager.select_for_update().get(pk=session.pk)
+        locked = (
+            AuditSession._base_manager.select_related("location").select_for_update(of=("self",)).get(pk=session.pk)
+        )
     except AuditSession.DoesNotExist:
         raise PermissionDenied("The audit session is no longer available.") from None
     if locked.deleted_at is not None:
@@ -159,10 +161,16 @@ def _authorize_session(
     if (user is None) == (system_authorization is None):
         raise PermissionDenied("Audit authorization requires exactly one actor or system authorization.")
     if user is not None:
-        return _authorize_human_session(session, user, permission)
-    if session.tenant_id is None:
-        raise PermissionDenied("Actorless global audit operations are not supported.")
-    return _authorize_system_session(session, system_authorization, permission, operation)
+        tenant_ids = _authorize_human_session(session, user, permission)
+    else:
+        if session.tenant_id is None:
+            raise PermissionDenied("Actorless global audit operations are not supported.")
+        tenant_ids = _authorize_system_session(session, system_authorization, permission, operation)
+    try:
+        session.validate_location_integrity(allowed_tenant_ids=tenant_ids)
+    except ValidationError as exc:
+        raise PermissionDenied("The audit session location is outside the authorized tenant scope.") from exc
+    return tenant_ids
 
 
 def _expected_assets_for_tenants(session: AuditSession, tenant_ids: frozenset[int]) -> QuerySet[Asset]:
@@ -863,7 +871,8 @@ def _frozen_rehome_location(
     if type(location_id) is not int or location_id <= 0:
         raise ValidationError(_("The frozen re-home target is unavailable."))
     location = (
-        Location._base_manager.filter(
+        Location._base_manager.select_for_update(of=("self",))
+        .filter(
             pk=location_id,
             deleted_at__isnull=True,
             tenant_id__in=tenant_ids,
@@ -879,8 +888,11 @@ def _frozen_rehome_location(
     return location
 
 
-def _canonical_missing_status() -> StatusLabel:
-    missing_status = StatusLabel._base_manager.filter(slug="missing", deleted_at__isnull=True).first()
+def _canonical_missing_status(*, lock: bool = False) -> StatusLabel:
+    queryset = StatusLabel._base_manager.filter(slug="missing", deleted_at__isnull=True)
+    if lock:
+        queryset = queryset.select_for_update(of=("self",))
+    missing_status = queryset.first()
     if missing_status is None or missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
         raise ValidationError(_("The canonical Missing status is unavailable or misconfigured."))
     return missing_status
@@ -1001,7 +1013,6 @@ def flag_missing_assets(
     if not missing_rows:
         return {"flagged": 0, "skipped": 0}
 
-    missing_status = _canonical_missing_status()
     assets = {
         asset.pk: asset
         for asset in Asset._base_manager.select_for_update(of=("self",))
@@ -1024,6 +1035,7 @@ def flag_missing_assets(
     )
     if any(asset.tenant_id not in current_tenant_ids for asset in assets.values()):
         raise PermissionDenied("The actor is no longer authorized for every missing-asset target.")
+    missing_status = _canonical_missing_status(lock=True)
     flagged = 0
     skipped = 0
     for row in missing_rows:
