@@ -1,0 +1,542 @@
+{
+  "schema": 1,
+  "spec_root": "itambox/tests/e2e",
+  "full_spec_path": "spec",
+  "always_run_scopes": [
+    "legacy-smoke",
+    "smoke"
+  ],
+  "full_scopes": [
+    "all"
+  ],
+  "scopes": {
+    "a11y": {
+      "path": "spec/accessibility",
+      "kind": "qualification",
+      "owner": "accessibility"
+    },
+    "all": {
+      "path": "spec",
+      "kind": "special",
+      "owner": "complete-suite"
+    },
+    "app:assets": {
+      "path": "spec/apps/assets",
+      "kind": "app",
+      "owner": "assets"
+    },
+    "app:compliance": {
+      "path": "spec/apps/compliance",
+      "kind": "app",
+      "owner": "compliance"
+    },
+    "app:core": {
+      "path": "spec/apps/core",
+      "kind": "app",
+      "owner": "core"
+    },
+    "app:extras": {
+      "path": "spec/apps/extras",
+      "kind": "app",
+      "owner": "extras"
+    },
+    "app:inventory": {
+      "path": "spec/apps/inventory",
+      "kind": "app",
+      "owner": "inventory"
+    },
+    "app:itambox": {
+      "path": "spec/apps/itambox",
+      "kind": "app",
+      "owner": "itambox"
+    },
+    "app:licenses": {
+      "path": "spec/apps/licenses",
+      "kind": "app",
+      "owner": "licenses"
+    },
+    "app:organization": {
+      "path": "spec/apps/organization",
+      "kind": "app",
+      "owner": "organization"
+    },
+    "app:procurement": {
+      "path": "spec/apps/procurement",
+      "kind": "app",
+      "owner": "procurement"
+    },
+    "app:software": {
+      "path": "spec/apps/software",
+      "kind": "app",
+      "owner": "software"
+    },
+    "app:subscriptions": {
+      "path": "spec/apps/subscriptions",
+      "kind": "app",
+      "owner": "subscriptions"
+    },
+    "app:users": {
+      "path": "spec/apps/users",
+      "kind": "app",
+      "owner": "users"
+    },
+    "contract:asset-custody": {
+      "path": "spec/contracts/asset-custody",
+      "kind": "contract",
+      "owner": "asset-custody"
+    },
+    "contract:auth-rbac": {
+      "path": "spec/contracts/auth-rbac",
+      "kind": "contract",
+      "owner": "auth-rbac"
+    },
+    "contract:cross-app": {
+      "path": "spec/contracts/cross-app",
+      "kind": "contract",
+      "owner": "cross-app"
+    },
+    "contract:generic-object": {
+      "path": "spec/contracts/generic-object",
+      "kind": "contract",
+      "owner": "generic-object"
+    },
+    "contract:jobs": {
+      "path": "spec/contracts/jobs",
+      "kind": "contract",
+      "owner": "jobs"
+    },
+    "contract:soft-delete": {
+      "path": "spec/contracts/soft-delete",
+      "kind": "contract",
+      "owner": "soft-delete"
+    },
+    "contract:tenant-isolation": {
+      "path": "spec/contracts/tenant-isolation",
+      "kind": "contract",
+      "owner": "tenant-isolation"
+    },
+    "layout": {
+      "path": "spec/layout",
+      "kind": "qualification",
+      "owner": "layout"
+    },
+    "legacy-smoke": {
+      "path": "spec/legacy-smoke",
+      "kind": "qualification",
+      "owner": "legacy-smoke"
+    },
+    "smoke": {
+      "path": "spec/smoke",
+      "kind": "qualification",
+      "owner": "smoke"
+    }
+  },
+  "rules": [
+    {
+      "id": "e2e-policy-infrastructure",
+      "decision": "full",
+      "patterns": [
+        ".github/workflows/e2e.yml",
+        ".github/workflows/release.yml",
+        "itambox/tests/e2e/auth/**",
+        "itambox/tests/e2e/fixtures/**",
+        "itambox/tests/e2e/global-setup.ts",
+        "itambox/tests/e2e/helpers/**",
+        "itambox/tests/e2e/package-lock.json",
+        "itambox/tests/e2e/package.json",
+        "itambox/tests/e2e/playwright.config.ts",
+        "itambox/tests/e2e/playwright.layout.config.ts",
+        "itambox/tests/e2e/preflight-check.mjs",
+        "itambox/tests/e2e/preflight-output.mjs",
+        "scripts/certify_e2e_run.py",
+        "scripts/check_e2e_gate.py",
+        "scripts/e2e_scope_map.yaml",
+        "scripts/select_e2e_scopes.py",
+        "scripts/tests/test_certify_e2e_run.py",
+        "scripts/tests/test_e2e_gate.py",
+        "scripts/tests/test_e2e_workflow_policy.py",
+        "scripts/tests/test_select_e2e_scopes.py"
+      ]
+    },
+    {
+      "id": "repository-ci-policy",
+      "decision": "full",
+      "patterns": [
+        ".github/workflows/**",
+        "Dockerfile",
+        "Makefile",
+        "docker-compose.yml",
+        "package-lock.json",
+        "package.json",
+        "pyproject.toml",
+        "scripts/**",
+        "setup.cfg",
+        "uv.lock"
+      ]
+    },
+    {
+      "id": "shared-migration-seed-runtime",
+      "decision": "full",
+      "patterns": [
+        "itambox/*/management/commands/seed_data.py",
+        "itambox/*/migrations/**",
+        "itambox/core/management/commands/**"
+      ]
+    },
+    {
+      "id": "shared-tenant-auth-runtime",
+      "decision": "full",
+      "patterns": [
+        "itambox/core/auth/**",
+        "itambox/core/managers.py",
+        "itambox/core/settings/**",
+        "itambox/itambox/middleware.py",
+        "itambox/organization/access.py",
+        "itambox/organization/models.py",
+        "itambox/organization/models/**",
+        "itambox/users/backends.py"
+      ]
+    },
+    {
+      "id": "shared-framework-runtime",
+      "decision": "full",
+      "patterns": [
+        "itambox/core/**",
+        "itambox/itambox/**",
+        "itambox/static/src/**",
+        "itambox/templates/core/**",
+        "itambox/templates/errors/**",
+        "itambox/templates/generic/**",
+        "itambox/templates/global_includes/**",
+        "itambox/templates/graphql/**",
+        "itambox/templates/htmx/**",
+        "itambox/templates/inc/**",
+        "itambox/templates/includes/**",
+        "itambox/templates/navigation/**",
+        "itambox/templates/registration/**",
+        "itambox/templates/rest_framework/**"
+      ]
+    },
+    {
+      "id": "assets-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/assets/**",
+        "itambox/templates/assets/**",
+        "itambox/tests/e2e/spec/apps/assets/**"
+      ],
+      "scopes": [
+        "app:assets",
+        "contract:asset-custody",
+        "contract:cross-app",
+        "contract:soft-delete",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "compliance-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/compliance/**",
+        "itambox/tests/e2e/spec/apps/compliance/**"
+      ],
+      "scopes": [
+        "app:compliance",
+        "contract:asset-custody",
+        "contract:jobs",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "extras-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/extras/**",
+        "itambox/templates/extras/**",
+        "itambox/tests/e2e/spec/apps/extras/**"
+      ],
+      "scopes": [
+        "app:extras",
+        "contract:generic-object",
+        "contract:jobs",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "inventory-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/inventory/**",
+        "itambox/tests/e2e/spec/apps/inventory/**"
+      ],
+      "scopes": [
+        "app:inventory",
+        "contract:asset-custody",
+        "contract:cross-app",
+        "contract:soft-delete",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "licenses-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/licenses/**",
+        "itambox/templates/licenses/**",
+        "itambox/tests/e2e/spec/apps/licenses/**"
+      ],
+      "scopes": [
+        "app:licenses",
+        "contract:cross-app",
+        "contract:soft-delete",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "organization-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/organization/**",
+        "itambox/templates/organization/**",
+        "itambox/tests/e2e/spec/apps/organization/**"
+      ],
+      "scopes": [
+        "app:organization",
+        "contract:auth-rbac",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "procurement-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/procurement/**",
+        "itambox/tests/e2e/spec/apps/procurement/**"
+      ],
+      "scopes": [
+        "app:procurement",
+        "contract:cross-app",
+        "contract:jobs",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "software-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/software/**",
+        "itambox/templates/software/**",
+        "itambox/tests/e2e/spec/apps/software/**"
+      ],
+      "scopes": [
+        "app:software",
+        "contract:cross-app",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "subscriptions-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/subscriptions/**",
+        "itambox/templates/subscriptions/**",
+        "itambox/tests/e2e/spec/apps/subscriptions/**"
+      ],
+      "scopes": [
+        "app:subscriptions",
+        "contract:cross-app",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "users-production",
+      "decision": "selected",
+      "patterns": [
+        "itambox/templates/users/**",
+        "itambox/tests/e2e/spec/apps/users/**",
+        "itambox/users/**"
+      ],
+      "scopes": [
+        "app:users",
+        "contract:auth-rbac",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "app-core-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/apps/core/**"
+      ],
+      "scopes": [
+        "app:core",
+        "contract:auth-rbac",
+        "contract:generic-object",
+        "contract:jobs",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "app-itambox-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/apps/itambox/**"
+      ],
+      "scopes": [
+        "app:itambox",
+        "contract:auth-rbac",
+        "contract:generic-object",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "contract-asset-custody-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/asset-custody/**"
+      ],
+      "scopes": [
+        "contract:asset-custody"
+      ]
+    },
+    {
+      "id": "contract-auth-rbac-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/auth-rbac/**"
+      ],
+      "scopes": [
+        "contract:auth-rbac"
+      ]
+    },
+    {
+      "id": "contract-cross-app-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/cross-app/**"
+      ],
+      "scopes": [
+        "contract:cross-app"
+      ]
+    },
+    {
+      "id": "contract-generic-object-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/generic-object/**"
+      ],
+      "scopes": [
+        "contract:generic-object"
+      ]
+    },
+    {
+      "id": "contract-jobs-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/jobs/**"
+      ],
+      "scopes": [
+        "contract:jobs"
+      ]
+    },
+    {
+      "id": "contract-soft-delete-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/soft-delete/**"
+      ],
+      "scopes": [
+        "contract:soft-delete"
+      ]
+    },
+    {
+      "id": "contract-tenant-isolation-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/contracts/tenant-isolation/**"
+      ],
+      "scopes": [
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "accessibility-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/accessibility/**"
+      ],
+      "scopes": [
+        "a11y"
+      ]
+    },
+    {
+      "id": "layout-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/layout/**"
+      ],
+      "scopes": [
+        "layout"
+      ]
+    },
+    {
+      "id": "legacy-smoke-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/legacy-smoke/**"
+      ],
+      "scopes": [
+        "legacy-smoke"
+      ]
+    },
+    {
+      "id": "smoke-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/smoke/**"
+      ],
+      "scopes": [
+        "smoke"
+      ]
+    },
+    {
+      "id": "safe-maintainer-metadata",
+      "decision": "safe_ignore",
+      "patterns": [
+        ".github/ISSUE_TEMPLATE/**",
+        ".github/PULL_REQUEST_TEMPLATE.md"
+      ]
+    }
+  ],
+  "known_production_roots": [
+    ".github/workflows/**",
+    "Dockerfile",
+    "Makefile",
+    "docker-compose.yml",
+    "itambox/assets/**",
+    "itambox/compliance/**",
+    "itambox/core/**",
+    "itambox/extras/**",
+    "itambox/inventory/**",
+    "itambox/itambox/**",
+    "itambox/licenses/**",
+    "itambox/organization/**",
+    "itambox/procurement/**",
+    "itambox/software/**",
+    "itambox/static/src/**",
+    "itambox/subscriptions/**",
+    "itambox/templates/**",
+    "itambox/tests/e2e/**",
+    "itambox/users/**",
+    "package-lock.json",
+    "package.json",
+    "pyproject.toml",
+    "scripts/**",
+    "setup.cfg",
+    "uv.lock"
+  ],
+  "rollback": {
+    "force_full_pr_selection": false,
+    "switch_path": "scripts/e2e_scope_map.yaml"
+  }
+}
