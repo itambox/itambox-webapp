@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-
 SCHEMA = 1
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -867,9 +866,7 @@ def _validate_reason(
         raise ValueError("added/modified reason cannot have an old path")
     if reason["status"] == "D" and reason["new_path"] is not None:
         raise ValueError("deleted reason cannot have a new path")
-    if reason["status"] in {"R", "C"} and (
-        reason["old_path"] is None or reason["new_path"] is None
-    ):
+    if reason["status"] in {"R", "C"} and (reason["old_path"] is None or reason["new_path"] is None):
         raise ValueError("rename/copy reason must have both old and new paths")
     if reason["path"] not in {reason["old_path"], reason["new_path"]}:
         raise ValueError("selection reason path must be one of its old/new identities")
@@ -946,9 +943,7 @@ def validate_selection(selection: Any, repo_root: str | Path, document: Mapping[
                 target = _contained_path(spec_root, relative, "selected spec path")
                 if not _discover_specs(target):
                     raise ValueError(f"selected spec path {relative!r} has no discoverable tests")
-            selected_reason_scopes = {
-                scope for reason in reasons for scope in reason.get("selected", [])
-            }
+            selected_reason_scopes = {scope for reason in reasons for scope in reason.get("selected", [])}
             if not selected_reason_scopes:
                 raise ValueError("selected mode has no product classification reason")
         return selection
@@ -1048,8 +1043,8 @@ def selection_summary(selection: Mapping[str, Any]) -> str:
         f"- Head: `{selection['head_sha']}`",
         f"- Merge base: `{selection['merge_base_sha']}`",
         f"- Changed identities: {len(selection['reasons'])}",
-        f"- Scopes: {', '.join(selection['scopes']) if selection['scopes'] else '(none)' }",
-        f"- Spec paths: {', '.join(selection['spec_paths']) if selection['spec_paths'] else '(none)' }",
+        f"- Scopes: {', '.join(selection['scopes']) if selection['scopes'] else '(none)'}",
+        f"- Spec paths: {', '.join(selection['spec_paths']) if selection['spec_paths'] else '(none)'}",
     ]
     if selection["reasons"]:
         lines.extend(["", "### Classification", ""])

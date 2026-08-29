@@ -10,7 +10,6 @@ import re
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "e2e.yml"
 RELEASE = REPO_ROOT / ".github" / "workflows" / "release.yml"

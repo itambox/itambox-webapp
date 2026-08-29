@@ -38,7 +38,12 @@ class CertificationTests(unittest.TestCase):
             "schema": 1,
             "selection_identity": copy.deepcopy(self.identity),
             "tested_checkout_sha": HEAD,
-            "selected_spec_paths": ["spec/apps/assets", "spec/contracts/asset-custody", "spec/legacy-smoke", "spec/smoke"],
+            "selected_spec_paths": [
+                "spec/apps/assets",
+                "spec/contracts/asset-custody",
+                "spec/legacy-smoke",
+                "spec/smoke",
+            ],
             "discovered_specs": [
                 "spec/apps/assets/contract.spec.ts",
                 "spec/contracts/asset-custody/contract.spec.ts",
@@ -47,7 +52,11 @@ class CertificationTests(unittest.TestCase):
             ],
             "discovered_tests": [
                 {"id": "assets::contract", "spec": "spec/apps/assets/contract.spec.ts", "project": "operator"},
-                {"id": "custody::contract", "spec": "spec/contracts/asset-custody/contract.spec.ts", "project": "operator"},
+                {
+                    "id": "custody::contract",
+                    "spec": "spec/contracts/asset-custody/contract.spec.ts",
+                    "project": "operator",
+                },
                 {"id": "legacy::contract", "spec": "spec/legacy-smoke/contract.spec.ts", "project": "operator"},
                 {"id": "smoke::contract", "spec": "spec/smoke/contract.spec.ts", "project": "operator"},
             ],
@@ -101,8 +110,12 @@ class CertificationTests(unittest.TestCase):
 
     def test_selected_path_with_no_discovered_tests_fails(self):
         discovery = copy.deepcopy(self.discovery)
-        discovery["discovered_specs"] = [path for path in discovery["discovered_specs"] if not path.startswith("spec/apps/assets/")]
-        discovery["discovered_tests"] = [test for test in discovery["discovered_tests"] if not test["spec"].startswith("spec/apps/assets/")]
+        discovery["discovered_specs"] = [
+            path for path in discovery["discovered_specs"] if not path.startswith("spec/apps/assets/")
+        ]
+        discovery["discovered_tests"] = [
+            test for test in discovery["discovered_tests"] if not test["spec"].startswith("spec/apps/assets/")
+        ]
         with self.assertRaises(CertificationError):
             self.run_certification(discovery=discovery)
 
@@ -219,9 +232,7 @@ class CertificationTests(unittest.TestCase):
         discovery["tested_checkout_sha"] = HEAD
         discovery["selected_spec_paths"] = ["spec"]
         discovery["discovered_specs"] = all_specs
-        discovery["discovered_tests"] = [
-            {"id": spec, "spec": spec, "project": "operator"} for spec in all_specs
-        ]
+        discovery["discovered_tests"] = [{"id": spec, "spec": spec, "project": "operator"} for spec in all_specs]
         execution = copy.deepcopy(self.execution)
         execution["selection_identity"] = copy.deepcopy(full_identity)
         execution["tested_checkout_sha"] = HEAD
@@ -237,24 +248,34 @@ class CertificationTests(unittest.TestCase):
             }
             for index, spec in enumerate(all_specs)
         ]
-        result = self.run_certification(selection=selection, discovery=discovery, execution=execution, current={
-            "event_name": "push",
-            "base_sha": HEAD,
-            "head_sha": HEAD,
-            "merge_base_sha": HEAD,
-            "changed_path_digest": selection["changed_path_digest"],
-        })
-        self.assertTrue(result["success"])
-
-        discovery["discovered_specs"] = all_specs[:-1]
-        with self.assertRaises(CertificationError):
-            self.run_certification(selection=selection, discovery=discovery, execution=execution, current={
+        result = self.run_certification(
+            selection=selection,
+            discovery=discovery,
+            execution=execution,
+            current={
                 "event_name": "push",
                 "base_sha": HEAD,
                 "head_sha": HEAD,
                 "merge_base_sha": HEAD,
                 "changed_path_digest": selection["changed_path_digest"],
-            })
+            },
+        )
+        self.assertTrue(result["success"])
+
+        discovery["discovered_specs"] = all_specs[:-1]
+        with self.assertRaises(CertificationError):
+            self.run_certification(
+                selection=selection,
+                discovery=discovery,
+                execution=execution,
+                current={
+                    "event_name": "push",
+                    "base_sha": HEAD,
+                    "head_sha": HEAD,
+                    "merge_base_sha": HEAD,
+                    "changed_path_digest": selection["changed_path_digest"],
+                },
+            )
 
 
 if __name__ == "__main__":

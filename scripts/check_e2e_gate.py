@@ -296,16 +296,16 @@ def evaluate_gate(value: Any) -> dict[str, Any]:
     if certification["success"] is not True or certification["verdict"] != "passed":
         return _failed(mode, "certification did not pass")
     try:
-        certification_identity = _identity(
-            {key: certification[key] for key in IDENTITY_KEYS}, "certification identity"
-        )
+        certification_identity = _identity({key: certification[key] for key in IDENTITY_KEYS}, "certification identity")
     except _InvalidEvidence as exc:
         return _failed(mode, str(exc))
     if certification_identity != selected_identity or certification_identity != current:
         return _failed(mode, "certification identity does not match selection/current event")
     if "tested_checkout_sha" in certification and certification["tested_checkout_sha"] != runtime_checkout_sha:
         return _failed(mode, "certification tested checkout does not match current event checkout")
-    if "tested_checkout_kind" in certification and certification["tested_checkout_kind"] != value["current"].get("tested_checkout_kind", "head"):
+    if "tested_checkout_kind" in certification and certification["tested_checkout_kind"] != value["current"].get(
+        "tested_checkout_kind", "head"
+    ):
         return _failed(mode, "certification tested checkout kind does not match current event")
     return {"schema": SCHEMA, "success": True, "verdict": "passed", "mode": mode, "reasons": []}
 

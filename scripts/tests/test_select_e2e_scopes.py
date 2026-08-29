@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 
 from scripts.select_e2e_scopes import (
-    SelectionError,
     ScopeMapError,
+    SelectionError,
     build_selection,
     canonical_json,
     parse_name_status_z,
@@ -35,7 +35,9 @@ def _map_document(root: Path) -> dict:
     for relative in scope_paths.values():
         path = root / "itambox" / "tests" / "e2e" / relative
         path.mkdir(parents=True, exist_ok=True)
-        (path / "contract.spec.ts").write_text("import { test } from '@playwright/test';\ntest('real');\n", encoding="utf-8")
+        (path / "contract.spec.ts").write_text(
+            "import { test } from '@playwright/test';\ntest('real');\n", encoding="utf-8"
+        )
     return {
         "schema": 1,
         "spec_root": "itambox/tests/e2e",
@@ -234,9 +236,7 @@ class SelectionClassificationTests(unittest.TestCase):
         self.assertEqual(deleted["mode"], "selected")
         self.assertIn("app:assets", deleted["scopes"])
 
-        renamed = self.select(
-            [{"status": "R", "old_path": "src/assets/old.py", "new_path": "src/unknown/new.py"}]
-        )
+        renamed = self.select([{"status": "R", "old_path": "src/assets/old.py", "new_path": "src/unknown/new.py"}])
         self.assertEqual(renamed["mode"], "full")
         identities = {reason["path"] for reason in renamed["reasons"]}
         self.assertEqual(identities, {"src/assets/old.py", "src/unknown/new.py"})

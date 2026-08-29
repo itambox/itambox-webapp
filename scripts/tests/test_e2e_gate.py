@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.check_e2e_gate import evaluate_gate, GateInputError
+from scripts.check_e2e_gate import GateInputError, evaluate_gate
 
 BASE = "a" * 40
 HEAD = "b" * 40
@@ -31,14 +31,16 @@ class GatePolicyTests(unittest.TestCase):
             **self.identity,
             "scopes": ["app:assets", "legacy-smoke", "smoke"],
             "spec_paths": ["spec/apps/assets", "spec/legacy-smoke", "spec/smoke"],
-            "reasons": [{
-                "matched_rule": "assets-source",
-                "new_path": "src/assets/services.py",
-                "old_path": None,
-                "path": "src/assets/services.py",
-                "selected": ["app:assets"],
-                "status": "M",
-            }],
+            "reasons": [
+                {
+                    "matched_rule": "assets-source",
+                    "new_path": "src/assets/services.py",
+                    "old_path": None,
+                    "path": "src/assets/services.py",
+                    "selected": ["app:assets"],
+                    "status": "M",
+                }
+            ],
         }
         self.certification = {"schema": 1, "success": True, "verdict": "passed", **self.identity}
         self.base = {

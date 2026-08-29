@@ -185,9 +185,7 @@ def _filesystem_specs(e2e_root: Path, selected_paths: list[str]) -> list[str]:
         if target.is_file():
             candidates = [target] if target.name.endswith(SPEC_SUFFIXES) else []
         elif target.is_dir():
-            candidates = [
-                path for path in target.rglob("*") if path.is_file() and path.name.endswith(SPEC_SUFFIXES)
-            ]
+            candidates = [path for path in target.rglob("*") if path.is_file() and path.name.endswith(SPEC_SUFFIXES)]
         else:
             candidates = []
         for candidate in candidates:
@@ -514,10 +512,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = beneath_root(args.output)
         _write_canonical(output, result)
         # A second strict parse detects accidental non-canonical/truncated writes.
-        if (
-            _load_required(output, "E2E certification") != result
-            or output.read_bytes() != canonical_json(result).encode("utf-8")
-        ):
+        if _load_required(output, "E2E certification") != result or output.read_bytes() != canonical_json(
+            result
+        ).encode("utf-8"):
             raise CertificationError("written certification did not round-trip canonically")
         summary = certification_summary(result)
         if args.summary:

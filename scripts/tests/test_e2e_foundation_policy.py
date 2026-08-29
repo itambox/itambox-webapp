@@ -5,7 +5,6 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 E2E_ROOT = REPO_ROOT / "itambox" / "tests" / "e2e"
 
@@ -50,7 +49,9 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         self.assertIn("fullyParallel: false", config)
 
     def test_automatic_fixture_contracts_are_fail_closed(self):
-        fixture = (E2E_ROOT / "fixtures" / "test.ts").read_text(encoding="utf-8") + (E2E_ROOT / "fixtures" / "playwright-fixtures.ts").read_text(encoding="utf-8")
+        fixture = (E2E_ROOT / "fixtures" / "test.ts").read_text(encoding="utf-8") + (
+            E2E_ROOT / "fixtures" / "playwright-fixtures.ts"
+        ).read_text(encoding="utf-8")
         cleanup = (E2E_ROOT / "fixtures" / "cleanup.ts").read_text(encoding="utf-8")
         tenant = (E2E_ROOT / "fixtures" / "tenant.ts").read_text(encoding="utf-8")
         errors = (E2E_ROOT / "helpers" / "errors.ts").read_text(encoding="utf-8")
