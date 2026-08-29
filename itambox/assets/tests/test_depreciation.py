@@ -59,6 +59,13 @@ class TestComputeBookValue(TestCase):
         result = compute_book_value(asset)
         self.assertEqual(result, Decimal("1000.00"))
 
+    def test_policy_without_clock_start_returns_rounded_purchase_cost(self):
+        policy = _policy(months=36)
+        asset_type = SimpleNamespace(depreciation_id=1, depreciation=policy)
+        asset = _asset(purchase_cost="1000.005", purchase_date=None, in_service_date=None, asset_type=asset_type)
+
+        self.assertEqual(compute_book_value(asset, on_date=datetime.date(2025, 1, 1)), Decimal("1000.01"))
+
     def test_mid_life_straight_line(self):
         # 36-month policy, purchased 18 months ago (exclude_purchase_month)
         # monthly = (1200-200)/36 = 27.77... per month
