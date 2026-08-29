@@ -86,6 +86,7 @@
     "scripts/tests/test_exception_policy.py",
     "scripts/tests/test_inline_styles.py",
     "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_normalized_migration_audit.py",
     "scripts/tests/test_typing_policy.py"
   ],
   "baseline_tests": [
@@ -177,6 +178,7 @@
     "scripts/tests/test_exception_policy.py",
     "scripts/tests/test_inline_styles.py",
     "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_normalized_migration_audit.py",
     "scripts/tests/test_typing_policy.py"
   ],
   "supporting_files": [
