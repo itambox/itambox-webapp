@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext, Page } from '@playwright/test';
+import { test, expect } from '../../../fixtures/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 
 function requiredEnv(name: string): string {
   const value = process.env[name];

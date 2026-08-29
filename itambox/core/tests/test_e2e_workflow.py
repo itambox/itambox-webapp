@@ -7,7 +7,7 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "e2e.yml"
 PLAYWRIGHT_CONFIG_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "playwright.config.ts"
 PREFLIGHT_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "preflight-check.mjs"
 E2E_PACKAGE_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "package.json"
-SCIM_SPEC_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "spec" / "07-sso-scim.spec.ts"
+SCIM_SPEC_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "spec" / "apps" / "users" / "sso-scim.spec.ts"
 
 
 def _folded_json_env_value(document, key):

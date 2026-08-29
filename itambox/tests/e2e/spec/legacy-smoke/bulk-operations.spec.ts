@@ -1,7 +1,7 @@
 import { test, expect, type Browser } from '@playwright/test';
 import * as path from 'path';
 
-const aggregateStorageState = path.resolve(__dirname, '../aggregateStorageState.json');
+const aggregateStorageState = path.resolve(__dirname, '../../.auth/aggregate.json');
 
 test.describe('The Bulk Operation Workflow Matrix', () => {
 

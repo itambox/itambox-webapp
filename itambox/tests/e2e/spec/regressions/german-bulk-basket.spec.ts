@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
 
-const aggregateStorageState = path.resolve(__dirname, '../aggregateStorageState.json');
+const aggregateStorageState = path.resolve(__dirname, '../../.auth/aggregate.json');
 
 /**
  * Issue #437: the two bulk-basket tenant strings were untranslated in the

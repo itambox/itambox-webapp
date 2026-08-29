@@ -77,12 +77,14 @@ class CertificationTests(unittest.TestCase):
     def tearDown(self):
         self.tempdir.cleanup()
 
-    def run_certification(self, selection=None, discovery=None, execution=None, current=None):
+    def run_certification(self, *, selection=None, discovery=Ellipsis, execution=None, current=None):
+        if discovery is Ellipsis:
+            discovery = self.discovery
         return certify_run(
-            selection or self.selection,
-            discovery or self.discovery,
-            execution or self.execution,
-            current or self.identity,
+            selection if selection is not None else self.selection,
+            discovery,
+            execution if execution is not None else self.execution,
+            current if current is not None else self.identity,
             self.root,
             self.scope_map,
         )
