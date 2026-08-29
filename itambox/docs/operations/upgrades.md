@@ -61,6 +61,43 @@ forward order above as soon as possible.
 4. Take a complete [database, media, and secret backup](backup-restore.md) and verify that it can be read.
 5. Plan a maintenance window; prerelease migrations are not guaranteed to be compatible with the old application.
 
+6. If the target changes the migration baseline, run the read-only recognition
+   preflight described below before allowing the candidate to perform any
+   migration work.
+
+## Migration baseline recognition preflight
+
+The current release retains the issue-#88 replacement layer and its later
+post-transition migrations. Before a cleanup release or a recovery retry, run
+this command against the intended database from the exact candidate checkout:
+
+```bash
+cd itambox
+uv run --locked --no-sync python manage.py migration_baseline_preflight --format=json
+```
+
+The command reads only first-party migration-recorder rows and the checked
+runtime manifest. Exit code `0` means that all replacement rows, their complete
+historical recognition set, and every current post-transition leaf are present.
+A non-zero result is a stop condition. It distinguishes complete old history
+without replacement recognition, partial old history, partial replacement,
+incomplete post-transition state, empty/unmigrated databases, and unknown or
+mixed first-party rows. Remediation is to deploy the designated transition
+release and run the ordinary migration executor, or to restore the verified
+predecessor and investigate the schema/data evidence as directed by the state.
+
+The command does not validate that an image or running process matches a
+caller-declared revision. Bind the exact full Git SHA to the immutable image or
+checkout separately. A failed or interrupted migration can have applied
+non-atomic operations before its recorder row commits; a missing row therefore
+never proves that no schema/data change occurred. Use restore-first rollback and
+fresh schema/protected-canary comparisons before retrying.
+
+The preflight is a prerequisite for a future baseline cleanup, not a claim that
+this prerelease supports arbitrary version skipping. The current checked layout
+is still transitional; no historical migration file is removed, renamed, or
+pruned by this release.
+
 ## Source-built Compose update
 
 ```bash
