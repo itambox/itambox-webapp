@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('asset custody contract', { tag: '@pr' }, () => {
   test('asset detail exposes an explicit custody action surface', async ({ page }) => {

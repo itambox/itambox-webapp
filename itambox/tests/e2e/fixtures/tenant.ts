@@ -18,7 +18,7 @@ export function assertSafeTarget(testInfo: TestInfo): void {
   if (SHARED_TARGETS.has(host)) {
     throw new Error(`Destructive E2E is permanently blocked for shared target ${url.origin}.`);
   }
-  if (testInfo.tags.includes('@non-destructive')) return;
+  if (testInfo.tags.includes('@non-destructive') && testInfo.project.name === 'remote-smoke') return;
 
   if (process.env.E2E_ALLOW_DESTRUCTIVE !== '1') {
     throw new Error(

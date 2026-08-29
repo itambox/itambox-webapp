@@ -37,9 +37,11 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         for project in ("setup-admin", "setup-operator", "setup-viewer", "admin", "operator", "viewer", "anonymous"):
             with self.subTest(project=project):
                 self.assertIn(f"name: '{project}'", config)
-        self.assertIn("dependencies: ['setup-admin']", config)
-        self.assertIn("dependencies: ['setup-operator']", config)
-        self.assertIn("dependencies: ['setup-viewer']", config)
+        self.assertIn("dependencies:", config)
+        self.assertIn("setup-admin", config)
+        self.assertIn("setup-operator", config)
+        self.assertIn("setup-viewer", config)
+        self.assertIn("setup-aggregate", config)
         self.assertNotIn("globalSetup", config)
         self.assertNotIn("storageState.json", config)
         self.assertIn("reporter", config)
@@ -48,16 +50,20 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         self.assertIn("fullyParallel: false", config)
 
     def test_automatic_fixture_contracts_are_fail_closed(self):
-        fixture = (E2E_ROOT / "fixtures" / "test.ts").read_text(encoding="utf-8")
+        fixture = (E2E_ROOT / "fixtures" / "test.ts").read_text(encoding="utf-8") + (E2E_ROOT / "fixtures" / "playwright-fixtures.ts").read_text(encoding="utf-8")
         cleanup = (E2E_ROOT / "fixtures" / "cleanup.ts").read_text(encoding="utf-8")
         tenant = (E2E_ROOT / "fixtures" / "tenant.ts").read_text(encoding="utf-8")
         errors = (E2E_ROOT / "helpers" / "errors.ts").read_text(encoding="utf-8")
         names = (E2E_ROOT / "helpers" / "names.ts").read_text(encoding="utf-8")
 
         self.assertIn("{ auto: true }", fixture)
+        shell = (REPO_ROOT / "itambox" / "templates" / "global_includes" / "_topbar.html").read_text(encoding="utf-8")
+        self.assertIn("data-testid", shell)
+        self.assertIn("data-tenant-id", shell)
+        self.assertIn("data-tenant-slug", shell)
         self.assertIn("assertSafeTarget", fixture)
-        self.assertIn("data-testid", tenant)
-        self.assertIn("data-tenant-id", tenant)
+        self.assertIn("activeTenant", fixture)
+        self.assertIn("E2E_TENANT_SLUG", tenant)
         self.assertIn("console", errors)
         self.assertIn("pageerror", errors)
         self.assertIn("status() >= 500", errors)

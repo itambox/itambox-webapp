@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('jobs contract', { tag: '@pr' }, () => {
   test('the asset scanner entry point is reachable without hiding a missing route', async ({ page }) => {

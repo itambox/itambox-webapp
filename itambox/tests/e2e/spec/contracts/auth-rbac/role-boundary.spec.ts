@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('authentication and RBAC contract', () => {
   test.describe('operator', { tag: '@operator' }, () => {

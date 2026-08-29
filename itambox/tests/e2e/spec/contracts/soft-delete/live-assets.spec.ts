@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('soft-delete contract', { tag: '@pr' }, () => {
   test('live asset list has a stable object-table boundary', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('generic object contract', { tag: '@pr' }, () => {
   test('the exact search form renders and returns a document', async ({ page }) => {

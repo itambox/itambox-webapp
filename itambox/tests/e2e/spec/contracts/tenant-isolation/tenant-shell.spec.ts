@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/test';
+import { test, expect } from '../../../fixtures/test';
 
 test.describe('tenant isolation contract', { tag: '@pr' }, () => {
   test('REST tenant visibility and rendered tenant identity agree', async ({ page, request, activeTenant }) => {

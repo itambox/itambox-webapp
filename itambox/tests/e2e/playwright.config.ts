@@ -73,6 +73,7 @@ export default defineConfig({
     {
       name: 'admin',
       dependencies: ['setup-admin', 'setup-aggregate'],
+      grepInvert: /@(non-destructive|operator|viewer)/,
       use: { ...browserDefaults, storageState: path.join(authDir, 'admin.json') },
     },
     {
@@ -91,6 +92,11 @@ export default defineConfig({
       name: 'anonymous',
       grep: /@anonymous/,
       use: { ...browserDefaults, storageState: { cookies: [], origins: [] } },
+    },
+    {
+      name: 'remote-smoke',
+      grep: /@non-destructive/,
+      use: { ...browserDefaults, storageState: undefined },
     },
   ],
 });

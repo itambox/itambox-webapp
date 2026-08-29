@@ -1,5 +1,5 @@
-import { test, expect } from '../../fixtures/test';
-import { openOwnedSurface } from '../../helpers/app-surface';
+import { test, expect } from '../../../fixtures/test';
+import { openOwnedSurface } from '../../../helpers/app-surface';
 
 test.describe('ITAMbox platform qualification surface', { tag: '@pr' }, () => {
   test('health endpoint remains reachable from the authenticated shell', async ({ page }) => {

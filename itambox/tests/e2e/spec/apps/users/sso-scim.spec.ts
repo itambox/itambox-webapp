@@ -46,7 +46,7 @@ async function expectScimError(response: Awaited<ReturnType<APIRequestContext['g
 }
 
 async function createScimUser(request: APIRequestContext, label: string): Promise<ScimUserFixture> {
-  const suffix = `${Date.now()}-${label}`;
+  const suffix = `${process.env.E2E_CURRENT_TEST_ID || process.env.GITHUB_RUN_ID || 'local'}-${label}`;
   const user = {
     userName: `e2e.scim.${suffix}`,
     email: `e2e.scim.${suffix}@example.com`,
