@@ -1,13 +1,9 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect } from '../../../fixtures/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 
 const allocationCreatePath = '/inventory/component-allocations/add/';
 const allocationListPath = '/inventory/component-allocations/';
 let configuredTenantId: string | undefined;
-
-async function hideDebugToolbar(page: Page): Promise<void> {
-  const hide = page.getByText('Hide »', { exact: true });
-  if ((await hide.count()) > 0 && (await hide.isVisible())) await hide.click();
-}
 
 async function responseRows(
   request: APIRequestContext,
@@ -18,12 +14,16 @@ async function responseRows(
   const response = await request.get(`${scopedPath.pathname}${scopedPath.search}`);
   expect(response.status(), await response.text()).toBe(200);
   const payload = await response.json();
-  return Array.isArray(payload) ? payload : payload.results || [];
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.results)) {
+    throw new Error(`Expected a result list from ${path}.`);
+  }
+  return payload.results as Record<string, any>[];
 }
 
 async function activateConfiguredTenant(page: Page, request: APIRequestContext): Promise<void> {
   const tenantSlug = process.env.E2E_TENANT_SLUG;
-  if (!tenantSlug) return;
+  if (!tenantSlug) throw new Error('E2E_TENANT_SLUG is required for component allocation tests.');
   const tenants = await responseRows(request, '/api/organization/tenants/?limit=100');
   const tenant = tenants.find((row) => row.slug === tenantSlug);
   expect(
@@ -53,11 +53,6 @@ async function availableComponentValue(page: Page, request: APIRequestContext): 
       }))
       .filter((option) => option.value),
   );
-  if (process.env.E2E_TENANT_SLUG) {
-    const seeded = options.find((option) => option.label.includes('Seagate IronWolf Pro 12TB'));
-    if (seeded) return seeded.value;
-  }
-
   const rows = await responseRows(request, '/api/inventory/components/?limit=100');
   const availableIds = new Set(
     rows.filter((row) => Number(row.available_stock) > 0).map((row) => String(row.id)),
@@ -109,7 +104,6 @@ async function cleanupAllocation(
   note: string,
 ): Promise<void> {
   await page.goto(`${allocationListPath}?q=E2E-ISSUE393-`, { waitUntil: 'networkidle' });
-  await hideDebugToolbar(page);
   const checkinPath = `/inventory/components/allocations/${allocationId}/checkin/`;
   const button = page.locator(`button[hx-post="${checkinPath}"]`);
   await expect(button).toBeVisible();
@@ -125,7 +119,6 @@ async function cleanupAllocation(
 
 async function firstModularAsset(page: Page): Promise<string> {
   await page.goto('/assets/assets/?per_page=100', { waitUntil: 'networkidle' });
-  await hideDebugToolbar(page);
   const hrefs = await page
     .locator('a[href^="/assets/assets/"]')
     .evaluateAll((links) => [
@@ -150,58 +143,20 @@ async function firstModularAsset(page: Page): Promise<string> {
   );
 }
 
-function errorRecorder(page: Page): { consoleErrors: string[]; pageErrors: string[] } {
-  const errors = { consoleErrors: [] as string[], pageErrors: [] as string[] };
-  page.on('console', (message) => {
-    if (message.type() === 'error') errors.consoleErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => errors.pageErrors.push(error.message));
-  return errors;
-}
-
-async function expectNoUnexpectedErrors(
-  page: Page,
-  errors: { consoleErrors: string[]; pageErrors: string[] },
-): Promise<void> {
-  expect(
-    errors.consoleErrors.filter((message) =>
-      /htmx:(?:oobErrorNoTarget|targetError)|Server Error/i.test(message),
-    ),
-  ).toEqual([]);
-  const debugToolbarPresent = (await page.locator('#djDebugRoot').count()) > 0;
-  const pageErrors = debugToolbarPresent
-    ? errors.pageErrors.filter(
-        (message) => message !== 'undefined' && !message.includes("reading 'shadowRoot'"),
-      )
-    : errors.pageErrors;
-  expect(pageErrors).toEqual([]);
-}
-
 test.describe('Issue #393 Component Allocation observability', () => {
   test.setTimeout(120_000);
-  test.afterEach(async ({ page, request }) => {
-    const allocations = await responseRows(
-      request,
-      '/api/inventory/component-allocations/?q=E2E-ISSUE393-',
-    );
-    for (const allocation of allocations.filter((row) =>
-      String(row.notes).startsWith('E2E-ISSUE393-'),
-    )) {
-      await cleanupAllocation(page, request, String(allocation.id), String(allocation.notes));
-    }
-  });
 
   test('full-page create is target-only and clear/replace matches POST and readback', async ({
     page,
     request,
+    cleanup,
+    runId,
   }) => {
-    const errors = errorRecorder(page);
-    const invalidNote = `E2E-ISSUE393-invalid-${Date.now()}`;
-    const successNote = `E2E-ISSUE393-success-${Date.now()}`;
+    const invalidNote = `E2E-ISSUE393-invalid-${runId}`;
+    const successNote = `E2E-ISSUE393-success-${runId}`;
 
     await activateConfiguredTenant(page, request);
     await page.goto(allocationCreatePath, { waitUntil: 'networkidle' });
-    await hideDebugToolbar(page);
     await expect(page.locator('select[name="from_location"]')).toHaveCount(0);
     await expect(page.getByText('From Location', { exact: true })).toHaveCount(0);
 
@@ -257,16 +212,18 @@ test.describe('Issue #393 Component Allocation observability', () => {
     expect(allocation).toBeDefined();
     expect(allocation!.from_location).toBeNull();
     expect(String(allocation!.assigned_holder.id)).toBe(holderValues[0]);
-    await cleanupAllocation(page, request, String(allocation!.id), successNote);
-    await expectNoUnexpectedErrors(page, errors);
+    cleanup.add(`component allocation ${successNote}`, async () => {
+      await cleanupAllocation(page, request, String(allocation!.id), successNote);
+    });
   });
 
   test('asset-detail quick-add returns HX-Redirect and leaves no stale modal or HTMX errors', async ({
     page,
     request,
+    cleanup,
+    runId,
   }) => {
-    const errors = errorRecorder(page);
-    const note = `E2E-ISSUE393-quickadd-${Date.now()}`;
+    const note = `E2E-ISSUE393-quickadd-${runId}`;
     await activateConfiguredTenant(page, request);
     const componentsPath = await firstModularAsset(page);
     const assetPath = new URL(componentsPath, 'http://localhost').pathname;
@@ -300,7 +257,8 @@ test.describe('Issue #393 Component Allocation observability', () => {
       .toBeTruthy();
     const allocation = await allocationByNote(request, note);
     expect(allocation!.from_location).toBeNull();
-    await cleanupAllocation(page, request, String(allocation!.id), note);
-    await expectNoUnexpectedErrors(page, errors);
+    cleanup.add(`component allocation ${note}`, async () => {
+      await cleanupAllocation(page, request, String(allocation!.id), note);
+    });
   });
 });
