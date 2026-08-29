@@ -100,14 +100,23 @@ class OwnedFoundationFilesTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, names)
 
+    def test_reference_app_scopes_do_not_retain_surface_only_placeholders(self):
+        for app in ("assets", "inventory", "users"):
+            with self.subTest(app=app):
+                surfaces = sorted((E2E_ROOT / "spec" / "apps" / app).glob("*-surface.spec.ts"))
+                self.assertEqual(surfaces, [])
+
     def test_new_owned_specs_do_not_use_known_fail_open_shortcuts(self):
         owned = E2E_ROOT / "spec" / "apps"
         self.assertTrue(owned.is_dir())
         contents = "\n".join(path.read_text(encoding="utf-8") for path in owned.rglob("*.ts"))
         self.assertNotIn("waitForTimeout(", contents)
         self.assertNotIn("console.log(", contents)
+        self.assertNotIn("console.error(", contents)
         self.assertNotIn("test.skip(", contents)
         self.assertNotIn("test.fixme(", contents)
+        self.assertNotIn("test.setTimeout(", contents)
+        self.assertNotRegex(contents, r"if\s*\(\s*\(await\s+[^\n]+\.count\(\)\)")
 
 
 if __name__ == "__main__":

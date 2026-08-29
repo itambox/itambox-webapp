@@ -117,35 +117,28 @@ async function cleanupAllocation(
   expect(await allocationByNote(request, note)).toBeUndefined();
 }
 
-async function firstModularAsset(page: Page): Promise<string> {
-  await page.goto('/assets/assets/?per_page=100', { waitUntil: 'networkidle' });
-  const hrefs = await page
-    .locator('a[href^="/assets/assets/"]')
-    .evaluateAll((links) => [
-      ...new Set(
-        links
-          .map((link) => (link as HTMLAnchorElement).getAttribute('href'))
-          .filter((href): href is string =>
-            Boolean(href && /^\/assets\/assets\/\d+\/$/.test(href)),
-          ),
-      ),
-    ]);
-  for (const href of hrefs) {
-    const componentsPath = `${href}?tab=components`;
-    await page.goto(componentsPath, { waitUntil: 'domcontentloaded' });
-    const button = page.locator(
-      'button[hx-get*="component-allocations/add"][hx-get*="_quickadd=1"]',
-    );
-    if ((await button.count()) > 0 && (await button.isVisible())) return componentsPath;
-  }
-  throw new Error(
-    'The E2E seed must expose one modular asset with the Add Component quick-add action.',
+async function seededModularAssetComponentsPath(request: APIRequestContext): Promise<string> {
+  const roles = await responseRows(request, '/api/assets/asset-roles/?limit=100');
+  const modularRoleIds = new Set(
+    roles
+      .filter((row) => /server|modular|workstation|hypervisor/i.test(String(row.slug || '')))
+      .map((row) => String(row.id)),
   );
+  expect(modularRoleIds.size, 'The E2E seed must expose a component-capable asset role.').toBeGreaterThan(0);
+  const assets = await responseRows(request, '/api/assets/assets/?limit=100');
+  const asset = assets.find((row) => {
+    const role = row.asset_role;
+    return role !== null
+      && typeof role === 'object'
+      && modularRoleIds.has(String((role as Record<string, unknown>).id));
+  });
+  if (!asset || (typeof asset.id !== 'string' && typeof asset.id !== 'number')) {
+    throw new Error('The E2E seed must expose one asset with a component-capable role.');
+  }
+  return `/assets/assets/${asset.id}/?tab=components`;
 }
 
 test.describe('Issue #393 Component Allocation observability', () => {
-  test.setTimeout(120_000);
-
   test('full-page create is target-only and clear/replace matches POST and readback', async ({
     page,
     request,
@@ -225,11 +218,13 @@ test.describe('Issue #393 Component Allocation observability', () => {
   }) => {
     const note = `E2E-ISSUE393-quickadd-${runId}`;
     await activateConfiguredTenant(page, request);
-    const componentsPath = await firstModularAsset(page);
+    const componentsPath = await seededModularAssetComponentsPath(request);
+    await page.goto(componentsPath, { waitUntil: 'domcontentloaded' });
     const assetPath = new URL(componentsPath, 'http://localhost').pathname;
     const button = page.locator(
       'button[hx-get*="component-allocations/add"][hx-get*="_quickadd=1"]',
     );
+    await expect(button).toBeVisible();
     await button.click();
     const modal = page.locator('#quick-add-modal');
     await expect(modal).toBeVisible();

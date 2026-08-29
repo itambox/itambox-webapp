@@ -1,5 +1,10 @@
 import { test, expect } from '../../../fixtures/test';
 import type { APIRequestContext, Page } from '@playwright/test';
+import {
+  assertNoUnexpectedBrowserErrors,
+  attachBrowserErrorCollection,
+  createBrowserErrors,
+} from '../../../helpers/errors';
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -104,17 +109,6 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   test.afterAll(async () => {
     await scimRequest.dispose();
-  });
-
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error(`[Console Error]: ${msg.text()}`);
-      }
-    });
-    page.on('pageerror', error => {
-      console.error(`[Page Error]: ${error.message}`);
-    });
   });
 
   test('1. OIDC login initiation rejects an unknown tenant', async ({ request }) => {
@@ -375,8 +369,11 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       baseURL,
       storageState: { cookies: [], origins: [] },
     });
+    const browserErrors = createBrowserErrors();
+    let stopErrorCollection: (() => void) | undefined;
     try {
       const page = await authenticatedContext.newPage();
+      stopErrorCollection = attachBrowserErrorCollection(page, browserErrors);
       await page.goto('/');
       await page.fill('input[name="username"]', requiredEnv('E2E_USERNAME'));
       await page.fill('input[name="password"]', requiredEnv('E2E_PASSWORD'));
@@ -398,18 +395,22 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       const afterLogout = await authenticatedContext.request.get('/', { maxRedirects: 0 });
       expect(afterLogout.status()).toBe(302);
       expect(afterLogout.headers()['location']).toMatch(/^\/accounts\/login\//);
+      assertNoUnexpectedBrowserErrors(browserErrors);
     } finally {
+      stopErrorCollection?.();
       await authenticatedContext.close();
     }
   });
 
   test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser }) => {
-    test.setTimeout(120_000);
     const oidcContext = await browser.newContext({ baseURL });
+    const browserErrors = createBrowserErrors();
+    let stopErrorCollection: (() => void) | undefined;
     let page: Page | undefined;
     try {
       await oidcContext.clearCookies();
       page = await oidcContext.newPage();
+      stopErrorCollection = attachBrowserErrorCollection(page, browserErrors);
       await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });
       const loginResponse = await page.goto('/accounts/login/');
       await page.setExtraHTTPHeaders({});
@@ -555,7 +556,9 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       await expect(assetHolderRow).toContainText('E2E');
       await expect(assetHolderRow).toContainText('OIDC');
       await expect(assetHolderRow).toContainText('Helix Biopharma AG');
+      assertNoUnexpectedBrowserErrors(browserErrors);
     } finally {
+      stopErrorCollection?.();
       if (page) {
         await page.goto('about:blank', { waitUntil: 'commit' });
         await page.close();
