@@ -640,8 +640,6 @@ class AuditLifecyclePreviewTests(TenantTestMixin, TestCase):
 
 @pytest.mark.serial_only
 class AuditLifecyclePostgresRaceTests(TransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Race tenant", slug="race-tenant")
         self.user = baker.make("users.User", username="race-user", is_active=True)

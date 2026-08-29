@@ -51,3 +51,12 @@ class CanonicalMissingPostMigrateTests(TransactionTestCase):
 
         missing = StatusLabel._base_manager.get(slug="missing")
         self.assertEqual((missing.name, missing.type, missing.color), ("Missing", "undeployable", "dc3545"))
+
+        normal = StatusLabel._base_manager.create(
+            name="Post-restore available",
+            slug="post-restore-available",
+            type=StatusLabel.TYPE_DEPLOYABLE,
+            color="28a745",
+        )
+        self.assertNotEqual(normal.pk, missing.pk)
+        self.assertTrue(StatusLabel._base_manager.filter(pk=normal.pk).exists())
