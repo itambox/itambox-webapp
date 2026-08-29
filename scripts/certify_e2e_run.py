@@ -254,6 +254,145 @@ def _validate_attempts(
     return len(attempts) - 1
 
 
+def _validate_report_metadata(execution: Mapping[str, Any]) -> None:
+    report = _object(execution["report"], "Playwright report metadata")
+    _exact_keys(report, frozenset({"file", "malformed", "error"}), frozenset(), "Playwright report metadata")
+    if not isinstance(report["file"], str) or not report["file"]:
+        raise CertificationError("Playwright report metadata has no report filename")
+    if report["malformed"] is not False or report["error"] is not None:
+        raise CertificationError("Playwright JSON report is missing or malformed")
+
+
+def _validate_discovery_flags(discovery: Mapping[str, Any], label: str) -> None:
+    if type(discovery["focused"]) is not bool or type(discovery.get("only", False)) is not bool:
+        raise CertificationError(f"{label} focused/only flags must be boolean")
+    if discovery["focused"] or discovery.get("only", False):
+        raise CertificationError(f"focused/only {label} cannot be certified")
+
+
+def _validate_discovered_specs(
+    discovered_specs: Sequence[str], selected_paths: Sequence[str], discovered_tests: Sequence[Mapping[str, Any]]
+) -> None:
+    discovered_spec_set = set(discovered_specs)
+    for index, spec in enumerate(discovered_specs):
+        _relative_spec_path(spec, f"discovered_specs[{index}]")
+        if not any(_is_within(spec, selected) for selected in selected_paths):
+            raise CertificationError(f"discovered spec {spec!r} is outside the selection")
+    if {test["spec"] for test in discovered_tests} != discovered_spec_set:
+        raise CertificationError("every discovered spec must contain at least one discovered test")
+    for selected in selected_paths:
+        if not any(_is_within(test["spec"], selected) for test in discovered_tests):
+            raise CertificationError(f"selected path {selected!r} discovered no tests")
+
+
+def _validate_discovery(
+    discovery: Any,
+    expected_identity: Mapping[str, str],
+    runtime_checkout_sha: str,
+    selection: Mapping[str, Any],
+    repo_root: str | Path,
+    scope_map: Mapping[str, Any],
+) -> tuple[list[str], list[dict[str, Any]], list[dict[str, Any]]]:
+    value = _object(discovery, "discovery envelope")
+    _exact_keys(value, DISCOVERY_REQUIRED_KEYS, DISCOVERY_OPTIONAL_KEYS, "discovery envelope")
+    if type(value["schema"]) is not int or value["schema"] != SCHEMA:
+        raise CertificationError(f"discovery schema must be {SCHEMA}")
+    if _identity(value["selection_identity"], "discovery selection identity") != expected_identity:
+        raise CertificationError("discovery identity does not match the selection")
+    _validate_checkout(value["tested_checkout_sha"], runtime_checkout_sha, "discovery")
+    _validate_discovery_flags(value, "discovery")
+    selected_paths = _sorted_unique_strings(
+        value["selected_spec_paths"], "discovery selected_spec_paths", nonempty=True
+    )
+    if selected_paths != selection["spec_paths"]:
+        raise CertificationError("discovery selected paths do not match the selection")
+    setup_projects = _sorted_unique_strings(value["setup_projects"], "discovery setup_projects", nonempty=True)
+    if setup_projects != REQUIRED_SETUP_PROJECTS:
+        raise CertificationError(f"discovery must include exactly the setup projects {REQUIRED_SETUP_PROJECTS}")
+    discovered_specs = _sorted_unique_strings(value["discovered_specs"], "discovered_specs", nonempty=True)
+    discovered_tests = _validate_test_rows(value["discovered_tests"], "discovered_tests", execution=False)
+    if any(test["spec"] not in set(discovered_specs) for test in discovered_tests):
+        raise CertificationError("a discovered test names a spec absent from discovered_specs")
+    _validate_discovered_specs(discovered_specs, selected_paths, discovered_tests)
+    e2e_root = (Path(repo_root).resolve() / scope_map["spec_root"]).resolve()
+    expected_filesystem_specs = _filesystem_specs(e2e_root, selected_paths)
+    if discovered_specs != expected_filesystem_specs:
+        missing = sorted(set(expected_filesystem_specs) - set(discovered_specs))
+        unexpected = sorted(set(discovered_specs) - set(expected_filesystem_specs))
+        raise CertificationError(
+            "discovery does not equal the selected on-disk spec tree; "
+            f"missing={missing[:5]}, unexpected={unexpected[:5]}"
+        )
+    return selected_paths, discovered_specs, discovered_tests
+
+
+def _validate_checkout(value: Any, expected: str, label: str) -> None:
+    if value != expected or not SHA_RE.fullmatch(str(value)):
+        raise CertificationError(f"{label} tested checkout does not match the intended merge candidate")
+
+
+def _validate_execution(
+    execution: Any,
+    expected_identity: Mapping[str, str],
+    runtime_checkout_sha: str,
+    selected_paths: Sequence[str],
+    discovered_specs: Sequence[str],
+    discovered_tests: Sequence[Mapping[str, Any]],
+) -> int:
+    value = _object(execution, "execution envelope")
+    _exact_keys(value, EXECUTION_REQUIRED_KEYS, EXECUTION_OPTIONAL_KEYS, "execution envelope")
+    _validate_report_metadata(value)
+    if type(value["schema"]) is not int or value["schema"] != SCHEMA:
+        raise CertificationError(f"execution schema must be {SCHEMA}")
+    if _identity(value["selection_identity"], "execution selection identity") != expected_identity:
+        raise CertificationError("execution identity does not match the selection")
+    _validate_checkout(value["tested_checkout_sha"], runtime_checkout_sha, "execution")
+    _validate_discovery_flags(value, "execution")
+    execution_paths = _sorted_unique_strings(
+        value["selected_spec_paths"], "execution selected_spec_paths", nonempty=True
+    )
+    if execution_paths != list(selected_paths):
+        raise CertificationError("execution selected paths do not match discovery")
+    executed_specs = _sorted_unique_strings(value["executed_specs"], "executed_specs", nonempty=True)
+    if executed_specs != list(discovered_specs):
+        raise CertificationError("executed spec set does not exactly match discovered specs")
+    executed_tests = _validate_test_rows(value["executed_tests"], "executed_tests", execution=True)
+    discovered_identities = {(row["spec"], row["project"], row["id"]) for row in discovered_tests}
+    executed_identities = {(row["spec"], row["project"], row["id"]) for row in executed_tests}
+    if executed_identities != discovered_identities:
+        raise CertificationError("executed test identities do not exactly match discovered tests")
+    return _validate_execution_tests(executed_tests, value["cleanup"])
+
+
+def _validate_execution_tests(executed_tests: Sequence[Mapping[str, Any]], cleanup: Any) -> int:
+    retry_count = 0
+    attempt_identities: set[str] = set()
+    for index, test in enumerate(executed_tests):
+        if test["status"] != "passed":
+            raise CertificationError(f"executed test {test['id']!r} has non-passing final status {test['status']!r}")
+        retry_count += _validate_attempts(
+            test,
+            f"executed_tests[{index}]",
+            attempt_identities,
+            allow_legacy_identity=test["spec"].startswith(
+                ("spec/legacy-smoke/", "spec/layout/", "spec/accessibility/", "spec/regressions/", "spec/external/")
+            ),
+        )
+    _validate_cleanup(cleanup)
+    return retry_count
+
+
+def _validate_cleanup(cleanup: Any) -> None:
+    value = _object(cleanup, "execution cleanup")
+    _exact_keys(value, CLEANUP_KEYS, frozenset(), "execution cleanup")
+    if type(value["success"]) is not bool or not isinstance(value["failures"], list):
+        raise CertificationError("execution cleanup success/failures types are invalid")
+    for failure in value["failures"]:
+        _nonblank(failure, "execution cleanup failure")
+    if not value["success"] or value["failures"]:
+        raise CertificationError("execution cleanup evidence is not successful and empty")
+
+
 def certify_run(
     selection: Any,
     discovery: Any,
@@ -264,17 +403,13 @@ def certify_run(
 ) -> dict[str, Any]:
     """Return a canonical passing certification or raise ``CertificationError``."""
 
+    if selection is None or discovery is None or execution is None:
+        missing = "selection" if selection is None else "discovery" if discovery is None else "execution"
+        raise CertificationError(f"{missing} report is missing")
     try:
-        if selection is None:
-            raise CertificationError("selection report is missing")
-        if discovery is None:
-            raise CertificationError("discovery report is missing")
-        if execution is None:
-            raise CertificationError("execution report is missing")
         validate_selection(selection, repo_root, scope_map)
     except SelectionError as exc:
         raise CertificationError(f"selection is invalid: {exc}") from exc
-
     if selection["mode"] not in {"selected", "full"}:
         raise CertificationError("only selected/full execution can be certified")
     expected_identity = _selection_identity(selection)
@@ -282,121 +417,13 @@ def certify_run(
     if current != expected_identity:
         raise CertificationError("current event identity does not match the selection")
     runtime_checkout_sha, runtime_checkout_kind = _runtime_checkout(current_identity, selection)
-
-    discovery = _object(discovery, "discovery envelope")
-    _exact_keys(discovery, DISCOVERY_REQUIRED_KEYS, DISCOVERY_OPTIONAL_KEYS, "discovery envelope")
-    if type(discovery["schema"]) is not int or discovery["schema"] != SCHEMA:
-        raise CertificationError(f"discovery schema must be {SCHEMA}")
-    if _identity(discovery["selection_identity"], "discovery selection identity") != expected_identity:
-        raise CertificationError("discovery identity does not match the selection")
-    if discovery["tested_checkout_sha"] != runtime_checkout_sha or not SHA_RE.fullmatch(
-        str(discovery["tested_checkout_sha"])
-    ):
-        raise CertificationError("discovery tested checkout does not match selection head")
-    if type(discovery["focused"]) is not bool or type(discovery.get("only", False)) is not bool:
-        raise CertificationError("discovery focused/only flags must be boolean")
-    if discovery["focused"] or discovery.get("only", False):
-        raise CertificationError("focused/only Playwright tests cannot be certified")
-    selected_paths = _sorted_unique_strings(
-        discovery["selected_spec_paths"], "discovery selected_spec_paths", nonempty=True
+    selected_paths, discovered_specs, discovered_tests = _validate_discovery(
+        discovery, expected_identity, runtime_checkout_sha, selection, repo_root, scope_map
     )
-    if selected_paths != selection["spec_paths"]:
-        raise CertificationError("discovery selected paths do not match the selection")
-    setup_projects = _sorted_unique_strings(discovery["setup_projects"], "discovery setup_projects", nonempty=True)
-    if setup_projects != REQUIRED_SETUP_PROJECTS:
-        raise CertificationError(f"discovery must include exactly the setup projects {REQUIRED_SETUP_PROJECTS}")
-
-    discovered_specs = _sorted_unique_strings(discovery["discovered_specs"], "discovered_specs", nonempty=True)
-    for index, spec in enumerate(discovered_specs):
-        _relative_spec_path(spec, f"discovered_specs[{index}]")
-        if not any(_is_within(spec, selected) for selected in selected_paths):
-            raise CertificationError(f"discovered spec {spec!r} is outside the selection")
-    discovered_tests = _validate_test_rows(discovery["discovered_tests"], "discovered_tests", execution=False)
-    discovered_spec_set = set(discovered_specs)
-    if any(test["spec"] not in discovered_spec_set for test in discovered_tests):
-        raise CertificationError("a discovered test names a spec absent from discovered_specs")
-    specs_with_tests = {test["spec"] for test in discovered_tests}
-    if specs_with_tests != discovered_spec_set:
-        raise CertificationError("every discovered spec must contain at least one discovered test")
-    for selected in selected_paths:
-        if not any(_is_within(test["spec"], selected) for test in discovered_tests):
-            raise CertificationError(f"selected path {selected!r} discovered no tests")
-
-    e2e_root = (Path(repo_root).resolve() / scope_map["spec_root"]).resolve()
-    expected_filesystem_specs = _filesystem_specs(e2e_root, selected_paths)
-    if discovered_specs != expected_filesystem_specs:
-        missing = sorted(set(expected_filesystem_specs) - set(discovered_specs))
-        unexpected = sorted(set(discovered_specs) - set(expected_filesystem_specs))
-        raise CertificationError(
-            "discovery does not equal the selected on-disk spec tree; "
-            f"missing={missing[:5]}, unexpected={unexpected[:5]}"
-        )
-
-    execution = _object(execution, "execution envelope")
-    _exact_keys(execution, EXECUTION_REQUIRED_KEYS, EXECUTION_OPTIONAL_KEYS, "execution envelope")
-    report = _object(execution["report"], "Playwright report metadata")
-    _exact_keys(report, frozenset({"file", "malformed", "error"}), frozenset(), "Playwright report metadata")
-    if not isinstance(report["file"], str) or not report["file"]:
-        raise CertificationError("Playwright report metadata has no report filename")
-    if report["malformed"] is not False or report["error"] is not None:
-        raise CertificationError("Playwright JSON report is missing or malformed")
-    if type(execution["schema"]) is not int or execution["schema"] != SCHEMA:
-        raise CertificationError(f"execution schema must be {SCHEMA}")
-    if _identity(execution["selection_identity"], "execution selection identity") != expected_identity:
-        raise CertificationError("execution identity does not match the selection")
-    if execution["tested_checkout_sha"] != runtime_checkout_sha or not SHA_RE.fullmatch(
-        str(execution["tested_checkout_sha"])
-    ):
-        raise CertificationError("execution tested checkout does not match selection head")
-    if type(execution["focused"]) is not bool or type(execution.get("only", False)) is not bool:
-        raise CertificationError("execution focused/only flags must be boolean")
-    if execution["focused"] or execution.get("only", False):
-        raise CertificationError("focused/only execution cannot be certified")
-    execution_paths = _sorted_unique_strings(
-        execution["selected_spec_paths"], "execution selected_spec_paths", nonempty=True
+    retry_count = _validate_execution(
+        execution, expected_identity, runtime_checkout_sha, selected_paths, discovered_specs, discovered_tests
     )
-    if execution_paths != selected_paths:
-        raise CertificationError("execution selected paths do not match discovery")
-    executed_specs = _sorted_unique_strings(execution["executed_specs"], "executed_specs", nonempty=True)
-    if executed_specs != discovered_specs:
-        raise CertificationError("executed spec set does not exactly match discovered specs")
-    executed_tests = _validate_test_rows(execution["executed_tests"], "executed_tests", execution=True)
-    discovered_identities = {(row["spec"], row["project"], row["id"]) for row in discovered_tests}
-    executed_identities = {(row["spec"], row["project"], row["id"]) for row in executed_tests}
-    if executed_identities != discovered_identities:
-        raise CertificationError("executed test identities do not exactly match discovered tests")
-
-    retry_count = 0
-    attempt_identities: set[str] = set()
-    for index, test in enumerate(executed_tests):
-        status = test["status"]
-        if status != "passed":
-            raise CertificationError(f"executed test {test['id']!r} has non-passing final status {status!r}")
-        retry_count += _validate_attempts(
-            test,
-            f"executed_tests[{index}]",
-            attempt_identities,
-            allow_legacy_identity=test["spec"].startswith(
-                (
-                    "spec/legacy-smoke/",
-                    "spec/layout/",
-                    "spec/accessibility/",
-                    "spec/regressions/",
-                    "spec/external/",
-                )
-            ),
-        )
-
-    cleanup = _object(execution["cleanup"], "execution cleanup")
-    _exact_keys(cleanup, CLEANUP_KEYS, frozenset(), "execution cleanup")
-    if type(cleanup["success"]) is not bool or not isinstance(cleanup["failures"], list):
-        raise CertificationError("execution cleanup success/failures types are invalid")
-    for failure in cleanup["failures"]:
-        _nonblank(failure, "execution cleanup failure")
-    if not cleanup["success"] or cleanup["failures"]:
-        raise CertificationError("execution cleanup evidence is not successful and empty")
-
-    return {
+    result = {
         "schema": SCHEMA,
         "success": True,
         "verdict": "passed",
@@ -407,11 +434,12 @@ def certify_run(
         "selected_spec_path_count": len(selected_paths),
         "discovered_spec_count": len(discovered_specs),
         "discovered_test_count": len(discovered_tests),
-        "executed_spec_count": len(executed_specs),
-        "executed_test_count": len(executed_tests),
+        "executed_spec_count": len(discovered_specs),
+        "executed_test_count": len(discovered_tests),
         "retry_count": retry_count,
         "cleanup_success": True,
     }
+    return result
 
 
 def certification_summary(result: Mapping[str, Any]) -> str:

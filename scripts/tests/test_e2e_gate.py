@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import copy
-import json
-import tempfile
 import unittest
-from pathlib import Path
 
 from scripts.check_e2e_gate import GateInputError, evaluate_gate
 

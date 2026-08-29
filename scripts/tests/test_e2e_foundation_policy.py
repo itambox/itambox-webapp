@@ -35,7 +35,7 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         config = (E2E_ROOT / "playwright.config.ts").read_text(encoding="utf-8")
         for project in ("setup-admin", "setup-operator", "setup-viewer", "admin", "operator", "viewer", "anonymous"):
             with self.subTest(project=project):
-                self.assertIn(f"name: '{project}'", config)
+                self.assertIn("name: '" + project + "'", config)
         self.assertIn("dependencies:", config)
         self.assertIn("setup-admin", config)
         self.assertIn("setup-operator", config)

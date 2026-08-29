@@ -238,43 +238,48 @@ def _validate_unique_strings(value: Any, label: str, *, nonempty: bool = False) 
     return rows
 
 
+def _glob_star(pattern: str, index: int) -> tuple[str, int]:
+    next_index = index + 1
+    while next_index < len(pattern) and pattern[next_index] == "*":
+        next_index += 1
+    if next_index < len(pattern) and pattern[next_index] == "/":
+        return "(?:[^/]+/)*", next_index + 1
+    return ".*", next_index
+
+
+def _glob_class(pattern: str, index: int) -> tuple[str, int]:
+    end = pattern.find("]", index + 1)
+    if end < 0:
+        raise ValueError(f"glob pattern {pattern!r} has an unterminated character class")
+    content = pattern[index + 1 : end]
+    if not content or "/" in content or "\\" in content:
+        raise ValueError(f"glob pattern {pattern!r} has an invalid character class")
+    if content.startswith("!"):
+        content = "^" + content[1:]
+    elif content.startswith("^"):
+        content = "\\" + content
+    return "[" + content + "]", end + 1
+
+
+def _glob_piece(pattern: str, index: int) -> tuple[str, int]:
+    character = pattern[index]
+    if character == "*":
+        return _glob_star(pattern, index)
+    if character == "?":
+        return "[^/]", index + 1
+    if character == "[":
+        return _glob_class(pattern, index)
+    return re.escape(character), index + 1
+
+
 def _glob_regex(pattern: str) -> re.Pattern[str]:
     """Compile the small, path-aware glob grammar used by the scope map."""
 
     pieces = ["^"]
     index = 0
     while index < len(pattern):
-        character = pattern[index]
-        if character == "*":
-            if index + 1 < len(pattern) and pattern[index + 1] == "*":
-                index += 2
-                while index < len(pattern) and pattern[index] == "*":
-                    index += 1
-                if index < len(pattern) and pattern[index] == "/":
-                    pieces.append("(?:[^/]+/)*")
-                    index += 1
-                else:
-                    pieces.append(".*")
-                continue
-            pieces.append("[^/]*")
-        elif character == "?":
-            pieces.append("[^/]")
-        elif character == "[":
-            end = pattern.find("]", index + 1)
-            if end < 0:
-                raise ValueError(f"glob pattern {pattern!r} has an unterminated character class")
-            content = pattern[index + 1 : end]
-            if not content or "/" in content or "\\" in content:
-                raise ValueError(f"glob pattern {pattern!r} has an invalid character class")
-            if content.startswith("!"):
-                content = "^" + content[1:]
-            elif content.startswith("^"):
-                content = "\\" + content
-            pieces.append("[" + content + "]")
-            index = end
-        else:
-            pieces.append(re.escape(character))
-        index += 1
+        piece, index = _glob_piece(pattern, index)
+        pieces.append(piece)
     pieces.append("$")
     return re.compile("".join(pieces))
 
@@ -339,6 +344,255 @@ def _discover_specs(path: Path) -> list[Path]:
     )
 
 
+def _validate_scope_entry(
+    name: str,
+    entry: Any,
+    spec_root: Path,
+    full_path: Path,
+    require_spec_evidence: bool,
+) -> str:
+    _expect_string(name, "scope name")
+    if not isinstance(entry, dict):
+        raise ValueError(f"scope {name!r} must be an object")
+    required = {"path", "kind"}
+    if not required.issubset(entry) or not set(entry).issubset(SCOPE_KEYS):
+        raise ValueError(f"scope {name!r} must contain path/kind and only supported keys")
+    scope_path = _validate_relative_path(entry["path"], f"scope {name!r} path")
+    kind = _expect_string(entry["kind"], f"scope {name!r} kind")
+    if kind not in {"app", "contract", "qualification", "special", "workflow"}:
+        raise ValueError(f"scope {name!r} has unsupported kind {kind!r}")
+    if "owner" in entry:
+        _expect_string(entry["owner"], f"scope {name!r} owner")
+    target = _contained_path(spec_root, scope_path, f"scope {name!r} path")
+    try:
+        target.relative_to(full_path)
+    except ValueError as exc:
+        raise ValueError(f"scope {name!r} path must be beneath 'spec'") from exc
+    if require_spec_evidence and not _discover_specs(target):
+        raise ValueError(f"scope {name!r} path {scope_path!r} has no discovered .spec.ts/.test.ts evidence")
+    return scope_path
+
+
+def _validate_scope_entries(
+    document: Mapping[str, Any], repo_root: str | Path, require_spec_evidence: bool
+) -> tuple[dict[str, str], Path, Path]:
+    spec_root_value = _validate_relative_path(document["spec_root"], "scope map spec_root")
+    full_spec_path = _validate_relative_path(document["full_spec_path"], "scope map full_spec_path")
+    spec_root = _contained_path(Path(repo_root), spec_root_value, "scope map spec_root")
+    full_path = _contained_path(spec_root, full_spec_path, "scope map full_spec_path")
+    scopes = document["scopes"]
+    if not isinstance(scopes, dict) or not scopes:
+        raise ValueError("scope map scopes must be a nonempty object")
+    scope_paths = {
+        name: _validate_scope_entry(name, entry, spec_root, full_path, require_spec_evidence)
+        for name, entry in scopes.items()
+    }
+    return scope_paths, spec_root, full_path
+
+
+def _validate_scope_lists(
+    document: Mapping[str, Any], scopes: Mapping[str, Any], require_catalog_scopes: bool
+) -> tuple[list[str], list[str]]:
+    always = _validate_unique_strings(document["always_run_scopes"], "always_run_scopes", nonempty=True)
+    full_scopes = _validate_unique_strings(document["full_scopes"], "full_scopes", nonempty=True)
+    for name in always + full_scopes:
+        if name not in scopes and not (not require_catalog_scopes and name == "all"):
+            raise ValueError(f"declared scope {name!r} is not defined")
+    return always, full_scopes
+
+
+def _validate_rule(
+    rule: Any, index: int, scopes: Mapping[str, Any], full_scopes: Sequence[str]
+) -> tuple[str, str, list[tuple[str, str]], set[str]]:
+    label = f"scope map rule {index}"
+    if not isinstance(rule, dict):
+        raise ValueError(f"{label} must be an object")
+    required = {"id", "decision", "patterns"}
+    if not required.issubset(rule) or not set(rule).issubset(RULE_KEYS):
+        raise ValueError(f"{label} must contain id/decision/patterns and only supported keys")
+    rule_id = _expect_string(rule["id"], f"{label} id")
+    if not RULE_ID_RE.fullmatch(rule_id):
+        raise ValueError(f"{label} id is not a stable policy token")
+    decision = rule["decision"]
+    if decision not in {"full", "selected", "safe_ignore"}:
+        raise ValueError(f"rule {rule_id!r} has unsupported decision {decision!r}")
+    patterns = _validate_unique_strings(rule["patterns"], f"rule {rule_id!r} patterns", nonempty=True)
+    validated: list[tuple[str, str]] = []
+    for pattern in patterns:
+        _validate_relative_path(pattern, f"rule {rule_id!r} pattern", allow_glob=True)
+        _glob_regex(pattern)
+        validated.append((rule_id, pattern))
+    selected_scope_owners: set[str] = set()
+    selected = rule.get("scopes")
+    if decision == "selected":
+        selected = _validate_unique_strings(selected, f"rule {rule_id!r} scopes", nonempty=True)
+        unknown = sorted(set(selected) - set(scopes))
+        if unknown:
+            raise ValueError(f"rule {rule_id!r} names unknown scopes {unknown}")
+        forbidden = sorted(set(selected) & set(full_scopes))
+        if forbidden:
+            raise ValueError(f"selected rule {rule_id!r} names full-only scopes {forbidden}")
+        selected_scope_owners.update(selected)
+    elif selected is not None:
+        raise ValueError(f"rule {rule_id!r} may not declare scopes for decision {decision!r}")
+    return rule_id, decision, validated, selected_scope_owners
+
+
+def _validate_rules(
+    document: Mapping[str, Any], scopes: Mapping[str, Any], full_scopes: Sequence[str]
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], set[str]]:
+    rules = _expect_list(document["rules"], "scope map rules", nonempty=True)
+    rule_ids: set[str] = set()
+    non_safe: list[tuple[str, str]] = []
+    safe: list[tuple[str, str]] = []
+    selected_owners: set[str] = set()
+    for index, rule in enumerate(rules):
+        rule_id, decision, patterns, owners = _validate_rule(rule, index, scopes, full_scopes)
+        if rule_id in rule_ids:
+            raise ValueError(f"duplicate rule id {rule_id!r}")
+        rule_ids.add(rule_id)
+        (safe if decision == "safe_ignore" else non_safe).extend(patterns)
+        selected_owners.update(owners)
+    return safe, non_safe, selected_owners
+
+
+def _validate_known_roots(document: Mapping[str, Any]) -> list[str]:
+    roots = _validate_unique_strings(document["known_production_roots"], "known_production_roots", nonempty=True)
+    for pattern in roots:
+        _validate_relative_path(pattern, "known production root", allow_glob=True)
+        _glob_regex(pattern)
+    return roots
+
+
+def _validate_safe_boundaries(
+    safe: Sequence[tuple[str, str]], non_safe: Sequence[tuple[str, str]], roots: Sequence[str]
+) -> None:
+    for safe_id, safe_pattern in safe:
+        for other_id, other_pattern in non_safe:
+            if _patterns_may_overlap(safe_pattern, other_pattern):
+                raise ValueError(
+                    f"safe-ignore rule {safe_id!r} pattern {safe_pattern!r} may overlap "
+                    f"non-safe rule {other_id!r} pattern {other_pattern!r}"
+                )
+        for root_pattern in roots:
+            if _patterns_may_overlap(safe_pattern, root_pattern):
+                raise ValueError(
+                    f"safe-ignore rule {safe_id!r} pattern {safe_pattern!r} may overlap "
+                    f"known production root {root_pattern!r}"
+                )
+
+
+def _validate_rollback(document: Mapping[str, Any], rules: Sequence[Mapping[str, Any]]) -> None:
+    rollback = document["rollback"]
+    if not isinstance(rollback, dict):
+        raise ValueError("rollback must be an object")
+    _expect_exact_keys(rollback, ROLLBACK_KEYS, "rollback")
+    if type(rollback["force_full_pr_selection"]) is not bool:
+        raise ValueError("rollback.force_full_pr_selection must be boolean")
+    switch_path = _validate_relative_path(rollback["switch_path"], "rollback.switch_path")
+    covered = any(
+        rule["decision"] == "full" and any(_matches(switch_path, pattern) for pattern in rule["patterns"])
+        for rule in rules
+    )
+    if not covered:
+        raise ValueError("rollback.switch_path must be covered by an explicit full rule")
+
+
+def _validate_owned_spec_paths(
+    scope_paths: Mapping[str, str], spec_root: Path, full_path: Path, owner_names: set[str], label: str
+) -> None:
+    owner_root = full_path / ("apps" if label == "app" else "contracts")
+    if not owner_root.is_dir():
+        raise ValueError(f"catalog {label} spec root {owner_root} does not exist")
+    roots = {name: _contained_path(spec_root, scope_paths[name], f"scope {name!r} path") for name in owner_names}
+    for spec in _discover_specs(owner_root):
+        owners = [name for name, root in roots.items() if spec == root or root in spec.parents]
+        if len(owners) != 1:
+            relative = spec.relative_to(spec_root).as_posix()
+            raise ValueError(
+                f"{label}-owned spec {relative!r} must have exactly one primary owner; found {sorted(owners)}"
+            )
+
+
+def _validate_catalog_basics(
+    document: Mapping[str, Any], scope_paths: Mapping[str, str], always: Sequence[str], full_scopes: Sequence[str]
+) -> None:
+    missing = sorted(REQUIRED_CATALOG_SCOPES - set(scope_paths))
+    if missing:
+        raise ValueError(f"scope map is missing required catalog scopes {missing}")
+    if list(always) != ["legacy-smoke", "smoke"]:
+        raise ValueError("catalog always_run_scopes must contain exactly legacy-smoke and smoke")
+    if list(full_scopes) != ["all"]:
+        raise ValueError("catalog full_scopes must be ['all']")
+    if document["spec_root"] != "itambox/tests/e2e" or document["full_spec_path"] != "spec":
+        raise ValueError("catalog spec_root/full_spec_path must be itambox/tests/e2e and spec")
+    if scope_paths["all"] != document["full_spec_path"]:
+        raise ValueError("special scope 'all' must map to the complete spec path")
+
+
+def _validate_catalog_owned_declarations(document: Mapping[str, Any]) -> None:
+    expected_shared = {
+        "a11y": ("spec/accessibility", "accessibility"),
+        "layout": ("spec/layout", "layout"),
+        "legacy-smoke": ("spec/legacy-smoke", "legacy-smoke"),
+        "smoke": ("spec/smoke", "smoke"),
+    }
+    for name, (expected_path, owner) in expected_shared.items():
+        entry = document["scopes"][name]
+        if entry["path"] != expected_path or entry["kind"] != "qualification" or entry.get("owner") != owner:
+            raise ValueError(f"scope {name!r} must explicitly own {expected_path}")
+    for name in sorted(REQUIRED_APP_SCOPES):
+        owner = name.split(":", 1)[1]
+        entry = document["scopes"][name]
+        expected_path = f"spec/apps/{owner}"
+        if entry["path"] != expected_path or entry["kind"] != "app" or entry.get("owner") != owner:
+            raise ValueError(f"scope {name!r} must explicitly own {expected_path}")
+    for name in sorted(REQUIRED_CONTRACT_SCOPES):
+        owner = name.split(":", 1)[1]
+        entry = document["scopes"][name]
+        expected_path = f"spec/contracts/{owner}"
+        if entry["path"] != expected_path or entry["kind"] != "contract" or entry.get("owner") != owner:
+            raise ValueError(f"scope {name!r} must explicitly own {expected_path}")
+
+
+def _validate_catalog_scope_overlap(scope_paths: Mapping[str, str]) -> None:
+    owned_names = sorted(REQUIRED_APP_SCOPES | REQUIRED_CONTRACT_SCOPES | REQUIRED_SHARED_SCOPES)
+    for index, first_name in enumerate(owned_names):
+        first_path = scope_paths[first_name]
+        for second_name in owned_names[index + 1 :]:
+            second_path = scope_paths[second_name]
+            overlaps = (
+                first_path == second_path
+                or first_path.startswith(second_path + "/")
+                or second_path.startswith(first_path + "/")
+            )
+            if overlaps:
+                raise ValueError(
+                    f"scope ownership paths overlap: {first_name!r}={first_path!r}, {second_name!r}={second_path!r}"
+                )
+
+
+def _validate_catalog_contract(
+    document: Mapping[str, Any],
+    scope_paths: Mapping[str, str],
+    spec_root: Path,
+    full_path: Path,
+    always: Sequence[str],
+    full_scopes: Sequence[str],
+    selected_scope_owners: set[str],
+    require_spec_evidence: bool,
+) -> None:
+    _validate_catalog_basics(document, scope_paths, always, full_scopes)
+    _validate_catalog_owned_declarations(document)
+    _validate_catalog_scope_overlap(scope_paths)
+    if require_spec_evidence:
+        _validate_owned_spec_paths(scope_paths, spec_root, full_path, REQUIRED_APP_SCOPES, "app")
+        _validate_owned_spec_paths(scope_paths, spec_root, full_path, REQUIRED_CONTRACT_SCOPES, "contract")
+    missing_rules = sorted((REQUIRED_APP_SCOPES | REQUIRED_CONTRACT_SCOPES) - selected_scope_owners)
+    if missing_rules:
+        raise ValueError(f"app/contract scopes have no explicit selection rule: {missing_rules}")
+
+
 def validate_scope_map(
     document: Any,
     repo_root: str | Path,
@@ -346,12 +600,7 @@ def validate_scope_map(
     *,
     require_spec_evidence: bool = True,
 ) -> dict[str, Any]:
-    """Validate the complete scope-map policy and its on-disk spec evidence.
-
-    ``require_catalog_scopes=False`` is intended for focused unit maps.  The
-    independent ``require_spec_evidence`` switch exists for map review during a
-    coordinated directory migration; execution must always leave it enabled.
-    """
+    """Validate the complete scope-map policy and its on-disk spec evidence."""
 
     try:
         if not isinstance(document, dict):
@@ -359,196 +608,23 @@ def validate_scope_map(
         _expect_exact_keys(document, MAP_KEYS, "scope map")
         if type(document["schema"]) is not int or document["schema"] != SCHEMA:
             raise ValueError(f"scope map schema must be {SCHEMA}")
-
-        spec_root_value = _validate_relative_path(document["spec_root"], "scope map spec_root")
-        full_spec_path = _validate_relative_path(document["full_spec_path"], "scope map full_spec_path")
-        spec_root = _contained_path(Path(repo_root), spec_root_value, "scope map spec_root")
-        full_path = _contained_path(spec_root, full_spec_path, "scope map full_spec_path")
-
-        scopes = document["scopes"]
-        if not isinstance(scopes, dict) or not scopes:
-            raise ValueError("scope map scopes must be a nonempty object")
-        scope_paths: dict[str, str] = {}
-        for name, entry in scopes.items():
-            _expect_string(name, "scope name")
-            if not isinstance(entry, dict):
-                raise ValueError(f"scope {name!r} must be an object")
-            required_scope_keys = {"path", "kind"}
-            actual_scope_keys = set(entry)
-            if not required_scope_keys.issubset(actual_scope_keys) or not actual_scope_keys.issubset(SCOPE_KEYS):
-                raise ValueError(f"scope {name!r} must contain path/kind and only supported keys")
-            scope_path = _validate_relative_path(entry["path"], f"scope {name!r} path")
-            kind = _expect_string(entry["kind"], f"scope {name!r} kind")
-            if kind not in {"app", "contract", "qualification", "special", "workflow"}:
-                raise ValueError(f"scope {name!r} has unsupported kind {kind!r}")
-            if "owner" in entry:
-                _expect_string(entry["owner"], f"scope {name!r} owner")
-            target = _contained_path(spec_root, scope_path, f"scope {name!r} path")
-            try:
-                target.relative_to(full_path)
-            except ValueError as exc:
-                raise ValueError(f"scope {name!r} path must be beneath {full_spec_path!r}") from exc
-            if require_spec_evidence and not _discover_specs(target):
-                raise ValueError(f"scope {name!r} path {scope_path!r} has no discovered .spec.ts/.test.ts evidence")
-            scope_paths[name] = scope_path
-
-        always = _validate_unique_strings(document["always_run_scopes"], "always_run_scopes", nonempty=True)
-        full_scopes = _validate_unique_strings(document["full_scopes"], "full_scopes", nonempty=True)
-        for name in always + full_scopes:
-            if name not in scopes and not (not require_catalog_scopes and name == "all"):
-                raise ValueError(f"declared scope {name!r} is not defined")
-
-        rules = _expect_list(document["rules"], "scope map rules", nonempty=True)
-        rule_ids: set[str] = set()
-        non_safe_patterns: list[tuple[str, str]] = []
-        safe_patterns: list[tuple[str, str]] = []
-        selected_scope_owners: set[str] = set()
-        for index, rule in enumerate(rules):
-            label = f"scope map rule {index}"
-            if not isinstance(rule, dict):
-                raise ValueError(f"{label} must be an object")
-            required = {"id", "decision", "patterns"}
-            if not required.issubset(rule) or not set(rule).issubset(RULE_KEYS):
-                raise ValueError(f"{label} must contain id/decision/patterns and only supported keys")
-            rule_id = _expect_string(rule["id"], f"{label} id")
-            if not RULE_ID_RE.fullmatch(rule_id):
-                raise ValueError(f"{label} id is not a stable policy token")
-            if rule_id in rule_ids:
-                raise ValueError(f"duplicate rule id {rule_id!r}")
-            rule_ids.add(rule_id)
-            decision = rule["decision"]
-            if decision not in {"full", "selected", "safe_ignore"}:
-                raise ValueError(f"rule {rule_id!r} has unsupported decision {decision!r}")
-            patterns = _validate_unique_strings(rule["patterns"], f"rule {rule_id!r} patterns", nonempty=True)
-            for pattern in patterns:
-                _validate_relative_path(pattern, f"rule {rule_id!r} pattern", allow_glob=True)
-                _glob_regex(pattern)
-                (safe_patterns if decision == "safe_ignore" else non_safe_patterns).append((rule_id, pattern))
-            selected = rule.get("scopes")
-            if decision == "selected":
-                selected = _validate_unique_strings(selected, f"rule {rule_id!r} scopes", nonempty=True)
-                unknown = sorted(set(selected) - set(scopes))
-                if unknown:
-                    raise ValueError(f"rule {rule_id!r} names unknown scopes {unknown}")
-                forbidden = sorted(set(selected) & set(full_scopes))
-                if forbidden:
-                    raise ValueError(f"selected rule {rule_id!r} names full-only scopes {forbidden}")
-                selected_scope_owners.update(selected)
-            elif selected is not None:
-                raise ValueError(f"rule {rule_id!r} may not declare scopes for decision {decision!r}")
-
-        known_roots = _validate_unique_strings(
-            document["known_production_roots"], "known_production_roots", nonempty=True
-        )
-        for root_pattern in known_roots:
-            _validate_relative_path(root_pattern, "known production root", allow_glob=True)
-            _glob_regex(root_pattern)
-            # A known root is itself a fail-closed classification boundary:
-            # unmatched descendants escalate through ``unknown-production``.
-            # Individual app/shared rules intentionally need not cover the
-            # entire root (the unit map uses ``src/**`` in exactly this way).
-
-        for safe_id, safe_pattern in safe_patterns:
-            for other_id, other_pattern in non_safe_patterns:
-                if _patterns_may_overlap(safe_pattern, other_pattern):
-                    raise ValueError(
-                        f"safe-ignore rule {safe_id!r} pattern {safe_pattern!r} may overlap "
-                        f"non-safe rule {other_id!r} pattern {other_pattern!r}"
-                    )
-            for root_pattern in known_roots:
-                if _patterns_may_overlap(safe_pattern, root_pattern):
-                    raise ValueError(
-                        f"safe-ignore rule {safe_id!r} pattern {safe_pattern!r} may overlap "
-                        f"known production root {root_pattern!r}"
-                    )
-
-        rollback = document["rollback"]
-        if not isinstance(rollback, dict):
-            raise ValueError("rollback must be an object")
-        _expect_exact_keys(rollback, ROLLBACK_KEYS, "rollback")
-        if type(rollback["force_full_pr_selection"]) is not bool:
-            raise ValueError("rollback.force_full_pr_selection must be boolean")
-        switch_path = _validate_relative_path(rollback["switch_path"], "rollback.switch_path")
-        if not any(
-            rule["decision"] == "full" and any(_matches(switch_path, pattern) for pattern in rule["patterns"])
-            for rule in rules
-        ):
-            raise ValueError("rollback.switch_path must be covered by an explicit full rule")
-
+        scope_paths, spec_root, full_path = _validate_scope_entries(document, repo_root, require_spec_evidence)
+        always, full_scopes = _validate_scope_lists(document, document["scopes"], require_catalog_scopes)
+        safe_patterns, non_safe_patterns, selected_owners = _validate_rules(document, document["scopes"], full_scopes)
+        roots = _validate_known_roots(document)
+        _validate_safe_boundaries(safe_patterns, non_safe_patterns, roots)
+        _validate_rollback(document, document["rules"])
         if require_catalog_scopes:
-            missing = sorted(REQUIRED_CATALOG_SCOPES - set(scopes))
-            if missing:
-                raise ValueError(f"scope map is missing required catalog scopes {missing}")
-            if set(always) != {"legacy-smoke", "smoke"}:
-                raise ValueError("catalog always_run_scopes must contain exactly legacy-smoke and smoke")
-            if full_scopes != ["all"]:
-                raise ValueError("catalog full_scopes must be ['all']")
-            if spec_root_value != "itambox/tests/e2e" or full_spec_path != "spec":
-                raise ValueError("catalog spec_root/full_spec_path must be itambox/tests/e2e and spec")
-            if scope_paths["all"] != full_spec_path:
-                raise ValueError("special scope 'all' must map to the complete spec path")
-            expected_shared = {
-                "a11y": ("spec/accessibility", "accessibility"),
-                "layout": ("spec/layout", "layout"),
-                "legacy-smoke": ("spec/legacy-smoke", "legacy-smoke"),
-                "smoke": ("spec/smoke", "smoke"),
-            }
-            for name, (path, owner) in expected_shared.items():
-                entry = scopes[name]
-                if entry["path"] != path or entry["kind"] != "qualification" or entry.get("owner") != owner:
-                    raise ValueError(f"scope {name!r} must explicitly own {path}")
-            for name in sorted(REQUIRED_APP_SCOPES):
-                owner = name.split(":", 1)[1]
-                entry = scopes[name]
-                if entry["path"] != f"spec/apps/{owner}" or entry["kind"] != "app" or entry.get("owner") != owner:
-                    raise ValueError(f"scope {name!r} must explicitly own spec/apps/{owner}")
-            for name in sorted(REQUIRED_CONTRACT_SCOPES):
-                owner = name.split(":", 1)[1]
-                entry = scopes[name]
-                if (
-                    entry["path"] != f"spec/contracts/{owner}"
-                    or entry["kind"] != "contract"
-                    or entry.get("owner") != owner
-                ):
-                    raise ValueError(f"scope {name!r} must explicitly own spec/contracts/{owner}")
-            owned_scope_names = sorted(REQUIRED_APP_SCOPES | REQUIRED_CONTRACT_SCOPES | REQUIRED_SHARED_SCOPES)
-            for index, first_name in enumerate(owned_scope_names):
-                first_path = scope_paths[first_name]
-                for second_name in owned_scope_names[index + 1 :]:
-                    second_path = scope_paths[second_name]
-                    if (
-                        first_path == second_path
-                        or first_path.startswith(second_path + "/")
-                        or second_path.startswith(first_path + "/")
-                    ):
-                        raise ValueError(
-                            f"scope ownership paths overlap: {first_name!r}={first_path!r}, "
-                            f"{second_name!r}={second_path!r}"
-                        )
-            if require_spec_evidence:
-                ownership_groups = (
-                    (REQUIRED_APP_SCOPES, full_path / "apps", "app"),
-                    (REQUIRED_CONTRACT_SCOPES, full_path / "contracts", "contract"),
-                )
-                for owner_names, owner_root, owner_label in ownership_groups:
-                    if not owner_root.is_dir():
-                        raise ValueError(f"catalog {owner_label} spec root {owner_root} does not exist")
-                    for spec in _discover_specs(owner_root):
-                        owners = [
-                            name
-                            for name in owner_names
-                            if spec == _contained_path(spec_root, scope_paths[name], f"scope {name!r} path")
-                            or _contained_path(spec_root, scope_paths[name], f"scope {name!r} path") in spec.parents
-                        ]
-                        if len(owners) != 1:
-                            relative = spec.relative_to(spec_root).as_posix()
-                            raise ValueError(
-                                f"{owner_label}-owned spec {relative!r} must have exactly one primary owner; "
-                                f"found {sorted(owners)}"
-                            )
-            missing_rule_owners = sorted((REQUIRED_APP_SCOPES | REQUIRED_CONTRACT_SCOPES) - selected_scope_owners)
-            if missing_rule_owners:
-                raise ValueError(f"app/contract scopes have no explicit selection rule: {missing_rule_owners}")
+            _validate_catalog_contract(
+                document,
+                scope_paths,
+                spec_root,
+                full_path,
+                always,
+                full_scopes,
+                selected_owners,
+                require_spec_evidence,
+            )
         return document
     except ScopeMapError:
         raise
@@ -577,35 +653,28 @@ def load_scope_map(
     )
 
 
-def _normalise_change(value: ChangeRecord | Mapping[str, Any]) -> ChangeRecord:
-    if isinstance(value, ChangeRecord):
-        record = value
-    elif isinstance(value, Mapping):
-        allowed = {"status", "old_path", "new_path"}
-        if not set(value).issubset(allowed) or "status" not in value:
-            raise SelectionError("change records may contain only status, old_path, and new_path")
-        raw_status = value["status"]
-        if not isinstance(raw_status, str):
-            raise SelectionError("change status must be a string")
-        match = re.fullmatch(r"([AMDCR]|[RC]\d{1,3})", raw_status)
-        if match is None:
-            raise SelectionError(f"unsupported Git change status {raw_status!r}")
-        if raw_status[0] in {"R", "C"} and len(raw_status) > 1 and int(raw_status[1:]) > 100:
-            raise SelectionError(f"unsupported Git similarity score {raw_status!r}")
-        status = raw_status[0]
-        old_path = value.get("old_path")
-        new_path = value.get("new_path")
-        try:
-            if old_path is not None:
-                old_path = _validate_relative_path(old_path, "old changed path")
-            if new_path is not None:
-                new_path = _validate_relative_path(new_path, "new changed path")
-        except ValueError as exc:
-            raise SelectionError(str(exc)) from exc
-        record = ChangeRecord(status=status, old_path=old_path, new_path=new_path)
-    else:
-        raise SelectionError("change records must be mappings or ChangeRecord values")
+def _change_from_mapping(value: Mapping[str, Any]) -> ChangeRecord:
+    allowed = {"status", "old_path", "new_path"}
+    if not set(value).issubset(allowed) or "status" not in value:
+        raise SelectionError("change records may contain only status, old_path, and new_path")
+    raw_status = value["status"]
+    if not isinstance(raw_status, str):
+        raise SelectionError("change status must be a string")
+    match = re.fullmatch(r"([AMDCR]|[RC]\d{1,3})", raw_status)
+    if match is None:
+        raise SelectionError(f"unsupported Git change status {raw_status!r}")
+    if raw_status[0] in {"R", "C"} and len(raw_status) > 1 and int(raw_status[1:]) > 100:
+        raise SelectionError(f"unsupported Git similarity score {raw_status!r}")
+    old_path, new_path = value.get("old_path"), value.get("new_path")
+    try:
+        old_path = _validate_relative_path(old_path, "old changed path") if old_path is not None else None
+        new_path = _validate_relative_path(new_path, "new changed path") if new_path is not None else None
+    except ValueError as exc:
+        raise SelectionError(str(exc)) from exc
+    return ChangeRecord(status=raw_status[0], old_path=old_path, new_path=new_path)
 
+
+def _validate_change_shape(record: ChangeRecord) -> ChangeRecord:
     expected = {
         "A": (False, True),
         "M": (False, True),
@@ -615,17 +684,46 @@ def _normalise_change(value: ChangeRecord | Mapping[str, Any]) -> ChangeRecord:
     }
     if record.status not in expected:
         raise SelectionError(f"unsupported Git change status {record.status!r}")
-    has_old, has_new = record.old_path is not None, record.new_path is not None
-    if (has_old, has_new) != expected[record.status]:
+    identities = (record.old_path is not None, record.new_path is not None)
+    if identities != expected[record.status]:
         raise SelectionError(f"status {record.status!r} has an invalid old/new path identity")
     try:
-        if record.old_path is not None:
-            _validate_relative_path(record.old_path, "old changed path")
-        if record.new_path is not None:
-            _validate_relative_path(record.new_path, "new changed path")
+        for path, label in ((record.old_path, "old changed path"), (record.new_path, "new changed path")):
+            if path is not None:
+                _validate_relative_path(path, label)
     except ValueError as exc:
         raise SelectionError(str(exc)) from exc
     return record
+
+
+def _normalise_change(value: ChangeRecord | Mapping[str, Any]) -> ChangeRecord:
+    if isinstance(value, ChangeRecord):
+        return _validate_change_shape(value)
+    if isinstance(value, Mapping):
+        return _validate_change_shape(_change_from_mapping(value))
+    raise SelectionError("change records must be mappings or ChangeRecord values")
+
+
+def _parse_git_status(status_token: str) -> str:
+    match = re.fullmatch(r"([AMD]|[RC]\d{1,3})", status_token)
+    if match is None:
+        raise SelectionError(f"unsupported or malformed Git status {status_token!r}")
+    if status_token[0] in {"R", "C"} and int(status_token[1:]) > 100:
+        raise SelectionError(f"unsupported Git similarity score {status_token!r}")
+    return status_token[0]
+
+
+def _change_from_git_tokens(status: str, paths: Sequence[str]) -> ChangeRecord:
+    expected_count = 2 if status in {"R", "C"} else 1
+    if len(paths) != expected_count:
+        raise SelectionError(f"Git status {status!r} is missing a path identity")
+    if status == "D":
+        raw = {"status": status, "old_path": paths[0]}
+    elif status in {"R", "C"}:
+        raw = {"status": status, "old_path": paths[0], "new_path": paths[1]}
+    else:
+        raw = {"status": status, "new_path": paths[0]}
+    return _normalise_change(raw)
 
 
 def parse_name_status_z(data: bytes) -> list[ChangeRecord]:
@@ -638,33 +736,18 @@ def parse_name_status_z(data: bytes) -> list[ChangeRecord]:
     if not data.endswith(b"\0"):
         raise SelectionError("Git name-status output is not NUL terminated")
     try:
-        tokens = data.decode("utf-8", errors="strict").split("\0")
+        tokens = data.decode("utf-8", errors="strict").split("\0")[:-1]
     except UnicodeDecodeError as exc:
         raise SelectionError("Git path output is not valid UTF-8") from exc
-    tokens.pop()
     result: list[ChangeRecord] = []
     index = 0
     while index < len(tokens):
-        status_token = tokens[index]
+        status = _parse_git_status(tokens[index])
         index += 1
-        match = re.fullmatch(r"([AMD]|[RC]\d{1,3})", status_token)
-        if match is None:
-            raise SelectionError(f"unsupported or malformed Git status {status_token!r}")
-        if status_token[0] in {"R", "C"} and int(status_token[1:]) > 100:
-            raise SelectionError(f"unsupported Git similarity score {status_token!r}")
-        status = status_token[0]
         path_count = 2 if status in {"R", "C"} else 1
-        if index + path_count > len(tokens):
-            raise SelectionError(f"Git status {status_token!r} is missing a path identity")
         paths = tokens[index : index + path_count]
         index += path_count
-        if status == "D":
-            raw = {"status": status, "old_path": paths[0]}
-        elif status in {"R", "C"}:
-            raw = {"status": status, "old_path": paths[0], "new_path": paths[1]}
-        else:
-            raw = {"status": status, "new_path": paths[0]}
-        result.append(_normalise_change(raw))
+        result.append(_change_from_git_tokens(status, paths))
     return result
 
 
@@ -741,6 +824,83 @@ def _selection_reason_sort_key(reason: Mapping[str, Any]) -> tuple[str, str, str
     return (str(reason.get("path", "")), str(reason.get("status", "")), str(reason.get("matched_rule", "")))
 
 
+def _normalise_changes(changes: Iterable[ChangeRecord | Mapping[str, Any]]) -> list[ChangeRecord]:
+    normalized = sorted(
+        (_normalise_change(change) for change in changes),
+        key=lambda row: (row.status, row.old_path or "", row.new_path or ""),
+    )
+    identities = [(record.status, path) for record in normalized for path in record.identities()]
+    if len(identities) != len(set(identities)):
+        raise SelectionError("change set contains duplicate status/path identities")
+    return normalized
+
+
+def _build_reasons(document: Mapping[str, Any], records: Sequence[ChangeRecord]) -> list[dict[str, Any]]:
+    reasons = [
+        _classify_identity(
+            document,
+            path,
+            record.status,
+            old_path=record.old_path,
+            new_path=record.new_path,
+        )
+        for record in records
+        for path in record.identities()
+    ]
+    return sorted(reasons, key=_selection_reason_sort_key)
+
+
+def _selection_mode(
+    document: Mapping[str, Any],
+    event_name: str,
+    base_sha: str,
+    head_sha: str,
+    merge_base_sha: str,
+    records: Sequence[ChangeRecord],
+    reasons: Sequence[Mapping[str, Any]],
+) -> tuple[str, list[dict[str, Any]]]:
+    empty_diff = not records
+    if empty_diff and event_name in SELECTIVE_EVENTS and not (base_sha == head_sha == merge_base_sha):
+        raise SelectionError("an empty pull-request diff is inconsistent with distinct base/head identity")
+    rollback_full = bool(document["rollback"]["force_full_pr_selection"] and event_name in SELECTIVE_EVENTS)
+    if rollback_full:
+        full_reasons = [
+            {
+                "escalation": "full",
+                "matched_rule": "rollback-force-full",
+                "new_path": record.new_path,
+                "old_path": record.old_path,
+                "path": path,
+                "status": record.status,
+            }
+            for record in records
+            for path in record.identities()
+        ]
+        return "full", sorted(full_reasons, key=_selection_reason_sort_key)
+    if event_name in AUTHORITATIVE_FULL_EVENTS or empty_diff:
+        return "full", list(reasons)
+    if any(reason.get("escalation") == "full" for reason in reasons):
+        return "full", list(reasons)
+    if reasons and all(reason.get("safe_ignore") is True for reason in reasons):
+        return "none", list(reasons)
+    return "selected", list(reasons)
+
+
+def _selection_paths(
+    document: Mapping[str, Any], mode: str, reasons: Sequence[Mapping[str, Any]]
+) -> tuple[list[str], list[str]]:
+    if mode == "full":
+        return sorted(document["full_scopes"]), [document["full_spec_path"]]
+    if mode == "none":
+        return [], []
+    scope_set = set(document["always_run_scopes"])
+    for reason in reasons:
+        scope_set.update(reason.get("selected", []))
+    scopes = sorted(scope_set)
+    paths = sorted({document["scopes"][scope]["path"] for scope in scopes})
+    return scopes, paths
+
+
 def build_selection(
     document: Mapping[str, Any],
     repo_root: str | Path,
@@ -754,77 +914,14 @@ def build_selection(
     """Build and validate a deterministic selection from already-resolved inputs."""
 
     try:
-        if event_name not in KNOWN_EVENTS:
-            raise ValueError(f"unsupported E2E event {event_name!r}")
-        _validate_sha(base_sha, "base_sha")
-        _validate_sha(head_sha, "head_sha")
-        _validate_sha(merge_base_sha, "merge_base_sha")
+        _validate_selection_identities(event_name, base_sha, head_sha, merge_base_sha)
     except ValueError as exc:
         raise SelectionError(str(exc)) from exc
-
-    normalized = sorted(
-        (_normalise_change(change) for change in changes),
-        key=lambda row: (row.status, row.old_path or "", row.new_path or ""),
-    )
-    identities = [(record.status, path) for record in normalized for path in record.identities()]
-    if len(identities) != len(set(identities)):
-        raise SelectionError("change set contains duplicate status/path identities")
+    normalized = _normalise_changes(changes)
     digest = changed_path_digest(normalized)
-
-    reasons: list[dict[str, Any]] = []
-    for record in normalized:
-        for path in record.identities():
-            reasons.append(
-                _classify_identity(
-                    document,
-                    path,
-                    record.status,
-                    old_path=record.old_path,
-                    new_path=record.new_path,
-                )
-            )
-    reasons.sort(key=_selection_reason_sort_key)
-    rollback_full = bool(document["rollback"]["force_full_pr_selection"] and event_name in SELECTIVE_EVENTS)
-    authoritative = event_name in AUTHORITATIVE_FULL_EVENTS
-    empty_diff = not normalized
-    if empty_diff and event_name in SELECTIVE_EVENTS and not (base_sha == head_sha == merge_base_sha):
-        raise SelectionError("an empty pull-request diff is inconsistent with distinct base/head identity")
-
-    if rollback_full:
-        reasons = [
-            {
-                "escalation": "full",
-                "matched_rule": "rollback-force-full",
-                "new_path": record.new_path,
-                "old_path": record.old_path,
-                "path": path,
-                "status": record.status,
-            }
-            for record in normalized
-            for path in record.identities()
-        ]
-        reasons.sort(key=_selection_reason_sort_key)
-        mode = "full"
-    elif authoritative or empty_diff or any(reason.get("escalation") == "full" for reason in reasons):
-        mode = "full"
-    elif reasons and all(reason.get("safe_ignore") is True for reason in reasons):
-        mode = "none"
-    else:
-        mode = "selected"
-
-    if mode == "full":
-        scopes = sorted(document["full_scopes"])
-        spec_paths = [document["full_spec_path"]]
-    elif mode == "none":
-        scopes = []
-        spec_paths = []
-    else:
-        scope_set = set(document["always_run_scopes"])
-        for reason in reasons:
-            scope_set.update(reason.get("selected", []))
-        scopes = sorted(scope_set)
-        spec_paths = sorted({document["scopes"][scope]["path"] for scope in scopes})
-
+    reasons = _build_reasons(document, normalized)
+    mode, reasons = _selection_mode(document, event_name, base_sha, head_sha, merge_base_sha, normalized, reasons)
+    scopes, spec_paths = _selection_paths(document, mode, reasons)
     selection = {
         "schema": SCHEMA,
         "mode": mode,
@@ -835,10 +932,60 @@ def build_selection(
         "changed_path_digest": digest,
         "scopes": scopes,
         "spec_paths": spec_paths,
-        "reasons": sorted(reasons, key=_selection_reason_sort_key),
+        "reasons": reasons,
     }
     validate_selection(selection, repo_root, document)
     return selection
+
+
+def _validate_selection_identities(event_name: str, base_sha: str, head_sha: str, merge_base_sha: str) -> None:
+    if event_name not in KNOWN_EVENTS:
+        raise ValueError(f"unsupported E2E event {event_name!r}")
+    for value, label in ((base_sha, "base_sha"), (head_sha, "head_sha"), (merge_base_sha, "merge_base_sha")):
+        _validate_sha(value, label)
+
+
+def _validate_reason_identities(reason: Mapping[str, Any]) -> None:
+    _validate_relative_path(reason["path"], "selection reason path")
+    for key in ("old_path", "new_path"):
+        value = reason[key]
+        if value is not None:
+            _validate_relative_path(value, f"selection reason {key}")
+    status = reason["status"]
+    if status not in CHANGE_STATUSES:
+        raise ValueError("selection reason has invalid status")
+    expected = {
+        "A": (None, reason["new_path"]),
+        "M": (None, reason["new_path"]),
+        "D": (reason["old_path"], None),
+        "R": (reason["old_path"], reason["new_path"]),
+        "C": (reason["old_path"], reason["new_path"]),
+    }[status]
+    if (reason["old_path"], reason["new_path"]) != expected:
+        raise ValueError(f"selection reason has invalid old/new identities for {status}")
+    if reason["path"] not in {reason["old_path"], reason["new_path"]}:
+        raise ValueError("selection reason path must be one of its old/new identities")
+
+
+def _validate_reason_decision(
+    reason: Mapping[str, Any],
+    document: Mapping[str, Any],
+    aggregate_scopes: set[str],
+    *,
+    allow_narrow_full_reason: bool,
+) -> None:
+    variant = set(reason) - {"new_path", "old_path", "path", "status", "matched_rule"}
+    if variant == {"selected"}:
+        selected = _validate_sorted_unique_strings(reason["selected"], "reason selected scopes", nonempty=True)
+        if not allow_narrow_full_reason and not set(selected).issubset(aggregate_scopes):
+            raise ValueError("selection reason names a scope absent from the aggregate selection")
+        return
+    if variant == {"safe_ignore"}:
+        if reason["safe_ignore"] is not True:
+            raise ValueError("safe-ignore reason must contain true")
+        return
+    if variant != {"escalation"} or reason["escalation"] != "full":
+        raise ValueError("selection reason has invalid decision keys")
 
 
 def _validate_reason(
@@ -850,26 +997,10 @@ def _validate_reason(
 ) -> None:
     if not isinstance(reason, dict):
         raise ValueError("selection reasons must be objects")
-    base_keys = {"new_path", "old_path", "path", "status", "matched_rule"}
-    variants = ({"selected"}, {"safe_ignore"}, {"escalation"})
-    extras = set(reason) - base_keys
-    if extras not in variants or not base_keys.issubset(reason):
+    base = {"new_path", "old_path", "path", "status", "matched_rule"}
+    if not base.issubset(reason):
         raise ValueError("selection reason has invalid keys")
-    _validate_relative_path(reason["path"], "selection reason path")
-    for key in ("old_path", "new_path"):
-        value = reason[key]
-        if value is not None:
-            _validate_relative_path(value, f"selection reason {key}")
-    if reason["status"] not in CHANGE_STATUSES:
-        raise ValueError("selection reason has invalid status")
-    if reason["status"] in {"A", "M"} and reason["old_path"] is not None:
-        raise ValueError("added/modified reason cannot have an old path")
-    if reason["status"] == "D" and reason["new_path"] is not None:
-        raise ValueError("deleted reason cannot have a new path")
-    if reason["status"] in {"R", "C"} and (reason["old_path"] is None or reason["new_path"] is None):
-        raise ValueError("rename/copy reason must have both old and new paths")
-    if reason["path"] not in {reason["old_path"], reason["new_path"]}:
-        raise ValueError("selection reason path must be one of its old/new identities")
+    _validate_reason_identities(reason)
     rule_ids = {rule["id"] for rule in document["rules"]} | {
         "unknown-production",
         "unknown-path",
@@ -877,15 +1008,86 @@ def _validate_reason(
     }
     if reason["matched_rule"] not in rule_ids:
         raise ValueError(f"selection reason names unknown rule {reason['matched_rule']!r}")
-    if extras == {"selected"}:
-        selected = _validate_sorted_unique_strings(reason["selected"], "reason selected scopes", nonempty=True)
-        if not allow_narrow_full_reason and not set(selected).issubset(aggregate_scopes):
-            raise ValueError("selection reason names a scope absent from the aggregate selection")
-    elif extras == {"safe_ignore"}:
-        if reason["safe_ignore"] is not True:
-            raise ValueError("safe-ignore reason must contain true")
-    elif reason["escalation"] != "full":
-        raise ValueError("full reason escalation must equal 'full'")
+    _validate_reason_decision(
+        reason,
+        document,
+        aggregate_scopes,
+        allow_narrow_full_reason=allow_narrow_full_reason,
+    )
+
+
+def _selection_header(
+    selection: Mapping[str, Any], document: Mapping[str, Any]
+) -> tuple[str, list[str], list[str], list[Any]]:
+    _expect_exact_keys(selection, SELECTION_KEYS, "selection")
+    if type(selection["schema"]) is not int or selection["schema"] != SCHEMA:
+        raise ValueError(f"selection schema must be {SCHEMA}")
+    mode = selection["mode"]
+    if mode not in {"none", "selected", "full"}:
+        raise ValueError(f"selection mode {mode!r} is unsupported")
+    if selection["event_name"] not in KNOWN_EVENTS:
+        raise ValueError(f"selection event {selection['event_name']!r} is unsupported")
+    for key in ("base_sha", "head_sha", "merge_base_sha"):
+        _validate_sha(selection[key], key)
+    _validate_digest(selection["changed_path_digest"])
+    scopes = _validate_sorted_unique_strings(selection["scopes"], "selection scopes")
+    spec_paths = _validate_sorted_unique_strings(selection["spec_paths"], "selection spec_paths")
+    unknown = sorted(set(scopes) - set(document["scopes"]) - set(document["full_scopes"]))
+    if unknown:
+        raise ValueError(f"selection contains unknown scopes {unknown}")
+    reasons = _expect_list(selection["reasons"], "selection reasons")
+    if reasons != sorted(reasons, key=_selection_reason_sort_key):
+        raise ValueError("selection reasons must use canonical path/status/rule sorting")
+    for reason in reasons:
+        _validate_reason(reason, document, set(scopes), allow_narrow_full_reason=mode == "full")
+    return mode, scopes, spec_paths, reasons
+
+
+def _validate_none_selection(scopes: Sequence[str], spec_paths: Sequence[str], reasons: Sequence[Any]) -> None:
+    if scopes or spec_paths:
+        raise ValueError("none selection must have no scopes or spec paths")
+    if any(reason.get("safe_ignore") is not True for reason in reasons):
+        raise ValueError("none selection may contain only safe-ignore reasons")
+
+
+def _validate_full_selection(
+    scopes: Sequence[str],
+    spec_paths: Sequence[str],
+    document: Mapping[str, Any],
+    repo_root: str | Path,
+) -> None:
+    if list(scopes) != sorted(document["full_scopes"]):
+        raise ValueError("full selection must contain exactly the configured full scopes")
+    if list(spec_paths) != [document["full_spec_path"]]:
+        raise ValueError("full selection must contain exactly the complete spec root")
+    spec_root = _contained_path(Path(repo_root), document["spec_root"], "scope map spec_root")
+    if not _discover_specs(_contained_path(spec_root, spec_paths[0], "full spec path")):
+        raise ValueError("full selection has no discoverable spec evidence")
+
+
+def _validate_selected_selection(
+    scopes: Sequence[str],
+    spec_paths: Sequence[str],
+    reasons: Sequence[Any],
+    document: Mapping[str, Any],
+    repo_root: str | Path,
+) -> None:
+    if not scopes or not spec_paths:
+        raise ValueError("selected mode requires nonempty scopes and spec paths")
+    if not set(document["always_run_scopes"]).issubset(scopes):
+        raise ValueError("selected mode is missing an always-run product scope")
+    expected_paths = sorted({document["scopes"][scope]["path"] for scope in scopes})
+    if list(spec_paths) != expected_paths:
+        raise ValueError("selected spec paths do not exactly match selected scope paths")
+    spec_root = _contained_path(Path(repo_root), document["spec_root"], "scope map spec_root")
+    for relative in spec_paths:
+        _validate_relative_path(relative, "selected spec path")
+        target = _contained_path(spec_root, relative, "selected spec path")
+        if not _discover_specs(target):
+            raise ValueError(f"selected spec path {relative!r} has no discoverable tests")
+    selected_reason_scopes = {scope for reason in reasons for scope in reason.get("selected", [])}
+    if not selected_reason_scopes:
+        raise ValueError("selected mode has no product classification reason")
 
 
 def validate_selection(selection: Any, repo_root: str | Path, document: Mapping[str, Any]) -> dict[str, Any]:
@@ -894,58 +1096,13 @@ def validate_selection(selection: Any, repo_root: str | Path, document: Mapping[
     try:
         if not isinstance(selection, dict):
             raise ValueError("selection must be a JSON object")
-        _expect_exact_keys(selection, SELECTION_KEYS, "selection")
-        if type(selection["schema"]) is not int or selection["schema"] != SCHEMA:
-            raise ValueError(f"selection schema must be {SCHEMA}")
-        mode = selection["mode"]
-        if mode not in {"none", "selected", "full"}:
-            raise ValueError(f"selection mode {mode!r} is unsupported")
-        if selection["event_name"] not in KNOWN_EVENTS:
-            raise ValueError(f"selection event {selection['event_name']!r} is unsupported")
-        for key in ("base_sha", "head_sha", "merge_base_sha"):
-            _validate_sha(selection[key], key)
-        _validate_digest(selection["changed_path_digest"])
-        scopes = _validate_sorted_unique_strings(selection["scopes"], "selection scopes")
-        spec_paths = _validate_sorted_unique_strings(selection["spec_paths"], "selection spec_paths")
-        unknown = sorted(set(scopes) - set(document["scopes"]) - set(document["full_scopes"]))
-        if unknown:
-            raise ValueError(f"selection contains unknown scopes {unknown}")
-
-        reasons = _expect_list(selection["reasons"], "selection reasons")
-        if reasons != sorted(reasons, key=_selection_reason_sort_key):
-            raise ValueError("selection reasons must use canonical path/status/rule sorting")
-        for reason in reasons:
-            _validate_reason(reason, document, set(scopes), allow_narrow_full_reason=mode == "full")
-
-        spec_root = _contained_path(Path(repo_root), document["spec_root"], "scope map spec_root")
+        mode, scopes, spec_paths, reasons = _selection_header(selection, document)
         if mode == "none":
-            if scopes or spec_paths:
-                raise ValueError("none selection must have no scopes or spec paths")
-            if any(reason.get("safe_ignore") is not True for reason in reasons):
-                raise ValueError("none selection may contain only safe-ignore reasons")
+            _validate_none_selection(scopes, spec_paths, reasons)
         elif mode == "full":
-            if scopes != sorted(document["full_scopes"]):
-                raise ValueError("full selection must contain exactly the configured full scopes")
-            if spec_paths != [document["full_spec_path"]]:
-                raise ValueError("full selection must contain exactly the complete spec root")
-            if not _discover_specs(_contained_path(spec_root, spec_paths[0], "full spec path")):
-                raise ValueError("full selection has no discoverable spec evidence")
+            _validate_full_selection(scopes, spec_paths, document, repo_root)
         else:
-            if not scopes or not spec_paths:
-                raise ValueError("selected mode requires nonempty scopes and spec paths")
-            if not set(document["always_run_scopes"]).issubset(scopes):
-                raise ValueError("selected mode is missing an always-run product scope")
-            expected_paths = sorted({document["scopes"][scope]["path"] for scope in scopes})
-            if spec_paths != expected_paths:
-                raise ValueError("selected spec paths do not exactly match selected scope paths")
-            for relative in spec_paths:
-                _validate_relative_path(relative, "selected spec path")
-                target = _contained_path(spec_root, relative, "selected spec path")
-                if not _discover_specs(target):
-                    raise ValueError(f"selected spec path {relative!r} has no discoverable tests")
-            selected_reason_scopes = {scope for reason in reasons for scope in reason.get("selected", [])}
-            if not selected_reason_scopes:
-                raise ValueError("selected mode has no product classification reason")
+            _validate_selected_selection(scopes, spec_paths, reasons, document, repo_root)
         return selection
     except SelectionError:
         raise
