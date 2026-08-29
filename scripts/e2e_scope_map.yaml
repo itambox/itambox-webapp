@@ -129,6 +129,16 @@
       "path": "spec/smoke",
       "kind": "qualification",
       "owner": "smoke"
+    },
+    "external:oidc": {
+      "path": "spec/external",
+      "kind": "qualification",
+      "owner": "oidc"
+    },
+    "regression:german-bulk-basket": {
+      "path": "spec/regressions",
+      "kind": "qualification",
+      "owner": "german-bulk-basket"
     }
   },
   "rules": [
@@ -155,7 +165,8 @@
         "scripts/tests/test_certify_e2e_run.py",
         "scripts/tests/test_e2e_gate.py",
         "scripts/tests/test_e2e_workflow_policy.py",
-        "scripts/tests/test_select_e2e_scopes.py"
+        "scripts/tests/test_select_e2e_scopes.py",
+        "itambox/tests/e2e/run-selected.mjs"
       ]
     },
     {
@@ -505,6 +516,99 @@
       "patterns": [
         ".github/ISSUE_TEMPLATE/**",
         ".github/PULL_REQUEST_TEMPLATE.md"
+      ]
+    },
+    {
+      "id": "external-oidc-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/external/**"
+      ],
+      "scopes": [
+        "external:oidc"
+      ]
+    },
+    {
+      "id": "regression-spec-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/regressions/**"
+      ],
+      "scopes": [
+        "regression:german-bulk-basket"
+      ]
+    },
+    {
+      "id": "legacy-navigation-migration",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/01-navigation.spec.ts",
+        "itambox/tests/e2e/spec/02-htmx-forms.spec.ts",
+        "itambox/tests/e2e/spec/03-data-tables.spec.ts",
+        "itambox/tests/e2e/spec/04-bulk-operations.spec.ts",
+        "itambox/tests/e2e/spec/05-detail-views.spec.ts",
+        "itambox/tests/e2e/spec/06-graphql-api.spec.ts",
+        "itambox/tests/e2e/spec/08-rest-guides.spec.ts"
+      ],
+      "scopes": [
+        "legacy-smoke"
+      ]
+    },
+    {
+      "id": "users-spec-migration",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/07-sso-scim.spec.ts"
+      ],
+      "scopes": [
+        "app:users",
+        "contract:auth-rbac",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "layout-spec-migration",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/09-dashboard-grid.spec.ts"
+      ],
+      "scopes": [
+        "layout"
+      ]
+    },
+    {
+      "id": "a11y-spec-migration",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/issue101-accessibility.spec.ts",
+        "itambox/tests/e2e/spec/issue389-accessibility.spec.ts"
+      ],
+      "scopes": [
+        "a11y"
+      ]
+    },
+    {
+      "id": "inventory-spec-migration",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/issue393-component-allocation.spec.ts"
+      ],
+      "scopes": [
+        "app:inventory",
+        "contract:asset-custody",
+        "contract:cross-app",
+        "contract:soft-delete",
+        "contract:tenant-isolation"
+      ]
+    },
+    {
+      "id": "regression-spec-migration",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/issue437-german-bulk-basket.spec.ts"
+      ],
+      "scopes": [
+        "regression:german-bulk-basket"
       ]
     }
   ],

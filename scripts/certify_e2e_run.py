@@ -49,7 +49,7 @@ DISCOVERY_REQUIRED_KEYS = frozenset(
         "focused",
     }
 )
-DISCOVERY_OPTIONAL_KEYS = frozenset({"only"})
+DISCOVERY_OPTIONAL_KEYS = frozenset({"only", "registered_spec_paths"})
 EXECUTION_REQUIRED_KEYS = frozenset(
     {
         "schema",
@@ -60,6 +60,7 @@ EXECUTION_REQUIRED_KEYS = frozenset(
         "executed_tests",
         "cleanup",
         "focused",
+        "report",
     }
 )
 EXECUTION_OPTIONAL_KEYS = frozenset({"only"})
@@ -67,7 +68,7 @@ DISCOVERED_TEST_KEYS = frozenset({"id", "spec", "project"})
 EXECUTED_TEST_KEYS = frozenset({"id", "spec", "project", "status", "attempts"})
 ATTEMPT_KEYS = frozenset({"retry", "status", "identity"})
 CLEANUP_KEYS = frozenset({"success", "failures"})
-REQUIRED_SETUP_PROJECTS = ["setup-admin", "setup-operator", "setup-viewer"]
+REQUIRED_SETUP_PROJECTS = ["setup-admin", "setup-aggregate", "setup-operator", "setup-viewer"]
 ATTEMPT_STATUSES = frozenset({"passed", "failed", "timed_out", "interrupted"})
 
 
@@ -112,9 +113,14 @@ def _sorted_unique_strings(value: Any, label: str, *, nonempty: bool = False) ->
     return value
 
 
-def _identity(value: Any, label: str) -> dict[str, str]:
+def _identity(value: Any, label: str, *, allow_runtime: bool = False) -> dict[str, str]:
     result = _object(value, label)
-    _exact_keys(result, IDENTITY_KEYS, frozenset(), label)
+    allowed = IDENTITY_KEYS | ({"tested_checkout_sha", "tested_checkout_kind"} if allow_runtime else set())
+    actual = set(result)
+    missing = sorted(IDENTITY_KEYS - actual)
+    unknown = sorted(actual - allowed)
+    if missing or unknown:
+        raise CertificationError(f"{label} has invalid keys; missing={missing}, unknown={unknown}")
     event_name = result["event_name"]
     if event_name not in KNOWN_EVENTS:
         raise CertificationError(f"{label}.event_name is unsupported")
@@ -124,7 +130,22 @@ def _identity(value: Any, label: str) -> dict[str, str]:
     digest = result["changed_path_digest"]
     if not isinstance(digest, str) or not DIGEST_RE.fullmatch(digest):
         raise CertificationError(f"{label}.changed_path_digest is not canonical")
-    return result
+    if allow_runtime and "tested_checkout_sha" in result:
+        if not isinstance(result["tested_checkout_sha"], str) or not SHA_RE.fullmatch(result["tested_checkout_sha"]):
+            raise CertificationError(f"{label}.tested_checkout_sha is not a canonical Git SHA")
+        if result.get("tested_checkout_kind") not in {"head", "merge_candidate"}:
+            raise CertificationError(f"{label}.tested_checkout_kind is unsupported")
+    return {key: result[key] for key in IDENTITY_KEYS}
+
+
+def _runtime_checkout(current: Mapping[str, Any], selection: Mapping[str, Any]) -> tuple[str, str]:
+    checkout = current.get("tested_checkout_sha", selection["head_sha"])
+    kind = current.get("tested_checkout_kind", "head")
+    if checkout != selection["head_sha"] and kind != "merge_candidate":
+        raise CertificationError("a checkout different from the PR head must be marked merge_candidate")
+    if checkout == selection["head_sha"] and kind not in {"head", "merge_candidate"}:
+        raise CertificationError("tested checkout kind is invalid")
+    return checkout, kind
 
 
 def _selection_identity(selection: Mapping[str, Any]) -> dict[str, str]:
@@ -198,7 +219,13 @@ def _validate_test_rows(value: Any, label: str, *, execution: bool) -> list[dict
     return result
 
 
-def _validate_attempts(test: Mapping[str, Any], label: str, globally_seen: set[str]) -> int:
+def _validate_attempts(
+    test: Mapping[str, Any],
+    label: str,
+    globally_seen: set[str],
+    *,
+    allow_legacy_identity: bool,
+) -> int:
     attempts = test["attempts"]
     if not isinstance(attempts, list) or not attempts:
         raise CertificationError(f"{label}.attempts must be a nonempty list")
@@ -212,7 +239,10 @@ def _validate_attempts(test: Mapping[str, Any], label: str, globally_seen: set[s
         status = attempt["status"]
         if status not in ATTEMPT_STATUSES:
             raise CertificationError(f"{label} attempt {index} has unsupported status {status!r}")
-        identity = _nonblank(attempt["identity"], f"{label}.attempts[{index}].identity")
+        identity = attempt["identity"]
+        if identity is None and allow_legacy_identity and len(attempts) == 1 and retry == 0:
+            continue
+        identity = _nonblank(identity, f"{label} attempt {index} identity")
         if re.search(rf"(?:^|-)r{retry}(?:-|$)", identity) is None:
             raise CertificationError(f"{label} attempt {index} identity does not contain distinct r{retry} evidence")
         if identity in attempt_identities or identity in globally_seen:
@@ -250,9 +280,10 @@ def certify_run(
     if selection["mode"] not in {"selected", "full"}:
         raise CertificationError("only selected/full execution can be certified")
     expected_identity = _selection_identity(selection)
-    current = _identity(current_identity, "current identity")
+    current = _identity(current_identity, "current identity", allow_runtime=True)
     if current != expected_identity:
         raise CertificationError("current event identity does not match the selection")
+    runtime_checkout_sha, runtime_checkout_kind = _runtime_checkout(current_identity, selection)
 
     discovery = _object(discovery, "discovery envelope")
     _exact_keys(discovery, DISCOVERY_REQUIRED_KEYS, DISCOVERY_OPTIONAL_KEYS, "discovery envelope")
@@ -260,7 +291,7 @@ def certify_run(
         raise CertificationError(f"discovery schema must be {SCHEMA}")
     if _identity(discovery["selection_identity"], "discovery selection identity") != expected_identity:
         raise CertificationError("discovery identity does not match the selection")
-    if discovery["tested_checkout_sha"] != selection["head_sha"] or not SHA_RE.fullmatch(
+    if discovery["tested_checkout_sha"] != runtime_checkout_sha or not SHA_RE.fullmatch(
         str(discovery["tested_checkout_sha"])
     ):
         raise CertificationError("discovery tested checkout does not match selection head")
@@ -305,11 +336,17 @@ def certify_run(
 
     execution = _object(execution, "execution envelope")
     _exact_keys(execution, EXECUTION_REQUIRED_KEYS, EXECUTION_OPTIONAL_KEYS, "execution envelope")
+    report = _object(execution["report"], "Playwright report metadata")
+    _exact_keys(report, frozenset({"file", "malformed", "error"}), frozenset(), "Playwright report metadata")
+    if not isinstance(report["file"], str) or not report["file"]:
+        raise CertificationError("Playwright report metadata has no report filename")
+    if report["malformed"] is not False or report["error"] is not None:
+        raise CertificationError("Playwright JSON report is missing or malformed")
     if type(execution["schema"]) is not int or execution["schema"] != SCHEMA:
         raise CertificationError(f"execution schema must be {SCHEMA}")
     if _identity(execution["selection_identity"], "execution selection identity") != expected_identity:
         raise CertificationError("execution identity does not match the selection")
-    if execution["tested_checkout_sha"] != selection["head_sha"] or not SHA_RE.fullmatch(
+    if execution["tested_checkout_sha"] != runtime_checkout_sha or not SHA_RE.fullmatch(
         str(execution["tested_checkout_sha"])
     ):
         raise CertificationError("execution tested checkout does not match selection head")
@@ -337,7 +374,20 @@ def certify_run(
         status = test["status"]
         if status != "passed":
             raise CertificationError(f"executed test {test['id']!r} has non-passing final status {status!r}")
-        retry_count += _validate_attempts(test, f"executed_tests[{index}]", attempt_identities)
+        retry_count += _validate_attempts(
+            test,
+            f"executed_tests[{index}]",
+            attempt_identities,
+            allow_legacy_identity=test["spec"].startswith(
+                (
+                    "spec/legacy-smoke/",
+                    "spec/layout/",
+                    "spec/accessibility/",
+                    "spec/regressions/",
+                    "spec/external/",
+                )
+            ),
+        )
 
     cleanup = _object(execution["cleanup"], "execution cleanup")
     _exact_keys(cleanup, CLEANUP_KEYS, frozenset(), "execution cleanup")
@@ -353,7 +403,8 @@ def certify_run(
         "success": True,
         "verdict": "passed",
         **expected_identity,
-        "tested_checkout_sha": execution["tested_checkout_sha"],
+        "tested_checkout_sha": runtime_checkout_sha,
+        "tested_checkout_kind": runtime_checkout_kind,
         "selection_mode": selection["mode"],
         "selected_spec_path_count": len(selected_paths),
         "discovered_spec_count": len(discovered_specs),

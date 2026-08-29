@@ -693,7 +693,14 @@ def _rule_specificity(rule: Mapping[str, Any], path: str) -> tuple[int, int]:
     return max((len(_literal_prefix(pattern)), len(pattern)) for pattern in matching)
 
 
-def _classify_identity(document: Mapping[str, Any], path: str, status: str) -> dict[str, Any]:
+def _classify_identity(
+    document: Mapping[str, Any],
+    path: str,
+    status: str,
+    *,
+    old_path: str | None,
+    new_path: str | None,
+) -> dict[str, Any]:
     matches = [rule for rule in document["rules"] if any(_matches(path, pattern) for pattern in rule["patterns"])]
     priority = {"safe_ignore": 1, "selected": 2, "full": 3}
     if matches:
@@ -705,7 +712,13 @@ def _classify_identity(document: Mapping[str, Any], path: str, status: str) -> d
         if len(signatures) != 1:
             raise SelectionError(f"path {path!r} has ambiguous primary classifications")
         rule = sorted(winners, key=lambda item: item["id"])[0]
-        reason: dict[str, Any] = {"matched_rule": rule["id"], "path": path, "status": status}
+        reason: dict[str, Any] = {
+            "matched_rule": rule["id"],
+            "new_path": new_path,
+            "old_path": old_path,
+            "path": path,
+            "status": status,
+        }
         if rule["decision"] == "full":
             reason["escalation"] = "full"
         elif rule["decision"] == "safe_ignore":
@@ -718,6 +731,8 @@ def _classify_identity(document: Mapping[str, Any], path: str, status: str) -> d
     return {
         "escalation": "full",
         "matched_rule": "unknown-production" if known else "unknown-path",
+        "new_path": new_path,
+        "old_path": old_path,
         "path": path,
         "status": status,
     }
@@ -757,10 +772,19 @@ def build_selection(
         raise SelectionError("change set contains duplicate status/path identities")
     digest = changed_path_digest(normalized)
 
-    reasons = sorted(
-        (_classify_identity(document, path, status) for status, path in identities),
-        key=_selection_reason_sort_key,
-    )
+    reasons: list[dict[str, Any]] = []
+    for record in normalized:
+        for path in record.identities():
+            reasons.append(
+                _classify_identity(
+                    document,
+                    path,
+                    record.status,
+                    old_path=record.old_path,
+                    new_path=record.new_path,
+                )
+            )
+    reasons.sort(key=_selection_reason_sort_key)
     rollback_full = bool(document["rollback"]["force_full_pr_selection"] and event_name in SELECTIVE_EVENTS)
     authoritative = event_name in AUTHORITATIVE_FULL_EVENTS
     empty_diff = not normalized
@@ -769,9 +793,18 @@ def build_selection(
 
     if rollback_full:
         reasons = [
-            {"escalation": "full", "matched_rule": "rollback-force-full", "path": path, "status": status}
-            for status, path in identities
+            {
+                "escalation": "full",
+                "matched_rule": "rollback-force-full",
+                "new_path": record.new_path,
+                "old_path": record.old_path,
+                "path": path,
+                "status": record.status,
+            }
+            for record in normalized
+            for path in record.identities()
         ]
+        reasons.sort(key=_selection_reason_sort_key)
         mode = "full"
     elif authoritative or empty_diff or any(reason.get("escalation") == "full" for reason in reasons):
         mode = "full"
@@ -818,14 +851,28 @@ def _validate_reason(
 ) -> None:
     if not isinstance(reason, dict):
         raise ValueError("selection reasons must be objects")
-    base_keys = {"path", "status", "matched_rule"}
+    base_keys = {"new_path", "old_path", "path", "status", "matched_rule"}
     variants = ({"selected"}, {"safe_ignore"}, {"escalation"})
     extras = set(reason) - base_keys
     if extras not in variants or not base_keys.issubset(reason):
         raise ValueError("selection reason has invalid keys")
     _validate_relative_path(reason["path"], "selection reason path")
+    for key in ("old_path", "new_path"):
+        value = reason[key]
+        if value is not None:
+            _validate_relative_path(value, f"selection reason {key}")
     if reason["status"] not in CHANGE_STATUSES:
         raise ValueError("selection reason has invalid status")
+    if reason["status"] in {"A", "M"} and reason["old_path"] is not None:
+        raise ValueError("added/modified reason cannot have an old path")
+    if reason["status"] == "D" and reason["new_path"] is not None:
+        raise ValueError("deleted reason cannot have a new path")
+    if reason["status"] in {"R", "C"} and (
+        reason["old_path"] is None or reason["new_path"] is None
+    ):
+        raise ValueError("rename/copy reason must have both old and new paths")
+    if reason["path"] not in {reason["old_path"], reason["new_path"]}:
+        raise ValueError("selection reason path must be one of its old/new identities")
     rule_ids = {rule["id"] for rule in document["rules"]} | {
         "unknown-production",
         "unknown-path",

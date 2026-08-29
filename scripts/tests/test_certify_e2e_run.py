@@ -51,7 +51,7 @@ class CertificationTests(unittest.TestCase):
                 {"id": "legacy::contract", "spec": "spec/legacy-smoke/contract.spec.ts", "project": "operator"},
                 {"id": "smoke::contract", "spec": "spec/smoke/contract.spec.ts", "project": "operator"},
             ],
-            "setup_projects": ["setup-admin", "setup-operator", "setup-viewer"],
+            "setup_projects": ["setup-admin", "setup-aggregate", "setup-operator", "setup-viewer"],
             "focused": False,
         }
         self.execution = {
@@ -72,6 +72,7 @@ class CertificationTests(unittest.TestCase):
             ],
             "cleanup": {"success": True, "failures": []},
             "focused": False,
+            "report": {"file": "results.json", "malformed": False, "error": None},
         }
 
     def tearDown(self):
@@ -174,6 +175,24 @@ class CertificationTests(unittest.TestCase):
         with self.assertRaises(CertificationError):
             self.run_certification(discovery=None)
 
+    def test_current_merge_candidate_checkout_is_explicitly_certified(self):
+        runtime = "f" * 40
+        selection = copy.deepcopy(self.selection)
+        discovery = copy.deepcopy(self.discovery)
+        execution = copy.deepcopy(self.execution)
+        current = copy.deepcopy(self.identity)
+        current.update(tested_checkout_sha=runtime, tested_checkout_kind="merge_candidate")
+        discovery["tested_checkout_sha"] = runtime
+        execution["tested_checkout_sha"] = runtime
+        result = self.run_certification(
+            selection=selection,
+            discovery=discovery,
+            execution=execution,
+            current=current,
+        )
+        self.assertTrue(result["success"])
+        self.assertEqual(result["tested_checkout_kind"], "merge_candidate")
+
     def test_full_run_must_discover_complete_spec_tree(self):
         selection = build_selection(
             self.scope_map,
@@ -189,12 +208,23 @@ class CertificationTests(unittest.TestCase):
             for path in (self.root / "itambox/tests/e2e/spec").rglob("*.spec.ts")
         )
         discovery = copy.deepcopy(self.discovery)
+        full_identity = {
+            "event_name": "push",
+            "base_sha": HEAD,
+            "head_sha": HEAD,
+            "merge_base_sha": HEAD,
+            "changed_path_digest": selection["changed_path_digest"],
+        }
+        discovery["selection_identity"] = copy.deepcopy(full_identity)
+        discovery["tested_checkout_sha"] = HEAD
         discovery["selected_spec_paths"] = ["spec"]
         discovery["discovered_specs"] = all_specs
         discovery["discovered_tests"] = [
             {"id": spec, "spec": spec, "project": "operator"} for spec in all_specs
         ]
         execution = copy.deepcopy(self.execution)
+        execution["selection_identity"] = copy.deepcopy(full_identity)
+        execution["tested_checkout_sha"] = HEAD
         execution["selected_spec_paths"] = ["spec"]
         execution["executed_specs"] = all_specs
         execution["executed_tests"] = [

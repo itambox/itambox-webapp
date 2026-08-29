@@ -26,6 +26,7 @@ DIGEST_RE = selector.DIGEST_RE
 KNOWN_EVENTS = selector.KNOWN_EVENTS
 SCHEMA = selector.SCHEMA
 SHA_RE = selector.SHA_RE
+RUNTIME_KEYS = frozenset({"tested_checkout_sha", "tested_checkout_kind"})
 SELECTION_KEYS = selector.SELECTION_KEYS
 SelectionError = selector.SelectionError
 canonical_json = selector.canonical_json
@@ -67,9 +68,14 @@ def _exact_keys(value: Mapping[str, Any], expected: frozenset[str], label: str) 
         raise GateInputError(f"{label} has invalid keys; missing={missing}, unknown={unknown}")
 
 
-def _identity(value: Any, label: str) -> dict[str, str]:
-    if not isinstance(value, dict) or set(value) != set(IDENTITY_KEYS):
+def _identity(value: Any, label: str, *, allow_runtime: bool = False) -> dict[str, str]:
+    if not isinstance(value, dict):
         raise _InvalidEvidence(f"{label} is not a complete identity object")
+    allowed = IDENTITY_KEYS | (RUNTIME_KEYS if allow_runtime else set())
+    missing = sorted(IDENTITY_KEYS - set(value))
+    unknown = sorted(set(value) - allowed)
+    if missing or unknown:
+        raise _InvalidEvidence(f"{label} is not a complete identity object: missing={missing}, unknown={unknown}")
     if value["event_name"] not in KNOWN_EVENTS:
         raise _InvalidEvidence(f"{label} has an unsupported event")
     for key in ("base_sha", "head_sha", "merge_base_sha"):
@@ -77,7 +83,20 @@ def _identity(value: Any, label: str) -> dict[str, str]:
             raise _InvalidEvidence(f"{label}.{key} is malformed")
     if not isinstance(value["changed_path_digest"], str) or DIGEST_RE.fullmatch(value["changed_path_digest"]) is None:
         raise _InvalidEvidence(f"{label}.changed_path_digest is malformed")
-    return value
+    if allow_runtime and "tested_checkout_sha" in value:
+        if not isinstance(value["tested_checkout_sha"], str) or SHA_RE.fullmatch(value["tested_checkout_sha"]) is None:
+            raise _InvalidEvidence(f"{label}.tested_checkout_sha is malformed")
+        if value.get("tested_checkout_kind") not in {"head", "merge_candidate"}:
+            raise _InvalidEvidence(f"{label}.tested_checkout_kind is malformed")
+    return {key: value[key] for key in IDENTITY_KEYS}
+
+
+def _runtime_checkout(value: Mapping[str, Any], selection: Mapping[str, Any]) -> str:
+    checkout = value.get("tested_checkout_sha", selection["head_sha"])
+    kind = value.get("tested_checkout_kind", "head")
+    if checkout != selection["head_sha"] and kind != "merge_candidate":
+        raise _InvalidEvidence("a checkout different from the selected head must be marked merge_candidate")
+    return checkout
 
 
 def _sorted_unique_strings(value: Any, label: str) -> list[str]:
@@ -97,7 +116,7 @@ def _basic_reasons(value: Any, mode: str, scopes: set[str], label: str) -> list[
     for index, reason in enumerate(value):
         if not isinstance(reason, dict):
             raise _InvalidEvidence(f"{label}[{index}] must be an object")
-        base = {"path", "status", "matched_rule"}
+        base = {"new_path", "old_path", "path", "status", "matched_rule"}
         extra = set(reason) - base
         if not base.issubset(reason) or extra not in ({"selected"}, {"safe_ignore"}, {"escalation"}):
             raise _InvalidEvidence(f"{label}[{index}] has invalid keys")
@@ -106,6 +125,18 @@ def _basic_reasons(value: Any, mode: str, scopes: set[str], label: str) -> list[
         rule = reason["matched_rule"]
         if status not in CHANGE_STATUSES or not isinstance(rule, str) or RULE_TOKEN_RE.fullmatch(rule) is None:
             raise _InvalidEvidence(f"{label}[{index}] has an invalid status or rule token")
+        for identity_key in ("old_path", "new_path"):
+            identity = reason[identity_key]
+            if identity is not None:
+                identity = _nonblank_reason_path(identity, f"{label}[{index}].{identity_key}")
+            if reason["status"] in {"A", "M"} and identity_key == "old_path" and identity is not None:
+                raise _InvalidEvidence(f"{label}[{index}] added/modified reason has old_path")
+            if reason["status"] == "D" and identity_key == "new_path" and identity is not None:
+                raise _InvalidEvidence(f"{label}[{index}] deleted reason has new_path")
+        if status in {"R", "C"} and (reason["old_path"] is None or reason["new_path"] is None):
+            raise _InvalidEvidence(f"{label}[{index}] rename/copy reason lacks an identity")
+        if path not in {reason["old_path"], reason["new_path"]}:
+            raise _InvalidEvidence(f"{label}[{index}] path is not one of old/new identities")
         key = (path, status, rule)
         if previous is not None and key < previous:
             raise _InvalidEvidence(f"{label} must use canonical path/status/rule sorting")
@@ -154,6 +185,8 @@ def _basic_selection(value: Any, label: str) -> dict[str, Any]:
     if mode == "selected":
         if not scopes or not paths:
             raise _InvalidEvidence("selected selection must contain scopes/spec paths")
+        if not value["reasons"]:
+            raise _InvalidEvidence("selected selection must contain classification reasons")
         if not {"legacy-smoke", "smoke"}.issubset(scopes):
             raise _InvalidEvidence("selected selection is missing always-run product scopes")
         for path in paths:
@@ -202,7 +235,8 @@ def evaluate_gate(value: Any) -> dict[str, Any]:
         return _failed(None, "detector selection artifact is absent")
     try:
         selection = _basic_selection(detector["selection"], "detector selection")
-        current = _identity(value["current"], "current identity")
+        current = _identity(value["current"], "current identity", allow_runtime=True)
+        runtime_checkout_sha = _runtime_checkout(value["current"], selection)
     except _InvalidEvidence as exc:
         return _failed(None, str(exc))
     mode = selection["mode"]
@@ -248,8 +282,8 @@ def evaluate_gate(value: Any) -> dict[str, Any]:
         return _failed(mode, "execution selection artifact differs from detector selection")
     if not isinstance(execution["tested_checkout_sha"], str) or not SHA_RE.fullmatch(execution["tested_checkout_sha"]):
         return _failed(mode, "execution tested checkout SHA is malformed")
-    if execution["tested_checkout_sha"] != selection["head_sha"]:
-        return _failed(mode, "execution tested checkout does not equal selection head")
+    if execution["tested_checkout_sha"] != runtime_checkout_sha:
+        return _failed(mode, "execution tested checkout does not match current event checkout")
 
     certification = value["certification"]
     if not isinstance(certification, dict):
@@ -269,8 +303,10 @@ def evaluate_gate(value: Any) -> dict[str, Any]:
         return _failed(mode, str(exc))
     if certification_identity != selected_identity or certification_identity != current:
         return _failed(mode, "certification identity does not match selection/current event")
-    if "tested_checkout_sha" in certification and certification["tested_checkout_sha"] != selection["head_sha"]:
-        return _failed(mode, "certification tested checkout does not match selection head")
+    if "tested_checkout_sha" in certification and certification["tested_checkout_sha"] != runtime_checkout_sha:
+        return _failed(mode, "certification tested checkout does not match current event checkout")
+    if "tested_checkout_kind" in certification and certification["tested_checkout_kind"] != value["current"].get("tested_checkout_kind", "head"):
+        return _failed(mode, "certification tested checkout kind does not match current event")
     return {"schema": SCHEMA, "success": True, "verdict": "passed", "mode": mode, "reasons": []}
 
 

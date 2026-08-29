@@ -73,7 +73,7 @@ function safeRelativePath(value, label) {
   if (typeof value !== 'string' || value.length === 0 || value.includes('\\') || value.includes('\0')) {
     throw new Error(`${label} is not a repository-relative POSIX path.`);
   }
-  if (isAbsolute(value) || value.startsWith('/') || value.split('/').includes('..') || value.split('/').includes('')) {
+  if (isAbsolute(value) || value.startsWith('/') || value.split('/').some((part) => part === '..' || part === '.') || value.split('/').includes('')) {
     throw new Error(`${label} contains an unsafe path.`);
   }
   return value;
@@ -90,6 +90,11 @@ function beneath(root, candidate, label) {
 
 function listSpecFiles(root) {
   if (!existsSync(root)) return [];
+  const target = statSync(root);
+  if (target.isFile()) {
+    return SPEC_FILE.test(root) ? [relative(E2E_ROOT, root).split(sep).join('/')] : [];
+  }
+  if (!target.isDirectory()) return [];
   const result = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const path = resolve(root, entry.name);
@@ -112,23 +117,92 @@ function validateIdentity(selection) {
   }
 }
 
+const SELECTION_KEYS = new Set([
+  'base_sha',
+  'changed_path_digest',
+  'event_name',
+  'head_sha',
+  'merge_base_sha',
+  'mode',
+  'reasons',
+  'schema',
+  'scopes',
+  'spec_paths',
+]);
+
+function validateStringList(value, label, { nonempty = false } = {}) {
+  if (!Array.isArray(value) || (nonempty && value.length === 0)) {
+    throw new Error(`${label} must be a${nonempty ? ' non-empty' : ''} array.`);
+  }
+  const copy = [...value];
+  if (copy.some((item) => typeof item !== 'string' || item.length === 0 || /[\u0000-\u001f\u007f]/u.test(item))) {
+    throw new Error(`${label} contains an invalid string.`);
+  }
+  if (JSON.stringify(copy) !== JSON.stringify([...new Set(copy)].sort())) {
+    throw new Error(`${label} must be sorted and unique.`);
+  }
+  return copy;
+}
+
 function loadSelection(path) {
   const selection = readJson(path, 'selection');
+  const actualKeys = Object.keys(selection).sort();
+  const expectedKeys = [...SELECTION_KEYS].sort();
+  if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) {
+    throw new Error('selection has missing or unknown keys.');
+  }
   if (selection.schema !== 1) throw new Error('selection schema must be 1.');
   if (!['none', 'selected', 'full'].includes(selection.mode)) throw new Error('selection mode is unknown.');
+  if (selection.event_name === 'pull_request' && selection.base_sha === selection.head_sha && selection.merge_base_sha !== selection.head_sha) {
+    throw new Error('pull-request selection has inconsistent empty-diff identity.');
+  }
   validateIdentity(selection);
-  if (!Array.isArray(selection.scopes) || !Array.isArray(selection.spec_paths)) {
-    throw new Error('selection scopes and spec_paths must be arrays.');
+  const scopes = validateStringList(selection.scopes, 'selection scopes');
+  const specPaths = validateStringList(selection.spec_paths, 'selection spec_paths');
+  if (!Array.isArray(selection.reasons)) throw new Error('selection reasons must be an array.');
+  if (selection.mode === 'none') {
+    if (scopes.length !== 0 || specPaths.length !== 0) throw new Error('none mode must not contain scopes or paths.');
+    if (selection.reasons.some((reason) => reason?.safe_ignore !== true)) {
+      throw new Error('none mode may contain only safe-ignore reasons.');
+    }
+    throw new Error('none mode cannot be executed by run-selected.mjs.');
   }
-  if (selection.mode === 'none') throw new Error('none mode cannot be executed by run-selected.mjs.');
-  if (selection.mode === 'full' && JSON.stringify(selection.spec_paths) !== JSON.stringify(['spec'])) {
-    throw new Error('full mode must execute the complete spec root.');
+  if (selection.mode === 'full') {
+    if (JSON.stringify(scopes) !== JSON.stringify(['all']) || JSON.stringify(specPaths) !== JSON.stringify(['spec'])) {
+      throw new Error('full mode must execute the complete spec root.');
+    }
+  } else {
+    if (scopes.length === 0 || specPaths.length === 0 || !scopes.includes('legacy-smoke') || !scopes.includes('smoke')) {
+      throw new Error('selected mode has empty or incomplete scope evidence.');
+    }
   }
-  if (selection.mode === 'selected' && selection.spec_paths.length === 0) {
-    throw new Error('selected mode has no spec paths.');
+  const previousReason = { path: '', status: '', matched_rule: '' };
+  for (const [index, reason] of selection.reasons.entries()) {
+    if (!reason || typeof reason !== 'object' || Array.isArray(reason)) throw new Error(`reason ${index} is invalid.`);
+    const reasonKeys = Object.keys(reason).sort();
+    const base = ['matched_rule', 'new_path', 'old_path', 'path', 'status'];
+    const decision = ['escalation', 'safe_ignore', 'selected'].filter((key) => key in reason);
+    const expectedReasonKeys = [...base, ...decision].sort();
+    if (JSON.stringify(reasonKeys) !== JSON.stringify(expectedReasonKeys) || decision.length !== 1) {
+      throw new Error(`reason ${index} has an invalid shape.`);
+    }
+    safeRelativePath(reason.path, `selection reason ${index}`);
+    if (reason.old_path !== null) safeRelativePath(reason.old_path, `selection reason ${index} old_path`);
+    if (reason.new_path !== null) safeRelativePath(reason.new_path, `selection reason ${index} new_path`);
+    if (!['A', 'M', 'D', 'R', 'C'].includes(reason.status) || typeof reason.matched_rule !== 'string') {
+      throw new Error(`reason ${index} has an invalid status/rule.`);
+    }
+    if (reason.path !== reason.old_path && reason.path !== reason.new_path) {
+      throw new Error(`reason ${index} path is not one of its old/new identities.`);
+    }
+    const key = { path: reason.path, status: reason.status, matched_rule: reason.matched_rule };
+    if (index > 0 && `${key.path}\u0000${key.status}\u0000${key.matched_rule}` < `${previousReason.path}\u0000${previousReason.status}\u0000${previousReason.matched_rule}`) {
+      throw new Error('selection reasons must be canonically sorted.');
+    }
+    Object.assign(previousReason, key);
   }
   const seen = new Set();
-  for (const pathValue of selection.spec_paths) {
+  for (const pathValue of specPaths) {
     const pathName = safeRelativePath(pathValue, 'selection spec path');
     if (seen.has(pathName)) throw new Error(`duplicate selection spec path ${pathName}.`);
     seen.add(pathName);
@@ -142,6 +216,8 @@ function loadSelection(path) {
 function specArguments(selection) {
   return selection.mode === 'full' ? ['spec'] : [...selection.spec_paths];
 }
+
+const PLAYWRIGHT_CLI = resolve(E2E_ROOT, 'node_modules/@playwright/test/cli.js');
 
 function spawnFile(command, args, env) {
   return new Promise((resolvePromise, reject) => {
@@ -162,19 +238,49 @@ function spawnFile(command, args, env) {
   });
 }
 
+const SPEC_DIR_NAMES = new Set([
+  'accessibility',
+  'apps',
+  'contracts',
+  'external',
+  'layout',
+  'legacy-smoke',
+  'regressions',
+  'smoke',
+]);
+
 function normaliseReportPath(file) {
-  const candidate = file.replaceAll('\\', '/');
-  const marker = candidate.indexOf('spec/');
-  if (marker >= 0) return candidate.slice(marker);
-  const authMarker = candidate.indexOf('auth/');
-  if (authMarker >= 0) return candidate.slice(authMarker);
-  return null;
+  let candidate = String(file).replaceAll('\\', '/');
+  const marker = candidate.lastIndexOf('/spec/');
+  if (marker >= 0) candidate = candidate.slice(marker + 1);
+  candidate = candidate.replace(/^\.\//, '').replace(/^\.\.\//, '');
+  if (candidate.startsWith('spec/')) return candidate;
+  if (candidate.startsWith('auth/')) return candidate;
+  const [first] = candidate.split('/');
+  return SPEC_DIR_NAMES.has(first) ? `spec/${candidate}` : null;
 }
 
 function collectJsonListing(value, output, parentFile = null, parentProject = null) {
   if (!value || typeof value !== 'object') return;
-  const file = normaliseReportPath(String(value.file || value.location?.file || parentFile || '')) || parentFile;
+  const titleFile = typeof value.title === 'string' && /\.(?:spec|test)\.(?:ts|tsx|js|mjs|cjs)$/.test(value.title.trim())
+    ? value.title.trim()
+    : null;
+  const file = normaliseReportPath(String(value.file || value.location?.file || titleFile || parentFile || '')) || parentFile;
   const project = value.projectName || value.project || parentProject || 'unknown';
+  if (Array.isArray(value.specs)) {
+    for (const spec of value.specs) {
+      const specFile = normaliseReportPath(String(spec.file || file || '')) || file;
+      const specProject = String(spec.tests?.[0]?.projectName || project);
+      for (const test of Array.isArray(spec.tests) ? spec.tests : []) {
+        if (!specFile) continue;
+        output.tests.push({
+          id: String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`),
+          spec: specFile,
+          project: String(test.projectName || specProject),
+        });
+      }
+    }
+  }
   if (Array.isArray(value.tests)) {
     for (const test of value.tests) {
       const testFile = normaliseReportPath(String(test.location?.file || file || '')) || file;
@@ -207,13 +313,15 @@ function parseListing(stdout, rawReport) {
     }
   }
   if (output.tests.length === 0) {
-    const pattern = /(?:^|\s)((?:spec|auth)\/[A-Za-z0-9._/-]+\.(?:spec|test)\.(?:ts|tsx|js|mjs|cjs))(?:[:]\d+(?::\d+)?)?/g;
+    const pattern = /(?:^|\s)(?:\.\.[\\/])?((?:spec[\\/])?(?:accessibility|apps|contracts|external|layout|legacy-smoke|regressions|smoke|auth)[\\/][A-Za-z0-9._\\/-]+\.(?:spec|test)\.(?:ts|tsx|js|mjs|cjs))(?:[:]\d+(?::\d+)?)?/g;
     for (const line of stdout.split(/\r?\n/)) {
       const match = pattern.exec(line);
       pattern.lastIndex = 0;
       if (!match) continue;
+      const spec = normaliseReportPath(match[1]);
+      if (!spec) continue;
       const project = line.match(/\[(setup-[^\]]+)\]/)?.[1] || line.match(/\[([^\]]+)\]/)?.[1] || 'unknown';
-      output.tests.push({ id: line.trim(), spec: match[1], project });
+      output.tests.push({ id: line.trim(), spec, project });
     }
   }
   const unique = new Map(output.tests.map((test) => [`${test.project}\0${test.id}`, test]));
@@ -272,8 +380,34 @@ function cleanupStatus(test) {
 
 function collectExecution(value, output, parentFile = null, parentProject = null) {
   if (!value || typeof value !== 'object') return;
-  const file = normaliseReportPath(String(value.file || value.location?.file || parentFile || '')) || parentFile;
+  const titleFile = typeof value.title === 'string' && /\.(?:spec|test)\.(?:ts|tsx|js|mjs|cjs)$/.test(value.title.trim())
+    ? value.title.trim()
+    : null;
+  const file = normaliseReportPath(String(value.file || value.location?.file || titleFile || parentFile || '')) || parentFile;
   const project = value.projectName || value.project || parentProject || 'unknown';
+  if (Array.isArray(value.specs)) {
+    for (const spec of value.specs) {
+      const specFile = normaliseReportPath(String(spec.file || file || '')) || file;
+      for (const test of Array.isArray(spec.tests) ? spec.tests : []) {
+        if (!specFile) continue;
+        const results = Array.isArray(test.results) ? test.results : [];
+        const attempts = results.map((result, index) => ({
+          retry: Number.isInteger(result.retry) ? result.retry : index,
+          status: String(result.status || 'unknown').replace('timedOut', 'timed_out'),
+          identity: identityFromAttachments(result) || identityFromAnnotations(test),
+        }));
+        output.tests.push({
+          id: String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`),
+          spec: specFile,
+          project: String(test.projectName || project),
+          status: String(test.status || attempts.at(-1)?.status || 'unknown').replace('timedOut', 'timed_out'),
+          expectedStatus: String(test.expectedStatus || 'passed'),
+          attempts,
+          cleanup: cleanupStatus(test),
+        });
+      }
+    }
+  }
   if (Array.isArray(value.tests)) {
     for (const test of value.tests) {
       const testFile = normaliseReportPath(String(test.location?.file || file || '')) || file;
@@ -311,7 +445,7 @@ function reportExecution(reportPath) {
   const output = { malformed: false, error: null, tests: [] };
   collectExecution(parsed, output);
   const unique = new Map(output.tests.map((test) => [`${test.project}\0${test.id}`, test]));
-  output.tests = [...unique.values()].sort((left, right) => `${left.spec}\0${left.id}`.localeCompare(`${right.spec}\0${right.id}`));
+  output.tests = [...unique.values()].sort((left, right) => `${left.spec}\0${left.project}\0${left.id}`.localeCompare(`${right.spec}\0${right.project}\0${right.id}`));
   return output;
 }
 
@@ -329,12 +463,27 @@ async function main() {
 
   const rawDiscoveryPath = resolve(dirname(paths.discovery), 'playwright-list.json');
   const discoveryRun = await spawnFile(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['playwright', 'test', ...specArguments(selection), '--list', '--reporter=json'],
+    process.execPath,
+    [
+      PLAYWRIGHT_CLI,
+      'test',
+      ...specArguments(selection),
+      '--list',
+      '--reporter=json',
+    ],
     { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: rawDiscoveryPath },
   );
   const listing = parseListing(discoveryRun.stdout, rawDiscoveryPath);
-  const discoveredSpecs = [...new Set(listing.tests.map((test) => test.spec))].sort();
+  const allListingTests = listing.tests;
+  const productListingTests = allListingTests.filter((test) => test.spec.startsWith('spec/'));
+  const discoveredSpecs = [...new Set(productListingTests.map((test) => test.spec))].sort();
+  const setupProjects = [...new Set([
+    ...allListingTests.map((test) => test.project),
+    ...discoveryRun.stdout
+      .split(/\r?\n/)
+      .map((line) => line.match(/\[(setup-[^\]]+)\]/)?.[1])
+      .filter(Boolean),
+  ].filter((project) => project.startsWith('setup-')))].sort();
   const discovery = {
     schema: 1,
     selection_identity: {
@@ -347,8 +496,8 @@ async function main() {
     tested_checkout_sha: testedCheckoutSha,
     selected_spec_paths: selectedSpecPaths,
     discovered_specs: discoveredSpecs,
-    discovered_tests: listing.tests,
-    setup_projects: [...new Set(listing.tests.map((test) => test.project).filter((project) => project.startsWith('setup-')))].sort(),
+    discovered_tests: productListingTests,
+    setup_projects: setupProjects,
     registered_spec_paths: listSpecFiles(SPEC_ROOT),
     focused: focus,
   };
@@ -360,23 +509,24 @@ async function main() {
   }
 
   const executionRun = await spawnFile(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['playwright', 'test', ...specArguments(selection)],
+    process.execPath,
+    [PLAYWRIGHT_CLI, 'test', ...specArguments(selection)],
     { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: paths.report },
   );
   process.stdout.write(executionRun.stdout);
   process.stderr.write(executionRun.stderr);
   const report = reportExecution(paths.report);
+  const productReportTests = report.tests.filter((test) => test.spec.startsWith('spec/'));
   const execution = {
     schema: 1,
     selection_identity: discovery.selection_identity,
     tested_checkout_sha: testedCheckoutSha,
     selected_spec_paths: selectedSpecPaths,
-    executed_specs: [...new Set(report.tests.map((test) => test.spec))].sort(),
-    executed_tests: report.tests,
+    executed_specs: [...new Set(productReportTests.map((test) => test.spec))].sort(),
+    executed_tests: productReportTests.map(({ expectedStatus, cleanup, ...test }) => test),
     cleanup: {
-      success: report.tests.every((test) => !test.cleanup.includes('failure')),
-      failures: report.tests.filter((test) => test.cleanup.includes('failure')).map((test) => test.id).sort(),
+      success: productReportTests.every((test) => !test.cleanup.includes('failure')),
+      failures: productReportTests.filter((test) => test.cleanup.includes('failure')).map((test) => test.id).sort(),
     },
     focused: focus,
     report: {

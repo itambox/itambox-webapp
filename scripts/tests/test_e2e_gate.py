@@ -31,7 +31,14 @@ class GatePolicyTests(unittest.TestCase):
             **self.identity,
             "scopes": ["app:assets", "legacy-smoke", "smoke"],
             "spec_paths": ["spec/apps/assets", "spec/legacy-smoke", "spec/smoke"],
-            "reasons": [],
+            "reasons": [{
+                "matched_rule": "assets-source",
+                "new_path": "src/assets/services.py",
+                "old_path": None,
+                "path": "src/assets/services.py",
+                "selected": ["app:assets"],
+                "status": "M",
+            }],
         }
         self.certification = {"schema": 1, "success": True, "verdict": "passed", **self.identity}
         self.base = {
@@ -64,6 +71,7 @@ class GatePolicyTests(unittest.TestCase):
         value["detector"]["selection"]["mode"] = "none"
         value["detector"]["selection"]["scopes"] = []
         value["detector"]["selection"]["spec_paths"] = []
+        value["detector"]["selection"]["reasons"] = []
         value["execution"] = {"result": "skipped"}
         value["certification"] = None
         result = evaluate_gate(value)
@@ -90,6 +98,7 @@ class GatePolicyTests(unittest.TestCase):
         value["detector"]["selection"]["mode"] = "none"
         value["detector"]["selection"]["scopes"] = []
         value["detector"]["selection"]["spec_paths"] = []
+        value["detector"]["selection"]["reasons"] = []
         value["execution"]["result"] = "success"
         self.assertFalse(evaluate_gate(value)["success"])
 
@@ -120,6 +129,14 @@ class GatePolicyTests(unittest.TestCase):
         value = copy.deepcopy(self.base)
         value["certification"] = {"not": "a certification"}
         self.assertFalse(evaluate_gate(value)["success"])
+
+    def test_merge_candidate_checkout_is_accepted_only_with_explicit_kind(self):
+        value = copy.deepcopy(self.base)
+        runtime = "e" * 40
+        value["current"].update(tested_checkout_sha=runtime, tested_checkout_kind="merge_candidate")
+        value["execution"]["tested_checkout_sha"] = runtime
+        value["certification"]["tested_checkout_sha"] = runtime
+        self.assertTrue(evaluate_gate(value)["success"])
 
     def test_invalid_gate_input_raises_instead_of_defaulting_green(self):
         for value in ({}, {"schema": 99}, {"schema": 1, "detector": None}):
