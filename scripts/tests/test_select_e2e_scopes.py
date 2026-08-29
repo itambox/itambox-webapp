@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 from scripts.select_e2e_scopes import (
     ScopeMapError,
     SelectionError,
+    _matches,
     build_selection,
     canonical_json,
     parse_name_status_z,
@@ -143,6 +145,71 @@ class ScopeMapValidationTests(unittest.TestCase):
             "a11y",
         }
         self.assertTrue(required.issubset(document["scopes"]))
+
+    def test_real_map_explicitly_classifies_every_tracked_known_production_file(self):
+        root = Path(__file__).resolve().parents[2]
+        document = json.loads((root / "scripts" / "e2e_scope_map.yaml").read_text(encoding="utf-8"))
+        tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=root).split(b"\0")
+        uncovered: list[str] = []
+        for raw_path in tracked:
+            if not raw_path:
+                continue
+            path = raw_path.decode("utf-8")
+            if not any(_matches(path, pattern) for pattern in document["known_production_roots"]):
+                continue
+            if not any(_matches(path, pattern) for rule in document["rules"] for pattern in rule["patterns"]):
+                uncovered.append(path)
+        self.assertEqual(uncovered, [], "known production files must not rely on the unknown fallback")
+
+    def test_real_map_covers_the_required_risk_matrix(self):
+        root = Path(__file__).resolve().parents[2]
+        document = json.loads((root / "scripts" / "e2e_scope_map.yaml").read_text(encoding="utf-8"))
+        cases = (
+            ("itambox/assets/models.py", "selected", {"app:assets", "contract:asset-custody"}),
+            ("itambox/templates/assets/asset.html", "selected", {"app:assets"}),
+            ("itambox/tests/e2e/spec/apps/assets/asset-lifecycle.spec.ts", "selected", {"app:assets"}),
+            (
+                "itambox/tests/e2e/spec/contracts/asset-custody/asset-action.spec.ts",
+                "selected",
+                {"contract:asset-custody"},
+            ),
+            ("itambox/assets/services/custody.py", "selected", {"contract:cross-app"}),
+            ("itambox/organization/models.py", "full", {"all"}),
+            ("itambox/itambox/middleware.py", "full", {"all"}),
+            ("itambox/users/backends.py", "full", {"all"}),
+            ("itambox/core/views/generic.py", "full", {"all"}),
+            ("itambox/static/src/scss/base.scss", "full", {"all"}),
+            ("itambox/static/src/ts/core.ts", "full", {"all"}),
+            ("itambox/tests/e2e/fixtures/test.ts", "full", {"all"}),
+            ("itambox/tests/e2e/helpers/errors.ts", "full", {"all"}),
+            ("itambox/tests/e2e/playwright.config.ts", "full", {"all"}),
+            ("itambox/tests/e2e/package-lock.json", "full", {"all"}),
+            ("scripts/select_e2e_scopes.py", "full", {"all"}),
+            ("scripts/certify_e2e_run.py", "full", {"all"}),
+            ("scripts/check_e2e_gate.py", "full", {"all"}),
+            ("scripts/e2e_scope_map.yaml", "full", {"all"}),
+            (".github/workflows/e2e.yml", "full", {"all"}),
+            ("itambox/assets/migrations/0001_initial.py", "full", {"all"}),
+            ("itambox/core/management/commands/seed_data.py", "full", {"all"}),
+            (".github/PULL_REQUEST_TEMPLATE.md", "none", set()),
+            ("itambox/templates/new-domain/runtime.html", "full", {"all"}),
+            ("unclassified-maintainer.txt", "full", {"all"}),
+        )
+        for path, mode, required_scopes in cases:
+            with self.subTest(path=path):
+                selection = build_selection(
+                    document,
+                    root,
+                    event_name="pull_request",
+                    base_sha=BASE,
+                    head_sha=HEAD,
+                    merge_base_sha=MERGE,
+                    changes=[{"status": "M", "new_path": path}],
+                )
+                self.assertEqual(selection["mode"], mode)
+                self.assertTrue(required_scopes.issubset(selection["scopes"]))
+                if mode != "full" or path.startswith(("itambox/", "scripts/", ".github/")):
+                    self.assertNotEqual(selection["reasons"][0]["matched_rule"], "unknown-path")
 
     def test_rejects_duplicate_rule_ids_and_safe_overlap(self):
         with tempfile.TemporaryDirectory() as directory:

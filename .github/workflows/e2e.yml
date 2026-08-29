@@ -114,6 +114,7 @@ jobs:
           - 8081:8080
 
     env:
+      DJANGO_SETTINGS_MODULE: core.settings.e2e
       ITAMBOX_ENV: dev
       ITAMBOX_DB_NAME: itambox_e2e
       ITAMBOX_DB_USER: itambox_e2e

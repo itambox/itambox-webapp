@@ -303,11 +303,21 @@ def test_release_preparation_awaits_reusable_full_e2e():
 
 def test_e2e_privileged_role_grants_are_reasoned_and_time_bounded():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
-    provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split(
-        "Start Django dev server", 1
-    )[0]
+    provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split("Start Django dev server", 1)[0]
 
     assert "from datetime import timedelta" in provision
     assert "from django.utils import timezone" in provision
     assert '"reason": "Disposable CI E2E role boundary."' in provision
     assert '"valid_until": timezone.now() + timedelta(hours=4)' in provision
+
+
+def test_e2e_uses_an_isolated_settings_module_with_a_bounded_login_budget():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    settings_path = REPOSITORY_ROOT / "itambox" / "core" / "settings" / "e2e.py"
+
+    assert "DJANGO_SETTINGS_MODULE: core.settings.e2e" in workflow
+    assert settings_path.is_file()
+    settings = settings_path.read_text(encoding="utf-8")
+    assert "from .dev import *" in settings
+    assert "RATELIMIT_LIMIT = 100" in settings
+    assert "RATELIMIT_PERIOD = 60" in settings
