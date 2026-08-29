@@ -1,11 +1,12 @@
 import secrets
+from contextlib import nullcontext
 from datetime import timedelta
 
 from django import conf
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -400,13 +401,18 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
 
-    def validate_location_integrity(self, allowed_tenant_ids=None):
+    def validate_location_integrity(self, allowed_tenant_ids=None, *, using=None):
         if self.location_id is None:
             return
         location = self._state.fields_cache.get("location")
         if location is None:
             location_model = self._meta.get_field("location").remote_field.model
-            location = location_model._base_manager.filter(pk=self.location_id).only("tenant_id", "deleted_at").first()
+            location = (
+                location_model._base_manager.using(using)
+                .filter(pk=self.location_id)
+                .only("tenant_id", "deleted_at")
+                .first()
+            )
         if location is None or location.deleted_at is not None or location.tenant_id is None:
             raise ValidationError({"location": _("Audit sessions require a live tenant-owned location.")})
         if self.tenant_id is not None and location.tenant_id != self.tenant_id:
@@ -414,39 +420,70 @@ class AuditSession(StandardModel, SoftDeleteMixin):
         if allowed_tenant_ids is not None and location.tenant_id not in allowed_tenant_ids:
             raise ValidationError({"location": _("The audit location is outside the authorized tenant scope.")})
 
-    def _reject_completed_mutation(self):
-        if self._state.adding or self.pk is None:
-            return
+    def _persisted_mutation_fields(self, *, lock=False, using=None):
         fields = tuple(
             field.attname
             for field in self._meta.concrete_fields
             if not field.primary_key and field.attname != "updated_at"
         )
-        persisted = type(self)._base_manager.filter(pk=self.pk).values(*fields).first()
+        queryset = type(self)._base_manager.using(using)
+        if lock:
+            queryset = queryset.select_for_update(of=("self",))
+        return fields, queryset.filter(pk=self.pk).values(*fields).first()
+
+    def _reject_completed_mutation(self, *, persisted_state=None):
+        if self._state.adding or self.pk is None:
+            return
+        fields, persisted = persisted_state or self._persisted_mutation_fields()
         if persisted is None or persisted["status"] != AuditSessionStatusChoices.COMPLETED:
             return
         if any(getattr(self, field) != persisted[field] for field in fields):
             raise ValidationError(_("Completed audit sessions are immutable."))
 
     def save(self, *args, **kwargs):
-        self.validate_location_integrity()
-        self._reject_completed_mutation()
-        return super().save(*args, **kwargs)
+        using = kwargs.get("using") or self._state.db or "default"
+        if self._state.adding or self.pk is None:
+            self.validate_location_integrity(using=using)
+            return super().save(*args, **kwargs)
+        write_transaction = (
+            nullcontext() if transaction.get_connection(using).in_atomic_block else transaction.atomic(using=using)
+        )
+        with write_transaction:
+            persisted_state = self._persisted_mutation_fields(lock=True, using=using)
+            self.validate_location_integrity(using=using)
+            self._reject_completed_mutation(persisted_state=persisted_state)
+            return super().save(*args, **kwargs)
 
-    def _reject_completed_delete(self):
+    def _reject_completed_delete(self, *, persisted_status=None, using=None):
         if self.pk is None:
             return
-        status = type(self)._base_manager.filter(pk=self.pk).values_list("status", flat=True).first()
+        status = persisted_status
+        if status is None:
+            status = type(self)._base_manager.using(using).filter(pk=self.pk).values_list("status", flat=True).first()
         if status == AuditSessionStatusChoices.COMPLETED:
             raise ValidationError(_("Completed audit sessions and their evidence cannot be deleted."))
 
     def soft_delete(self):
-        self._reject_completed_delete()
         return super().soft_delete()
 
     def delete(self, *args, **kwargs):
-        self._reject_completed_delete()
-        return super().delete(*args, **kwargs)
+        if self.pk is None:
+            return super().delete(*args, **kwargs)
+        using = kwargs.get("using") or self._state.db or "default"
+        write_transaction = (
+            nullcontext() if transaction.get_connection(using).in_atomic_block else transaction.atomic(using=using)
+        )
+        with write_transaction:
+            persisted_status = (
+                type(self)
+                ._base_manager.using(using)
+                .select_for_update(of=("self",))
+                .filter(pk=self.pk)
+                .values_list("status", flat=True)
+                .first()
+            )
+            self._reject_completed_delete(persisted_status=persisted_status, using=using)
+            return super().delete(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse("compliance:auditsession_detail", kwargs={"pk": self.pk})

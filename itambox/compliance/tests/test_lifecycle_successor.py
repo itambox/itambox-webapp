@@ -159,6 +159,38 @@ class AuditLifecycleBoundaryTests(TenantTestMixin, TestCase):
                     original,
                 )
 
+    def test_direct_soft_delete_defers_to_alias_aware_save_without_default_database_precheck(self):
+        session = AuditSession(pk=self.session.pk)
+        session._state.db = "audit_alias"
+
+        with (
+            patch.object(
+                session, "_reject_completed_delete", side_effect=AssertionError("default alias read")
+            ) as reject,
+            patch.object(session, "save") as save,
+        ):
+            session.soft_delete()
+
+        reject.assert_not_called()
+        save.assert_called_once_with(update_fields=["deleted_at"])
+        self.assertIsNotNone(session.deleted_at)
+
+    def test_location_integrity_reads_from_the_write_database_alias(self):
+        session = AuditSession(
+            pk=self.session.pk,
+            tenant_id=self.tenant.pk,
+            location_id=self.location_a.pk,
+        )
+        session._state.db = "audit_alias"
+        location_queryset = Mock()
+        location_queryset.filter.return_value.only.return_value.first.return_value = self.location_a
+
+        with patch.object(Location._base_manager, "using", return_value=location_queryset) as using:
+            session.validate_location_integrity(using="audit_alias")
+
+        using.assert_called_once_with("audit_alias")
+        location_queryset.filter.assert_called_once_with(pk=self.location_a.pk)
+
     def test_completed_session_delete_is_denied_at_model_html_and_api_boundaries(self):
         self._close(with_audit=True)
         audit_rows = list(
@@ -778,6 +810,121 @@ class AuditLifecyclePostgresRaceTests(TransactionTestCase):
             errors.put(exc)
         finally:
             db.close()
+
+    def _run_close_against_stale_session_mutation(self, mutation):
+        close_errors = Queue()
+        close_pid = Queue()
+        mutation_errors = Queue()
+        mutation_pid = Queue()
+        stale_session = AuditSession._base_manager.get(pk=self.session.pk)
+
+        def mutation_worker():
+            db = connections["default"]
+            db.close()
+            db.ensure_connection()
+            mutation_pid.put(db.connection.get_backend_pid())
+            try:
+                mutation(stale_session)
+            except Exception as exc:
+                mutation_errors.put(exc)
+            finally:
+                db.close()
+
+        close_thread = threading.Thread(target=self._close_worker, args=(close_errors, close_pid))
+        mutation_thread = threading.Thread(target=mutation_worker)
+        locker_errors = Queue()
+        locked = threading.Event()
+        release = threading.Event()
+        locker_thread = threading.Thread(target=self._asset_locker_worker, args=(locked, release, locker_errors))
+        locker_thread.start()
+        self.assertTrue(locked.wait(timeout=5))
+        try:
+            close_thread.start()
+            self._wait_for_lock(close_pid, "assets_asset", close_errors)
+            mutation_thread.start()
+            self._wait_for_lock(mutation_pid, "auditsession", mutation_errors)
+        finally:
+            release.set()
+        locker_thread.join(timeout=10)
+        close_thread.join(timeout=10)
+        mutation_thread.join(timeout=10)
+
+        self.assertFalse(locker_thread.is_alive())
+        self.assertFalse(close_thread.is_alive())
+        self.assertFalse(mutation_thread.is_alive())
+        self.assertTrue(locker_errors.empty(), list(locker_errors.queue))
+        self.assertTrue(close_errors.empty(), list(close_errors.queue))
+        self.assertFalse(mutation_errors.empty())
+        self.assertIsInstance(mutation_errors.get(), ValidationError)
+
+    def test_stale_save_waiting_for_close_cannot_reopen_completed_session(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("This regression requires PostgreSQL row-lock semantics.")
+
+        def stale_save(session):
+            session.name = "Stale overwrite"
+            session.save()
+
+        self._run_close_against_stale_session_mutation(stale_save)
+
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, "completed")
+        self.assertIsNotNone(self.session.completed_at)
+        self.assertIsNotNone(self.session.reconciliation_report)
+        self.assertNotEqual(self.session.name, "Stale overwrite")
+
+    def test_soft_delete_waiting_for_close_cannot_hide_completed_session(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("This regression requires PostgreSQL row-lock semantics.")
+
+        self._run_close_against_stale_session_mutation(lambda session: session.soft_delete())
+
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, "completed")
+        self.assertIsNone(self.session.deleted_at)
+        self.assertIsNotNone(self.session.reconciliation_report)
+
+    def test_hard_delete_waiting_for_close_cannot_remove_completed_evidence(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("This regression requires PostgreSQL row-lock semantics.")
+
+        audit_asset(
+            self.asset,
+            user=self.user,
+            session=self.session,
+            location=self.location,
+            status=self.status,
+        )
+        evidence = list(
+            AssetAudit.objects.filter(session=self.session).values(
+                "pk",
+                "session_id",
+                "asset_id",
+                "auditor_id",
+                "timestamp",
+                "location_id",
+                "status_id",
+            )
+        )
+
+        self._run_close_against_stale_session_mutation(lambda session: session.delete(force_hard_delete=True))
+
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, "completed")
+        self.assertEqual(
+            list(
+                AssetAudit.objects.filter(session=self.session).values(
+                    "pk",
+                    "session_id",
+                    "asset_id",
+                    "auditor_id",
+                    "timestamp",
+                    "location_id",
+                    "status_id",
+                )
+            ),
+            evidence,
+        )
 
     def test_scan_waits_for_close_and_cannot_commit_after_frozen_report(self):
         if connection.vendor != "postgresql":
