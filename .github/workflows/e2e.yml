@@ -5,7 +5,10 @@ on:
     branches: [master, main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '17 2 * * *'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -15,7 +18,76 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
+  detect-e2e-scope:
+    name: E2E / Detect scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      selection_valid: ${{ steps.select.outputs.selection_valid }}
+      base_sha: ${{ steps.select.outputs.base_sha }}
+      head_sha: ${{ steps.select.outputs.head_sha }}
+      merge_base_sha: ${{ steps.select.outputs.merge_base_sha }}
+      changed_path_digest: ${{ steps.select.outputs.changed_path_digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Validate policy and select E2E scopes
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHECKOUT_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifacts
+          # scripts/tests/test_*.py is the complete early policy suite; discover
+          # intentionally runs it before any application dependency setup.
+          python -m unittest discover \
+            --start-directory scripts/tests \
+            --top-level-directory . \
+            --pattern 'test_*.py'
+          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
+            test -n "$PR_BASE_SHA"
+            test -n "$PR_HEAD_SHA"
+            BASE_SHA="$PR_BASE_SHA"
+            HEAD_SHA="$PR_HEAD_SHA"
+          else
+            # authoritative full events have no narrow PR range. The selector
+            # still receives real, object-verified identities and emits full.
+            BASE_SHA="$CHECKOUT_SHA"
+            HEAD_SHA="$CHECKOUT_SHA"
+          fi
+          python scripts/select_e2e_scopes.py \
+            --repo-root . \
+            --scope-map scripts/e2e_scope_map.yaml \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
+            --output artifacts/e2e-selection.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --github-step-summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload canonical selection
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-selection
+          path: artifacts/e2e-selection.json
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e-selected:
+    name: E2E / Selected or Full
+    needs: detect-e2e-scope
+    if: >-
+      needs.detect-e2e-scope.result == 'success' &&
+      (needs.detect-e2e-scope.outputs.mode == 'selected' || needs.detect-e2e-scope.outputs.mode == 'full')
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -42,6 +114,7 @@ jobs:
           - 8081:8080
 
     env:
+      DJANGO_SETTINGS_MODULE: core.settings.e2e
       ITAMBOX_ENV: dev
       ITAMBOX_DB_NAME: itambox_e2e
       ITAMBOX_DB_USER: itambox_e2e
@@ -58,6 +131,10 @@ jobs:
       # settings: "itambox2026").
       E2E_AGGREGATE_USERNAME: lars.eklund
       E2E_AGGREGATE_PASSWORD: itambox2026
+      # These principals are created in the disposable database below with
+      # explicit tenant-local Asset Manager and Read-Only role grants.
+      E2E_OPERATOR_USERNAME: e2e-operator
+      E2E_VIEWER_USERNAME: e2e-viewer
       E2E_TENANT_SLUG: helix-rnd
       E2E_ISOLATION_TENANT_SLUG: e2e-isolation-tenant
       E2E_TENANT_GROUP_NAME: E2E Tenant Read-Only Group
@@ -73,6 +150,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -258,10 +337,12 @@ jobs:
         run: |
           uv run --locked --no-sync python manage.py shell <<'PY'
           import os
+          from datetime import timedelta
 
           from django.contrib.auth import get_user_model
           from django.db.models import Q
-          from organization.models import AssetHolder, Membership, Role, Tenant
+          from django.utils import timezone
+          from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
           from users.models import Token, UserGroup
 
           User = get_user_model()
@@ -330,6 +411,75 @@ jobs:
               raise RuntimeError("E2E OIDC fixture Membership already exists")
           print("E2E OIDC fixture absence and Admin-role preconditions passed.")
 
+          def provision_role_principal(username, email, first_name, last_name, role_name):
+              principal, _ = User._base_manager.get_or_create(
+                  username=username,
+                  defaults={
+                      "email": email,
+                      "first_name": first_name,
+                      "last_name": last_name,
+                      "is_staff": False,
+                      "is_superuser": False,
+                  },
+              )
+              principal.email = email
+              principal.is_active = True
+              principal.is_staff = False
+              principal.is_superuser = False
+              principal.set_password(os.environ["E2E_PASSWORD"])
+              principal.save()
+              holder, _ = AssetHolder.all_objects.get_or_create(
+                  tenant=tenant,
+                  upn=username,
+                  defaults={
+                      "first_name": first_name,
+                      "last_name": last_name,
+                      "email": email,
+                      "user": principal,
+                  },
+              )
+              if holder.user_id not in (None, principal.pk):
+                  raise RuntimeError(f"E2E holder {username} is owned by another principal")
+              if holder.user_id is None:
+                  holder.user = principal
+                  holder.save(update_fields=["user"])
+              membership, _ = Membership._base_manager.get_or_create(user=principal, tenant=tenant)
+              membership.is_active = True
+              membership.save(update_fields=["is_active"])
+              role = Role.all_objects.get(tenant=tenant, name=role_name, deleted_at__isnull=True)
+              grant, _ = RoleGrant._base_manager.get_or_create(
+                  membership=membership,
+                  role=role,
+                  defaults={
+                      "granted_by": user,
+                      "reason": "Disposable CI E2E role boundary.",
+                      "valid_until": timezone.now() + timedelta(hours=4),
+                  },
+              )
+              RoleGrantScope._base_manager.get_or_create(
+                  role_grant=grant,
+                  scope_type=RoleGrantScope.SCOPE_OWN,
+                  tenant=None,
+                  tenant_group=None,
+              )
+              return principal
+
+          provision_role_principal(
+              os.environ["E2E_OPERATOR_USERNAME"],
+              "e2e-operator@itambox.local",
+              "E2E",
+              "Operator",
+              "Asset Manager",
+          )
+          provision_role_principal(
+              os.environ["E2E_VIEWER_USERNAME"],
+              "e2e-viewer@itambox.local",
+              "E2E",
+              "Viewer",
+              "Read-Only",
+          )
+          print("E2E operator/viewer role boundary provisioned with tenant-local grants.")
+
           UserGroup._base_manager.get_or_create(
               tenant=tenant,
               name=os.environ["E2E_TENANT_GROUP_NAME"],
@@ -345,6 +495,9 @@ jobs:
           print(f"::add-mask::{plaintext}")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               env_file.write(f"E2E_SCIM_TOKEN={plaintext}\n")
+              env_file.write(f"E2E_API_TOKEN={plaintext}\n")
+              env_file.write(f"E2E_TENANT_ID={tenant.pk}\n")
+              env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\n")
           PY
 
       - name: Start Django dev server
@@ -399,11 +552,85 @@ jobs:
           [[ ${django_ready} == true ]]
           echo "Django server ready."
 
-      - name: Run E2E tests
+      - name: Download validated E2E selection
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: e2e-selection
+          path: artifacts/selection
+
+      - name: Record tested checkout identity
+        working-directory: ./
+        env:
+          E2E_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -Eeuo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          selection_path = Path("artifacts/selection/e2e-selection.json")
+          selection = json.loads(selection_path.read_text(encoding="utf-8"))
+          checkout = subprocess.run(
+              ["git", "rev-parse", "HEAD"],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.strip()
+          kind = "merge_candidate" if selection["event_name"] == "pull_request" and checkout != selection["head_sha"] else "head"
+          identity = {
+              key: selection[key]
+              for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest")
+          }
+          identity.update({"tested_checkout_sha": checkout, "tested_checkout_kind": kind})
+          output = Path("artifacts/e2e-current-identity.json")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(identity, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+          print(f"E2E tested checkout recorded as {checkout} ({kind}).")
+          PY
+
+      - name: Run selected/full Playwright qualification
         id: e2e
         working-directory: ./itambox/tests/e2e
-        run: npm test
-        timeout-minutes: 15
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/artifacts/e2e-playwright.json
+        run: |
+          node run-selected.mjs \
+            --selection "$GITHUB_WORKSPACE/artifacts/selection/e2e-selection.json" \
+            --discovery "$GITHUB_WORKSPACE/artifacts/e2e-discovery.json" \
+            --report "$GITHUB_WORKSPACE/artifacts/e2e-playwright.json" \
+            --execution "$GITHUB_WORKSPACE/artifacts/e2e-execution.json"
+        timeout-minutes: 30
+
+      - name: Certify Playwright discovery and execution
+        if: always()
+        working-directory: ./
+        run: |
+          python scripts/certify_e2e_run.py \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scope-map scripts/e2e_scope_map.yaml \
+            --selection artifacts/selection/e2e-selection.json \
+            --discovery artifacts/e2e-discovery.json \
+            --execution artifacts/e2e-execution.json \
+            --current-identity artifacts/e2e-current-identity.json \
+            --output artifacts/e2e-certification.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload E2E machine evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-run-evidence
+          path: |
+            artifacts/selection/e2e-selection.json
+            artifacts/e2e-current-identity.json
+            artifacts/e2e-discovery.json
+            artifacts/e2e-execution.json
+            artifacts/e2e-playwright.json
+            artifacts/e2e-certification.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run generated OpenAPI client smoke test
         if: always()
@@ -430,5 +657,101 @@ jobs:
             itambox/tests/e2e/test-results/
             itambox/tests/e2e/playwright-report/
             itambox/tests/e2e/storageStateError.png
+            artifacts/
           if-no-files-found: warn
           retention-days: 7
+
+  e2e-gate:
+    name: E2E / Gate
+    if: always()
+    needs: [detect-e2e-scope, e2e-selected]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Download detector evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: e2e-selection
+          path: artifacts/selection
+      - name: Download execution evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: e2e-run-evidence
+          path: artifacts/run
+      - name: Build aggregate gate input
+        env:
+          DETECTOR_RESULT: ${{ needs.detect-e2e-scope.result }}
+          EXECUTION_RESULT: ${{ needs.e2e-selected.result }}
+          # detector_result/execution_result are consumed by the stdlib gate envelope.
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -Eeuo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def load(path):
+              return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+          selection = load(Path("artifacts/selection/e2e-selection.json"))
+          execution = load(Path("artifacts/run/e2e-execution.json"))
+          certification = load(Path("artifacts/run/e2e-certification.json"))
+          detector = {
+              "result": os.environ["DETECTOR_RESULT"],
+              "selection": selection,
+              "artifact_exists": Path("artifacts/selection/e2e-selection.json").is_file(),
+          }
+          if os.environ["EXECUTION_RESULT"] == "success" and execution is not None and selection is not None:
+              execution_input = {
+                  "result": "success",
+                  "selection": selection,
+                  "tested_checkout_sha": execution.get("tested_checkout_sha", ""),
+                  "selection_artifact_exists": True,
+                  "discovery_artifact_exists": Path("artifacts/run/e2e-discovery.json").is_file(),
+                  "report_artifact_exists": Path("artifacts/run/e2e-playwright.json").is_file(),
+                  "certification_artifact_exists": Path("artifacts/run/e2e-certification.json").is_file(),
+              }
+              runtime_sha = execution.get("tested_checkout_sha")
+          else:
+              execution_input = {"result": os.environ["EXECUTION_RESULT"]}
+              runtime_sha = None
+          current = {}
+          if selection is not None:
+              current = {
+                  key: selection[key]
+                  for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest")
+              }
+              if runtime_sha:
+                  current["tested_checkout_sha"] = runtime_sha
+                  current["tested_checkout_kind"] = (
+                      "merge_candidate"
+                      if selection["event_name"] == "pull_request" and runtime_sha != selection["head_sha"]
+                      else "head"
+                  )
+          gate_input = {
+              "schema": 1,
+              "detector": detector,
+              "execution": execution_input,
+              "certification": certification,
+              "current": current,
+          }
+          output = Path("artifacts/e2e-gate-input.json")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(gate_input, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+          PY
+      - name: Evaluate stable aggregate gate
+        run: |
+          python scripts/check_e2e_gate.py \
+            --input artifacts/e2e-gate-input.json \
+            --output artifacts/e2e-gate.json \
+            --summary "$GITHUB_STEP_SUMMARY"

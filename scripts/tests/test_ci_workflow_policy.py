@@ -52,7 +52,8 @@ class AccessibilityE2EWorkflowPolicyTests(unittest.TestCase):
         workflow = E2E_WORKFLOW_PATH.read_text(encoding="utf-8")
 
         self.assertRegex(workflow, r"(?m)^  pull_request:\n    branches: \[main\]$")
-        self.assertIn("run: npm test", workflow)
+        self.assertIn("node run-selected.mjs", workflow)
+        self.assertIn("name: E2E / Gate", workflow)
 
 
 def _assign_field(step, body):

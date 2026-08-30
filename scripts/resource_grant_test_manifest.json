@@ -1,6 +1,6 @@
 {
   "base_commit": "27f82ca4398d933b9017c2a2abdbd9d43ebf7284",
-  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, and issue #446 domain-boundary implementation tests. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
+  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, and issue #465 fail-closed Playwright qualification tests. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
     "itambox/assets/tests/test_audit_cadence.py",
     "itambox/assets/tests/test_audits.py",
@@ -26,6 +26,7 @@
     "itambox/core/tests/test_attachment_idor.py",
     "itambox/core/tests/test_bulk_edit_form_tags.py",
     "itambox/core/tests/test_delivery_contracts.py",
+    "itambox/core/tests/test_e2e_workflow.py",
     "itambox/core/tests/test_global_label_template_permissions.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_intune_sync.py",
@@ -83,9 +84,15 @@
     "itambox/users/tests/test_scim_migrations.py",
     "itambox/users/tests/test_table_config_views.py",
     "scripts/tests/test_architecture_policy.py",
+    "scripts/tests/test_certify_e2e_run.py",
+    "scripts/tests/test_ci_workflow_policy.py",
+    "scripts/tests/test_e2e_foundation_policy.py",
+    "scripts/tests/test_e2e_gate.py",
+    "scripts/tests/test_e2e_workflow_policy.py",
     "scripts/tests/test_exception_policy.py",
     "scripts/tests/test_inline_styles.py",
     "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_select_e2e_scopes.py",
     "scripts/tests/test_typing_policy.py"
   ],
   "baseline_tests": [
@@ -116,6 +123,7 @@
     "itambox/core/tests/test_attachment_idor.py",
     "itambox/core/tests/test_bulk_edit_form_tags.py",
     "itambox/core/tests/test_delivery_contracts.py",
+    "itambox/core/tests/test_e2e_workflow.py",
     "itambox/core/tests/test_global_label_template_permissions.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_intune_sync.py",
@@ -174,9 +182,15 @@
     "itambox/users/tests/test_scim_migrations.py",
     "itambox/users/tests/test_table_config_views.py",
     "scripts/tests/test_architecture_policy.py",
+    "scripts/tests/test_certify_e2e_run.py",
+    "scripts/tests/test_ci_workflow_policy.py",
+    "scripts/tests/test_e2e_foundation_policy.py",
+    "scripts/tests/test_e2e_gate.py",
+    "scripts/tests/test_e2e_workflow_policy.py",
     "scripts/tests/test_exception_policy.py",
     "scripts/tests/test_inline_styles.py",
     "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_select_e2e_scopes.py",
     "scripts/tests/test_typing_policy.py"
   ],
   "supporting_files": [

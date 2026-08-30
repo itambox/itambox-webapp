@@ -314,8 +314,10 @@
 {% endblock page_modals %}
 {% block title %}{{ title|default:_("List View") }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
+  {% if base_template != "base_htmx.html" %}<div id="page-header-block">{% endif %}
   <div class="page-pretitle">{{ pretitle|default:_("Manage") }}</div>
   <h2 class="page-title">{{ title|default:_("Objects") }}{% include "generic/includes/capability_badge.html" %}</h2>
+  {% if base_template != "base_htmx.html" %}</div>{% endif %}
 {% endblock %}
 {% block page_actions %}
   <div class="btn-list">
