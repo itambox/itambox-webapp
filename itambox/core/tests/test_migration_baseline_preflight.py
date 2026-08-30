@@ -389,6 +389,11 @@ class PostgreSQLMigrationBaselineCommandTests(TransactionTestCase):
     def test_current_database_recognition_is_read_only(self):
         recorder = MigrationRecorder(connection)
         before = recorder.applied_migrations()
+        applied_ids = {f"{app_label}.{migration_name}" for app_label, migration_name in before}
+        manifest = load_manifest()
+        self.assertTrue(set(manifest["historical_ids"]).issubset(applied_ids))
+        self.assertTrue(set(manifest["replacement_ids"]).issubset(applied_ids))
+        self.assertTrue(set(manifest["post_transition_ids"]).issubset(applied_ids))
         stdout = io.StringIO()
         with CaptureQueriesContext(connection) as queries:
             call_command("migration_baseline_preflight", format="json", stdout=stdout)
