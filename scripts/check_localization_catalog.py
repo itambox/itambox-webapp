@@ -325,6 +325,7 @@ def entry_failures(domain: str, key: str, entry: dict, source: dict) -> list[str
     actual_plural = entry.get("msgid_plural")
     if expected_plural != actual_plural:
         failures.append(f"{domain}: plural identity mismatch {key!r}")
+        return failures
     values = translated_values(entry)
     if any(value == "" for value in values):
         failures.append(f"{domain}: empty {key!r}")
@@ -355,6 +356,9 @@ def catalog_failures(domain: str, entries: dict, duplicates: list[str], sources:
         runtime_missing = sorted(JS_RUNTIME_KEYS - actual)
         if runtime_missing:
             failures.append(f"{domain}: missing documented runtime keys {runtime_missing}")
+        runtime_only = sorted((JS_RUNTIME_KEYS & actual) - expected)
+        for key in runtime_only:
+            failures.extend(entry_failures(domain, key, entries[key], {"msgid": key, "plural": None}))
     if missing:
         failures.append(f"{domain}: missing {missing[:10]}" + (" ..." if len(missing) > 10 else ""))
     if stale:

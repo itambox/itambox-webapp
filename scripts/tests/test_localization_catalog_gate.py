@@ -58,6 +58,28 @@ def test_placeholder_multiplicity_mismatch_is_rejected():
     assert "django: placeholder mismatch 'example'" in failures
 
 
+def test_plural_shape_mismatch_does_not_crash():
+    source = {"msgid": "One asset", "plural": "%(count)s assets"}
+    entry = {"msgstr": "Ein Asset", "flags": set()}
+    failures = MODULE.entry_failures("django", "One asset", entry, source)
+    assert failures == ["django: plural identity mismatch 'One asset'"]
+
+
+def test_singular_source_with_plural_catalog_entry_does_not_crash():
+    source = {"msgid": "Asset", "plural": None}
+    entry = {"msgid_plural": "Assets", "0": "Asset", "1": "Assets", "flags": set()}
+    failures = MODULE.entry_failures("django", "Asset", entry, source)
+    assert failures == ["django: plural identity mismatch 'Asset'"]
+
+
+def test_runtime_only_entries_are_checked_for_empty_and_fuzzy_flags():
+    entries = {key: {"msgstr": key, "flags": set()} for key in MODULE.JS_RUNTIME_KEYS}
+    entries["Supplier"] = {"msgstr": "", "flags": {"fuzzy"}}
+    failures = MODULE.catalog_failures("djangojs", entries, [], {})
+    assert "djangojs: fuzzy 'Supplier'" in failures
+    assert "djangojs: empty 'Supplier'" in failures
+
+
 def test_documented_runtime_keys_are_required():
     failures = MODULE.catalog_failures("djangojs", {}, [], {})
     assert any("missing documented runtime keys" in failure for failure in failures)
