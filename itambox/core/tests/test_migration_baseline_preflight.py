@@ -25,14 +25,16 @@ from core.migration_preflight import (
 
 
 def _manifest(*, layout="transitional"):
+    historical_ids = ["assets.0001_initial", "assets.0002_second"]
+    replacement_ids = ["assets.0100_other", "assets.0100_shard"]
     return {
         "schema_version": 1,
         "layout": layout,
         "first_party_apps": ["assets"],
-        "historical_ids": ["assets.0001_initial", "assets.0002_second"],
-        "replacement_ids": ["assets.0100_other", "assets.0100_shard"],
-        "replacement_target_ids": ["assets.0001_initial", "assets.0002_second"],
-        "baseline_ids": ["assets.0100_other", "assets.0100_shard"],
+        "historical_ids": historical_ids,
+        "replacement_ids": replacement_ids,
+        "replacement_target_ids": historical_ids,
+        "baseline_ids": replacement_ids if layout == "normalized" else historical_ids,
         "post_transition_ids": ["assets.0101_current"],
         "post_transition_leaf_ids": ["assets.0101_current"],
         "current_leaf_ids": ["assets.0101_current"],
@@ -55,13 +57,11 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
             self.assertEqual(result.exit_code, exit_code)
         return result
 
-    def test_complete_replacement_recognition_requires_both_transition_sets(self):
+    def test_complete_replacement_recognition_uses_django_recorder_transition_rows(self):
         result = self.assert_state(
             {
                 "assets.0001_initial",
                 "assets.0002_second",
-                "assets.0100_other",
-                "assets.0100_shard",
                 "assets.0101_current",
             },
             "complete-replacement-recognition",
@@ -86,13 +86,13 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
         result = self.assert_state({"assets.0100_shard"}, "partial-replacement-set", exit_code=1)
         self.assertEqual(result.reason_code, "PARTIAL_REPLACEMENT_SET")
 
-    def test_partial_post_transition_state_is_rejected(self):
+    def test_complete_old_history_without_post_transition_is_rejected(self):
         result = self.assert_state(
-            {"assets.0001_initial", "assets.0002_second", "assets.0100_other", "assets.0100_shard"},
-            "partial-post-transition-state",
+            {"assets.0001_initial", "assets.0002_second"},
+            "complete-old-history-no-replacement",
             exit_code=1,
         )
-        self.assertEqual(result.reason_code, "POST_TRANSITION_INCOMPLETE")
+        self.assertEqual(result.reason_code, "TRANSITION_RELEASE_REQUIRED")
 
     def test_mixed_or_unknown_first_party_rows_are_rejected(self):
         result = self.assert_state(
@@ -130,29 +130,29 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
         )
         self.assertEqual(result.reason_code, "NORMALIZED_BASELINE_INCOMPLETE")
 
-    def test_transitional_full_replacement_without_history_is_not_normalized(self):
+    def test_transitional_raw_replacement_rows_are_rejected_as_anomaly(self):
         result = self.assert_state(
             {"assets.0100_other", "assets.0100_shard", "assets.0101_current"},
-            "normalized-baseline-not-current",
-            exit_code=1,
-        )
-        self.assertEqual(result.reason_code, "NORMALIZED_LAYOUT_NOT_CURRENT")
-
-    def test_transitional_replacement_with_incomplete_history_is_mixed(self):
-        result = self.assert_state(
-            {"assets.0001_initial", "assets.0100_other", "assets.0100_shard"},
             "mixed-or-unknown-first-party-state",
             exit_code=1,
         )
-        self.assertEqual(result.reason_code, "REPLACEMENT_WITH_INCOMPLETE_HISTORY")
+        self.assertEqual(result.reason_code, "TRANSITIONAL_REPLACEMENT_ROWS_PRESENT")
 
-    def test_complete_history_with_post_transition_rows_is_mixed(self):
+    def test_transitional_partial_replacement_rows_are_rejected(self):
+        result = self.assert_state(
+            {"assets.0001_initial", "assets.0100_shard"},
+            "partial-replacement-set",
+            exit_code=1,
+        )
+        self.assertEqual(result.reason_code, "PARTIAL_REPLACEMENT_SET")
+
+    def test_complete_history_with_post_transition_rows_is_recognized(self):
         result = self.assert_state(
             {"assets.0001_initial", "assets.0002_second", "assets.0101_current"},
-            "mixed-or-unknown-first-party-state",
-            exit_code=1,
+            "complete-replacement-recognition",
+            exit_code=0,
         )
-        self.assertEqual(result.reason_code, "POST_TRANSITION_WITHOUT_REPLACEMENT")
+        self.assertEqual(result.reason_code, "REPLACEMENT_RECOGNIZED")
 
     def test_partial_history_with_post_transition_rows_is_mixed(self):
         result = self.assert_state(
@@ -198,7 +198,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
         self.assertEqual(len(manifest["post_transition_ids"]), 28)
         self.assertEqual(len(manifest["post_transition_leaf_ids"]), 8)
-        self.assertEqual(manifest["baseline_ids"], manifest["replacement_ids"])
+        self.assertEqual(manifest["baseline_ids"], manifest["historical_ids"])
 
     def test_checked_manifest_rejects_malformed_shape(self):
         cases = (
@@ -256,7 +256,7 @@ class MigrationBaselineCommandTests(SimpleTestCase):
         manifest = _manifest()
         applied = {
             (item.split(".", 1)[0], item.split(".", 1)[1])
-            for item in manifest["historical_ids"] + manifest["replacement_ids"] + manifest["post_transition_ids"]
+            for item in manifest["historical_ids"] + manifest["post_transition_ids"]
         }
         stdout = io.StringIO()
         with (

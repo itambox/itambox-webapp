@@ -842,7 +842,7 @@ def _preflight_manifest_expected_ids(inventory):
         "historical_ids": historical_ids,
         "replacement_ids": replacement_ids,
         "replacement_target_ids": replacement_target_ids,
-        "baseline_ids": replacement_ids,
+        "baseline_ids": historical_ids,
         "post_transition_ids": post_transition_ids,
         "post_transition_leaf_ids": post_transition_leaf_ids,
         "current_leaf_ids": current_graph["leaves"],

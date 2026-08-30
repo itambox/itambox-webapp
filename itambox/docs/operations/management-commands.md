@@ -252,7 +252,11 @@ replacement set, incomplete post-transition state, empty/unmigrated, mixed or
 unknown first-party rows, and (when a future manifest explicitly selects that
 layout) the current normalized baseline. Only complete replacement recognition
 and current normalized baseline return exit code `0`. All other states return a
-non-zero status with a safe reason code and remediation text.
+non-zero status with a safe reason code and remediation text. In the current
+transitional layout, ordinary Django execution records the complete historical
+`replaces` target set plus the post-transition tail in `django_migrations`; it
+does **not** record the replacement-shard IDs themselves. Raw replacement-shard
+rows are therefore rejected as an anomalous fake/manual-recorder state.
 
 A successful preflight is not crash-recovery evidence and it is not schema or data-semantic parity evidence. It attests only to the completeness of the rows recorded in `django_migrations`; it cannot detect rows created through `migrate --fake`, `--fake-initial`, or direct recorder SQL. If a migration was
 interrupted or failed after database operations began, restore the verified
