@@ -15,6 +15,7 @@ from scripts.select_e2e_scopes import (
     _matches,
     build_selection,
     canonical_json,
+    changed_path_digest,
     parse_name_status_z,
     validate_scope_map,
     validate_selection,
@@ -175,8 +176,13 @@ class ScopeMapValidationTests(unittest.TestCase):
             ),
             ("itambox/assets/services/custody.py", "selected", {"contract:cross-app"}),
             ("itambox/organization/models.py", "full", {"all"}),
+            ("itambox/organization/rbac.py", "full", {"all"}),
+            ("itambox/organization/services/membership.py", "full", {"all"}),
             ("itambox/itambox/middleware.py", "full", {"all"}),
+            ("itambox/users/api/authentication.py", "full", {"all"}),
+            ("itambox/users/api/scim/provider_authentication.py", "full", {"all"}),
             ("itambox/users/backends.py", "full", {"all"}),
+            ("itambox/users/models.py", "full", {"all"}),
             ("itambox/core/views/generic.py", "full", {"all"}),
             ("itambox/static/src/scss/base.scss", "full", {"all"}),
             ("itambox/static/src/ts/core.ts", "full", {"all"}),
@@ -307,6 +313,14 @@ class SelectionClassificationTests(unittest.TestCase):
         self.assertEqual(renamed["mode"], "full")
         identities = {reason["path"] for reason in renamed["reasons"]}
         self.assertEqual(identities, {"src/assets/old.py", "src/unknown/new.py"})
+
+    def test_multi_copy_source_fanout_is_valid_and_deterministic(self):
+        records = [
+            {"status": "C", "old_path": "src/assets/source.py", "new_path": "src/assets/copy-a.py"},
+            {"status": "C", "old_path": "src/assets/source.py", "new_path": "src/assets/copy-b.py"},
+        ]
+        with self.assertRaisesRegex(SelectionError, "duplicate status/path identities"):
+            self.select(records)
 
     def test_input_order_permutation_is_byte_identical(self):
         records = [

@@ -128,7 +128,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     const deletePath = `/assets/assets/${assetId}/delete/`;
     const deletePage = await page.goto(deletePath, { waitUntil: 'domcontentloaded' });
     expect(deletePage?.status(), `GET ${deletePath}`).toBe(200);
-    await expect(page.getByText(assetTag, { exact: false })).toBeVisible();
+    await expect(page.locator('#page-body-main').getByText(assetTag, { exact: false })).toBeVisible();
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );

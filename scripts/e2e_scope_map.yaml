@@ -206,7 +206,14 @@
         "itambox/organization/access.py",
         "itambox/organization/models.py",
         "itambox/organization/models/**",
-        "itambox/users/backends.py"
+        "itambox/organization/rbac.py",
+        "itambox/organization/services/membership.py",
+        "itambox/organization/services/resource_access.py",
+        "itambox/organization/services/tenant_access.py",
+        "itambox/users/api/authentication.py",
+        "itambox/users/api/scim/**",
+        "itambox/users/backends.py",
+        "itambox/users/models.py"
       ]
     },
     {
