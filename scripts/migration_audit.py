@@ -811,12 +811,15 @@ def validate_preflight_manifest_git_objects(manifest, repository_root):
     revisions = {manifest["transition_release_sha"]}
     revisions.update(predecessor["revision"] for predecessor in manifest["supported_predecessors"])
     for revision in sorted(revisions):
-        result = subprocess.run(
-            ["git", "-C", str(repository_root), "cat-file", "-e", f"{revision}^{{commit}}"],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repository_root), "cat-file", "-e", f"{revision}^{{commit}}"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            raise ValueError("Git is unavailable for migration preflight identity verification") from exc
         if result.returncode:
             raise ValueError(f"migration preflight manifest revision is not a local Git commit: {revision}")
 
@@ -890,9 +893,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     repository_root = Path(__file__).resolve().parents[1]
     source_root = args.source_root or repository_root / "itambox"
+    canonical_source_root = (repository_root / "itambox").resolve()
     output = args.output or repository_root / "scripts" / "migration_audit.json"
     inventory = build_inventory(source_root)
-    manifest_is_requested = args.source_root is None or args.manifest is not None
+    manifest_is_requested = source_root.resolve() == canonical_source_root or args.manifest is not None
+    if args.write_preflight_manifest and args.check:
+        parser.error("--check and --write-preflight-manifest are mutually exclusive")
     if args.write_preflight_manifest and not manifest_is_requested:
         parser.error("--write-preflight-manifest requires the canonical source root or --manifest")
     if manifest_is_requested:
@@ -905,13 +911,17 @@ def main(argv=None):
             else:
                 validate_preflight_manifest_git_objects(manifest, repository_root)
             if args.write_preflight_manifest:
-                manifest_path.write_text(render_preflight_manifest(inventory, manifest), encoding="utf-8")
+                refreshed = json.loads(render_preflight_manifest(inventory, manifest))
+                validate_preflight_manifest(inventory, refreshed)
+                manifest_path.write_text(json.dumps(refreshed, indent=2, sort_keys=True) + "\n", encoding="utf-8")
                 print(f"wrote migration preflight manifest: {manifest_path}")
                 return 0
             validate_preflight_manifest(inventory, manifest)
         except ValueError as exc:
             print(f"migration preflight manifest invalid: {exc}", file=sys.stderr)
             return 1
+    else:
+        print("migration preflight manifest validation skipped for a non-canonical source root", file=sys.stderr)
     rendered = render_inventory(inventory)
     if args.check:
         if not output.exists() or output.read_text(encoding="utf-8") != rendered:

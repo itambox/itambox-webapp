@@ -46,7 +46,9 @@ class Command(BaseCommand):
                         f"{app_label}.{migration_name}" for app_label, migration_name in recorder.applied_migrations()
                     }
                     result = classify_applied_migrations(applied_ids, manifest)
-            except (ConnectionDoesNotExist, Error, ValueError):
+            except ValueError:
+                result = manifest_invalid_result()
+            except (ConnectionDoesNotExist, Error):
                 result = recorder_unavailable_result()
 
         if options["format"] == "json":
