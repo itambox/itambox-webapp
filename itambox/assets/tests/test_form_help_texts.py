@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from django.test import SimpleTestCase
 from django.utils.translation import override
 
@@ -11,8 +13,7 @@ from inventory.forms.accessory_forms import AccessoryForm
 from inventory.forms.component_forms import ComponentForm
 from inventory.forms.consumable_forms import ConsumableForm
 from licenses.forms import LicenseForm
-from organization.forms import CostCenterForm
-from organization.models import CostCenter
+from organization.tables import CostCenterTable
 from procurement.models import Contract
 
 
@@ -54,8 +55,13 @@ class VisibleFormHelpTextTests(SimpleTestCase):
                 str(AssetForm.base_fields["warranty_type"].choices[0][1]),
                 "Garantieart auswählen",
             )
-            label = CostCenterForm.base_fields["parent"].label_from_instance(CostCenter(code="FIN", name="Finance"))
-            self.assertEqual(label, "FIN: Finance")
+            label = str(
+                CostCenterTable.render_parent(
+                    None,
+                    SimpleNamespace(code="FIN", name="Finance", get_absolute_url=lambda: "/cost-centers/1/"),
+                )
+            )
+            self.assertIn("FIN: Finance", label)
             self.assertNotIn("—", label)
             self.assertNotIn("–", label)
 
