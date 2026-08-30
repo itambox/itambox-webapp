@@ -96,7 +96,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     expect(clonePage?.status(), `GET ${clonePath}`).toBe(200);
     const cloneForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="asset_tag"]') });
     const cloneName = `${originalName} Clone`;
-    const cloneTag = `${assetTag}-CLONE`.slice(0, 90);
+    const cloneTag = `${assetTag.slice(0, 43)}-CLONE`;
     await cloneForm.locator('input[name="name"]').fill(cloneName);
     await cloneForm.getByLabel('Asset tag').fill(cloneTag);
     const cloneResponsePromise = page.waitForResponse((response) =>
