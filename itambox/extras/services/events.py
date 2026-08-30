@@ -56,17 +56,21 @@ def _resolve_instance_tenant_id(instance):
     return None
 
 
-def dispatch_event(sender, instance, action, created=None):
+def dispatch_event(sender, instance, action, created=None, *, object_id=None):
     """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted."""
 
     if not issubclass(sender, ChangeLoggingMixin):
         return
 
     ct = ContentType.objects.get_for_model(sender)
+    event_object_id = instance.pk if object_id is None else object_id
+    if event_object_id is None:
+        logger.error("Skipping event with missing object id for %s:%s", sender.__name__, action)
+        return
 
     event = Event.objects.create(
         model=ct,
-        object_id=instance.pk,
+        object_id=event_object_id,
         action=action,
         data={"app_label": ct.app_label, "model_name": ct.model},
     )

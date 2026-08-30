@@ -1,6 +1,6 @@
 {% load i18n %}
 ﻿{# Panel: Assignment / Deployment details (holder, location, custody) #}
-<dl class="row mb-0">
+<dl class="row mb-0" data-testid="asset-assignment-state">
   <dt class="col-sm-4">{% translate "Assigned To:" %}</dt>
   <dd class="col-sm-8">
     {% if assignment and assignment.assigned_to %}

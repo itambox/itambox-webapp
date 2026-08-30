@@ -7,7 +7,7 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "e2e.yml"
 PLAYWRIGHT_CONFIG_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "playwright.config.ts"
 PREFLIGHT_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "preflight-check.mjs"
 E2E_PACKAGE_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "package.json"
-SCIM_SPEC_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "spec" / "07-sso-scim.spec.ts"
+SCIM_SPEC_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "spec" / "apps" / "users" / "sso-scim.spec.ts"
 
 
 def _folded_json_env_value(document, key):
@@ -246,7 +246,10 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "console.log(process.env.ITAMBOX_TENANT_OIDC_CONFIGS)" not in preflight
     assert "Sign in with E2E OIDC (OIDC)" in positive
     assert "browser.newContext({ baseURL });" in positive
-    assert "test.setTimeout(120_000);" in positive
+    assert "test.setTimeout(" not in positive
+    assert "attachBrowserErrorCollection(page, browserErrors)" in positive
+    assert "assertNoUnexpectedBrowserErrors(browserErrors)" in positive
+    assert "console.error(" not in positive
     assert "await oidcContext.clearCookies();" in positive
     assert "await page.goto('about:blank', { waitUntil: 'commit' });" in positive
     assert "await page.close();" in positive
@@ -278,3 +281,81 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "finally" in positive
     assert "console.log" not in positive
     assert "soft-pass" not in positive.lower()
+
+
+def test_owned_scope_workflow_topology_is_stable():
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "e2e.yml").read_text(encoding="utf-8")
+    assert "detect-e2e-scope:" in workflow
+    assert "e2e-selected:" in workflow
+    assert "e2e-gate:" in workflow
+    assert "if: always()" in workflow
+    assert "node run-selected.mjs" in workflow
+    assert "python scripts/certify_e2e_run.py" in workflow
+    assert "python scripts/check_e2e_gate.py" in workflow
+    assert "fetch-depth: 0" in workflow
+    assert "workflow_call:" in workflow
+
+
+def test_release_preparation_awaits_reusable_full_e2e():
+    release = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "e2e-qualification:" in release
+    assert "uses: ./.github/workflows/e2e.yml" in release
+    assert "prepare-release:" in release
+    assert "e2e-qualification" in release
+
+
+def test_e2e_privileged_role_grants_are_reasoned_and_time_bounded():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split("Start Django dev server", 1)[0]
+
+    assert "from datetime import timedelta" in provision
+    assert "from django.utils import timezone" in provision
+    assert '"reason": "Disposable CI E2E role boundary."' in provision
+    assert '"valid_until": timezone.now() + timedelta(hours=4)' in provision
+
+
+def test_e2e_uses_an_isolated_settings_module_with_a_bounded_login_budget():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    settings_path = REPOSITORY_ROOT / "itambox" / "core" / "settings" / "e2e.py"
+
+    assert "DJANGO_SETTINGS_MODULE: core.settings.e2e" in workflow
+    assert settings_path.is_file()
+    settings = settings_path.read_text(encoding="utf-8")
+    assert "from . import dev as _dev" in settings
+    assert "globals().update" in settings
+    assert "RATELIMIT_LIMIT = 100" in settings
+    assert "RATELIMIT_PERIOD = 60" in settings
+
+
+def test_e2e_settings_import_dev_defaults_and_raise_login_budget():
+    from core.settings import dev as dev_settings
+    from core.settings import e2e as e2e_settings
+
+    assert e2e_settings.DEBUG == dev_settings.DEBUG
+    assert e2e_settings.ALLOWED_HOSTS == dev_settings.ALLOWED_HOSTS
+    assert e2e_settings.RATELIMIT_LIMIT == 100
+    assert e2e_settings.RATELIMIT_PERIOD == 60
+
+
+def test_e2e_provisions_one_masked_tenant_bound_api_token():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split("Start Django dev server", 1)[0]
+
+    assert 'print(f"::add-mask::{plaintext}")' in provision
+    assert 'env_file.write(f"E2E_SCIM_TOKEN={plaintext}\\n")' in provision
+    assert 'env_file.write(f"E2E_API_TOKEN={plaintext}\\n")' in provision
+    assert 'env_file.write(f"E2E_TENANT_ID={tenant.pk}\\n")' in provision
+    assert 'env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\\n")' in provision
+
+
+def test_generic_delete_confirmation_opts_out_of_htmx_boost():
+    template = (REPOSITORY_ROOT / "itambox" / "templates" / "generic" / "object_confirm_delete.html").read_text(
+        encoding="utf-8"
+    )
+    form = template.split('<form method="post"', 1)[1].split(">", 1)[0]
+    assert 'hx-boost="false"' in form
+
+
+def test_slug_forms_do_not_reference_a_missing_standalone_script():
+    mixins = (REPOSITORY_ROOT / "itambox" / "core" / "forms" / "mixins.py").read_text(encoding="utf-8")
+    assert "js/slugify.js" not in mixins

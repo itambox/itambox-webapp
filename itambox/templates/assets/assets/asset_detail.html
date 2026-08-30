@@ -13,6 +13,7 @@
   {% if assignment and assignment.is_active %}
     {% if request.user.is_staff or perms.assets.change_asset %}
       <button type="button"
+              data-testid="asset-checkin-action"
               class="btn btn-soft-outline-success check-action"
               hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
               hx-target="#modal-placeholder"
@@ -25,6 +26,7 @@
     {# Check Out Button (only visible if not checked out) #}
     {% if request.user.is_staff or perms.assets.change_asset %}
       <button type="button"
+              data-testid="asset-checkout-action"
               class="btn btn-soft-success check-action"
               hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
               hx-target="#modal-placeholder"

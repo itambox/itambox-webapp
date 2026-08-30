@@ -95,6 +95,11 @@ class JobDetailView(ObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = self.object.name
+        context["can_cancel_job"] = self.object.status == Job.STATUS_PENDING and (
+            self.request.user.has_perm("core.change_job", obj=self.object.tenant)
+            if get_current_tenant() is None
+            else self.request.user.has_perm("core.change_job")
+        )
         return context
 
 

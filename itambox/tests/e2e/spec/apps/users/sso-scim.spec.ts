@@ -1,4 +1,11 @@
-import { test, expect, APIRequestContext, Page } from '@playwright/test';
+import { test, expect } from '../../../fixtures/test';
+import type { CleanupRegistry } from '../../../fixtures/cleanup';
+import type { APIRequestContext, Page } from '@playwright/test';
+import {
+  assertNoUnexpectedBrowserErrors,
+  attachBrowserErrorCollection,
+  createBrowserErrors,
+} from '../../../helpers/errors';
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -44,8 +51,12 @@ async function expectScimError(response: Awaited<ReturnType<APIRequestContext['g
   return body;
 }
 
-async function createScimUser(request: APIRequestContext, label: string): Promise<ScimUserFixture> {
-  const suffix = `${Date.now()}-${label}`;
+async function createScimUser(
+  request: APIRequestContext,
+  cleanup: CleanupRegistry,
+  label: string,
+): Promise<ScimUserFixture> {
+  const suffix = `${process.env.E2E_CURRENT_TEST_ID || process.env.GITHUB_RUN_ID || 'local'}-${label}`;
   const user = {
     userName: `e2e.scim.${suffix}`,
     email: `e2e.scim.${suffix}@example.com`,
@@ -64,6 +75,14 @@ async function createScimUser(request: APIRequestContext, label: string): Promis
 
   expect(response.status()).toBe(201);
   const body = await response.json();
+  expect(body.id).toMatch(/^[0-9a-f-]{36}$/i);
+  cleanup.add(`SCIM user ${user.userName}`, async () => {
+    const current = await request.get(scimUrl(`Users/${body.id}`));
+    if (current.status() === 404) return;
+    expect(current.status(), await current.text()).toBe(200);
+    const deletion = await request.delete(scimUrl(`Users/${body.id}`));
+    expect(deletion.status(), await deletion.text()).toBe(204);
+  });
   expect(body).toMatchObject({
     schemas: [scimUserSchema],
     userName: user.userName,
@@ -76,7 +95,6 @@ async function createScimUser(request: APIRequestContext, label: string): Promis
       location: expect.stringContaining('/Users/'),
     },
   });
-  expect(body.id).toMatch(/^[0-9a-f-]{36}$/i);
 
   return { ...user, id: body.id };
 }
@@ -103,17 +121,6 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   test.afterAll(async () => {
     await scimRequest.dispose();
-  });
-
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error(`[Console Error]: ${msg.text()}`);
-      }
-    });
-    page.on('pageerror', error => {
-      console.error(`[Page Error]: ${error.message}`);
-    });
   });
 
   test('1. OIDC login initiation rejects an unknown tenant', async ({ request }) => {
@@ -162,8 +169,8 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     });
   });
 
-  test('4. Tenant SCIM User create persists and is readable through list and detail APIs', async () => {
-    const user = await createScimUser(scimRequest, 'Create');
+  test('4. Tenant SCIM User create persists and is readable through list and detail APIs', async ({ cleanup }) => {
+    const user = await createScimUser(scimRequest, cleanup, 'Create');
 
     const detail = await scimRequest.get(scimUrl(`Users/${user.id}`));
     expect(detail.status()).toBe(200);
@@ -190,8 +197,8 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     );
   });
 
-  test('5. Tenant SCIM User PATCH updates identity and tenant active state', async () => {
-    const user = await createScimUser(scimRequest, 'Patch');
+  test('5. Tenant SCIM User PATCH updates identity and tenant active state', async ({ cleanup }) => {
+    const user = await createScimUser(scimRequest, cleanup, 'Patch');
     const replacementExternalId = `${user.externalId}-updated`;
 
     const response = await scimRequest.patch(scimUrl(`Users/${user.id}`), {
@@ -226,8 +233,8 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     });
   });
 
-  test('6. Tenant SCIM User PUT replaces the supported identity fields', async () => {
-    const user = await createScimUser(scimRequest, 'Put');
+  test('6. Tenant SCIM User PUT replaces the supported identity fields', async ({ cleanup }) => {
+    const user = await createScimUser(scimRequest, cleanup, 'Put');
     const replacement = {
       userName: `${user.userName}.replaced`,
       email: `${user.userName}.replaced@example.com`,
@@ -258,8 +265,8 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     });
   });
 
-  test('7. Tenant SCIM User DELETE removes the tenant membership and resource visibility', async () => {
-    const user = await createScimUser(scimRequest, 'Delete');
+  test('7. Tenant SCIM User DELETE removes the tenant membership and resource visibility', async ({ cleanup }) => {
+    const user = await createScimUser(scimRequest, cleanup, 'Delete');
 
     const deleted = await scimRequest.delete(scimUrl(`Users/${user.id}`));
     expect(deleted.status()).toBe(204);
@@ -274,8 +281,8 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     expect(body.totalResults).toBe(0);
   });
 
-  test('8. Tenant SCIM duplicate username returns a typed 409 uniqueness error', async () => {
-    const user = await createScimUser(scimRequest, 'Duplicate');
+  test('8. Tenant SCIM duplicate username returns a typed 409 uniqueness error', async ({ cleanup }) => {
+    const user = await createScimUser(scimRequest, cleanup, 'Duplicate');
     const duplicate = await scimRequest.post(scimUrl('Users'), {
       data: {
         schemas: [scimUserSchema],
@@ -374,8 +381,11 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       baseURL,
       storageState: { cookies: [], origins: [] },
     });
+    const browserErrors = createBrowserErrors();
+    let stopErrorCollection: (() => void) | undefined;
     try {
       const page = await authenticatedContext.newPage();
+      stopErrorCollection = attachBrowserErrorCollection(page, browserErrors);
       await page.goto('/');
       await page.fill('input[name="username"]', requiredEnv('E2E_USERNAME'));
       await page.fill('input[name="password"]', requiredEnv('E2E_PASSWORD'));
@@ -397,18 +407,35 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       const afterLogout = await authenticatedContext.request.get('/', { maxRedirects: 0 });
       expect(afterLogout.status()).toBe(302);
       expect(afterLogout.headers()['location']).toMatch(/^\/accounts\/login\//);
+      assertNoUnexpectedBrowserErrors(browserErrors);
     } finally {
+      stopErrorCollection?.();
       await authenticatedContext.close();
     }
   });
 
-  test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser }) => {
-    test.setTimeout(120_000);
+  test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser, cleanup }) => {
+    cleanup.add(`OIDC membership ${oidcEmail}`, async () => {
+      const filter = encodeURIComponent(`userName eq "${oidcEmail}"`);
+      const list = await scimRequest.get(`${scimUrl('Users')}?filter=${filter}`);
+      expect(list.status(), await list.text()).toBe(200);
+      const body = await list.json();
+      expectScimListBody(body);
+      if (body.totalResults === 0) return;
+      expect(body.totalResults).toBe(1);
+      const resourceId = body.Resources[0]?.id;
+      if (typeof resourceId !== 'string') throw new Error('OIDC SCIM cleanup could not resolve the resource ID.');
+      const deletion = await scimRequest.delete(scimUrl(`Users/${resourceId}`));
+      expect(deletion.status(), await deletion.text()).toBe(204);
+    });
     const oidcContext = await browser.newContext({ baseURL });
+    const browserErrors = createBrowserErrors();
+    let stopErrorCollection: (() => void) | undefined;
     let page: Page | undefined;
     try {
       await oidcContext.clearCookies();
       page = await oidcContext.newPage();
+      stopErrorCollection = attachBrowserErrorCollection(page, browserErrors);
       await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });
       const loginResponse = await page.goto('/accounts/login/');
       await page.setExtraHTTPHeaders({});
@@ -554,7 +581,9 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       await expect(assetHolderRow).toContainText('E2E');
       await expect(assetHolderRow).toContainText('OIDC');
       await expect(assetHolderRow).toContainText('Helix Biopharma AG');
+      assertNoUnexpectedBrowserErrors(browserErrors);
     } finally {
+      stopErrorCollection?.();
       if (page) {
         await page.goto('about:blank', { waitUntil: 'commit' });
         await page.close();

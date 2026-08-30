@@ -132,14 +132,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/forms/mixins.py",
-      "scope": "ClassDef:ConfirmationForm/FunctionDef:__init__",
-      "handler_type": "Exception",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/engine.py",
       "scope": "ClassDef:ChangeLogEngine/FunctionDef:_tenant_of",
       "handler_type": "Exception",
@@ -441,14 +433,6 @@
       "handler_type": "Exception",
       "classification": "log-only",
       "body_sha256": "4915e03754be15563606911c8b7d7af3b8ef764a880cd57c470ee54c63e8acbe",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/signals.py",
-      "scope": "FunctionDef:event_on_delete",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "06591fea7ae06a2ab587e34f0f8efb092afcc57fdbd99e36d66f693c0e7ae488",
       "count": 1
     },
     {

@@ -8,7 +8,7 @@
  *
  * Checks:
  *   1. E2E_USERNAME / E2E_PASSWORD / E2E_TENANT_SLUG / E2E_ISOLATION_TENANT_SLUG /
- *      E2E_TENANT_GROUP_NAME / E2E_SCIM_TOKEN / E2E_OIDC_PROVIDER_URL /
+ *      E2E_TENANT_ID / E2E_ISOLATION_TENANT_ID / E2E_TENANT_GROUP_NAME / E2E_SCIM_TOKEN / E2E_OIDC_PROVIDER_URL /
  *      E2E_OIDC_SUBJECT / E2E_OIDC_EMAIL / ITAMBOX_TENANT_OIDC_CONFIGS are set
  *   2. Python virtual environment exists
  *   3. Django system checks pass
@@ -79,10 +79,22 @@ if (process.env.E2E_TENANT_SLUG) {
   fail('E2E_TENANT_SLUG is not set');
 }
 
+if (process.env.E2E_TENANT_ID) {
+  ok(`E2E_TENANT_ID = ${process.env.E2E_TENANT_ID}`);
+} else {
+  fail('E2E_TENANT_ID is not set');
+}
+
 if (process.env.E2E_ISOLATION_TENANT_SLUG) {
   ok(`E2E_ISOLATION_TENANT_SLUG = ${process.env.E2E_ISOLATION_TENANT_SLUG}`);
 } else {
   fail('E2E_ISOLATION_TENANT_SLUG is not set');
+}
+
+if (process.env.E2E_ISOLATION_TENANT_ID) {
+  ok(`E2E_ISOLATION_TENANT_ID = ${process.env.E2E_ISOLATION_TENANT_ID}`);
+} else {
+  fail('E2E_ISOLATION_TENANT_ID is not set');
 }
 
 if (process.env.E2E_TENANT_GROUP_NAME) {
