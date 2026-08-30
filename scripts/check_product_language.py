@@ -35,12 +35,10 @@ PRESENTATION_CALLS = {"format_html": (0,), "format_html_join": (1,), "mark_safe"
 JS_TRANSLATION_CALL = re.compile(r"\b(?:gettext|ngettext|pgettext|npgettext)\s*\(")
 JS_STRING = re.compile(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", re.S)
 JS_CODEPOINT_CALL = re.compile(r"\bString\.from(?:CharCode|CodePoint)\s*\(\s*(0x[0-9a-f]+|\d+)\s*\)", re.I)
-JS_DOM_TEXT_ASSIGNMENT = re.compile(
-    r"\b(?:textContent|innerText|innerHTML)\s*(?:\+=|=)\s*(?P<literal>'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\")"
-)
+JS_DOM_TEXT_ASSIGNMENT = re.compile(r"\b(?:textContent|innerText|innerHTML)\s*(?:\+=|=)\s*(?P<expression>[^;\n]+)")
 JS_DOM_ATTRIBUTE_ASSIGNMENT = re.compile(
     r"\bsetAttribute\s*\(\s*['\"](?:title|aria-label|placeholder)['\"]\s*,\s*"
-    r"(?P<literal>'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\")"
+    r"(?P<expression>[^;\n]+)"
 )
 EXCLUDED_PARTS = {"tests", "migrations", "docs", "static", "locale"}
 
@@ -412,6 +410,16 @@ def scan_javascript_translation_calls(source: str, relative: str) -> list[Findin
     return findings
 
 
+def javascript_expression_values(expression: str) -> list[str]:
+    values = []
+    for literal in JS_STRING.findall(expression):
+        value = decode_js_literal(literal)
+        if value is not None:
+            values.append(value)
+    values.extend(chr(int(codepoint, 0)) for codepoint in JS_CODEPOINT_CALL.findall(expression))
+    return values
+
+
 def scan_javascript_dom_assignments(source: str, relative: str) -> list[Finding]:
     findings = []
     for pattern, field in (
@@ -419,8 +427,8 @@ def scan_javascript_dom_assignments(source: str, relative: str) -> list[Finding]
         (JS_DOM_ATTRIBUTE_ASSIGNMENT, "DOM attribute"),
     ):
         for match in pattern.finditer(source):
-            value = decode_js_literal(match.group("literal")) or match.group("literal")
-            tokens = forbidden_tokens(value)
+            values = javascript_expression_values(match.group("expression"))
+            tokens = forbidden_tokens("".join(values))
             if tokens:
                 line_number = source.count("\n", 0, match.start()) + 1
                 findings.append(Finding(relative, line_number, field, tokens))

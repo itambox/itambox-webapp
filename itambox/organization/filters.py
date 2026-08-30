@@ -60,7 +60,7 @@ class BaseOrgFilterSet(BaseFilterSet):
             # Add Clear button as HTML link within the layout
             HTML(
                 format_html(
-                    '<a href="{{ request.path }}" class="btn btn-secondary ms-2">{}</a>',
+                    '<a href="{{{{ request.path }}}}" class="btn btn-secondary ms-2">{}</a>',
                     _("Clear filters"),
                 )
             ),

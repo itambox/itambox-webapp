@@ -12,9 +12,23 @@ from django.urls import reverse
 from django.utils import translation
 
 from core.tests.mixins import TenantTestMixin, grant
+from organization.filters import RegionFilterSet
 from organization.models import Role, Tenant
 
 User = get_user_model()
+
+
+class OrganizationFilterPresentationTests(TestCase):
+    def test_clear_filter_link_preserves_the_django_request_path_variable(self):
+        filterset = RegionFilterSet()
+        clear_link = next(
+            field.html
+            for field in filterset.form.helper.layout.fields
+            if hasattr(field, "html") and "Clear filters" in field.html
+        )
+
+        self.assertIn("{{ request.path }}", clear_link)
+        self.assertNotIn("{ request.path }", clear_link)
 
 
 class ResourceGrantLocalizationTests(TestCase):

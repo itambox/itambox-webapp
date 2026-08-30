@@ -92,6 +92,17 @@ class ProductLanguageGateTests(unittest.TestCase):
             findings = MODULE.scan_javascript(path, "itambox/static/src/copy.ts")
             self.assertEqual([finding.line for finding in findings], [1])
 
+    def test_javascript_dom_scan_checks_all_rhs_literals_and_codepoints(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(
+                Path(directory),
+                "copy.ts",
+                "node.textContent = 'left ' + '– right';\n"
+                "node.setAttribute('title', 'left ' + String.fromCharCode(0x2014) + ' right');",
+            )
+            findings = MODULE.scan_javascript(path, "itambox/static/src/copy.ts")
+            self.assertEqual([finding.line for finding in findings], [1, 2])
+
     def test_template_scan_ignores_comments_but_checks_rendered_entities(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self.write(
