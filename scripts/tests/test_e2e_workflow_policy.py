@@ -85,6 +85,9 @@ class E2EWorkflowTopologyTests(unittest.TestCase):
         self.assertNotIn("paths:", before_jobs)
         self.assertNotIn("paths-ignore:", before_jobs)
 
+    def test_release_qualification_does_not_inherit_repository_secrets(self):
+        self.assertNotRegex(self.release, r"(?m)^\s+secrets:\s+inherit\s*$")
+
 
 if __name__ == "__main__":
     unittest.main()

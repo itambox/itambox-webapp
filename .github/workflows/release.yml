@@ -158,7 +158,6 @@ jobs:
   e2e-qualification:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/e2e.yml
-    secrets: inherit
 
   prepare-release:
     needs: [validate-dispatch-ref, e2e-qualification]

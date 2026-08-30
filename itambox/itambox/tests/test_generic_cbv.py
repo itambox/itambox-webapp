@@ -179,6 +179,11 @@ class ObjectListViewTests(TestCase):
         self.assertTrue(any_list_template)
         self.assertNotIn("htmx/list_page_wrapper.html", template_names)
 
+    def test_full_list_defines_page_header_once(self):
+        """The list template delegates the page-header wrapper to its base."""
+        response = self.client.get(reverse("assets:manufacturer_list"))
+        self.assertEqual(response.content.decode().count('id="page-header-block"'), 1)
+
     def test_table_in_context(self):
         """The context always contains a 'table' key."""
         response = self.client.get(reverse("assets:manufacturer_list"))

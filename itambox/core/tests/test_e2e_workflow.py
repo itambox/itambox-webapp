@@ -327,6 +327,16 @@ def test_e2e_uses_an_isolated_settings_module_with_a_bounded_login_budget():
     assert "RATELIMIT_PERIOD = 60" in settings
 
 
+def test_e2e_settings_import_dev_defaults_and_raise_login_budget():
+    from core.settings import dev as dev_settings
+    from core.settings import e2e as e2e_settings
+
+    assert e2e_settings.DEBUG == dev_settings.DEBUG
+    assert e2e_settings.ALLOWED_HOSTS == dev_settings.ALLOWED_HOSTS
+    assert e2e_settings.RATELIMIT_LIMIT == 100
+    assert e2e_settings.RATELIMIT_PERIOD == 60
+
+
 def test_e2e_provisions_one_masked_tenant_bound_api_token():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
     provision = workflow.split("Provision E2E principal and SCIM token", 1)[1].split("Start Django dev server", 1)[0]
