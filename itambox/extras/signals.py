@@ -144,10 +144,8 @@ def event_on_delete(sender, instance, **kwargs):
         return
     if sender.__name__ in _SIGNAL_SKIP_MODELS:
         return
-    try:
-        transaction.on_commit(lambda: _safe_dispatch(sender, instance, "delete"))
-    except Exception:
-        _safe_dispatch(sender, instance, "delete")
+    object_id = instance.pk
+    transaction.on_commit(lambda: _safe_dispatch(sender, instance, "delete", object_id=object_id))
 
     # Notify watchers (deferred to on_commit — see event_on_save).
     _defer_notify_watchers(sender, instance, "deleted")
@@ -166,11 +164,11 @@ def _defer_notify_watchers(sender, instance, action):
             logger.debug("Failed to notify watchers: %s", e)
 
 
-def _safe_dispatch(sender, instance, action, created=None):
+def _safe_dispatch(sender, instance, action, created=None, *, object_id=None):
     if not _table_exists("extras_event"):
         return
     try:
-        dispatch_event(sender, instance, action=action, created=created)
+        dispatch_event(sender, instance, action=action, created=created, object_id=object_id)
     except DatabaseError:
         logger.debug("Event dispatch skipped (table may not exist yet): %s:%s", sender.__name__, action)
     except Exception as e:

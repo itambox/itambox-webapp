@@ -62,6 +62,52 @@ class EventsSystemTestCase(TransactionTestCase):
         event_delete = Event.objects.filter(model=self.manufacturer_ct, object_id=mfr_pk, action="delete").first()
         self.assertIsNotNone(event_delete)
 
+    def test_delete_event_preserves_original_object_id_until_commit(self):
+        mfr = Manufacturer.objects.create(name="Commit Identity Mfr", slug="commit-identity-mfr")
+        object_id = mfr.pk
+
+        with transaction.atomic():
+            mfr.delete()
+            self.assertFalse(
+                Event.objects.filter(model=self.manufacturer_ct, object_id=object_id, action="delete").exists()
+            )
+
+        self.assertTrue(Event.objects.filter(model=self.manufacturer_ct, object_id=object_id, action="delete").exists())
+
+    def test_delete_rollback_does_not_emit_event(self):
+        mfr = Manufacturer.objects.create(name="Rollback Mfr", slug="rollback-mfr")
+        object_id = mfr.pk
+
+        with self.assertRaisesRegex(RuntimeError, "rollback event"):
+            with transaction.atomic():
+                mfr.delete()
+                raise RuntimeError("rollback event")
+
+        self.assertFalse(
+            Event.objects.filter(model=self.manufacturer_ct, object_id=object_id, action="delete").exists()
+        )
+
+    @patch("extras.services.events.process_event_rules")
+    def test_explicit_object_id_overrides_instance_primary_key(self, process_event_rules):
+        mfr = Manufacturer.objects.create(name="Explicit Identity Mfr", slug="explicit-identity-mfr")
+        explicit_object_id = mfr.pk + 1000
+        process_event_rules.reset_mock()
+
+        dispatch_event(Manufacturer, mfr, "delete", object_id=explicit_object_id)
+
+        event = Event.objects.get(model=self.manufacturer_ct, object_id=explicit_object_id, action="delete")
+        self.assertEqual(event.object_id, explicit_object_id)
+        process_event_rules.assert_called_once()
+
+    def test_missing_object_id_is_skipped_without_creating_event(self):
+        unsaved = Manufacturer(name="Missing Identity Mfr", slug="missing-identity-mfr")
+
+        with self.assertLogs("extras.services.events", level="ERROR") as logs:
+            dispatch_event(Manufacturer, unsaved, "delete")
+
+        self.assertTrue(any("missing object id" in message for message in logs.output))
+        self.assertFalse(Event.objects.filter(model=self.manufacturer_ct, action="delete").exists())
+
     def test_event_rule_conditions_evaluation(self):
         """B7: authored conditions now fail closed for 1.0, so no notification is dispatched."""
         # Create a rule with an "and" condition
