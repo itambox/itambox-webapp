@@ -21,7 +21,6 @@ PO_PATHS = {
 }
 PY_CALLS = {"_", "gettext", "gettext_lazy", "gettext_noop", "ngettext", "pgettext", "npgettext"}
 JS_CALL_START = re.compile(r"\b(gettext|ngettext|pgettext|npgettext)\s*\(")
-JS_STRING = re.compile(r"'(?:\\.|[^'])*'|\"(?:\\.|[^\"])*\"")
 BLOCK = re.compile(
     r"{%[-+]?\s*blocktrans(?:late)?(?P<opts>[^%]*)%}(?P<body>.*?){%[-+]?\s*endblocktrans(?:late)?\s*[-+]?%}",
     re.S,
@@ -221,6 +220,29 @@ def source_templates(path: Path, relative: str, sources: dict[str, dict]) -> Non
         )
 
 
+def iter_js_string_literals(text: str):
+    """Yield quoted JS string literals with linear-time scanning."""
+    index = 0
+    while index < len(text):
+        if text[index] not in {"'", '"'}:
+            index += 1
+            continue
+        quote = text[index]
+        start = index
+        index += 1
+        escaped = False
+        while index < len(text):
+            char = text[index]
+            index += 1
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                yield text[start:index]
+                break
+
+
 def update_js_quote(char: str, quote: str | None, escaped: bool) -> tuple[str | None, bool]:
     if escaped:
         return quote, False
@@ -261,7 +283,7 @@ def source_javascript(path: Path, relative: str, sources: dict[str, dict]) -> No
     text = path.read_text(encoding="utf-8-sig")
     for call, body in iter_js_calls(text):
         literals = []
-        for literal in JS_STRING.findall(body):
+        for literal in iter_js_string_literals(body):
             try:
                 literals.append(ast.literal_eval(literal))
             except (SyntaxError, ValueError):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "check_localization_catalog.py"
@@ -92,5 +93,15 @@ def test_escape_and_newline_shape_mismatch_is_rejected():
     assert failures == ["django: escape/newline mismatch 'example'"]
 
 
+def test_js_string_scanner_handles_escapes_without_backtracking():
+    text = 'gettext("A \\"quoted\\" value") + gettext(\'B\\\\\\\'s value\')'
+    assert list(MODULE.iter_js_string_literals(text)) == ['"A \\"quoted\\" value"', "'B\\\\\\'s value'"]
+
+
 def test_current_catalog_passes_source_contract():
     assert MODULE.main() == 0
+
+
+class LocalizationCatalogUnittestTests(unittest.TestCase):
+    def test_current_catalog_passes_source_contract_under_unittest_discovery(self):
+        self.assertEqual(MODULE.main(), 0)

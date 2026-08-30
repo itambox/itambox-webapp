@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('organization', '0103_tenant_resource_grant_expiry'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [

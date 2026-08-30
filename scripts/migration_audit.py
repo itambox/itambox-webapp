@@ -44,6 +44,11 @@ POST_TRANSITION_MIGRATIONS = {
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
     "users.0102_token_updated_at",
     "users.0103_oidcidentity",
+    "assets.0102_alter_asset_depreciation_override_and_more",
+    "extras.0114_alter_alertlog_tenant_resolution_status",
+    "inventory.0102_alter_accessory_ean_alter_accessorystock_tenant_and_more",
+    "licenses.0101_alter_license_version",
+    "organization.0104_alter_tenant_changelog_retention_days",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")
 ALLOWED_DISPOSITIONS = {

@@ -543,11 +543,12 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 28)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 33)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
                 "assets.0101_seed_canonical_missing_status",
+                "assets.0102_alter_asset_depreciation_override_and_more",
                 "compliance.0101_alter_custodyreceipt_signed_at",
                 "compliance.0102_clear_unsigned_receipt_timestamps",
                 "compliance.0103_alter_custodyreceipt_options",
@@ -566,10 +567,14 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0111_webhookdelivery_target_claim",
                 "extras.0112_backfill_webhookdelivery_targets",
                 "extras.0113_upgrade_legacy_webhook_retry_schedules",
+                "extras.0114_alter_alertlog_tenant_resolution_status",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
+                "inventory.0102_alter_accessory_ean_alter_accessorystock_tenant_and_more",
+                "licenses.0101_alter_license_version",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
                 "organization.0103_tenant_resource_grant_expiry",
+                "organization.0104_alter_tenant_changelog_retention_days",
                 "procurement.0101_alter_purchaseorder_options",
                 "subscriptions.0101_remove_subscription_auto_renewal_and_more",
                 "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",

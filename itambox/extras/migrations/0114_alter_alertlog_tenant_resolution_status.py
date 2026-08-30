@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('extras', '0113_upgrade_legacy_webhook_retry_schedules'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [

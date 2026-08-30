@@ -9,6 +9,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('inventory', '0101_alter_accessoryassignment_options_and_more'),
         ('organization', '0104_alter_tenant_changelog_retention_days'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [
