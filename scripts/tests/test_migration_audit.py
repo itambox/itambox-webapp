@@ -3,6 +3,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.migration_audit import (
     SEMANTIC_DISPOSITIONS,
@@ -10,6 +11,7 @@ from scripts.migration_audit import (
     load_preflight_manifest,
     render_inventory,
     validate_preflight_manifest,
+    validate_preflight_manifest_git_objects,
 )
 
 
@@ -732,6 +734,14 @@ class PreflightManifestAuditTests(unittest.TestCase):
 
     def test_checked_manifest_matches_the_current_transitional_inventory(self):
         validate_preflight_manifest(self.inventory, self.manifest)
+        validate_preflight_manifest_git_objects(self.manifest, self.repository_root)
+
+    def test_unresolvable_predecessor_revision_fails_closed(self):
+        with patch("scripts.migration_audit.subprocess.run") as run:
+            run.return_value.returncode = 1
+            with self.assertRaisesRegex(ValueError, "not a local Git commit"):
+                validate_preflight_manifest_git_objects(self.manifest, self.repository_root)
+        run.assert_called_once()
 
     def test_missing_replacement_id_fails_closed(self):
         manifest = json.loads(json.dumps(self.manifest))

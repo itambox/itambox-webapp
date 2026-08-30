@@ -5,6 +5,7 @@ import argparse
 import ast
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -798,6 +799,22 @@ def _validate_manifest_predecessors(manifest):
         raise ValueError("migration preflight manifest transition release is not a named predecessor revision")
 
 
+def validate_preflight_manifest_git_objects(manifest, repository_root):
+    """Require every declared predecessor identity to resolve to a local commit object."""
+
+    revisions = {manifest["transition_release_sha"]}
+    revisions.update(predecessor["revision"] for predecessor in manifest["supported_predecessors"])
+    for revision in sorted(revisions):
+        result = subprocess.run(
+            ["git", "-C", str(repository_root), "cat-file", "-e", f"{revision}^{{commit}}"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode:
+            raise ValueError(f"migration preflight manifest revision is not a local Git commit: {revision}")
+
+
 def _preflight_manifest_expected_ids(inventory):
     post_ids = set(inventory["post_transition_migrations"])
     historical_ids = sorted(
@@ -855,6 +872,8 @@ def main(argv=None):
         manifest_path = args.manifest or source_root / "core" / "migration_baseline_manifest.json"
         try:
             validate_preflight_manifest(inventory, load_preflight_manifest(manifest_path))
+            if args.source_root is None:
+                validate_preflight_manifest_git_objects(load_preflight_manifest(manifest_path), repository_root)
         except ValueError as exc:
             print(f"migration preflight manifest invalid: {exc}", file=sys.stderr)
             return 1
