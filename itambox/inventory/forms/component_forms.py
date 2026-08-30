@@ -65,6 +65,9 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
             "allow_overallocate": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+        help_texts = {
+            "ean": _("Barcode (EAN, UPC, or GTIN). Scan it to open this item."),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

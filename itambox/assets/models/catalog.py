@@ -230,7 +230,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         blank=True,
         db_index=True,
         verbose_name=_("EAN"),
-        help_text=_("Barcode (EAN, UPC, or GTIN). Scan this barcode to view assets of this type."),
+        help_text=_("Barcode (EAN / UPC / GTIN) " + chr(0x2014) + " scanning shows assets of this type."),
     )
 
     eol_months = models.PositiveIntegerField(

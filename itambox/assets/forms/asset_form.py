@@ -153,6 +153,11 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             "purchase_order_line": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "cost_center": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
         }
+        help_texts = {
+            "depreciation_override": _(
+                "Override the depreciation policy. Leave empty to use the tenant default or asset-type schedule."
+            ),
+        }
 
     def clean_status(self):
         status = self.cleaned_data.get("status")

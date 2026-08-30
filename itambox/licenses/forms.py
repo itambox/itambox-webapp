@@ -76,6 +76,10 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
         help_texts = {
             "name": _("Unique renewal or purchase name (e.g., Office 365 E5 Enterprise Renewal FY26)"),
             "seats": _("Total number of activation seats purchased"),
+            "version": _(
+                "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). This is for "
+                "reference only; reconciliation is performed at the Software level and ignores versions."
+            ),
             "product_key": _("License activation key or volume credential"),
         }
 

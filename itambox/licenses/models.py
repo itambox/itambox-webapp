@@ -87,8 +87,10 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         blank=True,
         verbose_name=_("Version"),
         help_text=_(
-            "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). This is for "
-            "reference only; reconciliation is performed at the Software level and ignores versions."
+            "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
+            "Informational only "
+            + chr(0x2014)
+            + " reconciliation is performed at the Software level (version-agnostic)."
         ),
     )
     expiration_date = models.DateField(

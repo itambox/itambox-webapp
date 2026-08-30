@@ -10860,9 +10860,6 @@ msgstr "Bestand erfordert einen Lagerort, der zu einem Mandanten gehört. Weisen
 msgid "The managing tenant owns this role. Only the owner can edit it."
 msgstr "Diese Rolle gehört dem verwaltenden Mandanten. Nur dieser kann sie bearbeiten."
 
-#: itambox/inventory/abstract_models.py:118
-msgid "The owning tenant is always the stock location's tenant."
-msgstr "Der zuständige Mandant ist immer der Mandant des Lagerorts für den Bestand."
 
 #: itambox/compliance/templates/compliance/custody/sign_error.html:36
 msgid "The requested custody link is unavailable."
@@ -12793,8 +12790,6 @@ msgstr "Keine gültigen Mitgliedschaften ausgewählt."
 msgid "Only meaningful when the owning tenant manages others: managed tenants may assign this role to their own members; only the owning tenant can edit it."
 msgstr "Nur relevant, wenn der besitzende Mandant andere verwaltet: Verwaltete Mandanten dürfen diese Rolle ihren eigenen Mitgliedern zuweisen; nur der besitzende Mandant kann sie bearbeiten."
 
-msgid "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange rows only. Blank uses the global setting. 0 = unlimited (legal hold. This tenant's change log is never pruned automatically)."
-msgstr "Überschreibt ITAMBOX_CHANGELOG_RETENTION_DAYS nur für die ObjectChange-Einträge dieses Mandanten. Leer verwendet die globale Einstellung. 0 = unbegrenzt (gesetzliche Aufbewahrung. Das Änderungsprotokoll dieses Mandanten wird nicht automatisch bereinigt)."
 
 msgid "Owning tenant. Leave blank for a global/shared contact (e.g. a manufacturer or service desk) visible to all tenants."
 msgstr "Besitzender Mandant. Leer lassen für einen globalen oder gemeinsamen Kontakt (z. B. einen Hersteller oder Service Desk), der für alle Mandanten sichtbar ist."
@@ -13365,9 +13360,6 @@ msgstr "Diese Rolle ist für verwaltete Mandanten freigegeben und gewährt dort 
 msgid "USD (US Dollar, $)"
 msgstr "USD (US-Dollar, $)"
 
-#: itambox/extras/models.py:1712
-msgid "Unresolved; operator review required"
-msgstr "Ungeklärt; manuelle Prüfung erforderlich"
 
 #: itambox/organization/forms/tenant_form.py:77
 msgid "Used for assets that have no depreciation schedule on the asset or its type."

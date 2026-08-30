@@ -297,8 +297,9 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
         verbose_name=_("Changelog retention override (days)"),
         help_text=_(
             "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange "
-            "rows only. Blank uses the global setting. 0 = unlimited (legal hold. This "
-            "tenant's change log is never pruned automatically)."
+            "rows only. Blank uses the global setting. 0 = unlimited (legal hold "
+            + "--"
+            + " this tenant's changelog is never pruned by prune_changelog)."
         ),
     )
 
