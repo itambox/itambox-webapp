@@ -36,13 +36,16 @@ Restore/purge use core URL names:
 """
 
 import json
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, override_settings
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from assets.models import Asset, AssetRole, Manufacturer, StatusLabel
+from core.forms.mixins import ConfirmationForm, SlugModelForm
 from core.tests.mixins import TenantTestMixin
 from organization.models import Membership, Role, Tenant
 
@@ -68,6 +71,50 @@ def _make_regular_user(username):
         email=f"{username}@example.com",
         password="testpassword",
     )
+
+
+class _ManufacturerSlugForm(SlugModelForm):
+    class Meta:
+        model = Manufacturer
+        fields = ("name", "slug")
+
+
+class ConfirmationFormTests(TestCase):
+    def test_explicit_return_url_initial_wins(self):
+        form = ConfirmationForm(
+            instance=Manufacturer(name="Explicit Return Target"), initial={"return_url": "/custom/"}
+        )
+
+        self.assertEqual(form["return_url"].value(), "/custom/")
+
+    def test_resolvable_list_route_wins_over_object_absolute_url(self):
+        form = ConfirmationForm(instance=Manufacturer(name="List Return Target"))
+
+        self.assertEqual(form["return_url"].value(), reverse("assets:manufacturer_list"))
+
+    def test_no_reverse_match_falls_back_to_absolute_url(self):
+        instance = SimpleNamespace(get_absolute_url=lambda: "/fallback-target/")
+        with (
+            patch("core.forms.mixins.get_model_viewname", return_value="missing:list"),
+            patch("core.forms.mixins.reverse", side_effect=NoReverseMatch) as reverse_mock,
+        ):
+            form = ConfirmationForm(instance=instance)
+
+        reverse_mock.assert_called_once_with("missing:list")
+        self.assertEqual(form["return_url"].value(), "/fallback-target/")
+
+    def test_instance_without_any_return_route_keeps_return_url_empty(self):
+        instance = SimpleNamespace()
+        with (
+            patch("core.forms.mixins.get_model_viewname", return_value="missing:list"),
+            patch("core.forms.mixins.reverse", side_effect=NoReverseMatch),
+        ):
+            form = ConfirmationForm(instance=instance)
+
+        self.assertIsNone(form.fields["return_url"].initial)
+
+    def test_slug_model_form_does_not_reference_removed_standalone_script(self):
+        self.assertTrue(all("slugify.js" not in path for path in _ManufacturerSlugForm().media._js))
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +338,10 @@ class ObjectDeleteViewTests(TestCase):
         """GET the delete confirmation page returns 200."""
         response = self.client.get(reverse("assets:manufacturer_delete", kwargs={"pk": self.mfr.pk}))
         self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        form_start = body.index('<form method="post"')
+        form_end = body.index(">", form_start)
+        self.assertIn('hx-boost="false"', body[form_start:form_end])
 
     def test_post_delete_soft_deletes(self):
         """POSTing the delete view sets deleted_at (soft delete) so the object
@@ -306,6 +357,7 @@ class ObjectDeleteViewTests(TestCase):
         """A non-HTMX delete POST redirects on success."""
         response = self.client.post(reverse("assets:manufacturer_delete", kwargs={"pk": self.mfr.pk}))
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("assets:manufacturer_list"))
 
 
 # ---------------------------------------------------------------------------

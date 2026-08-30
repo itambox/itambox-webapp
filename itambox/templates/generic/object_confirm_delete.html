@@ -32,7 +32,7 @@
           {% if extra_warning %}
             <div class="alert alert-warning" role="alert">{{ extra_warning }}</div>
           {% endif %}
-          <form method="post">
+          <form method="post" hx-boost="false">
             {% csrf_token %}
             {# Render the form if provided (e.g., ConfirmationForm from base view) #}
             {% if form %}

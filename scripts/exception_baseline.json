@@ -132,14 +132,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/forms/mixins.py",
-      "scope": "ClassDef:ConfirmationForm/FunctionDef:__init__",
-      "handler_type": "Exception",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/engine.py",
       "scope": "ClassDef:ChangeLogEngine/FunctionDef:_tenant_of",
       "handler_type": "Exception",

@@ -89,6 +89,45 @@ class JobScopingTests(TenantTestMixin, TestCase):
         response = self.client.get(reverse("job_detail", kwargs={"pk": self.foreign_job.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "foreign-tenant-job")
+        self.assertTrue(response.context["can_cancel_job"])
+        self.assertContains(response, "Cancel job")
+
+    def test_concrete_scope_shows_cancel_only_with_change_permission(self):
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        response = self.client.get(reverse("job_detail", kwargs={"pk": self.own_job.pk}))
+        self.assertTrue(response.context["can_cancel_job"])
+        self.assertContains(response, "Cancel job")
+
+        self.tenant_role.permissions = ["core.view_job"]
+        self.tenant_role.save()
+        response = self.client.get(reverse("job_detail", kwargs={"pk": self.own_job.pk}))
+        self.assertFalse(response.context["can_cancel_job"])
+        self.assertNotContains(response, "Cancel job")
+
+    def test_concrete_scope_hides_cancel_for_running_and_completed_jobs(self):
+        running = Job.objects.create(name="running-detail-job", tenant=self.tenant, status=Job.STATUS_RUNNING)
+        completed = Job.objects.create(name="completed-detail-job", tenant=self.tenant, status=Job.STATUS_COMPLETED)
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+
+        for job in (running, completed):
+            with self.subTest(status=job.status):
+                response = self.client.get(reverse("job_detail", kwargs={"pk": job.pk}))
+                self.assertFalse(response.context["can_cancel_job"])
+                self.assertNotContains(response, "Cancel job")
+
+    def test_aggregate_scope_hides_cancel_without_target_tenant_change_permission(self):
+        view_only_role = self.tenant_role.__class__.objects.create(
+            tenant=self.other_tenant,
+            name="Other View Only Role",
+            permissions=["core.view_job"],
+        )
+        self.grant(self.tenant_user, self.other_tenant, view_only_role)
+        self._login_all_accessible()
+
+        response = self.client.get(reverse("job_detail", kwargs={"pk": self.foreign_job.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_cancel_job"])
+        self.assertNotContains(response, "Cancel job")
 
     def test_aggregate_scope_hides_unreachable_tenant_job(self):
         """A job of a tenant the user cannot access stays hidden even in aggregate scope."""

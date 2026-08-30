@@ -89,6 +89,12 @@
   });
 
   function refreshDetailsPage() {
+    // The event is shared with list-level actions. Lists already declare their
+    // own HTMX refresh trigger; the detail controller must not start a second
+    // body refresh against the partial wrapper.
+    if (document.getElementById('object-list-dynamic-content')) {
+      return;
+    }
     if (typeof htmx !== 'undefined') {
       htmx.ajax('GET', window.location.href, { target: 'body', swap: 'outerHTML' });
     } else {
