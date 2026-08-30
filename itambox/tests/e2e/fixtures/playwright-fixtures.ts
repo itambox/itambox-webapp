@@ -101,7 +101,7 @@ export const test = base.extend<E2EFixtures>({
 
   runId: [
     async ({}, use, testInfo) => {
-      const identity = retrySafeName(testInfo, 'run');
+      const identity = retrySafeName(testInfo, testInfo.testId);
       testInfo.annotations.push({ type: 'e2e-identity', description: identity });
       await testInfo.attach('e2e-identity', {
         body: Buffer.from(identity, 'utf8'),
