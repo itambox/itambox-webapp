@@ -70,8 +70,8 @@ def _validate_manifest_relationships(manifest: Mapping[str, Any], values: Mappin
         raise ValueError("migration preflight manifest replacement targets do not cover historical IDs")
     if not set(values["post_transition_leaf_ids"]).issubset(values["post_transition_ids"]):
         raise ValueError("migration preflight manifest post-transition leaves are not post-transition IDs")
-    if manifest["layout"] == "transitional" and values["baseline_ids"] != values["historical_ids"]:
-        raise ValueError("migration preflight manifest transitional baseline IDs must equal historical IDs")
+    if manifest["layout"] == "transitional" and values["baseline_ids"] != values["replacement_ids"]:
+        raise ValueError("migration preflight manifest transitional baseline IDs must equal replacement IDs")
     known_ids = set(values["replacement_ids"]) | set(values["historical_ids"]) | set(values["post_transition_ids"])
     if not set(values["baseline_ids"]).issubset(known_ids):
         raise ValueError("migration preflight manifest baseline IDs are not known migration IDs")
@@ -241,45 +241,51 @@ def _classify_complete_transitional(
     )
 
 
-def _classify_replacement_rows(
+def _classify_all_replacement(
     manifest: Mapping[str, Any],
     observed: Mapping[str, set[str]],
-    replacement: set[str],
+    historical: set[str],
 ) -> PreflightResult:
-    """Reject raw replacement rows: normal Django transition execution never records them."""
-
-    if observed["replacement"] == replacement:
-        reason_code = "TRANSITIONAL_REPLACEMENT_ROWS_PRESENT"
-        state = "mixed-or-unknown-first-party-state"
-    else:
-        reason_code = "PARTIAL_REPLACEMENT_SET"
-        state = "partial-replacement-set"
+    if not observed["historical"]:
+        return _result(
+            manifest=manifest,
+            observed=observed,
+            state="normalized-baseline-not-current",
+            reason_code="NORMALIZED_LAYOUT_NOT_CURRENT",
+            exit_code=1,
+        )
     return _result(
         manifest=manifest,
         observed=observed,
-        state=state,
-        reason_code=reason_code,
+        state="mixed-or-unknown-first-party-state",
+        reason_code="REPLACEMENT_WITH_INCOMPLETE_HISTORY",
         exit_code=1,
-        unexpected_ids=observed["replacement"],
-        remediation=(
-            "Raw replacement recorder rows are not produced by ordinary Django transition execution; "
-            "restore the verified predecessor and rerun the ordinary migration executor."
-        ),
+        missing_ids=historical - observed["historical"],
     )
 
 
 def _classify_historical_only(
     manifest: Mapping[str, Any],
     observed: Mapping[str, set[str]],
+    historical: set[str],
+    replacement: set[str],
     post_transition: set[str],
 ) -> PreflightResult:
+    if observed["post_transition"]:
+        return _result(
+            manifest=manifest,
+            observed=observed,
+            state="mixed-or-unknown-first-party-state",
+            reason_code="POST_TRANSITION_WITHOUT_REPLACEMENT",
+            exit_code=1,
+        )
     return _result(
         manifest=manifest,
         observed=observed,
         state="complete-old-history-no-replacement",
         reason_code="TRANSITION_RELEASE_REQUIRED",
         exit_code=1,
-        missing_ids=post_transition - observed["post_transition"],
+        missing_ids=replacement | post_transition,
         remediation=_TRANSITION_REMEDIATION,
     )
 
@@ -292,12 +298,22 @@ def _classify_transitional(
     post_transition: set[str],
 ) -> PreflightResult:
     all_historical = observed["historical"] == historical
-    if observed["replacement"]:
-        return _classify_replacement_rows(manifest, observed, replacement)
-    if all_historical and observed["post_transition"]:
+    all_replacement = observed["replacement"] == replacement
+    if all_historical and all_replacement:
         return _classify_complete_transitional(manifest, observed, post_transition)
+    if all_replacement:
+        return _classify_all_replacement(manifest, observed, historical)
+    if observed["replacement"]:
+        return _result(
+            manifest=manifest,
+            observed=observed,
+            state="partial-replacement-set",
+            reason_code="PARTIAL_REPLACEMENT_SET",
+            exit_code=1,
+            missing_ids=replacement - observed["replacement"],
+        )
     if all_historical:
-        return _classify_historical_only(manifest, observed, post_transition)
+        return _classify_historical_only(manifest, observed, historical, replacement, post_transition)
     if observed["historical"]:
         if observed["post_transition"]:
             return _result(

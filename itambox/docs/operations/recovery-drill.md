@@ -78,10 +78,7 @@ checked manifest. The gate is a cleanup-release admission check, not a substitut
 for the ordinary transition upgrade. In this Path C drill, a restored pre-squash
 predecessor is expected to report `complete-old-history-no-replacement` (non-zero)
 before the normal candidate migration; after that migration completes, rerun the
-gate and require `complete-replacement-recognition` (zero). In the transitional
-layout that success is the complete historical recorder set plus the complete
-post-transition tail; Django records the `replaces` targets, not raw shard IDs.
-A raw shard row is an anomalous fake/manual state and must fail closed. A future cleanup
+gate and require `complete-replacement-recognition` (zero). A future cleanup
 release must run the gate before any cleanup migration writes and stop on every
 non-zero result. The command only reads `django_migrations` and cannot detect a
 failed non-atomic migration whose operations ran before its recorder row committed.
