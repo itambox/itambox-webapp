@@ -30,7 +30,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     await selectTomOption(createForm, 'status', 'draft');
     await selectTomOption(createForm, 'tenant', tenant.id);
     await selectTomOption(createForm, 'supplier', supplierId);
-    await createForm.getByLabel('Cost').fill('1200.00');
+    await createForm.locator('input[name="cost"]').fill('1200.00');
     await selectTomOption(createForm, 'currency', 'USD');
     await selectTomOption(createForm, 'billing_cycle', 'annual');
     await createForm.getByLabel('Start date').fill('2026-09-01');
@@ -88,7 +88,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     const updateForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await updateForm.getByLabel('Name').fill(renamedName);
     await selectTomOption(updateForm, 'status', 'active');
-    await updateForm.getByLabel('Cost').fill('1500.00');
+    await updateForm.locator('input[name="cost"]').fill('1500.00');
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
@@ -111,7 +111,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'contract delete response').toBe(302);
     expect((await api.get(`/api/procurement/contracts/${contractId}/`)).status()).toBe(404);
   });

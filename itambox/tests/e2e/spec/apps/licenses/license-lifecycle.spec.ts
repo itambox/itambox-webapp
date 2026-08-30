@@ -54,7 +54,7 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     });
 
     await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(originalName);
     const created = await jsonResponse(
       await api.get(`/api/licenses/licenses/${licenseId}/`),
       200,
@@ -86,7 +86,7 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     expect(updateResponse.headers()['location']).toBe('/licenses/');
     await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(renamedName);
     const updated = await jsonResponse(
       await api.get(`/api/licenses/licenses/${licenseId}/`),
       200,
@@ -108,7 +108,7 @@ test.describe('licenses-owned entitlement lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'license delete response').toBe(302);
     expect((await api.get(`/api/licenses/licenses/${licenseId}/`)).status()).toBe(404);
   });

@@ -8,7 +8,12 @@ export async function deleteOwnedResource(
   label: string,
   expectedStatus = 204,
 ): Promise<void> {
-  const response = await request.delete(path, { headers: { 'If-Match': '*' } });
+  const current = await request.get(path);
+  const currentBody = await current.text();
+  expect(current.status(), `${label} precondition read: ${currentBody}`).toBe(200);
+  const etag = current.headers()['etag'];
+  if (!etag) throw new Error(`${label}: the resource response did not include an ETag.`);
+  const response = await request.delete(path, { headers: { 'If-Match': etag } });
   const body = await response.text();
   expect(response.status(), `${label}: ${body}`).toBe(expectedStatus);
 }

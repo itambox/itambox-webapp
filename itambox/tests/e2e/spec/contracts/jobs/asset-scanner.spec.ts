@@ -6,20 +6,20 @@ import * as path from 'path';
 
 const aggregateStorageState = path.resolve(__dirname, '../../../.auth/aggregate.json');
 
-test.describe('jobs contract', { tag: '@pr' }, () => {
+test.describe('jobs contract', { tag: ['@pr', '@aggregate'] }, () => {
   test.use({ storageState: aggregateStorageState });
 
   test('owned aggregate check-in basket creates a cancellable tenant-bound job', async ({
     page,
     api,
-    activeTenant,
     cleanup,
     runId,
   }) => {
-    if (!activeTenant) throw new Error('Aggregate job qualification requires an attested tenant.');
-    const holder = await createOwnedAssetHolder(api, cleanup, activeTenant.id, `e2e-job-holder-${runId}`);
-    const first = await createOwnedAsset(api, cleanup, activeTenant.id, `${runId}-job-a`);
-    const second = await createOwnedAsset(api, cleanup, activeTenant.id, `${runId}-job-b`);
+    const tenantId = process.env.E2E_TENANT_ID;
+    if (!tenantId) throw new Error('E2E_TENANT_ID is required for aggregate job qualification.');
+    const holder = await createOwnedAssetHolder(api, cleanup, tenantId, `e2e-job-holder-${runId}`);
+    const first = await createOwnedAsset(api, cleanup, tenantId, `${runId}-job-a`);
+    const second = await createOwnedAsset(api, cleanup, tenantId, `${runId}-job-b`);
     for (const asset of [first, second]) {
       const checkout = await api.post(`/api/assets/assets/${asset.id}/checkout/`, {
         data: { holder_id: Number(holder.id), notes: `Jobs contract ${runId}` },

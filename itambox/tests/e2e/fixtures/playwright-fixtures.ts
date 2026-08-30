@@ -87,7 +87,10 @@ export const test = base.extend<E2EFixtures>({
 
   activeTenant: [
     async ({ page, request }, use, testInfo) => {
-      if (['anonymous', 'remote-smoke'].includes(testInfo.project.name)) {
+      if (
+        ['anonymous', 'remote-smoke'].includes(testInfo.project.name)
+        || testInfo.tags.includes('@aggregate')
+      ) {
         await use(null);
         return;
       }

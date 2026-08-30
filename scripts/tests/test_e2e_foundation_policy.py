@@ -67,6 +67,7 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         self.assertIn("../../fixtures/test", external)
         self.assertIn("activeTenant: ActiveTenant | null", fixture)
         self.assertIn("['anonymous', 'remote-smoke'].includes(testInfo.project.name)", fixture)
+        self.assertIn("testInfo.tags.includes('@aggregate')", fixture)
         self.assertIn("await use(null)", fixture)
 
     def test_remote_nondestructive_smoke_precedes_destructive_shared_target_block(self):
@@ -108,7 +109,8 @@ class OwnedFoundationFilesTests(unittest.TestCase):
     def test_owned_rest_cleanup_uses_the_etag_aware_helper(self):
         helper = (E2E_ROOT / "helpers" / "api.ts").read_text(encoding="utf-8")
         self.assertIn("export async function deleteOwnedResource", helper)
-        self.assertIn("'If-Match': '*'", helper)
+        self.assertIn("current.headers()['etag']", helper)
+        self.assertIn("'If-Match': etag", helper)
         self.assertIn("expectedStatus", helper)
 
         sources = list((E2E_ROOT / "fixtures" / "factories").rglob("*.ts"))

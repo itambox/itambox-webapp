@@ -20,7 +20,10 @@ test.describe('core-owned global search', { tag: '@pr' }, () => {
     await expect(
       page.getByRole('heading', { name: `Search Results for "${asset.assetTag}"`, exact: true }),
     ).toBeVisible();
-    const result = page.getByRole('link', { name: asset.assetTag, exact: true });
+    const row = page.locator('tbody tr').filter({ has: page.getByText(asset.assetTag, { exact: true }) });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByText(asset.assetTag, { exact: true })).toBeVisible();
+    const result = row.getByRole('link', { name: asset.name, exact: true });
     await expect(result).toHaveCount(1);
     await expect(result).toHaveAttribute('href', `/assets/assets/${asset.id}/`);
     await expect(page.locator('.badge').filter({ hasText: '1 found' })).toHaveCount(1);
@@ -33,6 +36,6 @@ test.describe('core-owned global search', { tag: '@pr' }, () => {
     expect(readback).toMatchObject({ id: Number(asset.id), asset_tag: asset.assetTag });
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('link', { name: asset.assetTag, exact: true })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: asset.name, exact: true })).toHaveCount(1);
   });
 });

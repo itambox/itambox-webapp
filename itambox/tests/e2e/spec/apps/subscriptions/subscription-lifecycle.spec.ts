@@ -84,7 +84,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     });
 
     await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(name);
     const created = await jsonResponse(
       await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`),
       200,
@@ -145,7 +145,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'subscription delete response').toBe(302);
     expect((await api.get(`/api/subscriptions/subscriptions/${subscriptionId}/`)).status()).toBe(404);
   });

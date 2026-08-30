@@ -91,6 +91,40 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
       notes: `Updated owned asset lifecycle ${runId}`,
     });
 
+    const clonePath = `/assets/assets/${assetId}/clone/`;
+    const clonePage = await page.goto(clonePath, { waitUntil: 'domcontentloaded' });
+    expect(clonePage?.status(), `GET ${clonePath}`).toBe(200);
+    const cloneForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="asset_tag"]') });
+    const cloneName = `${originalName} Clone`;
+    const cloneTag = `${assetTag}-CLONE`.slice(0, 90);
+    await cloneForm.getByLabel('Name').fill(cloneName);
+    await cloneForm.getByLabel('Asset tag').fill(cloneTag);
+    const cloneResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === clonePath,
+    );
+    await cloneForm.getByRole('button', { name: 'Create', exact: true }).click();
+    const cloneResponse = await cloneResponsePromise;
+    expect(cloneResponse.status(), 'asset clone response').toBe(302);
+    const cloneLocation = cloneResponse.headers()['location'];
+    const cloneMatch = cloneLocation?.match(/^\/assets\/assets\/(\d+)\/$/);
+    if (!cloneMatch) throw new Error(`Asset clone returned an unexpected location: ${cloneLocation || '<missing>'}`);
+    const cloneId = cloneMatch[1];
+    cleanup.add(`catalog asset clone ${cloneTag}`, async () => {
+      const current = await api.get(`/api/assets/assets/${cloneId}/`);
+      if (current.status() === 404) return;
+      expect(current.status(), await current.text()).toBe(200);
+      await deleteOwnedResource(api, `/api/assets/assets/${cloneId}/`, `delete catalog asset clone ${cloneTag}`);
+    });
+    expect(
+      await jsonResponse(await api.get(`/api/assets/assets/${cloneId}/`), 200, 'cloned asset readback'),
+    ).toMatchObject({
+      id: Number(cloneId),
+      name: cloneName,
+      asset_tag: cloneTag,
+      asset_type: expect.objectContaining({ id: Number(assetTypes[0].id) }),
+      tenant: expect.objectContaining({ id: Number(tenant.id) }),
+    });
+
     const deletePath = `/assets/assets/${assetId}/delete/`;
     const deletePage = await page.goto(deletePath, { waitUntil: 'domcontentloaded' });
     expect(deletePage?.status(), `GET ${deletePath}`).toBe(200);
@@ -98,7 +132,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'asset delete response').toBe(302);
     expect((await api.get(`/api/assets/assets/${assetId}/`)).status()).toBe(404);
   });

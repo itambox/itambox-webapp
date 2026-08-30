@@ -5,6 +5,7 @@ import { deleteOwnedResource, getJsonRows, jsonResponse, type JsonObject } from 
 export type OwnedAsset = {
   id: string;
   assetTag: string;
+  name: string;
   tenant: string;
 };
 
@@ -26,9 +27,10 @@ export async function createOwnedAsset(
   expect(assetTypes, 'the seeded E2E database must provide an asset type').not.toHaveLength(0);
   const assetTypeId = primaryKey(assetTypes[0], 'asset type');
   const assetTag = `E2E-${runId}`.slice(0, 90);
+  const name = `E2E owned asset ${runId}`;
   const response = await request.post('/api/assets/assets/', {
     data: {
-      name: `E2E owned asset ${runId}`,
+      name,
       asset_tag: assetTag,
       asset_type_id: assetTypeId,
       tenant_id: tenant,
@@ -37,7 +39,7 @@ export async function createOwnedAsset(
   const body = await jsonResponse(response, 201, 'create owned asset');
   const id = primaryKey(body, 'created asset');
   expect(body.asset_tag, 'created asset must preserve its owned tag').toBe(assetTag);
-  const owned = { id, assetTag, tenant };
+  const owned = { id, assetTag, name, tenant };
   cleanup.add(`asset ${assetTag}`, async () => {
     await deleteOwnedResource(request, `/api/assets/assets/${id}/`, `delete owned asset ${assetTag}`);
   });

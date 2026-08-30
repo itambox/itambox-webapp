@@ -29,6 +29,10 @@ export async function selectTomOption(
 ): Promise<void> {
   const select = root.locator(`select[data-tom-select][name="${field}"]`);
   await expect(select, `Tom Select field ${field}`).toHaveCount(1);
+  if ((await select.inputValue()) === value) {
+    await expect(select).toHaveValue(value);
+    return;
+  }
   const option = select.locator(`option[value="${value}"]`);
   await expect(option, `Tom Select option ${field}=${value}`).toHaveCount(1);
   const label = (await option.textContent())?.trim();
@@ -37,9 +41,8 @@ export async function selectTomOption(
   const wrapper = select.locator('xpath=following-sibling::div[contains(@class,"ts-wrapper")][1]');
   await expect(wrapper, `Tom Select wrapper for ${field}`).toHaveCount(1);
   await wrapper.locator('.ts-control').click();
-  const input = wrapper.locator('.dropdown-input:visible, .ts-control input:visible').first();
-  await expect(input, `Tom Select search input for ${field}`).toBeVisible();
-  await input.fill(label);
-  await wrapper.locator(`.ts-dropdown .option[data-value="${value}"]`).click();
+  const visibleOption = wrapper.locator(`.ts-dropdown .option[data-value="${value}"]:visible`);
+  await expect(visibleOption, `visible Tom Select option ${field}=${value}`).toHaveCount(1);
+  await visibleOption.click();
   await expect(select).toHaveValue(value);
 }

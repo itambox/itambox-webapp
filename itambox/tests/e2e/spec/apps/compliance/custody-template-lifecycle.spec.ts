@@ -59,7 +59,7 @@ test.describe('compliance-owned custody template lifecycle', { tag: '@pr' }, () 
     });
 
     await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(originalName);
     const created = await jsonResponse(
       await api.get(`/api/compliance/custody-templates/${templateId}/`),
       200,
@@ -111,7 +111,7 @@ test.describe('compliance-owned custody template lifecycle', { tag: '@pr' }, () 
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'custody template delete response').toBe(302);
     expect((await api.get(`/api/compliance/custody-templates/${templateId}/`)).status()).toBe(404);
   });

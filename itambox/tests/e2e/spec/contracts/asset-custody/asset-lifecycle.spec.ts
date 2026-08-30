@@ -3,6 +3,7 @@ import { createOwnedAsset } from '../../../fixtures/factories/assets';
 import { createOwnedAssetHolder } from '../../../fixtures/factories/identity';
 import { requireActiveTenant } from '../../../fixtures/tenant';
 import { jsonResponse } from '../../../helpers/api';
+import { selectTomOption } from '../../../helpers/forms';
 
 test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
   test('creates owned prerequisites and checks an asset out and back in', async ({
@@ -32,8 +33,8 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
 
     const checkoutForm = page.locator('#asset-checkout-form');
     await expect(checkoutForm).toBeVisible();
-    await checkoutForm.getByLabel('Assign to').selectOption('holder');
-    await checkoutForm.getByLabel('Asset Holder').selectOption(holder.id);
+    await selectTomOption(checkoutForm, 'target_type', 'holder');
+    await selectTomOption(checkoutForm, 'assigned_holder', holder.id);
     const checkoutWrite = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return response.request().method() === 'POST'

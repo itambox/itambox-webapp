@@ -82,7 +82,7 @@ test.describe('extras-owned tag lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'tag delete response').toBe(302);
     expect((await api.get(`/api/extras/tags/${tagId}/`)).status()).toBe(404);
   });

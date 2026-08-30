@@ -35,7 +35,7 @@ test.describe('soft-delete contract', { tag: '@pr' }, () => {
     const firstDeleteResponse = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await firstDeleteResponse).status(), 'first soft-delete response').toBe(302);
     expect((await api.get(`/api/assets/manufacturers/${manufacturerId}/`)).status()).toBe(404);
 
@@ -68,7 +68,7 @@ test.describe('soft-delete contract', { tag: '@pr' }, () => {
     const secondDeleteResponse = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Deletion', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await secondDeleteResponse).status(), 'second soft-delete response').toBe(302);
 
     await page.goto(recyclePath, { waitUntil: 'domcontentloaded' });

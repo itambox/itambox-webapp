@@ -496,6 +496,8 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               env_file.write(f"E2E_SCIM_TOKEN={plaintext}\n")
               env_file.write(f"E2E_API_TOKEN={plaintext}\n")
+              env_file.write(f"E2E_TENANT_ID={tenant.pk}\n")
+              env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\n")
           PY
 
       - name: Start Django dev server

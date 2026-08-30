@@ -321,7 +321,8 @@ def test_e2e_uses_an_isolated_settings_module_with_a_bounded_login_budget():
     assert "DJANGO_SETTINGS_MODULE: core.settings.e2e" in workflow
     assert settings_path.is_file()
     settings = settings_path.read_text(encoding="utf-8")
-    assert "from .dev import *" in settings
+    assert "from . import dev as _dev" in settings
+    assert "globals().update" in settings
     assert "RATELIMIT_LIMIT = 100" in settings
     assert "RATELIMIT_PERIOD = 60" in settings
 
@@ -333,3 +334,5 @@ def test_e2e_provisions_one_masked_tenant_bound_api_token():
     assert 'print(f"::add-mask::{plaintext}")' in provision
     assert 'env_file.write(f"E2E_SCIM_TOKEN={plaintext}\\n")' in provision
     assert 'env_file.write(f"E2E_API_TOKEN={plaintext}\\n")' in provision
+    assert 'env_file.write(f"E2E_TENANT_ID={tenant.pk}\\n")' in provision
+    assert 'env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\\n")' in provision

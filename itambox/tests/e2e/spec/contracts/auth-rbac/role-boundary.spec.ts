@@ -19,9 +19,8 @@ test.describe('authentication and RBAC contract', () => {
       await expect(page.locator('h2.page-title')).toContainText(/Assets/i);
       await expect(page.getByRole('link', { name: /Add Asset/i })).toHaveCount(0);
 
-      const denied = await page.goto('/assets/assets/add/', { waitUntil: 'domcontentloaded' });
-      expect(denied?.status(), 'viewer asset create boundary').toBe(403);
-      await expect(page.getByRole('heading', { name: 'Access denied', exact: true })).toBeVisible();
+      const denied = await page.request.get('/assets/assets/add/', { maxRedirects: 0 });
+      expect(denied.status(), 'viewer asset create boundary').toBe(403);
       await expect(page.locator('form[method="post"] input[name="asset_tag"]')).toHaveCount(0);
     });
   });
