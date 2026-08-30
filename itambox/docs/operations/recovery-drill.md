@@ -424,7 +424,7 @@ The helper does not start app/worker:
 ```bash
 restore_drill_project "$UPGRADE_PROJECT" "$UPGRADE_OVERRIDE"
 if docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE" \
-  run --rm --no-deps \
+  run --rm -T --no-deps --no-build \
   -v "$MIGRATION_PREFLIGHT_MODULE_MOUNT" \
   -v "$MIGRATION_PREFLIGHT_COMMAND_MOUNT" \
   -v "$MIGRATION_PREFLIGHT_MANIFEST_MOUNT" \

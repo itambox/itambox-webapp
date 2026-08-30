@@ -723,7 +723,13 @@ _PREFLIGHT_MANIFEST_LIST_FIELDS = (
     "post_transition_leaf_ids",
     "current_leaf_ids",
 )
-_SHA256_RE = re.compile(r"^[0-9a-f]{40}$")
+_GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+SUPPORTED_PREDECESSOR_STATES = frozenset(
+    {
+        "complete-old-history-no-replacement",
+        "complete-replacement-recognition",
+    }
+)
 
 
 def load_preflight_manifest(path):
@@ -772,7 +778,7 @@ def _assert_manifest_ids(manifest, key, expected):
 
 def _validate_manifest_predecessors(manifest):
     transition_release_sha = manifest.get("transition_release_sha")
-    if not isinstance(transition_release_sha, str) or not _SHA256_RE.fullmatch(transition_release_sha):
+    if not isinstance(transition_release_sha, str) or not _GIT_SHA_RE.fullmatch(transition_release_sha):
         raise ValueError("migration preflight manifest transition_release_sha must be a lowercase 40-character Git SHA")
     predecessors = manifest.get("supported_predecessors")
     if not isinstance(predecessors, list) or not predecessors:
@@ -787,12 +793,12 @@ def _validate_manifest_predecessors(manifest):
         state = predecessor.get("state")
         if not isinstance(name, str) or not name.strip() or name in names:
             raise ValueError("migration preflight manifest predecessor names must be unique and non-empty")
-        if not isinstance(revision, str) or not _SHA256_RE.fullmatch(revision):
+        if not isinstance(revision, str) or not _GIT_SHA_RE.fullmatch(revision):
             raise ValueError(
                 "migration preflight manifest predecessor revisions must be lowercase 40-character Git SHAs"
             )
-        if not isinstance(state, str) or not state.strip():
-            raise ValueError("migration preflight manifest predecessor states must be non-empty strings")
+        if state not in SUPPORTED_PREDECESSOR_STATES:
+            raise ValueError("migration preflight manifest predecessor state is not recognized")
         names.append(name)
         revisions.add(revision)
     if transition_release_sha not in revisions:
@@ -840,6 +846,14 @@ def _preflight_manifest_expected_ids(inventory):
     }
 
 
+def render_preflight_manifest(inventory, manifest):
+    """Refresh source-derived manifest fields without changing reviewed identity metadata."""
+
+    rendered = dict(manifest)
+    rendered.update(_preflight_manifest_expected_ids(inventory))
+    return json.dumps(rendered, indent=2, sort_keys=True) + "\n"
+
+
 def validate_preflight_manifest(inventory, manifest):
     if manifest.get("schema_version") != 1:
         raise ValueError("migration preflight manifest schema_version must be 1")
@@ -862,18 +876,39 @@ def main(argv=None):
     parser.add_argument("--check", action="store_true", help="fail if the audit is stale")
     parser.add_argument("--source-root", type=Path)
     parser.add_argument("--manifest", type=Path, help="checked runtime preflight manifest")
+    parser.add_argument(
+        "--skip-git-identity-check",
+        action="store_true",
+        help="skip Git-object identity verification for an explicitly isolated fixture run",
+    )
+    parser.add_argument(
+        "--write-preflight-manifest",
+        action="store_true",
+        help="refresh source-derived fields in the checked runtime preflight manifest",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     repository_root = Path(__file__).resolve().parents[1]
     source_root = args.source_root or repository_root / "itambox"
     output = args.output or repository_root / "scripts" / "migration_audit.json"
     inventory = build_inventory(source_root)
-    if args.source_root is None or args.manifest is not None:
+    manifest_is_requested = args.source_root is None or args.manifest is not None
+    if args.write_preflight_manifest and not manifest_is_requested:
+        parser.error("--write-preflight-manifest requires the canonical source root or --manifest")
+    if manifest_is_requested:
         manifest_path = args.manifest or source_root / "core" / "migration_baseline_manifest.json"
         try:
-            validate_preflight_manifest(inventory, load_preflight_manifest(manifest_path))
-            if args.source_root is None:
-                validate_preflight_manifest_git_objects(load_preflight_manifest(manifest_path), repository_root)
+            manifest = load_preflight_manifest(manifest_path)
+            _validate_manifest_predecessors(manifest)
+            if args.skip_git_identity_check:
+                print("migration preflight manifest Git identity check explicitly skipped", file=sys.stderr)
+            else:
+                validate_preflight_manifest_git_objects(manifest, repository_root)
+            if args.write_preflight_manifest:
+                manifest_path.write_text(render_preflight_manifest(inventory, manifest), encoding="utf-8")
+                print(f"wrote migration preflight manifest: {manifest_path}")
+                return 0
+            validate_preflight_manifest(inventory, manifest)
         except ValueError as exc:
             print(f"migration preflight manifest invalid: {exc}", file=sys.stderr)
             return 1

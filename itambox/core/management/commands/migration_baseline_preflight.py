@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from django.core.management.base import BaseCommand, CommandError
-from django.db import DatabaseError, connections
+from django.db import Error, connections
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.utils import ConnectionDoesNotExist
 
@@ -46,7 +46,7 @@ class Command(BaseCommand):
                         f"{app_label}.{migration_name}" for app_label, migration_name in recorder.applied_migrations()
                     }
                     result = classify_applied_migrations(applied_ids, manifest)
-            except (ConnectionDoesNotExist, DatabaseError, ValueError):
+            except (ConnectionDoesNotExist, Error, ValueError):
                 result = recorder_unavailable_result()
 
         if options["format"] == "json":

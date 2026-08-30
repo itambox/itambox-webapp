@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, InterfaceError, connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import SimpleTestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
@@ -41,7 +41,7 @@ def _manifest(*, layout="transitional"):
             {
                 "name": "test-predecessor",
                 "revision": "b" * 40,
-                "state": "complete-old-history",
+                "state": "complete-old-history-no-replacement",
             }
         ],
     }
@@ -224,7 +224,9 @@ class MigrationBaselineManifestTests(SimpleTestCase):
             ),
             (
                 "predecessor_state",
-                lambda m: m.update(supported_predecessors=[{"name": "old", "revision": "b" * 40, "state": 1}]),
+                lambda m: m.update(
+                    supported_predecessors=[{"name": "old", "revision": "b" * 40, "state": "unrecognized"}]
+                ),
             ),
             (
                 "transition_predecessor",
@@ -267,6 +269,7 @@ class MigrationBaselineCommandTests(SimpleTestCase):
             call_command("migration_baseline_preflight", format="json", stdout=stdout)
             recorder.record_applied.assert_not_called()
             recorder.record_unapplied.assert_not_called()
+            recorder.ensure_schema.assert_not_called()
             recorder.Migration.objects.create.assert_not_called()
             recorder.Migration.objects.update.assert_not_called()
             recorder.Migration.objects.delete.assert_not_called()
@@ -323,6 +326,22 @@ class MigrationBaselineCommandTests(SimpleTestCase):
         self.assertEqual(json.loads(stdout.getvalue())["state"], "migration-recorder-unavailable")
         self.assertIn("MIGRATION_RECORDER_UNAVAILABLE", str(raised.exception))
         self.assertNotIn("database failure", str(raised.exception))
+
+    def test_command_rejects_interface_error_without_database_details(self):
+        stdout = io.StringIO()
+        with (
+            patch("core.management.commands.migration_baseline_preflight.load_manifest", return_value=_manifest()),
+            patch("core.management.commands.migration_baseline_preflight.MigrationRecorder") as recorder_cls,
+        ):
+            recorder_cls.return_value.has_table.side_effect = InterfaceError("connection to server at db failed")
+            with self.assertRaises(CommandError) as raised:
+                call_command("migration_baseline_preflight", format="json", stdout=stdout)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["state"], "migration-recorder-unavailable")
+        self.assertIn("MIGRATION_RECORDER_UNAVAILABLE", str(raised.exception))
+        self.assertNotIn("connection to server", stdout.getvalue())
+        self.assertNotIn("connection to server", str(raised.exception))
 
     def test_command_rejects_manifest_validation_failures_with_structured_safe_json(self):
         for detail in ("synthetic unreadable manifest", "synthetic semantic manifest violation"):

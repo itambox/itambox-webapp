@@ -724,7 +724,7 @@
     {
       "name": "issue88-pre-squash",
       "revision": "deef4c8bf3fe678edecacf2c523d7bd0dcb6f6ef",
-      "state": "complete-old-history"
+      "state": "complete-old-history-no-replacement"
     },
     {
       "name": "issue88-transition-release",

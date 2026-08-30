@@ -19,6 +19,12 @@ _RESTORE_REMEDIATION = (
     "and protected-canary evidence before retrying."
 )
 _SHA_LENGTH = 40
+SUPPORTED_PREDECESSOR_STATES = frozenset(
+    {
+        "complete-old-history-no-replacement",
+        "complete-replacement-recognition",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -91,8 +97,8 @@ def _validate_manifest_predecessors(manifest: Mapping[str, Any]) -> None:
             raise ValueError(
                 "migration preflight manifest predecessor revisions must be lowercase 40-character Git SHAs"
             )
-        if not isinstance(state, str) or not state.strip():
-            raise ValueError("migration preflight manifest predecessor states must be non-empty strings")
+        if state not in SUPPORTED_PREDECESSOR_STATES:
+            raise ValueError("migration preflight manifest predecessor state is not recognized")
         predecessor_names.add(name)
         predecessor_revisions.add(revision)
     if manifest["transition_release_sha"] not in predecessor_revisions:

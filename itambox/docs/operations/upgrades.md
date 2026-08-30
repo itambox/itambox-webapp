@@ -77,7 +77,9 @@ uv run --locked --no-sync python manage.py migration_baseline_preflight --format
 ```
 
 The command reads only first-party migration-recorder rows and the checked
-runtime manifest. Exit code `0` means that all replacement rows, their complete
+runtime manifest. Exit code `0` attests recorder-row completeness only: it does
+not prove schema or data parity and cannot detect rows created with `migrate
+--fake`, `--fake-initial`, or direct recorder SQL. Exit code `0` means that all replacement rows, their complete
 historical recognition set, and every current post-transition leaf are present.
 A non-zero result is a stop condition. It distinguishes complete old history
 without replacement recognition, partial old history, partial replacement,
