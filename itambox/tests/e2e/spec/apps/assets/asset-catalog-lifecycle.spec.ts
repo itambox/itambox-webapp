@@ -25,7 +25,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     const createPath = '/assets/assets/add/';
     const originalName = `E2E Catalog Asset ${runId}`;
     const renamedName = `${originalName} Reviewed`;
-    const assetTag = `E2E-CATALOG-${runId}`.toUpperCase().replace(/[^A-Z0-9-]/g, '-').slice(0, 90);
+    const assetTag = `E2E-CATALOG-${runId}`.toUpperCase().replace(/[^A-Z0-9-]/g, '-').slice(0, 50);
     const createPage = await page.goto(createPath, { waitUntil: 'domcontentloaded' });
     expect(createPage?.status(), `GET ${createPath}`).toBe(200);
     const createForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });

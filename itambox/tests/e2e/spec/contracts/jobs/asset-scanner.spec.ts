@@ -26,9 +26,11 @@ test.describe('jobs contract', { tag: ['@pr', '@aggregate'] }, () => {
     );
     const first = await createOwnedAsset(api, cleanup, tenantId, `${runId}-job-a`, {
       preserveProtectedHistory: true,
+      tagScope: 'job',
     });
     const second = await createOwnedAsset(api, cleanup, tenantId, `${runId}-job-b`, {
       preserveProtectedHistory: true,
+      tagScope: 'job',
     });
     for (const asset of [first, second]) {
       const checkout = await api.post(`/api/assets/assets/${asset.id}/checkout/`, {
@@ -49,7 +51,8 @@ test.describe('jobs contract', { tag: ['@pr', '@aggregate'] }, () => {
       });
     }
 
-    const listPath = `/assets/assets/?switch_all_accessible=1&q=${encodeURIComponent(`${runId}-job-`)}`;
+    const jobTagPrefix = `E2E-job-${runId.slice(0, 30)}`;
+    const listPath = `/assets/assets/?switch_all_accessible=1&q=${encodeURIComponent(jobTagPrefix)}`;
     const list = await page.goto(listPath, { waitUntil: 'domcontentloaded' });
     expect(list?.status(), `GET ${listPath}`).toBe(200);
     await expect(page.locator('a[href*="switch_all_accessible=1"].active').first()).toHaveCount(1);

@@ -12,7 +12,7 @@ test.describe('core-owned global search', { tag: '@pr' }, () => {
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const asset = await createOwnedAsset(api, cleanup, tenant.id, `${runId}-search`);
+    const asset = await createOwnedAsset(api, cleanup, tenant.id, `${runId}-search`, { tagScope: 'search' });
     const searchPath = `/search/?q=${encodeURIComponent(asset.assetTag)}&lookup=iexact`;
 
     const response = await page.goto(searchPath, { waitUntil: 'domcontentloaded' });

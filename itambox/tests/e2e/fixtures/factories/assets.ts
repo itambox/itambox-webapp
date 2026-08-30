@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { expect, type APIRequestContext } from '@playwright/test';
 import type { CleanupRegistry } from '../cleanup';
 import { deleteOwnedResource, getJsonRows, jsonResponse, type JsonObject } from '../../helpers/api';
@@ -19,6 +20,7 @@ function primaryKey(row: JsonObject, label: string): string {
 
 export type OwnedAssetCleanupOptions = {
   preserveProtectedHistory?: boolean;
+  tagScope?: string;
 };
 
 export async function createOwnedAsset(
@@ -31,7 +33,11 @@ export async function createOwnedAsset(
   const assetTypes = await getJsonRows(request, '/api/assets/asset-types/?limit=100', 'asset type prerequisites');
   expect(assetTypes, 'the seeded E2E database must provide an asset type').not.toHaveLength(0);
   const assetTypeId = primaryKey(assetTypes[0], 'asset type');
-  const assetTag = `E2E-${runId}`.slice(0, 90);
+  const scope = (options.tagScope || 'asset').replace(/[^a-z0-9-]+/gi, '-');
+  const digest = createHash('sha256').update(runId).digest('hex').slice(0, 10);
+  const tagPrefix = `E2E-${scope}`.slice(0, 35);
+  const runBudget = 50 - tagPrefix.length - digest.length - 2;
+  const assetTag = `${tagPrefix}-${runId.slice(0, runBudget)}-${digest}`;
   const name = `E2E owned asset ${runId}`;
   const response = await request.post('/api/assets/assets/', {
     data: {

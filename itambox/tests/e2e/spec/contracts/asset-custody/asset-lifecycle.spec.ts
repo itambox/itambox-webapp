@@ -21,7 +21,10 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
       `e2e-holder-${runId}`,
       { preserveProtectedHistory: true },
     );
-    const asset = await createOwnedAsset(api, cleanup, tenant.id, `${runId}-custody`, { preserveProtectedHistory: true });
+    const asset = await createOwnedAsset(api, cleanup, tenant.id, `${runId}-custody`, {
+      preserveProtectedHistory: true,
+      tagScope: 'custody',
+    });
     const detailPath = `/assets/assets/${asset.id}/`;
 
     const initial = await page.goto(detailPath, { waitUntil: 'domcontentloaded' });
