@@ -1856,7 +1856,7 @@ msgid "Custody Agreement Secured - ITAMbox"
 msgstr "Verwahrungsvereinbarung bestätigt | ITAMbox"
 
 msgid "Custody Agreement Secured!"
-msgstr "Verwahrungsvereinbarung gesichert!"
+msgstr "Verwahrungsvereinbarung bestätigt!"
 
 msgid ""
 "An irrefutable cryptographic sign-off has been committed to the inventory "
@@ -11042,19 +11042,19 @@ msgstr "Verwahrungsübergabe erforderlich: %(name)s (%(tag)s)"
 #, python-format
 msgid "Hello %(holder)s,\n\nYou have a custody handoff waiting for you.\n\nAsset: %(name)s\nAsset tag: %(tag)s\nSerial number: %(serial)s\n\nOpen this one-time handoff link:\n%(url)s\n\nThe session expires at %(expires)s. Sign in as the intended holder before opening the link.\n\nIf you were not expecting this message, ignore it and report it to your IT administrator."
 msgstr ""
-"Hallo %(holder)s,\\n"
-"\\n"
-"für Sie steht eine Verwahrungsübergabe bereit.\\n"
-"\\n"
-"Asset: %(name)s\\n"
-"Inventarnummer: %(tag)s\\n"
-"Seriennummer: %(serial)s\\n"
-"\\n"
-"Öffnen Sie diesen einmalig verwendbaren Link zur Verwahrungsübergabe:\\n"
-"%(url)s\\n"
-"\\n"
-"Die Sitzung läuft am %(expires)s ab. Melden Sie sich vor dem Öffnen des Links als vorgesehener Asset-Inhaber an.\\n"
-"\\n"
+"Hallo %(holder)s,\n"
+"\n"
+"für Sie steht eine Verwahrungsübergabe bereit.\n"
+"\n"
+"Asset: %(name)s\n"
+"Inventarnummer: %(tag)s\n"
+"Seriennummer: %(serial)s\n"
+"\n"
+"Öffnen Sie diesen einmalig verwendbaren Link zur Verwahrungsübergabe:\n"
+"%(url)s\n"
+"\n"
+"Die Sitzung läuft am %(expires)s ab. Melden Sie sich vor dem Öffnen des Links als vorgesehener Asset-Inhaber an.\n"
+"\n"
 "Wenn Sie diese Nachricht nicht erwartet haben, ignorieren Sie sie und melden Sie sie Ihrer IT-Administration."
 
 #: itambox/compliance/services.py:313
@@ -11071,7 +11071,7 @@ msgstr "Die maximale Anzahl von Zustellversuchen für die E-Mail zur Verwahrungs
 
 #: itambox/compliance/templates/compliance/audits/audit_session_detail.html:186
 msgid "Scan barcode, type tag or serial..."
-msgstr "Barcode scannen oder Inventarnummer beziehungsweise Seriennummer eingeben..."
+msgstr "Barcode scannen, Inventarnummer oder Seriennummer eingeben..."
 
 #: itambox/compliance/templates/compliance/audits/audit_session_detail.html:205
 msgid "Audit Basket"
@@ -12236,7 +12236,7 @@ msgid "You do not have permission to fulfill this Asset Request."
 msgstr "Sie sind nicht berechtigt, diese Asset-Anforderung zu erfüllen."
 
 msgid "Vendor Auto-Renews"
-msgstr "Lieferant verlängert automatisch"
+msgstr "Automatische Verlängerung durch den Lieferanten"
 
 #, python-format
 msgid "Subscription '%(name)s' resumed successfully."
@@ -13242,7 +13242,7 @@ msgid "This schedule is single-tenant and does not require a cross-tenant scope 
 msgstr "Dieser Zeitplan ist auf einen einzelnen Mandanten beschränkt und erfordert keine Genehmigung eines mandantenübergreifenden Geltungsbereichs."
 
 msgid "This template uses the legacy report designer and continues to render only because it was grandfathered during migration. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before editing it."
-msgstr "Diese Vorlage verwendet den alten Bericht-Designer und wird nur weiterhin gerendert, weil sie bei der Migration als Bestand übernommen wurde. Setzen Sie vor der Bearbeitung ITAMBOX_FEATURE_REPORT_DESIGNER=True."
+msgstr "Diese Vorlage verwendet den alten Berichtsdesigner und wird nur weiterhin gerendert, weil sie bei der Migration als Bestand übernommen wurde. Setzen Sie vor der Bearbeitung ITAMBOX_FEATURE_REPORT_DESIGNER=True."
 
 msgid "Until"
 msgstr "Bis"
@@ -13410,8 +13410,8 @@ msgstr "Der geplante %(format)s-Bericht für „%(name)s“ ist beigefügt. Er w
 #: extras/tasks/reports.py:195
 msgid "Scheduled report '%(name)s' was generated on %(timestamp)s UTC.\nFormat: %(format)s\n%(summary)s"
 msgstr ""
-"Der geplante Bericht „%(name)s“ wurde am %(timestamp)s UTC erstellt.\\n"
-"Format: %(format)s\\n"
+"Der geplante Bericht „%(name)s“ wurde am %(timestamp)s UTC erstellt.\n"
+"Format: %(format)s\n"
 "%(summary)s"
 
 #: extras/export_views.py:139

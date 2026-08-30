@@ -39,5 +39,12 @@ def test_plural_entry_requires_all_active_forms():
     assert failures == ["django: empty 'One asset'"]
 
 
+def test_escape_and_newline_shape_mismatch_is_rejected():
+    source = {"msgid": "Hello\nWorld", "plural": None}
+    entry = {"msgstr": "Hallo\\nWelt", "flags": set()}
+    failures = MODULE.entry_failures("django", "example", entry, source)
+    assert failures == ["django: escape/newline mismatch 'example'"]
+
+
 def test_current_catalog_passes_source_contract():
     assert MODULE.main() == 0

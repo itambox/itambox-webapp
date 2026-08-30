@@ -26,7 +26,8 @@ BLOCK = re.compile(
     re.S,
 )
 TRANS = re.compile(r"{%[-+]?\s*(?:trans|translate)\s+(?P<value>['\"])(?P<text>.*?)(?P=value)[^%]*%}", re.S)
-PLACEHOLDER = re.compile(r"%\([^)]+\)[a-zA-Z]|%[a-zA-Z]")
+PLACEHOLDER = re.compile(r"%(?:\([^)]+\)|[0-9]+)?[a-zA-Z%]")
+ESCAPE_SEQUENCE = re.compile(r"\\[nrt\\]")
 HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 
 
@@ -305,6 +306,10 @@ def placeholders(value: str) -> set[str]:
     return {item for item in PLACEHOLDER.findall(value) if item != "%%"}
 
 
+def escape_shape(value: str) -> tuple[int, tuple[str, ...]]:
+    return value.count("\n"), tuple(ESCAPE_SEQUENCE.findall(value))
+
+
 def translated_values(entry: dict) -> list[str]:
     if "msgid_plural" not in entry:
         return [str(entry.get("msgstr", ""))]
@@ -326,6 +331,8 @@ def entry_failures(domain: str, key: str, entry: dict, source: dict) -> list[str
             continue
         if placeholders(source_value) != placeholders(translated):
             failures.append(f"{domain}: placeholder mismatch {key!r}")
+        if escape_shape(source_value) != escape_shape(translated):
+            failures.append(f"{domain}: escape/newline mismatch {key!r}")
         if html_skeleton(source_value) != html_skeleton(translated):
             failures.append(f"{domain}: HTML mismatch {key!r}")
     return failures
