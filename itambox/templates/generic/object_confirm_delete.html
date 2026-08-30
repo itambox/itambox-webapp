@@ -1,8 +1,8 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
-{% block title %}{% translate "Confirm Deletion -" %} {{ object }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% translate "Confirm Deletion -" %} {{ object_display|default:object }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
-  <h2 class="page-title">{% translate "Confirm Deletion:" %} {{ object }}</h2>
+  <h2 class="page-title">{% translate "Confirm Deletion:" %} {{ object_display|default:object }}</h2>
 {% endblock %}
 {% block page_actions %}
   {# Use return_url provided by ObjectDeleteView context #}
@@ -22,7 +22,7 @@
         </div>
         <div class="card-body">
           {% block message %}
-            <p>{% translate "Are you sure you want to delete" %} <strong>{{ object }}</strong>?</p>
+            <p>{% translate "Are you sure you want to delete" %} <strong>{{ object_display|default:object }}</strong>?</p>
           {% endblock message %}
           {% comment %}
                 Optional extra warning a specific delete view may pass via context —

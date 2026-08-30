@@ -1024,10 +1024,10 @@ msgid "Zero Padding"
 msgstr "Nullauffüllung"
 
 msgid "Asset Tag Sequence"
-msgstr "Asset-Tag-Sequenz"
+msgstr "Inventarnummernfolge"
 
 msgid "Asset Tag Sequences"
-msgstr "Asset-Tag-Sequenzen"
+msgstr "Inventarnummernfolgen"
 
 msgid "Either holder, location, or asset must be specified."
 msgstr ""
@@ -13499,9 +13499,11 @@ msgstr "Bestand hinzufügen"
 msgid "Are you sure you want to check in this software license seat?"
 msgstr "Möchten Sie diesen Softwarelizenzplatz wirklich einbuchen?"
 
+#: itambox/inventory/abstract_models.py:60
 msgid "Barcode (EAN / UPC / GTIN) — scannable to open this item."
 msgstr "Barcode (EAN / UPC / GTIN); scannbar, um diesen Artikel zu öffnen."
 
+#: itambox/assets/models/catalog.py:233
 msgid "Barcode (EAN / UPC / GTIN) — scanning shows assets of this type."
 msgstr "Barcode (EAN / UPC / GTIN); beim Scannen werden Assets dieses Typs angezeigt."
 
@@ -13541,17 +13543,73 @@ msgstr "Niedriger Bestand"
 msgid "Myself"
 msgstr "Ich selbst"
 
+#: itambox/licenses/models.py:90
 msgid "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). Informational only — reconciliation is performed at the Software level (version-agnostic)."
 msgstr "Optionale Versionsbeschränkung für diesen Lizenzanspruch, zum Beispiel '2021' oder '16.x'. Sie dient nur zur Information; der versionsunabhängige Abgleich erfolgt auf Softwareebene."
 
 msgid "Out of stock"
 msgstr "Nicht vorrätig"
 
+#: itambox/assets/models/asset.py:171
 msgid "Override depreciation policy — leave empty to use the tenant default or asset-type schedule."
 msgstr "Überschreibt die Abschreibungsregel. Leer verwendet den Mandantenstandard oder den Zeitplan des Asset-Typs."
 
+#: itambox/organization/filters.py:59
+msgid "Apply filter"
+msgstr "Filter anwenden"
+
+#: itambox/procurement/forms.py:336
+msgid "Asset model name"
+msgstr "Modellname des Assets"
+
+#: itambox/organization/filters.py:64
+msgid "Clear filters"
+msgstr "Filter zurücksetzen"
+
+#: itambox/procurement/forms.py:330
+msgid "Generate automatically"
+msgstr "Automatisch generieren"
+
+#: itambox/assets/forms/asset_form.py:73
+msgid "Inherit from Asset Type (default)"
+msgstr "Vom Asset-Typ übernehmen (Standard)"
+
+#: itambox/assets/forms/asset_form.py:137
+msgid "Leave blank to generate automatically"
+msgstr "Leer lassen, um automatisch zu generieren"
+
+#: itambox/subscriptions/filters.py:16
+msgid "Name, description, or contract reference"
+msgstr "Name, Beschreibung oder Vertragsreferenz"
+
+#: itambox/assets/forms/asset_form.py:75
+msgid "No, force not requestable"
+msgstr "Nein, nicht anforderbar"
+
+#: itambox/assets/forms/asset_form.py:90
+msgid "Select warranty type"
+msgstr "Garantieart auswählen"
+
+#: itambox/assets/forms/asset_form.py:74
+msgid "Yes, force requestable"
+msgstr "Ja, anforderbar"
+
 msgid "Same day"
 msgstr "Am selben Tag"
+
+#: itambox/assets/views/warranty_views.py:33 itambox/assets/views/warranty_views.py:63
+#, python-format
+msgid "%(type)s warranty on %(asset)s (%(start)s to %(end)s)"
+msgstr "%(type)s-Garantie für %(asset)s (%(start)s bis %(end)s)"
+
+#: itambox/assets/views/reservation_views.py:33 itambox/assets/views/reservation_views.py:66
+#, python-format
+msgid "%(asset)s reserved for %(holder)s (%(start)s to %(end)s)"
+msgstr "%(asset)s ist für %(holder)s reserviert (%(start)s bis %(end)s)"
+
+#: itambox/procurement/templates/procurement/contract_detail.html:5
+msgid "Contract"
+msgstr "Vertrag"
 
 msgid "Send test notification"
 msgstr "Testbenachrichtigung senden"

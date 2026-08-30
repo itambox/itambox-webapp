@@ -3,6 +3,7 @@
   "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, and issue #465 fail-closed Playwright qualification tests. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
     "itambox/assets/tests/test_audit_cadence.py",
+    "itambox/assets/tests/test_api.py",
     "itambox/assets/tests/test_audits.py",
     "itambox/assets/tests/test_depreciation.py",
     "itambox/assets/tests/test_ean.py",
@@ -117,6 +118,7 @@
   ],
   "mandatory_tests": [
     "itambox/assets/tests/test_audit_cadence.py",
+    "itambox/assets/tests/test_api.py",
     "itambox/assets/tests/test_audits.py",
     "itambox/assets/tests/test_depreciation.py",
     "itambox/assets/tests/test_ean.py",

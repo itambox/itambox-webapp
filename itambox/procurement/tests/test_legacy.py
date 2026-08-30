@@ -986,7 +986,7 @@ class ContractModelTests(TestCase):
 
     def test_contract_str(self):
         contract = self._make_contract()
-        self.assertEqual(str(contract), "CTR-001: Hardware Support Agreement")
+        self.assertEqual(str(contract), "CTR-001 – Hardware Support Agreement")
 
     def test_get_absolute_url(self):
         contract = self._make_contract()
@@ -1357,6 +1357,7 @@ class ContractAPITests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["contract_number"], "CTR-API-001")
+        self.assertEqual(data["display"], "CTR-API-001 – API Contract")
 
     def test_contract_api_create(self):
         """POST /api/procurement/contracts/ creates a new contract."""

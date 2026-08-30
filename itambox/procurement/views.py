@@ -519,6 +519,9 @@ class ContractDetailView(ObjectDetailView):
     template_name = "procurement/contract_detail.html"
     permission_required = "procurement.view_contract"
 
+    def get_object_display(self, obj):
+        return f"{obj.contract_number}: {obj.name}"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contract = self.object
@@ -536,3 +539,6 @@ class ContractDeleteView(ObjectDeleteView):
     queryset = Contract.objects.all()
     permission_required = "procurement.delete_contract"
     default_return_url = "procurement:contract_list"
+
+    def get_object_display(self):
+        return f"{self.object.contract_number}: {self.object.name}"

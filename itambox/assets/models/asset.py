@@ -244,7 +244,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         return due is not None and timezone.now() > due
 
     def get_status_display(self):
-        return self.status.name if self.status else _("Not set")
+        return self.status.name if self.status else "—"
 
     @property
     def eol_date(self):

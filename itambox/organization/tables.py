@@ -432,6 +432,12 @@ class CostCenterTable(BaseTable):
         fields = ("pk", "code", "name", "tenant", "parent", "description", "child_count", "is_active", "actions")
         default_columns = ("pk", "code", "name", "tenant", "parent", "child_count", "is_active", "actions")
 
+    def render_parent(self, value):
+        if not value:
+            return _("Not set")
+        label = f"{value.code}: {value.name}" if value.code else value.name
+        return format_html('<a href="{}">{}</a>', value.get_absolute_url(), label)
+
 
 class TenantResourceGrantTable(BaseTable):
     """Grants involving the active tenant (given and received)."""

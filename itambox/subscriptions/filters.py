@@ -13,7 +13,7 @@ class SubscriptionFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method="search",
         label=_("Search"),
-        widget=forms.TextInput(attrs={"placeholder": "Name, Description, Contract..."}),
+        widget=forms.TextInput(attrs={"placeholder": _("Name, description, or contract reference")}),
     )
     type = django_filters.ChoiceFilter(
         field_name="type",
@@ -65,6 +65,12 @@ class SubscriptionFilterSet(BaseFilterSet):
             "provider",
             "cost_center",
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters["cost_center"].field.label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
 
     def search(self, queryset, name, value):
         if not value.strip():

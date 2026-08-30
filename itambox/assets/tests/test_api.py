@@ -240,6 +240,21 @@ class ITAMBoxAPITestCase(APITestCase):
         response = self.client.post(checkout_url_b, data={"holder_id": self.holder_b.id}, format="json")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_asset_api_status_display_keeps_legacy_empty_value(self):
+        asset = Asset.objects.create(
+            name="Asset without status",
+            asset_tag="TAG-NO-STATUS",
+            asset_type=self.asset_type,
+            asset_role=self.role,
+            tenant=self.tenant_a,
+        )
+        self.client.force_authenticate(user=self.superuser)
+
+        response = self.client.get(reverse("api:assets_api:asset-detail", kwargs={"pk": asset.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["status_display"], "—")
+
     def test_asset_checkout_and_checkin_actions_with_custom_status_location_and_date(self):
         self.client.force_authenticate(user=self.superuser)
 

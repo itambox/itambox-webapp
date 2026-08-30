@@ -321,19 +321,19 @@ class AssetProvisionForm(forms.Form):
         max_length=100,
         required=False,
         label=_("Serial Number"),
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional"}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Optional")}),
     )
     asset_tag = forms.CharField(
         max_length=50,
         required=False,
         label=_("Asset Tag"),
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Auto-generate"}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Generate automatically")}),
     )
     name = forms.CharField(
         max_length=255,
         required=False,
         label=_("Asset Name"),
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Model Name"}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Asset model name")}),
     )
 
 

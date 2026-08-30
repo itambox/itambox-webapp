@@ -35,6 +35,13 @@ PRESENTATION_CALLS = {"format_html": (0,), "format_html_join": (1,), "mark_safe"
 JS_TRANSLATION_CALL = re.compile(r"\b(?:gettext|ngettext|pgettext|npgettext)\s*\(")
 JS_STRING = re.compile(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", re.S)
 JS_CODEPOINT_CALL = re.compile(r"\bString\.from(?:CharCode|CodePoint)\s*\(\s*(0x[0-9a-f]+|\d+)\s*\)", re.I)
+JS_DOM_TEXT_ASSIGNMENT = re.compile(
+    r"\b(?:textContent|innerText|innerHTML)\s*(?:\+=|=)\s*(?P<literal>'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\")"
+)
+JS_DOM_ATTRIBUTE_ASSIGNMENT = re.compile(
+    r"\bsetAttribute\s*\(\s*['\"](?:title|aria-label|placeholder)['\"]\s*,\s*"
+    r"(?P<literal>'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\")"
+)
 EXCLUDED_PARTS = {"tests", "migrations", "docs", "static", "locale"}
 
 # These exact current-main identities are persisted migration or API schema
@@ -74,6 +81,16 @@ FROZEN_CONTRACT_COPY = {
         "use this instead of offset/limit for bulk export or iterating large collections. "
         "Follow the `next` link to walk subsequent pages.",
     ),
+}
+
+# These model string representations are stable API/history contracts. Their
+# normal web detail, delete, table, and filter consumers must use a separate
+# presentation label instead of changing the model representation.
+FROZEN_STRING_CONTRACTS = {
+    ("itambox/assets/models/lifecycle.py", "Warranty"),
+    ("itambox/assets/models/lifecycle.py", "AssetReservation"),
+    ("itambox/organization/models.py", "CostCenter"),
+    ("itambox/procurement/models.py", "Contract"),
 }
 
 
@@ -185,9 +202,126 @@ def scan_python(path: Path, relative: str) -> list[Finding]:
         return []
     tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=relative)
     findings = scan_python_calls(tree, relative)
+    findings.extend(scan_python_direct_ui_literals(tree, relative))
     if relative == "itambox/itambox/api/pagination.py":
         findings.extend(scan_api_descriptions(tree, relative))
-    return findings
+    unique = []
+    seen = set()
+    for finding in findings:
+        identity = (finding.path, finding.line, finding.field, finding.tokens)
+        if identity not in seen:
+            seen.add(identity)
+            unique.append(finding)
+    return unique
+
+
+DIRECT_UI_KEYWORDS = {"label", "help_text", "message", "placeholder", "title", "verbose_name"}
+DIRECT_UI_DICT_KEYS = {"placeholder", "title", "aria-label", "aria_label"}
+DIRECT_UI_CALLS = {"ValidationError", "PermissionDenied", "SuspiciousOperation", "add_error", "message_user"}
+
+
+def joined_fragments(node: ast.JoinedStr) -> list[str]:
+    fragments = []
+    for value in node.values:
+        if isinstance(value, ast.FormattedValue):
+            fragment = constant_text(value.value)
+            if fragment is not None:
+                fragments.append(fragment)
+        elif isinstance(value, ast.Constant) and isinstance(value.value, str):
+            fragments.append(value.value)
+    return fragments
+
+
+def literal_fragments(node: ast.AST) -> list[str]:
+    """Return literal portions of a simple expression, including f-strings."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, ast.JoinedStr):
+        return joined_fragments(node)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return literal_fragments(node.left) + literal_fragments(node.right)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return [fragment for item in node.elts for fragment in literal_fragments(item)]
+    if isinstance(node, ast.Dict):
+        return [fragment for item in node.values if item is not None for fragment in literal_fragments(item)]
+    value = constant_text(node)
+    return [value] if value is not None else []
+
+
+class PythonProductCopyVisitor(ast.NodeVisitor):
+    def __init__(self, relative: str):
+        self.relative = relative
+        self.class_stack: list[str] = []
+        self.function_stack: list[str] = []
+        self.findings: list[Finding] = []
+
+    def visit_ClassDef(self, node: ast.ClassDef):
+        self.class_stack.append(node.name)
+        self.generic_visit(node)
+        self.class_stack.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        self.function_stack.append(node.name)
+        self.generic_visit(node)
+        self.function_stack.pop()
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_Return(self, node: ast.Return):
+        if self.function_stack and self.function_stack[-1] == "__str__":
+            if not (self.class_stack and (self.relative, self.class_stack[-1]) in FROZEN_STRING_CONTRACTS):
+                self._scan_expression(node.value, "__str__", node.lineno)
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign):
+        if any(isinstance(target, ast.Name) and target.id in {"help_texts", "labels"} for target in node.targets):
+            self._scan_expression(node.value, "form copy", node.lineno, include_fragments=True)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call):
+        function_name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", None)
+        if function_name in DIRECT_UI_CALLS:
+            positions = (0,)
+            if function_name in {"add_error", "message_user"}:
+                positions = (1,)
+            for position in positions:
+                if position < len(node.args):
+                    self._scan_expression(node.args[position], function_name, node.lineno)
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            if node.func.value.id == "messages" and len(node.args) > 1:
+                self._scan_expression(node.args[1], f"messages.{node.func.attr}", node.lineno)
+        for keyword in node.keywords:
+            if keyword.arg in DIRECT_UI_KEYWORDS:
+                self._scan_expression(keyword.value, keyword.arg, node.lineno)
+            elif keyword.arg == "choices":
+                self._scan_expression(keyword.value, "choices", node.lineno, include_fragments=True)
+        self.generic_visit(node)
+
+    def visit_Dict(self, node: ast.Dict):
+        for key, value in zip(node.keys, node.values, strict=True):
+            if isinstance(key, ast.Constant) and key.value in DIRECT_UI_DICT_KEYS:
+                self._scan_expression(value, str(key.value), node.lineno)
+        self.generic_visit(node)
+
+    def _scan_expression(self, node: ast.AST | None, field: str, line: int, *, include_fragments: bool = False):
+        if node is None:
+            return
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in TRANSLATION_CALLS or node.func.id in PRESENTATION_CALLS:
+                return
+        values = literal_fragments(node) if include_fragments or constant_text(node) is None else [constant_text(node)]
+        for value in values:
+            if value is None or (self.relative, value) in FROZEN_CONTRACT_COPY:
+                continue
+            tokens = forbidden_tokens(value)
+            if tokens:
+                self.findings.append(Finding(self.relative, line, field, tokens))
+
+
+def scan_python_direct_ui_literals(tree: ast.AST, relative: str) -> list[Finding]:
+    visitor = PythonProductCopyVisitor(relative)
+    visitor.visit(tree)
+    return visitor.findings
 
 
 def scan_python_calls(tree: ast.AST, relative: str) -> list[Finding]:
@@ -249,34 +383,53 @@ def scan_template(path: Path, relative: str) -> list[Finding]:
     return findings
 
 
-def scan_javascript(path: Path, relative: str) -> list[Finding]:
-    source = path.read_text(encoding="utf-8-sig")
+def scan_javascript_translation_body(body: str, relative: str, line_number: int) -> list[Finding]:
+    findings = []
+    values = []
+    for literal in JS_STRING.findall(body):
+        value = decode_js_literal(literal) or literal
+        values.append(value)
+        tokens = forbidden_tokens(value)
+        if tokens:
+            findings.append(Finding(relative, line_number, "translation call", tokens))
+    tokens = forbidden_tokens("".join(values))
+    if tokens and not any(finding.tokens == tokens for finding in findings):
+        findings.append(Finding(relative, line_number, "constructed translation call", tokens))
+    for codepoint in JS_CODEPOINT_CALL.findall(body):
+        tokens = forbidden_tokens(chr(int(codepoint, 0)))
+        if tokens:
+            findings.append(Finding(relative, line_number, "constructed translation call", tokens))
+    return findings
+
+
+def scan_javascript_translation_calls(source: str, relative: str) -> list[Finding]:
     findings = []
     for call in JS_TRANSLATION_CALL.finditer(source):
         end = find_js_call_end(source, call.end())
-        if end is None:
-            continue
-        body = source[call.end() : end - 1]
-        line_number = source.count("\n", 0, call.start()) + 1
-        values = []
-        for literal in JS_STRING.findall(body):
-            value = decode_js_literal(literal)
-            if value is None:
-                value = literal
-            values.append(value)
-            tokens = forbidden_tokens(value)
-            if tokens:
-                findings.append(Finding(relative, line_number, "translation call", tokens))
-        joined = "".join(values)
-        tokens = forbidden_tokens(joined)
-        if tokens and not any(finding.line == line_number and finding.tokens == tokens for finding in findings):
-            findings.append(Finding(relative, line_number, "constructed translation call", tokens))
-        for codepoint in JS_CODEPOINT_CALL.findall(body):
-            value = chr(int(codepoint, 0))
-            tokens = forbidden_tokens(value)
-            if tokens:
-                findings.append(Finding(relative, line_number, "constructed translation call", tokens))
+        if end is not None:
+            line_number = source.count("\n", 0, call.start()) + 1
+            findings.extend(scan_javascript_translation_body(source[call.end() : end - 1], relative, line_number))
     return findings
+
+
+def scan_javascript_dom_assignments(source: str, relative: str) -> list[Finding]:
+    findings = []
+    for pattern, field in (
+        (JS_DOM_TEXT_ASSIGNMENT, "DOM text"),
+        (JS_DOM_ATTRIBUTE_ASSIGNMENT, "DOM attribute"),
+    ):
+        for match in pattern.finditer(source):
+            value = decode_js_literal(match.group("literal")) or match.group("literal")
+            tokens = forbidden_tokens(value)
+            if tokens:
+                line_number = source.count("\n", 0, match.start()) + 1
+                findings.append(Finding(relative, line_number, field, tokens))
+    return findings
+
+
+def scan_javascript(path: Path, relative: str) -> list[Finding]:
+    source = path.read_text(encoding="utf-8-sig")
+    return scan_javascript_translation_calls(source, relative) + scan_javascript_dom_assignments(source, relative)
 
 
 def update_js_quote(char: str, quote: str | None, escaped: bool) -> tuple[str | None, bool]:
@@ -326,8 +479,8 @@ def scan_po(path: Path, relative: str) -> list[Finding]:
         if not block.strip() or block.lstrip().startswith("#~"):
             line_offset += len(lines) + 1
             continue
-        fields = po_fields(lines, line_offset)
-        findings.extend(scan_po_fields(fields, relative))
+        fields, references = po_fields(lines, line_offset)
+        findings.extend(scan_po_fields(fields, relative, references))
         line_offset += len(lines) + 1
     return findings
 
@@ -339,11 +492,15 @@ def literal_value(literal: str) -> str:
         return literal
 
 
-def po_fields(lines: list[str], line_offset: int) -> dict[str, tuple[int, str]]:
+def po_fields(lines: list[str], line_offset: int) -> tuple[dict[str, tuple[int, str]], tuple[str, ...]]:
     fields: dict[str, tuple[int, str]] = {}
+    references = []
     active_field = None
     for index, raw in enumerate(lines, 1):
         line = raw.strip()
+        if line.startswith("#:"):
+            references.extend(normalize_po_reference(token) for token in line[2:].split())
+            continue
         if line.startswith("#"):
             continue
         match = re.match(r"(msgctxt|msgid_plural|msgid|msgstr(?:\[\d+\])?)\s+(.*)$", line)
@@ -353,15 +510,27 @@ def po_fields(lines: list[str], line_offset: int) -> dict[str, tuple[int, str]]:
         elif line.startswith('"') and active_field is not None:
             field_line, current = fields[active_field]
             fields[active_field] = (field_line, current + literal_value(line))
-    return fields
+    return fields, tuple(references)
 
 
-def scan_po_fields(fields: dict[str, tuple[int, str]], relative: str) -> list[Finding]:
+def normalize_po_reference(reference: str) -> str:
+    """Return the repository-relative path portion of a PO source reference."""
+    reference = reference.replace("\\", "/")
+    if ":" in reference:
+        reference = reference.rsplit(":", 1)[0]
+    return reference.removeprefix("./")
+
+
+def scan_po_fields(fields: dict[str, tuple[int, str]], relative: str, references: tuple[str, ...]) -> list[Finding]:
     findings = []
-    frozen_messages = {message for _, message in FROZEN_CONTRACT_COPY}
+    frozen_paths_by_message: dict[str, set[str]] = {}
+    for frozen_path, message in FROZEN_CONTRACT_COPY:
+        frozen_paths_by_message.setdefault(message, set()).add(frozen_path)
     for field, (line_number, value) in fields.items():
-        if field in {"msgid", "msgid_plural"} and value in frozen_messages:
-            continue
+        if field in {"msgid", "msgid_plural"} and value in frozen_paths_by_message:
+            allowed_paths = frozen_paths_by_message[value]
+            if references and set(references).issubset(allowed_paths):
+                continue
         tokens = forbidden_tokens(value)
         if tokens:
             findings.append(Finding(relative, line_number, field, tokens))

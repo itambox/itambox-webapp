@@ -29,6 +29,14 @@ class WarrantyDetailView(ObjectDetailView):
 
     layout = (((Panel("info", _("Warranty Details")),),),)
 
+    def get_object_display(self, obj):
+        return _("%(type)s warranty on %(asset)s (%(start)s to %(end)s)") % {
+            "type": obj.get_warranty_type_display(),
+            "asset": obj.asset,
+            "start": obj.start_date,
+            "end": obj.end_date,
+        }
+
 
 class WarrantyEditView(QuickAddMixin, ObjectEditView):
     queryset = Warranty.objects.all()
@@ -51,3 +59,11 @@ class WarrantyDeleteView(ObjectDeleteView):
     model = Warranty
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("assets:warranty_list")
+
+    def get_object_display(self):
+        return _("%(type)s warranty on %(asset)s (%(start)s to %(end)s)") % {
+            "type": self.object.get_warranty_type_display(),
+            "asset": self.object.asset,
+            "start": self.object.start_date,
+            "end": self.object.end_date,
+        }
