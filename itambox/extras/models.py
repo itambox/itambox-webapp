@@ -1377,7 +1377,7 @@ class ScheduledReportScopeAuthorization(models.Model):
         ]
         if missing_tenants:
             raise PermissionDenied(
-                _("Your cross-tenant reach does not cover: %(tenants)s. The revocation would not be effective.")
+                _("Your permission does not cover these tenants: %(tenants)s. The revocation would not take effect.")
                 % {"tenants": ", ".join(tenant.name for tenant in missing_tenants)}
             )
         authorization.revoked_by = actor

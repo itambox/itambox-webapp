@@ -1,6 +1,5 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
-{% translate "No description" as no_description %}
 {% block title %}{% translate "Alert Rule" %}: {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
   <div class="page-pretitle">{% translate "Operations" %}</div>
@@ -50,7 +49,7 @@
               </tr>
               <tr>
                 <td class="text-secondary fw-bold">{% translate "Description" %}</td>
-                <td>{{ object.description|default:no_description }}</td>
+                <td>{% if object.description %}{{ object.description }}{% else %}{% translate "No description" %}{% endif %}</td>
               </tr>
               <tr>
                 <td class="text-secondary fw-bold">{% translate "Alert Type" %}</td>

@@ -1,7 +1,6 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 {% load crispy_forms_tags %}
-{% translate "Not set" as not_set %}
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
   <h2 class="page-title">{{ title }}</h2>
@@ -29,7 +28,7 @@
               <label class="form-label">{% translate "Tenant" %}</label>
               <input type="text"
                      class="form-control csp-style-6f35bc2732c6"
-                     value="{{ form.owner_tenant.name|default:not_set }}"
+                     value="{% if form.owner_tenant.name %}{{ form.owner_tenant.name }}{% else %}{% translate "Not set" %}{% endif %}"
                      disabled
                      readonly>
               <small class="form-hint text-muted mt-1 csp-style-6131b67a6494">

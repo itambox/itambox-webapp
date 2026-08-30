@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline architecture-issues typecheck lint lint-templates lint-styles inline-style-check format format-check format-templates format-styles e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline architecture-issues typecheck lint lint-templates lint-styles inline-style-check localization-check format format-check format-templates format-styles e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -47,6 +47,7 @@ help:
 	@echo "  make typecheck     - Check the statically typed modules (mypy + django-stubs allowlist)"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make lint-templates - Check all authored Django templates with djLint"
+	@echo "  make localization-check - Check source/catalog parity and placeholders"
 	@echo "  make lint-styles   - Check all authored CSS/SCSS with Stylelint"
 	@echo "  make inline-style-check - Check CSP inline-style policy"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
@@ -137,6 +138,10 @@ lint:
 # template exceptions. This target is check-only.
 lint-templates:
 	$(UV_DEV) python scripts/lint_templates.py --check --lint --statistics
+
+localization-check:
+	$(UV_DEV) python scripts/check_localization_catalog.py
+	$(UV_DEV) python scripts/check_product_language.py
 
 # Stylelint's config and source scope live under itambox/. This target is
 # check-only; use format-styles for the intentional local cleanup pass.

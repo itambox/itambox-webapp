@@ -1,6 +1,5 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n %}
-{% translate "Not set" as not_set %}
 {% block title %}
   {% translate "Request Details - ITAMbox" %}
 {% endblock %}
@@ -288,7 +287,7 @@
                           <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
                         {% endif %}
                       </td>
-                      <td>{{ child.assigned_target|default:not_set }}</td>
+                      <td>{% if child.assigned_target %}{{ child.assigned_target }}{% else %}{% translate "Not set" %}{% endif %}</td>
                       <td>
                         {% if child.asset %}
                           <a href="{% url 'assets:asset_detail' child.asset.pk %}">{{ child.asset.name }}</a>
@@ -324,7 +323,7 @@
               </div>
               <div class="datagrid-item">
                 <div class="datagrid-title">{% translate "Response Date" %}</div>
-                <div class="datagrid-content">{{ object.response_date|date:"Y-m-d H:i"|default:not_set }}</div>
+                <div class="datagrid-content">{% if object.response_date %}{{ object.response_date|date:"Y-m-d H:i" }}{% else %}{% translate "Not set" %}{% endif %}</div>
               </div>
             </div>
             {% if object.response_notes %}

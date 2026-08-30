@@ -1,6 +1,5 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
-{% translate "User group" as user_group_label %}
 {% load crispy_forms_tags %}
 {% comment %}
 Bespoke create/edit screen for UserGroupForm — one of the three RBAC form
@@ -11,7 +10,7 @@ the generic managed-row add/remove and coverage toggles.
 {% endcomment %}
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
-  <h2 class="page-title">{{ title|default:user_group_label }}</h2>
+  <h2 class="page-title">{% if title %}{{ title }}{% else %}{% translate "User group" %}{% endif %}</h2>
 {% endblock %}
 {% block page_actions %}
   {% if cancel_url %}

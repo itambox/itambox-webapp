@@ -38,7 +38,7 @@
         <p class="text-muted">{{ error|default:requested_custody_link_unavailable }}</p>
         {% if error_code == "custody_link_expired" %}
           <div class="mt-4">
-            <p class="text-muted small">{% translate "Custody links expire automatically after 7 days. Please contact your IT administrator to request a fresh transfer link." %}</p>
+            <p class="text-muted small">{% translate "Custody links expire automatically after 7 days. Please contact your IT administrator to request a new custody handoff link." %}</p>
           </div>
         {% endif %}
       </div>

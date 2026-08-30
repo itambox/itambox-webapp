@@ -1083,25 +1083,9 @@ msgstr "Kein Status-Label vom Typ „Deployed“ vorhanden. Konfigurieren Sie ei
 msgid "No available assets of type '%(type)s' in stock."
 msgstr "Keine verfügbaren Assets vom Typ '%(type)s' auf Lager."
 
-#~ #, python-format
-#~ msgid ""
-#~ "Insufficient stock for accessory '%(acc)s'. Required: %(qty)s, Available: "
-#~ "%(rem)s"
-#~ msgstr ""
-#~ "Unzureichender Bestand für Zubehör '%(acc)s'. Erforderlich: %(qty)s, "
-#~ "Verfügbar: %(rem)s"
-
 #, python-format
 msgid "No available seats for software license '%(lic)s'."
 msgstr "Keine verfügbaren Plätze für Softwarelizenz '%(lic)s'."
-
-#~ #, python-format
-#~ msgid ""
-#~ "Insufficient stock for consumable '%(con)s'. Required: %(qty)s, Available: "
-#~ "%(rem)s"
-#~ msgstr ""
-#~ "Unzureichender Bestand für Verbrauchsmaterial '%(con)s'. Erforderlich: "
-#~ "%(qty)s, Verfügbar: %(rem)s"
 
 #, python-format
 msgid ""
@@ -1180,9 +1164,6 @@ msgstr "Asset-Anforderung %(status)s"
 msgid "Your request for %(item)s has been %(status)s."
 msgstr "Ihre Anforderung für %(item)s wurde %(status)s."
 
-#~ msgid "Asset Overview"
-#~ msgstr "Asset-Übersicht"
-
 msgid "Asset Details"
 msgstr "Asset-Details"
 
@@ -1211,17 +1192,6 @@ msgstr "'%(asset)s' innerhalb der Kampagne '%(campaign)s' verifiziert."
 #, python-format
 msgid "'%(asset)s' standalone verification recorded."
 msgstr "Eigenständige Verifizierung von '%(asset)s' erfasst."
-
-#~ msgid "No assets selected or no holder specified."
-#~ msgstr "Keine Assets ausgewählt oder kein Besitzer angegeben."
-
-#~ #, python-format
-#~ msgid ""
-#~ "Asynchronous checkout job '%(job)s' enqueued successfully! Tracking progress"
-#~ " in real-time."
-#~ msgstr ""
-#~ "Asynchroner Herausgabe-Job '%(job)s' erfolgreich eingereiht! Fortschritt "
-#~ "wird in Echtzeit verfolgt."
 
 msgid "No assets selected for label printing."
 msgstr "Keine Assets für den Etikettendruck ausgewählt."
@@ -1658,9 +1628,6 @@ msgstr "Prüfsitzungen müssen vor dem gebündelten Lagerort-Abgleich abgeschlos
 msgid "Audit session must be closed before flagging missing assets."
 msgstr "Die Prüfsitzung muss abgeschlossen sein, bevor fehlende Assets markiert werden."
 
-#~ msgid "No reconciliation report found. Close the session first."
-#~ msgstr "Kein Abgleichsbericht gefunden. Schließen Sie zuerst die Sitzung ab."
-
 msgid "Template"
 msgstr "Vorlage"
 
@@ -1749,27 +1716,11 @@ msgstr "Fehlplatzierungen"
 msgid "Missing Assets"
 msgstr "Fehlende Assets"
 
-#~ msgid "Barcode Scanning Engine"
-#~ msgstr "Barcode-Scan-Engine"
-
-#~ msgid ""
-#~ "Set your barcode scanner to enter/newline mode, focus on the input box "
-#~ "below, and scan your physical assets."
-#~ msgstr ""
-#~ "Stellen Sie Ihren Barcodescanner auf Enter/Newline-Modus ein, fokussieren "
-#~ "Sie das Eingabefeld unten und scannen Sie Ihre physischen Assets."
-
 msgid "Scan via Camera"
 msgstr "Per Kamera scannen"
 
-#~ msgid "Log Scanned Asset"
-#~ msgstr "Gescanntes Asset protokollieren"
-
 msgid "Scan Asset Code"
 msgstr "Asset-Code scannen"
-
-#~ msgid "Align the barcode or QR code within the frame"
-#~ msgstr "Richten Sie den Barcode oder QR-Code innerhalb des Rahmens aus"
 
 msgid "Toggle Flash"
 msgstr "Blitz ein-/ausschalten"
@@ -1838,10 +1789,6 @@ msgstr ""
 
 msgid "All assets audited!"
 msgstr "Alle Assets geprüft!"
-
-#~ #, python-format
-#~ msgid "Zero missing assets. 100%% campaign coverage achieved!"
-#~ msgstr "Keine fehlenden Assets. 100%% Kampagnenabdeckung erreicht!"
 
 msgid ""
 "These assets were physically found and scanned during this campaign but were"
@@ -1941,26 +1888,8 @@ msgstr "Gezeichnete Signatur"
 msgid "Drawn signature image"
 msgstr "Bild der gezeichneten Signatur"
 
-msgid "This custody receipt represents a legally binding digital audit state. You can safely close this browser window."
-msgstr "Dieses Verwahrungsprotokoll stellt einen rechtlich bindenden digitalen Prüfstatus dar. Sie können dieses Browserfenster schließen."
-
-#~ msgid "Link Validation Failure - ITAMbox"
-#~ msgstr "- Link Validation Failure - ITAMbox"
-
-#~ msgid "Custody Signoff Failed"
-#~ msgstr "Verwahrungsfreigabe fehlgeschlagen"
-
-#~ msgid "The EULA checkout link is invalid or has expired."
-#~ msgstr "Der EULA-Herausgabe-Link ist ungültig oder abgelaufen."
-
-#~ msgid ""
-#~ "EULA custody links expire automatically after 7 days to preserve "
-#~ "organizational security. Please contact your IT administrator to request a "
-#~ "fresh transfer link."
-#~ msgstr ""
-#~ "EULA-Verwahrungslinks laufen automatisch nach 7 Tagen ab, um die Sicherheit "
-#~ "der Organisation zu gewährleisten. Bitte wenden Sie sich an Ihren IT-"
-#~ "Administrator, um einen neuen Übertragungslink anzufordern."
+msgid "This custody receipt records the recipient's digital acceptance and the associated audit evidence. You can close this browser window."
+msgstr "Dieses Verwahrungsprotokoll dokumentiert die digitale Zustimmung des Empfängers und die zugehörigen Prüfnachweise. Sie können dieses Browserfenster schließen."
 
 msgid "Custody Signoff & EULA Acceptance - ITAMbox"
 msgstr "- Custody Signoff & EULA Acceptance - ITAMbox"
@@ -2128,9 +2057,6 @@ msgstr ""
 msgid "Sign-Off Legal Disclaimer"
 msgstr "Rechtlicher Haftungsausschluss zur Freigabe"
 
-#~ msgid "Signed Custody Receipts"
-#~ msgstr "Signierte Verwahrungsprotokolle"
-
 msgid "No custody receipts generated under this template yet."
 msgstr "Unter dieser Vorlage wurden noch keine Übergabeprotokolle erstellt."
 
@@ -2203,14 +2129,6 @@ msgstr "Ungültige Formularübermittlung."
 
 msgid "Audit session closed. Reconciliation report generated."
 msgstr "Prüfsitzung geschlossen. Abgleichsbericht erstellt."
-
-#~ #, python-format
-#~ msgid ""
-#~ "All mismatched assets in campaign '%(name)s' have been bulk re-homed to "
-#~ "'%(location)s'."
-#~ msgstr ""
-#~ "Alle fehlplatzierten Assets in der Kampagne '%(name)s' wurden gesammelt nach"
-#~ " '%(location)s' umverlagert."
 
 #, python-format
 msgid ""
@@ -2365,10 +2283,6 @@ msgstr ""
 msgid "Please paste data in the editor tab."
 msgstr "Bitte fügen Sie die Daten im Editor-Tab ein."
 
-#~ #, python-brace-format
-#~ msgid "Failed to parse CSV data: {error}"
-#~ msgstr "CSV-Daten konnten nicht verarbeitet werden: {error}"
-
 msgid "CSV data is empty."
 msgstr "CSV-Daten sind leer."
 
@@ -2381,10 +2295,6 @@ msgstr ""
 #, python-brace-format
 msgid "Missing required columns: {columns}"
 msgstr "Fehlende erforderliche Spalten: {columns}"
-
-#~ #, python-brace-format
-#~ msgid "Failed to parse YAML data: {error}"
-#~ msgstr "YAML-Daten konnten nicht verarbeitet werden: {error}"
 
 msgid "YAML document is empty."
 msgstr "YAML-Dokument ist leer."
@@ -2430,9 +2340,6 @@ msgstr "Beginnt mit"
 msgid "Ends with"
 msgstr "Endet mit"
 
-#~ msgid "Regex"
-#~ msgstr "Regex"
-
 msgid "Lookup"
 msgstr "Suche"
 
@@ -2441,14 +2348,6 @@ msgstr "Tags hinzufügen"
 
 msgid "Remove Tags"
 msgstr "Tags entfernen"
-
-#~ msgid "Ensure the color hex code is 6 characters long (after removing '#')."
-#~ msgstr ""
-#~ "Stellen Sie sicher, dass der Hex-Farbcode 6 Zeichen lang ist (nach Entfernen"
-#~ " von '#')."
-
-#~ msgid "Ensure the color hex code is 6 characters long."
-#~ msgstr "Stellen Sie sicher, dass der Hex-Farbcode 6 Zeichen lang ist."
 
 msgid "Authentication credentials were not provided."
 msgstr "Es wurden keine Authentifizierungsdaten bereitgestellt."
@@ -2676,12 +2575,6 @@ msgstr "Ressourcen-Freigabe"
 msgid "Resource Grants"
 msgstr "Ressourcen-Freigaben"
 
-#~ msgid "Tenant resource grant"
-#~ msgstr "Ressourcen-Freigabe"
-
-#~ msgid "Tenant resource grants"
-#~ msgstr "Ressourcen-Freigaben"
-
 msgid "Requests"
 msgstr "Anforderungen"
 
@@ -2781,9 +2674,6 @@ msgstr "Benutzer"
 msgid "Roles"
 msgstr "Rollen"
 
-#~ msgid "Tenant Assignments"
-#~ msgstr "Mandantenzuweisungen"
-
 msgid "System"
 msgstr "System"
 
@@ -2822,9 +2712,6 @@ msgstr "Abonnementname"
 
 msgid "Billing Cycle"
 msgstr "Abrechnungszyklus"
-
-#~ msgid "Maintenance Title"
-#~ msgstr "Wartungsbezeichnung"
 
 msgid "Depreciation Lifespan (Months)"
 msgstr "Abschreibungsdauer (Monate)"
@@ -3119,10 +3006,6 @@ msgstr "%(count)s Asset(s) erfolgreich herausgegeben."
 msgid "Bulk Checkout Error"
 msgstr "Fehler bei der Sammel-Herausgabe"
 
-#~ #, python-format
-#~ msgid "A system exception occurred during the checkout: %(error)s"
-#~ msgstr "Während der Herausgabe ist eine Systemausnahme aufgetreten: %(error)s"
-
 #, python-format
 msgid "Target model %(app_label)s.%(model_name)s could not be resolved."
 msgstr ""
@@ -3148,10 +3031,6 @@ msgstr "%(count)s Datensatz/Datensätze erfolgreich nach %(model)s importiert."
 msgid "Bulk Import Error"
 msgstr "Fehler beim Sammelimport"
 
-#~ #, python-format
-#~ msgid "A system exception occurred during the import: %(error)s"
-#~ msgstr "Während des Imports ist eine Systemausnahme aufgetreten: %(error)s"
-
 msgid "Label Generation Complete"
 msgstr "Etikettenerstellung abgeschlossen"
 
@@ -3166,20 +3045,12 @@ msgstr ""
 msgid "Label Generation Failed"
 msgstr "Etikettenerstellung fehlgeschlagen"
 
-#~ #, python-format
-#~ msgid "An error occurred during barcode rendering: %(error)s"
-#~ msgstr "Beim Rendern des Barcodes ist ein Fehler aufgetreten: %(error)s"
-
 #, python-format
 msgid ""
 "Successfully generated label PDF for %(count)s asset(s). Click to download."
 msgstr ""
 "Etiketten-PDF für %(count)s Asset(s) erfolgreich erstellt. Zum Herunterladen"
 " klicken."
-
-#~ #, python-format
-#~ msgid "An error occurred during PDF rendering: %(error)s"
-#~ msgstr "Beim Rendern des PDFs ist ein Fehler aufgetreten: %(error)s"
 
 msgid "LDAP Sync Complete"
 msgstr "LDAP-Synchronisierung abgeschlossen"
@@ -3199,14 +3070,6 @@ msgstr ""
 "Die LDAP-Verzeichnissynchronisierung für Mandant '%(tenant)s' ist "
 "fehlgeschlagen: %(error)s"
 
-#~ #, python-format
-#~ msgid ""
-#~ "Please find attached the scheduled CSV report for '%(name)s' generated on "
-#~ "%(timestamp)s UTC."
-#~ msgstr ""
-#~ "Im Anhang finden Sie den geplanten CSV-Bericht für '%(name)s', erstellt am "
-#~ "%(timestamp)s UTC."
-
 msgid "SMTP Outbound Email is disabled in settings."
 msgstr ""
 "Der ausgehende SMTP-E-Mail-Versand ist in den Einstellungen deaktiviert."
@@ -3214,18 +3077,6 @@ msgstr ""
 #, python-format
 msgid "[Scheduled Report] %(name)s"
 msgstr "[Geplanter Bericht] %(name)s"
-
-#~ #, python-format
-#~ msgid ""
-#~ "Scheduled report '%(name)s' was successfully generated on %(timestamp)s UTC.\n"
-#~ "Format: %(format)s\n"
-#~ "Total Assets: %(total_assets)s\n"
-#~ "Acquisition Sum: $%(acquisition_sum)s"
-#~ msgstr ""
-#~ "Der geplante Bericht '%(name)s' wurde am %(timestamp)s UTC erfolgreich erstellt.\n"
-#~ "Format: %(format)s\n"
-#~ "Assets gesamt: %(total_assets)s\n"
-#~ "Anschaffungssumme: $%(acquisition_sum)s"
 
 msgid "A URL is required."
 msgstr "Eine URL ist erforderlich."
@@ -3502,22 +3353,6 @@ msgstr ""
 "Modelle, für die dieses Feld gilt. Felder, die für den Asset-Typ gelten, "
 "fungieren als Hardware-Spezifikationen; Felder, die für ein Asset gelten, "
 "sind gerätespezifische Details."
-
-#~ msgid "Enter configuration data in valid JSON format."
-#~ msgstr "Geben Sie die Konfigurationsdaten im gültigen JSON-Format ein."
-
-#~ msgid "Scope (optional)"
-#~ msgstr "Geltungsbereich (optional)"
-
-#~ msgid "Configuration Data"
-#~ msgstr "Konfigurationsdaten"
-
-#~ #, python-format
-#~ msgid "Invalid JSON: %(error)s"
-#~ msgstr "Ungültiges JSON: %(error)s"
-
-#~ msgid "Weight"
-#~ msgstr "Gewicht"
 
 msgid "Custom"
 msgstr "Benutzerdefiniert"
@@ -3960,9 +3795,6 @@ msgstr "Inhaltstyp"
 msgid "Template Code"
 msgstr "Vorlagencode"
 
-#~ msgid "Jinja2 or Django template code for export"
-#~ msgstr "Jinja2- oder Django-Template-Code für den Export"
-
 msgid "MIME type for the exported file"
 msgstr "MIME-Typ für die exportierte Datei"
 
@@ -4008,17 +3840,6 @@ msgstr "Jinja2-/HTML-Vorlage für das Etikettenlayout"
 
 msgid "Label Template"
 msgstr "Etikettenvorlage"
-
-#~ msgid "Priority weight for dictionary merging conflict resolution"
-#~ msgstr ""
-#~ "Prioritätsgewicht für die Konfliktlösung beim Zusammenführen von "
-#~ "Dictionaries"
-
-#~ msgid "Serialized configuration dictionary"
-#~ msgstr "Serialisiertes Konfigurations-Dictionary"
-
-#~ msgid "Config Context"
-#~ msgstr "Konfigurationskontext"
 
 msgid "Asset Inventory Summary"
 msgstr "Asset-Inventarübersicht"
@@ -4096,36 +3917,8 @@ msgstr ""
 msgid "Style Preset"
 msgstr "Stilvorlage"
 
-#~ msgid "Professional Layout"
-#~ msgstr "Professionelles Layout"
-
-#~ msgid "Compact Audit Sheet"
-#~ msgstr "Kompaktes Prüfblatt"
-
-#~ msgid "Financial Spend Summary"
-#~ msgstr "Finanzielle Ausgabenübersicht"
-
-#~ #| msgid "Advanced Code Active"
-#~ msgid "Advanced Mode"
-#~ msgstr "Erweiterter Modus"
-
-#~ msgid "Enable custom Jinja2/HTML template code override."
-#~ msgstr ""
-#~ "Benutzerdefinierte Überschreibung des Jinja2-/HTML-Vorlagencodes aktivieren."
-
-#~ #| msgid "Template Code:"
-#~ msgid "Template Content"
-#~ msgstr "Vorlageninhalt"
-
-#~ msgid "Optional Jinja2 custom HTML override template"
-#~ msgstr "Optionale benutzerdefinierte Jinja2-HTML-Überschreibungsvorlage"
-
 msgid "Report Template"
 msgstr "Berichtsvorlage"
-
-#~ #, python-format
-#~ msgid "Jinja2 template compilation failed: %(error)s"
-#~ msgstr "Kompilierung der Jinja2-Vorlage fehlgeschlagen: %(error)s"
 
 msgid "HTML Email"
 msgstr "HTML-E-Mail"
@@ -4353,9 +4146,6 @@ msgstr "Gelöst"
 #| msgid "Active Status"
 msgid "Delivery Status"
 msgstr "Lieferstatus"
-
-#~ msgid "Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"
-#~ msgstr "Zustellergebnis pro Kanal: {channel_pk: 'ok'|'failed'|'error: ...'}"
 
 msgid "Last Notified At"
 msgstr "Zuletzt benachrichtigt am"
@@ -4586,10 +4376,6 @@ msgstr "Bewertete Assets"
 
 msgid "Highest Utilization Rates"
 msgstr "Höchste Auslastungsraten"
-
-#~ #, python-format
-#~ msgid "%(allocated)s/%(total)s seats (%(pct)s%%)"
-#~ msgstr "%(allocated)s/%(total)s Plätze (%(pct)s%%)"
 
 msgid "No software licenses registered."
 msgstr "Keine Softwarelizenzen registriert."
@@ -5194,9 +4980,6 @@ msgstr "Restbestand"
 msgid "Description:"
 msgstr "Beschreibung:"
 
-#~ msgid "No description provided."
-#~ msgstr "Keine Beschreibung angegeben."
-
 msgid "Checkout Kit:"
 msgstr "Kit herausgeben:"
 
@@ -5249,14 +5032,6 @@ msgstr ""
 
 msgid "No source location specified."
 msgstr "Kein Quell-Lagerort angegeben."
-
-#~ #, python-format
-#~ msgid "Failed to check out %(item)s: %(error)s"
-#~ msgstr "Herausgabe von %(item)s fehlgeschlagen: %(error)s"
-
-#~ #, python-format
-#~ msgid "Failed to check out stock item: %(error)s"
-#~ msgstr "Herausgabe des Bestandsartikels fehlgeschlagen: %(error)s"
 
 #, python-format
 msgid "Successfully checked out %(count)s item(s)."
@@ -5464,14 +5239,6 @@ msgstr "Etikettenvorlage auswählen"
 
 msgid "Webhook Endpoint Details"
 msgstr "Details des Webhook-Endpunkts"
-
-#~ #, python-format
-#~ msgid "Test webhook blocked: %(reason)s"
-#~ msgstr "Test-Webhook blockiert: %(reason)s"
-
-#~ #, python-format
-#~ msgid "Test webhook failed: %(error)s"
-#~ msgstr "Test-Webhook fehlgeschlagen: %(error)s"
 
 msgid "No URL configured."
 msgstr "Keine URL konfiguriert."
@@ -5891,9 +5658,6 @@ msgid "A tenant group cannot be its own parent."
 msgstr ""
 "Eine Mandantengruppe kann nicht ihr eigenes übergeordnetes Element sein."
 
-#~ msgid "The selected role does not belong to the selected tenant."
-#~ msgstr "Die ausgewählte Rolle gehört nicht zum ausgewählten Mandanten."
-
 msgid "Inventory & Hardware"
 msgstr "Inventar & Hardware"
 
@@ -5911,9 +5675,6 @@ msgstr "Organisation & Struktur"
 
 msgid "Roles & Permissions"
 msgstr "Rollen & Berechtigungen"
-
-#~ msgid "Tenant Invitations"
-#~ msgstr "Mandanten-Einladungen"
 
 msgid "Metadata & Settings"
 msgstr "Metadaten & Einstellungen"
@@ -5938,21 +5699,6 @@ msgstr "API-Token"
 
 msgid "DocuSign Envelopes"
 msgstr "DocuSign-Umschläge"
-
-#~ #, python-format
-#~ msgid ""
-#~ "Privilege escalation detected: You cannot assign the following permissions "
-#~ "because you do not have them: %(perms)s"
-#~ msgstr ""
-#~ "Rechteausweitung erkannt: Sie können die folgenden Berechtigungen nicht "
-#~ "zuweisen, da Sie sie selbst nicht besitzen: %(perms)s"
-
-#~ #, python-format
-#~ msgid "Invalid permission codenames: %(perms)s"
-#~ msgstr "Ungültige Berechtigungs-Codenamen: %(perms)s"
-
-#~ msgid "Tenant assignment is required."
-#~ msgstr "Eine Mandantenzuweisung ist erforderlich."
 
 msgid "Staging"
 msgstr "Bereitstellung"
@@ -6043,41 +5789,14 @@ msgstr "Kontaktzuweisungen"
 msgid "Permissions"
 msgstr "Berechtigungen"
 
-#~ msgid "Tenant Role"
-#~ msgstr "Mandantenrolle"
-
-#~ msgid "Tenant Roles"
-#~ msgstr "Mandantenrollen"
-
-#~ msgid "Tenant Membership"
-#~ msgstr "Mandanten-Mitgliedschaft"
-
 msgid "Tenant Memberships"
 msgstr "Mandanten-Mitgliedschaften"
-
-#~ #| msgid "Sanitized By"
-#~ msgid "Invited By"
-#~ msgstr "Eingeladen von"
-
-#~ #| msgid "Expires"
-#~ msgid "Expires At"
-#~ msgstr "Läuft ab am"
-
-#~ #| msgid "Accepted"
-#~ msgid "Accepted At"
-#~ msgstr "Akzeptiert am"
-
-#~ msgid "Tenant Invitation"
-#~ msgstr "Mandanten-Einladung"
 
 msgid "Short identifier for this cost center (e.g. \"CC-100\")."
 msgstr "Kurzbezeichnung für diese Kostenstelle (z. B. \"CC-100\")."
 
 msgid "Code"
 msgstr "Code"
-
-#~ msgid "This invitation has expired or has already been accepted."
-#~ msgstr "Diese Einladung ist abgelaufen oder wurde bereits angenommen."
 
 msgid "UPN"
 msgstr "UPN"
@@ -6141,43 +5860,6 @@ msgstr "Kontakt erfolgreich %(target)s zugewiesen."
 
 msgid "Cost Center Details"
 msgstr "Kostenstellen-Details"
-
-#~ msgid "You must select an active workspace before inviting members."
-#~ msgstr ""
-#~ "Sie müssen einen aktiven Arbeitsbereich auswählen, bevor Sie Mitglieder "
-#~ "einladen."
-
-#~ #, python-format
-#~ msgid ""
-#~ "Successfully generated an invitation for %(email)s! Share this link: %(url)s"
-#~ msgstr ""
-#~ "Einladung für %(email)s erfolgreich erstellt! Teilen Sie diesen Link: "
-#~ "%(url)s"
-
-#~ msgid "This invitation link is invalid or has expired."
-#~ msgstr "Dieser Einladungslink ist ungültig oder abgelaufen."
-
-#~ msgid "This invitation has already been accepted or has expired."
-#~ msgstr "Diese Einladung wurde bereits angenommen oder ist abgelaufen."
-
-#~ #, python-format
-#~ msgid "Please sign in or register to accept your invitation to %(tenant)s."
-#~ msgstr ""
-#~ "Bitte melden Sie sich an oder registrieren Sie sich, um Ihre Einladung zu "
-#~ "%(tenant)s anzunehmen."
-
-#~ #, python-format
-#~ msgid ""
-#~ "This invitation was issued to %(email)s. Please sign in with that account to"
-#~ " accept it."
-#~ msgstr ""
-#~ "Diese Einladung wurde an %(email)s ausgestellt. Bitte melden Sie sich mit "
-#~ "diesem Konto an, um sie anzunehmen."
-
-#~ #, python-format
-#~ msgid "Welcome! You have successfully joined the workspace %(tenant)s."
-#~ msgstr ""
-#~ "Willkommen! Sie sind dem Arbeitsbereich %(tenant)s erfolgreich beigetreten."
 
 msgid "Location Details"
 msgstr "Lagerort-Details"
@@ -6359,40 +6041,6 @@ msgstr ""
 msgid "No memberships were selected."
 msgstr "Es wurden keine Mitgliedschaften ausgewählt."
 
-#~ msgid ""
-#~ "No valid memberships selected (you may lack permission for the selected "
-#~ "tenants)."
-#~ msgstr ""
-#~ "Keine gültigen Mitgliedschaften ausgewählt (möglicherweise fehlt Ihnen die "
-#~ "Berechtigung für die ausgewählten Mandanten)."
-
-#~ msgid ""
-#~ "Cannot bulk reassign: selected memberships span multiple tenants. Filter to "
-#~ "a single tenant and try again."
-#~ msgstr ""
-#~ "Sammelneuzuweisung nicht möglich: Die ausgewählten Mitgliedschaften "
-#~ "erstrecken sich über mehrere Mandanten. Filtern Sie auf einen einzelnen "
-#~ "Mandanten und versuchen Sie es erneut."
-
-#~ #, python-format
-#~ msgid ""
-#~ "Role '%(role)s' belongs to a different tenant than the selected memberships."
-#~ msgstr ""
-#~ "Die Rolle '%(role)s' gehört zu einem anderen Mandanten als die ausgewählten "
-#~ "Mitgliedschaften."
-
-#~ msgid "You do not have permission to change memberships for this tenant."
-#~ msgstr ""
-#~ "Sie haben keine Berechtigung, Mitgliedschaften für diesen Mandanten zu "
-#~ "ändern."
-
-#~ #, python-format
-#~ msgid "Reassigned %(count)d membership(s) to role '%(role)s'."
-#~ msgstr "%(count)d Mitgliedschaft(en) der Rolle '%(role)s' neu zugewiesen."
-
-#~ msgid "Bulk Reassign Role"
-#~ msgstr "Rolle gesammelt neu zuweisen"
-
 msgid "Memberships"
 msgstr "Mitgliedschaften"
 
@@ -6405,19 +6053,6 @@ msgstr "Es wurden keine Rollen ausgewählt."
 
 msgid "No valid roles selected for deletion."
 msgstr "Keine gültigen Rollen zum Löschen ausgewählt."
-
-#~ #, python-format
-#~ msgid "Successfully deleted %(count)d role(s)."
-#~ msgstr "%(count)d Rolle(n) erfolgreich gelöscht."
-
-#~ #, python-format
-#~ msgid ""
-#~ "Cannot delete: the following roles still have members and are protected: "
-#~ "%(names)s. Remove all memberships from these roles before deleting them."
-#~ msgstr ""
-#~ "Löschen nicht möglich: Die folgenden Rollen haben noch Mitglieder und sind "
-#~ "geschützt: %(names)s. Entfernen Sie alle Mitgliedschaften aus diesen Rollen,"
-#~ " bevor Sie sie löschen."
 
 #, python-format
 msgid "Delete (%(count)d)"
@@ -6811,11 +6446,6 @@ msgstr ""
 "Bestellung mit Asset-Anforderung #%(pk)s verknüpft und Anforderungsstatus "
 "auf Warten auf Beschaffung gesetzt."
 
-#~ #, python-format
-#~ msgid "Failed to link PO to request: %(error)s"
-#~ msgstr ""
-#~ "Verknüpfung der Bestellung mit der Anforderung fehlgeschlagen: %(error)s"
-
 msgid ""
 "Line items can only be added while the purchase order is in Draft status."
 msgstr ""
@@ -7060,12 +6690,6 @@ msgstr "Die Mandantengruppe, der dieser Anbieter gehört."
 msgid "Suspended"
 msgstr "Ausgesetzt"
 
-#~ msgid "Renewing"
-#~ msgstr "Wird verlängert"
-
-#~ msgid "Trial"
-#~ msgstr "Testversion"
-
 msgid "Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))"
 msgstr "Beschreibender Name (z. B. Adobe Creative Cloud - All Apps (Team))"
 
@@ -7080,12 +6704,6 @@ msgstr "Laufzeit (Monate)"
 
 msgid "Duration of the subscription term in months"
 msgstr "Dauer der Abonnementlaufzeit in Monaten"
-
-#~ msgid "Auto-Renewal"
-#~ msgstr "Automatische Verlängerung"
-
-#~ msgid "Whether this subscription renews automatically"
-#~ msgstr "Ob sich dieses Abonnement automatisch verlängert"
 
 msgid "Licensed Quantity"
 msgstr "Lizenzierte Menge"
@@ -7616,14 +7234,8 @@ msgstr "Unterzeichnetes Protokoll anzeigen"
 msgid "Pending EULA Acceptance"
 msgstr "EULA-Akzeptanz ausstehend"
 
-#~ msgid "Sign Custody (On-Site)..."
-#~ msgstr "Verwahrung unterzeichnen (vor Ort)..."
-
 msgid "Copied!"
 msgstr "Kopiert!"
-
-#~ msgid "Copy Link"
-#~ msgstr "Link kopieren"
 
 msgid "Acceptance Not Required"
 msgstr "Akzeptanz nicht erforderlich"
@@ -7688,24 +7300,6 @@ msgstr "Anschaffung +"
 
 msgid "repair/maintenance item"
 msgstr "Reparatur-/Wartungsposition"
-
-#~ msgid "Assignment Status"
-#~ msgstr "Zuweisungsstatus"
-
-#~ msgid "Software Inventory"
-#~ msgstr "Software-Inventar"
-
-#~ #, python-format
-#~ msgid "%(n)s Item Logged"
-#~ msgid_plural "%(n)s Items Logged"
-#~ msgstr[0] "%(n)s Element protokolliert"
-#~ msgstr[1] "%(n)s Elemente protokolliert"
-
-#~ msgid "Deployed / Checked Out"
-#~ msgstr "Deployed / Ausgebucht"
-
-#~ msgid "Available in Inventory"
-#~ msgstr "Im Inventar verfügbar"
 
 msgid "Assigned System Hardware Specifications"
 msgstr "Zugewiesene System-Hardware-Spezifikationen"
@@ -7858,9 +7452,6 @@ msgstr "System-Hardware-Spezifikationen"
 msgid "Color:"
 msgstr "Farbe:"
 
-#~ msgid "Tags:"
-#~ msgstr "Tags:"
-
 msgid "Lifespan:"
 msgstr "Nutzungsdauer:"
 
@@ -7875,9 +7466,6 @@ msgstr "GWG-Grenze:"
 
 msgid "(assets at or below this cost are immediately expensed)"
 msgstr "(Assets bis zu diesem Betrag werden sofort vollständig abgeschrieben)"
-
-#~ msgid "No description."
-#~ msgstr "Keine Beschreibung."
 
 msgid "Support &amp; Contracts"
 msgstr "Support &amp; Verträge"
@@ -8379,17 +7967,6 @@ msgstr "Daten vor der Änderung"
 msgid "Post-Change Data"
 msgstr "Daten nach der Änderung"
 
-#~ msgid "Visual inventory compilation."
-#~ msgstr "Visuelle Inventarzusammenstellung."
-
-#~ #, python-format
-#~ msgid "%(desc)s"
-#~ msgstr "%(desc)s"
-
-#~ #, python-format
-#~ msgid "GENERATED: %(gen)s UTC | STYLE: %(style)s"
-#~ msgstr "GENERIERT: %(gen)s UTC | STIL: %(style)s"
-
 msgid "Print Report"
 msgstr "Bericht drucken"
 
@@ -8425,19 +8002,6 @@ msgstr "Aktive Pläne"
 
 msgid "No schedules configured for this template yet."
 msgstr "Für diese Vorlage sind noch keine Zeitpläne konfiguriert."
-
-#~ msgid "Jinja2 HTML Override Code"
-#~ msgstr "Jinja2-HTML-Überschreibungscode"
-
-#~ msgid "Advanced Code Active"
-#~ msgstr "Erweiterter Code aktiv"
-
-#~ msgid ""
-#~ "Advanced mode enabled, but template content is empty. Falling back to "
-#~ "default layout."
-#~ msgstr ""
-#~ "Erweiterter Modus aktiviert, aber der Vorlageninhalt ist leer. Es wird auf "
-#~ "das Standardlayout zurückgegriffen."
 
 msgid "Visual Designer Parameters"
 msgstr "Parameter des visuellen Designers"
@@ -8477,9 +8041,6 @@ msgstr "Live-Vorschau der Berichtsvorlage"
 
 msgid "Loading..."
 msgstr "Wird geladen..."
-
-#~ msgid "Compiling Report Template..."
-#~ msgstr "Berichtsvorlage wird kompiliert..."
 
 msgid "Gathering tenant records &amp; rendering template"
 msgstr "Mandantendatensätze werden erfasst &amp; Vorlage wird gerendert"
@@ -8676,18 +8237,6 @@ msgstr "Schließen"
 msgid "0 selected"
 msgstr "0 ausgewählt"
 
-#~ msgid "Restore Selected"
-#~ msgstr "Ausgewählte wiederherstellen"
-
-#~ msgid "Purge Selected"
-#~ msgstr "Ausgewählte endgültig löschen"
-
-#~ msgid "Assign selected assets to a holder"
-#~ msgstr "Ausgewählte Assets einem Inhaber zuweisen"
-
-#~ msgid "Assign Selected"
-#~ msgstr "Ausgewählte zuweisen"
-
 msgid "Print labels for selected assets"
 msgstr "Etiketten für ausgewählte Assets drucken"
 
@@ -8696,15 +8245,6 @@ msgstr "Etiketten drucken"
 
 msgid "Check-out selected items"
 msgstr "Ausgewählte Artikel herausgeben"
-
-#~ msgid "Check-out Selected"
-#~ msgstr "Ausgewählte herausgeben"
-
-#~ msgid "Acknowledge Selected"
-#~ msgstr "Ausgewählte bestätigen"
-
-#~ msgid "Resolve Selected"
-#~ msgstr "Ausgewählte beheben"
 
 msgid "Edit Selected"
 msgstr "Ausgewählte bearbeiten"
@@ -8750,12 +8290,6 @@ msgstr ""
 "Es läuft kein Hintergrund-Worker. Webhook- &amp; "
 "Benachrichtigungszustellungen werden <strong>in die Warteschlange gestellt, "
 "aber nicht versendet</strong>, bis Sie den Worker starten:"
-
-#~ #, python-format
-#~ msgid "%(n)s task waiting in the queue."
-#~ msgid_plural "%(n)s tasks waiting in the queue."
-#~ msgstr[0] "%(n)s Aufgabe wartet in der Warteschlange."
-#~ msgstr[1] "%(n)s Aufgaben warten in der Warteschlange."
 
 msgid ""
 "Webhook &amp; notification deliveries run on the background worker "
@@ -8833,9 +8367,6 @@ msgstr "Nicht mehr beobachten"
 
 msgid "Watch (notify me on changes)"
 msgstr "Beobachten (bei Änderungen benachrichtigen)"
-
-#~ msgid "Copy/Clone"
-#~ msgstr "Kopieren/Klonen"
 
 msgid "More actions"
 msgstr "Weitere Aktionen"
@@ -8987,14 +8518,6 @@ msgstr "Filter"
 msgid "Collapse Panel"
 msgstr "Bereich einklappen"
 
-#~ msgid "Bulk Assign Assets"
-#~ msgstr "Assets gesammelt zuweisen"
-
-#~ msgid "Select an Asset Holder to assign the selected assets to:"
-#~ msgstr ""
-#~ "Wählen Sie einen Asset-Inhaber aus, dem die ausgewählten Assets zugewiesen "
-#~ "werden sollen:"
-
 msgid "Assign"
 msgstr "Zuweisen"
 
@@ -9066,9 +8589,6 @@ msgstr "Modalinhalt fehlt."
 msgid "Submit"
 msgstr "Absenden"
 
-#~ msgid "All Tenants (Global)"
-#~ msgstr "Alle Mandanten (Global)"
-
 msgid "Show All"
 msgstr "Alle anzeigen"
 
@@ -9080,9 +8600,6 @@ msgstr "Keine Mandanten verfügbar"
 
 msgid "Ungrouped"
 msgstr "Nicht gruppiert"
-
-#~ msgid "No workspace memberships"
-#~ msgstr "Keine Workspace-Mitgliedschaften"
 
 msgid "Toggle navigation"
 msgstr "Navigation ein-/ausblenden"
@@ -9108,9 +8625,6 @@ msgstr "Standard-Workspace"
 
 msgid "Workspace selected automatically when you sign in. You can still switch workspaces at any time."
 msgstr "Workspace, der bei der Anmeldung automatisch ausgewählt wird. Sie können den Workspace jederzeit wechseln."
-
-#~ msgid "Invite Member"
-#~ msgstr "Mitglied einladen"
 
 msgid "Enable dark mode"
 msgstr "Dunkelmodus aktivieren"
@@ -9225,9 +8739,6 @@ msgstr "Suche löschen"
 msgid "Quick actions"
 msgstr "Schnellaktionen"
 
-#~ msgid "Add Asset"
-#~ msgstr "Asset hinzufügen"
-
 msgid "Scan barcode or QR code"
 msgstr "Barcode oder QR-Code scannen"
 
@@ -9249,9 +8760,6 @@ msgstr "Richten Sie die Kamera auf einen Barcode oder QR-Code"
 msgid "Signed in as"
 msgstr "Angemeldet als"
 
-#~ msgid "Menu"
-#~ msgstr "Menü"
-
 msgid "Docs"
 msgstr "Dokumentation"
 
@@ -9263,12 +8771,6 @@ msgstr "API-Dokumentation"
 
 msgid "Source Code"
 msgstr "Quellcode"
-
-#~ msgid "Theme by"
-#~ msgstr "Theme von"
-
-#~ msgid "Tabler"
-#~ msgstr "Tabler"
 
 msgid "Software Catalog:"
 msgstr "Software-Katalog:"
@@ -9373,9 +8875,6 @@ msgstr "Software-Lizenzen"
 msgid "No software license seats assigned to this holder."
 msgstr "Diesem Inhaber sind keine Software-Lizenzplätze zugewiesen."
 
-#~ msgid "Signed Custody EULAs"
-#~ msgstr "Unterzeichnete Verwahrungs-EULAs"
-
 msgid "No electronic custody receipts logged for this holder."
 msgstr ""
 "Für diesen Inhaber sind keine elektronischen Übergabeprotokolle erfasst."
@@ -9427,9 +8926,6 @@ msgstr "Verknüpftes Benutzerkonto:"
 
 msgid "No linked user"
 msgstr "Kein verknüpfter Benutzer"
-
-#~ msgid "Comments:"
-#~ msgstr "Kommentare:"
 
 msgid "Checked Out Assets Assigned"
 msgstr "Zugewiesene herausgegebene Assets"
@@ -9493,19 +8989,6 @@ msgstr "Gruppe:"
 
 msgid "Parent:"
 msgstr "Übergeordnet:"
-
-#~ msgid "Invite Workspace Member"
-#~ msgstr "Workspace-Mitglied einladen"
-
-#~ msgid "Workspace Onboarding"
-#~ msgstr "Workspace-Onboarding"
-
-#~ msgid ""
-#~ "Invite a new staff member to join your active tenant workspace. They will "
-#~ "receive a secure token which links their account to this workspace."
-#~ msgstr ""
-#~ "Laden Sie einen neuen Mitarbeiter in Ihren aktiven Mandanten-Workspace ein. "
-#~ "Er erhält ein sicheres Token, das sein Konto mit diesem Workspace verknüpft."
 
 msgid "Organization / Locations"
 msgstr "Organisation / Lagerorte"
@@ -9677,13 +9160,6 @@ msgstr ""
 msgid "Role Details"
 msgstr "Rollendetails"
 
-#~ msgid ""
-#~ "Tenant cannot be changed after creation. To use a different tenant, please "
-#~ "create a new role."
-#~ msgstr ""
-#~ "Der Mandant kann nach der Erstellung nicht mehr geändert werden. Um einen "
-#~ "anderen Mandanten zu verwenden, erstellen Sie bitte eine neue Rolle."
-
 msgid "Read"
 msgstr "Gelesen"
 
@@ -9714,22 +9190,8 @@ msgstr "Organisation / Rollen"
 msgid "Back to Role"
 msgstr "Zurück zur Rolle"
 
-#~ #, python-format
-#~ msgid ""
-#~ "Select users to assign to this role in tenant <strong>%(tenant)s</strong>. "
-#~ "Users without a membership are added; current members get this role in addition "
-#~ "to what they hold; users already holding it stay unchanged."
-#~ msgstr ""
-#~ "Wählen Sie Benutzer für diese Rolle im Mandanten <strong>%(tenant)s</strong> aus. "
-#~ "Benutzer ohne Mitgliedschaft werden hinzugefügt; bestehende Mitglieder erhalten diese Rolle "
-#~ "zusätzlich zu ihren bisherigen Berechtigungen; Benutzer, die die Rolle bereits innehaben, "
-#~ "bleiben unverändert."
-
 msgid "Assign Users"
 msgstr "Benutzer zuweisen"
-
-#~ msgid "user(s) with this role"
-#~ msgstr "Benutzer mit dieser Rolle"
 
 msgid "This role has no permissions."
 msgstr "Diese Rolle hat keine Berechtigungen."
@@ -9813,9 +9275,6 @@ msgstr "Anmelden"
 
 msgid "or"
 msgstr "oder"
-
-#~ msgid "Login with SSO (dummy)"
-#~ msgstr "Anmeldung mit SSO (Dummy)"
 
 msgid "Two-Factor Authentication"
 msgstr "Zwei-Faktor-Authentifizierung"
@@ -9951,9 +9410,6 @@ msgstr "Gesch. Jahreskosten:"
 msgid "Licensed Qty:"
 msgstr "Lizenzierte Menge:"
 
-#~ msgid "Assigned Qty:"
-#~ msgstr "Zugewiesene Menge:"
-
 msgid "Cancel Subscription:"
 msgstr "Abonnement kündigen:"
 
@@ -9983,18 +9439,6 @@ msgstr "Mit diesem Anbieter sind noch keine Abonnements verknüpft."
 
 msgid "No contacts are assigned to this provider yet."
 msgstr "Diesem Anbieter sind noch keine Kontakte zugewiesen."
-
-#~ msgid "Financial Details"
-#~ msgstr "Finanzdetails"
-
-#~ msgid "Billing Cycle:"
-#~ msgstr "Abrechnungszyklus:"
-
-#~ msgid "Est. Annual:"
-#~ msgstr "Gesch. jährlich:"
-
-#~ msgid "Assigned:"
-#~ msgstr "Zugewiesen:"
 
 msgid "Open Provider Portal"
 msgstr "Anbieterportal öffnen"
@@ -10428,9 +9872,6 @@ msgstr "Alle Einbuchungen sind fehlgeschlagen. Details in den Protokollen."
 msgid "Checked in %(count)s asset(s)."
 msgstr "%(count)s Asset(s) eingebucht."
 
-#~ msgid "A system exception occurred during check-in: %(error)s"
-#~ msgstr "Während der Einbuchung ist eine Systemausnahme aufgetreten: %(error)s"
-
 msgid "Bulk Disposal Failed"
 msgstr "Sammel-Entsorgung fehlgeschlagen"
 
@@ -10445,9 +9886,6 @@ msgstr "Alle Entsorgungen sind fehlgeschlagen. Details in den Protokollen."
 
 msgid "Disposed %(count)s asset(s)."
 msgstr "%(count)s Asset(s) entsorgt."
-
-#~ msgid "A system exception occurred during disposal: %(error)s"
-#~ msgstr "Während der Entsorgung ist eine Systemausnahme aufgetreten: %(error)s"
 
 msgid "Bulk Actions"
 msgstr "Sammelaktionen"
@@ -10560,14 +9998,8 @@ msgstr "Ausgewählte Assets über den Scan-Korb herausgeben"
 msgid "Check in selected assets via the scan basket"
 msgstr "Ausgewählte Assets über den Scan-Korb einbuchen"
 
-#~ msgid "Check-in Selected"
-#~ msgstr "Ausgewählte einbuchen"
-
 msgid "Dispose selected assets via the scan basket"
 msgstr "Ausgewählte Assets über den Scan-Korb entsorgen"
-
-#~ msgid "Dispose Selected"
-#~ msgstr "Ausgewählte entsorgen"
 
 msgid "Add & bulk actions"
 msgstr "Hinzufügen & Sammelaktionen"
@@ -10761,9 +10193,6 @@ msgstr "%(allocated)s/%(total)s Plätze (%(pct)s %%)"
 msgid "Zero missing assets. 100% campaign coverage achieved!"
 msgstr "Keine fehlenden Assets. Die Kampagne ist zu 100 % abgedeckt."
 
-#~ msgid "(Detail block override missing)"
-#~ msgstr "(Detail block override missing)"
-
 msgid "Contract Renewals & Expirations"
 msgstr "Vertragsverlängerungen & -abläufe"
 
@@ -10838,9 +10267,6 @@ msgstr "Bereits abgelaufen"
 
 msgid "Total Disposals"
 msgstr "Entsorgungen gesamt"
-
-#~ msgid "WEEE Compliant Count"
-#~ msgstr "Anzahl WEEE-konform"
 
 msgid "Total Proceeds"
 msgstr "Erlöse gesamt"
@@ -10976,7 +10402,7 @@ msgstr "Ermöglicht das Anfordern von Assets für andere Benutzer, Lagerorte ode
 
 #: itambox/assets/views/bulk_scan_views.py:63
 msgid "Already disposed; this asset will be skipped."
-msgstr "Bereits ausgesondert; dieses Asset wird übersprungen."
+msgstr "Dieses Asset wurde bereits entsorgt und wird übersprungen."
 
 #: itambox/templates/organization/roles/role_detail.html:139
 msgid "Approve purchase orders"
@@ -10991,8 +10417,8 @@ msgid "Barcode (EAN, UPC, or GTIN). Scan it to open this item."
 msgstr "Barcode (EAN, UPC oder GTIN). Scannen Sie ihn, um dieses Element zu öffnen."
 
 #: itambox/assets/models/catalog.py:233
-msgid "Barcode (EAN, UPC, or GTIN). Scan it to show assets of this type."
-msgstr "Barcode (EAN, UPC oder GTIN). Scannen Sie ihn, um Assets dieses Typs anzuzeigen."
+msgid "Barcode (EAN, UPC, or GTIN). Scan this barcode to view assets of this type."
+msgstr "Barcode (EAN, UPC oder GTIN). Scannen Sie diesen Barcode, um Assets dieses Typs anzuzeigen."
 
 #: itambox/organization/models.py:356
 msgid "Before disabling or deleting this managing tenant, move all tenants it manages."
@@ -11061,9 +10487,7 @@ msgstr "Wählen Sie eine Benutzergruppe aus, die zu einem Mandanten gehört."
 msgid "Choose a valid role coverage option."
 msgstr "Wählen Sie einen gültigen Geltungsbereich für die Rolle aus."
 
-#: itambox/templates/organization/memberships/membership_form.html:43
-msgid "Choose an existing user or create one by email. Assign roles in this organization and, for a managing (MSP) tenant, in selected managed tenants."
-msgstr "Wählen Sie einen vorhandenen Benutzer aus oder erstellen Sie anhand der E-Mail-Adresse einen neuen. Weisen Sie Rollen in dieser Organisation und bei einem verwaltenden Mandanten (MSP) auch in ausgewählten verwalteten Mandanten zu."
+
 
 #: itambox/organization/models.py:894
 msgid "Choose either a member or a user group for this role, not both."
@@ -11147,8 +10571,8 @@ msgid "EUR (Euro, €)"
 msgstr "EUR (Euro, €)"
 
 #: itambox/extras/dashboard/widgets.py:828
-msgid "Each change also writes an internal Event row. Showing both would duplicate the feed."
-msgstr "Jede Änderung erzeugt auch einen internen Event-Datensatz. Würden beide angezeigt, erschiene der Eintrag doppelt im Feed."
+msgid "Each change appears in the activity feed. Showing internal events as well would duplicate entries."
+msgstr "Jede Änderung erscheint im Aktivitätsfeed. Wenn interne Ereignisse ebenfalls angezeigt werden, erscheinen die Einträge doppelt."
 
 #: itambox/templates/organization/memberships/membership_detail.html:49
 msgid "Each entry assigns one role and shows where it applies."
@@ -11262,9 +10686,7 @@ msgstr "Nicht abgeschlossen"
 msgid "Not finished"
 msgstr "Nicht abgeschlossen"
 
-#: itambox/compliance/templates/compliance/audits/audit_session_detail.html:401 itambox/compliance/templates/compliance/audits/audit_session_detail.html:402 itambox/compliance/templates/compliance/audits/audit_session_detail.html:403 itambox/compliance/templates/compliance/audits/audit_session_detail.html:489 itambox/compliance/templates/compliance/audits/audit_session_detail.html:490 itambox/compliance/templates/compliance/audits/audit_session_detail.html:491 itambox/compliance/templates/compliance/audits/audit_session_detail.html:530 itambox/compliance/templates/compliance/audits/audit_session_detail.html:531 itambox/compliance/templates/compliance/audits/audit_session_detail.html:533 itambox/compliance/views_audit.py:110 itambox/extras/templates/extras/dashboard/widgets/activity.html:32 itambox/templates/organization/memberships/membership_detail.html:98
-msgid "Not recorded"
-msgstr "Nicht erfasst"
+
 
 #: itambox/extras/tables.py:604
 msgid "Not sent"
@@ -11411,7 +10833,7 @@ msgstr "Status auswählen"
 
 #: itambox/templates/assets/requests/bulk_receive.html:79
 msgid "Select a supplier"
-msgstr "Lieferanten auswählen"
+msgstr "Lieferant auswählen"
 
 #: itambox/templates/generic/object_list.html:187
 msgid "Select a template"
@@ -11431,8 +10853,8 @@ msgstr "Asset-Inhaber auswählen"
 
 #: itambox/templates/organization/roles/role_assign_users.html:22
 #, python-format
-msgid "Select users for this role in tenant <strong>%(tenant)s</strong>. Users who are not yet members are added automatically. Existing members keep their other roles, and users who already have this role remain unchanged."
-msgstr "Wählen Sie Benutzer für diese Rolle im Mandanten <strong>%(tenant)s</strong> aus. Benutzer, die noch keine Mitglieder sind, werden automatisch hinzugefügt. Vorhandene Mitglieder behalten ihre anderen Rollen. Benutzer, die diese Rolle bereits haben, bleiben unverändert."
+msgid "Select users to assign to this role in tenant <strong>%(tenant)s</strong>. Users who are not yet members are added automatically. Existing members keep their other roles, and users who already have this role remain unchanged."
+msgstr "Wählen Sie Benutzer aus, die Sie dieser Rolle im Mandanten <strong>%(tenant)s</strong> zuweisen möchten. Benutzer, die noch keine Mitglieder sind, werden automatisch hinzugefügt. Vorhandene Mitglieder behalten ihre anderen Rollen. Benutzer, die diese Rolle bereits haben, bleiben unverändert."
 
 #: itambox/inventory/abstract_models.py:140
 msgid "Stock requires a location owned by a tenant. Assign the location to a tenant first."
@@ -11527,16 +10949,16 @@ msgid "Audit session must be closed before previewing missing assets."
 msgstr "Die Prüfsitzung muss abgeschlossen sein, bevor fehlende Assets in der Vorschau angezeigt werden."
 
 #: itambox/compliance/audit_services.py:869
-msgid "Re-homing requires a v2 report with a frozen target location."
-msgstr "Für die Lagerort-Neuzuordnung ist ein v2-Bericht mit festgeschriebenem Ziel-Lagerort erforderlich."
+msgid "This report is too old to update asset locations. Generate a current reconciliation report with a fixed target location."
+msgstr "Dieser Bericht ist zu alt, um Asset-Lagerorte zu aktualisieren. Erstellen Sie einen aktuellen Abgleichsbericht mit einem festgelegten Ziellagerort."
 
 #: itambox/compliance/audit_services.py:872
-msgid "The frozen re-home target is unavailable."
-msgstr "Der festgeschriebene Ziel-Lagerort für die Neuzuordnung ist nicht verfügbar."
+msgid "The selected target location is no longer available."
+msgstr "Der ausgewählte Ziellagerort ist nicht mehr verfügbar."
 
 #: itambox/compliance/audit_services.py:897
-msgid "The canonical Missing status is unavailable or misconfigured."
-msgstr "Der kanonische Status „Fehlend“ ist nicht verfügbar oder falsch konfiguriert."
+msgid "The Missing status is unavailable or misconfigured."
+msgstr "Der Status „Fehlend“ ist nicht verfügbar oder falsch konfiguriert."
 
 #: itambox/compliance/audit_services.py:953
 msgid "A stored reconciliation report is required for re-homing."
@@ -11685,8 +11107,8 @@ msgid "Internal custody permission required"
 msgstr "Berechtigung für interne Verwahrungsdaten erforderlich"
 
 #: itambox/compliance/templates/compliance/custody/sign_error.html:39
-msgid "Custody links expire automatically after 7 days. Please contact your IT administrator to request a fresh transfer link."
-msgstr "Verwahrungslinks laufen nach 7 Tagen automatisch ab. Fordern Sie bei Ihrer IT-Administration einen neuen Übergabelink an."
+msgid "Custody links expire automatically after 7 days. Please contact your IT administrator to request a new custody handoff link."
+msgstr "Verwahrungslinks laufen nach 7 Tagen automatisch ab. Wenden Sie sich an Ihren IT-Administrator, um einen neuen Link zur Übergabe der Verwahrung anzufordern."
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:101
 msgid "IP address"
@@ -12111,17 +11533,17 @@ msgid "You are not permitted to change this scope approval."
 msgstr "Sie sind nicht berechtigt, diese Geltungsbereichsgenehmigung zu ändern."
 
 #: itambox/extras/views.py:1098
-msgid "This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored."
-msgstr "Dieser Zeitplan enthält keine auflösbaren Mandanten im Geltungsbereich. Daher kann keine mandantenübergreifende Genehmigung gespeichert werden."
+msgid "This schedule has no tenant targets, so a cross-tenant approval cannot be stored."
+msgstr "Dieser Zeitplan enthält keine Mandanten. Eine mandantenübergreifende Genehmigung kann nicht gespeichert werden."
 
 #: itambox/extras/views.py:1102
-msgid "Not every tenant in the scope resolves to a live tenant, so the approval would not take effect."
-msgstr "Nicht jeder Mandant im Geltungsbereich verweist auf einen aktiven Mandanten. Die Genehmigung würde daher nicht wirksam."
+msgid "Some tenants in this scope are no longer available, so the approval would not take effect."
+msgstr "Einige Mandanten in diesem Geltungsbereich sind nicht mehr verfügbar. Die Genehmigung würde nicht wirksam werden."
 
 #: itambox/extras/views.py:1111
 #, python-format
-msgid "Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect."
-msgstr "Ihre mandantenübergreifende Reichweite deckt folgende Mandanten nicht ab: %(tenants)s. Die Genehmigung würde nicht wirksam."
+msgid "Your permission does not cover these tenants: %(tenants)s. Update the scope or ask an authorized administrator to approve it."
+msgstr "Ihre Berechtigung umfasst diese Mandanten nicht: %(tenants)s. Passen Sie den Geltungsbereich an oder lassen Sie ihn von einem berechtigten Administrator genehmigen."
 
 #: itambox/extras/views.py:1122
 msgid "The scope changed while approving; please review the scope and approve again."
@@ -12175,8 +11597,8 @@ msgid "Source location is only available through component checkout."
 msgstr "Der Quell-Lagerort ist nur bei der Herausgabe von Komponenten verfügbar."
 
 #: itambox/inventory/models.py:42
-msgid "Assignments must be mutated through the authorized inventory service."
-msgstr "Zuweisungen dürfen nur über den autorisierten Bestandsdienst geändert werden."
+msgid "This assignment cannot be changed here. Use the authorized checkout or check-in action."
+msgstr "Diese Zuweisung kann hier nicht geändert werden. Verwenden Sie die autorisierte Herausgabe- oder Rücknahmeaktion."
 
 #: itambox/inventory/models.py:560
 msgid "Assignment hard purge requires the authorized purge service."
@@ -12247,8 +11669,8 @@ msgid "Component allocation is not authorized in the active tenant."
 msgstr "Die Komponentenzuweisung ist im aktiven Mandanten nicht autorisiert."
 
 #: itambox/inventory/services.py:247
-msgid "Only trusted actorless system work may override component availability."
-msgstr "Nur vertrauenswürdige Systemvorgänge ohne Akteur dürfen die Komponentenverfügbarkeit überschreiben."
+msgid "Only a trusted system process can change this component's availability."
+msgstr "Nur ein vertrauenswürdiger Systemprozess kann die Verfügbarkeit dieser Komponente ändern."
 
 #: itambox/inventory/services.py:252
 msgid "No stock available for allocation."
@@ -12263,8 +11685,8 @@ msgid "Allocation update is outside the active tenant boundary."
 msgstr "Die Aktualisierung der Zuweisung liegt außerhalb der Grenze des aktiven Mandanten."
 
 #: itambox/inventory/services.py:322
-msgid "Allocation grant provenance cannot be rewritten."
-msgstr "Die Herkunft der Freigabe für die Zuweisung kann nicht geändert werden."
+msgid "The source of this allocation cannot be changed."
+msgstr "Die Herkunft dieser Zuweisung kann nicht geändert werden."
 
 #: itambox/inventory/services.py:343
 msgid "Allocation security provenance changed during update."
@@ -12502,8 +11924,8 @@ msgid "Only superusers can create global subscriptions."
 msgstr "Nur Superuser können globale Abonnements erstellen."
 
 #: itambox/templates/core/reports/report_template_form.html:48
-msgid "Compiling Report Template.."
-msgstr "Berichtsvorlage wird kompiliert..."
+msgid "Preparing report preview..."
+msgstr "Berichtsvorschau wird vorbereitet..."
 
 #: itambox/templates/core/reports/report_template_form.html:55
 msgid "Report Preview"
@@ -12531,8 +11953,8 @@ msgid "<strong>%(name)s</strong> is <strong>%(grade)s</strong>. Its API and data
 msgstr "<strong>%(name)s</strong> hat den Reifegrad <strong>%(grade)s</strong>. API und Datenmodell können sich in zukünftigen Versionen ändern. Ihr Feedback ist willkommen."
 
 #: itambox/templates/generic/includes/beta_banner.html:33
-msgid "Read the capability contract"
-msgstr "Capability-Vertrag lesen"
+msgid "Read the capability details"
+msgstr "Funktionsumfang anzeigen"
 
 #: itambox/templates/generic/includes/bulk_action_toolbar.html:37
 msgid "Purge"
@@ -12795,8 +12217,8 @@ msgstr "Die untergeordneten Asset-Anforderungen der Gruppe entsprechen nicht der
 msgid "Asset Request group children must be procured through their group parent."
 msgstr "Die untergeordneten Asset-Anforderungen einer Gruppe müssen über ihre übergeordnete Gruppenanforderung beschafft werden."
 
-msgid "Asset Request has an incomplete fulfillment graph that requires reconciliation."
-msgstr "Die Asset-Anforderung hat einen unvollständigen Erfüllungsgraphen, der abgeglichen werden muss."
+msgid "Asset Request fulfillment is incomplete. Review the linked requests before continuing."
+msgstr "Die Erfüllung der Asset-Anforderung ist unvollständig. Prüfen Sie die verknüpften Anforderungen, bevor Sie fortfahren."
 
 msgid "Asset Request is already linked to another purchase order."
 msgstr "Die Asset-Anforderung ist bereits mit einer anderen Bestellung verknüpft."
@@ -12813,8 +12235,8 @@ msgstr "Nur genehmigte Asset-Anforderungen können mit einer Bestellung verknüp
 msgid "Purchase order no longer exists."
 msgstr "Die Bestellung existiert nicht mehr."
 
-msgid "The Asset Request procurement seam is not configured."
-msgstr "Die Beschaffungsschnittstelle für Asset-Anforderungen ist nicht konfiguriert."
+msgid "Procurement is not configured for Asset Requests. Ask an administrator to enable it before continuing."
+msgstr "Die Beschaffung für Asset-Anforderungen ist nicht konfiguriert. Bitten Sie einen Administrator, sie zu aktivieren, bevor Sie fortfahren."
 
 msgid "You do not have permission to change this purchase order."
 msgstr "Sie sind nicht berechtigt, diese Bestellung zu ändern."
@@ -13160,8 +12582,8 @@ msgid "Webhook Delivery"
 msgstr "Webhook-Zustellung"
 
 #, python-format
-msgid "Your cross-tenant reach does not cover: %(tenants)s. The revocation would not be effective."
-msgstr "Ihre mandantenübergreifende Reichweite deckt folgende Mandanten nicht ab: %(tenants)s. Der Widerruf würde nicht wirksam."
+msgid "Your permission does not cover these tenants: %(tenants)s. The revocation would not take effect."
+msgstr "Ihre Berechtigung umfasst diese Mandanten nicht: %(tenants)s. Der Widerruf würde nicht wirksam werden."
 
 msgid "All channels delivered"
 msgstr "Alle Kanäle zugestellt"
@@ -13380,8 +12802,8 @@ msgstr "Keine gültigen Mitgliedschaften ausgewählt."
 msgid "Only meaningful when the owning tenant manages others: managed tenants may assign this role to their own members; only the owning tenant can edit it."
 msgstr "Nur relevant, wenn der besitzende Mandant andere verwaltet: Verwaltete Mandanten dürfen diese Rolle ihren eigenen Mitgliedern zuweisen; nur der besitzende Mandant kann sie bearbeiten."
 
-msgid "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange rows only. Blank uses the global setting. 0 = unlimited (legal hold -- this tenant's changelog is never pruned by prune_changelog)."
-msgstr "Überschreibt ITAMBOX_CHANGELOG_RETENTION_DAYS nur für die ObjectChange-Einträge dieses Mandanten. Leer verwendet die globale Einstellung. 0 = unbegrenzt (rechtliche Aufbewahrung -- das Änderungsprotokoll dieses Mandanten wird durch prune_changelog nie bereinigt)."
+msgid "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange rows only. Blank uses the global setting. 0 = unlimited (legal hold. This tenant's change log is never pruned automatically)."
+msgstr "Überschreibt ITAMBOX_CHANGELOG_RETENTION_DAYS nur für die ObjectChange-Einträge dieses Mandanten. Leer verwendet die globale Einstellung. 0 = unbegrenzt (gesetzliche Aufbewahrung. Das Änderungsprotokoll dieses Mandanten wird nicht automatisch bereinigt)."
 
 msgid "Owning tenant. Leave blank for a global/shared contact (e.g. a manufacturer or service desk) visible to all tenants."
 msgstr "Besitzender Mandant. Leer lassen für einen globalen oder gemeinsamen Kontakt (z. B. einen Hersteller oder Service Desk), der für alle Mandanten sichtbar ist."
@@ -13821,8 +13243,8 @@ msgstr "Der Geltungsbereich wurde nach der Genehmigung geändert. Daher stimmt d
 msgid "The stored approval matches the current scope and remains in effect."
 msgstr "Die gespeicherte Genehmigung entspricht dem aktuellen Geltungsbereich und bleibt wirksam."
 
-msgid "The stored approval no longer takes effect: the authorizing principal is inactive or has lost cross-tenant reach over part of the scope. Delivery fails closed until the scope is approved again."
-msgstr "Die gespeicherte Genehmigung ist nicht mehr wirksam: Der autorisierende Benutzer ist inaktiv oder hat den mandantenübergreifenden Zugriff auf einen Teil des Geltungsbereichs verloren. Die Zustellung wird sicher abgebrochen, bis der Geltungsbereich erneut genehmigt wurde."
+msgid "The approval is no longer valid because the authorizing user is inactive or no longer has access to part of the scope. Delivery remains blocked until the scope is approved again."
+msgstr "Die Genehmigung ist nicht mehr gültig, weil der genehmigende Benutzer inaktiv ist oder keinen Zugriff mehr auf einen Teil des Geltungsbereichs hat. Die Zustellung bleibt blockiert, bis der Geltungsbereich erneut genehmigt wurde."
 
 msgid "This account is disabled and cannot currently sign in."
 msgstr "Dieses Konto ist deaktiviert und kann sich derzeit nicht anmelden."
@@ -13870,8 +13292,8 @@ msgid "The same role includes a managed tenant more than once."
 msgstr "Dieselbe Rolle enthält einen verwalteten Mandanten mehrfach."
 
 #: itambox/templates/core/reports/report_schedule_scope_approval.html:41
-msgid "The scope has no resolvable tenants. Delivery would fail closed, so this scope cannot be approved."
-msgstr "Für diesen Geltungsbereich lassen sich keine Mandanten ermitteln. Die Zustellung würde sicherheitshalber blockiert, daher kann dieser Geltungsbereich nicht genehmigt werden."
+msgid "This scope has no available tenants. It cannot be approved."
+msgstr "Dieser Geltungsbereich enthält keine verfügbaren Mandanten. Er kann nicht genehmigt werden."
 
 #: itambox/organization/models.py:341
 msgid "The selected managing tenant is already managed by another tenant. Nested management is not supported."
@@ -13989,244 +13411,11 @@ msgstr "Berechtigungscodes anzeigen"
 msgid "{user} has no password yet. <a href=\"{url}\">Send them a password setup link</a> so they can sign in."
 msgstr "{user} hat noch kein Passwort. <a href=\"{url}\">Senden Sie einen Link zum Einrichten eines Passworts</a>, damit die Anmeldung möglich ist."
 
-#~ msgid "Component Inventory"
-#~ msgstr "Komponenten-Inventar"
+msgid "Not recorded"
+msgstr "Nicht erfasst"
 
-#~ msgid "Peripherals & Accessories"
-#~ msgstr "Peripheriegeräte & Zubehör"
+msgid "These assets were scanned during the campaign but their <strong>observed location</strong> at time of scan differed from the campaign target location (Global)."
+msgstr "Diese Assets wurden während der Kampagne gescannt, aber ihr <strong>beobachteter Lagerort</strong> zum Scanzeitpunkt wich vom Ziellagerort der Kampagne (Global) ab."
 
-#~ msgid "Contracts & SaaS"
-#~ msgstr "Verträge & SaaS"
-
-#~ msgid "Export to CSV"
-#~ msgstr "Als CSV exportieren"
-
-#~ msgid "Create new %(object_type)s"
-#~ msgstr "Neues %(object_type)s erstellen"
-
-#~ msgid "Bulk Re-home Mismatches"
-#~ msgstr "Fehlplatzierungen gesammelt korrigieren"
-
-#~ msgid ""
-#~ "These assets are registered under other locations, but were physically "
-#~ "verified at <strong>%(loc)s</strong> during this campaign."
-#~ msgstr ""
-#~ "Diese Assets sind an anderen Lagerorten registriert, wurden aber während "
-#~ "dieser Kampagne physisch an <strong>%(loc)s</strong> verifiziert."
-
-#~ msgid "- Component Type Details - ITAMbox"
-#~ msgstr "- Component Type Details - ITAMbox"
-
-#~ msgid "Active Workers"
-#~ msgstr "Aktive Worker"
-
-#~ msgid "Add Software"
-#~ msgstr "Software hinzufügen"
-
-#~ msgid "Any Asset Type"
-#~ msgstr "Any Asset Type"
-
-#~ msgid "Assets / Component Types"
-#~ msgstr "Assets / Component Types"
-
-#~ msgid "Assigned Groups"
-#~ msgstr "Assigned Groups"
-
-#~ msgid "Audit Safety"
-#~ msgstr "Audit Safety"
-
-#~ msgid "Cancel Task"
-#~ msgstr "Aufgabe abbrechen"
-
-#~ msgid "Centralized logs registry"
-#~ msgstr "Zentralisiertes Protokollregister"
-
-#~ msgid "Component Model:"
-#~ msgstr "Komponentenmodell:"
-
-#~ msgid "Configured Permissions:"
-#~ msgstr "Konfigurierte Berechtigungen:"
-
-#~ msgid "Contact Person:"
-#~ msgstr "Contact Person:"
-
-#~ msgid "Day"
-#~ msgstr "Day"
-
-#~ msgid "Django-Q2 ORM Broker"
-#~ msgstr "Django-Q2 ORM Broker"
-
-#~ msgid "Don't have account yet?"
-#~ msgstr "Don't have account yet?"
-
-#~ msgid "Download"
-#~ msgstr "Download"
-
-#~ msgid "Duration (months):"
-#~ msgstr "Duration (months):"
-
-#~ msgid "Email EULA:"
-#~ msgstr "Email EULA:"
-
-#~ msgid "Email on Checkin:"
-#~ msgstr "Email on Checkin:"
-
-#~ msgid "Email on Checkout:"
-#~ msgstr "Email on Checkout:"
-
-#~ msgid "Error: content_template_name not provided to user page wrapper."
-#~ msgstr "Error: content_template_name not provided to user page wrapper."
-
-#~ msgid "Execution & Activity Logs"
-#~ msgstr "Execution & Activity Logs"
-
-#~ msgid "Generated Attachments"
-#~ msgstr "Generated Attachments"
-
-#~ msgid "Granted"
-#~ msgstr "Granted"
-
-#~ msgid "Group Name:"
-#~ msgstr "Group Name:"
-
-#~ msgid "Historical runs queue"
-#~ msgstr "Historical runs queue"
-
-#~ msgid "Label:"
-#~ msgstr "Label:"
-
-#~ msgid "Monitor the status and execution logs of asynchronous operations."
-#~ msgstr "Monitor the status and execution logs of asynchronous operations."
-
-#~ msgid "No assets assigned to active status labels."
-#~ msgstr "No assets assigned to active status labels."
-
-#~ msgid "No physical units of this component model found in inventory."
-#~ msgstr "No physical units of this component model found in inventory."
-
-#~ msgid "No users assigned to this group."
-#~ msgstr "No users assigned to this group."
-
-#~ msgid "Not Assigned"
-#~ msgstr "Not Assigned"
-
-#~ msgid "Only requestable and deployable assets are shown."
-#~ msgstr "Only requestable and deployable assets are shown."
-
-#~ msgid ""
-#~ "Overview of physical and logical inventory objects you have subscribed to "
-#~ "for real-time change notifications."
-#~ msgstr ""
-#~ "Overview of physical and logical inventory objects you have subscribed to "
-#~ "for real-time change notifications."
-
-#~ msgid "Physical Components / Serialized Units"
-#~ msgstr "Physical Components / Serialized Units"
-
-#~ msgid "Physical Parts"
-#~ msgstr "Physical Parts"
-
-#~ msgid "Printer Settings:"
-#~ msgstr "Printer Settings:"
-
-#~ msgid "Rate:"
-#~ msgstr "Rate:"
-
-#~ msgid "Related Objects"
-#~ msgstr "Related Objects"
-
-#~ msgid "Revoked"
-#~ msgstr "Revoked"
-
-#~ msgid "Subscribed Objects & Change Updates"
-#~ msgstr "Subscribed Objects & Change Updates"
-
-#~ msgid "Subscribed on"
-#~ msgstr "Subscribed on"
-
-#~ msgid "Task Result Summary"
-#~ msgstr "Task Result Summary"
-
-#~ msgid "Tasks & Jobs"
-#~ msgstr "Tasks & Jobs"
-
-#~ msgid "Tasks Queue"
-#~ msgstr "Tasks Queue"
-
-#~ msgid "Template HTML/Jinja Code:"
-#~ msgstr "Template HTML/Jinja Code:"
-
-#~ msgid ""
-#~ "The background operation generated files for checkout or label template "
-#~ "batch downloading."
-#~ msgstr ""
-#~ "The background operation generated files for checkout or label template "
-#~ "batch downloading."
-
-#~ msgid "Total Tasks"
-#~ msgstr "Total Tasks"
-
-#~ msgid "Unassigned / In Stock"
-#~ msgstr "Unassigned / In Stock"
-
-#~ msgid "Unsubscribe"
-#~ msgstr "Unsubscribe"
-
-#~ msgid ""
-#~ "Use the star icon on any hardware asset, license, or location details page "
-#~ "to subscribe."
-#~ msgstr ""
-#~ "Use the star icon on any hardware asset, license, or location details page "
-#~ "to subscribe."
-
-#~ msgid "Waiting for task initialization..."
-#~ msgstr "Waiting for task initialization..."
-
-#~ msgid "You have not subscribed to any specific objects for updates yet."
-#~ msgstr "You have not subscribed to any specific objects for updates yet."
-
-#~ msgid "Zero N+1 query storm"
-#~ msgstr "Zero N+1 query storm"
-
-#~ msgid ""
-#~ "Deleting this role will prevent these assets from being properly "
-#~ "categorized."
-#~ msgstr ""
-#~ "Deleting this role will prevent these assets from being properly "
-#~ "categorized."
-
-#~ msgid "Consider reassigning assets before deleting this role."
-#~ msgstr "Consider reassigning assets before deleting this role."
-
-#~ msgid "assets"
-#~ msgstr "assets"
-
-#~ msgid "months ("
-#~ msgstr "months ("
-
-#~ msgid "processing..."
-#~ msgstr "processing..."
-
-#~ msgid "″ height"
-#~ msgstr "″ height"
-
-#~ msgid "″ width ×"
-#~ msgstr "″ width ×"
-
-#~ msgid "Consumable Assignment"
-#~ msgstr "Verbrauchsmaterialzuweisung"
-
-#~ msgid "Consumable Assignments"
-#~ msgstr "Verbrauchsmaterialzuweisungen"
-
-#~ msgid "Asset Holder Assignment"
-#~ msgstr "Asset-Inhaber-Zuweisung"
-
-#~ msgid "Asset Holder Assignments"
-#~ msgstr "Asset-Inhaber-Zuweisungen"
-
-#~ msgid "Start Campaign"
-#~ msgstr "Kampagne starten"
-
-#~ msgid "Null = all tenants/MSP-wide"
-#~ msgstr "Leer = alle Mandanten / MSP-weit"
+msgid "Choose who to add: select an existing user or create a new user by email."
+msgstr "Legen Sie fest, wer hinzugefügt wird: Wählen Sie einen vorhandenen Benutzer aus oder legen Sie per E-Mail einen neuen an."

@@ -1318,7 +1318,7 @@ class AssetCatalogLocalizationTest(SimpleTestCase):
             "Add new Asset Type": "Neuen Asset-Typ hinzufügen",
             "Add new Location": "Neuen Lagerort hinzufügen",
             "Custody Declined": "Verwahrung abgelehnt",
-            "View Receipt": "Übergabeprotokoll anzeigen",
+            "View Receipt": "Verwahrungsprotokoll anzeigen",
             "Warranty Provider": "Garantieanbieter",
             "Select an Asset Holder.": "Wählen Sie einen Asset-Inhaber als Ziel aus.",
             "The holder has no e-mail address.": "Der Asset-Inhaber hat keine E-Mail-Adresse.",

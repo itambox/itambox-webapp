@@ -1,6 +1,5 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n %}
-{% translate "Not set" as not_set %}
 {% load render_table from django_tables2 %}
 {% load static %}
 {% load utility_tags %}
@@ -125,8 +124,8 @@
                       <span class="badge bg-light text-dark">{{ assignment.get_priority_display }}</span>
                     {% endif %}
                   </td>
-                  <td>{{ assignment.contact.phone|default:not_set }}</td>
-                  <td>{{ assignment.contact.email|default:not_set }}</td>
+                  <td>{% if assignment.contact.phone %}{{ assignment.contact.phone }}{% else %}{% translate "Not set" %}{% endif %}</td>
+                  <td>{% if assignment.contact.email %}{{ assignment.contact.email }}{% else %}{% translate "Not set" %}{% endif %}</td>
                   <td>
                     <a href="{% url 'organization:contactassignment_delete' assignment.pk %}?return_url={{ request.path }}"
                        class="btn btn-sm btn-danger px-2"

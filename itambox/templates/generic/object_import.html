@@ -1,6 +1,5 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
-{% translate "Not set" as not_set %}
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
   <h2 class="page-title">{{ title }}</h2>
@@ -66,7 +65,7 @@
                       <tr>
                         <td>{{ forloop.counter }}</td>
                         {% for key, value in row.items %}
-                          <td>{{ value|default:not_set }}</td>
+                          <td>{% if value %}{{ value }}{% else %}{% translate "Not set" %}{% endif %}</td>
                         {% endfor %}
                       </tr>
                     {% endfor %}
@@ -221,7 +220,7 @@
                           {% if f.required %}
                             <span class="badge bg-red-lt">{% translate "Required" %}</span>
                           {% else %}
-                            <span class="text-muted">{% translate "Not set" %}</span>
+                            <span class="text-muted">{% translate "Optional" %}</span>
                           {% endif %}
                         </td>
                         <td class="font-monospace">

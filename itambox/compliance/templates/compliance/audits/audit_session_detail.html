@@ -1,11 +1,6 @@
 {% extends base_template|default:'layout.html' %}
 {% load static %}
 {% load i18n %}
-{% translate "Global (All Locations)" as global_all_locations %}
-{% translate "Not completed" as not_completed %}
-{% translate "Global" as global_label %}
-{% translate "Not recorded" as not_recorded %}
-{% translate "Not set" as not_set %}
 {% load utility_tags %}
 {% block title %}{% translate "Audit Campaign" %} - {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
@@ -307,7 +302,7 @@
             <dl class="row mb-0">
               <dt class="col-5">{% translate "Target Location:" %}</dt>
               <dd class="col-7">
-                {{ object.location.name|default:global_all_locations }}
+                {% if object.location.name %}{{ object.location.name }}{% else %}{% translate "Global (All Locations)" %}{% endif %}
               </dd>
               <dt class="col-5">{% translate "Created By:" %}</dt>
               <dd class="col-7">
@@ -319,7 +314,7 @@
               </dd>
               <dt class="col-5">{% translate "Completed At:" %}</dt>
               <dd class="col-7">
-                {{ object.completed_at|date:"Y-m-d H:i"|default:not_completed }}
+                {% if object.completed_at %}{{ object.completed_at|date:"Y-m-d H:i" }}{% else %}{% translate "Not completed" %}{% endif %}
               </dd>
             </dl>
           </div>
@@ -382,7 +377,11 @@
               <div class="tab-pane active show" id="tab-mismatch">
                 <h4 class="mb-3">{% translate "Mismatched Assets" %}</h4>
                 <p class="text-secondary small">
-                  {% blocktranslate with loc=object.location.name|default:global_label %}These assets were scanned during the campaign but their <strong>observed location</strong> at time of scan differed from the campaign target location ({{ loc }}).{% endblocktranslate %}
+                  {% if object.location.name %}
+                    {% blocktranslate with loc=object.location.name %}These assets were scanned during the campaign but their <strong>observed location</strong> at time of scan differed from the campaign target location ({{ loc }}).{% endblocktranslate %}
+                  {% else %}
+                    {% blocktranslate %}These assets were scanned during the campaign but their <strong>observed location</strong> at time of scan differed from the campaign target location (Global).{% endblocktranslate %}
+                  {% endif %}
                 </p>
                 {% if mismatches %}
                   <div class="table-responsive">
@@ -403,9 +402,9 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td class="text-warning font-weight-bold">{{ row.observed_location|default:not_recorded }}</td>
-                            <td>{{ row.auditor|default:not_recorded }}</td>
-                            <td class="text-secondary">{{ row.timestamp_display|default:not_recorded }}</td>
+                            <td class="text-warning font-weight-bold">{% if row.observed_location %}{{ row.observed_location }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
+                            <td>{% if row.auditor %}{{ row.auditor }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
+                            <td class="text-secondary">{% if row.timestamp_display %}{{ row.timestamp_display }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
                           </tr>
                         {% endfor %}
                       </tbody>
@@ -443,14 +442,14 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td>{{ row.serial_number|default:not_set }}</td>
+                            <td>{% if row.serial_number %}{{ row.serial_number }}{% else %}{% translate "Not set" %}{% endif %}</td>
                             <td>
                               {% if row.status_color %}
                                 {% csp_color_style row.status_color "status" as status_style %}
                                 {{ status_style.style_block|safe }}
                                 <span class="badge {{ status_style.class_name }}">{{ row.status_name }}</span>
                               {% else %}
-                                {{ row.status_name|default:not_set }}
+                                {% if row.status_name %}{{ row.status_name }}{% else %}{% translate "Not set" %}{% endif %}
                               {% endif %}
                             </td>
                           </tr>
@@ -491,9 +490,9 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td class="text-orange font-weight-bold">{{ row.observed_location|default:not_recorded }}</td>
-                            <td>{{ row.auditor|default:not_recorded }}</td>
-                            <td class="text-secondary">{{ row.timestamp_display|default:not_recorded }}</td>
+                            <td class="text-orange font-weight-bold">{% if row.observed_location %}{{ row.observed_location }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
+                            <td>{% if row.auditor %}{{ row.auditor }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
+                            <td class="text-secondary">{% if row.timestamp_display %}{{ row.timestamp_display }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
                           </tr>
                         {% endfor %}
                       </tbody>
@@ -532,10 +531,10 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td>{{ row.auditor|default:not_recorded }}</td>
-                            <td class="text-secondary">{{ row.timestamp_display|default:not_recorded }}</td>
+                            <td>{% if row.auditor %}{{ row.auditor }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
+                            <td class="text-secondary">{% if row.timestamp_display %}{{ row.timestamp_display }}{% else %}{% translate "Not recorded" %}{% endif %}</td>
                             <td>
-                              <span class="badge bg-secondary-lt">{{ row.verification_method_display|default:not_recorded }}</span>
+                              <span class="badge bg-secondary-lt">{% if row.verification_method_display %}{{ row.verification_method_display }}{% else %}{% translate "Not recorded" %}{% endif %}</span>
                             </td>
                           </tr>
                         {% endfor %}

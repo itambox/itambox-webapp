@@ -99,7 +99,7 @@ if API_TOKEN_PEPPERS_STATE == ConfigState.UNSET.value:
         "ITAMBOX_API_TOKEN_PEPPERS is not set in production: API-token hashing "
         "falls back to a SECRET_KEY-derived pepper. Tokens hashed under the "
         "fallback stop validating once a dedicated mapping is configured. "
-        "Reissue them, then set a dedicated pepper mapping and back it up."
+        "Configure and back up a dedicated pepper mapping before reissuing tokens hashed with the fallback."
     )
 
 # Field-encryption keyring: only unset/blank may use the warned

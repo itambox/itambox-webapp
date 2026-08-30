@@ -38,7 +38,7 @@
                 <li class="list-group-item">{{ tenant.name }} <span class="text-secondary">({{ tenant.slug }})</span></li>
               {% empty %}
                 <li class="list-group-item text-danger">
-                  {% translate "The scope has no resolvable tenants. Delivery would fail closed, so this scope cannot be approved." %}
+                  {% translate "This scope has no available tenants. It cannot be approved." %}
                 </li>
               {% endfor %}
             </ul>
@@ -66,7 +66,7 @@
               </div>
               {% if not stored_approval_is_effective %}
                 <div class="alert alert-warning">
-                  {% translate "The stored approval no longer takes effect: the authorizing principal is inactive or has lost cross-tenant reach over part of the scope. Delivery fails closed until the scope is approved again." %}
+                  {% translate "The approval is no longer valid because the authorizing user is inactive or no longer has access to part of the scope. Delivery remains blocked until the scope is approved again." %}
                 </div>
               {% endif %}
             {% elif not authorization.is_revoked %}

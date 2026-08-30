@@ -1,13 +1,11 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
-{% translate "Detail View" as detail_view %}
-{% translate "Object" as object_label %}
 {% load render_table from django_tables2 %}
 {% load utility_tags %}
 {% load plugins %}
-{% block title %}{{ object }} - {{ title|default:detail_view }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{{ object }} - {% if title %}{{ title }}{% else %}{% translate "Detail View" %}{% endif %} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
-  <div class="page-pretitle">{{ object_type|default:object_label }} {% translate "Details" %}</div>
+  <div class="page-pretitle">{% if object_type %}{{ object_type }}{% else %}{% translate "Object" %}{% endif %} {% translate "Details" %}</div>
   <h2 class="page-title">{{ object }}{% include "generic/includes/capability_badge.html" %}</h2>
 {% endblock %}
 {% block page_actions %}
@@ -224,7 +222,7 @@
               {# --- Default Object Details Card --- #}
               <div class="card mb-3 shadow-sm">
                 <div class="card-header">
-                  <h3 class="card-title">{{ object_type|default:object_label }} {% translate "Information" %}</h3>
+                  <h3 class="card-title">{% if object_type %}{{ object_type }}{% else %}{% translate "Object" %}{% endif %} {% translate "Information" %}</h3>
                 </div>
                 <div class="card-body">
                   {% block object_details %}

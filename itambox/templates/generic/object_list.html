@@ -5,9 +5,6 @@
 {% load render_table from django_tables2 %}
 {% load utility_tags %}
 {% load i18n %}
-{% translate "List View" as list_view %}
-{% translate "Manage" as manage_label %}
-{% translate "Objects" as objects_label %}
 {% load crispy_forms_tags %}
 {% block tabs %}
 {% endblock tabs %}
@@ -315,10 +312,10 @@
     </div>
   {% endif %}
 {% endblock page_modals %}
-{% block title %}{{ title|default:list_view }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% if title %}{{ title }}{% else %}{% translate "List View" %}{% endif %} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
-  <div class="page-pretitle">{{ pretitle|default:manage_label }}</div>
-  <h2 class="page-title">{{ title|default:objects_label }}{% include "generic/includes/capability_badge.html" %}</h2>
+  <div class="page-pretitle">{% if pretitle %}{{ pretitle }}{% else %}{% translate "Manage" %}{% endif %}</div>
+  <h2 class="page-title">{% if title %}{{ title }}{% else %}{% translate "Objects" %}{% endif %}{% include "generic/includes/capability_badge.html" %}</h2>
 {% endblock %}
 {% block page_actions %}
   <div class="btn-list">

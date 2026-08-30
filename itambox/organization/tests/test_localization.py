@@ -103,7 +103,7 @@ class RoleSurfaceLocalizationTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Set this role's permissions below. Granular permissions can separate Create and Edit access.",
+            "Choose which actions this role allows. Create and edit can be assigned separately.",
         )
         self.assertNotContains(response, "Configure role-specific access")
         self.assertContains(response, "A role belongs to the tenant it was created in and cannot be moved.")
@@ -114,7 +114,7 @@ class RoleSurfaceLocalizationTests(TenantTestMixin, TestCase):
     def test_german_role_form_uses_localized_copy(self):
         response = self._get(reverse("organization:role_create"), "de")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Legen Sie unten die Berechtigungen dieser Rolle fest")
+        self.assertContains(response, "Wählen Sie aus, welche Aktionen diese Rolle erlaubt")
         self.assertNotContains(response, "Konfigurieren Sie den rollenspezifischen Zugriff")
         self.assertNotContains(response, "Set this role's permissions below")
 
@@ -134,7 +134,7 @@ class RoleSurfaceLocalizationTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f"Wählen Sie Benutzer für diese Rolle im Mandanten <strong>{self.tenant.name}</strong> aus.",
+            f"Wählen Sie Benutzer aus, die Sie dieser Rolle im Mandanten <strong>{self.tenant.name}</strong> zuweisen möchten.",
         )
         self.assertNotContains(response, "Select users to assign to this role in tenant")
         self.assertNotContains(response, "mit einer anderen Rolle vorhanden sind")
@@ -144,6 +144,6 @@ class RoleSurfaceLocalizationTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Pick who joins: an existing user or a new one created by email.",
+            "Choose who to add: select an existing user or create a new user by email.",
         )
-        self.assertNotContains(response, "Pick who joins (an existing user, or a new one created by email)")
+        self.assertNotContains(response, "Choose an existing user or create one by email.")

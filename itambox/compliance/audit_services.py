@@ -866,10 +866,15 @@ def _frozen_rehome_location(
     tenant_ids: frozenset[int],
 ) -> Location:
     if report["schema_version"] != 2 or "rehome_location_id" not in report:
-        raise ValidationError(_("Re-homing requires a v2 report with a frozen target location."))
+        raise ValidationError(
+            _(
+                "This report is too old to update asset locations. Generate a current reconciliation report "
+                "with a fixed target location."
+            )
+        )
     location_id = report["rehome_location_id"]
     if type(location_id) is not int or location_id <= 0:
-        raise ValidationError(_("The frozen re-home target is unavailable."))
+        raise ValidationError(_("The selected target location is no longer available."))
     location = (
         Location._base_manager.select_for_update(of=("self",))
         .filter(
@@ -882,9 +887,9 @@ def _frozen_rehome_location(
         .first()
     )
     if location is None:
-        raise PermissionDenied("The frozen re-home target is not live and authorized.")
+        raise PermissionDenied("The selected target location is inactive or not authorized.")
     if session.tenant_id is not None and location.tenant_id != session.tenant_id:
-        raise PermissionDenied("The frozen re-home target is not in the audit session tenant.")
+        raise PermissionDenied("The selected target location is outside the audit session's tenant.")
     return location
 
 
@@ -894,7 +899,7 @@ def _canonical_missing_status(*, lock: bool = False) -> StatusLabel:
         queryset = queryset.select_for_update(of=("self",))
     missing_status = queryset.first()
     if missing_status is None or missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
-        raise ValidationError(_("The canonical Missing status is unavailable or misconfigured."))
+        raise ValidationError(_("The Missing status is unavailable or misconfigured."))
     return missing_status
 
 
@@ -955,7 +960,12 @@ def rehome_audit_session_mismatches(
     if stored_version != 2:
         for row in stored_rows:
             _validated_report_category(row)
-        raise ValidationError(_("Re-homing requires a v2 report with a frozen target location."))
+        raise ValidationError(
+            _(
+                "This report is too old to update asset locations. Generate a current reconciliation report "
+                "with a fixed target location."
+            )
+        )
     report = _read_report_for_tenants(session, tenant_ids)
     mismatch_rows = [row for row in report["rows"] if row["category"] == "mismatched"]
     mismatch_ids = [row["asset_id"] for row in mismatch_rows]

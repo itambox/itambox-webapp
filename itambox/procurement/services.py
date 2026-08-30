@@ -88,7 +88,9 @@ def _existing_fulfillment_link(asset_request, targets, po):
     linked_target_ids = {link.asset_request_id for link in existing_links}
     line_ids = {link.purchase_order_line_id for link in existing_links}
     if linked_target_ids != target_ids or len(line_ids) != 1:
-        raise ValidationError(_("Asset Request has an incomplete fulfillment graph that requires reconciliation."))
+        raise ValidationError(
+            _("Asset Request fulfillment is incomplete. Review the linked requests before continuing.")
+        )
     return existing_links[0]
 
 
@@ -127,7 +129,9 @@ def _create_fulfillment_link(po, asset_request, targets):
 def link_asset_request_to_purchase_order(po, asset_request_id, user):
     """Create the Procurement-owned fulfillment graph for an approved Asset Request."""
     if not registry.is_active("procurement.requisition_seam"):
-        raise ValidationError(_("The Asset Request procurement seam is not configured."))
+        raise ValidationError(
+            _("Procurement is not configured for Asset Requests. Ask an administrator to enable it before continuing.")
+        )
     locked_po = _lock_purchase_order_for_asset_request(po)
     if user is None or not user.has_perm("procurement.change_purchaseorder", locked_po):
         raise PermissionDenied(_("You do not have permission to change this purchase order."))
