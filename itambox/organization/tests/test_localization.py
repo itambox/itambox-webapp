@@ -27,8 +27,8 @@ class OrganizationFilterPresentationTests(TestCase):
             if hasattr(field, "html") and "Clear filters" in field.html
         )
 
-        self.assertIn("{{ request.path }}", clear_link)
-        self.assertNotIn("{ request.path }", clear_link)
+        self.assertIn('href="{{ request.path }}"', clear_link)
+        self.assertNotIn('href="{ request.path }"', clear_link)
 
 
 class ResourceGrantLocalizationTests(TestCase):
