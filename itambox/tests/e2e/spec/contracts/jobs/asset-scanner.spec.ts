@@ -49,7 +49,7 @@ test.describe('jobs contract', { tag: ['@pr', '@aggregate'] }, () => {
       });
     }
 
-    const listPath = `/assets/assets/?switch_all_accessible=1&q=${encodeURIComponent(runId)}`;
+    const listPath = `/assets/assets/?switch_all_accessible=1&q=${encodeURIComponent(`${runId}-job-`)}`;
     const list = await page.goto(listPath, { waitUntil: 'domcontentloaded' });
     expect(list?.status(), `GET ${listPath}`).toBe(200);
     await expect(page.locator('a[href*="switch_all_accessible=1"].active').first()).toHaveCount(1);
