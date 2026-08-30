@@ -3,7 +3,7 @@ import uuid
 
 import django_tables2 as tables
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from model_bakery import baker
 
 from assets.models import (
@@ -24,6 +24,23 @@ from organization.models import Location, Site
 User = get_user_model()
 
 
+class BaseTableEmptyValueTest(SimpleTestCase):
+    def test_empty_cells_render_translated_default(self):
+        class EmptyValueTable(BaseTable):
+            value = tables.Column()
+
+            class Meta:
+                fields = ("value",)
+
+        table = EmptyValueTable([{"value": None}])
+        request = RequestFactory().get("/")
+        rendered = table.as_html(request)
+
+        self.assertIn("Not set", rendered)
+        self.assertNotIn("—", rendered)
+        self.assertNotIn("–", rendered)
+
+
 class IDColumnTestCase(TestCase):
     """The universal `id` detail-link column (NetBox-style): hidden by default,
     available via the column selector, and — on tables that have no natural
@@ -41,20 +58,6 @@ class IDColumnTestCase(TestCase):
     def _asset(self, tag):
         role = AssetRole.objects.create(name="Role " + tag, slug="role-" + tag.lower())
         return Asset.objects.create(name="Asset " + tag, asset_tag=tag, asset_role=role)
-
-    def test_empty_cells_render_translated_default(self):
-        class EmptyValueTable(BaseTable):
-            value = tables.Column()
-
-            class Meta:
-                fields = ("value",)
-
-        table = EmptyValueTable([{"value": None}])
-        rendered = table.as_html(self._req())
-
-        self.assertIn("Not set", rendered)
-        self.assertNotIn("—", rendered)
-        self.assertNotIn("–", rendered)
 
     def test_id_hidden_by_default(self):
         """A table with a natural identity column (AssetTable.name) keeps id
