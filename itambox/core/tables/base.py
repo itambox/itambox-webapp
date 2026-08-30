@@ -29,7 +29,7 @@ class BaseTable(tables.Table):
             "td": {"class": "text-nowrap"},
         }
         exclude_from_config = ("pk", "actions")
-        empty_values_display = _("Not set")
+        default = _("Not set")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

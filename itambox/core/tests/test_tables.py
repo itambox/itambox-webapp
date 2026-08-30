@@ -1,6 +1,7 @@
 import datetime
 import uuid
 
+import django_tables2 as tables
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from model_bakery import baker
@@ -40,6 +41,20 @@ class IDColumnTestCase(TestCase):
     def _asset(self, tag):
         role = AssetRole.objects.create(name="Role " + tag, slug="role-" + tag.lower())
         return Asset.objects.create(name="Asset " + tag, asset_tag=tag, asset_role=role)
+
+    def test_empty_cells_render_translated_default(self):
+        class EmptyValueTable(BaseTable):
+            value = tables.Column()
+
+            class Meta:
+                fields = ("value",)
+
+        table = EmptyValueTable([{"value": None}])
+        rendered = table.as_html(self._req())
+
+        self.assertIn("Not set", rendered)
+        self.assertNotIn("—", rendered)
+        self.assertNotIn("–", rendered)
 
     def test_id_hidden_by_default(self):
         """A table with a natural identity column (AssetTable.name) keeps id

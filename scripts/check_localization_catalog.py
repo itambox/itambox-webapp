@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import re
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -264,7 +265,7 @@ def source_javascript(path: Path, relative: str, sources: dict[str, dict]) -> No
             try:
                 literals.append(ast.literal_eval(literal))
             except (SyntaxError, ValueError):
-                pass
+                continue
         name = call.group(1)
         if name in {"pgettext", "npgettext"} and len(literals) >= 2:
             add_source(
@@ -302,8 +303,8 @@ def all_sources() -> dict[str, dict]:
     return sources
 
 
-def placeholders(value: str) -> set[str]:
-    return {item for item in PLACEHOLDER.findall(value) if item != "%%"}
+def placeholders(value: str) -> Counter[str]:
+    return Counter(item for item in PLACEHOLDER.findall(value) if item != "%%")
 
 
 def escape_shape(value: str) -> tuple[int, tuple[str, ...]]:
@@ -320,6 +321,10 @@ def entry_failures(domain: str, key: str, entry: dict, source: dict) -> list[str
     failures = []
     if "fuzzy" in entry.get("flags", set()):
         failures.append(f"{domain}: fuzzy {key!r}")
+    expected_plural = source.get("plural")
+    actual_plural = entry.get("msgid_plural")
+    if expected_plural != actual_plural:
+        failures.append(f"{domain}: plural identity mismatch {key!r}")
     values = translated_values(entry)
     if any(value == "" for value in values):
         failures.append(f"{domain}: empty {key!r}")
@@ -346,6 +351,10 @@ def catalog_failures(domain: str, entries: dict, duplicates: list[str], sources:
     allowed = JS_RUNTIME_KEYS if domain == "djangojs" else set()
     missing = sorted(expected - actual)
     stale = sorted(actual - expected - allowed)
+    if domain == "djangojs":
+        runtime_missing = sorted(JS_RUNTIME_KEYS - actual)
+        if runtime_missing:
+            failures.append(f"{domain}: missing documented runtime keys {runtime_missing}")
     if missing:
         failures.append(f"{domain}: missing {missing[:10]}" + (" ..." if len(missing) > 10 else ""))
     if stale:

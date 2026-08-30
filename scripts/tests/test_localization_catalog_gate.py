@@ -39,6 +39,30 @@ def test_plural_entry_requires_all_active_forms():
     assert failures == ["django: empty 'One asset'"]
 
 
+def test_plural_identity_mismatch_is_rejected():
+    source = {"msgid": "One asset", "plural": "%(count)s assets"}
+    entry = {
+        "msgid_plural": "%(count)s items",
+        "0": "Ein Asset",
+        "1": "%(count)s Assets",
+        "flags": set(),
+    }
+    failures = MODULE.entry_failures("django", "One asset", entry, source)
+    assert "django: plural identity mismatch 'One asset'" in failures
+
+
+def test_placeholder_multiplicity_mismatch_is_rejected():
+    source = {"msgid": "%(name)s: %(name)s", "plural": None}
+    entry = {"msgstr": "%(name)s: Name", "flags": set()}
+    failures = MODULE.entry_failures("django", "example", entry, source)
+    assert "django: placeholder mismatch 'example'" in failures
+
+
+def test_documented_runtime_keys_are_required():
+    failures = MODULE.catalog_failures("djangojs", {}, [], {})
+    assert any("missing documented runtime keys" in failure for failure in failures)
+
+
 def test_escape_and_newline_shape_mismatch_is_rejected():
     source = {"msgid": "Hello\nWorld", "plural": None}
     entry = {"msgstr": "Hallo\\nWelt", "flags": set()}
