@@ -74,6 +74,7 @@
     "itambox/itambox/tests/test_notification_download_links.py",
     "itambox/itambox/tests/test_scanning.py",
     "itambox/licenses/tests/test_reconciliation.py",
+    "itambox/organization/tests/test_localization.py",
     "itambox/organization/tests/test_resource_grant_expiry.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",
     "itambox/subscriptions/tests/test_models.py",
@@ -84,7 +85,19 @@
     "scripts/tests/test_exception_policy.py",
     "scripts/tests/test_inline_styles.py",
     "scripts/tests/test_migration_audit.py",
-    "scripts/tests/test_typing_policy.py"
+    "scripts/tests/test_typing_policy.py",
+    "itambox/core/tests/test_views.py",
+    "itambox/extras/tests/test_eventrule_withdrawn_guards.py",
+    "itambox/extras/tests/test_eventrule_withdrawn_report.py",
+    "itambox/extras/tests/test_scheduledreport_scope_approval.py",
+    "itambox/organization/tests/test_clone.py",
+    "itambox/organization/tests/test_membership_form_delegation.py",
+    "itambox/organization/tests/test_membership_service_authz.py",
+    "itambox/organization/tests/test_role_container_chooser.py",
+    "itambox/organization/tests/test_role_form_provider_scope.py",
+    "itambox/procurement/tests/test_concurrency.py",
+    "itambox/procurement/tests/test_legacy.py",
+    "itambox/users/tests/test_usergroup_escalation.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -163,6 +176,7 @@
     "itambox/itambox/tests/test_notification_download_links.py",
     "itambox/itambox/tests/test_scanning.py",
     "itambox/licenses/tests/test_reconciliation.py",
+    "itambox/organization/tests/test_localization.py",
     "itambox/organization/tests/test_resource_grant_expiry.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",
     "itambox/subscriptions/tests/test_models.py",
@@ -173,7 +187,19 @@
     "scripts/tests/test_exception_policy.py",
     "scripts/tests/test_inline_styles.py",
     "scripts/tests/test_migration_audit.py",
-    "scripts/tests/test_typing_policy.py"
+    "scripts/tests/test_typing_policy.py",
+    "itambox/core/tests/test_views.py",
+    "itambox/extras/tests/test_eventrule_withdrawn_guards.py",
+    "itambox/extras/tests/test_eventrule_withdrawn_report.py",
+    "itambox/extras/tests/test_scheduledreport_scope_approval.py",
+    "itambox/organization/tests/test_clone.py",
+    "itambox/organization/tests/test_membership_form_delegation.py",
+    "itambox/organization/tests/test_membership_service_authz.py",
+    "itambox/organization/tests/test_role_container_chooser.py",
+    "itambox/organization/tests/test_role_form_provider_scope.py",
+    "itambox/procurement/tests/test_concurrency.py",
+    "itambox/procurement/tests/test_legacy.py",
+    "itambox/users/tests/test_usergroup_escalation.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

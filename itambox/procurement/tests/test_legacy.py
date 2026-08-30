@@ -986,7 +986,7 @@ class ContractModelTests(TestCase):
 
     def test_contract_str(self):
         contract = self._make_contract()
-        self.assertEqual(str(contract), "CTR-001 – Hardware Support Agreement")
+        self.assertEqual(str(contract), "CTR-001: Hardware Support Agreement")
 
     def test_get_absolute_url(self):
         contract = self._make_contract()

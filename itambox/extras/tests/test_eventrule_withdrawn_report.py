@@ -62,12 +62,12 @@ class EventRuleWithdrawnReportTests(TransactionTestCase):
             self.assertNotIn(secret, output)
         self.assertIn("action_type=notification", output)
         self.assertIn("enabled=False", output)
-        self.assertIn("2 rule(s) with withdrawn conditions — these rules will not dispatch in 1.0.", output)
+        self.assertIn("2 rule(s) have withdrawn conditions. These rules will not dispatch in 1.0.", output)
 
     def test_report_returns_zero_for_no_withdrawn_rules(self):
         self._create_rule(name="Empty conditions rule", conditions={})
 
         self.assertEqual(
             self._run_report(),
-            "0 rule(s) with withdrawn conditions — these rules will not dispatch in 1.0.\n",
+            "0 rule(s) have withdrawn conditions. These rules will not dispatch in 1.0.\n",
         )

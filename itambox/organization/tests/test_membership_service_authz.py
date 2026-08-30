@@ -157,7 +157,7 @@ class PlanShapeRejectionTests(_PlanTestBase):
 
         (err,) = ctx.exception.errors
         self.assertEqual(err.row_index, 3)
-        self.assertIn("granted twice", err.message)
+        self.assertIn("appears more than once", err.message)
         self.assert_wrote_nothing(before)
 
     def test_managed_row_on_a_non_provider_tenant_is_rejected(self):
@@ -175,7 +175,7 @@ class PlanShapeRejectionTests(_PlanTestBase):
                 plan=GrantPlan(managed=(ManagedGrantSpec(role=customer_role, row_index=0),)),
             )
 
-        self.assertIn("provider", " ".join(ctx.exception.messages).lower())
+        self.assertIn("manages other tenants", " ".join(ctx.exception.messages).lower())
         self.assertEqual(ctx.exception.errors[0].row_index, 0)
         self.assert_wrote_nothing(before)
 

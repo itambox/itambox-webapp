@@ -347,6 +347,6 @@ class AllManagedScopeConflictTests(TestCase):
         self.assertFalse(form.is_valid())
         errors = " ".join(form.managed_formset.non_form_errors())
         self.assertIn(
-            "All managed tenants already cover every narrower scope for that role.",
+            "'All managed tenants' already covers every other selection for that role.",
             errors,
         )

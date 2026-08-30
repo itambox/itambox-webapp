@@ -139,7 +139,7 @@ class PurchaseOrderConcurrencyTests(TransactionTestCase):
         self.assertEqual([kind for kind, _message in results].count("success"), 1, results)
         self.assertEqual([kind for kind, _message in results].count("validation_error"), 1, results)
         loser_message = next(message for kind, message in results if kind == "validation_error")
-        self.assertIn("only 0 outstanding", loser_message)
+        self.assertIn("only 0 remain outstanding", loser_message)
         self.line.refresh_from_db()
         self.purchase_order.refresh_from_db()
         self.assertEqual(self.line.qty_received, 1)
