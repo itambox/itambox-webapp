@@ -175,12 +175,12 @@
             <div id="breadcrumbs-block">{% include 'global_includes/_breadcrumbs.html' %}</div>
             <div class="row g-2 align-items-center mt-2">
               <div class="col-12 col-lg order-2 order-lg-1">
-                {% block page_header %}
-                  <div id="page-header-block">
+                <div id="page-header-block">
+                  {% block page_header %}
                     <div class="page-pretitle">{% translate "Overview" %}</div>
                     <h2 class="page-title">{% translate "Dashboard" %}</h2>
-                  </div>
-                {% endblock %}
+                  {% endblock %}
+                </div>
               </div>
               <div class="col-12 col-lg-auto ms-lg-auto d-flex justify-content-end order-1 order-lg-2 d-print-none">
                 {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}

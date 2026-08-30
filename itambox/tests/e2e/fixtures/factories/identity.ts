@@ -8,11 +8,16 @@ export type OwnedAssetHolder = {
   tenant: string;
 };
 
+export type OwnedAssetHolderCleanupOptions = {
+  preserveProtectedHistory?: boolean;
+};
+
 export async function createOwnedAssetHolder(
   request: APIRequestContext,
   cleanup: CleanupRegistry,
   tenant: string,
   semantic: string,
+  options: OwnedAssetHolderCleanupOptions = {},
 ): Promise<OwnedAssetHolder> {
   const localPart = semantic
     .toLowerCase()
@@ -35,6 +40,11 @@ export async function createOwnedAssetHolder(
   }
   const owned: OwnedAssetHolder = { id: String(rawId), upn, tenant };
   cleanup.add(`asset holder ${upn}`, async () => {
+    if (options.preserveProtectedHistory) {
+      const current = await request.get(`/api/organization/asset-holders/${owned.id}/`);
+      expect(current.status(), `preserved asset holder ${upn} cleanup readback`).toBe(200);
+      return;
+    }
     await deleteOwnedResource(
       request,
       `/api/organization/asset-holders/${owned.id}/`,

@@ -14,8 +14,14 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const holder = await createOwnedAssetHolder(api, cleanup, tenant.id, `e2e-holder-${runId}`);
-    const asset = await createOwnedAsset(api, cleanup, tenant.id, runId);
+    const holder = await createOwnedAssetHolder(
+      api,
+      cleanup,
+      tenant.id,
+      `e2e-holder-${runId}`,
+      { preserveProtectedHistory: true },
+    );
+    const asset = await createOwnedAsset(api, cleanup, tenant.id, runId, { preserveProtectedHistory: true });
     const detailPath = `/assets/assets/${asset.id}/`;
 
     const initial = await page.goto(detailPath, { waitUntil: 'domcontentloaded' });

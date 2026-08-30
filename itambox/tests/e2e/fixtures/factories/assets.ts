@@ -17,11 +17,16 @@ function primaryKey(row: JsonObject, label: string): string {
   return String(value);
 }
 
+export type OwnedAssetCleanupOptions = {
+  preserveProtectedHistory?: boolean;
+};
+
 export async function createOwnedAsset(
   request: APIRequestContext,
   cleanup: CleanupRegistry,
   tenant: string,
   runId: string,
+  options: OwnedAssetCleanupOptions = {},
 ): Promise<OwnedAsset> {
   const assetTypes = await getJsonRows(request, '/api/assets/asset-types/?limit=100', 'asset type prerequisites');
   expect(assetTypes, 'the seeded E2E database must provide an asset type').not.toHaveLength(0);
@@ -41,6 +46,11 @@ export async function createOwnedAsset(
   expect(body.asset_tag, 'created asset must preserve its owned tag').toBe(assetTag);
   const owned = { id, assetTag, name, tenant };
   cleanup.add(`asset ${assetTag}`, async () => {
+    if (options.preserveProtectedHistory) {
+      const current = await request.get(`/api/assets/assets/${id}/`);
+      expect(current.status(), `preserved asset ${assetTag} cleanup readback`).toBe(200);
+      return;
+    }
     await deleteOwnedResource(request, `/api/assets/assets/${id}/`, `delete owned asset ${assetTag}`);
   });
   return owned;
