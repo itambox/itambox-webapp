@@ -86,7 +86,7 @@ test.describe('jobs contract', { tag: ['@pr', '@aggregate'] }, () => {
     const cancelResponse = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === cancelPath,
     );
-    await page.getByRole('button', { name: 'Cancel job', exact: true }).click();
+    await page.getByRole('button', { name: /Cancel job$/ }).click();
     expect((await cancelResponse).status(), 'job cancellation response').toBe(302);
     await page.waitForURL((url) => url.pathname === `/jobs/${jobId}/`);
     await expect(page.locator('#job-detail .badge')).toHaveText('Failed');
