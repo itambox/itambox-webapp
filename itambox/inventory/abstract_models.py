@@ -57,7 +57,7 @@ class AbstractInventoryItem(
         blank=True,
         db_index=True,
         verbose_name=_("EAN"),
-        help_text=_("Barcode (EAN / UPC / GTIN) " + chr(0x2014) + " scannable to open this item."),
+        help_text=_("Barcode (EAN, UPC, or GTIN). Scan it to open this item."),
     )
     min_qty = models.PositiveIntegerField(
         default=0, blank=True, verbose_name=_("Safety Threshold"), help_text=_("Alert threshold quantity")
@@ -115,7 +115,7 @@ class AbstractStock(ChangeLoggingMixin, BaseModel):
         db_index=True,
         editable=False,
         verbose_name=_("Tenant"),
-        help_text=_("Owning tenant " + chr(0x2014) + " always the stock location's tenant."),
+        help_text=_("Tenant of the stock location."),
     )
     # Signed: when an item allows over-allocation, a checkout can drive on-hand
     # below zero. The balance must be able to represent that deficit so check-in

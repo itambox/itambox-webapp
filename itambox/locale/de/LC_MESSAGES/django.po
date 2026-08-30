@@ -10720,9 +10720,9 @@ msgstr "Nur aktive Mitglieder dieses Mandanten können hinzugefügt werden. Vorh
 msgid "Open this form from a tenant, or select an active tenant first."
 msgstr "Rufen Sie dieses Formular über einen Mandanten auf oder wählen Sie zuerst einen aktiven Mandanten aus."
 
-#: itambox/licenses/models.py:90
-msgid "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). This is for reference only; reconciliation is performed at the Software level and ignores versions."
-msgstr "Optionale Versionsbeschränkung für diesen Lizenzanspruch, zum Beispiel '2021' oder '16.x'. Sie dient nur als Referenz; der Abgleich erfolgt auf Softwareebene und berücksichtigt keine Versionen."
+#: itambox/licenses/models.py:90 itambox/licenses/forms.py:80
+msgid "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). Reconciliation ignores the version and runs at the Software level."
+msgstr "Optionale Versionsbeschränkung für diesen Lizenzanspruch, zum Beispiel '2021' oder '16.x'. Der Abgleich ignoriert die Version und erfolgt auf Softwareebene."
 
 #: itambox/assets/models/asset.py:170
 msgid "Override the depreciation policy. Leave empty to use the tenant default or asset-type schedule."
@@ -12257,6 +12257,18 @@ msgstr "Nur Superuser können den Mitarbeiter-, Superuser- oder Anmeldestatus ve
 
 msgid "Owning tenant"
 msgstr "Besitzender Mandant"
+
+#: itambox/organization/models.py:299
+msgid "Set to 0 for unlimited retention under a legal hold. This tenant's change log will not be pruned automatically."
+msgstr "Auf 0 setzen, um eine unbegrenzte Aufbewahrung im Rahmen einer rechtlichen Sperre zu aktivieren. Das Änderungsprotokoll dieses Mandanten wird dann nicht automatisch bereinigt."
+
+#: itambox/inventory/abstract_models.py:118
+msgid "Tenant of the stock location."
+msgstr "Mandant des Lagerorts."
+
+#: itambox/extras/models.py:1712
+msgid "Unresolved. Manual review required."
+msgstr "Ungeklärt. Manuelle Prüfung erforderlich."
 
 msgid "Pick a tenant group."
 msgstr "Wählen Sie eine Mandantengruppe aus."

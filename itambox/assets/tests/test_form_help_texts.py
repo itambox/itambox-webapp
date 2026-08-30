@@ -23,8 +23,8 @@ class VisibleFormHelpTextTests(SimpleTestCase):
             (ConsumableForm, "ean"): "Barcode (EAN, UPC, or GTIN). Scan it to open this item.",
             (ComponentForm, "ean"): "Barcode (EAN, UPC, or GTIN). Scan it to open this item.",
             (LicenseForm, "version"): (
-                "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). This is for "
-                "reference only; reconciliation is performed at the Software level and ignores versions."
+                "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
+                "Reconciliation ignores the version and runs at the Software level."
             ),
         }
         for (form_class, field_name), text in expected.items():
