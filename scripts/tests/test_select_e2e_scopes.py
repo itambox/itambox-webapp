@@ -15,7 +15,6 @@ from scripts.select_e2e_scopes import (
     _matches,
     build_selection,
     canonical_json,
-    changed_path_digest,
     parse_name_status_z,
     validate_scope_map,
     validate_selection,
