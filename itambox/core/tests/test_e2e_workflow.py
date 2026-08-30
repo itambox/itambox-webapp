@@ -336,3 +336,16 @@ def test_e2e_provisions_one_masked_tenant_bound_api_token():
     assert 'env_file.write(f"E2E_API_TOKEN={plaintext}\\n")' in provision
     assert 'env_file.write(f"E2E_TENANT_ID={tenant.pk}\\n")' in provision
     assert 'env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\\n")' in provision
+
+
+def test_generic_delete_confirmation_opts_out_of_htmx_boost():
+    template = (REPOSITORY_ROOT / "itambox" / "templates" / "generic" / "object_confirm_delete.html").read_text(
+        encoding="utf-8"
+    )
+    form = template.split('<form method="post"', 1)[1].split(">", 1)[0]
+    assert 'hx-boost="false"' in form
+
+
+def test_slug_forms_do_not_reference_a_missing_standalone_script():
+    mixins = (REPOSITORY_ROOT / "itambox" / "core" / "forms" / "mixins.py").read_text(encoding="utf-8")
+    assert "js/slugify.js" not in mixins

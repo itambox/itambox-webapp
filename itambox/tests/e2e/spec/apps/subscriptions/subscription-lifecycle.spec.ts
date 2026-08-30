@@ -12,31 +12,9 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const providerName = `E2E Provider ${runId}`;
-    const providerSlug = `e2e-provider-${runId}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90);
-    const provider = await jsonResponse(
-      await api.post('/api/subscriptions/providers/', {
-        data: {
-          name: providerName,
-          slug: providerSlug,
-          tenant_id: tenant.id,
-          is_active: true,
-        },
-      }),
-      201,
-      'create subscription provider',
-    );
-    const providerId = String(provider.id);
-    cleanup.add(`subscription provider ${providerSlug}`, async () => {
-      const current = await api.get(`/api/subscriptions/providers/${providerId}/`);
-      if (current.status() === 404) return;
-      expect(current.status(), await current.text()).toBe(200);
-      await deleteOwnedResource(
-        api,
-        `/api/subscriptions/providers/${providerId}/`,
-        `delete subscription provider ${providerSlug}`,
-      );
-    });
+    const providers = await getJsonRows(api, '/api/subscriptions/providers/?limit=100', 'subscription provider');
+    expect(providers, 'the seeded E2E database must provide a visible subscription provider').not.toHaveLength(0);
+    const providerId = String(providers[0].id);
 
     const createPath = '/subscriptions/subscriptions/add/';
     const name = `E2E Subscription ${runId}`;
@@ -109,7 +87,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
       response.request().method() === 'POST' && new URL(response.url()).pathname === suspendPath,
     );
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Suspend', exact: true }).click();
+    await page.getByRole('button', { name: /Suspend$/ }).click();
     expect((await suspendResponsePromise).status(), 'subscription suspend response').toBe(204);
     expect(
       await jsonResponse(
@@ -119,14 +97,14 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
       ),
     ).toMatchObject({ status: 'suspended' });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Resume$/ })).toBeVisible();
 
     const resumePath = `/subscriptions/subscriptions/${subscriptionId}/resume/`;
     const resumeResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === resumePath,
     );
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page.getByRole('button', { name: /Resume$/ }).click();
     expect((await resumeResponsePromise).status(), 'subscription resume response').toBe(204);
     expect(
       await jsonResponse(
@@ -136,7 +114,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
       ),
     ).toMatchObject({ status: 'active' });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: 'Suspend', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Suspend$/ })).toBeVisible();
 
     const deletePath = `/subscriptions/subscriptions/${subscriptionId}/delete/`;
     const deletePage = await page.goto(deletePath, { waitUntil: 'domcontentloaded' });

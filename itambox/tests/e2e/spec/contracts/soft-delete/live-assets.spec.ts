@@ -39,7 +39,7 @@ test.describe('soft-delete contract', { tag: '@pr' }, () => {
     expect((await firstDeleteResponse).status(), 'first soft-delete response').toBe(302);
     expect((await api.get(`/api/assets/manufacturers/${manufacturerId}/`)).status()).toBe(404);
 
-    const recyclePath = `/assets/manufacturers/?deleted=true&q=${encodeURIComponent(slug)}`;
+    const recyclePath = `/assets/manufacturers/?deleted=true&q=${encodeURIComponent(name)}`;
     const recycle = await page.goto(recyclePath, { waitUntil: 'domcontentloaded' });
     expect(recycle?.status(), `GET ${recyclePath}`).toBe(200);
     let row = page.locator('tbody tr').filter({ has: page.getByRole('link', { name, exact: true }) });

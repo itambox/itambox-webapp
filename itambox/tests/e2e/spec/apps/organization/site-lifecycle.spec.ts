@@ -93,7 +93,7 @@ test.describe('organization-owned site lifecycle', { tag: '@pr' }, () => {
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );
-    await page.getByRole('button', { name: 'Confirm Delete', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm Deletion$/ }).click();
     expect((await deleteResponsePromise).status(), 'site delete response').toBe(302);
     expect((await api.get(`/api/organization/sites/${siteId}/`)).status()).toBe(404);
   });

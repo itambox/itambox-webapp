@@ -62,7 +62,7 @@ test.describe('jobs contract', { tag: ['@pr', '@aggregate'] }, () => {
     ]);
     const tenantSelect = page.locator('#scan-basket-form select[name="tenant"]');
     await expect(tenantSelect).toHaveCount(1);
-    await expect(tenantSelect).toHaveValue(activeTenant.id);
+    await expect(tenantSelect).toHaveValue(tenantId);
     const basketPks = page.locator('#scan-basket-rows input[name="pk"]');
     await expect(basketPks).toHaveCount(2);
     expect(

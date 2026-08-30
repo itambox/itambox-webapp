@@ -34,7 +34,7 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
     const checkoutForm = page.locator('#asset-checkout-form');
     await expect(checkoutForm).toBeVisible();
     await selectTomOption(checkoutForm, 'target_type', 'holder');
-    await selectTomOption(checkoutForm, 'assigned_holder', holder.id);
+    await selectTomOption(checkoutForm, 'asset_holder', holder.id);
     const checkoutWrite = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return response.request().method() === 'POST'

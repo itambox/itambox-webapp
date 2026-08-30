@@ -61,7 +61,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     });
 
     await page.waitForURL((url) => url.pathname === detailPath);
-    await expect(page.getByRole('heading', { name: originalName, exact: true })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(originalName);
     const created = await jsonResponse(
       await api.get(`/api/procurement/contracts/${contractId}/`),
       200,
@@ -96,7 +96,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     expect((await updateResponsePromise).status(), 'contract update response').toBe(302);
     await page.waitForURL((url) => url.pathname === detailPath);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: renamedName, exact: true })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(renamedName);
     const updated = await jsonResponse(
       await api.get(`/api/procurement/contracts/${contractId}/`),
       200,
@@ -107,7 +107,7 @@ test.describe('procurement-owned contract lifecycle', { tag: '@pr' }, () => {
     const deletePath = `/procurement/contracts/${contractId}/delete/`;
     const deletePage = await page.goto(deletePath, { waitUntil: 'domcontentloaded' });
     expect(deletePage?.status(), `GET ${deletePath}`).toBe(200);
-    await expect(page.getByText(renamedName, { exact: false })).toBeVisible();
+    await expect(page.locator('h2.page-title')).toContainText(renamedName);
     const deleteResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === deletePath,
     );

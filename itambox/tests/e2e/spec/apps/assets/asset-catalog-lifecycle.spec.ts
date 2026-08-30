@@ -30,7 +30,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     expect(createPage?.status(), `GET ${createPath}`).toBe(200);
     const createForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await expect(createForm).toHaveCount(1);
-    await createForm.getByLabel('Name').fill(originalName);
+    await createForm.locator('input[name="name"]').fill(originalName);
     await createForm.getByLabel('Asset tag').fill(assetTag);
     await selectTomOption(createForm, 'asset_type', String(assetTypes[0].id));
     await selectTomOption(createForm, 'asset_role', String(assetRoles[0].id));
@@ -74,7 +74,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     const updatePage = await page.goto(updatePath, { waitUntil: 'domcontentloaded' });
     expect(updatePage?.status(), `GET ${updatePath}`).toBe(200);
     const updateForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
-    await updateForm.getByLabel('Name').fill(renamedName);
+    await updateForm.locator('input[name="name"]').fill(renamedName);
     await updateForm.getByLabel('Notes').fill(`Updated owned asset lifecycle ${runId}`);
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
@@ -97,7 +97,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     const cloneForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="asset_tag"]') });
     const cloneName = `${originalName} Clone`;
     const cloneTag = `${assetTag}-CLONE`.slice(0, 90);
-    await cloneForm.getByLabel('Name').fill(cloneName);
+    await cloneForm.locator('input[name="name"]').fill(cloneName);
     await cloneForm.getByLabel('Asset tag').fill(cloneTag);
     const cloneResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === clonePath,

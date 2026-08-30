@@ -17,7 +17,7 @@ test.describe('generic object presentation contract', { tag: '@pr' }, () => {
     expect(createPage?.status(), `GET ${createPath}`).toBe(200);
     const createForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await expect(createForm).toHaveCount(1);
-    await createForm.getByLabel('Name').fill(originalName);
+    await createForm.locator('input[name="name"]').fill(originalName);
     await createForm.getByLabel('Slug').fill(slug);
     await createForm.getByLabel('Description').fill(`Generic object contract ${runId}`);
     const createResponsePromise = page.waitForResponse((response) =>
@@ -64,7 +64,7 @@ test.describe('generic object presentation contract', { tag: '@pr' }, () => {
     const updatePage = await page.goto(updatePath, { waitUntil: 'domcontentloaded' });
     expect(updatePage?.status(), `GET ${updatePath}`).toBe(200);
     const updateForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
-    await updateForm.getByLabel('Name').fill(renamedName);
+    await updateForm.locator('input[name="name"]').fill(renamedName);
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
