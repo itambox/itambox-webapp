@@ -11,7 +11,7 @@ from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row,
 from django import forms
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 
 from core.search import SEARCH_INDEXES
@@ -66,14 +66,13 @@ class ConfirmationForm(forms.Form):
         self.instance = instance
         if kwargs.get("initial") and "return_url" in kwargs["initial"]:
             self.fields["return_url"].initial = kwargs["initial"]["return_url"]
-        elif instance and hasattr(instance, "get_absolute_url"):
-            self.fields["return_url"].initial = instance.get_absolute_url()
         elif instance:
             try:
                 list_view_name = get_model_viewname(instance.__class__, "list")
                 self.fields["return_url"].initial = reverse(list_view_name)
-            except Exception:
-                pass
+            except NoReverseMatch:
+                if hasattr(instance, "get_absolute_url"):
+                    self.fields["return_url"].initial = instance.get_absolute_url()
 
 
 BULK_EDIT_FIELD_BLACKLIST = {
@@ -249,8 +248,7 @@ class CrispyFormMixin:
 
 
 class SlugModelForm(CrispyFormMixin, forms.ModelForm):
-    class Media:
-        js = ("js/slugify.js",)
+    pass
 
 
 class FilterForm(forms.Form):

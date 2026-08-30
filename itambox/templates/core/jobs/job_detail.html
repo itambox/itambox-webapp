@@ -7,7 +7,7 @@
   <h2 class="page-title">{{ object.name }}</h2>
 {% endblock %}
 {% block page_actions %}
-  {% if object.status == 'pending' and perms.core.change_job %}
+  {% if can_cancel_job %}
     <form action="{% url 'job_cancel' object.pk %}"
           method="post"
           class="d-inline">
