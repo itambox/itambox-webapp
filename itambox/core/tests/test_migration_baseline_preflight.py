@@ -324,6 +324,25 @@ class MigrationBaselineCommandTests(SimpleTestCase):
         self.assertIn("MIGRATION_RECORDER_UNAVAILABLE", str(raised.exception))
         self.assertNotIn("database failure", str(raised.exception))
 
+    def test_command_rejects_manifest_validation_failures_with_structured_safe_json(self):
+        for detail in ("synthetic unreadable manifest", "synthetic semantic manifest violation"):
+            with self.subTest(detail=detail):
+                stdout = io.StringIO()
+                with patch(
+                    "core.management.commands.migration_baseline_preflight.load_manifest",
+                    side_effect=ValueError(detail),
+                ):
+                    with self.assertRaises(CommandError) as raised:
+                        call_command("migration_baseline_preflight", format="json", stdout=stdout)
+
+                payload = json.loads(stdout.getvalue())
+                self.assertEqual(payload["state"], "migration-preflight-manifest-invalid")
+                self.assertEqual(payload["reason_code"], "MIGRATION_PREFLIGHT_MANIFEST_INVALID")
+                self.assertEqual(payload["exit_code"], 1)
+                self.assertEqual(payload["counts"], {})
+                self.assertIn("MIGRATION_PREFLIGHT_MANIFEST_INVALID", str(raised.exception))
+                self.assertNotIn(detail, stdout.getvalue())
+
     def test_format_table_is_safe_and_contains_ids_and_counts(self):
         result = recorder_unavailable_result(missing_table=True)
         rendered = format_table(result)

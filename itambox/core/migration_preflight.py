@@ -378,6 +378,18 @@ def classify_applied_migrations(applied_ids: Iterable[str], manifest: Mapping[st
     return _classify_transitional(manifest, observed, historical, replacement, post_transition)
 
 
+def manifest_invalid_result() -> PreflightResult:
+    """Return a safe, structured failure for an unusable checked manifest."""
+
+    return PreflightResult(
+        state="migration-preflight-manifest-invalid",
+        reason_code="MIGRATION_PREFLIGHT_MANIFEST_INVALID",
+        exit_code=1,
+        counts={},
+        remediation="Restore the checked manifest from the exact reviewed source before retrying; do not run cleanup.",
+    )
+
+
 def recorder_unavailable_result(*, missing_table: bool = False) -> PreflightResult:
     """Return a safe failure for a missing or unreadable recorder table."""
 

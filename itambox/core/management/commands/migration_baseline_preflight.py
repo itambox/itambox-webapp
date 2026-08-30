@@ -13,6 +13,7 @@ from core.migration_preflight import (
     classify_applied_migrations,
     format_table,
     load_manifest,
+    manifest_invalid_result,
     recorder_unavailable_result,
 )
 
@@ -32,19 +33,21 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             manifest = load_manifest()
-            connection = connections[options["database"]]
-            recorder = MigrationRecorder(connection)
-            if not recorder.has_table():
-                result = recorder_unavailable_result(missing_table=True)
-            else:
-                applied_ids = {
-                    f"{app_label}.{migration_name}" for app_label, migration_name in recorder.applied_migrations()
-                }
-                result = classify_applied_migrations(applied_ids, manifest)
-        except (ConnectionDoesNotExist, DatabaseError, ValueError) as exc:
-            if isinstance(exc, ValueError):
-                raise CommandError(f"MIGRATION_PREFLIGHT_MANIFEST_INVALID: {exc}") from exc
-            result = recorder_unavailable_result()
+        except ValueError:
+            result = manifest_invalid_result()
+        else:
+            try:
+                connection = connections[options["database"]]
+                recorder = MigrationRecorder(connection)
+                if not recorder.has_table():
+                    result = recorder_unavailable_result(missing_table=True)
+                else:
+                    applied_ids = {
+                        f"{app_label}.{migration_name}" for app_label, migration_name in recorder.applied_migrations()
+                    }
+                    result = classify_applied_migrations(applied_ids, manifest)
+            except (ConnectionDoesNotExist, DatabaseError, ValueError):
+                result = recorder_unavailable_result()
 
         if options["format"] == "json":
             self.stdout.write(json.dumps(result.as_dict(), indent=2, sort_keys=True))
