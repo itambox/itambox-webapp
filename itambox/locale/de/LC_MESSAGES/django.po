@@ -1414,9 +1414,7 @@ msgstr ""
 msgid ""
 "Global custody templates are disabled. You must select either a Tenant or a "
 "Tenant Group."
-msgstr ""
-"Globale Übergabevorlagen sind deaktiviert. Sie müssen entweder einen "
-"Mandanten oder eine Mandantengruppe auswählen."
+msgstr "Globale Verwahrungsvorlagen sind deaktiviert. Sie müssen entweder einen Mandanten oder eine Mandantengruppe auswählen."
 
 msgid "Start immediately"
 msgstr "Sofort starten"
@@ -1855,7 +1853,7 @@ msgid ") successfully!"
 msgstr ") erfolgreich!"
 
 msgid "Custody Agreement Secured - ITAMbox"
-msgstr "- Custody Agreement Secured - ITAMbox"
+msgstr "Verwahrungsvereinbarung bestätigt | ITAMbox"
 
 msgid "Custody Agreement Secured!"
 msgstr "Verwahrungsvereinbarung gesichert!"
@@ -1892,10 +1890,10 @@ msgid "This custody receipt records the recipient's digital acceptance and the a
 msgstr "Dieses Verwahrungsprotokoll dokumentiert die digitale Zustimmung des Empfängers und die zugehörigen Prüfnachweise. Sie können dieses Browserfenster schließen."
 
 msgid "Custody Signoff & EULA Acceptance - ITAMbox"
-msgstr "- Custody Signoff & EULA Acceptance - ITAMbox"
+msgstr "Verwahrungsbestätigung und EULA-Annahme | ITAMbox"
 
 msgid "Equipment Transfer & Custody Agreement"
-msgstr "Geräteübertragungs- & Verwahrungsvereinbarung"
+msgstr "Vereinbarung zur Geräteübertragung und Verwahrung"
 
 msgid "EULA Acceptance Portal"
 msgstr "EULA-Akzeptanzportal"
@@ -1989,7 +1987,7 @@ msgid "Decline"
 msgstr "Ablehnen"
 
 msgid "I Agree & Accept Custody"
-msgstr "Ich stimme zu & akzeptiere die Verwahrung"
+msgstr "Ich stimme zu und übernehme die Verwahrung"
 
 msgid "- Custody Template - ITAMbox"
 msgstr "Verwahrungsvorlage | ITAMbox"
@@ -2058,7 +2056,7 @@ msgid "Sign-Off Legal Disclaimer"
 msgstr "Rechtlicher Haftungsausschluss zur Freigabe"
 
 msgid "No custody receipts generated under this template yet."
-msgstr "Unter dieser Vorlage wurden noch keine Übergabeprotokolle erstellt."
+msgstr "Unter dieser Vorlage wurden noch keine Verwahrungsprotokolle erstellt."
 
 msgid "Asset:"
 msgstr "Asset:"
@@ -6067,7 +6065,7 @@ msgstr ""
 "%(unchanged)d unverändert."
 
 msgid "Vendor / Commercial"
-msgstr "Anbieter / Kommerziell"
+msgstr "Lieferant / Kommerziell"
 
 msgid "Dates"
 msgstr "Datumsangaben"
@@ -6972,7 +6970,7 @@ msgid "No verification audits logged for this asset."
 msgstr "Für dieses Asset wurden keine Verifizierungsprüfungen protokolliert."
 
 msgid "No custody receipts exist for this asset."
-msgstr "Für dieses Asset wurden keine Übergabeprotokolle erstellt."
+msgstr "Für dieses Asset wurden noch keine Verwahrungsprotokolle erstellt."
 
 msgid "Allocated Software Licenses"
 msgstr "Zugewiesene Softwarelizenzen"
@@ -6998,7 +6996,7 @@ msgid "Set margins to \"None\" in your print options."
 msgstr "Setzen Sie die Ränder in den Druckoptionen auf „Keine“."
 
 msgid "Delete Asset Type - ITAMbox"
-msgstr "- Delete Asset Type - ITAMbox"
+msgstr "Asset-Typ löschen | ITAMbox"
 
 msgid "Delete Asset Type"
 msgstr "Asset-Typ löschen"
@@ -7043,7 +7041,7 @@ msgid "No kits allocate this asset type."
 msgstr "Kein Kit verwendet diesen Asset-Typ."
 
 msgid "Asset Types - ITAMbox"
-msgstr "- Asset Types - ITAMbox"
+msgstr "Asset-Typen | ITAMbox"
 
 msgid "- Category Details - ITAMbox"
 msgstr "- Kategoriedetails - ITAMbox"
@@ -7616,7 +7614,7 @@ msgid "Deny Request"
 msgstr "Anforderung ablehnen"
 
 msgid "Request Details - ITAMbox"
-msgstr "- Request Details - ITAMbox"
+msgstr "Anforderungsdetails | ITAMbox"
 
 msgid "Approve..."
 msgstr "Genehmigen..."
@@ -7709,8 +7707,7 @@ msgstr "Sammel-Wareneingang &amp; -zuweisung"
 msgid ""
 "Enter serial numbers and asset details below for the approved requests "
 "(%(count)s total). New assets will be allocated to the matching requests."
-msgstr ""
-"Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen (Anzahl: %(count)s). Geben Sie unten die Seriennummern und individuellen Angaben für jedes Asset ein. Beim Anlegen werden die Assets automatisch den entsprechenden Anfragen zugewiesen."
+msgstr "Sie nehmen Hardware entgegen, um genehmigte Anforderungen zu erfüllen (Anzahl: %(count)s). Geben Sie unten die Seriennummern und individuellen Angaben für jedes Asset ein. Beim Anlegen werden die Assets automatisch den entsprechenden Anforderungen zugewiesen."
 
 msgid "Error validating batch"
 msgstr "Fehler bei der Validierung des Stapels"
@@ -8065,7 +8062,7 @@ msgid "Search Options"
 msgstr "Suchoptionen"
 
 msgid "Dashboard - ITAMbox"
-msgstr "- Dashboard - ITAMbox"
+msgstr "Dashboard | ITAMbox"
 
 msgid "Switch Dashboard"
 msgstr "Dashboard wechseln"
@@ -8876,8 +8873,7 @@ msgid "No software license seats assigned to this holder."
 msgstr "Diesem Inhaber sind keine Software-Lizenzplätze zugewiesen."
 
 msgid "No electronic custody receipts logged for this holder."
-msgstr ""
-"Für diesen Inhaber sind keine elektronischen Übergabeprotokolle erfasst."
+msgstr "Für diesen Inhaber sind keine elektronischen Verwahrungsprotokolle erfasst."
 
 msgid "Assign Contact to"
 msgstr "Kontakt zuweisen zu"
@@ -10186,7 +10182,7 @@ msgstr "Für eine Garantie ist ein Startdatum erforderlich."
 
 # --- Automated Remediation Translations (ITAMbox Audit) ---
 #: itambox/extras/templates/extras/dashboard/widgets/licenses.html:9
-msgid "%(allocated)s/%(total)s seats (%(pct)s%)"
+msgid "%(allocated)s/%(total)s seats (%(pct)s%%)"
 msgstr "%(allocated)s/%(total)s Plätze (%(pct)s %%)"
 
 #: itambox/compliance/templates/compliance/audits/audit_session_detail.html:467
@@ -10888,10 +10884,6 @@ msgstr "Erforderlich, wenn der aktuelle Geltungsbereich mehrere Mandanten umfass
 msgid "The bulk check-in could not be completed. Code: checkin.boundary_failed"
 msgstr "Die Sammel-Einbuchung konnte nicht abgeschlossen werden. Code: checkin.boundary_failed"
 
-#: itambox/assets/tasks/checkout.py:277
-msgid "The bulk checkout could not be completed. Code: checkout.boundary_failed"
-msgstr "Die Sammel-Herausgabe konnte nicht abgeschlossen werden. Code: checkout.boundary_failed"
-
 #: itambox/assets/tasks/disposal.py:267
 msgid "The bulk disposal could not be completed. Code: disposal.boundary_failed"
 msgstr "Die Sammel-Entsorgung konnte nicht abgeschlossen werden. Code: disposal.boundary_failed"
@@ -11052,7 +11044,21 @@ msgstr "Verwahrungsübergabe erforderlich: %(name)s (%(tag)s)"
 #: itambox/compliance/services.py:178
 #, python-format
 msgid "Hello %(holder)s,\n\nYou have a custody handoff waiting for you.\n\nAsset: %(name)s\nAsset tag: %(tag)s\nSerial number: %(serial)s\n\nOpen this one-time handoff link:\n%(url)s\n\nThe session expires at %(expires)s. Sign in as the intended holder before opening the link.\n\nIf you were not expecting this message, ignore it and report it to your IT administrator."
-msgstr "Hallo %(holder)s,\n\nfür Sie steht eine Verwahrungsübergabe bereit.\n\nAsset: %(name)s\nInventarnummer: %(tag)s\nSeriennummer: %(serial)s\n\nÖffnen Sie diesen einmalig verwendbaren Übergabelink:\n%(url)s\n\nDie Sitzung läuft am %(expires)s ab. Melden Sie sich vor dem Öffnen des Links als vorgesehener Asset-Inhaber an.\n\nWenn Sie diese Nachricht nicht erwartet haben, ignorieren Sie sie und melden Sie sie Ihrer IT-Administration."
+msgstr ""
+"Hallo %(holder)s,\\n"
+"\\n"
+"für Sie steht eine Verwahrungsübergabe bereit.\\n"
+"\\n"
+"Asset: %(name)s\\n"
+"Inventarnummer: %(tag)s\\n"
+"Seriennummer: %(serial)s\\n"
+"\\n"
+"Öffnen Sie diesen einmalig verwendbaren Link zur Verwahrungsübergabe:\\n"
+"%(url)s\\n"
+"\\n"
+"Die Sitzung läuft am %(expires)s ab. Melden Sie sich vor dem Öffnen des Links als vorgesehener Asset-Inhaber an.\\n"
+"\\n"
+"Wenn Sie diese Nachricht nicht erwartet haben, ignorieren Sie sie und melden Sie sie Ihrer IT-Administration."
 
 #: itambox/compliance/services.py:313
 msgid "Email is not configured."
@@ -11060,11 +11066,11 @@ msgstr "E-Mail ist nicht konfiguriert."
 
 #: itambox/compliance/services.py:316
 msgid "Please wait before sending another handoff e-mail."
-msgstr "Warten Sie, bevor Sie eine weitere Übergabe-E-Mail senden."
+msgstr "Warten Sie, bevor Sie eine weitere E-Mail zur Verwahrungsübergabe senden."
 
 #: itambox/compliance/services.py:322
 msgid "The handoff e-mail attempt limit has been reached."
-msgstr "Die maximale Anzahl von Zustellversuchen für die Übergabe-E-Mail wurde erreicht."
+msgstr "Die maximale Anzahl von Zustellversuchen für die E-Mail zur Verwahrungsübergabe wurde erreicht."
 
 #: itambox/compliance/templates/compliance/audits/audit_session_detail.html:186
 msgid "Scan barcode, type tag or serial..."
@@ -11108,7 +11114,7 @@ msgstr "Berechtigung für interne Verwahrungsdaten erforderlich"
 
 #: itambox/compliance/templates/compliance/custody/sign_error.html:39
 msgid "Custody links expire automatically after 7 days. Please contact your IT administrator to request a new custody handoff link."
-msgstr "Verwahrungslinks laufen nach 7 Tagen automatisch ab. Wenden Sie sich an Ihren IT-Administrator, um einen neuen Link zur Übergabe der Verwahrung anzufordern."
+msgstr "Verwahrungslinks laufen nach 7 Tagen automatisch ab. Wenden Sie sich an Ihren IT-Administrator, um einen neuen Link zur Verwahrungsübergabe anzufordern."
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:101
 msgid "IP address"
@@ -11144,11 +11150,11 @@ msgstr "Dieses Verwahrungsprotokoll wartet auf die Entscheidung des Empfängers.
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:131
 msgid "Recipient handoff is ready"
-msgstr "Übergabe an den Empfänger ist bereit"
+msgstr "Die Verwahrungsübergabe an den Empfänger ist bereit"
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:141
 msgid "Copy recipient handoff link"
-msgstr "Übergabelink für den Empfänger kopieren"
+msgstr "Link zur Verwahrungsübergabe für den Empfänger kopieren"
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:150
 msgid "Show QR code"
@@ -11160,7 +11166,7 @@ msgstr "Link per E-Mail an den Asset-Inhaber senden"
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:179
 msgid "QR code for the one-time recipient handoff"
-msgstr "QR-Code für die einmalige Übergabe an den Empfänger"
+msgstr "QR-Code für die einmalige Verwahrungsübergabe an den Empfänger"
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:184
 #, python-format
@@ -11293,7 +11299,7 @@ msgstr "Signatur-Hash"
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_export_pdf.html:220
 msgid "Handoff audit appendix"
-msgstr "Prüfanhang zur Übergabe"
+msgstr "Prüfanhang zur Verwahrungsübergabe"
 
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_export_pdf.html:236
 msgid "Outcome"
@@ -11323,7 +11329,7 @@ msgstr "Das PDF des Verwahrungsprotokolls konnte nicht erstellt werden."
 #: itambox/compliance/views.py:757
 #, python-format
 msgid "The handoff e-mail was accepted for delivery. The signing session expires in %(minutes)s minutes."
-msgstr "Die Übergabe-E-Mail wurde zur Zustellung angenommen. Die Signatursitzung läuft in %(minutes)s Minuten ab."
+msgstr "Die E-Mail zur Verwahrungsübergabe wurde zur Zustellung angenommen. Die Signatursitzung läuft in %(minutes)s Minuten ab."
 
 #: itambox/compliance/views.py:760
 msgid "Delivery could not be confirmed; the session remains active."
@@ -11412,11 +11418,6 @@ msgstr "Webhook-Zustellung erneut zustellen"
 msgid "You are not a member of the selected tenant."
 msgstr "Sie sind kein Mitglied des ausgewählten Mandanten."
 
-#: itambox/extras/export_views.py:139
-#, python-format
-msgid "There was an error rendering the export template \"%(name)s\": %(error)s"
-msgstr "Beim Erstellen der Exportvorlage \"%(name)s\" ist ein Fehler aufgetreten: %(error)s"
-
 #: itambox/extras/export_views.py:165
 msgid "Invalid pk value(s)."
 msgstr "Ungültige PK-Werte."
@@ -11433,16 +11434,6 @@ msgstr "Kommentare durchsuchen…"
 #, python-format
 msgid "Rows: %(n)s"
 msgstr "Zeilen: %(n)s"
-
-#: itambox/extras/tasks/reports.py:195
-#, python-format
-msgid "Scheduled report '%(name)s' was successfully generated on %(timestamp)s UTC.\nFormat: %(format)s\n%(summary)s"
-msgstr "Der geplante Bericht '%(name)s' wurde am %(timestamp)s UTC erfolgreich erstellt.\nFormat: %(format)s\n%(summary)s"
-
-#: itambox/extras/tasks/reports.py:73
-#, python-format
-msgid "Please find attached the scheduled %(format)s report for '%(name)s' generated on %(timestamp)s UTC."
-msgstr "Im Anhang finden Sie den geplanten %(format)s-Bericht für '%(name)s', der am %(timestamp)s UTC erstellt wurde."
 
 #: itambox/extras/templates/extras/includes/detail/exporttemplate_info.html:11
 msgid "MIME Type:"
@@ -13342,7 +13333,7 @@ msgstr "Diese Schätzung unterstützt das IT-Asset-Management und die Budgetplan
 #: itambox/compliance/templates/compliance/custodyreceipts/custodyreceipt_detail.html:133
 #, python-format
 msgid "This one-time handoff expires at %(expires)s. Copy the link and send it to the intended holder. The link only works in their account."
-msgstr "Diese einmalige Übergabe läuft am %(expires)s ab. Kopieren Sie den Link und senden Sie ihn an den vorgesehenen Asset-Inhaber. Der Link funktioniert nur in dessen Konto."
+msgstr "Diese einmalige Verwahrungsübergabe läuft am %(expires)s ab. Kopieren Sie den Link und senden Sie ihn an den vorgesehenen Asset-Inhaber. Der Link funktioniert nur in dessen Konto."
 
 #: itambox/organization/forms/membership_form.py:477
 msgid "This organization's roles"
@@ -13419,3 +13410,22 @@ msgstr "Diese Assets wurden während der Kampagne gescannt, aber ihr <strong>beo
 
 msgid "Choose who to add: select an existing user or create a new user by email."
 msgstr "Legen Sie fest, wer hinzugefügt wird: Wählen Sie einen vorhandenen Benutzer aus oder legen Sie per E-Mail einen neuen an."
+
+#: extras/tasks/reports.py:73
+msgid "Attached is the scheduled %(format)s report for '%(name)s', generated on %(timestamp)s UTC."
+msgstr "Der geplante %(format)s-Bericht für „%(name)s“ ist beigefügt. Er wurde am %(timestamp)s UTC erstellt."
+
+#: extras/tasks/reports.py:195
+msgid "Scheduled report '%(name)s' was generated on %(timestamp)s UTC.\nFormat: %(format)s\n%(summary)s"
+msgstr ""
+"Der geplante Bericht „%(name)s“ wurde am %(timestamp)s UTC erstellt.\\n"
+"Format: %(format)s\\n"
+"%(summary)s"
+
+#: extras/export_views.py:139
+msgid "The export template \"%(name)s\" could not be rendered. Try again or contact an administrator."
+msgstr "Die Exportvorlage „%(name)s“ konnte nicht gerendert werden. Versuchen Sie es erneut oder wenden Sie sich an einen Administrator."
+
+#: assets/tasks/checkout.py:277
+msgid "The bulk checkout could not be completed. Check the job details for more information."
+msgstr "Die gebündelte Herausgabe konnte nicht abgeschlossen werden. Weitere Informationen finden Sie in den Jobdetails."

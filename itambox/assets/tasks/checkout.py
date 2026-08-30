@@ -274,7 +274,7 @@ def bulk_checkout_task(
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Checkout Error"),
-                    message=_("The bulk checkout could not be completed. Code: checkout.boundary_failed"),
+                    message=_("The bulk checkout could not be completed. Check the job details for more information."),
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )

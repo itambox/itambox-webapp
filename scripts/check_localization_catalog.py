@@ -27,7 +27,12 @@ BLOCK = re.compile(
 )
 TRANS = re.compile(r"{%[-+]?\s*(?:trans|translate)\s+(?P<value>['\"])(?P<text>.*?)(?P=value)[^%]*%}", re.S)
 PLACEHOLDER = re.compile(r"%\([^)]+\)[a-zA-Z]|%[a-zA-Z]")
-HTML_TAG = re.compile(r"</?([A-Za-z][A-Za-z0-9]*)\b[^>]*>")
+HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
+
+
+def html_skeleton(value: str) -> list[str]:
+    return [re.sub(r"\s+", " ", tag).strip() for tag in HTML_TAG.findall(value)]
+
 
 # These labels are served by the JS catalog to the existing form/runtime
 # contract even though they are not all literal gettext calls in static/src.
@@ -186,7 +191,8 @@ def block_identity(body: str, trimmed: bool) -> tuple[str, str | None]:
     parts = re.split(r"{%[-+]?\s*plural\s*[-+]?%}", body, maxsplit=1)
 
     def convert(value: str) -> str:
-        return re.sub(r"{{\s*([A-Za-z_]\w*)\s*}}", r"%(\1)s", value)
+        value = re.sub(r"{{\s*([A-Za-z_]\w*)\s*}}", r"%(\1)s", value)
+        return re.sub(r"%(?!\([^)]+\)[a-zA-Z]|[a-zA-Z]|%)", "%%", value)
 
     values = [convert(value) for value in parts]
     if trimmed:
@@ -316,9 +322,11 @@ def entry_failures(domain: str, key: str, entry: dict, source: dict) -> list[str
     if source.get("plural"):
         source_values.append(source["plural"])
     for source_value, translated in zip(source_values, values, strict=True):
+        if not translated:
+            continue
         if placeholders(source_value) != placeholders(translated):
             failures.append(f"{domain}: placeholder mismatch {key!r}")
-        if sorted(HTML_TAG.findall(source_value)) != sorted(HTML_TAG.findall(translated)):
+        if html_skeleton(source_value) != html_skeleton(translated):
             failures.append(f"{domain}: HTML mismatch {key!r}")
     return failures
 

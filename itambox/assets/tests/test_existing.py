@@ -1323,10 +1323,10 @@ class AssetCatalogLocalizationTest(SimpleTestCase):
             "Select an Asset Holder.": "Wählen Sie einen Asset-Inhaber als Ziel aus.",
             "The holder has no e-mail address.": "Der Asset-Inhaber hat keine E-Mail-Adresse.",
             bulk_receive_message: (
-                "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen "
+                "Sie nehmen Hardware entgegen, um genehmigte Anforderungen zu erfüllen "
                 "(Anzahl: %(count)s). Geben Sie unten die Seriennummern und individuellen "
                 "Angaben für jedes Asset ein. Beim Anlegen werden die Assets automatisch "
-                "den entsprechenden Anfragen zugewiesen."
+                "den entsprechenden Anforderungen zugewiesen."
             ),
         }
 
@@ -1400,9 +1400,9 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
         )
         self.assertEqual(
             translated_bulk_receive,
-            "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen (Anzahl: %(count)s). "
+            "Sie nehmen Hardware entgegen, um genehmigte Anforderungen zu erfüllen (Anzahl: %(count)s). "
             "Geben Sie unten die Seriennummern und individuellen Angaben für jedes Asset ein. "
-            "Beim Anlegen werden die Assets automatisch den entsprechenden Anfragen zugewiesen.",
+            "Beim Anlegen werden die Assets automatisch den entsprechenden Anforderungen zugewiesen.",
         )
         for placeholder in ("%(name)s", "%(tag)s", "%(serial)s", "%(url)s"):
             self.assertEqual(translated_custody.count(placeholder), 1)
