@@ -51,7 +51,7 @@ test.describe('assets-owned lifecycle', { tag: '@pr' }, () => {
     );
     const assignment = checkedOut.assigned_to;
     expect(assignment).toMatchObject({ id: Number(holder.id), type: 'assetholder' });
-    await expect(page.getByTestId('asset-assignment-state')).toContainText('E2E Holder');
+    await expect(page.getByTestId('asset-assignment-state')).toContainText(holder.upn);
 
     const checkinOpen = page.waitForResponse((response) => {
       const url = new URL(response.url());
