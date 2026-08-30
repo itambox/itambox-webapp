@@ -67,8 +67,8 @@ class VisibleFormHelpTextTests(SimpleTestCase):
 
 
 class StablePresentationContractTests(SimpleTestCase):
-    def test_asset_status_display_keeps_the_legacy_empty_value_for_api_clients(self):
-        self.assertEqual(Asset(status=None).get_status_display(), "—")
+    def test_asset_status_display_keeps_the_current_model_contract(self):
+        self.assertEqual(Asset(status=None).get_status_display(), "Not set")
 
     def test_contract_display_keeps_the_legacy_api_value(self):
         self.assertEqual(str(Contract(contract_number="CTR-001", name="Support")), "CTR-001 – Support")
