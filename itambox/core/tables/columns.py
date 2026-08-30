@@ -378,7 +378,7 @@ class AssigneeColumn(tables.Column):
             try:
                 url = holder.get_absolute_url()
                 if getattr(holder, "_meta", None) is not None and holder._meta.label_lower == "organization.location":
-                    return format_html('Location: <a href="{}">{}</a>', url, holder)
+                    return format_html('{}: <a href="{}">{}</a>', _("Location"), url, holder)
                 return format_html('<a href="{}">{}</a>', url, holder)
             except Exception:
                 return str(holder)
@@ -391,9 +391,9 @@ class AssigneeColumn(tables.Column):
             if loc:
                 try:
                     url = loc.get_absolute_url()
-                    return format_html('Location: <a href="{}">{}</a>', url, loc)
-                except Exception:
-                    return f"Location: {loc}"
+                    return format_html('{}: <a href="{}">{}</a>', _("Location"), url, loc)
+                except Exception:  # broad except: render-degrade: location links may fail without breaking the table
+                    return f"{_('Location')}: {loc}"
 
         if self._empty_text is not None:
             return self._empty_text

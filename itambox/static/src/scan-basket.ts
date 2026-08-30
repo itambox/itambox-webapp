@@ -199,9 +199,14 @@ function initScanBasket(): void {
     if (input) input.disabled = !tenantSelected;
     if (cameraBtn) cameraBtn.disabled = !tenantSelected;
     if (submitBtn) submitBtn.disabled = count === 0 || !tenantSelected;
-    document.querySelectorAll<HTMLElement>('.scan-basket-confirm-count').forEach((el) => {
-      el.textContent = String(count);
-    });
+    const disposeConfirmText = document.getElementById('scan-basket-dispose-confirm-text');
+    if (disposeConfirmText) {
+      disposeConfirmText.textContent = interpolate(
+        ngettext('Dispose of %(count)s asset?', 'Dispose of %(count)s assets?', count),
+        { count },
+        true,
+      );
+    }
     updateKeptAsideNotice();
   }
 

@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from core.context import get_current_request_id
 from core.importers.bulk_forms import get_import_form_class
@@ -74,10 +75,24 @@ def import_csv_task(
                 with transaction.atomic():
                     imported_count, errors = form.import_data()
 
-                job.append_log(f"Import finished. Successfully imported: {imported_count} record(s).")
+                job.append_log(
+                    ngettext(
+                        "Import finished. Successfully imported %(count)s record.",
+                        "Import finished. Successfully imported %(count)s records.",
+                        imported_count,
+                    )
+                    % {"count": imported_count}
+                )
 
                 if errors:
-                    job.append_log(f"Encountered {len(errors)} error(s) during processing:")
+                    job.append_log(
+                        ngettext(
+                            "Encountered %(count)s error during processing:",
+                            "Encountered %(count)s errors during processing:",
+                            len(errors),
+                        )
+                        % {"count": len(errors)}
+                    )
                     for err in errors:
                         job.append_log(f" - {err}")
 
@@ -98,7 +113,11 @@ def import_csv_task(
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Import Complete"),
-                    message=_("Successfully imported %(count)s record(s) to %(model)s.")
+                    message=ngettext(
+                        "Successfully imported %(count)s record to %(model)s.",
+                        "Successfully imported %(count)s records to %(model)s.",
+                        imported_count,
+                    )
                     % {"count": imported_count, "model": model._meta.verbose_name_plural},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk),

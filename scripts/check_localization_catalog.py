@@ -27,7 +27,8 @@ BLOCK = re.compile(
 )
 TRANS = re.compile(r"{%[-+]?\s*(?:trans|translate)\s+(?P<value>['\"])(?P<text>.*?)(?P=value)[^%]*%}", re.S)
 PLACEHOLDER = re.compile(r"%(?:\([^)]+\)|[0-9]+)?[a-zA-Z%]")
-ESCAPE_SEQUENCE = re.compile(r"\\[nrt\\]")
+BRACE_PLACEHOLDER = re.compile(r"(?<!{){([A-Za-z_]\w*(?:![rsa])?(?::[^{}]+)?)\}(?!})")
+ESCAPE_SEQUENCE = re.compile(r"\r\n|\r|\n|\\[nrt\\]")
 HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 
 
@@ -165,9 +166,7 @@ def source_python(path: Path, relative: str, sources: dict[str, dict]) -> None:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name) or node.func.id not in PY_CALLS:
             continue
-        args = [
-            arg.value if isinstance(arg, ast.Constant) and isinstance(arg.value, str) else None for arg in node.args
-        ]
+        args = [constant_python_text(arg) for arg in node.args]
         if node.func.id in {"pgettext", "npgettext"}:
             if len(args) > 1 and args[1] is not None:
                 add_source(
@@ -188,6 +187,20 @@ def source_python(path: Path, relative: str, sources: dict[str, dict]) -> None:
             )
 
 
+def constant_python_text(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = constant_python_text(node.left)
+        right = constant_python_text(node.right)
+        return left + right if left is not None and right is not None else None
+    if isinstance(node, ast.JoinedStr):
+        values = [constant_python_text(value) for value in node.values]
+        if all(value is not None for value in values):
+            return "".join(values)  # type: ignore[arg-type]
+    return None
+
+
 def block_identity(body: str, trimmed: bool) -> tuple[str, str | None]:
     parts = re.split(r"{%[-+]?\s*plural\s*[-+]?%}", body, maxsplit=1)
 
@@ -204,7 +217,7 @@ def block_identity(body: str, trimmed: bool) -> tuple[str, str | None]:
 def source_templates(path: Path, relative: str, sources: dict[str, dict]) -> None:
     if set(Path(relative).parts) & {"tests", "docs", "locale"}:
         return
-    text = path.read_text(encoding="utf-8-sig")
+    text = strip_template_comments(path.read_text(encoding="utf-8-sig"))
     for match in TRANS.finditer(text):
         add_source(sources, "django", match.group("text"), path=relative)
     for match in BLOCK.finditer(text):
@@ -218,6 +231,16 @@ def source_templates(path: Path, relative: str, sources: dict[str, dict]) -> Non
             context=context_match.group(1) if context_match else None,
             path=relative,
         )
+
+
+def strip_template_comments(source: str) -> str:
+    for pattern in (
+        r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}",
+        r"{#.*?#}",
+        r"<!--.*?-->",
+    ):
+        source = re.sub(pattern, lambda match: "\n" * match.group(0).count("\n"), source, flags=re.S)
+    return source
 
 
 def iter_js_string_literals(text: str):
@@ -279,31 +302,71 @@ def iter_js_calls(text: str):
             yield match, text[match.end() : end - 1]
 
 
+def split_js_arguments(text: str) -> list[str]:
+    arguments = []
+    start = 0
+    depth = 0
+    quote = None
+    escaped = False
+    for index, char in enumerate(text):
+        if quote:
+            quote, escaped = update_js_quote(char, quote, escaped)
+        elif char in {"'", '"', "`"}:
+            quote = char
+        elif char in "([{":
+            depth += 1
+        elif char in ")]}" and depth:
+            depth -= 1
+        elif char == "," and depth == 0:
+            arguments.append(text[start:index])
+            start = index + 1
+    arguments.append(text[start:])
+    return arguments
+
+
+def constant_js_text(argument: str) -> str | None:
+    literals = list(iter_js_string_literals(argument))
+    if not literals:
+        return None
+    remainder = argument
+    values = []
+    for literal in literals:
+        if literal.startswith("`"):
+            if "${" in literal:
+                return None
+            value = literal[1:-1]
+        else:
+            try:
+                value = ast.literal_eval(literal)
+            except (SyntaxError, ValueError):
+                return None
+        values.append(value)
+        remainder = remainder.replace(literal, "", 1)
+    if re.sub(r"[+\s]", "", remainder):
+        return None
+    return "".join(values)
+
+
 def source_javascript(path: Path, relative: str, sources: dict[str, dict]) -> None:
     text = path.read_text(encoding="utf-8-sig")
     for call, body in iter_js_calls(text):
-        literals = []
-        for literal in iter_js_string_literals(body):
-            try:
-                literals.append(ast.literal_eval(literal))
-            except (SyntaxError, ValueError):
-                continue
+        arguments = [constant_js_text(argument) for argument in split_js_arguments(body)]
         name = call.group(1)
-        if name in {"pgettext", "npgettext"} and len(literals) >= 2:
+        if name in {"pgettext", "npgettext"} and len(arguments) >= 2 and arguments[0] and arguments[1]:
             add_source(
                 sources,
                 "djangojs",
-                literals[1],
-                plural=literals[2] if name == "npgettext" and len(literals) > 2 else None,
-                context=literals[0],
+                arguments[1],
+                plural=arguments[2] if name == "npgettext" and len(arguments) > 2 else None,
+                context=arguments[0],
                 path=relative,
             )
-        elif literals:
+        elif arguments and arguments[0]:
             add_source(
                 sources,
                 "djangojs",
-                literals[0],
-                plural=literals[1] if name == "ngettext" and len(literals) > 1 else None,
+                arguments[0],
+                plural=arguments[1] if name == "ngettext" and len(arguments) > 1 else None,
                 path=relative,
             )
 
@@ -326,11 +389,13 @@ def all_sources() -> dict[str, dict]:
 
 
 def placeholders(value: str) -> Counter[str]:
-    return Counter(item for item in PLACEHOLDER.findall(value) if item != "%%")
+    values = [item for item in PLACEHOLDER.findall(value) if item != "%%"]
+    values.extend(f"{{{item}}}" for item in BRACE_PLACEHOLDER.findall(value))
+    return Counter(values)
 
 
-def escape_shape(value: str) -> tuple[int, tuple[str, ...]]:
-    return value.count("\n"), tuple(ESCAPE_SEQUENCE.findall(value))
+def escape_shape(value: str) -> tuple[str, ...]:
+    return tuple(ESCAPE_SEQUENCE.findall(value))
 
 
 def translated_values(entry: dict) -> list[str]:

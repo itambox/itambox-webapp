@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from .models import Provider, Subscription, SubscriptionAssignment
 
@@ -96,7 +97,10 @@ class SubscriptionAdmin(admin.ModelAdmin):
         days = obj.days_until_renewal
         if days is None:
             return _("Not set")
-        return f"{days} days" if days >= 0 else f"{abs(days)} days overdue"
+        if days >= 0:
+            return ngettext("%(count)s day", "%(count)s days", days) % {"count": days}
+        count = abs(days)
+        return ngettext("%(count)s day overdue", "%(count)s days overdue", count) % {"count": count}
 
     def get_actions(self, request):
         actions = super().get_actions(request)
@@ -110,7 +114,15 @@ class SubscriptionAdmin(admin.ModelAdmin):
         for subscription in queryset:
             subscription.expire()
             updated += 1
-        self.message_user(request, f"{updated} subscription(s) marked as expired.")
+        self.message_user(
+            request,
+            ngettext(
+                "%(count)s subscription marked as expired.",
+                "%(count)s subscriptions marked as expired.",
+                updated,
+            )
+            % {"count": updated},
+        )
 
     @admin.action(description=_("Mark selected as Cancelled"))
     def mark_cancelled(self, request, queryset):
@@ -120,7 +132,11 @@ class SubscriptionAdmin(admin.ModelAdmin):
         for subscription in queryset:
             subscription.cancel(cancellation_date=timezone.now().date())
             updated += 1
-        self.message_user(request, f"{updated} subscription(s) cancelled.")
+        self.message_user(
+            request,
+            ngettext("%(count)s subscription cancelled.", "%(count)s subscriptions cancelled.", updated)
+            % {"count": updated},
+        )
 
 
 @admin.register(SubscriptionAssignment)

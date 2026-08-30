@@ -232,6 +232,9 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["cost_center"].label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True

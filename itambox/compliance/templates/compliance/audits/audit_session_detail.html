@@ -116,7 +116,7 @@
                   {{ total_scanned }}
                   {% if surprise_finds %}
                     <small class="text-warning ms-1"
-                           title="{% blocktranslate with n=surprise_finds|length %}including {{ n }} surprise find(s) not in expected list{% endblocktranslate %}">
+                           title="{% blocktranslate trimmed count count=surprise_finds|length %}including {{ count }} unexpected asset not in the planned list{% plural %}including {{ count }} unexpected assets not in the planned list{% endblocktranslate %}">
                       (+{{ surprise_finds|length }} {% translate "unexpected" %})
                     </small>
                   {% endif %}

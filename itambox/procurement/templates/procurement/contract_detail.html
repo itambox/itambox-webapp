@@ -193,7 +193,7 @@
           <div class="datagrid-title">{% translate "Cost Center" %}</div>
           <div class="datagrid-content">
             {% if object.cost_center %}
-              <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+              <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{% if object.cost_center.code %}{{ object.cost_center.code }}: {% endif %}{{ object.cost_center.name }}</a>
 {% else %}-{% endif %}
   </div>
   </div>

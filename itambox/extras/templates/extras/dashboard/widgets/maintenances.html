@@ -16,7 +16,7 @@
           <span>
             {% if maint.is_overdue %}
               <span class="badge bg-danger"
-                    title="{% blocktranslate with days=overdue_days %}Running longer than {{ days }} days{% endblocktranslate %}">{{ maint.days_running }}d</span>
+                    title="{% blocktranslate trimmed count count=overdue_days %}Running longer than {{ count }} day{% plural %}Running longer than {{ count }} days{% endblocktranslate %}">{{ maint.days_running }}d</span>
             {% else %}
               {% translate "Started:" %} {{ maint.start_date|date:"Y-m-d" }}
             {% endif %}

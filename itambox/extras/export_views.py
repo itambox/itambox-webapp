@@ -162,7 +162,7 @@ class ObjectExportView(LoginRequiredMixin, View):
         export_scope = request.GET.get("export_scope", "all").lower()
         queryset = _get_export_queryset(request, model, app_label, model_name, export_scope)
         if queryset is None:
-            return HttpResponseBadRequest(_("Invalid pk value(s)."))
+            return HttpResponseBadRequest(_("One or more selected IDs are invalid."))
 
         if template_id == 0:
             if export_format == "yaml":

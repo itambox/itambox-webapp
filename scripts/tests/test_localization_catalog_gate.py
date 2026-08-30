@@ -59,6 +59,13 @@ def test_placeholder_multiplicity_mismatch_is_rejected():
     assert "django: placeholder mismatch 'example'" in failures
 
 
+def test_brace_placeholder_multiplicity_mismatch_is_rejected():
+    source = {"msgid": "Open {name} from {name} at {url}", "plural": None}
+    entry = {"msgstr": "{name} unter {url} öffnen", "flags": set()}
+    failures = MODULE.entry_failures("django", "example", entry, source)
+    assert "django: placeholder mismatch 'example'" in failures
+
+
 def test_plural_shape_mismatch_does_not_crash():
     source = {"msgid": "One asset", "plural": "%(count)s assets"}
     entry = {"msgstr": "Ein Asset", "flags": set()}
@@ -93,9 +100,39 @@ def test_escape_and_newline_shape_mismatch_is_rejected():
     assert failures == ["django: escape/newline mismatch 'example'"]
 
 
+def test_escape_shape_preserves_order_not_only_counts():
+    source = {"msgid": "First\nSecond\\tThird", "plural": None}
+    entry = {"msgstr": "Erste\\tZweite\nDritte", "flags": set()}
+    failures = MODULE.entry_failures("django", "example", entry, source)
+    assert failures == ["django: escape/newline mismatch 'example'"]
+
+
 def test_js_string_scanner_handles_escapes_without_backtracking():
     text = 'gettext("A \\"quoted\\" value") + gettext(\'B\\\\\\\'s value\')'
     assert list(MODULE.iter_js_string_literals(text)) == ['"A \\"quoted\\" value"', "'B\\\\\\'s value'"]
+
+
+def test_constant_source_extraction_handles_python_and_javascript_concatenation(tmp_path):
+    sources = {}
+    python_path = tmp_path / "copy.py"
+    python_path.write_text("gettext('Stock ' + 'status')", encoding="utf-8")
+    MODULE.source_python(python_path, "itambox/example/copy.py", sources)
+    javascript_path = tmp_path / "copy.ts"
+    javascript_path.write_text("ngettext('One ' + 'day', '%(count)s ' + 'days', count)", encoding="utf-8")
+    MODULE.source_javascript(javascript_path, "itambox/static/src/copy.ts", sources)
+    assert ("django", "Stock status") in sources
+    assert sources[("djangojs", "One day")]["plural"] == "%(count)s days"
+
+
+def test_template_source_extraction_ignores_non_rendered_comments(tmp_path):
+    path = tmp_path / "copy.html"
+    path.write_text(
+        '{# {% translate "Hidden" %} #}\n<!-- {% translate "Also hidden" %} -->\n{% translate "Visible" %}',
+        encoding="utf-8",
+    )
+    sources = {}
+    MODULE.source_templates(path, "itambox/templates/copy.html", sources)
+    assert set(sources) == {("django", "Visible")}
 
 
 def test_current_catalog_passes_source_contract():

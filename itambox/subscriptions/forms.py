@@ -235,6 +235,9 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         # Rescope the tenant-owned `cost_center` FK per request (import-frozen
         # unscoped — would expose/permit another tenant's cost center).
         self.fields["cost_center"].queryset = CostCenter.objects.all()
+        self.fields["cost_center"].label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
 
         cancel_url = (
             self.instance.get_absolute_url() if self.instance.pk else reverse("subscriptions:subscription_list")

@@ -295,3 +295,9 @@ msgstr "Erstellungsdatum"
 #: .\static\dist\itambox.js:1
 msgid "IP Address"
 msgstr "IP-Adresse"
+
+#, javascript-format
+msgid "Dispose of %(count)s asset?"
+msgid_plural "Dispose of %(count)s assets?"
+msgstr[0] "%(count)s Asset entsorgen?"
+msgstr[1] "%(count)s Assets entsorgen?"

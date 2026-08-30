@@ -4,6 +4,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import FilterForm, scope_tenant_field
@@ -83,7 +84,7 @@ class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
         else:
             self.fields["user"].queryset = unassigned_users
 
-        button_text = "Update" if self.instance and self.instance.pk else "Create"
+        button_text = _("Update") if self.instance and self.instance.pk else _("Create")
         cancel_url = reverse("organization:assetholder_list")
 
         self.helper.layout = Layout(
@@ -107,7 +108,7 @@ class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
             "tags",
             HTML('<div class="mt-4"></div>'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(format_html('<a href="{}" class="btn btn-outline-secondary ms-2">{}</a>', cancel_url, _("Cancel"))),
         )
         self.append_custom_fields_to_layout()
 

@@ -32,7 +32,7 @@ class SearchForm(forms.Form):
         label=_("Search"), widget=forms.TextInput(attrs={"placeholder": _("Search ITAMbox"), "class": "form-control"})
     )
     obj_type = forms.MultipleChoiceField(
-        label=_("Object type(s)"),
+        label=_("Object types"),
         choices=OBJ_TYPE_CHOICES,
         required=False,
         widget=forms.SelectMultiple(attrs={"class": "form-select", "id": "id_obj_type_select", "data-tom-select": ""}),

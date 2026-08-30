@@ -254,7 +254,7 @@
                     aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="modal-body">
-            <p>{% blocktranslate %}Dispose of <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s)?{% endblocktranslate %}</p>
+            <p id="scan-basket-dispose-confirm-text">{% blocktranslate count count=0 %}Dispose of {{ count }} asset?{% plural %}Dispose of {{ count }} assets?{% endblocktranslate %}</p>
             <p class="text-muted mb-0">{% translate "The system checks in each asset if needed, archives it, and records the disposal. Reversing this is difficult." %}</p>
           </div>
           <div class="modal-footer">

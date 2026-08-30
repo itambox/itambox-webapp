@@ -1317,8 +1317,11 @@ msgstr ""
 "Der Anforderer hat kein aktives Asset-Inhaber-Profil, dem das Asset "
 "zugewiesen werden könnte."
 
-msgid "Item(s) claimed successfully."
-msgstr "Artikel erfolgreich übernommen."
+#, python-format
+msgid "Claimed %(count)d item."
+msgid_plural "Claimed %(count)d items."
+msgstr[0] "%(count)d Artikel übernommen."
+msgstr[1] "%(count)d Artikel übernommen."
 
 msgid "You do not have permission to mark this request as fulfilled."
 msgstr ""
@@ -1697,10 +1700,10 @@ msgid "Expected Assets"
 msgstr "Erwartete Assets"
 
 #, python-format
-msgid "including %(n)s surprise find(s) not in expected list"
-msgstr ""
-"einschließlich %(n)s Überraschungsfund(en), die nicht in der erwarteten "
-"Liste enthalten sind"
+msgid "including %(count)s unexpected asset not in the planned list"
+msgid_plural "including %(count)s unexpected assets not in the planned list"
+msgstr[0] "einschließlich %(count)s unerwarteten Assets, das nicht in der geplanten Liste enthalten ist"
+msgstr[1] "einschließlich %(count)s unerwarteter Assets, die nicht in der geplanten Liste enthalten sind"
 
 msgid "unexpected"
 msgstr "unerwartet"
@@ -1822,16 +1825,10 @@ msgid "No missing assets recorded in this session's report."
 msgstr "Im Bericht dieser Sitzung wurden keine fehlenden Assets erfasst."
 
 #, python-format
-msgid ""
-"\n"
-"                This will set the status of <strong>%(count)s missing asset(s)</strong>\n"
-"                from campaign <em>%(name)s</em> to <strong>\"Missing\"</strong> (undeployable).\n"
-"            "
-msgstr ""
-"\n"
-"                Dadurch wird der Status von <strong>%(count)s fehlenden Asset(s)</strong>\n"
-"                aus der Kampagne <em>%(name)s</em> auf <strong>„Fehlend“</strong> (nicht einsatzfähig) gesetzt.\n"
-"            "
+msgid "This will set the status of <strong>%(count)s missing asset</strong> from campaign <em>%(name)s</em> to <strong>\"Missing\"</strong> (undeployable)."
+msgid_plural "This will set the status of <strong>%(count)s missing assets</strong> from campaign <em>%(name)s</em> to <strong>\"Missing\"</strong> (undeployable)."
+msgstr[0] "Dadurch wird der Status von <strong>%(count)s fehlenden Asset</strong> aus der Kampagne <em>%(name)s</em> auf <strong>\"Fehlend\"</strong> (nicht einsatzfähig) gesetzt."
+msgstr[1] "Dadurch wird der Status von <strong>%(count)s fehlenden Assets</strong> aus der Kampagne <em>%(name)s</em> auf <strong>\"Fehlend\"</strong> (nicht einsatzfähig) gesetzt."
 
 msgid ""
 "Assets whose status has been manually changed since the session closed will "
@@ -2129,12 +2126,16 @@ msgid "Audit session closed. Reconciliation report generated."
 msgstr "Prüfsitzung geschlossen. Abgleichsbericht erstellt."
 
 #, python-format
-msgid ""
-"%(flagged)s asset(s) flagged as Missing. %(skipped)s skipped (status changed"
-" since close)."
-msgstr ""
-"%(flagged)s Asset(s) als fehlend markiert. %(skipped)s übersprungen (Status "
-"seit Abschluss geändert)."
+msgid "%(count)s asset flagged as Missing."
+msgid_plural "%(count)s assets flagged as Missing."
+msgstr[0] "%(count)s Asset wurde als fehlend markiert."
+msgstr[1] "%(count)s Assets wurden als fehlend markiert."
+
+#, python-format
+msgid "%(count)s asset was skipped because its status changed after the audit closed."
+msgid_plural "%(count)s assets were skipped because their status changed after the audit closed."
+msgstr[0] "%(count)s Asset wurde übersprungen, weil sein Status nach Abschluss der Prüfung geändert wurde."
+msgstr[1] "%(count)s Assets wurden übersprungen, weil ihr Status nach Abschluss der Prüfung geändert wurde."
 
 msgid "Missing assets flagged."
 msgstr "Fehlende Assets markiert."
@@ -2323,8 +2324,8 @@ msgstr "Zeile %(row)s: \"%(field)s\" ist erforderlich."
 msgid "Search ITAMbox"
 msgstr "ITAMbox durchsuchen"
 
-msgid "Object type(s)"
-msgstr "Objekttyp(en)"
+msgid "Object types"
+msgstr "Objekttypen"
 
 msgid "Partial match"
 msgstr "Teilübereinstimmung"
@@ -2922,54 +2923,58 @@ msgid "Upcoming Hardware EOL: %(tag)s"
 msgstr "Bevorstehendes Hardware-EOL: %(tag)s"
 
 #, python-format
-msgid ""
-"Asset %(tag)s (%(name)s) reaches EOL on %(eol)s (%(days)s day(s) remaining)."
-msgstr ""
-"Asset %(tag)s (%(name)s) erreicht das EOL am %(eol)s (noch %(days)s Tag(e))."
+msgid "Asset %(tag)s (%(name)s) reaches EOL on %(eol)s (%(days)s day remaining)."
+msgid_plural "Asset %(tag)s (%(name)s) reaches EOL on %(eol)s (%(days)s days remaining)."
+msgstr[0] "Asset %(tag)s (%(name)s) erreicht das EOL am %(eol)s (noch %(days)s Tag)."
+msgstr[1] "Asset %(tag)s (%(name)s) erreicht das EOL am %(eol)s (noch %(days)s Tage)."
 
 #, python-format
 msgid "License Expiring: %(name)s"
 msgstr "Lizenz läuft ab: %(name)s"
 
 #, python-format
-msgid "License '%(name)s' expires on %(date)s (%(days)s day(s) remaining)."
-msgstr "Lizenz '%(name)s' läuft am %(date)s ab (noch %(days)s Tag(e))."
+msgid "License '%(name)s' expires on %(date)s (%(days)s day remaining)."
+msgid_plural "License '%(name)s' expires on %(date)s (%(days)s days remaining)."
+msgstr[0] "Lizenz '%(name)s' läuft am %(date)s ab (noch %(days)s Tag)."
+msgstr[1] "Lizenz '%(name)s' läuft am %(date)s ab (noch %(days)s Tage)."
 
 #, python-format
 msgid "Subscription Renewal Due: %(name)s"
 msgstr "Abonnementverlängerung fällig: %(name)s"
 
 #, python-format
-msgid ""
-"Subscription '%(name)s' ends on %(date)s (%(days)s day(s) remaining) and "
-"requires renewal validation."
-msgstr ""
-"Abonnement '%(name)s' endet am %(date)s (noch %(days)s Tag(e)) und erfordert"
-" eine Verlängerungsprüfung."
+msgid "Subscription '%(name)s' ends on %(date)s (%(days)s day remaining) and requires renewal validation."
+msgid_plural "Subscription '%(name)s' ends on %(date)s (%(days)s days remaining) and requires renewal validation."
+msgstr[0] "Abonnement '%(name)s' endet am %(date)s (noch %(days)s Tag) und erfordert eine Verlängerungsprüfung."
+msgstr[1] "Abonnement '%(name)s' endet am %(date)s (noch %(days)s Tage) und erfordert eine Verlängerungsprüfung."
 
 #, python-format
 msgid "Warranty Expiring: %(tag)s"
 msgstr "Garantie läuft ab: %(tag)s"
 
 #, python-format
-msgid ""
-"Asset %(tag)s (%(name)s) %(wtype)s warranty expires on %(date)s (%(days)s "
-"day(s) remaining)."
-msgstr ""
-"Die %(wtype)s-Garantie von Asset %(tag)s (%(name)s) läuft am %(date)s ab "
-"(noch %(days)s Tag(e))."
+msgid "Asset %(tag)s (%(name)s) %(wtype)s warranty expires on %(date)s (%(days)s day remaining)."
+msgid_plural "Asset %(tag)s (%(name)s) %(wtype)s warranty expires on %(date)s (%(days)s days remaining)."
+msgstr[0] "Die %(wtype)s-Garantie von Asset %(tag)s (%(name)s) läuft am %(date)s ab (noch %(days)s Tag)."
+msgstr[1] "Die %(wtype)s-Garantie von Asset %(tag)s (%(name)s) läuft am %(date)s ab (noch %(days)s Tage)."
 
 #, python-format
-msgid "every %(months)s month(s) per category"
-msgstr "alle %(months)s Monat(e) pro Kategorie"
+msgid "every %(months)s month per category"
+msgid_plural "every %(months)s months per category"
+msgstr[0] "jeden %(months)s Monat gemäß Kategorie"
+msgstr[1] "alle %(months)s Monate gemäß Kategorie"
 
 #, python-format
-msgid "every %(days)s day(s)"
-msgstr "alle %(days)s Tag(e)"
+msgid "every %(days)s day"
+msgid_plural "every %(days)s days"
+msgstr[0] "jeden %(days)s Tag"
+msgstr[1] "alle %(days)s Tage"
 
 #, python-format
-msgid "last audited %(days)s day(s) ago (%(date)s)"
-msgstr "zuletzt vor %(days)s Tag(en) geprüft (%(date)s)"
+msgid "last audited %(days)s day ago (%(date)s)"
+msgid_plural "last audited %(days)s days ago (%(date)s)"
+msgstr[0] "zuletzt vor %(days)s Tag geprüft (%(date)s)"
+msgstr[1] "zuletzt vor %(days)s Tagen geprüft (%(date)s)"
 
 msgid "never audited"
 msgstr "nie geprüft"
@@ -2998,8 +3003,10 @@ msgid "Bulk Checkout Complete"
 msgstr "Sammel-Herausgabe abgeschlossen"
 
 #, python-format
-msgid "Successfully checked out %(count)s asset(s)."
-msgstr "%(count)s Asset(s) erfolgreich herausgegeben."
+msgid "Successfully checked out %(count)s asset."
+msgid_plural "Successfully checked out %(count)s assets."
+msgstr[0] "%(count)s Asset wurde erfolgreich herausgegeben."
+msgstr[1] "%(count)s Assets wurden erfolgreich herausgegeben."
 
 msgid "Bulk Checkout Error"
 msgstr "Fehler bei der Sammel-Herausgabe"
@@ -3023,8 +3030,10 @@ msgid "Bulk Import Complete"
 msgstr "Sammelimport abgeschlossen"
 
 #, python-format
-msgid "Successfully imported %(count)s record(s) to %(model)s."
-msgstr "%(count)s Datensatz/Datensätze erfolgreich nach %(model)s importiert."
+msgid "Successfully imported %(count)s record to %(model)s."
+msgid_plural "Successfully imported %(count)s records to %(model)s."
+msgstr[0] "%(count)s Datensatz wurde erfolgreich in %(model)s importiert."
+msgstr[1] "%(count)s Datensätze wurden erfolgreich in %(model)s importiert."
 
 msgid "Bulk Import Error"
 msgstr "Fehler beim Sammelimport"
@@ -3033,22 +3042,19 @@ msgid "Label Generation Complete"
 msgstr "Etikettenerstellung abgeschlossen"
 
 #, python-format
-msgid ""
-"Successfully generated label batch zip for %(count)s asset(s). Click to "
-"download."
-msgstr ""
-"ZIP-Etikettenstapel für %(count)s Asset(s) erfolgreich erstellt. Zum "
-"Herunterladen klicken."
+msgid "Successfully generated a label batch ZIP for %(count)s asset. Click to download."
+msgid_plural "Successfully generated a label batch ZIP for %(count)s assets. Click to download."
+msgstr[0] "Ein Etikettenstapel als ZIP für %(count)s Asset wurde erfolgreich erstellt. Zum Herunterladen klicken."
+msgstr[1] "Ein Etikettenstapel als ZIP für %(count)s Assets wurde erfolgreich erstellt. Zum Herunterladen klicken."
 
 msgid "Label Generation Failed"
 msgstr "Etikettenerstellung fehlgeschlagen"
 
 #, python-format
-msgid ""
-"Successfully generated label PDF for %(count)s asset(s). Click to download."
-msgstr ""
-"Etiketten-PDF für %(count)s Asset(s) erfolgreich erstellt. Zum Herunterladen"
-" klicken."
+msgid "Successfully generated a label PDF for %(count)s asset. Click to download."
+msgid_plural "Successfully generated a label PDF for %(count)s assets. Click to download."
+msgstr[0] "Ein Etiketten-PDF für %(count)s Asset wurde erfolgreich erstellt. Zum Herunterladen klicken."
+msgstr[1] "Ein Etiketten-PDF für %(count)s Assets wurde erfolgreich erstellt. Zum Herunterladen klicken."
 
 msgid "LDAP Sync Complete"
 msgstr "LDAP-Synchronisierung abgeschlossen"
@@ -4320,8 +4326,10 @@ msgid "Star any object to pin it here."
 msgstr "Markiere ein Objekt mit einem Stern, um es hier anzuheften."
 
 #, python-format
-msgid "Hardware Expiring within %(days_horizon)s days"
-msgstr "Hardware, die innerhalb von %(days_horizon)s Tagen ausläuft"
+msgid "Hardware expiring within %(count)s day"
+msgid_plural "Hardware expiring within %(count)s days"
+msgstr[0] "Hardware, deren EOL in %(count)s Tag erreicht wird"
+msgstr[1] "Hardware, deren EOL in %(count)s Tagen erreicht wird"
 
 #, python-format
 msgid "%(asset_type)s &middot; EOL: %(eol_date)s"
@@ -4391,8 +4399,10 @@ msgid "Internal"
 msgstr "Intern"
 
 #, python-format
-msgid "Running longer than %(days)s days"
-msgstr "Läuft länger als %(days)s Tage"
+msgid "Running longer than %(count)s day"
+msgid_plural "Running longer than %(count)s days"
+msgstr[0] "Läuft länger als %(count)s Tag"
+msgstr[1] "Läuft länger als %(count)s Tage"
 
 msgid "Started:"
 msgstr "Gestartet:"
@@ -4411,18 +4421,19 @@ msgstr ""
 "werden sollen."
 
 #, python-format
-msgid "Active subscriptions renewing within %(days_horizon)s days"
-msgstr ""
-"Aktive Abonnements, die innerhalb von %(days_horizon)s Tagen verlängert "
-"werden"
+msgid "Active subscriptions renewing within %(count)s day"
+msgid_plural "Active subscriptions renewing within %(count)s days"
+msgstr[0] "Aktive Abonnements mit Verlängerung innerhalb von %(count)s Tag"
+msgstr[1] "Aktive Abonnements mit Verlängerung innerhalb von %(count)s Tagen"
 
 msgid "Active subscription spend:"
 msgstr "Ausgaben für aktive Abonnements:"
 
 #, python-format
-msgid "No upcoming renewals within %(days_horizon)s days."
-msgstr ""
-"Keine anstehenden Verlängerungen innerhalb von %(days_horizon)s Tagen."
+msgid "No upcoming renewals within %(count)s day."
+msgid_plural "No upcoming renewals within %(count)s days."
+msgstr[0] "Keine anstehenden Verlängerungen innerhalb von %(count)s Tag."
+msgstr[1] "Keine anstehenden Verlängerungen innerhalb von %(count)s Tagen."
 
 msgid "Total Managed Assets"
 msgstr "Verwaltete Assets gesamt"
@@ -4497,12 +4508,16 @@ msgid "No alerts selected."
 msgstr "Keine Warnungen ausgewählt."
 
 #, python-format
-msgid "%(count)s alert(s) acknowledged."
-msgstr "%(count)s Warnung(en) bestätigt."
+msgid "%(count)s alert acknowledged."
+msgid_plural "%(count)s alerts acknowledged."
+msgstr[0] "%(count)s Warnung wurde bestätigt."
+msgstr[1] "%(count)s Warnungen wurden bestätigt."
 
 #, python-format
-msgid "%(count)s alert(s) resolved."
-msgstr "%(count)s Warnung(en) aufgelöst."
+msgid "%(count)s alert resolved."
+msgid_plural "%(count)s alerts resolved."
+msgstr[0] "%(count)s Warnung wurde behoben."
+msgstr[1] "%(count)s Warnungen wurden behoben."
 
 msgid "Create Notification Channel"
 msgstr "Benachrichtigungskanal erstellen"
@@ -5032,8 +5047,10 @@ msgid "No source location specified."
 msgstr "Kein Quell-Lagerort angegeben."
 
 #, python-format
-msgid "Successfully checked out %(count)s item(s)."
-msgstr "%(count)s Artikel erfolgreich herausgegeben."
+msgid "Successfully checked out %(count)s item."
+msgid_plural "Successfully checked out %(count)s items."
+msgstr[0] "%(count)s Artikel wurde erfolgreich herausgegeben."
+msgstr[1] "%(count)s Artikel wurden erfolgreich herausgegeben."
 
 msgid "Component Details"
 msgstr "Komponentendetails"
@@ -6859,9 +6876,6 @@ msgstr "Möchten Sie die Asset-Rolle wirklich löschen:"
 msgid "Warning: Related Assets"
 msgstr "Warnung: Zugehörige Assets"
 
-msgid "There are"
-msgstr "Es gibt"
-
 msgid "This asset role is not currently assigned to any assets."
 msgstr "Diese Asset-Rolle ist derzeit keinen Assets zugewiesen."
 
@@ -7007,11 +7021,11 @@ msgstr "Möchten Sie den Asset-Typ wirklich löschen"
 msgid "Warning:"
 msgstr "Warnung:"
 
-msgid "This asset type is currently assigned to"
-msgstr "Dieser Asset-Typ ist derzeit zugewiesen an"
-
-msgid "asset(s)."
-msgstr "Asset(s)."
+#, python-format
+msgid "This asset type is currently assigned to %(count)s asset."
+msgid_plural "This asset type is currently assigned to %(count)s assets."
+msgstr[0] "Dieser Asset-Typ ist derzeit %(count)s Asset zugewiesen."
+msgstr[1] "Dieser Asset-Typ ist derzeit %(count)s Assets zugewiesen."
 
 msgid "- Asset Type - ITAMbox"
 msgstr "- Asset-Typ - ITAMbox"
@@ -7281,9 +7295,6 @@ msgstr "Nicht gesetzt (verwendet Kaufdatum)"
 msgid "Estimated EOL Date:"
 msgstr "Geschätztes EOL-Datum:"
 
-msgid "months"
-msgstr "Monate"
-
 msgid "Remaining Lifespan:"
 msgstr "Verbleibende Nutzungsdauer:"
 
@@ -7293,11 +7304,11 @@ msgstr "Abgelaufen (EOL erreicht)"
 msgid "Total Cost of Ownership (TCO):"
 msgstr "Gesamtbetriebskosten (TCO):"
 
-msgid "Purchase +"
-msgstr "Anschaffung +"
-
-msgid "repair/maintenance item"
-msgstr "Reparatur-/Wartungsposition"
+#, python-format
+msgid "Purchase plus %(count)s repair or maintenance item"
+msgid_plural "Purchase plus %(count)s repair or maintenance items"
+msgstr[0] "Anschaffung plus %(count)s Reparatur- oder Wartungsposition"
+msgstr[1] "Anschaffung plus %(count)s Reparatur- oder Wartungspositionen"
 
 msgid "Assigned System Hardware Specifications"
 msgstr "Zugewiesene System-Hardware-Spezifikationen"
@@ -7845,8 +7856,10 @@ msgid "Re-notify"
 msgstr "Erneut benachrichtigen"
 
 #, python-format
-msgid "Every %(days)s day(s) while unresolved"
-msgstr "Alle %(days)s Tag(e), solange ungelöst"
+msgid "Every %(count)s day while unresolved"
+msgid_plural "Every %(count)s days while unresolved"
+msgstr[0] "Jeden %(count)s Tag, solange ungelöst"
+msgstr[1] "Alle %(count)s Tage, solange ungelöst"
 
 msgid "Once only"
 msgstr "Nur einmal"
@@ -8439,8 +8452,10 @@ msgstr ""
 "erfolgreich importiert."
 
 #, python-format
-msgid "<strong>%(err_len)s</strong> error(s) occurred during import:"
-msgstr "<strong>%(err_len)s</strong> Fehler beim Import aufgetreten:"
+msgid "<strong>%(count)s</strong> error occurred during import:"
+msgid_plural "<strong>%(count)s</strong> errors occurred during import:"
+msgstr[0] "Beim Import ist <strong>%(count)s</strong> Fehler aufgetreten:"
+msgstr[1] "Beim Import sind <strong>%(count)s</strong> Fehler aufgetreten:"
 
 msgid "Return to List"
 msgstr "Zurück zur Liste"
@@ -9865,8 +9880,11 @@ msgstr "Fehler bei der Sammel-Einbuchung"
 msgid "All hardware check-ins failed. View logs for details."
 msgstr "Alle Einbuchungen sind fehlgeschlagen. Details in den Protokollen."
 
-msgid "Checked in %(count)s asset(s)."
-msgstr "%(count)s Asset(s) eingebucht."
+#, python-format
+msgid "Checked in %(count)s asset."
+msgid_plural "Checked in %(count)s assets."
+msgstr[0] "%(count)s Asset wurde eingebucht."
+msgstr[1] "%(count)s Assets wurden eingebucht."
 
 msgid "Bulk Disposal Failed"
 msgstr "Sammel-Entsorgung fehlgeschlagen"
@@ -9880,8 +9898,11 @@ msgstr "Fehler bei der Sammel-Entsorgung"
 msgid "All hardware disposals failed. View logs for details."
 msgstr "Alle Entsorgungen sind fehlgeschlagen. Details in den Protokollen."
 
-msgid "Disposed %(count)s asset(s)."
-msgstr "%(count)s Asset(s) entsorgt."
+#, python-format
+msgid "Disposed %(count)s asset."
+msgid_plural "Disposed %(count)s assets."
+msgstr[0] "%(count)s Asset wurde entsorgt."
+msgstr[1] "%(count)s Assets wurden entsorgt."
 
 msgid "Bulk Actions"
 msgstr "Sammelaktionen"
@@ -9971,12 +9992,11 @@ msgstr "Fertig"
 msgid "Confirm disposal"
 msgstr "Entsorgung bestätigen"
 
-msgid ""
-"Dispose of <strong><span class=\"scan-basket-confirm-count\">0</span></strong> "
-"asset(s)?"
-msgstr ""
-"Sie sind dabei, <strong><span class=\"scan-basket-confirm-"
-"count\">0</span></strong> Asset(s) zu entsorgen."
+#, python-format
+msgid "Dispose of %(count)s asset?"
+msgid_plural "Dispose of %(count)s assets?"
+msgstr[0] "%(count)s Asset entsorgen?"
+msgstr[1] "%(count)s Assets entsorgen?"
 
 msgid ""
 "The system checks in each asset if needed, archives it, and records the "
@@ -11416,8 +11436,8 @@ msgid "You are not a member of the selected tenant."
 msgstr "Sie sind kein Mitglied des ausgewählten Mandanten."
 
 #: itambox/extras/export_views.py:165
-msgid "Invalid pk value(s)."
-msgstr "Ungültige PK-Werte."
+msgid "One or more selected IDs are invalid."
+msgstr "Mindestens eine ausgewählte ID ist ungültig."
 
 #: itambox/extras/filters.py:130
 msgid "Test send"
@@ -12103,10 +12123,12 @@ msgstr "Es wurden keine Benutzergruppen ausgewählt."
 msgid "No valid user groups selected for deletion."
 msgstr "Keine gültigen Benutzergruppen zum Löschen ausgewählt."
 
-#: itambox/users/views.py:880
+#: itambox/users/views.py:881
 #, python-format
-msgid "Successfully deleted %(count)d user group(s)."
-msgstr "%(count)d Benutzergruppe(n) erfolgreich gelöscht."
+msgid "Deleted %(count)d user group."
+msgid_plural "Deleted %(count)d user groups."
+msgstr[0] "%(count)d Benutzergruppe gelöscht."
+msgstr[1] "%(count)d Benutzergruppen gelöscht."
 
 #: itambox/users/views.py:951
 #, python-format
@@ -12138,8 +12160,11 @@ msgid "Total"
 msgstr "Gesamt"
 
 #: itambox/templates/assets/assetroles/assetrole_confirm_delete.html:15
-msgid "asset(s) assigned to this role.\n        Deleting this role will prevent these assets from being properly categorized.\n        Consider reassigning assets before deleting this role."
-msgstr "Asset(s), die dieser Rolle zugewiesen sind.\n        Wenn Sie diese Rolle löschen, können diese Assets nicht mehr richtig kategorisiert werden.\n        Weisen Sie die Assets möglichst neu zu, bevor Sie diese Rolle löschen."
+#, python-format
+msgid "There is <strong>%(count)s</strong> asset assigned to this role. Deleting this role will prevent the asset from being properly categorized. Consider reassigning it before deleting this role."
+msgid_plural "There are <strong>%(count)s</strong> assets assigned to this role. Deleting this role will prevent these assets from being properly categorized. Consider reassigning them before deleting this role."
+msgstr[0] "Dieser Rolle ist <strong>%(count)s</strong> Asset zugewiesen. Wenn Sie die Rolle löschen, kann das Asset nicht mehr korrekt kategorisiert werden. Weisen Sie es vor dem Löschen möglichst einer anderen Rolle zu."
+msgstr[1] "Dieser Rolle sind <strong>%(count)s</strong> Assets zugewiesen. Wenn Sie die Rolle löschen, können diese Assets nicht mehr korrekt kategorisiert werden. Weisen Sie sie vor dem Löschen möglichst einer anderen Rolle zu."
 
 msgid "Email authentication failed."
 msgstr "Die E-Mail-Authentifizierung ist fehlgeschlagen."
@@ -12259,16 +12284,16 @@ msgid "Owning tenant"
 msgstr "Besitzender Mandant"
 
 #: itambox/organization/models.py:299
-msgid "Set to 0 for unlimited retention under a legal hold. This tenant's change log will not be pruned automatically."
-msgstr "Auf 0 setzen, um eine unbegrenzte Aufbewahrung im Rahmen einer rechtlichen Sperre zu aktivieren. Das Änderungsprotokoll dieses Mandanten wird dann nicht automatisch bereinigt."
+msgid "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange rows only. Blank uses the global setting. 0 = unlimited (legal hold -- this tenant's changelog is never pruned by prune_changelog)."
+msgstr "Überschreibt ITAMBOX_CHANGELOG_RETENTION_DAYS nur für die ObjectChange-Einträge dieses Mandanten. Leer verwendet die globale Einstellung. 0 bedeutet unbegrenzt (rechtliche Sperre; prune_changelog bereinigt das Änderungsprotokoll dieses Mandanten nie)."
 
 #: itambox/inventory/abstract_models.py:118
-msgid "Tenant of the stock location."
-msgstr "Mandant des Lagerorts."
+msgid "Owning tenant — always the stock location's tenant."
+msgstr "Zugehöriger Mandant; immer der Mandant des Lagerorts."
 
 #: itambox/extras/models.py:1712
-msgid "Unresolved. Manual review required."
-msgstr "Ungeklärt. Manuelle Prüfung erforderlich."
+msgid "Unresolved — operator review required"
+msgstr "Ungeklärt; Prüfung durch einen Administrator erforderlich"
 
 msgid "Pick a tenant group."
 msgstr "Wählen Sie eine Mandantengruppe aus."
@@ -12569,8 +12594,8 @@ msgid "Typed error class (or disposition) of the most recent failed channel deli
 msgstr "Typisierte Fehlerklasse (oder Disposition) der letzten fehlgeschlagenen Kanalzustellung, falls vorhanden."
 
 #, python-format
-msgid "Unknown report column key(s): %(keys)s"
-msgstr "Unbekannte Schlüssel für Berichtsspalten: %(keys)s"
+msgid "Unknown report columns: %(keys)s"
+msgstr "Unbekannte Berichtsspalten: %(keys)s"
 
 msgid "Use the legacy summary CSV shape; this does not enable custom HTML execution."
 msgstr "Verwendet das alte CSV-Zusammenfassungsformat; die Ausführung von benutzerdefiniertem HTML wird dadurch nicht aktiviert."
@@ -12703,8 +12728,10 @@ msgid "Delete change"
 msgstr "Löschänderung"
 
 #, python-format
-msgid "Deleted %(count)d role(s)."
-msgstr "%(count)d Rolle(n) gelöscht."
+msgid "Deleted %(count)d role."
+msgid_plural "Deleted %(count)d roles."
+msgstr[0] "%(count)d Rolle wurde gelöscht."
+msgstr[1] "%(count)d Rollen wurden gelöscht."
 
 msgid "Describe the role…"
 msgstr "Beschreiben Sie die Rolle…"
@@ -12982,8 +13009,10 @@ msgid "Triggering deadline"
 msgstr "Auslösende Frist"
 
 #, python-format
-msgid "Updated %(count)d membership(s)."
-msgstr "%(count)d Mitgliedschaft(en) aktualisiert."
+msgid "Updated %(count)d membership."
+msgid_plural "Updated %(count)d memberships."
+msgstr[0] "%(count)d Mitgliedschaft wurde aktualisiert."
+msgstr[1] "%(count)d Mitgliedschaften wurden aktualisiert."
 
 msgid "Valid until"
 msgstr "Gültig bis"
@@ -13433,3 +13462,96 @@ msgstr "Die Exportvorlage „%(name)s“ konnte nicht gerendert werden. Versuche
 #: assets/tasks/checkout.py:277
 msgid "The bulk checkout could not be completed. Check the job details for more information."
 msgstr "Die gebündelte Herausgabe konnte nicht abgeschlossen werden. Weitere Informationen finden Sie in den Jobdetails."
+
+#, python-format
+msgid "%(count)s day"
+msgid_plural "%(count)s days"
+msgstr[0] "%(count)s Tag"
+msgstr[1] "%(count)s Tage"
+
+#, python-format
+msgid "%(count)s day overdue"
+msgid_plural "%(count)s days overdue"
+msgstr[0] "%(count)s Tag überfällig"
+msgstr[1] "%(count)s Tage überfällig"
+
+#, python-format
+msgid "%(count)s subscription cancelled."
+msgid_plural "%(count)s subscriptions cancelled."
+msgstr[0] "%(count)s Abonnement wurde gekündigt."
+msgstr[1] "%(count)s Abonnements wurden gekündigt."
+
+#, python-format
+msgid "%(count)s subscription marked as expired."
+msgid_plural "%(count)s subscriptions marked as expired."
+msgstr[0] "%(count)s Abonnement wurde als abgelaufen markiert."
+msgstr[1] "%(count)s Abonnements wurden als abgelaufen markiert."
+
+#, python-format
+msgid "%(count)s tag total"
+msgid_plural "%(count)s tags total"
+msgstr[0] "insgesamt %(count)s Tag"
+msgstr[1] "insgesamt %(count)s Tags"
+
+msgid "Add stock"
+msgstr "Bestand hinzufügen"
+
+msgid "Are you sure you want to check in this software license seat?"
+msgstr "Möchten Sie diesen Softwarelizenzplatz wirklich einbuchen?"
+
+msgid "Barcode (EAN / UPC / GTIN) — scannable to open this item."
+msgstr "Barcode (EAN / UPC / GTIN); scannbar, um diesen Artikel zu öffnen."
+
+msgid "Barcode (EAN / UPC / GTIN) — scanning shows assets of this type."
+msgstr "Barcode (EAN / UPC / GTIN); beim Scannen werden Assets dieses Typs angezeigt."
+
+msgid "Change log"
+msgstr "Änderungsprotokoll"
+
+msgid "Check in"
+msgstr "Einbuchen"
+
+msgid "Check out"
+msgstr "Herausgeben"
+
+msgid "Delivered with failures"
+msgstr "Mit Fehlern zugestellt"
+
+msgid "Empty"
+msgstr "Leer"
+
+#, python-format
+msgid "Encountered %(count)s error during processing:"
+msgid_plural "Encountered %(count)s errors during processing:"
+msgstr[0] "Bei der Verarbeitung ist %(count)s Fehler aufgetreten:"
+msgstr[1] "Bei der Verarbeitung sind %(count)s Fehler aufgetreten:"
+
+#, python-format
+msgid "Import finished. Successfully imported %(count)s record."
+msgid_plural "Import finished. Successfully imported %(count)s records."
+msgstr[0] "Import abgeschlossen. %(count)s Datensatz wurde erfolgreich importiert."
+msgstr[1] "Import abgeschlossen. %(count)s Datensätze wurden erfolgreich importiert."
+
+msgid "Low"
+msgstr "Niedrig"
+
+msgid "Low stock"
+msgstr "Niedriger Bestand"
+
+msgid "Myself"
+msgstr "Ich selbst"
+
+msgid "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). Informational only — reconciliation is performed at the Software level (version-agnostic)."
+msgstr "Optionale Versionsbeschränkung für diesen Lizenzanspruch, zum Beispiel '2021' oder '16.x'. Sie dient nur zur Information; der versionsunabhängige Abgleich erfolgt auf Softwareebene."
+
+msgid "Out of stock"
+msgstr "Nicht vorrätig"
+
+msgid "Override depreciation policy — leave empty to use the tenant default or asset-type schedule."
+msgstr "Überschreibt die Abschreibungsregel. Leer verwendet den Mandantenstandard oder den Zeitplan des Asset-Typs."
+
+msgid "Same day"
+msgstr "Am selben Tag"
+
+msgid "Send test notification"
+msgstr "Testbenachrichtigung senden"

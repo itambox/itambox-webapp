@@ -1,5 +1,11 @@
 {% load i18n %}
-<div class="text-muted small mb-2">{% blocktranslate %}Hardware Expiring within {{ days_horizon }} days{% endblocktranslate %}</div>
+<div class="text-muted small mb-2">
+  {% blocktranslate trimmed count count=days_horizon %}
+    Hardware expiring within {{ count }} day
+  {% plural %}
+    Hardware expiring within {{ count }} days
+  {% endblocktranslate %}
+</div>
 {% if eol_alerts %}
   <div class="list-group list-group-flush csp-style-0c5e419543f9">
     {% for alert in eol_alerts|slice:":5" %}

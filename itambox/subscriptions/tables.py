@@ -2,6 +2,7 @@ import django_tables2 as tables
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_tables2.utils import A
 
 from core.html_styles import status_color_class
@@ -104,13 +105,15 @@ class SubscriptionTable(BaseTable):
         if value is None:
             return _("Not set")
         if value < 0:
-            return format_html('<span class="text-danger fw-bold">{} days overdue</span>', abs(value))
+            count = abs(value)
+            label = ngettext("%(count)s day overdue", "%(count)s days overdue", count) % {"count": count}
+            return format_html('<span class="text-danger fw-bold">{}</span>', label)
         elif value == 0:
-            return format_html('<span class="text-warning fw-bold">Today</span>')
+            return format_html('<span class="text-warning fw-bold">{}</span>', _("Today"))
         elif value <= 30:
-            return format_html('<span class="text-warning">{} days</span>', value)
-        else:
-            return f"{value} days"
+            label = ngettext("%(count)s day", "%(count)s days", value) % {"count": value}
+            return format_html('<span class="text-warning">{}</span>', label)
+        return ngettext("%(count)s day", "%(count)s days", value) % {"count": value}
 
 
 class SubscriptionAssignmentTable(BaseTable):

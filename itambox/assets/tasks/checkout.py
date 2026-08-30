@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from assets import services
 from assets.models import Asset, StatusLabel
@@ -95,7 +96,12 @@ def _finish_checkout(
     Notification.objects.create(
         user=ctx.user,
         subject=_("Bulk Checkout Complete"),
-        message=_("Successfully checked out %(count)s asset(s).") % {"count": success_count},
+        message=ngettext(
+            "Successfully checked out %(count)s asset.",
+            "Successfully checked out %(count)s assets.",
+            success_count,
+        )
+        % {"count": success_count},
         level=Notification.LEVEL_SUCCESS,
         target_url=reverse_job_detail(job.pk),
     )

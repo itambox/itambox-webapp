@@ -40,7 +40,7 @@
     {{ object.start_date|date:"Y-m-d"|default:not_set }}
   </dd>
   <dt class="col-sm-3">{% translate "Term:" %}</dt>
-  <dd class="col-sm-9 text-secondary">{% if object.term_months %}{{ object.term_months }} {% translate "months" %}{% else %}{% translate "Not set" %}{% endif %}{% if object.billing_cycle %} · {{ object.get_billing_cycle_display }}{% endif %}</dd>
+  <dd class="col-sm-9 text-secondary">{% if object.term_months %}{% blocktranslate trimmed count count=object.term_months %}{{ count }} month{% plural %}{{ count }} months{% endblocktranslate %}{% else %}{% translate "Not set" %}{% endif %}{% if object.billing_cycle %} · {{ object.get_billing_cycle_display }}{% endif %}</dd>
   <dt class="col-sm-3">{% translate "Next Renewal:" %}</dt>
   <dd class="col-sm-9">
     {{ object.renewal_date|date:"Y-m-d"|default:not_set }}
@@ -71,7 +71,7 @@
   {% if object.cost_center %}
     <dt class="col-sm-3">{% translate "Cost Center:" %}</dt>
     <dd class="col-sm-9">
-      {{ object.cost_center }}
+      {% if object.cost_center.code %}{{ object.cost_center.code }}:&nbsp;{% endif %}{{ object.cost_center.name }}
     </dd>
   {% endif %}
   <dt class="col-sm-3">{% translate "Renewal Cost:" %}</dt>

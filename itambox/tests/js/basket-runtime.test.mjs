@@ -254,6 +254,7 @@ function makeDom(kind, options = {}) {
     'scan-basket-empty',
     'scan-basket-clear',
     'scan-basket-submit',
+    'scan-basket-dispose-confirm-text',
     'audit-basket-empty',
     'audit-basket-clear',
     'audit-basket-submit',
@@ -424,6 +425,23 @@ test('initial target selection keeps same-tenant seeded rows, counts, and pk inp
     assert.equal(count.textContent, '2');
     assert.deepEqual(visiblePks(dom), [1, 2]);
     assert.deepEqual(rows.querySelectorAll('input[name="pk"]').map((input) => input.value), ['1', '2']);
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('dispose confirmation uses the localized singular and plural asset forms', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  try {
+    const { dom } = await loadBulkDom({ mode: 'dispose', seeds: [bulkPayload(1, 11), bulkPayload(2, 11)] });
+    const confirmation = dom.document.getElementById('scan-basket-dispose-confirm-text');
+    assert.equal(confirmation.textContent, 'Dispose of 2 assets?');
+
+    const rows = dom.document.getElementById(dom.ids.rowsId);
+    const remove = rows.children[0].querySelector('.scan-basket-remove');
+    rows.dispatchEvent({ type: 'click', target: remove });
+    assert.equal(confirmation.textContent, 'Dispose of 1 asset?');
   } finally {
     globalThis.setTimeout = originalTimers.setTimeout;
     globalThis.clearTimeout = originalTimers.clearTimeout;

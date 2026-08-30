@@ -255,10 +255,15 @@ class AssetAssignmentTable(BaseTable):
             return format_html('<span class="text-muted small">{}</span>', _("Not available"))
 
         url = reverse("assets:asset_checkin", kwargs={"pk": record.asset.pk})
+        checkin_label = _("Check in")
         return format_html(
-            '<div class="d-inline-block"><button type="button" class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none">'
-            '<i class="mdi mdi-keyboard-return"></i> Check-in</button></div>',
+            '<div class="d-inline-block"><button type="button" class="btn btn-sm btn-outline-success text-success" '
+            'hx-post="{}" hx-swap="none" title="{}" aria-label="{}">'
+            '<i class="mdi mdi-keyboard-return"></i> {}</button></div>',
             url,
+            checkin_label,
+            checkin_label,
+            checkin_label,
         )
 
 
@@ -302,10 +307,14 @@ class ContactAssignmentTable(BaseTable):
     priority = tables.Column()
     actions = tables.TemplateColumn(
         template_code="""
-        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-action btn-action-danger px-2" title="Delete">
+        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}"
+           class="btn btn-sm btn-action btn-action-danger px-2"
+           title="{{ delete }}"
+           aria-label="{{ delete }}">
             <i class="mdi mdi-trash-can-outline m-0"></i>
         </a>
         """,
+        extra_context={"delete": _("Delete")},
         verbose_name=_("Actions"),
         orderable=False,
     )

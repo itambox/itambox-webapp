@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_tables2.utils import A  # Alias for Accessor
 
 from compliance.models import AssetAudit
@@ -158,7 +159,7 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
             return _("Not set")
         date_str = due.strftime("%Y-%m-%d")
         if record.audit_overdue:
-            return format_html('<span class="text-danger fw-semibold" title="Overdue">{}</span>', date_str)
+            return format_html('<span class="text-danger fw-semibold" title="{}">{}</span>', _("Overdue"), date_str)
         return date_str
 
     def render_salvage_value(self, value):
@@ -198,7 +199,6 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
     def render_actions(self, record):
         if getattr(record, "deleted_at", None) is not None:
             from django.contrib.contenttypes.models import ContentType
-            from django.utils.translation import gettext as _
 
             ct = ContentType.objects.get_for_model(record)
 
@@ -249,63 +249,91 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
             # outline (take back). Equal width via .check-action.
             if record.active_assignment:
                 checkin_url = reverse("assets:asset_checkin", kwargs={"pk": record.pk})
+                checkin_label = _("Check in")
                 html += format_html(
                     '<button class="btn btn-sm btn-soft-outline-success check-action cursor-pointer" type="button" '
-                    'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-                    'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</button>',
+                    'hx-get="{0}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                    'title="{1}" aria-label="{1}"><i class="mdi mdi-login me-1"></i>{1}</button>',
                     checkin_url,
+                    checkin_label,
                 )
             else:
                 checkout_url = reverse("assets:asset_checkout_modal", kwargs={"pk": record.pk})
+                checkout_label = _("Check out")
                 html += format_html(
                     '<button class="btn btn-sm btn-soft-success check-action cursor-pointer" type="button" '
-                    'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-                    'title="Check-out" aria-label="Check-out">'
-                    '<i class="mdi mdi-logout me-1"></i>Check-out</button>',
+                    'hx-get="{0}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                    'title="{1}" aria-label="{1}">'
+                    '<i class="mdi mdi-logout me-1"></i>{1}</button>',
                     checkout_url,
+                    checkout_label,
                 )
 
         if can_clone:
             clone_url = reverse("assets:asset_clone", kwargs={"pk": record.pk})
-            html += f'<a class="btn btn-sm btn-action" href="{clone_url}" title="Copy/Clone"><i class="mdi mdi-content-copy"></i></a>'
+            clone_title = _("Clone")
+            html += format_html(
+                '<a class="btn btn-sm btn-action" href="{}" title="{}" aria-label="{}">'
+                '<i class="mdi mdi-content-copy"></i></a>',
+                clone_url,
+                clone_title,
+                clone_title,
+            )
 
         changelog_url = reverse("assets:asset_detail", kwargs={"pk": record.pk}) + "?tab=changelog"
-        changelog_li = (
-            f'<li><a class="dropdown-item" href="{changelog_url}">'
-            f'<i class="mdi mdi-history me-1"></i>Changelog</a></li>'
+        changelog_li = format_html(
+            '<li><a class="dropdown-item" href="{}"><i class="mdi mdi-history me-1"></i>{}</a></li>',
+            changelog_url,
+            _("Change log"),
         )
+        edit_title = _("Edit")
+        more_actions = _("More actions")
+        delete_label = _("Delete")
 
         if can_edit and can_delete:
             edit_url = reverse("assets:asset_update", kwargs={"pk": record.pk})
             del_url = reverse("assets:asset_delete", kwargs={"pk": record.pk})
             html += format_html(
                 '<span class="btn-group dropdown">'
-                '<a class="btn btn-sm btn-action" href="{}" title="Edit Details">'
+                '<a class="btn btn-sm btn-action" href="{}" title="{}" aria-label="{}">'
                 '<i class="mdi mdi-pencil-outline"></i></a>'
                 '<button class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" '
-                'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions"></button>'
+                'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{}"></button>'
                 '<ul class="dropdown-menu dropdown-menu-end">{}<li><hr class="dropdown-divider"></li>'
                 '<li><a class="dropdown-item text-danger" href="{}">'
-                '<i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li></ul></span>',
+                '<i class="mdi mdi-trash-can-outline me-1"></i>{}</a></li></ul></span>',
                 edit_url,
-                mark_safe(changelog_li),
+                edit_title,
+                edit_title,
+                more_actions,
+                changelog_li,
                 del_url,
+                delete_label,
             )
         elif can_edit:
             edit_url = reverse("assets:asset_update", kwargs={"pk": record.pk})
             html += format_html(
                 '<span class="btn-group dropdown">'
-                '<a class="btn btn-sm btn-action" href="{}" title="Edit Details">'
+                '<a class="btn btn-sm btn-action" href="{}" title="{}" aria-label="{}">'
                 '<i class="mdi mdi-pencil-outline"></i></a>'
                 '<button class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" '
-                'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions"></button>'
+                'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{}"></button>'
                 '<ul class="dropdown-menu dropdown-menu-end">{}</ul></span>',
                 edit_url,
-                mark_safe(changelog_li),
+                edit_title,
+                edit_title,
+                more_actions,
+                changelog_li,
             )
         elif can_delete:
             del_url = reverse("assets:asset_delete", kwargs={"pk": record.pk})
-            html += f'<a class="btn btn-sm btn-action btn-action-danger" href="{del_url}" title="Delete"><i class="mdi mdi-trash-can-outline"></i></a>'
+            html += format_html(
+                '<a class="btn btn-sm btn-action btn-action-danger" href="{}" title="{}" aria-label="{}">'
+                '<i class="mdi mdi-trash-can-outline"></i></a>',
+                del_url,
+                delete_label,
+                delete_label,
+            )
 
         html += "</div>"
         return mark_safe(html)
@@ -414,7 +442,7 @@ class AssetTypeTable(BaseTable):
 
     def render_eol_months(self, value):
         if value is not None:
-            return f"{value} month{'s' if value != 1 else ''}"
+            return ngettext("%(count)s month", "%(count)s months", value) % {"count": value}
         return _("Not set")
 
 
@@ -474,8 +502,8 @@ class AssetMaintenanceTable(BaseTable):
     def render_downtime_days(self, value):
         if value is not None:
             if value == 0:
-                return "Same day"
-            return f"{value} day{'s' if value != 1 else ''}"
+                return _("Same day")
+            return ngettext("%(count)s day", "%(count)s days", value) % {"count": value}
         return _("Not set")
 
     def render_supplier(self, value):
@@ -654,30 +682,30 @@ class AssetRequestTable(BaseTable):
     def render_item(self, record):
         if record.asset:
             url = reverse("assets:asset_detail", args=[record.asset_id])
-            return format_html('<a href="{}">{} (Asset)</a>', url, record.asset)
+            return format_html('<a href="{}">{} ({})</a>', url, record.asset, _("Asset"))
         elif record.asset_type:
             url = reverse("assets:assettype_detail", args=[record.asset_type_id])
             if getattr(record, "is_group", False) or getattr(record, "qty", 1) > 1:
-                return format_html('<a href="{}">{}x {} (Asset Type)</a>', url, record.qty, record.asset_type)
-            return format_html('<a href="{}">{} (Asset Type)</a>', url, record.asset_type)
+                return format_html('<a href="{}">{}x {} ({})</a>', url, record.qty, record.asset_type, _("Asset Type"))
+            return format_html('<a href="{}">{} ({})</a>', url, record.asset_type, _("Asset Type"))
         elif record.component:
             url = reverse("inventory:component_detail", args=[record.component_id])
-            return format_html('<a href="{}">{} (Component, x{})</a>', url, record.component, record.qty)
+            return format_html('<a href="{}">{} ({}, x{})</a>', url, record.component, _("Component"), record.qty)
         elif record.accessory:
             url = reverse("inventory:accessory_detail", args=[record.accessory_id])
-            return format_html('<a href="{}">{} (Accessory, x{})</a>', url, record.accessory, record.qty)
+            return format_html('<a href="{}">{} ({}, x{})</a>', url, record.accessory, _("Accessory"), record.qty)
         elif record.consumable:
             url = reverse("inventory:consumable_detail", args=[record.consumable_id])
-            return format_html('<a href="{}">{} (Consumable, x{})</a>', url, record.consumable, record.qty)
+            return format_html('<a href="{}">{} ({}, x{})</a>', url, record.consumable, _("Consumable"), record.qty)
         return _("Not set")
 
     def render_requested_for(self, value, record):
         target = record.assigned_target
         if not target:
-            return "Myself"
+            return _("Myself")
         return str(target)
 
-    def render_status(self, value):
+    def render_status(self, value, record):
         status_classes = {
             "pending": "bg-warning text-warning-fg",
             "approved": "bg-info text-info-fg",
@@ -686,7 +714,7 @@ class AssetRequestTable(BaseTable):
             "cancelled": "bg-secondary text-secondary-fg",
         }
         badge_class = status_classes.get(value, "bg-secondary text-secondary-fg")
-        display = value.title()
+        display = record.get_status_display()
         return format_html('<span class="badge {}">{}</span>', badge_class, display)
 
 

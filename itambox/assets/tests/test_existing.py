@@ -1361,7 +1361,7 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
             "Stock received; requests fulfilled.",
             "The system archives the asset and creates a permanent disposal record for audit.",
             "The system archives each asset and freezes its book value. It skips assets already marked as disposed.",
-            'Dispose of <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s)?',
+            "Dispose of 0 assets?",
             "The system checks in each asset if needed, archives it, and records the disposal. Reversing this is difficult.",
             "No custody receipts exist for this asset.",
             'Set margins to "None" in your print options.',

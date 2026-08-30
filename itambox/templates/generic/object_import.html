@@ -31,7 +31,11 @@
             <p>{% blocktranslate with imported=import_summary.imported_count total=import_summary.row_count %}Successfully imported <strong>{{ imported }}</strong> of <strong>{{ total }}</strong> records.{% endblocktranslate %}</p>
             {% if import_summary.errors_list %}
               <div class="alert alert-warning mt-3">
-                {% blocktranslate with err_len=import_summary.errors_list|length %}<strong>{{ err_len }}</strong> error(s) occurred during import:{% endblocktranslate %}
+                {% blocktranslate trimmed count count=import_summary.errors_list|length %}
+                  <strong>{{ count }}</strong> error occurred during import:
+                {% plural %}
+                  <strong>{{ count }}</strong> errors occurred during import:
+                {% endblocktranslate %}
                 <ul class="mb-0 mt-2">
                   {% for err in import_summary.errors_list %}
                     <li>{{ err }}</li>

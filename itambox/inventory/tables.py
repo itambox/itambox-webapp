@@ -194,9 +194,13 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
 
     def render_available(self, value, record):
         if value <= 0:
-            return format_html('<span class="badge bg-danger-lt text-danger font-weight-bold">0 (Empty)</span>')
+            return format_html(
+                '<span class="badge bg-danger-lt text-danger font-weight-bold">0 ({})</span>', _("Empty")
+            )
         elif value < record.min_qty:
-            return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low)</span>', value)
+            return format_html(
+                '<span class="badge bg-warning-lt text-warning font-weight-bold">{} ({})</span>', value, _("Low")
+            )
         return value
 
 
@@ -245,24 +249,31 @@ class AccessoryStockTable(SharePoolActionMixin, BaseTable):
 
         add_stock_html = ""
         if self.has_perm(request.user, "inventory.change_accessorystock", record.accessory):
+            add_stock_label = _("Add stock")
             add_stock_html = format_html(
                 '  <button type="button" class="btn btn-sm btn-action d-flex align-items-center" '
-                '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" title="Add Stock">'
-                '    <i class="mdi mdi-plus me-1"></i> Add Stock'
+                '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                '          title="{}" aria-label="{}">'
+                '    <i class="mdi mdi-plus me-1"></i> {}'
                 "  </button>",
                 add_stock_url,
                 record.location.pk,
+                add_stock_label,
+                add_stock_label,
+                add_stock_label,
             )
 
+        delete_label = _("Delete")
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
             "  {}"
             '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center cursor-pointer" role="button" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-            '     title="{}" aria-label=_("{}")>'
+            '     title="{}" aria-label="{}">'
             '    <i class="mdi mdi-logout me-1"></i> {}'
             "  </a>"
-            '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
+            '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" '
+            '     title="{}" aria-label="{}">'
             '    <i class="mdi mdi-trash-can-outline m-0"></i>'
             "  </a>"
             "{}"
@@ -274,6 +285,8 @@ class AccessoryStockTable(SharePoolActionMixin, BaseTable):
             checkout_title,
             checkout_title,
             delete_url,
+            delete_label,
+            delete_label,
             self.share_pool_html(request, record),
         )
 
@@ -308,13 +321,13 @@ class AccessoryAssignmentTable(BaseTable):
     def render_assigned_to(self, record):
         if record.assigned_holder:
             url = reverse("organization:assetholder_detail", kwargs={"pk": record.assigned_holder.pk})
-            return format_html('<a href="{}">Holder: {}</a>', url, record.assigned_holder)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Holder"), record.assigned_holder)
         elif record.assigned_location:
             url = reverse("organization:location_detail", kwargs={"pk": record.assigned_location.pk})
-            return format_html('<a href="{}">Location: {}</a>', url, record.assigned_location)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Location"), record.assigned_location)
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
-            return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Asset"), record.assigned_asset)
         return _("Not set")
 
     def render_actions(self, record):
@@ -326,14 +339,15 @@ class AccessoryAssignmentTable(BaseTable):
         confirm_msg = _("Are you sure you want to check in this accessory assignment?")
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
-            '  <button hx-post="{}" hx-confirm="{}" '
-            '          class="btn btn-sm btn-soft-outline-success check-action d-flex align-items-center" title="Check-in">'
-            '    <i class="mdi mdi-keyboard-return me-1"></i> {}'
+            '  <button hx-post="{0}" hx-confirm="{1}" '
+            '          class="btn btn-sm btn-soft-outline-success check-action d-flex align-items-center" '
+            '          title="{2}" aria-label="{2}">'
+            '    <i class="mdi mdi-keyboard-return me-1"></i> {2}'
             "  </button>"
             "</div>",
             url,
             confirm_msg,
-            _("Check-in"),
+            _("Check in"),
         )
 
 
@@ -385,10 +399,12 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
 
     def render_available(self, value, record):
         if value <= 0:
-            return format_html('<span class="badge bg-danger-lt text-danger font-weight-bold">0 (Out of Stock)</span>')
+            return format_html(
+                '<span class="badge bg-danger-lt text-danger font-weight-bold">0 ({})</span>', _("Out of stock")
+            )
         elif value < record.min_qty:
             return format_html(
-                '<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low Stock)</span>', value
+                '<span class="badge bg-warning-lt text-warning font-weight-bold">{} ({})</span>', value, _("Low stock")
             )
         return value
 
@@ -440,24 +456,31 @@ class ConsumableStockTable(SharePoolActionMixin, BaseTable):
 
         add_stock_html = ""
         if self.has_perm(request.user, "inventory.change_consumablestock", record.consumable):
+            add_stock_label = _("Add stock")
             add_stock_html = format_html(
                 '  <button type="button" class="btn btn-sm btn-action d-flex align-items-center" '
-                '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" title="Add Stock">'
-                '    <i class="mdi mdi-plus me-1"></i> Add Stock'
+                '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                '          title="{}" aria-label="{}">'
+                '    <i class="mdi mdi-plus me-1"></i> {}'
                 "  </button>",
                 add_stock_url,
                 record.location.pk,
+                add_stock_label,
+                add_stock_label,
+                add_stock_label,
             )
 
+        delete_label = _("Delete")
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
             "  {}"
             '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center cursor-pointer" role="button" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-            '     title="{}" aria-label=_("{}")>'
+            '     title="{}" aria-label="{}">'
             '    <i class="mdi mdi-logout me-1"></i> {}'
             "  </a>"
-            '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
+            '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" '
+            '     title="{}" aria-label="{}">'
             '    <i class="mdi mdi-trash-can-outline m-0"></i>'
             "  </a>"
             "{}"
@@ -469,6 +492,8 @@ class ConsumableStockTable(SharePoolActionMixin, BaseTable):
             checkout_title,
             checkout_title,
             delete_url,
+            delete_label,
+            delete_label,
             self.share_pool_html(request, record),
         )
 
@@ -497,13 +522,13 @@ class ConsumableAssignmentTable(BaseTable):
     def render_assigned_to(self, record):
         if record.assigned_holder:
             url = reverse("organization:assetholder_detail", kwargs={"pk": record.assigned_holder.pk})
-            return format_html('<a href="{}">Holder: {}</a>', url, record.assigned_holder)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Holder"), record.assigned_holder)
         elif record.assigned_location:
             url = reverse("organization:location_detail", kwargs={"pk": record.assigned_location.pk})
-            return format_html('<a href="{}">Location: {}</a>', url, record.assigned_location)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Location"), record.assigned_location)
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
-            return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Asset"), record.assigned_asset)
         return _("Not set")
 
 
@@ -618,24 +643,31 @@ class ComponentStockTable(SharePoolActionMixin, BaseTable):
 
         add_stock_html = ""
         if self.has_perm(request.user, "inventory.change_componentstock", record.component):
+            add_stock_label = _("Add stock")
             add_stock_html = format_html(
                 '  <button type="button" class="btn btn-sm btn-action d-flex align-items-center" '
-                '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" title="Add Stock">'
-                '    <i class="mdi mdi-plus me-1"></i> Add Stock'
+                '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                '          title="{}" aria-label="{}">'
+                '    <i class="mdi mdi-plus me-1"></i> {}'
                 "  </button>",
                 add_stock_url,
                 record.location.pk,
+                add_stock_label,
+                add_stock_label,
+                add_stock_label,
             )
 
+        delete_label = _("Delete")
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
             "  {}"
             '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center cursor-pointer" role="button" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-            '     title="{}" aria-label=_("{}")>'
+            '     title="{}" aria-label="{}">'
             '    <i class="mdi mdi-logout me-1"></i> {}'
             "  </a>"
-            '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
+            '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" '
+            '     title="{}" aria-label="{}">'
             '    <i class="mdi mdi-trash-can-outline m-0"></i>'
             "  </a>"
             "{}"
@@ -647,6 +679,8 @@ class ComponentStockTable(SharePoolActionMixin, BaseTable):
             checkout_title,
             checkout_title,
             delete_url,
+            delete_label,
+            delete_label,
             self.share_pool_html(request, record),
         )
 
@@ -681,13 +715,13 @@ class ComponentAllocationTable(BaseTable):
     def render_assigned_to(self, record):
         if record.assigned_holder:
             url = reverse("organization:assetholder_detail", kwargs={"pk": record.assigned_holder.pk})
-            return format_html('<a href="{}">Holder: {}</a>', url, record.assigned_holder)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Holder"), record.assigned_holder)
         elif record.assigned_location:
             url = reverse("organization:location_detail", kwargs={"pk": record.assigned_location.pk})
-            return format_html('<a href="{}">Location: {}</a>', url, record.assigned_location)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Location"), record.assigned_location)
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
-            return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
+            return format_html('<a href="{}">{}: {}</a>', url, _("Asset"), record.assigned_asset)
         return _("Not set")
 
     def render_actions(self, record):
@@ -699,12 +733,13 @@ class ComponentAllocationTable(BaseTable):
         confirm_msg = _("Are you sure you want to check in this component allocation?")
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
-            '  <button hx-post="{}" hx-confirm="{}" '
-            '          class="btn btn-sm btn-soft-outline-success check-action d-flex align-items-center" title="Check-in">'
-            '    <i class="mdi mdi-keyboard-return me-1"></i> {}'
+            '  <button hx-post="{0}" hx-confirm="{1}" '
+            '          class="btn btn-sm btn-soft-outline-success check-action d-flex align-items-center" '
+            '          title="{2}" aria-label="{2}">'
+            '    <i class="mdi mdi-keyboard-return me-1"></i> {2}'
             "  </button>"
             "</div>",
             url,
             confirm_msg,
-            _("Check-in"),
+            _("Check in"),
         )

@@ -296,8 +296,9 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
         validators=[MinValueValidator(0)],
         verbose_name=_("Changelog retention override (days)"),
         help_text=_(
-            "Set to 0 for unlimited retention under a legal hold. This tenant's change log will not be pruned "
-            "automatically."
+            "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange "
+            "rows only. Blank uses the global setting. 0 = unlimited (legal hold -- this "
+            "tenant's changelog is never pruned by prune_changelog)."
         ),
     )
 
@@ -1195,7 +1196,7 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
         ]
 
     def __str__(self):
-        return f"{self.code}: {self.name}" if self.code else self.name
+        return f"{self.code} – {self.name}" if self.code else self.name
 
     def get_absolute_url(self):
         return reverse("organization:costcenter_detail", kwargs={"pk": self.pk})

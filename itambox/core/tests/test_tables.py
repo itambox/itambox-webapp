@@ -1,9 +1,11 @@
 import datetime
 import uuid
+from types import SimpleNamespace
 
 import django_tables2 as tables
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.utils import translation
 from model_bakery import baker
 
 from assets.models import (
@@ -14,7 +16,7 @@ from assets.models import (
     Warranty,
     WarrantyTypeChoices,
 )
-from assets.tables import AssetTable, WarrantyTable
+from assets.tables import AssetMaintenanceTable, AssetTable, AssetTypeTable, WarrantyTable
 from core.models import ObjectChange
 from core.tables import AssigneeColumn, BaseTable, ObjectChangeTable
 from extras.models import NotificationChannel
@@ -39,6 +41,22 @@ class BaseTableEmptyValueTest(SimpleTestCase):
         self.assertIn("Not set", rendered)
         self.assertNotIn("—", rendered)
         self.assertNotIn("–", rendered)
+
+
+class AssetTableLocalizationTest(SimpleTestCase):
+    def test_duration_renderers_use_german_plural_forms(self):
+        with translation.override("de"):
+            self.assertEqual(AssetTypeTable([]).render_eol_months(1), "1 Monat")
+            self.assertEqual(AssetTypeTable([]).render_eol_months(2), "2 Monate")
+            self.assertEqual(AssetMaintenanceTable([]).render_downtime_days(0), "Am selben Tag")
+            self.assertEqual(AssetMaintenanceTable([]).render_downtime_days(1), "1 Tag")
+            self.assertEqual(AssetMaintenanceTable([]).render_downtime_days(2), "2 Tage")
+
+    def test_overdue_tooltip_is_translated(self):
+        record = SimpleNamespace(audit_due_date=datetime.date(2026, 8, 30), audit_overdue=True)
+        with translation.override("de"):
+            rendered = AssetTable([]).render_audit_due_date(record)
+        self.assertIn('title="Überfällig"', rendered)
 
 
 class IDColumnTestCase(TestCase):

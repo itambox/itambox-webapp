@@ -7,10 +7,11 @@
     <div class="alert alert-info mb-0">{% translate "No missing assets recorded in this session's report." %}</div>
   {% else %}
     <p>
-      {% blocktranslate with count=missing_count name=session.name %}
-                This will set the status of <strong>{{ count }} missing asset(s)</strong>
-                from campaign <em>{{ name }}</em> to <strong>"Missing"</strong> (undeployable).
-            {% endblocktranslate %}
+      {% blocktranslate trimmed count count=missing_count with name=session.name %}
+        This will set the status of <strong>{{ count }} missing asset</strong> from campaign <em>{{ name }}</em> to <strong>"Missing"</strong> (undeployable).
+      {% plural %}
+        This will set the status of <strong>{{ count }} missing assets</strong> from campaign <em>{{ name }}</em> to <strong>"Missing"</strong> (undeployable).
+      {% endblocktranslate %}
     </p>
     <p class="text-muted small mb-0">
       {% translate "Assets whose status has been manually changed since the session closed will be skipped." %}

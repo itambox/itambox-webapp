@@ -14,7 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.html import escape
 from django.utils.http import urlencode
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
 from django_tables2 import RequestConfig
@@ -646,7 +646,7 @@ class AlertBulkAcknowledgeView(_BulkAlertActionView):
         return count
 
     def success_message(self, count):
-        return gettext("%(count)s alert(s) acknowledged.") % {"count": count}
+        return ngettext("%(count)s alert acknowledged.", "%(count)s alerts acknowledged.", count) % {"count": count}
 
 
 class AlertBulkResolveView(_BulkAlertActionView):
@@ -663,7 +663,7 @@ class AlertBulkResolveView(_BulkAlertActionView):
         return count
 
     def success_message(self, count):
-        return gettext("%(count)s alert(s) resolved.") % {"count": count}
+        return ngettext("%(count)s alert resolved.", "%(count)s alerts resolved.", count) % {"count": count}
 
 
 @method_decorator(login_required, name="dispatch")

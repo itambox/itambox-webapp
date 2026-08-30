@@ -261,14 +261,6 @@
     },
     {
       "path": "itambox/core/tables/columns.py",
-      "scope": "ClassDef:AssigneeColumn/FunctionDef:render",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "f838d907d57243a1bc62ae744964c2465eeb7f2956c3c07f89f0bc9e97d16319",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/columns.py",
       "scope": "ClassDef:IDColumn/FunctionDef:_detail_url",
       "handler_type": "Exception",
       "classification": "silent",

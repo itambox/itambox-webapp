@@ -229,6 +229,9 @@ class ContractForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["cost_center"].label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
 
         # Scope tenant-aware querysets to the active tenant
         from core.managers import get_current_tenant

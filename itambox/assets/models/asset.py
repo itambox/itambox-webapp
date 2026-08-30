@@ -168,7 +168,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         blank=True,
         related_name="asset_overrides",
         verbose_name=_("Depreciation override"),
-        help_text=_("Override the depreciation policy. Leave empty to use the tenant default or asset-type schedule."),
+        help_text=_("Override depreciation policy — leave empty to use the tenant default or asset-type schedule."),
     )
     in_service_date = models.DateField(
         null=True,
@@ -263,7 +263,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
             today = datetime.date.today()
             if today >= eol:
-                return "Expired"
+                return str(_("Expired"))
 
             delta = relativedelta(eol, today)
             parts = []

@@ -54,7 +54,7 @@ class TasksTestCase(TransactionTestCase):
         # Verify notification was created
         notification = Notification.objects.filter(user=self.user, level=Notification.LEVEL_SUCCESS).first()
         self.assertIsNotNone(notification)
-        self.assertIn("Successfully imported 5 record(s)", notification.message)
+        self.assertIn("Successfully imported 5 records", notification.message)
 
     @patch("core.tasks.csv_import.get_import_form_class")
     def test_import_csv_task_failed(self, mock_get_import_form_class):

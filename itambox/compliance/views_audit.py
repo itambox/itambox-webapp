@@ -11,6 +11,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views.generic import View
 from django_tables2.utils import A
 
@@ -466,10 +467,19 @@ class AuditSessionFlagMissingView(GenericTransactionView):
 
     def get_success_message(self, result=None):
         if result:
-            return _("%(flagged)s asset(s) flagged as Missing. %(skipped)s skipped (status changed since close).") % {
-                "flagged": result["flagged"],
-                "skipped": result["skipped"],
-            }
+            flagged = result["flagged"]
+            skipped = result["skipped"]
+            flagged_message = ngettext(
+                "%(count)s asset flagged as Missing.",
+                "%(count)s assets flagged as Missing.",
+                flagged,
+            ) % {"count": flagged}
+            skipped_message = ngettext(
+                "%(count)s asset was skipped because its status changed after the audit closed.",
+                "%(count)s assets were skipped because their status changed after the audit closed.",
+                skipped,
+            ) % {"count": skipped}
+            return f"{flagged_message} {skipped_message}"
         return _("Missing assets flagged.")
 
 

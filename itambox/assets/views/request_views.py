@@ -5,6 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views import View
 
 from assets import filters, tables
@@ -375,7 +376,15 @@ class RequestClaimView(SimplePostView):
                 obj.responded_by = request.user
                 obj.save(update_fields=["status", "response_date", "responded_by"])
 
-        return {"message": _("Item(s) claimed successfully.")}
+        count = len(requests_to_claim)
+        return {
+            "message": ngettext(
+                "Claimed %(count)d item.",
+                "Claimed %(count)d items.",
+                count,
+            )
+            % {"count": count}
+        }
 
 
 class RequestMarkFulfilledView(SimplePostView):

@@ -1085,7 +1085,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         unknown = unknown_column_keys(self.included_columns)
         if unknown:
             raise ValidationError(
-                {"included_columns": _("Unknown report column key(s): %(keys)s") % {"keys": ", ".join(unknown)}}
+                {"included_columns": _("Unknown report columns: %(keys)s") % {"keys": ", ".join(unknown)}}
             )
         if report_designer_probe().active:
             return
@@ -1709,7 +1709,7 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
             ("not_required", _("Not required")),
             ("resolved", _("Resolved from target")),
             ("global", _("Global target")),
-            ("unresolved", _("Unresolved. Manual review required.")),
+            ("unresolved", _("Unresolved — operator review required")),
         ],
         default="not_required",
         db_index=True,

@@ -7,6 +7,7 @@ from django.db.models import F, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from assets.models import Asset, Category, Warranty
 from core import context
@@ -634,7 +635,11 @@ def _match_upcoming_eol(rule, today):
                     "obj": asset,
                     "tenant": asset.tenant,
                     "subject": _("Upcoming Hardware EOL: %(tag)s") % {"tag": asset.asset_tag},
-                    "message": _("Asset %(tag)s (%(name)s) reaches EOL on %(eol)s (%(days)s day(s) remaining).")
+                    "message": ngettext(
+                        "Asset %(tag)s (%(name)s) reaches EOL on %(eol)s (%(days)s day remaining).",
+                        "Asset %(tag)s (%(name)s) reaches EOL on %(eol)s (%(days)s days remaining).",
+                        days_left,
+                    )
                     % {
                         "tag": asset.asset_tag,
                         "name": asset.name,
@@ -664,7 +669,11 @@ def _match_license_expiry(rule, today):
                 "obj": lic,
                 "tenant": lic.tenant,
                 "subject": _("License Expiring: %(name)s") % {"name": lic.name},
-                "message": _("License '%(name)s' expires on %(date)s (%(days)s day(s) remaining).")
+                "message": ngettext(
+                    "License '%(name)s' expires on %(date)s (%(days)s day remaining).",
+                    "License '%(name)s' expires on %(date)s (%(days)s days remaining).",
+                    days_left,
+                )
                 % {"name": lic.name, "date": lic.expiration_date, "days": days_left},
             }
         )
@@ -690,9 +699,12 @@ def _match_renewal_due(rule, today):
                 "obj": sub,
                 "tenant": sub.tenant,
                 "subject": _("Subscription Renewal Due: %(name)s") % {"name": sub.name},
-                "message": _(
+                "message": ngettext(
                     "Subscription '%(name)s' ends on %(date)s "
-                    "(%(days)s day(s) remaining) and requires renewal validation."
+                    "(%(days)s day remaining) and requires renewal validation.",
+                    "Subscription '%(name)s' ends on %(date)s "
+                    "(%(days)s days remaining) and requires renewal validation.",
+                    days_left,
                 )
                 % {"name": sub.name, "date": sub.renewal_date, "days": days_left},
             }
@@ -720,8 +732,10 @@ def _match_warranty_expiry(rule, today):
                 "obj": asset,
                 "tenant": asset.tenant,
                 "subject": _("Warranty Expiring: %(tag)s") % {"tag": asset.asset_tag},
-                "message": _(
-                    "Asset %(tag)s (%(name)s) %(wtype)s warranty expires on %(date)s (%(days)s day(s) remaining)."
+                "message": ngettext(
+                    "Asset %(tag)s (%(name)s) %(wtype)s warranty expires on %(date)s (%(days)s day remaining).",
+                    "Asset %(tag)s (%(name)s) %(wtype)s warranty expires on %(date)s (%(days)s days remaining).",
+                    days_left,
                 )
                 % {
                     "tag": asset.asset_tag,
@@ -775,15 +789,25 @@ def _match_audit_overdue(rule, today):
             due_date = (base + timezone.timedelta(days=interval_days)).date()
             if due_date > today:
                 continue  # category cadence says not yet overdue
-            threshold_desc = _("every %(months)s month(s) per category") % {
+            threshold_desc = ngettext(
+                "every %(months)s month per category",
+                "every %(months)s months per category",
+                category.audit_interval_months,
+            ) % {
                 "months": category.audit_interval_months,
             }
         else:
-            threshold_desc = _("every %(days)s day(s)") % {"days": rule.threshold_value}
+            threshold_desc = ngettext("every %(days)s day", "every %(days)s days", rule.threshold_value) % {
+                "days": rule.threshold_value
+            }
 
         if asset.last_audited:
             days_overdue = (today - asset.last_audited.date()).days
-            detail = _("last audited %(days)s day(s) ago (%(date)s)") % {
+            detail = ngettext(
+                "last audited %(days)s day ago (%(date)s)",
+                "last audited %(days)s days ago (%(date)s)",
+                days_overdue,
+            ) % {
                 "days": days_overdue,
                 "date": f"{asset.last_audited:%Y-%m-%d}",
             }

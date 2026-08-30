@@ -205,6 +205,7 @@ class AssetDetailView(ObjectDetailView):
         context["license_seats_table"] = license_seats_table
 
         context["eol_date"] = asset.eol_date
+        context["eol_expired"] = asset.eol_date is not None and timezone.localdate() >= asset.eol_date
         context["time_to_eol"] = asset.time_to_eol
         context["total_cost_of_ownership"] = asset.total_cost_of_ownership
 
