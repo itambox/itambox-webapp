@@ -1,4 +1,5 @@
 {% load i18n %}
+{% translate "Action" as action_label %}
 {% comment %}
     Base modal structure using Bootstrap 5.
     Expects context variables:
@@ -24,7 +25,7 @@
             hx-swap="outerHTML">
         {% csrf_token %}
         <div class="modal-header">
-          <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:_("Action") }}</h5>
+          <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:action_label }}</h5>
           <button type="button"
                   class="btn-close"
                   data-bs-dismiss="modal"

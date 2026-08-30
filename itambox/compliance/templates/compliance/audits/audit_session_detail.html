@@ -1,6 +1,11 @@
 {% extends base_template|default:'layout.html' %}
 {% load static %}
 {% load i18n %}
+{% translate "Global (All Locations)" as global_all_locations %}
+{% translate "Not completed" as not_completed %}
+{% translate "Global" as global_label %}
+{% translate "Not recorded" as not_recorded %}
+{% translate "Not set" as not_set %}
 {% load utility_tags %}
 {% block title %}{% translate "Audit Campaign" %} - {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
@@ -227,7 +232,7 @@
                 </div>
                 <div class="card-body text-center text-muted py-4" id="audit-basket-empty">
                   <i class="mdi mdi-basket-outline d-block mb-2 csp-style-c5510aee071a"></i>
-                  {% translate "No assets yet — start scanning." %}
+                  {% translate "No assets yet. Start scanning." %}
                 </div>
                 <div class="card-footer">
                   <button type="submit"
@@ -261,7 +266,7 @@
                    aria-live="assertive"
                    aria-atomic="true">
                 <i class="mdi mdi-alert-outline me-2"></i>
-                <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
+                <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone or iPad, scanning requires HTTPS and camera permission. Open Settings, then Safari, then Camera, or use a hardware scanner." %}</span>
               </div>
               <div class="mt-4 d-flex gap-2">
                 <button type="button"
@@ -302,7 +307,7 @@
             <dl class="row mb-0">
               <dt class="col-5">{% translate "Target Location:" %}</dt>
               <dd class="col-7">
-                {{ object.location.name|default:_("Global (All Locations)") }}
+                {{ object.location.name|default:global_all_locations }}
               </dd>
               <dt class="col-5">{% translate "Created By:" %}</dt>
               <dd class="col-7">
@@ -314,7 +319,7 @@
               </dd>
               <dt class="col-5">{% translate "Completed At:" %}</dt>
               <dd class="col-7">
-                {{ object.completed_at|date:"Y-m-d H:i"|default:"—" }}
+                {{ object.completed_at|date:"Y-m-d H:i"|default:not_completed }}
               </dd>
             </dl>
           </div>
@@ -377,7 +382,7 @@
               <div class="tab-pane active show" id="tab-mismatch">
                 <h4 class="mb-3">{% translate "Mismatched Assets" %}</h4>
                 <p class="text-secondary small">
-                  {% blocktranslate with loc=object.location.name|default:_("Global") %}These assets were scanned during the campaign but their <strong>observed location</strong> at time of scan differed from the campaign target location ({{ loc }}).{% endblocktranslate %}
+                  {% blocktranslate with loc=object.location.name|default:global_label %}These assets were scanned during the campaign but their <strong>observed location</strong> at time of scan differed from the campaign target location ({{ loc }}).{% endblocktranslate %}
                 </p>
                 {% if mismatches %}
                   <div class="table-responsive">
@@ -398,9 +403,9 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td class="text-warning font-weight-bold">{{ row.observed_location|default:"—" }}</td>
-                            <td>{{ row.auditor|default:"—" }}</td>
-                            <td class="text-secondary">{{ row.timestamp_display|default:"—" }}</td>
+                            <td class="text-warning font-weight-bold">{{ row.observed_location|default:not_recorded }}</td>
+                            <td>{{ row.auditor|default:not_recorded }}</td>
+                            <td class="text-secondary">{{ row.timestamp_display|default:not_recorded }}</td>
                           </tr>
                         {% endfor %}
                       </tbody>
@@ -438,14 +443,14 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td>{{ row.serial_number|default:"—" }}</td>
+                            <td>{{ row.serial_number|default:not_set }}</td>
                             <td>
                               {% if row.status_color %}
                                 {% csp_color_style row.status_color "status" as status_style %}
                                 {{ status_style.style_block|safe }}
                                 <span class="badge {{ status_style.class_name }}">{{ row.status_name }}</span>
                               {% else %}
-                                {{ row.status_name|default:"—" }}
+                                {{ row.status_name|default:not_set }}
                               {% endif %}
                             </td>
                           </tr>
@@ -486,9 +491,9 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td class="text-orange font-weight-bold">{{ row.observed_location|default:"—" }}</td>
-                            <td>{{ row.auditor|default:"—" }}</td>
-                            <td class="text-secondary">{{ row.timestamp_display|default:"—" }}</td>
+                            <td class="text-orange font-weight-bold">{{ row.observed_location|default:not_recorded }}</td>
+                            <td>{{ row.auditor|default:not_recorded }}</td>
+                            <td class="text-secondary">{{ row.timestamp_display|default:not_recorded }}</td>
                           </tr>
                         {% endfor %}
                       </tbody>
@@ -527,10 +532,10 @@
                               {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                             </td>
                             <td><code>{{ row.asset_tag }}</code></td>
-                            <td>{{ row.auditor|default:"—" }}</td>
-                            <td class="text-secondary">{{ row.timestamp_display|default:"—" }}</td>
+                            <td>{{ row.auditor|default:not_recorded }}</td>
+                            <td class="text-secondary">{{ row.timestamp_display|default:not_recorded }}</td>
                             <td>
-                              <span class="badge bg-secondary-lt">{{ row.verification_method_display|default:"—" }}</span>
+                              <span class="badge bg-secondary-lt">{{ row.verification_method_display|default:not_recorded }}</span>
                             </td>
                           </tr>
                         {% endfor %}

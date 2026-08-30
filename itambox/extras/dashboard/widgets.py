@@ -825,7 +825,7 @@ class ChangelogWidget(DashboardWidget):
             initial=True,
             widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
             required=False,
-            help_text=_("Each change also writes an internal Event row — showing both duplicates the feed."),
+            help_text=_("Each change also writes an internal Event row. Showing both would duplicate the feed."),
         )
 
     def get_context(self, request):

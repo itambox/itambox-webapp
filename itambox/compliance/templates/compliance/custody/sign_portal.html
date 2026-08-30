@@ -1,4 +1,5 @@
 {% load i18n %}
+{% translate "No Email" as no_email %}
 {# templates/assets/custody/sign_portal.html #}
 {% load static %}
 <!DOCTYPE html>
@@ -95,7 +96,7 @@
           <label class="form-label text-muted">{% translate "Custodian / Asset Holder" %}</label>
           <div class="bg-light p-3 rounded">
             <h4 class="mb-1 text-dark">{{ holder.first_name }} {{ holder.last_name }}</h4>
-            <span class="text-muted small">{{ holder.upn }} | {{ holder.email|default:_("No Email") }}</span>
+            <span class="text-muted small">{{ holder.upn }} | {{ holder.email|default:no_email }}</span>
           </div>
         </div>
         <div class="mb-4">

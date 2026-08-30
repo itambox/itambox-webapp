@@ -87,8 +87,8 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         blank=True,
         verbose_name=_("Version"),
         help_text=_(
-            "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
-            "Informational only — reconciliation is performed at the Software level (version-agnostic)."
+            "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). This is for "
+            "reference only; reconciliation is performed at the Software level and ignores versions."
         ),
     )
     expiration_date = models.DateField(
@@ -195,7 +195,7 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         if proposed < assigned:
             raise ValidationError(
                 {
-                    "seats": _("Cannot set seats to %(seats)s — %(n)s are already assigned.")
+                    "seats": _("Cannot set the seat count to %(seats)s because %(n)s seats are already assigned.")
                     % {
                         "seats": proposed,
                         "n": assigned,

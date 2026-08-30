@@ -15,16 +15,16 @@ from .helpers import add_standard_buttons
 # Codes the `money` template filter renders with a proper symbol/placement;
 # anything else falls back to an ISO-code suffix.
 CURRENCY_CHOICES = [
-    ("EUR", _("EUR — Euro (€)")),
-    ("USD", _("USD — US Dollar ($)")),
-    ("GBP", _("GBP — British Pound (£)")),
-    ("CHF", _("CHF — Swiss Franc")),
-    ("SEK", _("SEK — Swedish Krona")),
-    ("NOK", _("NOK — Norwegian Krone")),
-    ("DKK", _("DKK — Danish Krone")),
-    ("CAD", _("CAD — Canadian Dollar")),
-    ("AUD", _("AUD — Australian Dollar")),
-    ("JPY", _("JPY — Japanese Yen (¥)")),
+    ("EUR", _("EUR (Euro, €)")),
+    ("USD", _("USD (US Dollar, $)")),
+    ("GBP", _("GBP (British Pound, £)")),
+    ("CHF", _("CHF (Swiss Franc)")),
+    ("SEK", _("SEK (Swedish Krona)")),
+    ("NOK", _("NOK (Norwegian Krone)")),
+    ("DKK", _("DKK (Danish Krone)")),
+    ("CAD", _("CAD (Canadian Dollar)")),
+    ("AUD", _("AUD (Australian Dollar)")),
+    ("JPY", _("JPY (Japanese Yen, ¥)")),
 ]
 
 
@@ -36,7 +36,7 @@ class TenantForm(forms.ModelForm):
         choices=CURRENCY_CHOICES,
         initial="EUR",
         widget=forms.Select(attrs={"class": "form-select"}),
-        help_text=_("ISO 4217 code used when displaying this tenant's monetary values (display only, no conversion)."),
+        help_text=_("Currency used to display monetary values for this tenant. Amounts are not converted."),
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -69,6 +69,12 @@ class TenantForm(forms.ModelForm):
         }
         help_texts = {
             "slug": _("URL-friendly identifier."),
+            "managed_by": _("The tenant that manages this one. Leave blank for an independent tenant."),
+            "is_provider": _(
+                "Lets this tenant manage other tenants and assign its members access to them. "
+                "Only superusers can change this setting."
+            ),
+            "default_depreciation": _("Used for assets that have no depreciation schedule on the asset or its type."),
         }
 
     def _apply_active_provider_initial(self, eligible_provider_ids):

@@ -44,9 +44,9 @@
         {% endif %}
       {% elif object.action_config.url %}
         <span class="font-monospace">{{ object.action_config.url }}</span>
-        <span class="text-secondary small ms-1">{% translate "(inline URL — consider linking a Webhook Endpoint)" %}</span>
+        <span class="text-secondary small ms-1">{% translate "(inline URL; consider linking a Webhook Endpoint instead)" %}</span>
       {% else %}
-        <span class="badge bg-danger">{% translate "No endpoint set — this rule will not deliver" %}</span>
+        <span class="badge bg-danger">{% translate "No endpoint is set, so this rule will not deliver" %}</span>
       {% endif %}
     </dd>
   {% endif %}

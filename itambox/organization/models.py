@@ -327,16 +327,21 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
                 raise ValidationError({"managed_by": _("A tenant cannot manage itself.")})
             if self.is_provider:
                 raise ValidationError(
-                    {"is_provider": _("A managed tenant cannot itself be a managing tenant (one level only).")}
+                    {"is_provider": _("A tenant managed by another tenant cannot manage tenants itself.")}
                 )
             manager = self.managed_by
             if not manager.is_provider:
                 raise ValidationError(
-                    {"managed_by": _("The managing tenant must have MSP mode enabled (is_provider).")}
+                    {"managed_by": _("The selected managing tenant must be set to manage other tenants.")}
                 )
             if manager.managed_by_id:
                 raise ValidationError(
-                    {"managed_by": _("The managing tenant is itself managed — chains are not supported.")}
+                    {
+                        "managed_by": _(
+                            "The selected managing tenant is already managed by another tenant. "
+                            "Nested management is not supported."
+                        )
+                    }
                 )
 
         if (
@@ -348,7 +353,7 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
             ).exists()
         ):
             raise ValidationError(
-                {"is_provider": _("Move every live managed tenant before disabling or deleting this provider.")}
+                {"is_provider": _("Before disabling or deleting this managing tenant, move all tenants it manages.")}
             )
 
     def get_absolute_url(self):
@@ -886,14 +891,14 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
     def clean(self):
         super().clean()
         if bool(self.membership_id) == bool(self.user_group_id):
-            raise ValidationError(_("A role grant requires exactly one principal."))
+            raise ValidationError(_("Choose either a member or a user group for this role, not both."))
 
         owner_id = self.principal_tenant_id
         if owner_id is None:
-            raise ValidationError(_("The grant principal must have an owning tenant."))
+            raise ValidationError(_("The selected member or user group must belong to a tenant."))
 
         if self.user_group_id and self.role_id and self.role.tenant_id != owner_id:
-            raise ValidationError({"role": _("A group may carry only roles owned by the group tenant.")})
+            raise ValidationError({"role": _("Choose a role owned by the group's tenant.")})
 
         if self.membership_id and self.role_id and self.role.tenant_id != owner_id:
             shared_own_role = (
@@ -902,16 +907,14 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
                 and self.membership.tenant.managed_by_id == self.role.tenant_id
             )
             if not shared_own_role:
-                raise ValidationError(
-                    {"role": _("A direct grant may use only a role owned by its tenant or managing provider.")}
-                )
+                raise ValidationError({"role": _("Choose a role owned by this tenant or its managing tenant.")})
 
         if self.membership_id and self.role_id and role_is_privileged(self.role):
             errors = {}
             if not self.reason.strip():
-                errors["reason"] = _("Elevated direct grants require a reason.")
+                errors["reason"] = _("Directly assigned elevated roles require a reason.")
             if self.valid_until is None:
-                errors["valid_until"] = _("Elevated direct grants require an expiration.")
+                errors["valid_until"] = _("Directly assigned elevated roles require an expiration.")
             elif self.valid_until <= timezone.now():
                 errors["valid_until"] = _("The expiration must be in the future.")
             if errors:
@@ -1101,15 +1104,15 @@ class RoleGrantScope(ChangeLoggingMixin, models.Model):
         has_group = self.tenant_group_id is not None
         if self.scope_type in (self.SCOPE_OWN, self.SCOPE_ALL_MANAGED):
             if has_tenant or has_group:
-                raise ValidationError(_("This scope type cannot carry a tenant target."))
+                raise ValidationError(_("This coverage option cannot include a specific tenant or tenant group."))
         elif self.scope_type == self.SCOPE_TENANT:
             if not has_tenant or has_group:
-                raise ValidationError(_("A tenant scope requires exactly one tenant."))
+                raise ValidationError(_("Choose exactly one tenant for this coverage."))
         elif self.scope_type == self.SCOPE_TENANT_GROUP:
             if has_tenant or not has_group:
-                raise ValidationError(_("A group scope requires exactly one tenant group."))
+                raise ValidationError(_("Choose exactly one tenant group for this coverage."))
         else:
-            raise ValidationError({"scope_type": _("Unknown role grant scope type.")})
+            raise ValidationError({"scope_type": _("Choose a valid role coverage option.")})
 
         # The identity service sets this operation-local marker only while moving
         # a locked historical scope between grants with the same role and principal.
@@ -1125,12 +1128,14 @@ class RoleGrantScope(ChangeLoggingMixin, models.Model):
                 and grant.membership.tenant.managed_by_id == grant.role.tenant_id
             )
             if grant.role.tenant_id != owner_id and not valid_shared_role:
-                raise ValidationError(_("Own scope requires a role valid in the principal tenant."))
+                raise ValidationError(_("Choose a role available in the member or group's tenant."))
             return
         if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-            raise ValidationError(_("Managed scopes require a provider-owned role and principal."))
+            raise ValidationError(_("Managed-tenant access requires a role owned by the managing tenant."))
         if self.scope_type == self.SCOPE_TENANT and self.tenant.managed_by_id != owner_id:
-            raise ValidationError({"tenant": _("The target tenant is not managed by the role owner.")})
+            raise ValidationError(
+                {"tenant": _("The selected tenant is not managed by the tenant that owns this role.")}
+            )
 
 
 class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
@@ -1191,7 +1196,7 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
         ]
 
     def __str__(self):
-        return f"{self.code} – {self.name}" if self.code else self.name
+        return f"{self.code}: {self.name}" if self.code else self.name
 
     def get_absolute_url(self):
         return reverse("organization:costcenter_detail", kwargs={"pk": self.pk})

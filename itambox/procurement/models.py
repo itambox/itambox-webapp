@@ -337,7 +337,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         ]
 
     def __str__(self):
-        return f"{self.contract_number} – {self.name}"
+        return f"{self.contract_number}: {self.name}"
 
     def get_absolute_url(self):
         return reverse("procurement:contract_detail", kwargs={"pk": self.pk})

@@ -147,7 +147,7 @@ class EventRuleTable(BaseTable):
     def render_conditions(self, value):
         if value:
             return format_html('<span class="badge bg-warning">{}</span>', _("Withdrawn"))
-        return "—"
+        return _("Not set")
 
 
 class LabelTemplateTable(BaseTable):
@@ -187,7 +187,7 @@ class TagTable(BaseTable):
             normalized = safe_hex_color(value)
             color_class, style_block = color_chip_class(normalized)
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
-        return "—"
+        return _("Not set")
 
 
 class CustomFieldTable(BaseTable):
@@ -273,7 +273,7 @@ class JournalEntryTable(BaseTable):
 
     def render_content_object(self, value):
         if value is None:
-            return mark_safe('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         get_url = getattr(value, "get_absolute_url", None)
         url = None
         if get_url is not None:
@@ -373,14 +373,14 @@ class WebhookDeliveryTable(BaseTable):
 
     def render_delivery_id(self, value):
         if not value:
-            return format_html('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         return format_html('<code title="{}">{}</code>', value, str(value)[:8])
 
     def render_event(self, value, record):
         if record.test_send:
             return _("Test webhook")
         if value is None:
-            return format_html('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         return value.get_action_display()
 
     def render_status(self, value):
@@ -394,18 +394,18 @@ class WebhookDeliveryTable(BaseTable):
         return format_html('<span class="badge bg-{}">{}</span>', color, str(value).capitalize())
 
     def render_response_code(self, value):
-        return value if value is not None else format_html('<span class="text-muted">&mdash;</span>')
+        return value if value is not None else format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def render_error_message(self, value):
         if not value:
-            return format_html('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         truncated = Truncator(str(value)).chars(80)
         return format_html('<span title="{}">{}</span>', value, truncated)
 
     def render_test_send(self, value):
         if value:
             return format_html('<span class="badge bg-info">{}</span>', _("Test"))
-        return format_html('<span class="text-muted">&mdash;</span>')
+        return format_html('<span class="text-muted">{}</span>', _("No"))
 
 
 # =============================================================================
@@ -599,8 +599,9 @@ class AlertLogTable(BaseTable):
                     _("No channels attached to this rule"),
                 )
             return format_html(
-                '<span class="text-muted" title="{}">&mdash;</span>',
+                '<span class="text-muted" title="{}">{}</span>',
                 _("No delivery planned (muted rule or never dispatched)"),
+                _("Not sent"),
             )
         if outcome == AlertLog.DELIVERY_OUTCOME_PENDING:
             return format_html('<span class="badge bg-info" title="{}">pending</span>', _("Dispatch pending"))

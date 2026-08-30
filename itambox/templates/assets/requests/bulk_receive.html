@@ -58,7 +58,7 @@
               <div class="col-md-3">
                 <label class="form-label small text-muted">{% translate "Status" %}</label>
                 <select id="bulk-fill-status" class="form-select" data-tom-select>
-                  <option value="">{% translate "— Select Status —" %}</option>
+                  <option value="">{% translate "Select a status" %}</option>
                   {% for status in formset.forms.0.fields.status.queryset %}
                     <option value="{{ status.pk }}">{{ status.name }}</option>
                   {% endfor %}
@@ -67,7 +67,7 @@
               <div class="col-md-3">
                 <label class="form-label small text-muted">{% translate "Location Target" %}</label>
                 <select id="bulk-fill-location" class="form-select" data-tom-select>
-                  <option value="">{% translate "— Select Location —" %}</option>
+                  <option value="">{% translate "Select a location" %}</option>
                   {% for loc in formset.forms.0.fields.location.queryset %}
                     <option value="{{ loc.pk }}">{{ loc }}</option>
                   {% endfor %}
@@ -76,7 +76,7 @@
               <div class="col-md-3">
                 <label class="form-label small text-muted">{% translate "Supplier" %}</label>
                 <select id="bulk-fill-supplier" class="form-select" data-tom-select>
-                  <option value="">{% translate "— Select Supplier —" %}</option>
+                  <option value="">{% translate "Select a supplier" %}</option>
                   {% for supplier in formset.forms.0.fields.supplier.queryset %}
                     <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
                   {% endfor %}

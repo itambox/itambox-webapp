@@ -93,16 +93,16 @@ class SubscriptionTable(BaseTable):
                 color_class,
                 display,
             )
-        return "—"
+        return _("Not set")
 
     def render_renewal_cost(self, value, record):
         if value is not None:
             return f"{value:,.2f} {record.currency or 'USD'}"
-        return "—"
+        return _("Not set")
 
     def render_days_until_renewal(self, value):
         if value is None:
-            return "—"
+            return _("Not set")
         if value < 0:
             return format_html('<span class="text-danger fw-bold">{} days overdue</span>', abs(value))
         elif value == 0:
@@ -123,7 +123,7 @@ class SubscriptionAssignmentTable(BaseTable):
     )
     assigned_object = tables.Column(verbose_name=_("Assigned To"), orderable=False)
     assigned_date = tables.DateColumn(format="Y-m-d H:i", verbose_name=_("Assigned"))
-    assigned_by = tables.Column(accessor="assigned_by.username", verbose_name=_("By"), default="—")
+    assigned_by = tables.Column(accessor="assigned_by.username", verbose_name=_("By"), default=_("Not set"))
     notes = tables.Column(verbose_name=_("Notes"))
     actions = ActionsColumn()
 
@@ -135,5 +135,5 @@ class SubscriptionAssignmentTable(BaseTable):
     def render_assigned_object(self, value, record):
         obj = record.tenant_safe_assigned_object
         if obj is None:
-            return "—"
+            return _("Not set")
         return str(obj)

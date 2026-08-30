@@ -251,7 +251,7 @@ class SeedHistoryMixin:
                     user=self._pick_actor(actors),
                     action="update",
                     status=sl_retired,
-                    notes="Decommissioned — end of useful life. Disposed via certified e-waste vendor.",
+                    notes="Decommissioned at the end of its useful life. Disposed of by a certified e-waste vendor.",
                 )
 
         # ── 4. Licenses: create log + optional seat bump ──────────────────────

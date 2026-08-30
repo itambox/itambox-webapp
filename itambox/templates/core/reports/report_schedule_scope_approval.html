@@ -38,7 +38,7 @@
                 <li class="list-group-item">{{ tenant.name }} <span class="text-secondary">({{ tenant.slug }})</span></li>
               {% empty %}
                 <li class="list-group-item text-danger">
-                  {% translate "No resolvable scope tenants — delivery would fail closed and this scope cannot be approved." %}
+                  {% translate "The scope has no resolvable tenants. Delivery would fail closed, so this scope cannot be approved." %}
                 </li>
               {% endfor %}
             </ul>

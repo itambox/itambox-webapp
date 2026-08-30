@@ -114,7 +114,7 @@ class SiteTable(BaseTable):
                 color_class,
                 display,
             )
-        return "—"
+        return _("Not set")
 
 
 class LocationTable(BaseTable):
@@ -144,7 +144,7 @@ class LocationTable(BaseTable):
                 color_class,
                 display,
             )
-        return "—"
+        return _("Not set")
 
 
 class TenantGroupTable(BaseTable):
@@ -247,12 +247,12 @@ class AssetAssignmentTable(BaseTable):
         default_columns = ("asset", "asset_tag", "asset_role", "checked_out_at", "expected_checkin_date", "checkin_btn")
 
     def render_asset_role(self, value):
-        return value.name if value else "—"
+        return value.name if value else _("No role")
 
     def render_checkin_btn(self, record):
         request = getattr(self, "request", None)
         if not request or not self.has_perm(request.user, "assets.change_asset", record.asset):
-            return mark_safe('<span class="text-muted small">—</span>')
+            return format_html('<span class="text-muted small">{}</span>', _("Not available"))
 
         url = reverse("assets:asset_checkin", kwargs={"pk": record.asset.pk})
         return format_html(
@@ -336,11 +336,11 @@ class RoleTable(BaseTable):
     def render_tenant(self, value, record):
         tenant = record.tenant
         if tenant is None:
-            return "—"
+            return _("Not set")
         return format_html('<a href="{}">{}</a>', tenant.get_absolute_url(), tenant)
 
     def render_shared(self, value, record):
-        return shared_role_badge(record) or "—"
+        return shared_role_badge(record) or _("No")
 
     def render_member_count(self, value, record):
         count = getattr(record, "member_count", 0) or 0
@@ -475,7 +475,7 @@ class TenantResourceGrantTable(BaseTable):
             "organization.delete_tenantresourcegrant",
             record,
         ):
-            return mark_safe('<span class="text-muted small">&mdash;</span>')
+            return format_html('<span class="text-muted small">{}</span>', _("Not available"))
         revoke_url = reverse("organization:tenantresourcegrant_delete", kwargs={"pk": record.pk})
         return format_html(
             '<a href="{}" class="btn btn-sm btn-outline-danger" title="{}">'

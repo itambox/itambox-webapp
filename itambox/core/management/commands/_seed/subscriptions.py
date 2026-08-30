@@ -71,7 +71,7 @@ class SeedSubscriptionsMixin:
                     vendor_contract_auto_renews=True,
                     contract_reference=f"MSA-{prov_name.split()[0].upper()}-{start.year}",
                     owner=self._provisioner,
-                    description=f"{prov_name} cloud subscription — group contract held by {tenant.name}.",
+                    description=f"{prov_name} cloud subscription. The group contract is held by {tenant.name}.",
                     tenant=tenant,
                 )
                 self._subscriptions.append(sub)

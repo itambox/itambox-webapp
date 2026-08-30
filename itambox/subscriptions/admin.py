@@ -95,7 +95,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
     def days_until_renewal_display(self, obj):
         days = obj.days_until_renewal
         if days is None:
-            return "—"
+            return _("Not set")
         return f"{days} days" if days >= 0 else f"{abs(days)} days overdue"
 
     def get_actions(self, request):

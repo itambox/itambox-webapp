@@ -141,7 +141,7 @@ class LicenseSeatAssignmentTable(BaseTable):
                 holder = target
                 via_asset = True
         if holder is None:
-            return "—"
+            return _("Not set")
         url = reverse("organization:assetholder_detail", kwargs={"pk": holder.pk})
         label = holder.upn or str(holder)
         if via_asset:

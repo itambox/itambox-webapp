@@ -759,7 +759,7 @@ class SeedOrganizationsMixin:
                 )
                 industry = org.get("industry", "Managed Service Provider")
                 description = (
-                    f"{t['name']} — {industry} entity of "
+                    f"{t['name']}: {industry} entity of "
                     f"{(org['group'][0] if org['group'] else t['name'])}.\n"
                     f"Registered seat: {t['legal_seat']} · {t['reg_no']} · functional currency {currency}.\n"
                     f"IT managed by Northwind Managed Services GmbH."

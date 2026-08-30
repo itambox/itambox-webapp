@@ -1,7 +1,7 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 {% load crispy_forms_tags %}
-{% block title %}{% translate "Assign Users to" %} {{ group }} {% translate "— ITAMbox" %}{% endblock %}
+{% block title %}{% translate "Assign Users to" %} {{ group }} | ITAMbox{% endblock %}
 {% block page_header %}
   <div class="page-pretitle">{% translate "Access Control / User Groups" %}</div>
   <h2 class="page-title">{% translate "Assign Users to" %} {{ group.name }}</h2>
@@ -19,7 +19,7 @@
       <div class="card border-0 shadow-sm">
         <div class="card-body">
           <p class="text-muted">
-            {% translate "Select active memberships from the group's owning tenant. Members inherit every explicitly scoped role grant carried by the group." %}
+            {% translate "Select active members of this group's tenant. They receive all roles assigned to the group, wherever those roles apply." %}
           </p>
           <form method="post">
             {% csrf_token %}

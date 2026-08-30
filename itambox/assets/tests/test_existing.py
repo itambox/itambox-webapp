@@ -779,7 +779,7 @@ class AssetMaintenanceAndLifecycleTestCase(_SeededStatusLabelsMixin, TestCase):
             status=self.status,
         )
         self.assertIsNone(asset_no_eol.eol_date)
-        self.assertEqual(asset_no_eol.time_to_eol, "—")
+        self.assertEqual(asset_no_eol.time_to_eol, "Not set")
 
     def test_total_cost_of_ownership_aggregation(self):
         import datetime
@@ -1755,10 +1755,13 @@ class JavaScriptCatalogLocalizationTest(SimpleTestCase):
     # the same identities.
     BULK_BASKET_GERMAN = {
         "Select a target tenant before scanning.": "Wählen Sie vor dem Scannen einen Ziel-Mandanten aus.",
-        ("%(count)s assets from another tenant are kept aside — switching the target tenant shows them."): (
-            "Assets aus einem anderen Mandanten werden zurückgehalten (%(count)s) — "
-            "beim Wechsel des Ziel-Mandanten werden sie angezeigt."
-        ),
+        "%(count)s asset from another tenant is kept aside. Switch the target tenant to see it.": [
+            "%(count)s Asset aus einem anderen Mandanten wird zurückgehalten. "
+            "Wechseln Sie den Ziel-Mandanten, um es anzuzeigen.",
+            "%(count)s Assets aus einem anderen Mandanten werden zurückgehalten. "
+            "Wechseln Sie den Ziel-Mandanten, um sie anzuzeigen.",
+        ],
+        "Not set": "Nicht festgelegt",
     }
 
     EXPECTED_GERMAN = {

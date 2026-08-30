@@ -1,5 +1,6 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
+{% translate "User group" as user_group_label %}
 {% load crispy_forms_tags %}
 {% comment %}
 Bespoke create/edit screen for UserGroupForm — one of the three RBAC form
@@ -10,7 +11,7 @@ the generic managed-row add/remove and coverage toggles.
 {% endcomment %}
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
-  <h2 class="page-title">{{ title|default:_("User group") }}</h2>
+  <h2 class="page-title">{{ title|default:user_group_label }}</h2>
 {% endblock %}
 {% block page_actions %}
   {% if cancel_url %}
@@ -35,7 +36,7 @@ the generic managed-row add/remove and coverage toggles.
             {% endif %}
           </h4>
           <p class="text-muted mb-4 small">
-            {% translate "A user group is owned by one tenant and contains that tenant's memberships. Its permanent group grants can be projected into explicitly scoped managed tenants." %}
+            {% translate "A user group belongs to one tenant and contains its members. Roles assigned to the group can also give members access to selected managed tenants." %}
           </p>
           <form method="post" hx-boost="false" novalidate>
             {% csrf_token %}
@@ -45,9 +46,9 @@ the generic managed-row add/remove and coverage toggles.
             {% crispy form %}
             {% if managed_formset %}
               <fieldset class="mb-4" id="managed-grants" data-managed-formset>
-                <legend class="fs-4 text-primary">{% translate "Managed tenant projections" %}</legend>
+                <legend class="fs-4 text-primary">{% translate "Roles in managed tenants" %}</legend>
                 <p class="text-muted small">
-                  {% translate "Add one or more scope rows per role. Group grants can be permanent; direct-grant reason and expiration rules do not apply." %}
+                  {% translate "Choose where each role applies. Group access does not need a reason or expiration." %}
                 </p>
                 {{ managed_formset.management_form }}
                 {% if managed_formset.non_form_errors %}
@@ -71,7 +72,7 @@ the generic managed-row add/remove and coverage toggles.
                         class="btn btn-outline-primary btn-sm mt-2"
                         data-add-managed-row>
                   <i class="mdi mdi-plus"></i>
-                  {% translate "Add managed scope" %}
+                  {% translate "Add managed role" %}
                 </button>
               </fieldset>
             {% endif %}

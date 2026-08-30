@@ -19,7 +19,7 @@
       {{ color_style.style_block|safe }}
       <span class="badge {{ color_style.class_name }}">&nbsp;</span> #{{ object.color }}
     {% else %}
-      —
+      <span class="text-muted"><i>{% translate "Not set" %}</i></span>
     {% endif %}
   </dd>
 </dl>

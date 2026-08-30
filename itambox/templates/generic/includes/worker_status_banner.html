@@ -12,7 +12,7 @@
       <i class="mdi mdi-alert-octagon-outline me-2 fs-3"></i>
       <div>
         {% blocktranslate %}No background worker is running. Webhook &amp; notification deliveries will be <strong>queued but never sent</strong> until you start the worker:{% endblocktranslate %}
-        <code>python manage.py qcluster</code>{% if worker_status.queued_tasks %} — {% blocktranslate count n=worker_status.queued_tasks %}{{ n }} task waiting in the queue.{% plural %}{{ n }} tasks waiting in the queue.{% endblocktranslate %}{% endif %}
+        <code>python manage.py qcluster</code>{% if worker_status.queued_tasks %}. {% blocktranslate count n=worker_status.queued_tasks %}{{ n }} task is waiting in the queue.{% plural %}{{ n }} tasks are waiting in the queue.{% endblocktranslate %}{% endif %}
       </div>
     </div>
   {% else %}

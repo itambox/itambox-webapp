@@ -60,20 +60,22 @@ def asset_action_payload(asset, mode):
     if mode == "dispose":
         if asset.disposed_at is not None or AssetDisposal.all_objects.filter(asset=asset).exists():
             eligible = False
-            warning = str(_("Already disposed — will be skipped."))
+            warning = str(_("Already disposed; this asset will be skipped."))
         bv = compute_book_value(asset)
         book_value = str(bv) if bv is not None else None
     elif mode == "checkout":
         status_type = asset.status.type if asset.status_id else None
         if status_type in ("in_repair", "on_order", "archived"):
             eligible = False
-            warning = str(_("Cannot check out — %(status)s.")) % {"status": asset.status.get_type_display()}
+            warning = str(_("Cannot check out this asset because its status is %(status)s.")) % {
+                "status": asset.status.get_type_display()
+            }
         elif assigned is not None:
-            warning = str(_("Currently assigned to %(holder)s — will be reassigned.")) % {"holder": assigned}
+            warning = str(_("Currently assigned to %(holder)s; this asset will be reassigned.")) % {"holder": assigned}
     else:  # checkin
         if active is None and not asset.location_id:
             eligible = False
-            warning = str(_("Not checked out — nothing to return."))
+            warning = str(_("This asset is not checked out, so there is nothing to return."))
 
     return {
         "pk": asset.pk,

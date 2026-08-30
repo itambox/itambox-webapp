@@ -15,7 +15,8 @@ custom_field_data feature and at least one stored value.{% endcomment %}
               <span class="badge bg-green">{% translate "Yes" %}</span>
             {% elif value is False %}
               <span class="badge bg-secondary">{% translate "No" %}</span>
-            {% elif value is None or value == "" %}<span class="text-muted">—</span>
+            {% elif value is None or value == "" %}
+              <span class="text-muted">{% translate "Not set" %}</span>
         {% else %}{{ value }}{% endif %}
           </dd>
       {% endfor %}

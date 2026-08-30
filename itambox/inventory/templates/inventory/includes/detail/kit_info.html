@@ -1,4 +1,5 @@
 {% load i18n %}
+{% translate "Active" as active_label %}
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Name:" %}</dt>
   <dd class="col-sm-9">
@@ -6,6 +7,6 @@
   </dd>
   <dt class="col-sm-3">{% translate "Status:" %}</dt>
   <dd class="col-sm-9">
-    {{ object.get_status_display|default:_("Active") }}
+    {{ object.get_status_display|default:active_label }}
   </dd>
 </dl>

@@ -107,7 +107,7 @@ class AuditSessionTable(BaseTable):
         return value or "Global (All Locations)"
 
     def render_completed_at(self, value):
-        return value.strftime("%Y-%m-%d %H:%M") if value else "—"
+        return value.strftime("%Y-%m-%d %H:%M") if value else _("Not recorded")
 
 
 class AuditSessionListView(ObjectListView):

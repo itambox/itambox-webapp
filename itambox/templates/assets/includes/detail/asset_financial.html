@@ -58,7 +58,7 @@
       <span class="text-muted"><i>{% translate "N/A (No Purchase Cost)" %}</i></span>
     {% endif %}
     <br>
-    <small class="text-muted fst-italic">{% translate "Indicative figure for IT asset management and budgeting — not a substitute for your accounting system." %}</small>
+    <small class="text-muted fst-italic">{% translate "This estimate supports IT asset management and budgeting. It does not replace your accounting system." %}</small>
   </dd>
   <dt class="col-sm-4">{% translate "In-Service Date:" %}</dt>
   <dd class="col-sm-8 text-secondary">
@@ -81,7 +81,7 @@
   <dd class="col-sm-8">
     {% if time_to_eol == 'Expired' %}
       <span class="badge bg-danger-lt text-danger font-weight-bold text-uppercase">{% translate "Expired (EOL Reached)" %}</span>
-    {% elif time_to_eol != '—' %}
+    {% elif eol_date %}
       <span class="badge bg-success-lt text-success font-weight-bold">{{ time_to_eol }}</span>
     {% else %}
       <span class="text-muted"><i>{% translate "N/A" %}</i></span>

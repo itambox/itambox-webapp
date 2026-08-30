@@ -177,7 +177,11 @@ function initScanBasket(): void {
     keptAsideNotice.classList.toggle('d-none', !visible);
     keptAsideNotice.textContent = visible
       ? interpolate(
-        gettext('%(count)s assets from another tenant are kept aside — switching the target tenant shows them.'),
+        ngettext(
+          '%(count)s asset from another tenant is kept aside. Switch the target tenant to see it.',
+          '%(count)s assets from another tenant are kept aside. Switch the target tenant to see them.',
+          keptAsideCount,
+        ),
         { count: keptAsideCount },
         true,
       )
@@ -225,9 +229,9 @@ function initScanBasket(): void {
 
     set('asset_tag', p.asset_tag || `#${p.pk}`);
     set('label', p.label);
-    set('status', p.status || '—');
-    set('assigned_to', p.assigned_to || '—');
-    set('book_value', p.book_value || '—');
+    set('status', p.status || gettext('Not set'));
+    set('assigned_to', p.assigned_to || gettext('Not set'));
+    set('book_value', p.book_value || gettext('Not set'));
 
     const proceeds = tr.querySelector<HTMLInputElement>('input[data-field="proceeds"]');
     if (proceeds) {

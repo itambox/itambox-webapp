@@ -7,7 +7,7 @@
 {% block content_tab %}
   <div class="mb-4">
     <h3 class="card-title mb-0">{% translate "API Tokens" %}</h3>
-    <p class="text-muted small mb-0">{% translate "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities." %}</p>
+    <p class="text-muted small mb-0">{% translate "Create and revoke personal API tokens for integrations, scripts, and command-line tools." %}</p>
   </div>
   {# Generated Key copy-once alert block #}
   {% if new_token_key %}
@@ -17,10 +17,8 @@
           <i class="mdi mdi-check alert-icon"></i>
         </div>
         <div class="w-100">
-          <h4 class="alert-title">{% translate "New API Access Token Generated Successfully!" %}</h4>
-          <div class="mb-3">
-            {% translate "Please copy this token key now. For your security, it will not be displayed on this page again." %}
-          </div>
+          <h4 class="alert-title">{% translate "API token created" %}</h4>
+          <div class="mb-3">{% translate "Copy this token now. For your security, it will not be shown again." %}</div>
           <div class="input-group">
             <input type="text"
                    class="form-control font-monospace fw-bold select-all"
@@ -64,7 +62,11 @@
                       <code class="font-monospace text-body fw-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
                     </td>
                     <td data-label="{% translate 'Description' %}">
-                      <span class="text-secondary small font-weight-medium d-block">{{ token.description|default:"—" }}</span>
+                      {% if token.description %}
+                        <span class="text-secondary small font-weight-medium d-block">{{ token.description }}</span>
+                      {% else %}
+                        <span class="text-muted small">{% translate "No description" %}</span>
+                      {% endif %}
                     </td>
                     <td data-label="{% translate 'Permissions' %}">
                       {% if token.write_enabled %}
@@ -117,7 +119,7 @@
           <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
             <div class="card-body">
               <i class="mdi mdi-key-outline text-muted mb-2"></i>
-              <p class="mb-0 small font-weight-medium">{% translate "You have not generated any API access tokens." %}</p>
+              <p class="mb-0 small font-weight-medium">{% translate "You do not have any API tokens yet." %}</p>
             </div>
           </div>
         {% endif %}

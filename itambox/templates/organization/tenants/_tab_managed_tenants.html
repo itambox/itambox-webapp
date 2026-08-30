@@ -41,7 +41,7 @@ can_add_managed_tenant
                 {% if mt.group %}
                   <a href="{% url 'organization:tenantgroup_detail' pk=mt.group_id %}">{{ mt.group.name }}</a>
                 {% else %}
-                  <span class="text-muted">—</span>
+                  <span class="text-muted">{% translate "No group" %}</span>
                 {% endif %}
               </td>
               <td>

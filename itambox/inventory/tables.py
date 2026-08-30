@@ -1,7 +1,6 @@
 import django_tables2 as tables
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
@@ -237,7 +236,7 @@ class AccessoryStockTable(SharePoolActionMixin, BaseTable):
         )
         if not can_manage_owner_item and not shared_checkout:
             shared = self.share_pool_html(request, record)
-            return shared or mark_safe('<span class="text-muted small">—</span>')
+            return shared or format_html('<span class="text-muted small">{}</span>', _("Not shared"))
 
         checkout_url = reverse("inventory:accessory_checkout", kwargs={"pk": record.accessory.pk})
         checkout_title = _("Check-out")
@@ -316,12 +315,12 @@ class AccessoryAssignmentTable(BaseTable):
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
             return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
-        return "—"
+        return _("Not set")
 
     def render_actions(self, record):
         request = getattr(self, "request", None)
         if not request or not self.has_perm(request.user, "inventory.change_accessory", record.accessory):
-            return mark_safe('<span class="text-muted small">—</span>')
+            return format_html('<span class="text-muted small">{}</span>', _("Not available"))
 
         url = reverse("inventory:accessory_checkin", kwargs={"pk": record.pk})
         confirm_msg = _("Are you sure you want to check in this accessory assignment?")
@@ -431,7 +430,7 @@ class ConsumableStockTable(SharePoolActionMixin, BaseTable):
             return (
                 shared_checkout
                 or self.share_pool_html(request, record)
-                or mark_safe('<span class="text-muted small">—</span>')
+                or format_html('<span class="text-muted small">{}</span>', _("Not shared"))
             )
 
         checkout_url = reverse("inventory:consumable_checkout", kwargs={"pk": record.consumable.pk})
@@ -505,7 +504,7 @@ class ConsumableAssignmentTable(BaseTable):
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
             return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
-        return "—"
+        return _("Not set")
 
 
 class KitTable(BaseTable):
@@ -609,7 +608,7 @@ class ComponentStockTable(SharePoolActionMixin, BaseTable):
             return (
                 shared_checkout
                 or self.share_pool_html(request, record)
-                or mark_safe('<span class="text-muted small">—</span>')
+                or format_html('<span class="text-muted small">{}</span>', _("Not shared"))
             )
 
         checkout_url = reverse("inventory:component_checkout", kwargs={"pk": record.component.pk})
@@ -689,12 +688,12 @@ class ComponentAllocationTable(BaseTable):
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
             return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
-        return "—"
+        return _("Not set")
 
     def render_actions(self, record):
         request = getattr(self, "request", None)
         if not request or not self.has_perm(request.user, "inventory.change_component", record.component):
-            return mark_safe('<span class="text-muted small">—</span>')
+            return format_html('<span class="text-muted small">{}</span>', _("Not available"))
 
         url = reverse("inventory:component_checkin", kwargs={"pk": record.pk})
         confirm_msg = _("Are you sure you want to check in this component allocation?")

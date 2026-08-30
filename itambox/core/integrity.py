@@ -286,7 +286,7 @@ def check_stock_tenant_conflicts(topology=None):
                         pk=row["pk"],
                         summary=(
                             f"{label} #{row['pk']}: location #{row['location_id']} has no "
-                            f"tenant — pool owner cannot be derived"
+                            f"tenant, so the pool owner cannot be determined"
                         ),
                         classification=CLASS_AMBIGUOUS,
                         details={

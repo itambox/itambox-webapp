@@ -188,16 +188,16 @@ class SeedLifecycleMixin:
         assets_by_tenant = getattr(self, "_assets_by_tenant", {})
 
         LOANER_PURPOSES = [
-            "Loaner — hardware refresh in progress",
-            "Temporary loaner — user laptop in repair",
-            "Loaner device — new hire onboarding",
-            "Short-term loaner — conference/event",
+            "Loaner for a hardware refresh in progress",
+            "Temporary loaner while the user's laptop is being repaired",
+            "Loaner device for new employee onboarding",
+            "Short-term loaner for a conference or event",
         ]
         REGULAR_PURPOSES = [
             "Equipment reserved for new hire",
-            "Planned role transition — seat transfer",
+            "Planned role transition for a seat transfer",
             "Project: infrastructure migration",
-            "Temporary allocation — department reshuffle",
+            "Temporary allocation during a department reorganization",
             "Reserved for contractor onboarding",
             "Pre-deployment staging hold",
         ]
@@ -258,7 +258,7 @@ class SeedLifecycleMixin:
                         status=ReservationStatusChoices.PENDING,  # start pending
                         created_by=eng_user,
                         purpose=purpose,
-                        notes=f"Closed out — {'returned loaner' if is_loaner else 'reservation fulfilled'}.",
+                        notes=f"Closed out: {'returned loaner' if is_loaner else 'reservation fulfilled'}.",
                     )
                     eng.log_create(res, when=created_when, user=eng_user)
                     # Transition: pending → active at start, then fulfilled at end
@@ -281,7 +281,7 @@ class SeedLifecycleMixin:
                         status=ReservationStatusChoices.PENDING,
                         created_by=eng_user,
                         purpose=purpose,
-                        notes=f"{'Loaner issued — monitor closely.' if is_loaner else 'In progress.'}",
+                        notes=f"{'Loaner issued. Monitor it closely.' if is_loaner else 'In progress.'}",
                     )
                     eng.log_create(res, when=created_when, user=eng_user)
                     eng.change(res, when=start_date, user=eng_user, status=ReservationStatusChoices.ACTIVE)
@@ -302,7 +302,7 @@ class SeedLifecycleMixin:
                         status=ReservationStatusChoices.PENDING,
                         created_by=eng_user,
                         purpose=purpose,
-                        notes=f"Upcoming {'loaner' if is_loaner else 'reservation'} — not yet started.",
+                        notes=f"Upcoming {'loaner' if is_loaner else 'reservation'}; it has not started yet.",
                     )
                     eng.log_create(res, when=created_when, user=eng_user)
 
@@ -470,7 +470,7 @@ class SeedLifecycleMixin:
         self.stdout.write(f"  {len(self._disposals)} asset disposal records created.")
         self.stdout.write(
             self.style.SUCCESS(
-                f"  Lifecycle totals — "
+                f"  Lifecycle totals: "
                 f"{len(self._warranties)} warranties, "
                 f"{len(self._reservations)} reservations, "
                 f"{len(self._disposals)} disposals."

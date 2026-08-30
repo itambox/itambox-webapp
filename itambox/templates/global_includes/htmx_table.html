@@ -90,7 +90,7 @@
       {% empty %}
         {% if table.empty_text %}
           <tr>
-            <td colspan="{{ table.columns|length }}" class="text-center text-muted">— {{ table.empty_text }} —</td>
+            <td colspan="{{ table.columns|length }}" class="text-center text-muted">{{ table.empty_text }}</td>
           </tr>
         {% endif %}
       {% endfor %}

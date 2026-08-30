@@ -172,7 +172,7 @@ class SeedAssetsMixin:
         # custody configuration layered on top of the global defaults.
         for tname, tslug, cat_slug, qms, eula, tags in [
             (
-                "Meridian — PCI-DSS Laptop Custody Agreement",
+                "Meridian: PCI-DSS Laptop Custody Agreement",
                 "meridian-retail",
                 "laptops",
                 "MER-PCI-IT-007",
@@ -181,7 +181,7 @@ class SeedAssetsMixin:
                 ["pci-scope", "critical"],
             ),
             (
-                "Brightwell — Confidential Records Custody Agreement",
+                "Brightwell: Confidential Records Custody Agreement",
                 "brightwell-legal",
                 "laptops",
                 "BWL-LEG-IT-003",
@@ -199,7 +199,7 @@ class SeedAssetsMixin:
                     "tenant": tenant,
                     "category": self._categories[cat_slug],
                     "eula_text": eula,
-                    "disclaimer": "Regulated equipment — handle per the referenced policy.",
+                    "disclaimer": "Regulated equipment. Handle it according to the referenced policy.",
                     "qms_reference": qms,
                     "is_active": True,
                     "require_acceptance": True,
@@ -216,7 +216,7 @@ class SeedAssetsMixin:
         self._gxp_custody_template = None
         if helix_group:
             self._gxp_custody_template = CustodyTemplate.objects.get_or_create(
-                name="Helix Biopharma — GxP Laptop & Workstation Agreement",
+                name="Helix Biopharma: GxP Laptop & Workstation Agreement",
                 defaults={
                     "tenant_group": helix_group,
                     "category": self._categories["laptops"],
@@ -225,7 +225,7 @@ class SeedAssetsMixin:
                         "unvalidated software, will keep audit logging enabled and will follow the "
                         "Helix Biopharma QMS change-control procedure for any modification."
                     ),
-                    "disclaimer": "GxP-validated equipment — subject to QMS change control.",
+                    "disclaimer": "GxP-validated equipment is subject to QMS change control.",
                     "qms_reference": "HLX-QMS-IT-014",
                     "is_active": True,
                     "require_acceptance": True,

@@ -6916,14 +6916,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/forms/assetholder_form.py",
-      "code": "B950",
-      "message": "line too long (164 > 120 characters)",
-      "source": "                \"User Principal Name \u2014 the login identity in Active Directory / Entra ID (e.g. jdoe@corp.com). Used to match this holder to directory sync sources.\"",
-      "context": "Module:body/ClassDef:AssetHolderForm:body/ClassDef:Meta:body",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/forms/helpers.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",

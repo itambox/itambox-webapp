@@ -331,14 +331,14 @@ def _validate_managed_row_basics(rejections, principal_tenant, spec, seen_role_i
     if not principal_tenant.is_provider:
         rejections.add(
             CrossTenantObject,
-            _("Managed grants require a managing (provider) tenant."),
+            _("Only a tenant that manages other tenants can assign roles there."),
             row_index=row,
         )
         return False
     if spec.role.pk in seen_role_ids:
         rejections.add(
             MembershipServiceError,
-            _("Role '%(role)s' is granted twice in Managed tenants — combine the coverage into one row.")
+            _("Role '%(role)s' appears more than once. Combine its managed-tenant coverage in one row.")
             % {"role": spec.role},
             row_index=row,
         )
@@ -358,7 +358,7 @@ def _validate_managed_row_basics(rejections, principal_tenant, spec, seen_role_i
     if spec.role.tenant_id != principal_tenant.pk or not spec.role.tenant.is_provider:
         rejections.add(
             CrossTenantObject,
-            _("Managed scopes require a provider-owned role and principal."),
+            _("Choose a role owned by this managing tenant."),
             row_index=row,
         )
         return False
@@ -370,7 +370,7 @@ def _validate_managed_group_coverage(rejections, principal_tenant, spec):
     if spec.scope_group is None:
         rejections.add(
             MembershipServiceError,
-            _("A tenant group is required when coverage is 'A tenant group + its descendants'."),
+            _("Choose a tenant group for this coverage."),
             field="scope_group",
             row_index=row,
         )
@@ -389,7 +389,7 @@ def _validate_managed_explicit_coverage(rejections, principal_tenant, spec):
     if not spec.tenants:
         rejections.add(
             MembershipServiceError,
-            _("Pick at least one tenant for 'Specific tenants'."),
+            _("Pick at least one tenant."),
             field="assigned_tenants",
             row_index=row,
         )
@@ -434,14 +434,14 @@ def _check_elevated(rejections, reason, valid_until, now, *, row_index):
     if not (reason or "").strip():
         rejections.add(
             ElevatedGrantIncomplete,
-            _("Elevated direct grants require a reason."),
+            _("Directly assigned elevated roles require a reason."),
             field="reason",
             row_index=row_index,
         )
     if valid_until is None:
         rejections.add(
             ElevatedGrantIncomplete,
-            _("Elevated direct grants require an expiration."),
+            _("Directly assigned elevated roles require an expiration."),
             field="valid_until",
             row_index=row_index,
         )

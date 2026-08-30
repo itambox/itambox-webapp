@@ -68,7 +68,7 @@ def _compile_po(po_path: str, mo_path: str) -> None:
         lines = fh.readlines()
 
     if lines and lines[0].startswith(codecs.BOM_UTF8):
-        raise CommandError(f"{po_path} starts with a UTF-8 BOM — remove it and retry.")
+        raise CommandError(f"{po_path} starts with a UTF-8 BOM. Remove it and retry.")
 
     for lno, raw in enumerate(lines, 1):
         l = raw.decode(encoding)
@@ -197,7 +197,7 @@ class Command(BaseCommand):
         if compiled == 0:
             self.stdout.write(self.style.WARNING("No .po files found to compile."))
         else:
-            self.stdout.write(self.style.SUCCESS(f"Done — {compiled} catalog(s) compiled."))
+            self.stdout.write(self.style.SUCCESS(f"Done: {compiled} catalog(s) compiled."))
 
     @staticmethod
     def _catalogue_files(locale_dir: Path):

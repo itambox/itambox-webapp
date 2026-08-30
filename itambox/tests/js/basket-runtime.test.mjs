@@ -337,6 +337,7 @@ function installGlobals(dom, readers, fetchImpl) {
   globalThis.setTimeout = schedule;
   globalThis.clearTimeout = (id) => fakeTimers.delete(id);
   globalThis.gettext = (message) => message;
+  globalThis.ngettext = (singular, plural, count) => (count === 1 ? singular : plural);
   globalThis.interpolate = (message, context) => message.replace(/%\(([^)]+)\)s/g, (_, key) => context[key]);
   globalThis.fetch = fetchImpl;
   globalThis.Html5Qrcode = class {
@@ -465,7 +466,7 @@ test('mixed-tenant seeds switch losslessly and report rows kept aside', async ()
     dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
     assert.deepEqual(visiblePks(dom), [1, 2]);
     assert.equal(notice.hidden, false);
-    assert.match(notice.textContent, /^1 assets from another tenant/);
+    assert.match(notice.textContent, /^1 asset from another tenant/);
 
     dom.tenantField.value = '22';
     dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });

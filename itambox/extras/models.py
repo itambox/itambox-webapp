@@ -1709,7 +1709,7 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
             ("not_required", _("Not required")),
             ("resolved", _("Resolved from target")),
             ("global", _("Global target")),
-            ("unresolved", _("Unresolved — operator review required")),
+            ("unresolved", _("Unresolved; operator review required")),
         ],
         default="not_required",
         db_index=True,

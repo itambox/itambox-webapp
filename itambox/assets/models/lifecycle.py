@@ -201,7 +201,7 @@ class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.get_warranty_type_display()} warranty on {self.asset} ({self.start_date} – {self.end_date})"
+        return f"{self.get_warranty_type_display()} warranty on {self.asset} ({self.start_date} to {self.end_date})"
 
     def get_absolute_url(self):
         return reverse("assets:warranty_detail", kwargs={"pk": self.pk})
@@ -303,7 +303,7 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
 
     def __str__(self):
         holder = self.reserved_for or _("(no holder)")
-        return f"{self.asset} reserved for {holder} ({self.start_date} – {self.end_date})"
+        return f"{self.asset} reserved for {holder} ({self.start_date} to {self.end_date})"
 
     def get_absolute_url(self):
         return reverse("assets:assetreservation_detail", kwargs={"pk": self.pk})

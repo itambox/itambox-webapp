@@ -205,8 +205,8 @@ class ITAMBoxPagination(LimitOffsetPagination):
                 "in": "query",
                 "description": (
                     "Keyset/cursor pagination: return results with pk >= start, ordered by pk. "
-                    "Skips the (capped) row count and stays O(page) regardless of table size — "
-                    "use this instead of offset/limit for bulk export or iterating large "
+                    "Skips the capped row count and stays O(page) regardless of table size. "
+                    "Use this instead of offset/limit for bulk export or iterating large "
                     "collections. Follow the `next` link to walk subsequent pages."
                 ),
                 "schema": {

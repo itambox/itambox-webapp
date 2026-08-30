@@ -376,7 +376,7 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         if self.pk:
             original_tenant_id = type(self)._base_manager.filter(pk=self.pk).values_list("tenant_id", flat=True).first()
             if original_tenant_id is not None and self.tenant_id != original_tenant_id:
-                raise ValidationError({"tenant": _("A user group owner cannot be changed.")})
+                raise ValidationError({"tenant": _("The tenant that owns a user group cannot be changed.")})
 
 
 class GroupMembership(ChangeLoggingMixin, models.Model):
@@ -470,6 +470,6 @@ class GroupMembership(ChangeLoggingMixin, models.Model):
         if not self.user_group_id or not self.membership_id:
             return
         if self.user_group.tenant_id is None:
-            raise ValidationError({"user_group": _("A group membership requires a tenant-owned group.")})
+            raise ValidationError({"user_group": _("Choose a user group that belongs to a tenant.")})
         if self.membership.tenant_id != self.user_group.tenant_id:
-            raise ValidationError({"membership": _("The membership must belong to the group's owning tenant.")})
+            raise ValidationError({"membership": _("Choose a member of this group's tenant.")})

@@ -113,8 +113,8 @@ test.describe('German bulk basket catalogue (issue #437)', () => {
     const keptAside = page.locator('#scan-basket-kept-aside');
     await expect(page.locator('#scan-basket-count')).toHaveText('1');
     await expect(keptAside).toBeVisible();
-    await expect(keptAside).toContainText('Assets aus einem anderen Mandanten werden zurückgehalten (1)');
-    await expect(keptAside).toContainText('beim Wechsel des Ziel-Mandanten werden sie angezeigt');
+    await expect(keptAside).toContainText('1 Asset aus einem anderen Mandanten wird zurückgehalten');
+    await expect(keptAside).toContainText('Wechseln Sie den Ziel-Mandanten, um es anzuzeigen');
     await expect(keptAside).not.toContainText('%(count)s');
     // The tenant-B basket row is not rendered for the active tenant A.
     await expect(page.locator('#scan-basket-rows tr.scan-basket-row')).toHaveCount(1);

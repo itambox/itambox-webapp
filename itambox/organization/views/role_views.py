@@ -263,10 +263,8 @@ class RoleDeleteView(ObjectDeleteView):
             .exists()
         ):
             context["extra_warning"] = _(
-                "This role is shared with managed tenants and still has active "
-                "managed scopes. Deleting it does not remove those grants — "
-                "they survive as an audit trail but immediately stop granting "
-                "access."
+                "This role is shared with managed tenants and still grants access there. "
+                "Deleting it preserves the grant records for auditing, but they stop granting access immediately."
             )
         return context
 

@@ -240,7 +240,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
 
         if qty > line.qty_outstanding:
             raise ValidationError(
-                _("Cannot receive %(qty)s for line %(line)s — only %(outstanding)s outstanding.")
+                _("Cannot receive %(qty)s for line %(line)s because only %(outstanding)s remain outstanding.")
                 % {"qty": qty, "line": line.pk, "outstanding": line.qty_outstanding}
             )
 

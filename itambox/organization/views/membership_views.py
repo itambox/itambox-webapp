@@ -444,7 +444,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
                 self.request,
                 format_html(
                     gettext(
-                        '{user} has no password yet — <a href="{url}">send them a '
+                        '{user} has no password yet. <a href="{url}">Send them a '
                         "password setup link</a> so they can sign in."
                     ),
                     user=str(membership.user),
@@ -458,7 +458,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
                 self.request,
                 _(
                     "%(user)s is now a member of %(tenant)s but has no permissions "
-                    "yet — edit the membership to assign a role."
+                    "yet. Edit the membership to assign a role."
                 )
                 % {"user": membership.user, "tenant": membership.tenant},
             )

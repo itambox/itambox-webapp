@@ -228,7 +228,7 @@ class SeedOperationsMixin:
             AssetRequest.objects.create(
                 requester=user,
                 asset_type=req_type,
-                notes="New starter joining next month — needs a standard laptop.",
+                notes="A new employee joins next month and needs a standard laptop.",
                 status=random.choice(["pending", "approved"]),
             )
             req_count += 1
@@ -241,7 +241,7 @@ class SeedOperationsMixin:
                     user=self._provisioner,
                     comment=random.choice(
                         [
-                            "Device inspected during site visit — minor cosmetic wear.",
+                            "Device inspected during a site visit. Minor cosmetic wear was found.",
                             "User reported fan noise under load; monitoring.",
                             "Re-imaged and re-enrolled in MDM after role change.",
                             "Confirmed asset present and tagged during audit.",

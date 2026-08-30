@@ -14,7 +14,7 @@
         </div>
         <div class="d-flex justify-content-between text-muted small">
           <span>{{ sub.provider.name }}</span>
-          <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|money:sub.currency_obj }}{% else %}—{% endif %}</span>
+          <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|money:sub.currency_obj }}{% else %}{% translate "Not set" %}{% endif %}</span>
         </div>
       </div>
     {% endfor %}

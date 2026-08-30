@@ -53,7 +53,8 @@ class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
         }
         help_texts = {
             "upn": _(
-                "User Principal Name — the login identity in Active Directory / Entra ID (e.g. jdoe@corp.com). Used to match this holder to directory sync sources."
+                "User Principal Name: the sign-in address in Active Directory or Entra ID "
+                "(for example, jdoe@corp.com). Used to match this holder during directory synchronization."
             ),
         }
 

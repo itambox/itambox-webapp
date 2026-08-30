@@ -137,7 +137,7 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
         super().__init__(*args, **kwargs)
 
     def render_serial_number(self, value):
-        return value or "—"
+        return value or _("Not set")
 
     def render_status(self, value):
         # .badge-status derives fill/text/border from --status-color and adds
@@ -150,12 +150,12 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
                 color_class,
                 value.name,
             )
-        return "—"
+        return _("Not set")
 
     def render_audit_due_date(self, record):
         due = record.audit_due_date
         if due is None:
-            return "—"
+            return _("Not set")
         date_str = due.strftime("%Y-%m-%d")
         if record.audit_overdue:
             return format_html('<span class="text-danger fw-semibold" title="Overdue">{}</span>', date_str)
@@ -164,7 +164,7 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
     def render_salvage_value(self, value):
         if value is not None:
             return f"${value:,.2f}"
-        return "—"
+        return _("Not set")
 
     def render_requestable(self, record):
         # Effective state (icon), plus whether it is set on the asset or inherited
@@ -193,7 +193,7 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
 
     def value_purchase_date(self, value):
         # Format date if it exists
-        return value.strftime("%Y-%m-%d") if value else "—"
+        return value.strftime("%Y-%m-%d") if value else _("Not set")
 
     def render_actions(self, record):
         if getattr(record, "deleted_at", None) is not None:
@@ -329,10 +329,10 @@ class StatusLabelTable(BaseTable):
             normalized = safe_hex_color(value)
             color_class, style_block = color_chip_class(normalized)
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
-        return "—"
+        return _("Not set")
 
     def render_type(self, value):
-        return value.title() if value else "—"
+        return value.title() if value else _("Not set")
 
 
 class AssetRoleTable(BaseTable):
@@ -353,7 +353,7 @@ class AssetRoleTable(BaseTable):
             normalized = safe_hex_color(value)
             color_class, style_block = color_chip_class(normalized)
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
-        return "—"
+        return _("Not set")
 
 
 class ManufacturerTable(BaseTable):
@@ -415,7 +415,7 @@ class AssetTypeTable(BaseTable):
     def render_eol_months(self, value):
         if value is not None:
             return f"{value} month{'s' if value != 1 else ''}"
-        return "—"
+        return _("Not set")
 
 
 class AssetMaintenanceTable(BaseTable):
@@ -469,17 +469,17 @@ class AssetMaintenanceTable(BaseTable):
     def render_cost(self, value):
         if value is not None:
             return f"${value:,.2f}"
-        return "—"
+        return _("Not set")
 
     def render_downtime_days(self, value):
         if value is not None:
             if value == 0:
                 return "Same day"
             return f"{value} day{'s' if value != 1 else ''}"
-        return "—"
+        return _("Not set")
 
     def render_supplier(self, value):
-        return value or "—"
+        return value or _("Not set")
 
 
 class AssetDisposalTable(BaseTable):
@@ -525,11 +525,11 @@ class AssetDisposalTable(BaseTable):
         return record.get_data_sanitization_method_display()
 
     def render_recipient(self, value):
-        return value or "—"
+        return value or _("Not set")
 
     def render_proceeds(self, value, record):
         if value is None:
-            return "—"
+            return _("Not set")
         from extras.templatetags.money import money
 
         return money(value, record)
@@ -614,7 +614,7 @@ class CategoryTable(BaseTable):
             normalized = safe_hex_color(value)
             color_class, style_block = color_chip_class(normalized)
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
-        return "—"
+        return _("Not set")
 
 
 class AssetRequestTable(BaseTable):
@@ -669,7 +669,7 @@ class AssetRequestTable(BaseTable):
         elif record.consumable:
             url = reverse("inventory:consumable_detail", args=[record.consumable_id])
             return format_html('<a href="{}">{} (Consumable, x{})</a>', url, record.consumable, record.qty)
-        return "—"
+        return _("Not set")
 
     def render_requested_for(self, value, record):
         target = record.assigned_target
@@ -781,7 +781,7 @@ class WarrantyTable(BaseTable):
 
     def render_cost(self, value, record):
         if value is None:
-            return "—"
+            return _("Not set")
         try:
             from extras.templatetags.money import money
 
@@ -823,4 +823,4 @@ class AssetReservationTable(BaseTable):
         return record.get_status_display()
 
     def render_reserved_for(self, value):
-        return value or "—"
+        return value or _("Not set")

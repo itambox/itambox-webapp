@@ -1,5 +1,6 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
+{% translate "Membership" as membership_label %}
 {% load crispy_forms_tags %}
 {% comment %}
 Bespoke create/edit screen for MembershipForm — the unified "Add member" grant
@@ -15,7 +16,7 @@ management form + nonce-free bundle behaviour predictable (mirrors bulk_receive)
 {% endcomment %}
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
-  <h2 class="page-title">{{ title|default:_("Membership") }}</h2>
+  <h2 class="page-title">{{ title|default:membership_label }}</h2>
 {% endblock %}
 {% block page_actions %}
   {% if cancel_url %}
@@ -40,7 +41,7 @@ management form + nonce-free bundle behaviour predictable (mirrors bulk_receive)
             {% endif %}
           </h4>
           <p class="text-muted mb-4 small">
-            {% translate "Pick who joins: an existing user or a new one created by email. Define what they may do in this organization (roles) and — on a managing (MSP) tenant — which roles reach into its managed tenants (one grant per row)." %}
+            {% translate "Choose an existing user or create one by email. Assign roles in this organization and, for a managing (MSP) tenant, in selected managed tenants." %}
           </p>
           <form method="post" hx-boost="false" novalidate>
             {% csrf_token %}
@@ -51,9 +52,9 @@ management form + nonce-free bundle behaviour predictable (mirrors bulk_receive)
             {% crispy form %}
             {% if managed_formset %}
               <fieldset class="mb-4" id="managed-grants" data-managed-formset>
-                <legend class="fs-4 text-primary">{% translate "Managed tenants" %}</legend>
+                <legend class="fs-4 text-primary">{% translate "Roles in managed tenants" %}</legend>
                 <p class="text-muted small">
-                  {% translate "Roles that reach into the tenants this organization manages. Add one row per grant; each row has its own coverage." %}
+                  {% translate "Choose where each role applies in managed tenants. Add one row for each role and coverage combination." %}
                 </p>
                 {{ managed_formset.management_form }}
                 {% if managed_formset.non_form_errors %}
@@ -79,7 +80,7 @@ management form + nonce-free bundle behaviour predictable (mirrors bulk_receive)
                         class="btn btn-outline-primary btn-sm mt-2"
                         data-add-managed-row>
                   <i class="mdi mdi-plus"></i>
-                  {% translate "Add managed grant" %}
+                  {% translate "Add managed role" %}
                 </button>
               </fieldset>
             {% endif %}

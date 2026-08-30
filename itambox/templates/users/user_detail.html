@@ -11,15 +11,15 @@
         </tr>
         <tr>
           <td><strong>{% translate "First Name" %}:</strong></td>
-          <td>{{ object.first_name|default:"—" }}</td>
+          <td>{% if object.first_name %}{{ object.first_name }}{% else %}<span class="text-muted">{% translate "Not set" %}</span>{% endif %}</td>
         </tr>
         <tr>
           <td><strong>{% translate "Last Name" %}:</strong></td>
-          <td>{{ object.last_name|default:"—" }}</td>
+          <td>{% if object.last_name %}{{ object.last_name }}{% else %}<span class="text-muted">{% translate "Not set" %}</span>{% endif %}</td>
         </tr>
         <tr>
           <td><strong>{% translate "Email Address" %}:</strong></td>
-          <td>{% if object.email %}<a href="mailto:{{ object.email }}">{{ object.email }}</a>{% else %}—{% endif %}</td>
+          <td>{% if object.email %}<a href="mailto:{{ object.email }}">{{ object.email }}</a>{% else %}<span class="text-muted">{% translate "Not set" %}</span>{% endif %}</td>
         </tr>
         <tr>
           <td><strong>{% translate "Active Status" %}:</strong></td>
@@ -67,7 +67,7 @@
         </tr>
         <tr>
           <td><strong>{% translate "Last Login" %}:</strong></td>
-          <td>{{ object.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
+          <td>{% if object.last_login %}{{ object.last_login|date:"Y-m-d H:i" }}{% else %}<span class="text-muted">{% translate "Never" %}</span>{% endif %}</td>
         </tr>
       </tbody>
     </table>

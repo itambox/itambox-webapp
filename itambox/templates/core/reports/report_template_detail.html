@@ -1,5 +1,6 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
+{% translate "No description" as no_description %}
 {% block title %}{% translate "Report Template" %}: {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
   <div class="page-pretitle">{% translate "Operations" %}</div>
@@ -59,7 +60,7 @@
               </tr>
               <tr>
                 <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Description" %}</td>
-                <td class="text-wrap text-break">{{ object.description|default:"&mdash;" }}</td>
+                <td class="text-wrap text-break">{{ object.description|default:no_description }}</td>
               </tr>
               <tr>
                 <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Report Type" %}</td>

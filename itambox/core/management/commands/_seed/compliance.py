@@ -104,7 +104,7 @@ class SeedComplianceMixin:
                     session_location = random.choice(loc_candidates or locs)
 
                 if session_location:
-                    session_name = f"{quarter_label} — {session_location.name} Audit"
+                    session_name = f"{quarter_label}: {session_location.name} Audit"
                 else:
                     session_name = f"{quarter_label} Asset Audit"
 

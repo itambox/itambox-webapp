@@ -20,7 +20,7 @@ class ColorChipColumn(tables.Column):
 
     def render(self, value):
         if not value:
-            return mark_safe('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         safe_color = safe_hex_color(value.color)
         color_class, style_block = color_chip_class(safe_color)
         return format_html(
@@ -62,7 +62,7 @@ class CountLinkColumn(tables.Column):
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe('<span class="text-success"><i class="mdi mdi-check-circle-outline"></i></span>')
     FALSE_MARK = mark_safe('<span class="text-danger"><i class="mdi mdi-close-circle-outline"></i></span>')
-    EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
+    EMPTY_MARK = format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def __init__(self, *args, true_mark=None, false_mark=None, **kwargs):
         self.true_mark = true_mark if true_mark is not None else self.TRUE_MARK
@@ -334,7 +334,7 @@ class AssigneeColumn(tables.Column):
             AssetAssignment-like model.
     """
 
-    EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
+    EMPTY_MARK = format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def __init__(
         self,

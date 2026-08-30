@@ -1,5 +1,6 @@
 {% load render_table from django_tables2 %}
 {% load i18n %}
+{% translate "No items found." as no_items_found %}
 <div class="card border-0 shadow-sm">
   <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
     <h3 class="card-title">{{ title }}</h3>
@@ -18,7 +19,7 @@
       {% if empty_icon %}
         <i class="mdi {{ empty_icon }} text-muted mb-2 csp-style-b676192d2b77"></i>
       {% endif %}
-      <p class="mb-0">{{ empty_text|default:_("No items found.") }}</p>
+      <p class="mb-0">{{ empty_text|default:no_items_found }}</p>
     </div>
   {% endif %}
 </div>

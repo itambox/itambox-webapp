@@ -1,6 +1,6 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n money %}
-{% block page_title %}{{ object.contract_number }} – {{ object.name }}{% endblock %}
+{% block page_title %}{{ object.contract_number }}: {{ object.name }}{% endblock %}
 {% block page_actions %}
   <div class="btn-list">
     <a href="{% url 'procurement:contract_edit' pk=object.pk %}"
