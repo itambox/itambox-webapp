@@ -6220,46 +6220,6 @@
     },
     {
       "dependencies": [
-        "assets.0101_seed_canonical_missing_status",
-        "users.0100_issue88_shard_62_users_relations"
-      ],
-      "id": "assets.0102_alter_asset_depreciation_override_and_more",
-      "is_replacement": false,
-      "operations": {
-        "BtreeGistExtension": {
-          "count": 0
-        },
-        "RunPython": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "RunSQL": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "SeparateDatabaseAndState": {
-          "count": 0
-        }
-      },
-      "path": "itambox/assets/migrations/0102_alter_asset_depreciation_override_and_more.py",
-      "replaces": [],
-      "reviewed_disposition": null,
-      "run_before": [],
-      "special_users_bootstrap": false,
-      "swappable_user_dependency": false,
-      "syntactic_facts": {
-        "has_custom_operations": {
-          "BtreeGistExtension": false,
-          "RunPython": false,
-          "RunSQL": false,
-          "SeparateDatabaseAndState": false
-        }
-      }
-    },
-    {
-      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -11593,46 +11553,6 @@
     },
     {
       "dependencies": [
-        "extras.0113_upgrade_legacy_webhook_retry_schedules",
-        "users.0100_issue88_shard_62_users_relations"
-      ],
-      "id": "extras.0114_alter_alertlog_tenant_resolution_status",
-      "is_replacement": false,
-      "operations": {
-        "BtreeGistExtension": {
-          "count": 0
-        },
-        "RunPython": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "RunSQL": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "SeparateDatabaseAndState": {
-          "count": 0
-        }
-      },
-      "path": "itambox/extras/migrations/0114_alter_alertlog_tenant_resolution_status.py",
-      "replaces": [],
-      "reviewed_disposition": null,
-      "run_before": [],
-      "special_users_bootstrap": false,
-      "swappable_user_dependency": false,
-      "syntactic_facts": {
-        "has_custom_operations": {
-          "BtreeGistExtension": false,
-          "RunPython": false,
-          "RunSQL": false,
-          "SeparateDatabaseAndState": false
-        }
-      }
-    },
-    {
-      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -12377,47 +12297,6 @@
     },
     {
       "dependencies": [
-        "inventory.0101_alter_accessoryassignment_options_and_more",
-        "organization.0104_alter_tenant_changelog_retention_days",
-        "users.0100_issue88_shard_62_users_relations"
-      ],
-      "id": "inventory.0102_alter_accessory_ean_alter_accessorystock_tenant_and_more",
-      "is_replacement": false,
-      "operations": {
-        "BtreeGistExtension": {
-          "count": 0
-        },
-        "RunPython": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "RunSQL": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "SeparateDatabaseAndState": {
-          "count": 0
-        }
-      },
-      "path": "itambox/inventory/migrations/0102_alter_accessory_ean_alter_accessorystock_tenant_and_more.py",
-      "replaces": [],
-      "reviewed_disposition": null,
-      "run_before": [],
-      "special_users_bootstrap": false,
-      "swappable_user_dependency": false,
-      "syntactic_facts": {
-        "has_custom_operations": {
-          "BtreeGistExtension": false,
-          "RunPython": false,
-          "RunSQL": false,
-          "SeparateDatabaseAndState": false
-        }
-      }
-    },
-    {
-      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial",
@@ -13030,46 +12909,6 @@
         "licenses.0012_alter_license_cost_center_and_more",
         "licenses.0013_licenseseatassignment_unique_active_license_seat_per_asset_and_more"
       ],
-      "reviewed_disposition": null,
-      "run_before": [],
-      "special_users_bootstrap": false,
-      "swappable_user_dependency": false,
-      "syntactic_facts": {
-        "has_custom_operations": {
-          "BtreeGistExtension": false,
-          "RunPython": false,
-          "RunSQL": false,
-          "SeparateDatabaseAndState": false
-        }
-      }
-    },
-    {
-      "dependencies": [
-        "licenses.0100_issue88_shard_48_licenses_relations",
-        "users.0100_issue88_shard_62_users_relations"
-      ],
-      "id": "licenses.0101_alter_license_version",
-      "is_replacement": false,
-      "operations": {
-        "BtreeGistExtension": {
-          "count": 0
-        },
-        "RunPython": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "RunSQL": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "SeparateDatabaseAndState": {
-          "count": 0
-        }
-      },
-      "path": "itambox/licenses/migrations/0101_alter_license_version.py",
-      "replaces": [],
       "reviewed_disposition": null,
       "run_before": [],
       "special_users_bootstrap": false,
@@ -15227,46 +15066,6 @@
         }
       },
       "path": "itambox/organization/migrations/0103_tenant_resource_grant_expiry.py",
-      "replaces": [],
-      "reviewed_disposition": null,
-      "run_before": [],
-      "special_users_bootstrap": false,
-      "swappable_user_dependency": false,
-      "syntactic_facts": {
-        "has_custom_operations": {
-          "BtreeGistExtension": false,
-          "RunPython": false,
-          "RunSQL": false,
-          "SeparateDatabaseAndState": false
-        }
-      }
-    },
-    {
-      "dependencies": [
-        "organization.0103_tenant_resource_grant_expiry",
-        "users.0100_issue88_shard_62_users_relations"
-      ],
-      "id": "organization.0104_alter_tenant_changelog_retention_days",
-      "is_replacement": false,
-      "operations": {
-        "BtreeGistExtension": {
-          "count": 0
-        },
-        "RunPython": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "RunSQL": {
-          "with_noop_reverse": 0,
-          "with_reverse": 0,
-          "without_reverse": 0
-        },
-        "SeparateDatabaseAndState": {
-          "count": 0
-        }
-      },
-      "path": "itambox/organization/migrations/0104_alter_tenant_changelog_retention_days.py",
       "replaces": [],
       "reviewed_disposition": null,
       "run_before": [],
@@ -18259,7 +18058,6 @@
   ],
   "post_transition_migrations": [
     "assets.0101_seed_canonical_missing_status",
-    "assets.0102_alter_asset_depreciation_override_and_more",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -18278,14 +18076,10 @@
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
-    "extras.0114_alter_alertlog_tenant_resolution_status",
     "inventory.0101_alter_accessoryassignment_options_and_more",
-    "inventory.0102_alter_accessory_ean_alter_accessorystock_tenant_and_more",
-    "licenses.0101_alter_license_version",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
     "organization.0103_tenant_resource_grant_expiry",
-    "organization.0104_alter_tenant_changelog_retention_days",
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
@@ -18569,7 +18363,7 @@
         ]
       }
     },
-    "post_transition_migrations": 33,
+    "post_transition_migrations": 28,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
