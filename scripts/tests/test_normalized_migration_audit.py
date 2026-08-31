@@ -9,13 +9,16 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import scripts.migration_audit as migration_audit
 from scripts.migration_audit import (
     NORMALIZED_POST_TRANSITION_DISPOSITIONS,
     POST_TRANSITION_DISPOSITION_GROUPS,
     POST_TRANSITION_MIGRATIONS,
     TRUSTED_PRE_CLEANUP_REVISION,
     _load_trusted_normalized_evidence,
+    _normalized_post_transition_dispositions,
     _strict_migration_operations,
     build_inventory,
     main,
@@ -183,7 +186,7 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
         path = self._baseline_path(root, 2)
         with temporary_directory:
             self._replace(path, "operations = [", 'operations = [migrations.RunSQL("SELECT 1"),')
-            self._assert_rejected(root, contract, "semantic representation disagrees with trusted pre-cleanup")
+            self._assert_rejected(root, contract, "whole-module semantics disagree with trusted pre-cleanup")
 
         temporary_directory, root, contract = self._fixture()
         with temporary_directory:
@@ -215,9 +218,8 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
 
     def test_post_transition_disposition_is_exhaustive_and_unknown_ids_fail_closed(self):
         self.assertEqual(set(POST_TRANSITION_DISPOSITION_GROUPS), NORMALIZED_POST_TRANSITION_DISPOSITIONS)
+        self.assertEqual(NORMALIZED_POST_TRANSITION_DISPOSITIONS, {"RETAIN"})
         self.assertEqual(set(POST_TRANSITION_DISPOSITION_GROUPS["RETAIN"]), POST_TRANSITION_MIGRATIONS)
-        self.assertFalse(POST_TRANSITION_DISPOSITION_GROUPS["FOLD_INTO_BASELINE"])
-        self.assertFalse(POST_TRANSITION_DISPOSITION_GROUPS["RETIRE_UPGRADE_ONLY"])
         disposition_sets = list(POST_TRANSITION_DISPOSITION_GROUPS.values())
         self.assertEqual(set().union(*disposition_sets), POST_TRANSITION_MIGRATIONS)
         for index, migration_ids in enumerate(disposition_sets):
@@ -245,12 +247,33 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             )
             self._assert_rejected(root, contract, "unknown=.*extras.9999_unknown")
 
+        with (
+            patch.dict(
+                POST_TRANSITION_DISPOSITION_GROUPS,
+                {"RETAIN": POST_TRANSITION_MIGRATIONS, "FOLD_INTO_BASELINE": frozenset()},
+                clear=True,
+            ),
+            self.assertRaisesRegex(ValueError, "unknown or missing groups"),
+        ):
+            _normalized_post_transition_dispositions()
+
+        retained_subset = frozenset(set(POST_TRANSITION_MIGRATIONS) - {sorted(POST_TRANSITION_MIGRATIONS)[0]})
+        with (
+            patch.dict(
+                POST_TRANSITION_DISPOSITION_GROUPS,
+                {"RETAIN": retained_subset},
+                clear=True,
+            ),
+            self.assertRaisesRegex(ValueError, "cover exactly"),
+        ):
+            _normalized_post_transition_dispositions()
+
     def test_rejects_non_direct_wrong_decorated_and_keyword_migration_classes(self):
         cases = {
             "nested": (
                 "class Migration(migrations.Migration):",
                 "if True:\n    class Migration(migrations.Migration):",
-                "exactly one direct Migration class",
+                "module-level statement is not allowlisted",
             ),
             "wrong-base": (
                 "class Migration(migrations.Migration):",
@@ -301,7 +324,7 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             )
             self._assert_rejected(root, contract, "exactly one direct Migration class")
 
-    def test_rejects_all_reserved_field_binding_forms(self):
+    def test_rejects_all_non_allowlisted_module_level_mutation_and_execution(self):
         additions = {
             "reassign": "Migration.operations = []",
             "delete": "del Migration.operations",
@@ -311,6 +334,9 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             "class-reassign": "Migration = object",
             "class-delete": "del Migration",
             "exec": "exec('Migration.operations = []')",
+            "aliased-setattr": "cls = Migration\nsetattr(cls, 'opera' + 'tions', [])",
+            "qualified-exec": "import builtins\nbuiltins.exec('Migration.operations = []')",
+            "type-setattr": "type.__setattr__(Migration, 'operations', [])",
         }
         for name, addition in additions.items():
             with self.subTest(name=name):
@@ -318,7 +344,7 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
                 path = self._baseline_path(root)
                 with temporary_directory:
                     path.write_text(path.read_text(encoding="utf-8") + f"\n{addition}\n", encoding="utf-8")
-                    self._assert_rejected(root, contract, "normalized migration")
+                    self._assert_rejected(root, contract, "normalized")
 
     def test_rejects_duplicate_annotated_augassign_namedexpr_and_nested_fields(self):
         cases = {
@@ -335,7 +361,7 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
                 path = self._baseline_path(root)
                 with temporary_directory:
                     self._replace(path, "    operations = [", insertion + "    operations = [")
-                    self._assert_rejected(root, contract, "normalized migration")
+                    self._assert_rejected(root, contract, "normalized")
 
     def test_rejects_missing_required_reserved_field(self):
         temporary_directory, root, contract = self._fixture()
@@ -401,14 +427,41 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
         )
         with temporary_directory:
             self._replace(candidate, "migrations.RunPython(", "migrations.RunPython(migrations.RunPython.noop, ")
-            self._assert_rejected(root, contract, "semantic representation disagrees with trusted pre-cleanup")
+            self._assert_rejected(root, contract, "whole-module semantics disagree with trusted pre-cleanup")
+
+    def test_whole_module_semantics_bind_imports_helpers_and_custom_operation_bodies(self):
+        temporary_directory, root, contract = self._fixture()
+        helper_path = self._path(root, "assets.0100_issue88_shard_43_assets_seed")
+        with temporary_directory:
+            self._replace(
+                helper_path,
+                "def seed_required_asset_data(apps, schema_editor):",
+                "def seed_required_asset_data(apps, schema_editor):\n    raise RuntimeError('changed helper')",
+            )
+            self._assert_rejected(root, contract, "whole-module semantics disagree with trusted pre-cleanup")
+
+        temporary_directory, root, contract = self._fixture()
+        import_path = self._baseline_path(root)
+        with temporary_directory:
+            self._replace(import_path, "import core.mixins", "import core.models as core_mixins")
+            self._assert_rejected(root, contract, "whole-module semantics disagree with trusted pre-cleanup")
+
+        temporary_directory, root, contract = self._fixture()
+        operation_path = self._path(root, "extras.0105_reporttemplate_advanced_mode_and_more")
+        with temporary_directory:
+            self._replace(
+                operation_path,
+                "class AddPersistentReportDesignerFields(Operation):",
+                "class AddPersistentReportDesignerFields(Operation):\n    changed_contract = True",
+            )
+            self._assert_rejected(root, contract, "retained post-transition whole-module semantics")
 
     def test_retained_post_transition_semantics_must_match_trusted_source(self):
         temporary_directory, root, contract = self._fixture()
         path = self._path(root, "compliance.0101_alter_custodyreceipt_signed_at")
         with temporary_directory:
             self._replace(path, "verbose_name='Signed At'", "verbose_name='Mutated Signed At'")
-            self._assert_rejected(root, contract, "retained post-transition semantic representation")
+            self._assert_rejected(root, contract, "retained post-transition whole-module semantics")
 
     def test_rejects_deleted_history_dependency_and_run_before(self):
         deleted_id = self.contract_template["deleted_historical_ids"][0]
@@ -482,7 +535,7 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             self._write_migration(root, "extras", "helper", "value = 1")
             self._assert_rejected(root, contract, "must have a numeric prefix")
 
-    def test_isolated_runtime_import_detects_dynamic_metadata_drift(self):
+    def test_allowlist_rejects_post_declaration_runtime_mutation(self):
         temporary_directory, root, contract = self._fixture()
         path = self._baseline_path(root)
         with temporary_directory:
@@ -490,17 +543,82 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
                 path.read_text(encoding="utf-8") + "\ngetattr(Migration, 'operations').clear()\n",
                 encoding="utf-8",
             )
-            self._assert_rejected(root, contract, "runtime metadata disagrees with static representation")
+            self._assert_rejected(root, contract, "module-level statement is not allowlisted")
+
+    def test_runtime_parity_is_value_bearing(self):
+        temporary_directory, root, contract = self._fixture()
+        real_run = subprocess.run
+
+        def mutate_runtime_fingerprint(*args, **kwargs):
+            result = real_run(*args, **kwargs)
+            command = args[0]
+            if "-c" not in command or migration_audit._RUNTIME_INSPECTOR not in command:
+                return result
+            output = json.loads(result.stdout)
+            metadata = next(item for item in output.values() if item["operations"])
+            metadata["operations"][0]["value_fingerprint"] = "0" * 64
+            return subprocess.CompletedProcess(
+                result.args,
+                result.returncode,
+                stdout=json.dumps(output),
+                stderr=result.stderr,
+            )
+
+        with (
+            temporary_directory,
+            patch("scripts.migration_audit.subprocess.run", side_effect=mutate_runtime_fingerprint),
+        ):
+            self._assert_rejected(root, contract, "runtime operation values disagree")
 
     def test_isolated_runtime_import_failure_is_closed(self):
         temporary_directory, root, contract = self._fixture()
-        path = self._path(root, sorted(POST_TRANSITION_MIGRATIONS)[0])
-        with temporary_directory:
-            path.write_text(
-                "raise RuntimeError('fixture import failed')\n" + path.read_text(encoding="utf-8"),
-                encoding="utf-8",
+        failure = subprocess.CompletedProcess(
+            ["python"],
+            1,
+            stdout="",
+            stderr="RuntimeError: fixture import failed\n",
+        )
+        with (
+            temporary_directory,
+            patch(
+                "scripts.migration_audit.subprocess.run",
+                return_value=failure,
+            ),
+        ):
+            self._assert_rejected(
+                root,
+                contract,
+                "isolated runtime import failed: RuntimeError: fixture import failed",
             )
-            self._assert_rejected(root, contract, "isolated runtime import failed")
+
+    def test_isolated_runtime_timeout_and_process_failures_are_clean(self):
+        for error, pattern in (
+            (subprocess.TimeoutExpired(["python"], 120), "runtime import timed out"),
+            (OSError("cannot spawn"), "runtime process failed"),
+        ):
+            with self.subTest(pattern=pattern):
+                temporary_directory, root, contract = self._fixture()
+                with temporary_directory, patch("scripts.migration_audit.subprocess.run", side_effect=error):
+                    self._assert_rejected(root, contract, pattern)
+
+    def test_isolated_runtime_uses_minimal_environment(self):
+        temporary_directory, root, contract = self._fixture()
+        real_run = subprocess.run
+        observed_environment = None
+
+        def record_environment(*args, **kwargs):
+            nonlocal observed_environment
+            command = args[0]
+            if "-c" in command and migration_audit._RUNTIME_INSPECTOR in command:
+                observed_environment = kwargs["env"]
+            return real_run(*args, **kwargs)
+
+        with temporary_directory, patch("scripts.migration_audit.subprocess.run", side_effect=record_environment):
+            self._build(root, contract)
+        expected_keys = {"ITAMBOX_ENV", "DJANGO_SETTINGS_MODULE"} | {
+            key for key in ("SYSTEMROOT", "WINDIR", "PATH", "TEMP", "TMP") if key in os.environ
+        }
+        self.assertEqual(set(observed_environment), expected_keys)
 
     def test_normalized_manifest_validation_uses_legacy_recognition_ids(self):
         temporary_directory, root, contract = self._fixture()
