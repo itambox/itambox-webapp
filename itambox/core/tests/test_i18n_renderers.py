@@ -14,6 +14,7 @@ from assets.tables import (
     AssetRequestTable,
     AssetTable,
     CategoryTable,
+    StatusLabelTable,
     WarrantyTable,
 )
 from compliance.views_audit import AuditSessionTable
@@ -37,6 +38,7 @@ class ChangedTableRendererTests(SimpleTestCase):
     def test_asset_renderers_cover_empty_status_and_quantity_copy(self):
         table = AssetTable([])
         status = SimpleNamespace(color="#00ff00", name="Ready")
+        status_record = SimpleNamespace(type="deployable", get_type_display=lambda: "Einsatzbereit")
         overdue = SimpleNamespace(audit_due_date=date(2026, 8, 30), audit_overdue=True)
         current = SimpleNamespace(audit_due_date=date(2026, 8, 30), audit_overdue=False)
         inherited = SimpleNamespace(is_requestable=True, requestable=None)
@@ -45,6 +47,9 @@ class ChangedTableRendererTests(SimpleTestCase):
         with override("de"):
             self.assertIn("Nicht festgelegt", str(table.render_serial_number(None)))
             self.assertIn("badge-status", table.render_status(status))
+            status_table = StatusLabelTable([])
+            self.assertEqual(status_table.render_type("deployable", status_record), "Einsatzbereit")
+            self.assertIn("Nicht festgelegt", str(status_table.render_type(None, None)))
             self.assertIn("Nicht festgelegt", str(table.render_status(None)))
             self.assertIn('title="Überfällig"', table.render_audit_due_date(overdue))
             self.assertEqual(table.render_audit_due_date(current), "2026-08-30")

@@ -359,8 +359,8 @@ class StatusLabelTable(BaseTable):
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
         return _("Not set")
 
-    def render_type(self, value):
-        return value.title() if value else _("Not set")
+    def render_type(self, value, record):
+        return record.get_type_display() if record and value else _("Not set")
 
 
 class AssetRoleTable(BaseTable):
