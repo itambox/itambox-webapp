@@ -3,11 +3,16 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.migration_audit import (
     SEMANTIC_DISPOSITIONS,
     build_inventory,
+    load_preflight_manifest,
     render_inventory,
+    render_preflight_manifest,
+    validate_preflight_manifest,
+    validate_preflight_manifest_git_objects,
 )
 
 
@@ -718,6 +723,65 @@ class MigrationAuditTests(unittest.TestCase):
                 operations = []
             """,
         )
+
+
+class PreflightManifestAuditTests(unittest.TestCase):
+    def setUp(self):
+        self.repository_root = Path(__file__).resolve().parents[2]
+        self.source_root = self.repository_root / "itambox"
+        self.manifest_path = self.source_root / "core" / "migration_baseline_manifest.json"
+        self.inventory = build_inventory(self.source_root)
+        self.manifest = load_preflight_manifest(self.manifest_path)
+
+    def test_checked_manifest_matches_the_current_transitional_inventory(self):
+        validate_preflight_manifest(self.inventory, self.manifest)
+        validate_preflight_manifest_git_objects(self.manifest, self.repository_root)
+
+    def test_unresolvable_predecessor_revision_fails_closed(self):
+        with patch("scripts.migration_audit.subprocess.run") as run:
+            run.return_value.returncode = 1
+            with self.assertRaisesRegex(ValueError, "not a local Git commit"):
+                validate_preflight_manifest_git_objects(self.manifest, self.repository_root)
+        run.assert_called_once()
+
+    def test_render_preflight_manifest_refreshes_only_source_derived_fields(self):
+        stale = json.loads(json.dumps(self.manifest))
+        stale["post_transition_ids"] = []
+        refreshed = json.loads(render_preflight_manifest(self.inventory, stale))
+        self.assertEqual(refreshed["post_transition_ids"], self.manifest["post_transition_ids"])
+        self.assertEqual(refreshed["transition_release_sha"], self.manifest["transition_release_sha"])
+        self.assertEqual(refreshed["supported_predecessors"], self.manifest["supported_predecessors"])
+        validate_preflight_manifest(self.inventory, refreshed)
+
+    def test_unrecognized_predecessor_state_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["supported_predecessors"][0]["state"] = "not-a-real-state"
+        with self.assertRaisesRegex(ValueError, "predecessor state"):
+            validate_preflight_manifest(self.inventory, manifest)
+
+    def test_missing_replacement_id_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["replacement_ids"].pop()
+        with self.assertRaisesRegex(ValueError, "replacement_ids"):
+            validate_preflight_manifest(self.inventory, manifest)
+
+    def test_missing_post_transition_leaf_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["post_transition_leaf_ids"].pop()
+        with self.assertRaisesRegex(ValueError, "post_transition_leaf_ids"):
+            validate_preflight_manifest(self.inventory, manifest)
+
+    def test_unexpected_normalized_layout_fails_closed_against_transitional_source(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["layout"] = "normalized"
+        with self.assertRaisesRegex(ValueError, "layout"):
+            validate_preflight_manifest(self.inventory, manifest)
+
+    def test_unexpected_first_party_baseline_mutation_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["baseline_ids"].append("assets.9999_unmanifested")
+        with self.assertRaisesRegex(ValueError, "baseline_ids"):
+            validate_preflight_manifest(self.inventory, manifest)
 
 
 if __name__ == "__main__":

@@ -233,6 +233,49 @@ python manage.py integrity_report --proposals /tmp/grants.json --fail-on-finding
 
 ---
 
+### `migration_baseline_preflight`
+
+Inspect the first-party rows in `django_migrations` and fail closed unless the
+shipped transitional baseline has been fully recognized. This command is
+strictly read-only: it never runs migrations, repairs recorder state, or writes
+application data.
+
+| | |
+|---|---|
+| **Usage** | `python manage.py migration_baseline_preflight [--format table\|json] [--database ALIAS]` |
+| **Production-safe** | Yes (read-only migration-recorder inspection). |
+| **When to use** | Before a migration cleanup or recovery retry, after a successful ordinary migration run, and in the CI fresh-database qualification. |
+
+The checked manifest recognizes these states: complete replacement recognition,
+complete old history without replacement rows, partial old history, partial
+replacement set, incomplete post-transition state, empty/unmigrated, mixed or
+unknown first-party rows, and (when a future manifest explicitly selects that
+layout) the current normalized baseline. Only complete replacement recognition
+and current normalized baseline return exit code `0`. All other states return a
+non-zero status with a safe reason code and remediation text.
+
+A successful preflight is not crash-recovery evidence and it is not schema or data-semantic parity evidence. It attests only to the completeness of the rows recorded in `django_migrations`; it cannot detect rows created through `migrate --fake`, `--fake-initial`, or direct recorder SQL. If a migration was
+interrupted or failed after database operations began, restore the verified
+predecessor first and compare schema, data, and protected-canary evidence; a
+missing recorder row does not prove that no operation ran. The declared
+revision in recovery evidence is metadata and must be bound separately to the
+immutable image or checkout.
+
+When the first-party migration universe changes, refresh the checked manifest
+from the repository root before running the preflight or CI:
+
+```bash
+python scripts/migration_audit.py --write-preflight-manifest
+python scripts/migration_audit.py --check
+```
+
+The refresh updates only source-derived ID and leaf fields. It preserves the
+reviewed layout, transition release SHA, and supported-predecessor identities;
+review those metadata fields separately. `--skip-git-identity-check` is for an
+explicitly isolated fixture only and must not be used for CI or release work.
+
+---
+
 ### `list_failed_tasks`
 
 List recently failed django-q2 background tasks with their function names, timestamps, attempt counts, and tracebacks.
