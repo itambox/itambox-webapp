@@ -135,6 +135,11 @@
       "kind": "qualification",
       "owner": "oidc"
     },
+    "regression:aggregate-bulk-basket": {
+      "path": "spec/regressions/aggregate-bulk-basket-switch-back.spec.ts",
+      "kind": "qualification",
+      "owner": "aggregate-bulk-basket"
+    },
     "regression:german-bulk-basket": {
       "path": "spec/regressions",
       "kind": "qualification",
@@ -549,10 +554,20 @@
       "id": "regression-spec-owner",
       "decision": "selected",
       "patterns": [
-        "itambox/tests/e2e/spec/regressions/**"
+        "itambox/tests/e2e/spec/regressions/german-bulk-basket.spec.ts"
       ],
       "scopes": [
         "regression:german-bulk-basket"
+      ]
+    },
+    {
+      "id": "aggregate-bulk-basket-regression-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/regressions/aggregate-bulk-basket-switch-back.spec.ts"
+      ],
+      "scopes": [
+        "regression:aggregate-bulk-basket"
       ]
     },
     {
