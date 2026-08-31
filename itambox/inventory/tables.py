@@ -6,6 +6,7 @@ from django_tables2.utils import A
 
 from core.managers import get_current_tenant
 from core.tables import ActionsColumn, BaseTable, ColorChipColumn, CountLinkColumn, ToggleColumn
+from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.tables import TagColumn
 from organization.access import resolved_shared_stock_ids
 from organization.models import TenantResourceGrant
@@ -328,7 +329,7 @@ class AccessoryAssignmentTable(BaseTable):
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
             return format_html('<a href="{}">{}: {}</a>', url, _("Asset"), record.assigned_asset)
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
     def render_actions(self, record):
         request = getattr(self, "request", None)
@@ -529,7 +530,7 @@ class ConsumableAssignmentTable(BaseTable):
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
             return format_html('<a href="{}">{}: {}</a>', url, _("Asset"), record.assigned_asset)
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
 
 class KitTable(BaseTable):
@@ -722,7 +723,7 @@ class ComponentAllocationTable(BaseTable):
         elif record.assigned_asset:
             url = reverse("assets:asset_detail", kwargs={"pk": record.assigned_asset.pk})
             return format_html('<a href="{}">{}: {}</a>', url, _("Asset"), record.assigned_asset)
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
     def render_actions(self, record):
         request = getattr(self, "request", None)

@@ -6,6 +6,7 @@ from django_tables2.data import TableQuerysetData
 
 from core.paginator import EnhancedPaginator
 from core.tables.columns import IDColumn
+from core.tables.constants import TABLE_EMPTY_VALUE
 from itambox.utils import get_paginate_count
 
 logger = logging.getLogger(__name__)
@@ -29,10 +30,10 @@ class BaseTable(tables.Table):
             "td": {"class": "text-nowrap"},
         }
         exclude_from_config = ("pk", "actions")
-        default = _("Not set")
+        default = TABLE_EMPTY_VALUE
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("default", _("Not set"))
+        kwargs.setdefault("default", TABLE_EMPTY_VALUE)
         super().__init__(*args, **kwargs)
 
         if self.empty_text is None:

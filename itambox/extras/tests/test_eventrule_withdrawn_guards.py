@@ -149,7 +149,7 @@ class EventRuleWithdrawnUiStatusTests(TenantTestMixin, TestCase):
         self.assertIn("Withdrawn rule", content)
         self.assertIn("Withdrawn", content)
         self.assertIn("Plain rule", content)
-        self.assertIn("Not set", content)
+        self.assertIn("–", content)
         # The authored condition JSON must never leak into the list table.
         self.assertNotIn('"field": "model_name"', content)
 

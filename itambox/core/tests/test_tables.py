@@ -29,7 +29,7 @@ User = get_user_model()
 
 
 class BaseTableEmptyValueTest(SimpleTestCase):
-    def test_empty_cells_render_translated_default(self):
+    def test_empty_cells_render_an_en_dash_default(self):
         class EmptyValueTable(BaseTable):
             value = tables.Column()
 
@@ -40,19 +40,19 @@ class BaseTableEmptyValueTest(SimpleTestCase):
         request = RequestFactory().get("/")
         rendered = table.as_html(request)
 
-        self.assertIn("Not set", rendered)
+        self.assertIn("–", rendered)
+        self.assertNotIn("Not set", rendered)
         self.assertNotIn("—", rendered)
-        self.assertNotIn("–", rendered)
 
 
 class TableLocalizationTests(SimpleTestCase):
-    def test_boolean_empty_label_resolves_when_the_cell_is_rendered(self):
+    def test_boolean_empty_value_is_language_neutral(self):
         column = BooleanColumn()
 
         with translation.override("de"):
-            self.assertIn("Nicht festgelegt", str(column.render(None)))
+            self.assertIn("–", str(column.render(None)))
         with translation.override("en"):
-            self.assertIn("Not set", str(column.render(None)))
+            self.assertIn("–", str(column.render(None)))
 
     def test_subscription_renewal_journal_is_localized_only_when_rendered(self):
         comment = "Renewed subscription. Next renewal date: 2026-09-01. Cost: Not set EUR."
@@ -227,7 +227,8 @@ class CoreTablesTestCase(TestCase):
 
         with translation.override("de"):
             rendered_2 = column.render(asset_available.pk, asset_available, col_bound, table)
-        self.assertIn("Nicht festgelegt", rendered_2)
+        self.assertIn("–", rendered_2)
+        self.assertNotIn("Nicht festgelegt", rendered_2)
 
     def test_table_optimizations(self):
         class DummyTable(BaseTable):

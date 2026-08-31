@@ -7,6 +7,7 @@ from django_tables2.utils import A
 
 from core.html_styles import status_color_class
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
+from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.tables import TagColumn
 
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
@@ -94,16 +95,16 @@ class SubscriptionTable(BaseTable):
                 color_class,
                 display,
             )
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
     def render_renewal_cost(self, value, record):
         if value is not None:
             return f"{value:,.2f} {record.currency or 'USD'}"
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
     def render_days_until_renewal(self, value):
         if value is None:
-            return _("Not set")
+            return TABLE_EMPTY_VALUE
         if value < 0:
             count = abs(value)
             label = ngettext("%(count)s day overdue", "%(count)s days overdue", count) % {"count": count}
@@ -126,7 +127,7 @@ class SubscriptionAssignmentTable(BaseTable):
     )
     assigned_object = tables.Column(verbose_name=_("Assigned To"), orderable=False)
     assigned_date = tables.DateColumn(format="Y-m-d H:i", verbose_name=_("Assigned"))
-    assigned_by = tables.Column(accessor="assigned_by.username", verbose_name=_("By"), default=_("Not set"))
+    assigned_by = tables.Column(accessor="assigned_by.username", verbose_name=_("By"), default=TABLE_EMPTY_VALUE)
     notes = tables.Column(verbose_name=_("Notes"))
     actions = ActionsColumn()
 
@@ -138,5 +139,5 @@ class SubscriptionAssignmentTable(BaseTable):
     def render_assigned_object(self, value, record):
         obj = record.tenant_safe_assigned_object
         if obj is None:
-            return _("Not set")
+            return TABLE_EMPTY_VALUE
         return str(obj)
