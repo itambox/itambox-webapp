@@ -463,7 +463,7 @@ def compiled_catalog_failures(domain: str, entries: dict[str, dict]) -> list[str
     try:
         with mo_path.open("rb") as handle:
             compiled = gettext.GNUTranslations(handle)._catalog
-    except (OSError, EOFError, UnicodeError, ValueError, struct.error) as exc:
+    except (OSError, EOFError, ValueError, struct.error) as exc:
         return [f"{domain}: cannot read compiled catalog {mo_path}: {exc}"]
 
     expected_keys = set()
