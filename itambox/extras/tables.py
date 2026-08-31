@@ -13,6 +13,7 @@ from django_tables2.utils import A
 
 from core.html_styles import color_chip_class, safe_hex_color
 from core.tables import ActionsColumn, BaseTable, BooleanColumn, ToggleColumn
+from core.templatetags.utility_tags import localize_journal_comment
 
 from .models import (
     AlertLog,
@@ -290,7 +291,7 @@ class JournalEntryTable(BaseTable):
         return model._meta.verbose_name.title() if model else value.model
 
     def render_comment(self, value):
-        return Truncator(str(value)).chars(120)
+        return Truncator(str(localize_journal_comment(str(value)))).chars(120)
 
 
 class WebhookDeliveryActionsColumn(tables.Column):

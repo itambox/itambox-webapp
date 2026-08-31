@@ -21,6 +21,7 @@ from core.models import ObjectChange
 from core.tables import AssigneeColumn, BaseTable, BooleanColumn, ObjectChangeTable
 from core.templatetags.utility_tags import localize_journal_comment
 from extras.models import NotificationChannel
+from extras.tables import JournalEntryTable
 from itambox.middleware import _request_id
 from organization.models import Location, Site
 
@@ -68,6 +69,15 @@ class TableLocalizationTests(SimpleTestCase):
         with translation.override("en"):
             self.assertEqual(localize_journal_comment(comment), comment)
         self.assertEqual(localize_journal_comment("A user-written journal entry."), "A user-written journal entry.")
+
+    def test_journal_table_uses_the_render_time_localization_helper(self):
+        with translation.override("de"):
+            rendered = JournalEntryTable([]).render_comment(
+                "Renewed subscription. Next renewal date: 2026-09-01. Cost: 12.50 EUR."
+            )
+
+        self.assertIn("Abonnement verlängert", rendered)
+        self.assertIn("Kosten: 12.50 EUR", rendered)
 
 
 class AssetTableLocalizationTest(SimpleTestCase):
