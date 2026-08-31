@@ -58,9 +58,11 @@ ALLOWED_DISPOSITIONS = {
     "safely-replaced-by-final-schema",
     "review-blocker",
 }
-NORMALIZED_POST_TRANSITION_DISPOSITIONS = frozenset({"RETAIN"})
+NORMALIZED_POST_TRANSITION_DISPOSITIONS = frozenset({"RETAIN", "FOLD_INTO_BASELINE", "RETIRE_UPGRADE_ONLY"})
 POST_TRANSITION_DISPOSITION_GROUPS = {
     "RETAIN": frozenset(POST_TRANSITION_MIGRATIONS),
+    "FOLD_INTO_BASELINE": frozenset(),
+    "RETIRE_UPGRADE_ONLY": frozenset(),
 }
 EXPECTED_BLOCKERS = {
     "organization.0026_remove_tenantrole_tenant_provider_tenant_provider_and_more",

@@ -219,9 +219,12 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             self._assert_rejected(root, contract, "must name the trusted pre-cleanup revision")
 
     def test_post_transition_disposition_is_exhaustive_and_unknown_ids_fail_closed(self):
-        self.assertEqual(set(POST_TRANSITION_DISPOSITION_GROUPS), NORMALIZED_POST_TRANSITION_DISPOSITIONS)
-        self.assertEqual(NORMALIZED_POST_TRANSITION_DISPOSITIONS, {"RETAIN"})
+        expected_groups = {"RETAIN", "FOLD_INTO_BASELINE", "RETIRE_UPGRADE_ONLY"}
+        self.assertEqual(set(POST_TRANSITION_DISPOSITION_GROUPS), expected_groups)
+        self.assertEqual(NORMALIZED_POST_TRANSITION_DISPOSITIONS, expected_groups)
         self.assertEqual(set(POST_TRANSITION_DISPOSITION_GROUPS["RETAIN"]), POST_TRANSITION_MIGRATIONS)
+        self.assertEqual(POST_TRANSITION_DISPOSITION_GROUPS["FOLD_INTO_BASELINE"], frozenset())
+        self.assertEqual(POST_TRANSITION_DISPOSITION_GROUPS["RETIRE_UPGRADE_ONLY"], frozenset())
         disposition_sets = list(POST_TRANSITION_DISPOSITION_GROUPS.values())
         self.assertEqual(set().union(*disposition_sets), POST_TRANSITION_MIGRATIONS)
         for index, migration_ids in enumerate(disposition_sets):
@@ -249,6 +252,23 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             )
             self._assert_rejected(root, contract, "unknown=.*extras.9999_unknown")
 
+        temporary_directory, root, contract = self._fixture()
+        folded_id = sorted(POST_TRANSITION_MIGRATIONS)[0]
+        with (
+            temporary_directory,
+            patch.dict(
+                POST_TRANSITION_DISPOSITION_GROUPS,
+                {
+                    "RETAIN": POST_TRANSITION_MIGRATIONS - {folded_id},
+                    "FOLD_INTO_BASELINE": {folded_id},
+                    "RETIRE_UPGRADE_ONLY": frozenset(),
+                },
+                clear=True,
+            ),
+        ):
+            self._path(root, folded_id).unlink()
+            self._assert_rejected(root, contract, "post-transition IDs must exactly match")
+
         with (
             patch.dict(
                 POST_TRANSITION_DISPOSITION_GROUPS,
@@ -263,7 +283,11 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
         with (
             patch.dict(
                 POST_TRANSITION_DISPOSITION_GROUPS,
-                {"RETAIN": retained_subset},
+                {
+                    "RETAIN": retained_subset,
+                    "FOLD_INTO_BASELINE": frozenset(),
+                    "RETIRE_UPGRADE_ONLY": frozenset(),
+                },
                 clear=True,
             ),
             self.assertRaisesRegex(ValueError, "cover exactly"),
@@ -640,14 +664,16 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
         contract_path = base / "contract.json"
         manifest_path = base / "manifest.json"
         output_path = base / "audit.json"
+        contract_path.write_text(json.dumps(contract), encoding="utf-8")
         runtime_manifest = self._runtime_manifest(contract)
+        real_load_preflight_manifest = migration_audit.load_preflight_manifest
+        loaded_paths = []
 
         def load_external_fixture(path):
-            if path == contract_path:
-                return contract
+            loaded_paths.append(path)
             if path == manifest_path:
                 return runtime_manifest
-            self.fail(f"unexpected normalized CLI fixture input: {path}")
+            return real_load_preflight_manifest(path)
 
         live_output = self.repository_root / "scripts/migration_audit.json"
         before = live_output.read_bytes()
@@ -673,7 +699,7 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             rendered = json.loads(output_path.read_text(encoding="utf-8"))
         self.assertEqual(result, 0)
         self.assertEqual(rendered["layout"], "normalized")
-        self.assertFalse(contract_path.exists())
+        self.assertEqual(loaded_paths, [contract_path, manifest_path])
         self.assertFalse(manifest_path.exists())
         self.assertEqual(live_output.read_bytes(), before)
 
