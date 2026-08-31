@@ -20,7 +20,7 @@ class ColorChipColumn(tables.Column):
 
     def render(self, value):
         if not value:
-            return mark_safe('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         safe_color = safe_hex_color(value.color)
         color_class, style_block = color_chip_class(safe_color)
         return format_html(
@@ -62,7 +62,6 @@ class CountLinkColumn(tables.Column):
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe('<span class="text-success"><i class="mdi mdi-check-circle-outline"></i></span>')
     FALSE_MARK = mark_safe('<span class="text-danger"><i class="mdi mdi-close-circle-outline"></i></span>')
-    EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
 
     def __init__(self, *args, true_mark=None, false_mark=None, **kwargs):
         self.true_mark = true_mark if true_mark is not None else self.TRUE_MARK
@@ -72,9 +71,9 @@ class BooleanColumn(tables.Column):
     def render(self, value):
         if value is True:
             return self.true_mark
-        elif value is False:
+        if value is False:
             return self.false_mark
-        return self.EMPTY_MARK
+        return format_html('<span class="text-muted">{}</span>', _("Not set"))
 
 
 class IDColumn(tables.Column):
@@ -334,8 +333,6 @@ class AssigneeColumn(tables.Column):
             AssetAssignment-like model.
     """
 
-    EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
-
     def __init__(
         self,
         *args,
@@ -378,26 +375,26 @@ class AssigneeColumn(tables.Column):
             try:
                 url = holder.get_absolute_url()
                 if getattr(holder, "_meta", None) is not None and holder._meta.label_lower == "organization.location":
-                    return format_html('Location: <a href="{}">{}</a>', url, holder)
+                    return format_html('{}: <a href="{}">{}</a>', _("Location"), url, holder)
                 return format_html('<a href="{}">{}</a>', url, holder)
             except Exception:
                 return str(holder)
 
         if hasattr(record, "active_assignment") and record.active_assignment is None:
-            return self.EMPTY_MARK
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
 
         if self.location_field and hasattr(record, self.location_field):
             loc = getattr(record, self.location_field)
             if loc:
                 try:
                     url = loc.get_absolute_url()
-                    return format_html('Location: <a href="{}">{}</a>', url, loc)
-                except Exception:
-                    return f"Location: {loc}"
+                    return format_html('{}: <a href="{}">{}</a>', _("Location"), url, loc)
+                except Exception:  # broad except: render-degrade: location links may fail without breaking the table
+                    return f"{_('Location')}: {loc}"
 
         if self._empty_text is not None:
             return self._empty_text
-        return self.EMPTY_MARK
+        return format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def _build_cache(self, table, model_class, cache_attr):
         from django.contrib.contenttypes.models import ContentType

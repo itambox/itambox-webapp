@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 
 from assets import services
 from assets.models import Asset, StatusLabel
@@ -110,7 +111,8 @@ def _finish_checkin(
     Notification.objects.create(
         user=ctx.user,
         subject=_("Bulk Check-in Complete"),
-        message=_("Checked in %(count)s asset(s).") % {"count": success_count},
+        message=ngettext("Checked in %(count)s asset.", "Checked in %(count)s assets.", success_count)
+        % {"count": success_count},
         level=Notification.LEVEL_SUCCESS,
         target_url=reverse_job_detail(job.pk),
     )

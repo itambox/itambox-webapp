@@ -12,9 +12,9 @@
     <i class="mdi mdi-information-outline me-2 mt-1"></i>
     <div class="small">
       {% blocktranslate trimmed %}
-        A <strong>user group</strong> contains memberships from exactly one owning tenant.
-        Its role grants may apply there or be projected into explicitly scoped managed
-        tenants. Directory memberships remain controlled by their identity source.
+        A <strong>user group</strong> contains members from one tenant. Its roles can apply
+        there or in selected tenants that it manages. Members added through a directory
+        must be removed from that directory.
       {% endblocktranslate %}
     </div>
   </div>
@@ -24,7 +24,7 @@
       <div class="fw-bold fs-3 text-dark">{{ object.name }}</div>
     </div>
     <div class="col-md-4 mb-3">
-      <label class="form-label text-muted">{% translate "SCIM scope / owning tenant" %}</label>
+      <label class="form-label text-muted">{% translate "Owning tenant" %}</label>
       <div>
         <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant.name }}</a>
       </div>
@@ -50,11 +50,17 @@
     <label class="form-label text-muted">{% translate "Members" %}</label>
     <div>
       <span class="fw-bold fs-5">{{ member_count }}</span>
-      <span class="text-muted small ms-1">{% translate "user(s) in this group" %}</span>
+      <span class="text-muted small ms-1">
+        {% blocktranslate trimmed count count=member_count %}
+          member in this group
+        {% plural %}
+          members in this group
+        {% endblocktranslate %}
+      </span>
     </div>
   </div>
   <hr class="my-4">
-  <h4 class="card-title text-primary mb-3">{% translate "Assigned Roles" %}</h4>
+  <h4 class="card-title text-primary mb-3">{% translate "Assigned roles" %}</h4>
   {% if grants %}
     <div class="table-responsive">
       <table class="table table-hover align-middle border mb-0">
@@ -85,7 +91,13 @@
                 {% endfor %}
               </td>
               <td>
-                <span class="badge bg-secondary-lt">{{ grant.role.permissions|length }} {% translate "permission(s)" %}</span>
+                <span class="badge bg-secondary-lt">
+                  {% blocktranslate trimmed count count=grant.role.permissions|length %}
+                    {{ count }} permission
+                  {% plural %}
+                    {{ count }} permissions
+                  {% endblocktranslate %}
+                </span>
               </td>
             </tr>
           {% endfor %}

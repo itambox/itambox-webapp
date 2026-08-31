@@ -177,7 +177,11 @@ function initScanBasket(): void {
     keptAsideNotice.classList.toggle('d-none', !visible);
     keptAsideNotice.textContent = visible
       ? interpolate(
-        gettext('%(count)s assets from another tenant are kept aside — switching the target tenant shows them.'),
+        ngettext(
+          '%(count)s asset from another tenant is kept aside. Switch the target tenant to see it.',
+          '%(count)s assets from another tenant are kept aside. Switch the target tenant to see them.',
+          keptAsideCount,
+        ),
         { count: keptAsideCount },
         true,
       )
@@ -195,9 +199,14 @@ function initScanBasket(): void {
     if (input) input.disabled = !tenantSelected;
     if (cameraBtn) cameraBtn.disabled = !tenantSelected;
     if (submitBtn) submitBtn.disabled = count === 0 || !tenantSelected;
-    document.querySelectorAll<HTMLElement>('.scan-basket-confirm-count').forEach((el) => {
-      el.textContent = String(count);
-    });
+    const disposeConfirmText = document.getElementById('scan-basket-dispose-confirm-text');
+    if (disposeConfirmText) {
+      disposeConfirmText.textContent = interpolate(
+        ngettext('Dispose of %(count)s asset?', 'Dispose of %(count)s assets?', count),
+        { count },
+        true,
+      );
+    }
     updateKeptAsideNotice();
   }
 
@@ -225,9 +234,9 @@ function initScanBasket(): void {
 
     set('asset_tag', p.asset_tag || `#${p.pk}`);
     set('label', p.label);
-    set('status', p.status || '—');
-    set('assigned_to', p.assigned_to || '—');
-    set('book_value', p.book_value || '—');
+    set('status', p.status || gettext('Not set'));
+    set('assigned_to', p.assigned_to || gettext('Not set'));
+    set('book_value', p.book_value || gettext('Not set'));
 
     const proceeds = tr.querySelector<HTMLInputElement>('input[data-field="proceeds"]');
     if (proceeds) {

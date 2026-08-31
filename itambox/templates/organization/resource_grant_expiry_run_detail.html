@@ -18,12 +18,12 @@
         </dd>
         <dt class="col-sm-3">{% translate "State / outcome" %}</dt>
         <dd class="col-sm-9">
-          {{ object.state }} / {{ object.outcome|default:_("Not finished") }}
+          {{ object.state }} / {% if object.outcome %}{{ object.outcome }}{% else %}{% translate "Not finished" %}{% endif %}
         </dd>
         <dt class="col-sm-3">{% translate "Counts" %}</dt>
         <dd class="col-sm-9">{% translate "Revoked" %}: {{ object.revoked_count }}, {% translate "Remaining due" %}: {{ object.remaining_due_count }}, {% translate "Invalid" %}: {{ object.invalid_count }}</dd>
         <dt class="col-sm-3">{% translate "Error" %}</dt>
-        <dd class="col-sm-9">{{ object.error_code|default:_("None") }}{% if object.error_message %}: {{ object.error_message }}{% endif %}</dd>
+        <dd class="col-sm-9">{% if object.error_code %}{{ object.error_code }}{% else %}{% translate "None" %}{% endif %}{% if object.error_message %}: {{ object.error_message }}{% endif %}</dd>
       </dl>
     </div>
   </div>

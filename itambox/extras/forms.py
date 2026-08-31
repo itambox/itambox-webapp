@@ -674,7 +674,7 @@ class ExportTemplateForm(forms.ModelForm):
         help_texts = {
             "template_code": _(
                 "Jinja2 template rendered once over the whole result set. The full "
-                "queryset is available as <code>queryset</code> — loop it with "
+                "queryset is available as <code>queryset</code>. Loop over it with "
                 "<code>{% for obj in queryset %}…{% endfor %}</code> and emit your own "
                 "header row. Built-in filters such as <code>|tojson</code> are available."
             ),
@@ -777,9 +777,8 @@ def _resolve_nonadmin_write_tenant(form, user):
     if tenant is None:
         raise forms.ValidationError(
             _(
-                "This record must belong to a single tenant. Switch to one "
-                "specific tenant before saving — the active scope spans multiple "
-                "tenants."
+                "This record must belong to one tenant. Switch to a specific tenant before saving because the "
+                "active scope contains multiple tenants."
             )
         )
     return tenant

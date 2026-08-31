@@ -1,4 +1,6 @@
 {% load i18n %}
+{% translate "Custody Link Unavailable" as custody_link_unavailable %}
+{% translate "The requested custody link is unavailable." as requested_custody_link_unavailable %}
 {# templates/assets/custody/sign_error.html #}
 {% load static %}
 <!DOCTYPE html>
@@ -7,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>{{ error_title|default:_("Custody Link Unavailable") }} - {% translate "ITAMbox" %}</title>
+    <title>{{ error_title|default:custody_link_unavailable }} - {% translate "ITAMbox" %}</title>
     <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}"
           rel="stylesheet" />
     <style nonce="{{ request.csp_nonce }}">
@@ -32,11 +34,11 @@
         <span class="avatar avatar-xl bg-danger-lt text-danger rounded-circle mb-4">
           <i class="mdi mdi-alert-outline"></i>
         </span>
-        <h2 class="text-danger mb-2">{{ error_title|default:_("Custody Link Unavailable") }}</h2>
-        <p class="text-muted">{{ error|default:_("The requested custody link is unavailable.") }}</p>
+        <h2 class="text-danger mb-2">{{ error_title|default:custody_link_unavailable }}</h2>
+        <p class="text-muted">{{ error|default:requested_custody_link_unavailable }}</p>
         {% if error_code == "custody_link_expired" %}
           <div class="mt-4">
-            <p class="text-muted small">{% translate "Custody links expire automatically after 7 days. Please contact your IT administrator to request a fresh transfer link." %}</p>
+            <p class="text-muted small">{% translate "Custody links expire automatically after 7 days. Please contact your IT administrator to request a new custody handoff link." %}</p>
           </div>
         {% endif %}
       </div>

@@ -5,6 +5,7 @@ from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import AssetType, Manufacturer
@@ -32,7 +33,7 @@ from organization.models import (
 # --- Base Search Filter ---
 class BaseOrgFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Search..."})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": _("Search")})
     )
     # Common tag filter
     tag = django_filters.ModelMultipleChoiceFilter(
@@ -55,9 +56,14 @@ class BaseOrgFilterSet(BaseFilterSet):
         self.form.helper.layout = Layout(
             *self.filters.keys(),  # Render all defined filter fields
             HTML('<div class="mt-3">'),  # Add margin like the template had
-            Submit("submit", "Apply Filter", css_class="btn btn-primary"),
+            Submit("submit", _("Apply filter"), css_class="btn btn-primary"),
             # Add Clear button as HTML link within the layout
-            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
+            HTML(
+                format_html(
+                    '<a href="{{{{ request.path }}}}" class="btn btn-secondary ms-2">{}</a>',
+                    _("Clear filters"),
+                )
+            ),
             HTML("</div>"),
         )
 
@@ -451,6 +457,12 @@ class CostCenterFilterSet(BaseOrgFilterSet):
     class Meta:
         model = CostCenter
         fields = ["name", "code", "tenant", "parent", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters["parent"].field.label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
 
     def search(self, queryset, name, value):
         if not value.strip():

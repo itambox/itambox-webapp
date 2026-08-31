@@ -137,7 +137,7 @@ class AbstractStock(ChangeLoggingMixin, BaseModel):
                 raise ValidationError(
                     {
                         "location": _(
-                            "Stock requires a location owned by a tenant — assign the location to a tenant first."
+                            "Stock requires a location owned by a tenant. Assign the location to a tenant first."
                         )
                     }
                 )

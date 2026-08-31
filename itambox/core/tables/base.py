@@ -29,8 +29,10 @@ class BaseTable(tables.Table):
             "td": {"class": "text-nowrap"},
         }
         exclude_from_config = ("pk", "actions")
+        default = _("Not set")
 
     def __init__(self, *args, **kwargs):
+        kwargs.setdefault("default", _("Not set"))
         super().__init__(*args, **kwargs)
 
         if self.empty_text is None:

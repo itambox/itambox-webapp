@@ -323,12 +323,6 @@
     },
     {
       "path": "itambox/assets/tables.py",
-      "context": "ClassDef:AssetTable/FunctionDef:render_actions",
-      "statement": "from django.utils.translation import gettext as _",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
       "context": "ClassDef:WarrantyTable/FunctionDef:render_cost",
       "statement": "from extras.templatetags.money import money",
       "count": 1

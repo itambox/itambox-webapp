@@ -142,12 +142,7 @@ def resolve_identity(*, spec: NewIdentitySpec) -> _MembershipUser | None:
         return resolve_existing_user(spec.email)
     except AmbiguousEmailError:
         raise AmbiguousIdentity.single(
-            str(
-                _(
-                    "More than one account already uses this email address — "
-                    "resolve the duplicate before adding a membership."
-                )
-            ),
+            str(_("More than one account uses this email address. Resolve the duplicates before adding a membership.")),
             field="new_user_email",
         ) from None
 
@@ -231,7 +226,7 @@ def plan_membership_write(
     if creating and resolved_user is not None and _membership_exists(resolved_user, intent.tenant):
         raise DuplicateMembership.single(
             str(
-                _("%(user)s is already a member of %(tenant)s — edit their membership instead.")
+                _("%(user)s is already a member of %(tenant)s. Edit the existing membership instead.")
                 % {"user": resolved_user, "tenant": intent.tenant}
             ),
             field="new_user_email" if intent.user is None else None,
@@ -273,7 +268,7 @@ def _insert_membership(*, user, intent: MembershipIntent) -> Membership:
             raise
         raise DuplicateMembership.single(
             str(
-                _("%(user)s is already a member of %(tenant)s — edit their membership instead.")
+                _("%(user)s is already a member of %(tenant)s. Edit the existing membership instead.")
                 % {"user": user, "tenant": intent.tenant}
             )
         ) from None

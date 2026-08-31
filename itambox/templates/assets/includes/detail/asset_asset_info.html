@@ -41,7 +41,7 @@
         <span class="badge px-2.5 py-1 text-uppercase {{ status_style.class_name }}">{{ object.status.name }}</span>
       </a>
     {% else %}
-      —
+      <span class="text-muted"><i>{% translate "Not set" %}</i></span>
     {% endif %}
   </dd>
   <dt class="col-sm-3">{% translate "Requestable Status:" %}</dt>

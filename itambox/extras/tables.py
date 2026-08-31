@@ -8,10 +8,12 @@ from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_tables2.utils import A
 
 from core.html_styles import color_chip_class, safe_hex_color
 from core.tables import ActionsColumn, BaseTable, BooleanColumn, ToggleColumn
+from core.templatetags.utility_tags import localize_journal_comment
 
 from .models import (
     AlertLog,
@@ -83,10 +85,9 @@ class TagColumn(tables.ManyToManyColumn):
             )
 
         if remaining_count > 0:
+            total_title = ngettext("%(count)s tag total", "%(count)s tags total", len(tags)) % {"count": len(tags)}
             rendered_tags.append(
-                format_html(
-                    '<span class="badge bg-secondary" title="{} tags total">+{}</span>', len(tags), remaining_count
-                )
+                format_html('<span class="badge bg-secondary" title="{}">+{}</span>', total_title, remaining_count)
             )
 
         return mark_safe("".join(rendered_tags))
@@ -147,7 +148,7 @@ class EventRuleTable(BaseTable):
     def render_conditions(self, value):
         if value:
             return format_html('<span class="badge bg-warning">{}</span>', _("Withdrawn"))
-        return "—"
+        return _("Not set")
 
 
 class LabelTemplateTable(BaseTable):
@@ -187,7 +188,7 @@ class TagTable(BaseTable):
             normalized = safe_hex_color(value)
             color_class, style_block = color_chip_class(normalized)
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
-        return "—"
+        return _("Not set")
 
 
 class CustomFieldTable(BaseTable):
@@ -244,7 +245,7 @@ class SavedFilterTable(BaseTable):
         return model._meta.verbose_name.title() if model else value.model
 
     def render_tenant(self, value):
-        return value or mark_safe('<span class="badge bg-secondary">Global</span>')
+        return value or format_html('<span class="badge bg-secondary">{}</span>', _("Global"))
 
 
 class JournalEntryTable(BaseTable):
@@ -273,7 +274,7 @@ class JournalEntryTable(BaseTable):
 
     def render_content_object(self, value):
         if value is None:
-            return mark_safe('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         get_url = getattr(value, "get_absolute_url", None)
         url = None
         if get_url is not None:
@@ -290,7 +291,7 @@ class JournalEntryTable(BaseTable):
         return model._meta.verbose_name.title() if model else value.model
 
     def render_comment(self, value):
-        return Truncator(str(value)).chars(120)
+        return Truncator(str(localize_journal_comment(str(value)))).chars(120)
 
 
 class WebhookDeliveryActionsColumn(tables.Column):
@@ -373,17 +374,17 @@ class WebhookDeliveryTable(BaseTable):
 
     def render_delivery_id(self, value):
         if not value:
-            return format_html('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         return format_html('<code title="{}">{}</code>', value, str(value)[:8])
 
     def render_event(self, value, record):
         if record.test_send:
             return _("Test webhook")
         if value is None:
-            return format_html('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         return value.get_action_display()
 
-    def render_status(self, value):
+    def render_status(self, value, record):
         colors = {
             "pending": "info",
             "success": "success",
@@ -391,21 +392,21 @@ class WebhookDeliveryTable(BaseTable):
             "dead": "danger",
         }
         color = colors.get(value, "secondary")
-        return format_html('<span class="badge bg-{}">{}</span>', color, str(value).capitalize())
+        return format_html('<span class="badge bg-{}">{}</span>', color, record.get_status_display())
 
     def render_response_code(self, value):
-        return value if value is not None else format_html('<span class="text-muted">&mdash;</span>')
+        return value if value is not None else format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def render_error_message(self, value):
         if not value:
-            return format_html('<span class="text-muted">&mdash;</span>')
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
         truncated = Truncator(str(value)).chars(80)
         return format_html('<span title="{}">{}</span>', value, truncated)
 
     def render_test_send(self, value):
         if value:
             return format_html('<span class="badge bg-info">{}</span>', _("Test"))
-        return format_html('<span class="text-muted">&mdash;</span>')
+        return format_html('<span class="text-muted">{}</span>', _("No"))
 
 
 # =============================================================================
@@ -428,15 +429,22 @@ class AlertRuleTable(BaseTable):
             <form method="post" action="{% url 'extras:alertrule_run' record.pk %}" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                <button type="submit" class="btn btn-sm btn-outline-primary btn-icon" title="Run now">
+                <button type="submit"
+                        class="btn btn-sm btn-outline-primary btn-icon"
+                        title="{{ run_now }}"
+                        aria-label="{{ run_now }}">
                     <i class="mdi mdi-play-circle-outline"></i>
                 </button>
             </form>
-            <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'extras:alertrule_update' record.pk %}" title="Edit">
+            <a class="btn btn-sm btn-outline-secondary btn-icon"
+               href="{% url 'extras:alertrule_update' record.pk %}"
+               title="{{ edit }}"
+               aria-label="{{ edit }}">
                 <i class="mdi mdi-pencil-outline"></i>
             </a>
         </div>
         """,
+        extra_context={"run_now": _("Run now"), "edit": _("Edit")},
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
@@ -470,7 +478,7 @@ class AlertRuleTable(BaseTable):
             "actions",
         )
 
-    def render_severity(self, value):
+    def render_severity(self, value, record):
         color = "secondary"
         if value == AlertRule.SEVERITY_INFO:
             color = "info"
@@ -478,7 +486,7 @@ class AlertRuleTable(BaseTable):
             color = "warning"
         elif value == AlertRule.SEVERITY_CRITICAL:
             color = "danger"
-        return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
+        return format_html('<span class="badge bg-{}">{}</span>', color, record.get_severity_display())
 
 
 class NotificationChannelTable(BaseTable):
@@ -492,18 +500,32 @@ class NotificationChannelTable(BaseTable):
         <div class="d-flex gap-1 justify-content-end">
             <form method="post" action="{% url 'extras:notificationchannel_test' record.pk %}" class="d-inline">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-info btn-icon" title="Send test notification">
+                <button type="submit"
+                        class="btn btn-sm btn-outline-info btn-icon"
+                        title="{{ send_test_notification }}"
+                        aria-label="{{ send_test_notification }}">
                     <i class="mdi mdi-send-outline"></i>
                 </button>
             </form>
-            <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'extras:notificationchannel_update' record.pk %}" title="Edit">
+            <a class="btn btn-sm btn-outline-secondary btn-icon"
+               href="{% url 'extras:notificationchannel_update' record.pk %}"
+               title="{{ edit }}"
+               aria-label="{{ edit }}">
                 <i class="mdi mdi-pencil-outline"></i>
             </a>
-            <a class="btn btn-sm btn-outline-danger btn-icon" href="{% url 'extras:notificationchannel_delete' record.pk %}" title="Delete">
+            <a class="btn btn-sm btn-outline-danger btn-icon"
+               href="{% url 'extras:notificationchannel_delete' record.pk %}"
+               title="{{ delete }}"
+               aria-label="{{ delete }}">
                 <i class="mdi mdi-trash-can-outline"></i>
             </a>
         </div>
         """,
+        extra_context={
+            "send_test_notification": _("Send test notification"),
+            "edit": _("Edit"),
+            "delete": _("Delete"),
+        },
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
@@ -535,9 +557,9 @@ class AlertLogTable(BaseTable):
                 <form method="post" action="{% url 'extras:alertlog_acknowledge' record.pk %}" class="d-inline">
                     {% csrf_token %}
                     <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Acknowledge">
+                    <button type="submit" class="btn btn-sm btn-outline-warning" title="{{ acknowledge }}">
                         <i class="mdi mdi-eye-outline"></i>
-                        Acknowledge
+                        {{ acknowledge }}
                     </button>
                 </form>
             {% endif %}
@@ -545,14 +567,15 @@ class AlertLogTable(BaseTable):
                 <form method="post" action="{% url 'extras:alertlog_resolve' record.pk %}" class="d-inline">
                     {% csrf_token %}
                     <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                    <button type="submit" class="btn btn-sm btn-outline-success" title="Resolve">
+                    <button type="submit" class="btn btn-sm btn-outline-success" title="{{ resolve }}">
                         <i class="mdi mdi-check"></i>
-                        Resolve
+                        {{ resolve }}
                     </button>
                 </form>
             {% endif %}
         </div>
         """,
+        extra_context={"acknowledge": _("Acknowledge"), "resolve": _("Resolve")},
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
@@ -569,7 +592,7 @@ class AlertLogTable(BaseTable):
         sequence = ("pk", "created_at", "rule", "subject", "severity", "status", "delivery", "actions")
         empty_text = _("All clear. No alerts match the current filters.")
 
-    def render_severity(self, value):
+    def render_severity(self, value, record):
         color = "secondary"
         if value == AlertRule.SEVERITY_INFO:
             color = "info"
@@ -577,9 +600,9 @@ class AlertLogTable(BaseTable):
             color = "warning"
         elif value == AlertRule.SEVERITY_CRITICAL:
             color = "danger"
-        return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
+        return format_html('<span class="badge bg-{}">{}</span>', color, record.get_severity_display())
 
-    def render_status(self, value):
+    def render_status(self, value, record):
         color = "secondary"
         if value == AlertLog.STATUS_ACTIVE:
             color = "danger"
@@ -587,7 +610,7 @@ class AlertLogTable(BaseTable):
             color = "warning"
         elif value == AlertLog.STATUS_RESOLVED:
             color = "success"
-        return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
+        return format_html('<span class="badge bg-{}">{}</span>', color, record.get_status_display())
 
     def render_delivery(self, record):
         outcome = record.delivery_outcome or AlertLog.DELIVERY_OUTCOME_NONE
@@ -595,27 +618,30 @@ class AlertLogTable(BaseTable):
         if outcome == AlertLog.DELIVERY_OUTCOME_NONE:
             if statuses.get("__no_channels__"):
                 return format_html(
-                    '<span class="badge bg-secondary" title="{}">none</span>',
+                    '<span class="badge bg-secondary" title="{}">{}</span>',
                     _("No channels attached to this rule"),
+                    _("None"),
                 )
             return format_html(
-                '<span class="text-muted" title="{}">&mdash;</span>',
+                '<span class="text-muted" title="{}">{}</span>',
                 _("No delivery planned (muted rule or never dispatched)"),
+                _("Not sent"),
             )
         if outcome == AlertLog.DELIVERY_OUTCOME_PENDING:
-            return format_html('<span class="badge bg-info" title="{}">pending</span>', _("Dispatch pending"))
+            return format_html('<span class="badge bg-info" title="{}">{}</span>', _("Dispatch pending"), _("Pending"))
         if outcome == AlertLog.DELIVERY_OUTCOME_DELIVERED:
             failed = _failed_channel_summary(statuses)
             if failed:
                 return format_html(
-                    '<span class="badge bg-warning text-dark" title="{}">delivered*</span>',
+                    '<span class="badge bg-warning text-dark" title="{}">{}</span>',
                     f"{_('Delivered with channel failures')}: {failed}",
+                    _("Delivered with failures"),
                 )
             return format_html(
-                '<span class="badge bg-success" title="{}">delivered</span>', _("All channels delivered")
+                '<span class="badge bg-success" title="{}">{}</span>', _("All channels delivered"), _("Delivered")
             )
         failed = _failed_channel_summary(statuses) or _("Delivery failed")
-        return format_html('<span class="badge bg-danger" title="{}">failed</span>', failed)
+        return format_html('<span class="badge bg-danger" title="{}">{}</span>', failed, _("Failed"))
 
 
 def _failed_channel_summary(statuses):
@@ -714,19 +740,24 @@ class ScheduledReportTable(BaseTable):
             <form method="post" action="{% url 'extras:scheduledreport_trigger' record.pk %}" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                <button type="submit" class="btn btn-sm btn-outline-primary d-flex align-items-center" title="Run Now">
+                <button type="submit" class="btn btn-sm btn-outline-primary d-flex align-items-center" title="{{ run_now }}">
                     <i class="mdi mdi-play"></i>
-                    <span class="ms-1 d-none d-md-inline">Run Now</span>
+                    <span class="ms-1 d-none d-md-inline">{{ run_now }}</span>
                 </button>
             </form>
-            <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'extras:scheduledreport_update' record.pk %}" title="Edit">
+            <a class="btn btn-sm btn-outline-secondary btn-icon"
+               href="{% url 'extras:scheduledreport_update' record.pk %}"
+               title="{{ edit }}">
                 <i class="mdi mdi-pencil-outline"></i>
             </a>
-            <a class="btn btn-sm btn-outline-danger btn-icon" href="{% url 'extras:scheduledreport_delete' record.pk %}" title="Delete">
+            <a class="btn btn-sm btn-outline-danger btn-icon"
+               href="{% url 'extras:scheduledreport_delete' record.pk %}"
+               title="{{ delete }}">
                 <i class="mdi mdi-trash-can-outline"></i>
             </a>
         </div>
         """,
+        extra_context={"run_now": _("Run now"), "edit": _("Edit"), "delete": _("Delete")},
         verbose_name=_("Actions"),
         orderable=False,
         attrs={

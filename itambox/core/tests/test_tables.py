@@ -1,8 +1,11 @@
 import datetime
 import uuid
+from types import SimpleNamespace
 
+import django_tables2 as tables
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.utils import translation
 from model_bakery import baker
 
 from assets.models import (
@@ -13,14 +16,84 @@ from assets.models import (
     Warranty,
     WarrantyTypeChoices,
 )
-from assets.tables import AssetTable, WarrantyTable
+from assets.tables import AssetMaintenanceTable, AssetTable, AssetTypeTable, WarrantyTable
 from core.models import ObjectChange
-from core.tables import AssigneeColumn, BaseTable, ObjectChangeTable
+from core.tables import AssigneeColumn, BaseTable, BooleanColumn, ObjectChangeTable
+from core.templatetags.utility_tags import localize_journal_comment
 from extras.models import NotificationChannel
+from extras.tables import JournalEntryTable
 from itambox.middleware import _request_id
 from organization.models import Location, Site
 
 User = get_user_model()
+
+
+class BaseTableEmptyValueTest(SimpleTestCase):
+    def test_empty_cells_render_translated_default(self):
+        class EmptyValueTable(BaseTable):
+            value = tables.Column()
+
+            class Meta:
+                fields = ("value",)
+
+        table = EmptyValueTable([{"value": None}])
+        request = RequestFactory().get("/")
+        rendered = table.as_html(request)
+
+        self.assertIn("Not set", rendered)
+        self.assertNotIn("—", rendered)
+        self.assertNotIn("–", rendered)
+
+
+class TableLocalizationTests(SimpleTestCase):
+    def test_boolean_empty_label_resolves_when_the_cell_is_rendered(self):
+        column = BooleanColumn()
+
+        with translation.override("de"):
+            self.assertIn("Nicht festgelegt", str(column.render(None)))
+        with translation.override("en"):
+            self.assertIn("Not set", str(column.render(None)))
+
+    def test_subscription_renewal_journal_is_localized_only_when_rendered(self):
+        comment = "Renewed subscription. Next renewal date: 2026-09-01. Cost: Not set EUR."
+
+        with translation.override("de"):
+            self.assertEqual(
+                localize_journal_comment(comment),
+                "Abonnement verlängert. Nächster Verlängerungstermin: 2026-09-01. Kosten: Nicht festgelegt EUR.",
+            )
+            self.assertIn(
+                "Kosten: Nicht festgelegt EUR.",
+                localize_journal_comment("Renewed subscription. Next renewal date: 2026-09-01. Cost: — EUR."),
+            )
+        with translation.override("en"):
+            self.assertEqual(localize_journal_comment(comment), comment)
+        self.assertEqual(localize_journal_comment("A user-written journal entry."), "A user-written journal entry.")
+
+    def test_journal_table_uses_the_render_time_localization_helper(self):
+        with translation.override("de"):
+            rendered = JournalEntryTable([]).render_comment(
+                "Renewed subscription. Next renewal date: 2026-09-01. Cost: 12.50 EUR."
+            )
+
+        self.assertIn("Abonnement verlängert", rendered)
+        self.assertIn("Kosten: 12.50 EUR", rendered)
+
+
+class AssetTableLocalizationTest(SimpleTestCase):
+    def test_duration_renderers_use_german_plural_forms(self):
+        with translation.override("de"):
+            self.assertEqual(AssetTypeTable([]).render_eol_months(1), "1 Monat")
+            self.assertEqual(AssetTypeTable([]).render_eol_months(2), "2 Monate")
+            self.assertEqual(AssetMaintenanceTable([]).render_downtime_days(0), "Am selben Tag")
+            self.assertEqual(AssetMaintenanceTable([]).render_downtime_days(1), "1 Tag")
+            self.assertEqual(AssetMaintenanceTable([]).render_downtime_days(2), "2 Tage")
+
+    def test_overdue_tooltip_is_translated(self):
+        record = SimpleNamespace(audit_due_date=datetime.date(2026, 8, 30), audit_overdue=True)
+        with translation.override("de"):
+            rendered = AssetTable([]).render_audit_due_date(record)
+        self.assertIn('title="Überfällig"', rendered)
 
 
 class IDColumnTestCase(TestCase):
@@ -152,9 +225,9 @@ class CoreTablesTestCase(TestCase):
         rendered_1 = column.render(asset_checked_out.pk, asset_checked_out, col_bound, table)
         self.assertIn(f'Location: <a href="{location.get_absolute_url()}">{location.name}</a>', rendered_1)
 
-        # Render check for Asset 2 (available)
-        rendered_2 = column.render(asset_available.pk, asset_available, col_bound, table)
-        self.assertEqual(rendered_2, column.EMPTY_MARK)
+        with translation.override("de"):
+            rendered_2 = column.render(asset_available.pk, asset_available, col_bound, table)
+        self.assertIn("Nicht festgelegt", rendered_2)
 
     def test_table_optimizations(self):
         class DummyTable(BaseTable):

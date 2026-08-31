@@ -178,14 +178,14 @@ class SeedCatalogMixin:
                 "months": 36,
                 "method": "straight_line",
                 "convention": "include_purchase_month",
-                "description": "AfA-Tabelle 2021 — Computer, Notebooks, Tablets: 3 Jahre",
+                "description": "AfA-Tabelle 2021: Computer, Notebooks, Tablets (3 Jahre)",
             },
             {
                 "name": "Server 60 Monate (AfA)",
                 "months": 60,
                 "method": "straight_line",
                 "convention": "include_purchase_month",
-                "description": "AfA-Tabelle 2021 — Server / Workstations: 5 Jahre",
+                "description": "AfA-Tabelle 2021: Server und Workstations (5 Jahre)",
             },
             {
                 "name": "Sofortabschreibung GWG (≤ 800 €)",
@@ -193,7 +193,7 @@ class SeedCatalogMixin:
                 "method": "straight_line",
                 "convention": "include_purchase_month",
                 "immediate_expense_threshold": "800.00",
-                "description": "Geringwertige Wirtschaftsgüter §6 Abs. 2 EStG — Sofortabschreibung bis 800 €",
+                "description": "Geringwertige Wirtschaftsgüter nach § 6 Abs. 2 EStG: Sofortabschreibung bis 800 €",
             },
         ]
         self._demo_depreciation_afa = None

@@ -4,6 +4,7 @@
 
 # itambox/templatetags/utility_tags.py
 import json
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
 from django import template
@@ -20,6 +21,39 @@ register = template.Library()
 def lookup(dictionary, key):
     """Enable dictionary lookup by variable key in templates."""
     return dictionary.get(key)
+
+
+@register.filter
+def absolute(value):
+    """Return the absolute numeric value for count-aware display copy."""
+    try:
+        return abs(value)
+    except (TypeError, ValueError):
+        return value
+
+
+@register.filter
+def localize_journal_comment(comment):
+    """Translate the stable subscription renewal journal format at render time."""
+    if not isinstance(comment, str):
+        return comment
+    prefix = "Renewed subscription. Next renewal date: "
+    separator = ". Cost: "
+    if not comment.startswith(prefix) or separator not in comment or not comment.endswith("."):
+        return comment
+    renewal_date, cost_and_currency = comment[len(prefix) : -1].split(separator, 1)
+    if " " not in cost_and_currency:
+        return comment
+    renewal_cost, currency = cost_and_currency.rsplit(" ", 1)
+    try:
+        Decimal(renewal_cost)
+    except InvalidOperation:
+        renewal_cost = _("Not set")
+    return _("Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s.") % {
+        "renewal_date": renewal_date,
+        "renewal_cost": renewal_cost,
+        "currency": currency,
+    }
 
 
 @register.simple_tag(takes_context=True)

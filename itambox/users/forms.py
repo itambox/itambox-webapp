@@ -41,6 +41,12 @@ class UserForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ["username", "first_name", "last_name", "email", "is_active", "can_login", "is_staff", "is_superuser"]
+        help_texts = {
+            "can_login": _(
+                "If unchecked, this user cannot sign in with a password or SSO. "
+                "API tokens and the account's active status are unaffected."
+            ),
+        }
         widgets = {
             "username": forms.TextInput(attrs={"class": "form-control"}),
             "first_name": forms.TextInput(attrs={"class": "form-control"}),
@@ -420,7 +426,7 @@ class UserBulkEditForm(BulkEditForm):
             label=_("Active"),
             widget=forms.Select(
                 choices=(
-                    (None, _("— No Change —")),
+                    (None, _("No change")),
                     (True, _("Yes")),
                     (False, _("No")),
                 ),
@@ -432,7 +438,7 @@ class UserBulkEditForm(BulkEditForm):
             label=_("Staff"),
             widget=forms.Select(
                 choices=(
-                    (None, _("— No Change —")),
+                    (None, _("No change")),
                     (True, _("Yes")),
                     (False, _("No")),
                 ),
@@ -444,7 +450,7 @@ class UserBulkEditForm(BulkEditForm):
             label=_("Superuser"),
             widget=forms.Select(
                 choices=(
-                    (None, _("— No Change —")),
+                    (None, _("No change")),
                     (True, _("Yes")),
                     (False, _("No")),
                 ),
@@ -456,7 +462,7 @@ class UserBulkEditForm(BulkEditForm):
             label=_("Can log in"),
             widget=forms.Select(
                 choices=(
-                    (None, _("— No Change —")),
+                    (None, _("No change")),
                     (True, _("Yes")),
                     (False, _("No")),
                 ),
@@ -487,7 +493,7 @@ class UserBulkEditForm(BulkEditForm):
                 # If they are superuser, these fields aren't disabled and we validate they aren't None.
                 # If they aren't superuser, they were already validated/gated above, so we only need to validate fields that aren't disabled (i.e. is_active).
                 if val is None and (self.request_user and self.request_user.is_superuser or field_name == "is_active"):
-                    self.add_error(field_name, _("Please select Yes or No for this field."))
+                    self.add_error(field_name, _("Select Yes or No for this field."))
 
         return cleaned_data
 
@@ -525,7 +531,7 @@ class GroupManagedRoleGrantForm(forms.Form):
     managed_scope = forms.ChoiceField(
         choices=(
             (SCOPE_EXPLICIT, _("Specific tenants")),
-            (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group + its descendants")),
+            (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group and its subgroups")),
             (RoleGrantScope.SCOPE_ALL_MANAGED, _("All managed tenants")),
         ),
         initial=SCOPE_EXPLICIT,
@@ -572,9 +578,9 @@ class GroupManagedRoleGrantForm(forms.Form):
         owner = self._owner
         role = cleaned["role"]
         if owner is None or not owner.is_provider:
-            raise forms.ValidationError(_("Managed group grants require a managing provider tenant."))
+            raise forms.ValidationError(_("Only a tenant that manages other tenants can assign group roles there."))
         if role.tenant_id != owner.pk:
-            self.add_error("role", _("The role must be owned by the group tenant."))
+            self.add_error("role", _("Choose a role from this group's tenant."))
             return cleaned
 
         scope = cleaned.get("managed_scope") or self.SCOPE_EXPLICIT
@@ -602,7 +608,7 @@ class GroupManagedRoleGrantForm(forms.Form):
             if any(tenant.managed_by_id != owner.pk for tenant in assigned):
                 self.add_error(
                     "assigned_tenants",
-                    _("Every selected tenant must be managed by the group owner."),
+                    _("Choose only tenants managed by this group's tenant."),
                 )
                 return cleaned
             requested_tenant_ids = {tenant.pk for tenant in assigned}
@@ -652,15 +658,15 @@ class BaseGroupManagedRoleGrantFormSet(forms.BaseFormSet):
                 tenant_ids = {tenant.pk for tenant in cleaned.get("assigned_tenants") or []}
                 overlap = explicit_tenants_by_role.setdefault(role_id, set()) & tenant_ids
                 if overlap:
-                    raise forms.ValidationError(_("The same role targets a managed tenant more than once."))
+                    raise forms.ValidationError(_("The same role includes a managed tenant more than once."))
                 explicit_tenants_by_role[role_id].update(tenant_ids)
                 signature = None
             if signature is not None and signature in signatures:
-                raise forms.ValidationError(_("A managed grant scope is duplicated."))
+                raise forms.ValidationError(_("The same role and coverage are listed more than once."))
             if signature is not None:
                 signatures.add(signature)
         if any(row_count_by_role[role_id] > 1 for role_id in all_managed_roles):
-            raise forms.ValidationError(_("All managed tenants already cover every narrower scope for that role."))
+            raise forms.ValidationError(_("'All managed tenants' already covers every other selection for that role."))
 
 
 GroupManagedRoleGrantFormSet = forms.formset_factory(
@@ -695,9 +701,9 @@ class UserGroupForm(forms.ModelForm):
     roles = forms.ModelMultipleChoiceField(
         queryset=Role._base_manager.none(),
         required=False,
-        label=_("Roles in owning tenant"),
+        label=_("Roles in this tenant"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
-        help_text=_("Owner-owned roles that apply inside the group's own tenant."),
+        help_text=_("Roles that group members receive in this tenant."),
     )
     members = forms.ModelMultipleChoiceField(
         queryset=Membership.objects.none(),
@@ -705,9 +711,8 @@ class UserGroupForm(forms.ModelForm):
         label=_("Members"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
         help_text=_(
-            "Active memberships in the owning tenant can be added. Existing "
-            "inactive rows remain visible; directory-managed rows must be "
-            "removed through their identity source."
+            "Only active members of this tenant can be added. Existing inactive members remain visible. "
+            "To remove a directory-managed member, update the connected directory."
         ),
     )
     tenant = forms.ModelChoiceField(
@@ -715,7 +720,7 @@ class UserGroupForm(forms.ModelForm):
         required=True,
         label=_("Owning tenant"),
         widget=forms.Select(attrs={"class": "form-select"}),
-        help_text=_("The tenant/provider that owns this group and its member identities."),
+        help_text=_("The tenant that owns this group and its members."),
     )
     is_active = forms.BooleanField(
         required=False,
@@ -833,7 +838,7 @@ class UserGroupForm(forms.ModelForm):
                 "description",
                 "is_active",
             ),
-            Fieldset(str(_("Owning tenant roles")), "roles"),
+            Fieldset(str(_("Roles in this tenant")), "roles"),
             Fieldset(str(_("Members")), "members"),
         )
 
@@ -908,17 +913,17 @@ class UserGroupForm(forms.ModelForm):
         owner = cleaned_data.get("tenant")
 
         if owner is None:
-            self.add_error("tenant", _("Every user group must have an owning tenant."))
+            self.add_error("tenant", _("Choose the tenant that owns this user group."))
             return cleaned_data
 
         if self.instance.pk and (owner.pk != self.instance.tenant_id or self._submitted_owner_changed):
-            self.add_error("tenant", _("A user group owner cannot be changed."))
+            self.add_error("tenant", _("The tenant that owns a user group cannot be changed."))
 
         roles = list(cleaned_data.get("roles") or [])
         if any(role.tenant_id != owner.pk for role in roles):
             self.add_error(
                 "roles",
-                _("A group may carry only roles owned by its owning tenant."),
+                _("Choose only roles owned by the group's tenant."),
             )
 
         memberships = list(cleaned_data.get("members") or [])
@@ -931,7 +936,7 @@ class UserGroupForm(forms.ModelForm):
         ):
             self.add_error(
                 "members",
-                _("Every group member must be an active Membership in the owning tenant."),
+                _("New group members must be active members of the group's tenant."),
             )
 
         existing_own_role_ids = set(

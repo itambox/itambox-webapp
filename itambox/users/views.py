@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
+from django.utils.translation import ngettext
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView, UpdateView, View
 from django.views.generic.base import TemplateResponseMixin
@@ -877,7 +878,12 @@ class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
                     deleted_count += 1
             messages.success(
                 request,
-                _("Successfully deleted %(count)d user group(s).") % {"count": deleted_count},
+                ngettext(
+                    "Deleted %(count)d user group.",
+                    "Deleted %(count)d user groups.",
+                    deleted_count,
+                )
+                % {"count": deleted_count},
             )
             return HttpResponseRedirect(return_url)
         else:

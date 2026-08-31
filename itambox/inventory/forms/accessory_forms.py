@@ -3,6 +3,7 @@ from crispy_forms.layout import HTML, Column, Layout, Row, Submit
 from django import forms
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Category, Manufacturer, Supplier
@@ -64,6 +65,9 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
             "allow_overallocate": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+        help_texts = {
+            "ean": _("Barcode (EAN, UPC, or GTIN). Scan it to open this item."),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -73,7 +77,7 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
         self.helper.form_tag = True
         self.fields["slug"].widget.attrs["slugify"] = "name"
 
-        button_text = "Update" if self.instance.pk else "Create"
+        button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse("inventory:accessory_list")
 
         self.helper.layout = Layout(
@@ -90,7 +94,7 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
             "notes",
             HTML('<div class="mt-3">'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(format_html('<a href="{}" class="btn btn-outline-secondary ms-2">{}</a>', cancel_url, _("Cancel"))),
             HTML("</div>"),
         )
         self.append_custom_fields_to_layout()
@@ -114,7 +118,7 @@ class AccessoryStockForm(forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
-        button_text = "Update" if self.instance.pk else "Create"
+        button_text = _("Update") if self.instance.pk else _("Create")
         self.helper.layout = Layout(
             "accessory",
             "location",

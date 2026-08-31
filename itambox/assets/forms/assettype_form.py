@@ -61,6 +61,7 @@ class AssetTypeForm(SlugModelForm):
         }
         help_texts = {
             "slug": _("URL-friendly identifier. Leave blank to auto-generate."),
+            "ean": _("Barcode (EAN, UPC, or GTIN). Scan this barcode to view assets of this type."),
         }
 
     def __init__(self, *args, **kwargs):

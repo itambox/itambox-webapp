@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% load i18n %}
-{% block title %}{% translate "Who Has Access" %} — {{ tenant.name }} {% translate "— ITAMbox" %}{% endblock %}
+{% block title %}{% translate "Who Has Access" %}: {{ tenant.name }} | ITAMbox{% endblock %}
 {% block page_header %}
   <div class="page-pretitle">{% translate "Organization / Tenants" %}</div>
-  <h2 class="page-title">{% translate "Who Has Access" %} — {{ tenant.name }}</h2>
+  <h2 class="page-title">{% translate "Who Has Access" %}: {{ tenant.name }}</h2>
 {% endblock %}
 {% block page_actions %}
   <a href="{% url 'organization:tenant_detail' pk=tenant.pk %}"
@@ -36,7 +36,7 @@
                       <details>
                         <summary>
                           <span class="badge bg-secondary-lt">{{ entry.permissions|length }}</span>
-                          <span class="text-muted small ms-1">{% translate "show codenames" %}</span>
+                          <span class="text-muted small ms-1">{% translate "show permission codes" %}</span>
                         </summary>
                         <ul class="list-inline mb-0 mt-2">
                           {% for codename in entry.permissions %}

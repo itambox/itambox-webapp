@@ -3,7 +3,6 @@
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 # 
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
@@ -114,318 +113,6 @@ msgstr "Hinzugefügt: %(label)s"
 msgid "You do not have permission to do this."
 msgstr "Sie haben dazu keine Berechtigung."
 
-#: .\static\dist\itambox.js:1
-msgid "Visual inventory compilation."
-msgstr "Visuelle Inventarzusammenstellung."
-
-#: .\static\dist\itambox.js:1
-msgid "Asset Tag"
-msgstr "Inventarnummer"
-
-#: .\static\dist\itambox.js:1
-msgid "Asset Name"
-msgstr "Asset-Name"
-
-#: .\static\dist\itambox.js:1
-msgid "Manufacturer"
-msgstr "Hersteller"
-
-#: .\static\dist\itambox.js:1
-msgid "Model"
-msgstr "Modell"
-
-#: .\static\dist\itambox.js:1
-msgid "Serial Number"
-msgstr "Seriennummer"
-
-#: .\static\dist\itambox.js:1
-msgid "Status Label"
-msgstr "Status-Label"
-
-#: .\static\dist\itambox.js:1
-msgid "Location"
-msgstr "Lagerort"
-
-#: .\static\dist\itambox.js:1
-msgid "Asset Holder"
-msgstr "Asset-Inhaber"
-
-#: .\static\dist\itambox.js:1
-msgid "Purchase Cost"
-msgstr "Anschaffungskosten"
-
-#: .\static\dist\itambox.js:1
-msgid "Purchase Date"
-msgstr "Kaufdatum"
-
-#: .\static\dist\itambox.js:1
-msgid "Warranty (Months)"
-msgstr "Garantie (Monate)"
-
-#: .\static\dist\itambox.js:1
-msgid "License Name"
-msgstr "Lizenzname"
-
-#: .\static\dist\itambox.js:1
-msgid "Software"
-msgstr "Software"
-
-#: .\static\dist\itambox.js:1
-msgid "Total Seats"
-msgstr "Gesamtplätze"
-
-#: .\static\dist\itambox.js:1
-msgid "Assigned Seats"
-msgstr "Zugewiesene Plätze"
-
-#: .\static\dist\itambox.js:1
-msgid "Available Seats"
-msgstr "Verfügbare Plätze"
-
-#: .\static\dist\itambox.js:1
-msgid "Utilization Rate"
-msgstr "Auslastungsrate"
-
-#: .\static\dist\itambox.js:1
-msgid "Subscription Name"
-msgstr "Abonnementname"
-
-#: .\static\dist\itambox.js:1
-msgid "Provider"
-msgstr "Anbieter"
-
-#: .\static\dist\itambox.js:1
-msgid "Billing Cycle"
-msgstr "Abrechnungszyklus"
-
-#: .\static\dist\itambox.js:1
-msgid "Cost"
-msgstr "Kosten"
-
-#: .\static\dist\itambox.js:1
-msgid "End Date"
-msgstr "Enddatum"
-
-#: .\static\dist\itambox.js:1
-msgid "Salvage Value"
-msgstr "Restwert"
-
-#: .\static\dist\itambox.js:1
-msgid "Depreciation Lifespan (Months)"
-msgstr "Abschreibungsdauer (Monate)"
-
-#: .\static\dist\itambox.js:1
-msgid "Depreciated Value"
-msgstr "Abgeschriebener Wert"
-
-#: .\static\dist\itambox.js:1
-msgid "Software Product"
-msgstr "Softwareprodukt"
-
-#: .\static\dist\itambox.js:1
-msgid "Installed Count"
-msgstr "Anzahl Installationen"
-
-#: .\static\dist\itambox.js:1
-msgid "License Count"
-msgstr "Anzahl Lizenzen"
-
-#: .\static\dist\itambox.js:1
-msgid "Maintenance Title"
-msgstr "Wartungsbezeichnung"
-
-#: .\static\dist\itambox.js:1
-msgid "Asset"
-msgstr "Asset"
-
-#: .\static\dist\itambox.js:1
-msgid "Type"
-msgstr "Typ"
-
-#: .\static\dist\itambox.js:1
-msgid "Status"
-msgstr "Status"
-
-#: .\static\dist\itambox.js:1
-msgid "Contract #"
-msgstr "Vertragsnr."
-
-#: .\static\dist\itambox.js:1
-msgid "Contract Name"
-msgstr "Vertragsname"
-
-#: .\static\dist\itambox.js:1
-msgid "Contract Type"
-msgstr "Vertragstyp"
-
-#: .\static\dist\itambox.js:1
-msgid "Contract Status"
-msgstr "Vertragsstatus"
-
-#: .\static\dist\itambox.js:1
-msgid "Supplier"
-msgstr "Lieferant"
-
-#: .\static\dist\itambox.js:1
-msgid "Start Date"
-msgstr "Startdatum"
-
-#: .\static\dist\itambox.js:1
-msgid "Renewal Date"
-msgstr "Verlängerungsdatum"
-
-#: .\static\dist\itambox.js:1
-msgid "Days Until Expiry"
-msgstr "Tage bis Ablauf"
-
-#: .\static\dist\itambox.js:1
-msgid "Contract Cost"
-msgstr "Vertragskosten"
-
-#: .\static\dist\itambox.js:1
-msgid "Auto-Renew"
-msgstr "Autom. Verlängerung"
-
-#: .\static\dist\itambox.js:1
-msgid "Covered Assets"
-msgstr "Abgedeckte Assets"
-
-#: .\static\dist\itambox.js:1
-msgid "SLA Response Time"
-msgstr "SLA-Reaktionszeit"
-
-#: .\static\dist\itambox.js:1
-msgid "SLA Resolution Time"
-msgstr "SLA-Lösungszeit"
-
-#: .\static\dist\itambox.js:1
-msgid "Coverage Hours"
-msgstr "Abdeckungszeiten"
-
-#: .\static\dist\itambox.js:1
-msgid "Warranty Type"
-msgstr "Garantieart"
-
-#: .\static\dist\itambox.js:1
-msgid "Days Remaining"
-msgstr "Verbleibende Tage"
-
-#: .\static\dist\itambox.js:1
-msgid "Warranty Cost"
-msgstr "Garantiekosten"
-
-#: .\static\dist\itambox.js:1
-msgid "Reference"
-msgstr "Referenz"
-
-#: .\static\dist\itambox.js:1
-msgid "Disposal Date"
-msgstr "Entsorgungsdatum"
-
-#: .\static\dist\itambox.js:1
-msgid "Disposal Method"
-msgstr "Entsorgungsmethode"
-
-#: .\static\dist\itambox.js:1
-msgid "Data Sanitization Method"
-msgstr "Datenlöschmethode"
-
-#: .\static\dist\itambox.js:1
-msgid "Sanitization Certificate"
-msgstr "Zertifikat zur Datenlöschung"
-
-#: .\static\dist\itambox.js:1
-msgid "Sanitized By"
-msgstr "Bereinigt von"
-
-#: .\static\dist\itambox.js:1
-msgid "Recipient"
-msgstr "Empfänger"
-
-#: .\static\dist\itambox.js:1
-msgid "Proceeds"
-msgstr "Erlös"
-
-#: .\static\dist\itambox.js:1
-msgid "WEEE Compliant"
-msgstr "WEEE-konform"
-
-#: .\static\dist\itambox.js:1
-msgid "Notes"
-msgstr "Notizen"
-
-#: .\static\dist\itambox.js:1
-msgid "Item Type"
-msgstr "Artikeltyp"
-
-#: .\static\dist\itambox.js:1
-msgid "Name"
-msgstr "Name"
-
-#: .\static\dist\itambox.js:1
-msgid "Category"
-msgstr "Kategorie"
-
-#: .\static\dist\itambox.js:1
-msgid "Part Number"
-msgstr "Teilenummer"
-
-#: .\static\dist\itambox.js:1
-msgid "Total Stock"
-msgstr "Gesamtbestand"
-
-#: .\static\dist\itambox.js:1
-msgid "Available"
-msgstr "Verfügbar"
-
-#: .\static\dist\itambox.js:1
-msgid "Safety Threshold"
-msgstr "Sicherheitsbestand"
-
-#: .\static\dist\itambox.js:1
-msgid "Stock Status"
-msgstr "Bestandsstatus"
-
-#: .\static\dist\itambox.js:1
-msgid "Holder"
-msgstr "Asset-Inhaber"
-
-#: .\static\dist\itambox.js:1
-msgid "Acceptance Status"
-msgstr "Annahmestatus"
-
-#: .\static\dist\itambox.js:1
-msgid "Accepted Date"
-msgstr "Annahmedatum"
-
-#: .\static\dist\itambox.js:1
-msgid "EULA Version"
-msgstr "EULA-Version"
-
-#: .\static\dist\itambox.js:1
-msgid "Signature Provider"
-msgstr "Signaturanbieter"
-
-#: .\static\dist\itambox.js:1
-msgid "QMS Reference"
-msgstr "QMS-Referenz"
-
-#: .\static\dist\itambox.js:1
-msgid "IP Address"
-msgstr "IP-Adresse"
-
-#: .\static\dist\itambox.js:1
-msgid "Created Date"
-msgstr "Erstellungsdatum"
-
-#: .\static\dist\itambox.js:170
-msgid "No records found."
-msgstr "Keine Datensätze gefunden."
-
-#: .\static\dist\itambox.js:179
-msgid "Sent automatically by ITAMbox — IT Asset Management Console."
-msgstr "Automatisch versendet von ITAMbox — IT-Asset-Management-Konsole."
-
 #: .\static\dist\itambox.js:189
 msgid "Move Up"
 msgstr "Nach oben"
@@ -449,14 +136,6 @@ msgstr "Ausgewählte Reihenfolge (sortierbar)"
 #: .\static\dist\itambox.js:215
 msgid "Available Columns"
 msgstr "Verfügbare Spalten"
-
-#: .\static\dist\itambox.js:221
-msgid "Bootstrap from Visual Builder"
-msgstr "Aus dem visuellen Builder übernehmen"
-
-#: .\static\dist\itambox.js:221
-msgid "Are you sure you want to overwrite the current custom template with the selections from the Visual Builder?"
-msgstr "Möchten Sie die aktuelle benutzerdefinierte Vorlage wirklich mit den Auswahlen aus dem visuellen Builder überschreiben?"
 
 #: .\static\dist\itambox.js:221
 msgid "Preview Report"
@@ -514,94 +193,111 @@ msgstr "Keine weiteren Ergebnisse"
 msgid "option_create"
 msgstr "Option erstellen"
 
-msgid "Contract Renewals & Expirations"
-msgstr "Vertragsverlängerungen & -abläufe"
-
-msgid "Warranty Expiration"
-msgstr "Garantieablauf"
-
-msgid "Asset Disposal & End-of-Life"
-msgstr "Anlagenentsorgung & End-of-Life"
-
-msgid "Hardware Inventory (Accessories, Consumables, Components)"
-msgstr "Hardware-Bestand (Zubehör, Verbrauchsmaterial, Komponenten)"
-
-msgid "Custody & EULA Sign-off Compliance"
-msgstr "Verwahrungs- & EULA-Bestätigungs-Compliance"
-
-msgid "PDF Attachment"
-msgstr "PDF-Anhang"
-
-msgid "Excel (XLSX) Attachment"
-msgstr "Excel (XLSX)-Anhang"
-
-msgid "Out of Stock"
-msgstr "Nicht vorrätig"
-
-msgid "Low Stock"
-msgstr "Geringer Bestand"
-
-msgid "In Stock"
-msgstr "Vorrätig"
-
-msgid "Uncategorized"
-msgstr "Nicht kategorisiert"
-
-msgid "Active Contracts"
-msgstr "Aktive Verträge"
-
-msgid "Expiring Within 30 Days"
-msgstr "Ablauf innerhalb von 30 Tagen"
-
-msgid "Est. Annual Spend"
-msgstr "Geschätzte Jahresausgaben"
-
-msgid "Total Warranties"
-msgstr "Garantien gesamt"
-
-msgid "Already Expired"
-msgstr "Bereits abgelaufen"
-
-msgid "Total Disposals"
-msgstr "Entsorgungen gesamt"
-
-msgid "WEEE Compliant Count"
-msgstr "Anzahl WEEE-konform"
-
-msgid "Total Proceeds"
-msgstr "Erlöse gesamt"
-
-msgid "Total Receipts"
-msgstr "Belege gesamt"
-
-msgid "Pending Sign-offs"
-msgstr "Ausstehende Bestätigungen"
-
-msgid "Acceptance Rate"
-msgstr "Annahmequote"
-
-msgid "Accessory SKUs"
-msgstr "Zubehör-SKUs"
-
-msgid "Consumable SKUs"
-msgstr "Verbrauchsmaterial-SKUs"
-
-msgid "Component SKUs"
-msgstr "Komponenten-SKUs"
-
-msgid "Items at Zero Stock"
-msgstr "Artikel ohne Bestand"
-
-msgid "Hardware Inventory by Type"
-msgstr "Hardware-Bestand nach Typ"
-
-msgid "Annual Spend by Supplier"
-msgstr "Jährliche Ausgaben nach Lieferant"
-
-#: .\static\dist\itambox.js:1
-msgid "%(count)s assets from another tenant are kept aside — switching the target tenant shows them."
-msgstr "Assets aus einem anderen Mandanten werden zurückgehalten (%(count)s) — beim Wechsel des Ziel-Mandanten werden sie angezeigt."
-
 #: .\static\dist\itambox.js:1
 msgid "Select a target tenant before scanning."
 msgstr "Wählen Sie vor dem Scannen einen Ziel-Mandanten aus."
+
+#: .\static\dist\itambox.js:1
+#, javascript-format
+msgid "%(count)s asset from another tenant is kept aside. Switch the target tenant to see it."
+msgid_plural "%(count)s assets from another tenant are kept aside. Switch the target tenant to see them."
+msgstr[0] "%(count)s Asset aus einem anderen Mandanten wird zurückgehalten. Wechseln Sie den Ziel-Mandanten, um es anzuzeigen."
+msgstr[1] "%(count)s Assets aus einem anderen Mandanten werden zurückgehalten. Wechseln Sie den Ziel-Mandanten, um sie anzuzeigen."
+
+#: .\static\dist\itambox.js:1
+msgid "Not set"
+msgstr "Nicht festgelegt"
+
+#: .\static\dist\itambox.js:1
+msgid "Supplier"
+msgstr "Lieferant"
+
+#: .\static\dist\itambox.js:1
+msgid "Start Date"
+msgstr "Startdatum"
+
+#: .\static\dist\itambox.js:1
+msgid "Renewal Date"
+msgstr "Verlängerungsdatum"
+
+#: .\static\dist\itambox.js:1
+msgid "Covered Assets"
+msgstr "Abgedeckte Assets"
+
+#: .\static\dist\itambox.js:1
+msgid "Warranty Type"
+msgstr "Garantieart"
+
+#: .\static\dist\itambox.js:1
+msgid "Warranty Cost"
+msgstr "Garantiekosten"
+
+#: .\static\dist\itambox.js:1
+msgid "Reference"
+msgstr "Referenz"
+
+#: .\static\dist\itambox.js:1
+msgid "Sanitization Certificate"
+msgstr "Zertifikat zur Datenlöschung"
+
+#: .\static\dist\itambox.js:1
+msgid "Recipient"
+msgstr "Empfänger"
+
+#: .\static\dist\itambox.js:1
+msgid "Notes"
+msgstr "Notizen"
+
+#: .\static\dist\itambox.js:1
+msgid "Item Type"
+msgstr "Artikeltyp"
+
+#: .\static\dist\itambox.js:1
+msgid "Name"
+msgstr "Name"
+
+#: .\static\dist\itambox.js:1
+msgid "Category"
+msgstr "Kategorie"
+
+#: .\static\dist\itambox.js:1
+msgid "Part Number"
+msgstr "Teilenummer"
+
+#: .\static\dist\itambox.js:1
+msgid "Total Stock"
+msgstr "Gesamtbestand"
+
+#: .\static\dist\itambox.js:1
+msgid "Available"
+msgstr "Verfügbar"
+
+#: .\static\dist\itambox.js:1
+msgid "Safety Threshold"
+msgstr "Sicherheitsbestand"
+
+#: .\static\dist\itambox.js:1
+msgid "Stock Status"
+msgstr "Bestandsstatus"
+
+#: .\static\dist\itambox.js:1
+msgid "Holder"
+msgstr "Asset-Inhaber"
+
+#: .\static\dist\itambox.js:1
+msgid "Signature Provider"
+msgstr "Signaturanbieter"
+
+#: .\static\dist\itambox.js:1
+msgid "Created Date"
+msgstr "Erstellungsdatum"
+
+#: .\static\dist\itambox.js:1
+msgid "IP Address"
+msgstr "IP-Adresse"
+
+#, javascript-format
+msgid "Dispose of %(count)s asset?"
+msgid_plural "Dispose of %(count)s assets?"
+msgstr[0] "%(count)s Asset entsorgen?"
+msgstr[1] "%(count)s Assets entsorgen?"

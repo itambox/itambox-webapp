@@ -12,9 +12,9 @@ from organization.models import AssetHolder, Location
 
 class AssetCheckOutForm(forms.Form):
     TARGET_CHOICES = [
-        ("holder", "Asset Holder"),
-        ("location", "Location"),
-        ("asset", "Asset"),
+        ("holder", _("Asset Holder")),
+        ("location", _("Location")),
+        ("asset", _("Asset")),
     ]
 
     target_type = forms.ChoiceField(

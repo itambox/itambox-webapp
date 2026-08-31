@@ -65,7 +65,7 @@ class TenantRoleCloneTests(TestCase):
             user=self.superuser,
         )
         self.assertFalse(form.is_valid())
-        self.assertIn("No tenant context", str(form.errors))
+        self.assertIn("Open this form from a tenant", str(form.errors))
 
     def test_form_on_clone_prechecks_permissions_from_active_tenant_context(self):
         set_current_tenant(self.tenant_a)

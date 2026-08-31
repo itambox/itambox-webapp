@@ -189,7 +189,9 @@ class ObjectDetailView(
 
         context.update(self._build_mutation_context(obj, app_label, model_name))
 
-        context["title"] = str(obj)
+        object_display = self.get_object_display(obj)
+        context["object_display"] = object_display
+        context["title"] = object_display
         base_breadcrumbs = [
             (reverse("dashboard"), _("Dashboard")),
             (reverse(get_model_viewname(obj, "list")), verbose_name_plural),
@@ -225,3 +227,7 @@ class ObjectDetailView(
             shared_content_type,
             core_context=context,
         )
+
+    def get_object_display(self, obj):
+        """Return the presentation label without changing the model string contract."""
+        return str(obj)

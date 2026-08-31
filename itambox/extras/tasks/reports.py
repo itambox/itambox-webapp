@@ -70,7 +70,7 @@ def _report_filename(template, extension):
 
 
 def _attachment_email_body(format_name, template):
-    return _("Please find attached the scheduled %(format)s report for '%(name)s' generated on %(timestamp)s UTC.") % {
+    return _("Attached is the scheduled %(format)s report for '%(name)s', generated on %(timestamp)s UTC.") % {
         "format": format_name,
         "name": template.name,
         "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",
@@ -192,7 +192,7 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
         _("Rows: %(n)s") % {"n": total_rows}
     )
     report_body = _(
-        "Scheduled report '%(name)s' was successfully generated on %(timestamp)s UTC.\nFormat: %(format)s\n%(summary)s"
+        "Scheduled report '%(name)s' was generated on %(timestamp)s UTC.\nFormat: %(format)s\n%(summary)s"
     ) % {
         "name": sched.name,
         "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",

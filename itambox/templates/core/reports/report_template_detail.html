@@ -59,7 +59,7 @@
               </tr>
               <tr>
                 <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Description" %}</td>
-                <td class="text-wrap text-break">{{ object.description|default:"&mdash;" }}</td>
+                <td class="text-wrap text-break">{% if object.description %}{{ object.description }}{% else %}{% translate "No description" %}{% endif %}</td>
               </tr>
               <tr>
                 <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Report Type" %}</td>

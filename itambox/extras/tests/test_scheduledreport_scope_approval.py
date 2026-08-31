@@ -96,7 +96,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
     def test_approve_post_refuses_when_reach_does_not_cover_scope(self):
         response = self._client_for(self.partial).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
-        self.assertContains(response, "reach does not cover")
+        self.assertContains(response, "Your permission does not cover these tenants")
 
     def test_approve_of_single_tenant_schedule_is_rejected(self):
         self.sched.filter_tenants.clear()
@@ -118,7 +118,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         response = self._client_for(self.partial).post(self.url, {"action": "revoke"}, follow=True)
         authorization = ScheduledReportScopeAuthorization.objects.get(scheduled_report=self.sched)
         self.assertFalse(authorization.is_revoked())
-        self.assertContains(response, "The revocation would not be effective")
+        self.assertContains(response, "The revocation would not take effect")
 
     def test_approve_after_revoke_clears_the_revocation(self):
         client = self._client_for(self.admin)
@@ -157,7 +157,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         ):
             response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
-        self.assertContains(response, "resolves to a live tenant")
+        self.assertContains(response, "Some tenants in this scope are no longer available")
 
     def test_approve_refused_when_a_scope_tenant_is_soft_deleted(self):
         self.tenant_b.delete()
@@ -203,7 +203,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         RoleGrant.objects.filter(membership__user=self.operator, role__tenant=self.tenant_b).delete()
         response = self._client_for(self.admin).get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "no longer takes effect")
+        self.assertContains(response, "The approval is no longer valid")
 
     def test_off_host_return_url_is_sanitized(self):
         response = self._client_for(self.admin).post(

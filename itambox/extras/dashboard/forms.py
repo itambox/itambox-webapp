@@ -17,7 +17,7 @@ class DashboardWidgetAddForm(forms.Form):
         super().__init__(*args, **kwargs)
         widgets = get_registered_widgets()
         self.fields["widget"].choices = [
-            (w.widget_id, f"{w.title} — {w.description}") for w in sorted(widgets, key=lambda w: w.title)
+            (w.widget_id, f"{w.title}: {w.description}") for w in sorted(widgets, key=lambda w: w.title)
         ]
 
 

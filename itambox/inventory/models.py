@@ -39,7 +39,9 @@ class AssignmentWriteProtectionMixin:
 
     @staticmethod
     def _deny_bulk_write():
-        raise ValidationError(_("Assignments must be mutated through the authorized inventory service."))
+        raise ValidationError(
+            _("This assignment cannot be changed here. Use the authorized checkout or check-in action.")
+        )
 
     def _cascade_allows(self, operation, values=None):
         pks = tuple(self.values_list("pk", flat=True))

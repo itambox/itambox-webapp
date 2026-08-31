@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 import {
@@ -25,6 +26,8 @@ import {
 const itamboxRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const sourceDir = resolve(itamboxRoot, 'static/src');
 const poPath = resolve(itamboxRoot, 'locale/de/LC_MESSAGES/djangojs.po');
+const repositoryRoot = resolve(itamboxRoot, '..');
+const forbiddenDashForms = ['\u2013', '\u2014', '&ndash;', '&mdash;', '&#8211;', '&#8212;', '\\u2013', '\\u2014'];
 
 // ---------------------------------------------------------------------------
 // PO reader unit coverage (catalogue features actually supported by the gate)
@@ -296,4 +299,31 @@ test('catalogue parity: every static gettext()/ngettext() source message has a v
   );
 
   assert.equal(report.messages.length > 0, true, 'expected at least one static source message');
+});
+
+test('product language: JavaScript sources and all server-rendered surfaces contain no en/em dash forms', () => {
+  const report = inventory({ sourceDir, poPath });
+  const jsViolations = [];
+  for (const message of report.messages) {
+    for (const [field, value] of [['msgid', message.msgid], ['msgid_plural', message.plural]]) {
+      if (value === null) continue;
+      for (const forbidden of forbiddenDashForms) {
+        if (value.includes(forbidden)) {
+          jsViolations.push(`${message.path}:${message.line} ${field} contains ${JSON.stringify(forbidden)}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(jsViolations, [], jsViolations.join('\n'));
+
+  const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const result = spawnSync(python, ['scripts/check_product_language.py'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(
+    result.status,
+    0,
+    `product-language dash gate failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+  );
 });

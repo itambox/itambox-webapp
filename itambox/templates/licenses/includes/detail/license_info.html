@@ -48,7 +48,7 @@
   <dt class="col-sm-3">{% translate "Cost Center:" %}</dt>
   <dd class="col-sm-9">
     {% if object.cost_center %}
-      <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+      <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{% if object.cost_center.code %}{{ object.cost_center.code }}: {% endif %}{{ object.cost_center.name }}</a>
     {% else %}
       <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}

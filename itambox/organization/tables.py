@@ -114,7 +114,7 @@ class SiteTable(BaseTable):
                 color_class,
                 display,
             )
-        return "—"
+        return _("Not set")
 
 
 class LocationTable(BaseTable):
@@ -144,7 +144,7 @@ class LocationTable(BaseTable):
                 color_class,
                 display,
             )
-        return "—"
+        return _("Not set")
 
 
 class TenantGroupTable(BaseTable):
@@ -247,18 +247,23 @@ class AssetAssignmentTable(BaseTable):
         default_columns = ("asset", "asset_tag", "asset_role", "checked_out_at", "expected_checkin_date", "checkin_btn")
 
     def render_asset_role(self, value):
-        return value.name if value else "—"
+        return value.name if value else _("No role")
 
     def render_checkin_btn(self, record):
         request = getattr(self, "request", None)
         if not request or not self.has_perm(request.user, "assets.change_asset", record.asset):
-            return mark_safe('<span class="text-muted small">—</span>')
+            return format_html('<span class="text-muted small">{}</span>', _("Not available"))
 
         url = reverse("assets:asset_checkin", kwargs={"pk": record.asset.pk})
+        checkin_label = _("Check in")
         return format_html(
-            '<div class="d-inline-block"><button type="button" class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none">'
-            '<i class="mdi mdi-keyboard-return"></i> Check-in</button></div>',
+            '<div class="d-inline-block"><button type="button" class="btn btn-sm btn-outline-success text-success" '
+            'hx-post="{}" hx-swap="none" title="{}" aria-label="{}">'
+            '<i class="mdi mdi-keyboard-return"></i> {}</button></div>',
             url,
+            checkin_label,
+            checkin_label,
+            checkin_label,
         )
 
 
@@ -302,10 +307,14 @@ class ContactAssignmentTable(BaseTable):
     priority = tables.Column()
     actions = tables.TemplateColumn(
         template_code="""
-        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-action btn-action-danger px-2" title="Delete">
+        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}"
+           class="btn btn-sm btn-action btn-action-danger px-2"
+           title="{{ delete }}"
+           aria-label="{{ delete }}">
             <i class="mdi mdi-trash-can-outline m-0"></i>
         </a>
         """,
+        extra_context={"delete": _("Delete")},
         verbose_name=_("Actions"),
         orderable=False,
     )
@@ -336,11 +345,11 @@ class RoleTable(BaseTable):
     def render_tenant(self, value, record):
         tenant = record.tenant
         if tenant is None:
-            return "—"
+            return _("Not set")
         return format_html('<a href="{}">{}</a>', tenant.get_absolute_url(), tenant)
 
     def render_shared(self, value, record):
-        return shared_role_badge(record) or "—"
+        return shared_role_badge(record) or _("No")
 
     def render_member_count(self, value, record):
         count = getattr(record, "member_count", 0) or 0
@@ -423,6 +432,12 @@ class CostCenterTable(BaseTable):
         fields = ("pk", "code", "name", "tenant", "parent", "description", "child_count", "is_active", "actions")
         default_columns = ("pk", "code", "name", "tenant", "parent", "child_count", "is_active", "actions")
 
+    def render_parent(self, value):
+        if not value:
+            return _("Not set")
+        label = f"{value.code}: {value.name}" if value.code else value.name
+        return format_html('<a href="{}">{}</a>', value.get_absolute_url(), label)
+
 
 class TenantResourceGrantTable(BaseTable):
     """Grants involving the active tenant (given and received)."""
@@ -475,7 +490,7 @@ class TenantResourceGrantTable(BaseTable):
             "organization.delete_tenantresourcegrant",
             record,
         ):
-            return mark_safe('<span class="text-muted small">&mdash;</span>')
+            return format_html('<span class="text-muted small">{}</span>', _("Not available"))
         revoke_url = reverse("organization:tenantresourcegrant_delete", kwargs={"pk": record.pk})
         return format_html(
             '<a href="{}" class="btn btn-sm btn-outline-danger" title="{}">'

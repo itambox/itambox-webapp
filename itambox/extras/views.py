@@ -14,7 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.html import escape
 from django.utils.http import urlencode
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
 from django_tables2 import RequestConfig
@@ -646,7 +646,7 @@ class AlertBulkAcknowledgeView(_BulkAlertActionView):
         return count
 
     def success_message(self, count):
-        return gettext("%(count)s alert(s) acknowledged.") % {"count": count}
+        return ngettext("%(count)s alert acknowledged.", "%(count)s alerts acknowledged.", count) % {"count": count}
 
 
 class AlertBulkResolveView(_BulkAlertActionView):
@@ -663,7 +663,7 @@ class AlertBulkResolveView(_BulkAlertActionView):
         return count
 
     def success_message(self, count):
-        return gettext("%(count)s alert(s) resolved.") % {"count": count}
+        return ngettext("%(count)s alert resolved.", "%(count)s alerts resolved.", count) % {"count": count}
 
 
 @method_decorator(login_required, name="dispatch")
@@ -1095,11 +1095,11 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         scope_tenants = self._scope_tenants(sched)
         if not scope_tenant_ids:
             raise ValidationError(
-                _("This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored.")
+                _("This schedule has no tenant targets, so a cross-tenant approval cannot be stored.")
             )
         if len(scope_tenants) != len(set(scope_tenant_ids)):
             raise ValidationError(
-                _("Not every tenant in the scope resolves to a live tenant, so the approval would not take effect.")
+                _("Some tenants in this scope are no longer available, so the approval would not take effect.")
             )
         if not self._approval_would_be_effective(sched, scope_tenants):
             missing = [
@@ -1108,7 +1108,10 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
                 if not request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant)
             ]
             raise ValidationError(
-                _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
+                _(
+                    "Your permission does not cover these tenants: %(tenants)s. "
+                    "Update the scope or ask an authorized administrator to approve it."
+                )
                 % {"tenants": ", ".join(missing)}
             )
         # approve() snapshots the scope itself; atomically re-verify the

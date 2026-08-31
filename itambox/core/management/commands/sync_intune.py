@@ -72,7 +72,7 @@ class Command(BaseCommand):
         # Resolve a system/admin user for change-log attribution.
         admin_user = User.objects.filter(is_superuser=True).order_by("pk").first()
         if not admin_user:
-            raise CommandError("No superuser found — create one before running the sync.")
+            raise CommandError("No superuser found. Create one before running the sync.")
 
         job = Job.objects.create(
             name=f"intune-sync:{tenant_slug}",

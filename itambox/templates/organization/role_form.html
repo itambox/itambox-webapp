@@ -28,7 +28,7 @@
               <label class="form-label">{% translate "Tenant" %}</label>
               <input type="text"
                      class="form-control csp-style-6f35bc2732c6"
-                     value="{{ form.owner_tenant.name|default:"—" }}"
+                     value="{% if form.owner_tenant.name %}{{ form.owner_tenant.name }}{% else %}{% translate "Not set" %}{% endif %}"
                      disabled
                      readonly>
               <small class="form-hint text-muted mt-1 csp-style-6131b67a6494">
@@ -53,9 +53,9 @@
             </div>
           {% endif %}
           <hr class="my-4">
-          <h4 class="card-title text-primary mb-3">{% translate "Permissions Matrix" %}</h4>
+          <h4 class="card-title text-primary mb-3">{% translate "Permissions" %}</h4>
           <p class="text-muted mb-4 small">
-            {% translate "Set this role's permissions below. Granular permissions can separate Create and Edit access." %}
+            {% translate "Choose which actions this role allows. Create and edit can be assigned separately." %}
           </p>
           {{ form.preset_field_map|json_script:"role-preset-field-map" }}
           <div class="row mb-4">
@@ -75,7 +75,7 @@
             <table class="table table-hover align-middle border mb-4">
               <thead class="table-light">
                 <tr>
-                  <th class="csp-style-b8b699ddacaf">{% translate "Object / Model" %}</th>
+                  <th class="csp-style-b8b699ddacaf">{% translate "Resource" %}</th>
                   <th class="text-center csp-style-99ef5965e15e">
                     <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Read" %}</div>
                     <div class="d-inline-block">
@@ -117,7 +117,7 @@
                     </div>
                   </th>
                   <th class="text-center csp-style-99ef5965e15e">
-                    <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Row All" %}</div>
+                    <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "All" %}</div>
                     <div class="csp-style-048e9971e577"></div>
                   </th>
                 </tr>
@@ -165,9 +165,9 @@
             </table>
           </div>
           <hr class="my-4">
-          <h4 class="card-title text-primary mb-3">{% translate "Additional Permissions" %}</h4>
+          <h4 class="card-title text-primary mb-3">{% translate "Additional permissions" %}</h4>
           <p class="text-muted mb-4 small">
-            {% translate "Enable special permissions that control administrative or delegated capabilities." %}
+            {% translate "Choose special permissions for administrative and delegated actions." %}
           </p>
           <div class="row">
             {% for label, field in form.custom_permission_fields %}

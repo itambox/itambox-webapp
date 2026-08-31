@@ -298,7 +298,7 @@ class AssetBulkCheckOutForm(BulkTenantSelectionMixin, forms.Form):
             "tenant",
             HTML(
                 '<p class="text-muted small mb-2">%s</p>'
-                % _("Choose exactly one target — a holder, a location, or a parent asset.")
+                % _("Choose exactly one target: a holder, a location, or a parent asset.")
             ),
             "asset_holder",
             "location",

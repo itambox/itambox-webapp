@@ -779,7 +779,7 @@ class AssetMaintenanceAndLifecycleTestCase(_SeededStatusLabelsMixin, TestCase):
             status=self.status,
         )
         self.assertIsNone(asset_no_eol.eol_date)
-        self.assertEqual(asset_no_eol.time_to_eol, "—")
+        self.assertEqual(asset_no_eol.time_to_eol, "Not set")
 
     def test_total_cost_of_ownership_aggregation(self):
         import datetime
@@ -1318,15 +1318,15 @@ class AssetCatalogLocalizationTest(SimpleTestCase):
             "Add new Asset Type": "Neuen Asset-Typ hinzufügen",
             "Add new Location": "Neuen Lagerort hinzufügen",
             "Custody Declined": "Verwahrung abgelehnt",
-            "View Receipt": "Übergabeprotokoll anzeigen",
+            "View Receipt": "Verwahrungsprotokoll anzeigen",
             "Warranty Provider": "Garantieanbieter",
             "Select an Asset Holder.": "Wählen Sie einen Asset-Inhaber als Ziel aus.",
             "The holder has no e-mail address.": "Der Asset-Inhaber hat keine E-Mail-Adresse.",
             bulk_receive_message: (
-                "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen "
+                "Sie nehmen Hardware entgegen, um genehmigte Anforderungen zu erfüllen "
                 "(Anzahl: %(count)s). Geben Sie unten die Seriennummern und individuellen "
                 "Angaben für jedes Asset ein. Beim Anlegen werden die Assets automatisch "
-                "den entsprechenden Anfragen zugewiesen."
+                "den entsprechenden Anforderungen zugewiesen."
             ),
         }
 
@@ -1361,7 +1361,7 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
             "Stock received; requests fulfilled.",
             "The system archives the asset and creates a permanent disposal record for audit.",
             "The system archives each asset and freezes its book value. It skips assets already marked as disposed.",
-            'Dispose of <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s)?',
+            "Dispose of 0 assets?",
             "The system checks in each asset if needed, archives it, and records the disposal. Reversing this is difficult.",
             "No custody receipts exist for this asset.",
             'Set margins to "None" in your print options.',
@@ -1400,9 +1400,9 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
         )
         self.assertEqual(
             translated_bulk_receive,
-            "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen (Anzahl: %(count)s). "
+            "Sie nehmen Hardware entgegen, um genehmigte Anforderungen zu erfüllen (Anzahl: %(count)s). "
             "Geben Sie unten die Seriennummern und individuellen Angaben für jedes Asset ein. "
-            "Beim Anlegen werden die Assets automatisch den entsprechenden Anfragen zugewiesen.",
+            "Beim Anlegen werden die Assets automatisch den entsprechenden Anforderungen zugewiesen.",
         )
         for placeholder in ("%(name)s", "%(tag)s", "%(serial)s", "%(url)s"):
             self.assertEqual(translated_custody.count(placeholder), 1)
@@ -1755,10 +1755,13 @@ class JavaScriptCatalogLocalizationTest(SimpleTestCase):
     # the same identities.
     BULK_BASKET_GERMAN = {
         "Select a target tenant before scanning.": "Wählen Sie vor dem Scannen einen Ziel-Mandanten aus.",
-        ("%(count)s assets from another tenant are kept aside — switching the target tenant shows them."): (
-            "Assets aus einem anderen Mandanten werden zurückgehalten (%(count)s) — "
-            "beim Wechsel des Ziel-Mandanten werden sie angezeigt."
-        ),
+        "%(count)s asset from another tenant is kept aside. Switch the target tenant to see it.": [
+            "%(count)s Asset aus einem anderen Mandanten wird zurückgehalten. "
+            "Wechseln Sie den Ziel-Mandanten, um es anzuzeigen.",
+            "%(count)s Assets aus einem anderen Mandanten werden zurückgehalten. "
+            "Wechseln Sie den Ziel-Mandanten, um sie anzuzeigen.",
+        ],
+        "Not set": "Nicht festgelegt",
     }
 
     EXPECTED_GERMAN = {

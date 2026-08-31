@@ -14,6 +14,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 
 from assets import services
 from assets.models import Asset, AssetDisposal
@@ -104,7 +105,8 @@ def _finish_disposal(
     Notification.objects.create(
         user=ctx.user,
         subject=_("Bulk Disposal Complete"),
-        message=_("Disposed %(count)s asset(s).") % {"count": success_count},
+        message=ngettext("Disposed %(count)s asset.", "Disposed %(count)s assets.", success_count)
+        % {"count": success_count},
         level=Notification.LEVEL_SUCCESS,
         target_url=reverse_job_detail(job.pk),
     )

@@ -1,6 +1,12 @@
 {% load i18n %}
 {% load money %}
-<div class="text-muted small mb-2">{% blocktranslate %}Active subscriptions renewing within {{ days_horizon }} days{% endblocktranslate %}</div>
+<div class="text-muted small mb-2">
+  {% blocktranslate trimmed count count=days_horizon %}
+    Active subscriptions renewing within {{ count }} day
+  {% plural %}
+    Active subscriptions renewing within {{ count }} days
+  {% endblocktranslate %}
+</div>
 {% if upcoming_renewals %}
   <div class="list-group list-group-flush csp-style-4908cb0a1366">
     {% for sub in upcoming_renewals %}
@@ -14,7 +20,7 @@
         </div>
         <div class="d-flex justify-content-between text-muted small">
           <span>{{ sub.provider.name }}</span>
-          <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|money:sub.currency_obj }}{% else %}—{% endif %}</span>
+          <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|money:sub.currency_obj }}{% else %}{% translate "Not set" %}{% endif %}</span>
         </div>
       </div>
     {% endfor %}
@@ -28,5 +34,11 @@
     </div>
   {% endif %}
 {% else %}
-  <div class="text-muted text-center py-4">{% blocktranslate %}No upcoming renewals within {{ days_horizon }} days.{% endblocktranslate %}</div>
+  <div class="text-muted text-center py-4">
+    {% blocktranslate trimmed count count=days_horizon %}
+      No upcoming renewals within {{ count }} day.
+    {% plural %}
+      No upcoming renewals within {{ count }} days.
+    {% endblocktranslate %}
+  </div>
 {% endif %}

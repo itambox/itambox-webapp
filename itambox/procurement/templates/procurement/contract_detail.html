@@ -1,6 +1,10 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n money %}
-{% block page_title %}{{ object.contract_number }} – {{ object.name }}{% endblock %}
+{% block page_title %}{{ object.contract_number }}: {{ object.name }}{% endblock %}
+{% block page_header %}
+  <div class="page-pretitle">{% translate "Contract" %}</div>
+  <h2 class="page-title">{{ object.contract_number }}: {{ object.name }}</h2>
+{% endblock %}
 {% block page_actions %}
   <div class="btn-list">
     <a href="{% url 'procurement:contract_edit' pk=object.pk %}"
@@ -193,7 +197,7 @@
           <div class="datagrid-title">{% translate "Cost Center" %}</div>
           <div class="datagrid-content">
             {% if object.cost_center %}
-              <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+              <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{% if object.cost_center.code %}{{ object.cost_center.code }}: {% endif %}{{ object.cost_center.name }}</a>
 {% else %}-{% endif %}
   </div>
   </div>

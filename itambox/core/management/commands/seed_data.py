@@ -340,7 +340,7 @@ class Command(
         defs = [
             (
                 Asset,
-                "Assets — CSV",
+                "Assets: CSV",
                 "Flat CSV of every asset (tag, name, serial, status).",
                 asset_csv,
                 "text/csv",
@@ -348,7 +348,7 @@ class Command(
             ),
             (
                 Asset,
-                "Assets — JSON",
+                "Assets: JSON",
                 "JSON array of assets for downstream tooling.",
                 asset_json,
                 "application/json",
@@ -356,7 +356,7 @@ class Command(
             ),
             (
                 License,
-                "Licenses — CSV",
+                "Licenses: CSV",
                 "Flat CSV of licenses with seat counts and expiry.",
                 license_csv,
                 "text/csv",

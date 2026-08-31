@@ -26,7 +26,7 @@ class Command(BaseCommand):
             return
 
         for task in failures:
-            self.stdout.write(self.style.ERROR(f"Task {task.id} — {task.name}"))
+            self.stdout.write(self.style.ERROR(f"Task {task.id}: {task.name}"))
             self.stdout.write(f"  func:    {task.func}")
             self.stdout.write(f"  started: {task.started}")
             self.stdout.write(f"  stopped: {task.stopped}")

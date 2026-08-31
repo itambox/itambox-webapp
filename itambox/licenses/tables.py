@@ -110,13 +110,18 @@ class LicenseSeatAssignmentTable(BaseTable):
         {% load i18n %}
         <div class="d-flex gap-1 justify-content-end">
             <button hx-post="{% url 'licenses:license_seat_checkin' record.pk %}"
-                    hx-confirm="Are you sure you want to check in this software license seat?"
-                    class="btn btn-sm btn-outline-danger d-flex align-items-center" title="Check In">
+                    hx-confirm="{{ confirm_check_in }}"
+                    class="btn btn-sm btn-outline-danger d-flex align-items-center"
+                    title="{{ check_in }}">
                 <i class="mdi mdi-account-minus-outline me-1"></i>
-                {% translate "Check In" %}
+                {{ check_in }}
             </button>
         </div>
         """,
+        extra_context={
+            "check_in": _("Check in"),
+            "confirm_check_in": _("Are you sure you want to check in this software license seat?"),
+        },
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
@@ -141,7 +146,7 @@ class LicenseSeatAssignmentTable(BaseTable):
                 holder = target
                 via_asset = True
         if holder is None:
-            return "—"
+            return _("Not set")
         url = reverse("organization:assetholder_detail", kwargs={"pk": holder.pk})
         label = holder.upn or str(holder)
         if via_asset:

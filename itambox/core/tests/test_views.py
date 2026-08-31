@@ -192,7 +192,7 @@ class CoreViewsTestCase(TestCase):
         response = self.client.get(recycle_bin_url)
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Alice ThinkPad")
-        self.assertContains(response, "Recycle Bin — Assets")
+        self.assertContains(response, "Recycle Bin: Assets")
 
         # Soft-delete the asset
         asset.delete()

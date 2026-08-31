@@ -21,4 +21,4 @@ class Command(BaseCommand):
             )
             count += 1
 
-        self.stdout.write(f"{count} rule(s) with withdrawn conditions — these rules will not dispatch in 1.0.")
+        self.stdout.write(f"{count} rule(s) have withdrawn conditions. These rules will not dispatch in 1.0.")

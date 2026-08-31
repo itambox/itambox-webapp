@@ -368,20 +368,20 @@ class SharedRoleNotEditableFromManagedTenantTests(TenantTestMixin, TestCase):
     def test_shared_role_detail_shows_the_shared_by_banner_from_the_managed_tenant(self):
         resp = self.client.get(self._url("organization:role_detail", self.shared_role.pk, self.managed_tenant))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Shared by")
+        self.assertContains(resp, "This role is shared by")
         self.assertContains(resp, self.provider_tenant.name)
 
     def test_local_role_detail_has_no_shared_by_banner(self):
         resp = self.client.get(self._url("organization:role_detail", self.local_role.pk, self.managed_tenant))
         self.assertEqual(resp.status_code, 200)
-        self.assertNotContains(resp, "Shared by")
+        self.assertNotContains(resp, "This role is shared by")
 
     def test_shared_role_owning_tenant_detail_has_no_shared_by_banner(self):
         """Control: viewed from its OWN tenant (role_editable=True), the banner
         must not render even though the role itself is shared_with_managed."""
         resp = self.client.get(self._url("organization:role_detail", self.shared_role.pk, self.provider_tenant))
         self.assertEqual(resp.status_code, 200)
-        self.assertNotContains(resp, "Shared by")
+        self.assertNotContains(resp, "This role is shared by")
 
     def test_shared_role_detail_hides_edit_and_delete_actions_even_for_a_superuser(self):
         """MembershipBackend.has_perm short-circuits True for any superuser

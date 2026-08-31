@@ -69,7 +69,7 @@ class RoleFormOwnerResolutionTests(TenantTestMixin, TestCase):
         form = RoleForm(data={"name": "Homeless"}, user=self.superuser)
         self.assertFalse(form.is_valid())
         errs = " ".join(form.non_field_errors()).lower()
-        self.assertIn("tenant context", errs)
+        self.assertIn("open this form from a tenant", errs)
 
     def test_tenant_kwarg_binds_owner_on_create(self):
         form = RoleForm(data={"name": "Tenant Ops"}, tenant=self.tenant, user=self.superuser)
@@ -559,7 +559,7 @@ class RoleFormPrivilegeTransitionTests(TenantTestMixin, TestCase):
     def test_rejects_elevation_with_permanent_direct_grant(self):
         form = self._elevating_form()
         self.assertFalse(form.is_valid())
-        self.assertIn("direct grants", str(form.non_field_errors()))
+        self.assertIn("assigned directly", str(form.non_field_errors()))
 
     def test_allows_elevation_after_direct_grant_gets_expiration_metadata(self):
         self.direct_grant.reason = "Temporary operational escalation"

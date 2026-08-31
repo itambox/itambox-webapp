@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.utils.html import escape, format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from assets.models import Asset
 from core.html_sanitizer import sanitize_label_html_for_pdf
@@ -174,7 +175,11 @@ def _finalize_label_zip(job, user, zip_buffer: io.BytesIO, rendered: int, total:
     _try_create_notification(
         user,
         subject=_("Label Generation Complete"),
-        message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
+        message=ngettext(
+            "Successfully generated a label batch ZIP for %(count)s asset. Click to download.",
+            "Successfully generated a label batch ZIP for %(count)s assets. Click to download.",
+            rendered,
+        )
         % {"count": rendered},
         level=Notification.LEVEL_SUCCESS,
         target_url=attachment.get_download_url(),
@@ -552,7 +557,11 @@ def _finalize_label_pdf(job, user, log_extra, pdf_bytes, assets, rendered_cards)
     _try_create_notification(
         user,
         subject=_("Label Generation Complete"),
-        message=_("Successfully generated label PDF for %(count)s asset(s). Click to download.")
+        message=ngettext(
+            "Successfully generated a label PDF for %(count)s asset. Click to download.",
+            "Successfully generated a label PDF for %(count)s assets. Click to download.",
+            len(assets),
+        )
         % {"count": len(assets)},
         level=Notification.LEVEL_SUCCESS,
         target_url=attachment.get_download_url(),

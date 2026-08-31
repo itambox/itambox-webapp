@@ -504,7 +504,7 @@ class ServiceErrorPlacementTests(_FormDelegationTestBase):
         self.assertFalse(form.is_valid())
         rows = form.managed_formset.forms
         self.assertEqual(rows[0].errors, {})
-        self.assertIn("granted twice", " ".join(rows[1].non_field_errors()))
+        self.assertIn("appears more than once", " ".join(rows[1].non_field_errors()))
         self.assertEqual(form.managed_formset.non_form_errors(), [])
 
     def test_a_group_row_reaching_no_managed_tenant_is_reported_on_its_field(self):

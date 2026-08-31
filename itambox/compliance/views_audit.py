@@ -11,6 +11,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views.generic import View
 from django_tables2.utils import A
 
@@ -91,23 +92,23 @@ class AuditSessionTable(BaseTable):
         fields = ("pk", "name", "location", "status", "started_at", "completed_at", "actions")
         default_columns = ("pk", "name", "location", "status", "started_at", "completed_at", "actions")
 
-    def render_status(self, value):
+    def render_status(self, value, record):
         badges = {
             "planned": "bg-secondary text-secondary-fg",
             "active": "bg-primary text-primary-fg",
             "completed": "bg-success text-success-fg",
         }
         badge_class = badges.get(value, "bg-secondary text-secondary-fg")
-        display = value.title() if value else "Planned"
+        display = record.get_status_display() if value else _("Planned")
         from django.utils.html import format_html
 
         return format_html('<span class="badge {}">{}</span>', badge_class, display)
 
     def render_location(self, value):
-        return value or "Global (All Locations)"
+        return value or _("Global (All Locations)")
 
     def render_completed_at(self, value):
-        return value.strftime("%Y-%m-%d %H:%M") if value else "—"
+        return value.strftime("%Y-%m-%d %H:%M") if value else _("Not completed")
 
 
 class AuditSessionListView(ObjectListView):
@@ -466,10 +467,19 @@ class AuditSessionFlagMissingView(GenericTransactionView):
 
     def get_success_message(self, result=None):
         if result:
-            return _("%(flagged)s asset(s) flagged as Missing. %(skipped)s skipped (status changed since close).") % {
-                "flagged": result["flagged"],
-                "skipped": result["skipped"],
-            }
+            flagged = result["flagged"]
+            skipped = result["skipped"]
+            flagged_message = ngettext(
+                "%(count)s asset flagged as Missing.",
+                "%(count)s assets flagged as Missing.",
+                flagged,
+            ) % {"count": flagged}
+            skipped_message = ngettext(
+                "%(count)s asset was skipped because its status changed after the audit closed.",
+                "%(count)s assets were skipped because their status changed after the audit closed.",
+                skipped,
+            ) % {"count": skipped}
+            return f"{flagged_message} {skipped_message}"
         return _("Missing assets flagged.")
 
 

@@ -136,8 +136,8 @@ def _render_template_export(request, model, queryset, template_id):
         logger.warning("Export template %s render failed: %s", template.pk, exc)
         messages.error(
             request,
-            _('There was an error rendering the export template "%(name)s": %(error)s')
-            % {"name": template.name, "error": exc},
+            _('The export template "%(name)s" could not be rendered. Try again or contact an administrator.')
+            % {"name": template.name},
         )
         return HttpResponseRedirect(
             safe_return_url(request, request.META.get("HTTP_REFERER"), template.get_absolute_url())
@@ -162,7 +162,7 @@ class ObjectExportView(LoginRequiredMixin, View):
         export_scope = request.GET.get("export_scope", "all").lower()
         queryset = _get_export_queryset(request, model, app_label, model_name, export_scope)
         if queryset is None:
-            return HttpResponseBadRequest(_("Invalid pk value(s)."))
+            return HttpResponseBadRequest(_("One or more selected IDs are invalid."))
 
         if template_id == 0:
             if export_format == "yaml":

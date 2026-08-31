@@ -229,6 +229,9 @@ class ContractForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["cost_center"].label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
 
         # Scope tenant-aware querysets to the active tenant
         from core.managers import get_current_tenant
@@ -318,19 +321,19 @@ class AssetProvisionForm(forms.Form):
         max_length=100,
         required=False,
         label=_("Serial Number"),
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional"}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Optional")}),
     )
     asset_tag = forms.CharField(
         max_length=50,
         required=False,
         label=_("Asset Tag"),
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Auto-generate"}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Generate automatically")}),
     )
     name = forms.CharField(
         max_length=255,
         required=False,
         label=_("Asset Name"),
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Model Name"}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Asset model name")}),
     )
 
 

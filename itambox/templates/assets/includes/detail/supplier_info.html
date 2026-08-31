@@ -1,4 +1,6 @@
 {% load i18n %}
+{% translate "Not set" as not_set %}
+{% translate "No notes" as no_notes %}
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Name:" %}</dt>
   <dd class="col-sm-9">
@@ -24,11 +26,11 @@
   </dd>
   <dt class="col-sm-3">{% translate "Address:" %}</dt>
   <dd class="col-sm-9 text-secondary">
-    {{ object.address|linebreaksbr|default:"—" }}
+    {{ object.address|linebreaksbr|default:not_set }}
   </dd>
   <dt class="col-sm-3">{% translate "Notes:" %}</dt>
   <dd class="col-sm-9 text-secondary">
-    {{ object.notes|linebreaksbr|default:"—" }}
+    {{ object.notes|linebreaksbr|default:no_notes }}
   </dd>
 </dl>
 {% if object.primary_contact %}

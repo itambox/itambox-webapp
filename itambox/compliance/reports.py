@@ -41,7 +41,7 @@ class CustodyComplianceReportProvider(ReportDefinition):
     }
 
     sample_cells = {
-        "custody_asset": "AST-MOCK-001 — MacBook Pro (Mock)",
+        "custody_asset": "AST-MOCK-001: MacBook Pro (Mock)",
         "custody_holder": "Alex Dev (Mock)",
         "custody_status": "Accepted",
         "custody_accepted_date": "2026-06-01 09:00",

@@ -287,12 +287,12 @@
                           <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
                         {% endif %}
                       </td>
-                      <td>{{ child.assigned_target|default:"—" }}</td>
+                      <td>{% if child.assigned_target %}{{ child.assigned_target }}{% else %}{% translate "Not set" %}{% endif %}</td>
                       <td>
                         {% if child.asset %}
                           <a href="{% url 'assets:asset_detail' child.asset.pk %}">{{ child.asset.name }}</a>
                         {% else %}
-                          <span class="text-muted">—</span>
+                          <span class="text-muted">{% translate "Not set" %}</span>
                         {% endif %}
                       </td>
                     </tr>
@@ -323,7 +323,7 @@
               </div>
               <div class="datagrid-item">
                 <div class="datagrid-title">{% translate "Response Date" %}</div>
-                <div class="datagrid-content">{{ object.response_date|date:"Y-m-d H:i"|default:"—" }}</div>
+                <div class="datagrid-content">{% if object.response_date %}{{ object.response_date|date:"Y-m-d H:i" }}{% else %}{% translate "Not set" %}{% endif %}</div>
               </div>
             </div>
             {% if object.response_notes %}

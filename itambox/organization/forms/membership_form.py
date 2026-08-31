@@ -94,7 +94,7 @@ class ManagedRoleGrantForm(forms.Form):
     managed_scope = forms.ChoiceField(
         choices=(
             (SCOPE_EXPLICIT, _("Specific tenants")),
-            (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group + its descendants")),
+            (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group and its subgroups")),
             (RoleGrantScope.SCOPE_ALL_MANAGED, _("All managed tenants")),
         ),
         initial=SCOPE_EXPLICIT,
@@ -116,18 +116,18 @@ class ManagedRoleGrantForm(forms.Form):
     )
     reason = forms.CharField(
         required=False,
-        label=_("Reason"),
+        label=_("Reason for elevated access"),
         widget=forms.Textarea(attrs={"rows": 2}),
-        help_text=_("Required when this is an elevated direct grant."),
+        help_text=_("Required when this role grants elevated access directly to a member."),
     )
     valid_until = forms.DateTimeField(
         required=False,
-        label=_("Valid until"),
+        label=_("Elevated access expires"),
         widget=forms.DateTimeInput(
             format="%Y-%m-%dT%H:%M",
             attrs={"type": "datetime-local"},
         ),
-        help_text=_("Required; must be in the future for elevated direct grants."),
+        help_text=_("Required and must be in the future when this role grants elevated access directly to a member."),
     )
 
     def __init__(self, *args, membership_tenant=None, **kwargs):
@@ -167,13 +167,11 @@ class ManagedRoleGrantForm(forms.Form):
         if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
             cleaned["assigned_tenants"] = []
             if not cleaned.get("scope_group"):
-                self.add_error(
-                    "scope_group", _("A tenant group is required when coverage is 'A tenant group + its descendants'.")
-                )
+                self.add_error("scope_group", _("Choose a tenant group for this coverage."))
         elif scope == SCOPE_EXPLICIT:
             cleaned["scope_group"] = None
             if not cleaned.get("assigned_tenants"):
-                self.add_error("assigned_tenants", _("Pick at least one tenant for 'Specific tenants'."))
+                self.add_error("assigned_tenants", _("Pick at least one tenant."))
         else:  # SCOPE_ALL_MANAGED carries no explicit target of either kind.
             cleaned["scope_group"] = None
             cleaned["assigned_tenants"] = []
@@ -244,9 +242,8 @@ class MembershipForm(forms.ModelForm):
             }
         ),
         help_text=_(
-            "An existing account with this email is reused; otherwise a new "
-            "user without a password is created — send them a password setup "
-            "link afterwards."
+            "If this email belongs to an existing account, that account is reused. "
+            "Otherwise, a new user is created without a password; send them a password setup link afterward."
         ),
     )
     new_user_first_name = forms.CharField(
@@ -266,25 +263,22 @@ class MembershipForm(forms.ModelForm):
         required=False,
         label=_("Roles"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
-        help_text=_(
-            "Roles that apply inside this organization. This tenant's roles, "
-            "plus definitions shared down by its managing organization."
-        ),
+        help_text=_("Roles available in this organization, including roles shared by its managing organization."),
     )
     reason = forms.CharField(
         required=False,
-        label=_("Reason for new elevated direct grants"),
+        label=_("Reason for new elevated access"),
         widget=forms.Textarea(attrs={"rows": 2}),
-        help_text=_("Required when adding an elevated role directly to this membership."),
+        help_text=_("Required when assigning an elevated role directly to this member."),
     )
     valid_until = forms.DateTimeField(
         required=False,
-        label=_("Expiry for new elevated direct grants"),
+        label=_("Expiration for new elevated access"),
         widget=forms.DateTimeInput(
             format="%Y-%m-%dT%H:%M",
             attrs={"type": "datetime-local"},
         ),
-        help_text=_("Required; must be in the future for new elevated direct grants."),
+        help_text=_("Required and must be in the future when assigning an elevated role directly to this member."),
     )
 
     class Meta:
@@ -480,7 +474,7 @@ class MembershipForm(forms.ModelForm):
             items.append("user")
         items.append(
             Fieldset(
-                str(_("This organization — roles")),
+                str(_("This organization's roles")),
                 "own_roles",
                 "reason",
                 "valid_until",
@@ -630,10 +624,7 @@ class MembershipForm(forms.ModelForm):
             self._existing_user_by_email = None
             self.add_error(
                 "new_user_email",
-                _(
-                    "More than one account already uses this email address — "
-                    "resolve the duplicate before adding a membership."
-                ),
+                _("More than one account uses this email address. Resolve the duplicates before adding a membership."),
             )
             return
         if self._existing_user_by_email is None:
@@ -662,7 +653,7 @@ class MembershipForm(forms.ModelForm):
         ):
             self.add_error(
                 "new_user_email",
-                _("%(user)s is already a member of %(tenant)s — edit their membership instead.")
+                _("%(user)s is already a member of %(tenant)s. Edit the existing membership instead.")
                 % {"user": self._existing_user_by_email, "tenant": tenant},
             )
         else:
@@ -867,12 +858,12 @@ class MembershipBulkRoleForm(BulkEditForm):
     )
     reason = forms.CharField(
         required=False,
-        label=_("Reason for elevated direct grants"),
+        label=_("Reason for elevated access"),
         widget=forms.Textarea(attrs={"rows": 2}),
     )
     valid_until = forms.DateTimeField(
         required=False,
-        label=_("Expiry for elevated direct grants"),
+        label=_("Expiration for elevated access"),
         widget=forms.DateTimeInput(
             format="%Y-%m-%dT%H:%M",
             attrs={"type": "datetime-local"},
@@ -892,9 +883,9 @@ class MembershipBulkRoleForm(BulkEditForm):
         cleaned["reason"] = reason
         if privileged:
             if not reason:
-                self.add_error("reason", _("Elevated direct grants require a reason."))
+                self.add_error("reason", _("Directly assigned elevated roles require a reason."))
             if valid_until is None:
-                self.add_error("valid_until", _("Elevated direct grants require an expiration."))
+                self.add_error("valid_until", _("Directly assigned elevated roles require an expiration."))
             elif valid_until <= timezone.now():
                 self.add_error("valid_until", _("The expiration must be in the future."))
         return cleaned

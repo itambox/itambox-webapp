@@ -29,6 +29,15 @@ class AssetReservationDetailView(ObjectDetailView):
 
     layout = (((Panel("info", _("Reservation Details")),),),)
 
+    def get_object_display(self, obj):
+        holder = obj.reserved_for or _("(no holder)")
+        return _("%(asset)s reserved for %(holder)s (%(start)s to %(end)s)") % {
+            "asset": obj.asset,
+            "holder": holder,
+            "start": obj.start_date,
+            "end": obj.end_date,
+        }
+
 
 class AssetReservationEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetReservation.objects.all()
@@ -53,3 +62,12 @@ class AssetReservationDeleteView(ObjectDeleteView):
     model = AssetReservation
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("assets:assetreservation_list")
+
+    def get_object_display(self):
+        holder = self.object.reserved_for or _("(no holder)")
+        return _("%(asset)s reserved for %(holder)s (%(start)s to %(end)s)") % {
+            "asset": self.object.asset,
+            "holder": holder,
+            "start": self.object.start_date,
+            "end": self.object.end_date,
+        }

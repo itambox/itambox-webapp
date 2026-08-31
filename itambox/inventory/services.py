@@ -244,7 +244,7 @@ def create_component_allocation(
     ):
         raise ValidationError(_("Component allocation is not authorized in the active tenant."))
     if system_allow_overallocate and actor is not None:
-        raise ValidationError(_("Only trusted actorless system work may override component availability."))
+        raise ValidationError(_("Only a trusted system process can change this component's availability."))
     provenance = _system_authorization_provenance(actor, system_authorization)
     with transaction.atomic():
         component = type(component)._base_manager.select_for_update().get(pk=component.pk)
@@ -319,7 +319,7 @@ def update_component_allocation(
             user=actor,
         )
         if getattr(resolved_grant, "pk", None) != assignment.resource_grant_id:
-            raise ValidationError(_("Allocation grant provenance cannot be rewritten."))
+            raise ValidationError(_("The source of this allocation cannot be changed."))
 
         provenance = (
             assignment.source_tenant_id,

@@ -12,7 +12,13 @@
   {% if object.assets.exists %}
     <div class="alert alert-warning">
       <h4 class="alert-heading">{% translate "Warning:" %}</h4>
-      <p>{% translate "This asset type is currently assigned to" %} {{ object.assets.count }} {% translate "asset(s)." %}</p>
+      <p>
+        {% blocktranslate trimmed count count=object.assets.count %}
+          This asset type is currently assigned to {{ count }} asset.
+        {% plural %}
+          This asset type is currently assigned to {{ count }} assets.
+        {% endblocktranslate %}
+      </p>
     </div>
   {% endif %}
 {% endblock %}

@@ -57,7 +57,7 @@ class ObjectDeleteView(
         return kwargs
 
     def form_valid(self, form):
-        obj_repr = str(self.object)
+        obj_repr = self.get_object_display()
         model = self.object.__class__
         try:
             self.object.delete()
@@ -82,8 +82,10 @@ class ObjectDeleteView(
             raise ValueError("Cannot determine model for delete view.")
         context["model"] = self.model or model
         context["verbose_name"] = model._meta.verbose_name
+        object_display = self.get_object_display()
+        context["object_display"] = object_display
         context["title"] = _("Delete {verbose_name}: {object}").format(
-            verbose_name=model._meta.verbose_name, object=self.object
+            verbose_name=model._meta.verbose_name, object=object_display
         )
 
         if hasattr(self.object, "get_absolute_url"):
@@ -99,8 +101,12 @@ class ObjectDeleteView(
         base_breadcrumbs = [
             (reverse("dashboard"), _("Dashboard")),
             (context["cancel_url"], model._meta.verbose_name_plural),
-            (None, _("Delete {object}").format(object=self.object)),
+            (None, _("Delete {object}").format(object=object_display)),
         ]
         context["breadcrumbs"] = getattr(self, "get_breadcrumbs", lambda: base_breadcrumbs)()
         context["help_url"] = get_help_url(self, model._meta.app_label, model._meta.model_name)
         return context
+
+    def get_object_display(self):
+        """Return the presentation label without changing the model string contract."""
+        return str(self.object)

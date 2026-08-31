@@ -33,8 +33,8 @@ class Command(BaseCommand):
     help = (
         "Report tenant-integrity violations across all apps (read-only). "
         "Cross-tenant rows are classified; sharing-eligible rows produce "
-        "PROPOSED TenantResourceGrant payloads for operator review — nothing "
-        "is written to the database."
+        "PROPOSED TenantResourceGrant payloads for operator review. The command "
+        "does not write to the database."
     )
 
     def add_arguments(self, parser):

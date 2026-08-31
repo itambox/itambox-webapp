@@ -31,7 +31,11 @@
             <p>{% blocktranslate with imported=import_summary.imported_count total=import_summary.row_count %}Successfully imported <strong>{{ imported }}</strong> of <strong>{{ total }}</strong> records.{% endblocktranslate %}</p>
             {% if import_summary.errors_list %}
               <div class="alert alert-warning mt-3">
-                {% blocktranslate with err_len=import_summary.errors_list|length %}<strong>{{ err_len }}</strong> error(s) occurred during import:{% endblocktranslate %}
+                {% blocktranslate trimmed count count=import_summary.errors_list|length %}
+                  <strong>{{ count }}</strong> error occurred during import:
+                {% plural %}
+                  <strong>{{ count }}</strong> errors occurred during import:
+                {% endblocktranslate %}
                 <ul class="mb-0 mt-2">
                   {% for err in import_summary.errors_list %}
                     <li>{{ err }}</li>
@@ -65,7 +69,7 @@
                       <tr>
                         <td>{{ forloop.counter }}</td>
                         {% for key, value in row.items %}
-                          <td>{{ value|default:"—" }}</td>
+                          <td>{% if value %}{{ value }}{% else %}{% translate "Not set" %}{% endif %}</td>
                         {% endfor %}
                       </tr>
                     {% endfor %}
@@ -220,14 +224,14 @@
                           {% if f.required %}
                             <span class="badge bg-red-lt">{% translate "Required" %}</span>
                           {% else %}
-                            <span class="text-muted">—</span>
+                            <span class="text-muted">{% translate "Optional" %}</span>
                           {% endif %}
                         </td>
                         <td class="font-monospace">
                           {% if f.accessor %}
                             <span class="badge bg-blue-lt">{{ f.accessor }}</span>
                           {% else %}
-                            <span class="text-muted">—</span>
+                            <span class="text-muted">{% translate "Not set" %}</span>
                           {% endif %}
                         </td>
                         <td>

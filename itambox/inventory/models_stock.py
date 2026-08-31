@@ -16,7 +16,9 @@ from .models_assignment_write import assignment_write_is_permitted
 def require_authorized_assignment_creation(assignment_instance: object, is_delete: bool) -> None:
     """Refuse an unpermitted assignment write before stock is touched."""
     if not assignment_write_is_permitted(assignment_instance):
-        raise ValidationError(_("Assignments must be mutated through the authorized inventory service."))
+        raise ValidationError(
+            _("This assignment cannot be changed here. Use the authorized checkout or check-in action.")
+        )
 
 
 def _update_stock(stock_model, item_field, item, location, qty_diff, allow_overallocate):

@@ -736,7 +736,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
 
         assert response.status_code == 400
         assert b"Invalid report template configuration." in response.content
-        assert b"Unknown report column key" in response.content
+        assert b"Unknown report columns" in response.content
         assert b"not_published" in response.content
         build_context.assert_not_called()
 

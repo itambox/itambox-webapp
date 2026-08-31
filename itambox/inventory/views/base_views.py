@@ -8,6 +8,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views.generic import View
 
 from inventory.services import checkout_inventory_item
@@ -190,7 +191,15 @@ def bulk_checkout_inventory(request):
                     messages.error(request, _("Failed to check out stock item."))
 
     if success_count > 0:
-        messages.success(request, _("Successfully checked out %(count)s item(s).") % {"count": success_count})
+        messages.success(
+            request,
+            ngettext(
+                "Successfully checked out %(count)s item.",
+                "Successfully checked out %(count)s items.",
+                success_count,
+            )
+            % {"count": success_count},
+        )
 
     redirect_url = reverse("inventory:inventory_list")
     if model_name_str in ("inventory.accessory", "inventory.accessorystock"):

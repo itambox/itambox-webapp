@@ -20,7 +20,7 @@
   <dt class="col-sm-4">{% translate "Cost Center:" %}</dt>
   <dd class="col-sm-8">
     {% if object.cost_center %}
-      <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+      <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{% if object.cost_center.code %}{{ object.cost_center.code }}: {% endif %}{{ object.cost_center.name }}</a>
     {% else %}
       <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}
@@ -58,7 +58,7 @@
       <span class="text-muted"><i>{% translate "N/A (No Purchase Cost)" %}</i></span>
     {% endif %}
     <br>
-    <small class="text-muted fst-italic">{% translate "Indicative figure for IT asset management and budgeting — not a substitute for your accounting system." %}</small>
+    <small class="text-muted fst-italic">{% translate "This estimate supports IT asset management and budgeting. It does not replace your accounting system." %}</small>
   </dd>
   <dt class="col-sm-4">{% translate "In-Service Date:" %}</dt>
   <dd class="col-sm-8 text-secondary">
@@ -72,16 +72,22 @@
   <dd class="col-sm-8">
     {% if eol_date %}
       {{ eol_date|date:"Y-m-d" }}
-      <span class="badge bg-secondary-lt ms-1">{{ object.asset_type.eol_months }} {% translate "months" %}</span>
+      <span class="badge bg-secondary-lt ms-1">
+        {% blocktranslate trimmed count count=object.asset_type.eol_months %}
+          {{ count }} month
+        {% plural %}
+          {{ count }} months
+        {% endblocktranslate %}
+      </span>
     {% else %}
       <span class="text-muted"><i>{% translate "N/A" %}</i></span>
     {% endif %}
   </dd>
   <dt class="col-sm-4">{% translate "Remaining Lifespan:" %}</dt>
   <dd class="col-sm-8">
-    {% if time_to_eol == 'Expired' %}
+    {% if eol_expired %}
       <span class="badge bg-danger-lt text-danger font-weight-bold text-uppercase">{% translate "Expired (EOL Reached)" %}</span>
-    {% elif time_to_eol != '—' %}
+    {% elif eol_date %}
       <span class="badge bg-success-lt text-success font-weight-bold">{{ time_to_eol }}</span>
     {% else %}
       <span class="text-muted"><i>{% translate "N/A" %}</i></span>
@@ -91,6 +97,12 @@
   <dd class="col-sm-8">
     <span class="h3 font-weight-bold text-success">{{ total_cost_of_ownership|money:object }}</span>
     <br>
-    <small class="text-muted">{% translate "Purchase +" %} {{ object.maintenances.count }} {% translate "repair/maintenance item" %}{{ object.maintenances.count|pluralize }}</small>
+    <small class="text-muted">
+      {% blocktranslate trimmed count count=object.maintenances.count %}
+        Purchase plus {{ count }} repair or maintenance item
+      {% plural %}
+        Purchase plus {{ count }} repair or maintenance items
+      {% endblocktranslate %}
+    </small>
   </dd>
 </dl>

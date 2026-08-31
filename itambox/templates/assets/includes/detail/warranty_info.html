@@ -42,7 +42,7 @@
     {% if object.cost is not None %}
       <strong>{{ object.cost|money:object }}</strong>
     {% else %}
-      <span class="text-muted"><i>—</i></span>
+      <span class="text-muted"><i>{% translate "Not set" %}</i></span>
     {% endif %}
   </dd>
   <dt class="col-sm-4">{% translate "Reference:" %}</dt>

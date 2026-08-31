@@ -49,7 +49,7 @@
               </tr>
               <tr>
                 <td class="text-secondary fw-bold">{% translate "Description" %}</td>
-                <td>{{ object.description|default:"&mdash;" }}</td>
+                <td>{% if object.description %}{{ object.description }}{% else %}{% translate "No description" %}{% endif %}</td>
               </tr>
               <tr>
                 <td class="text-secondary fw-bold">{% translate "Alert Type" %}</td>
@@ -72,7 +72,11 @@
                 <td class="text-secondary fw-bold">{% translate "Re-notify" %}</td>
                 <td>
                   {% if object.renotify_interval_days %}
-                    {% blocktranslate with days=object.renotify_interval_days %}Every {{ days }} day(s) while unresolved{% endblocktranslate %}
+                    {% blocktranslate trimmed count count=object.renotify_interval_days %}
+                      Every {{ count }} day while unresolved
+                    {% plural %}
+                      Every {{ count }} days while unresolved
+                    {% endblocktranslate %}
                   {% else %}
                     {% translate "Once only" %}
                   {% endif %}

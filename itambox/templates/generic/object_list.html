@@ -184,7 +184,7 @@
                         id="bulk-print-template"
                         class="form-select"
                         required>
-                  <option value="">{% translate "— Select a Template —" %}</option>
+                  <option value="">{% translate "Select a template" %}</option>
                   {% for template in label_templates %}
                     <option value="{{ template.pk }}">{{ template.name }}</option>
                   {% empty %}
@@ -240,7 +240,7 @@
               <div class="mb-3" id="bulk-checkout-holder-container">
                 <label for="bulk-checkout-holder" class="form-label">{% translate "Asset Holder" %}</label>
                 <select name="assigned_holder" id="bulk-checkout-holder" class="form-select">
-                  <option value="">{% translate "— Select an Asset Holder —" %}</option>
+                  <option value="">{% translate "Select an asset holder" %}</option>
                   {% for holder in asset_holders %}
                     <option value="{{ holder.pk }}">{{ holder }}</option>
                   {% endfor %}
@@ -253,7 +253,7 @@
                 <select name="assigned_location"
                         id="bulk-checkout-location"
                         class="form-select">
-                  <option value="">{% translate "— Select a Location —" %}</option>
+                  <option value="">{% translate "Select a location" %}</option>
                   {% for location in locations %}
                     <option value="{{ location.pk }}">{{ location }}</option>
                   {% endfor %}
@@ -264,7 +264,7 @@
               <div class="mb-3" id="bulk-checkout-asset-container">
                 <label for="bulk-checkout-asset" class="form-label">{% translate "Asset" %}</label>
                 <select name="assigned_asset" id="bulk-checkout-asset" class="form-select">
-                  <option value="">{% translate "— Select an Asset —" %}</option>
+                  <option value="">{% translate "Select an asset" %}</option>
                   {% for asset in assets %}
                     <option value="{{ asset.pk }}">{{ asset.asset_tag }} - {{ asset.name }}</option>
                   {% endfor %}
@@ -278,7 +278,7 @@
                           id="bulk-checkout-from-location"
                           class="form-select"
                           required>
-                    <option value="">{% translate "— Select Source Location —" %}</option>
+                    <option value="">{% translate "Select a source location" %}</option>
                     {% for location in locations %}
                       <option value="{{ location.pk }}">{{ location }}</option>
                     {% endfor %}
@@ -312,11 +312,11 @@
     </div>
   {% endif %}
 {% endblock page_modals %}
-{% block title %}{{ title|default:_("List View") }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% if title %}{{ title }}{% else %}{% translate "List View" %}{% endif %} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
   {% if base_template != "base_htmx.html" %}<div id="page-header-block">{% endif %}
-  <div class="page-pretitle">{{ pretitle|default:_("Manage") }}</div>
-  <h2 class="page-title">{{ title|default:_("Objects") }}{% include "generic/includes/capability_badge.html" %}</h2>
+  <div class="page-pretitle">{% if pretitle %}{{ pretitle }}{% else %}{% translate "Manage" %}{% endif %}</div>
+  <h2 class="page-title">{% if title %}{{ title }}{% else %}{% translate "Objects" %}{% endif %}{% include "generic/includes/capability_badge.html" %}</h2>
   {% if base_template != "base_htmx.html" %}</div>{% endif %}
 {% endblock %}
 {% block page_actions %}

@@ -76,6 +76,10 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
         help_texts = {
             "name": _("Unique renewal or purchase name (e.g., Office 365 E5 Enterprise Renewal FY26)"),
             "seats": _("Total number of activation seats purchased"),
+            "version": _(
+                "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
+                "Reconciliation ignores the version and runs at the Software level."
+            ),
             "product_key": _("License activation key or volume credential"),
         }
 
@@ -89,6 +93,9 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
             field = self.fields.get(fk_name)
             if field is not None and getattr(field, "queryset", None) is not None:
                 field.queryset = field.queryset.model._default_manager.all()
+        self.fields["cost_center"].label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
         if self.instance and self.instance.pk:
             self.fields["product_key"].initial = self.instance.decrypted_product_key
 

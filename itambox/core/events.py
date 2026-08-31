@@ -322,7 +322,7 @@ def send_notification_to_channel(channel: NotificationChannelRef, subject, body)
             users = list(User.objects.filter(is_staff=True, is_active=True))
 
         if not users:
-            logger.warning("In-App channel '%s': no recipients found — notifications not sent.", channel.name)
+            logger.warning("In-App channel '%s': no recipients found, so notifications were not sent.", channel.name)
             return DeliveryResult(
                 "in_app.deliver", DeliveryDisposition.TERMINAL, True, str(_("No notification recipients were found."))
             )

@@ -1,4 +1,5 @@
 {% load i18n %}
+{% translate "Not set" as not_set %}
 {% load utility_tags %}
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Provider:" %}</dt>
@@ -36,21 +37,31 @@
   {% endif %}
   <dt class="col-sm-3">{% translate "Start Date:" %}</dt>
   <dd class="col-sm-9 text-secondary">
-    {{ object.start_date|date:"Y-m-d"|default:"—" }}
+    {{ object.start_date|date:"Y-m-d"|default:not_set }}
   </dd>
   <dt class="col-sm-3">{% translate "Term:" %}</dt>
-  <dd class="col-sm-9 text-secondary">{% if object.term_months %}{{ object.term_months }} {% translate "months" %}{% else %}—{% endif %}{% if object.billing_cycle %} · {{ object.get_billing_cycle_display }}{% endif %}</dd>
+  <dd class="col-sm-9 text-secondary">{% if object.term_months %}{% blocktranslate trimmed count count=object.term_months %}{{ count }} month{% plural %}{{ count }} months{% endblocktranslate %}{% else %}{% translate "Not set" %}{% endif %}{% if object.billing_cycle %} · {{ object.get_billing_cycle_display }}{% endif %}</dd>
   <dt class="col-sm-3">{% translate "Next Renewal:" %}</dt>
   <dd class="col-sm-9">
-    {{ object.renewal_date|date:"Y-m-d"|default:"—" }}
+    {{ object.renewal_date|date:"Y-m-d"|default:not_set }}
     {% if object.days_until_renewal is not None %}
       <span class="badge {% if object.days_until_renewal < 0 %}bg-danger{% elif object.days_until_renewal <= 30 %}bg-warning{% elif object.days_until_renewal <= 90 %}bg-info{% else %}bg-success{% endif %} ms-1">
         {% if object.days_until_renewal < 0 %}
-          {{ object.days_until_renewal|stringformat:"+d"|slice:"1:" }} {% translate "days overdue" %}
+          {% with days=object.days_until_renewal|absolute %}
+            {% blocktranslate trimmed count count=days %}
+              {{ count }} day overdue
+            {% plural %}
+              {{ count }} days overdue
+            {% endblocktranslate %}
+          {% endwith %}
         {% elif object.days_until_renewal == 0 %}
           {% translate "Today" %}
         {% else %}
-          {{ object.days_until_renewal }} {% translate "days" %}
+          {% blocktranslate trimmed count count=object.days_until_renewal %}
+            {{ count }} day
+          {% plural %}
+            {{ count }} days
+          {% endblocktranslate %}
         {% endif %}
       </span>
     {% endif %}
@@ -70,14 +81,16 @@
   {% if object.cost_center %}
     <dt class="col-sm-3">{% translate "Cost Center:" %}</dt>
     <dd class="col-sm-9">
-      {{ object.cost_center }}
+      {% if object.cost_center.code %}{{ object.cost_center.code }}:&nbsp;{% endif %}{{ object.cost_center.name }}
     </dd>
   {% endif %}
   <dt class="col-sm-3">{% translate "Renewal Cost:" %}</dt>
   <dd class="col-sm-9">
     {% if object.renewal_cost %}
       <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
-    {% else %}—{% endif %}
+    {% else %}
+      {% translate "Not set" %}
+    {% endif %}
   </dd>
   {% if object.annual_cost %}
     <dt class="col-sm-3">{% translate "Est. Annual Cost:" %}</dt>

@@ -143,9 +143,7 @@ class RoleForm(forms.ModelForm):
         cleaned_data = super().clean()
 
         if self.owner_tenant is None:
-            raise forms.ValidationError(
-                _("No tenant context: open this form from a tenant (?tenant=…) or with an active tenant.")
-            )
+            raise forms.ValidationError(_("Open this form from a tenant, or select an active tenant first."))
 
         # Build permission set from the matrix + custom checkboxes.
         assigned_perms = set()
@@ -217,9 +215,9 @@ class RoleForm(forms.ModelForm):
             if unsafe_direct_grants:
                 raise forms.ValidationError(
                     _(
-                        "This role cannot be elevated while it has direct grants without "
-                        "a reason and a future expiration. Move permanent access to a "
-                        "group or update/revoke those direct grants first."
+                        "This role cannot be elevated while it is assigned directly without a reason "
+                        "and a future expiration. Move permanent access to a group, or update or revoke "
+                        "those direct assignments first."
                     )
                 )
         return cleaned_data
@@ -453,13 +451,13 @@ class RoleAssignUsersForm(forms.Form):
     reason = forms.CharField(
         required=False,
         label=_("Reason"),
-        help_text=_("Required when directly assigning an elevated role."),
+        help_text=_("Required when assigning an elevated role directly to a user."),
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
     valid_until = forms.DateTimeField(
         required=False,
         label=_("Valid until"),
-        help_text=_("Required when directly assigning an elevated role."),
+        help_text=_("Required when assigning an elevated role directly to a user."),
         widget=forms.DateTimeInput(
             attrs={"class": "form-control", "type": "datetime-local"},
             format="%Y-%m-%dT%H:%M",
@@ -479,9 +477,9 @@ class RoleAssignUsersForm(forms.Form):
         reason = (cleaned_data.get("reason") or "").strip()
         valid_until = cleaned_data.get("valid_until")
         if not reason:
-            self.add_error("reason", _("Elevated direct grants require a reason."))
+            self.add_error("reason", _("Directly assigned elevated roles require a reason."))
         if valid_until is None:
-            self.add_error("valid_until", _("Elevated direct grants require an expiration."))
+            self.add_error("valid_until", _("Directly assigned elevated roles require an expiration."))
         elif valid_until <= timezone.now():
             self.add_error("valid_until", _("The expiration must be in the future."))
         cleaned_data["reason"] = reason

@@ -34,6 +34,9 @@ class CostCenterDetailView(ObjectDetailView):
 
     layout = (((Panel("info", _("Cost Center Details")),),),)
 
+    def get_object_display(self, obj):
+        return f"{obj.code}: {obj.name}" if obj.code else obj.name
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         cost_center = self.get_object()
@@ -75,6 +78,9 @@ class CostCenterDeleteView(ObjectDeleteView):
     model = CostCenter
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("organization:costcenter_list")
+
+    def get_object_display(self):
+        return f"{self.object.code}: {self.object.name}" if self.object.code else self.object.name
 
 
 class CostCenterBulkEditView(ObjectBulkEditView):

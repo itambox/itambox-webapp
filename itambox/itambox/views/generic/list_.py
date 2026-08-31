@@ -255,7 +255,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         show_deleted = self.request.GET.get("deleted") == "true"
 
         if show_deleted and has_soft_delete:
-            context["title"] = _("Recycle Bin — {verbose_name_plural}").format(
+            context["title"] = _("Recycle Bin: {verbose_name_plural}").format(
                 verbose_name_plural=_model._meta.verbose_name_plural,
             )
             context["pretitle"] = _("Trash")

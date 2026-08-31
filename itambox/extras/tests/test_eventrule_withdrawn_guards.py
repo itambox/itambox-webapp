@@ -138,7 +138,7 @@ class EventRuleWithdrawnUiStatusTests(TenantTestMixin, TestCase):
         )
         self.list_url = reverse("extras:eventrule_list")
 
-    def test_list_table_shows_withdrawn_badge_and_dash(self):
+    def test_list_table_shows_withdrawn_badge_and_empty_marker(self):
         admin = User.objects.create_superuser(username="admin", password="password")
         self.client.force_login(admin)
 
@@ -149,7 +149,7 @@ class EventRuleWithdrawnUiStatusTests(TenantTestMixin, TestCase):
         self.assertIn("Withdrawn rule", content)
         self.assertIn("Withdrawn", content)
         self.assertIn("Plain rule", content)
-        self.assertIn("—", content)
+        self.assertIn("Not set", content)
         # The authored condition JSON must never leak into the list table.
         self.assertNotIn('"field": "model_name"', content)
 

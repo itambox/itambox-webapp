@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views.generic import View
 
 from core.mfa import role_is_privileged
@@ -263,10 +264,8 @@ class RoleDeleteView(ObjectDeleteView):
             .exists()
         ):
             context["extra_warning"] = _(
-                "This role is shared with managed tenants and still has active "
-                "managed scopes. Deleting it does not remove those grants — "
-                "they survive as an audit trail but immediately stop granting "
-                "access."
+                "This role is shared with managed tenants and still grants access there. "
+                "Deleting it preserves the grant records for auditing, but they stop granting access immediately."
             )
         return context
 
@@ -316,7 +315,10 @@ class RoleBulkDeleteView(ObjectBulkDeleteView):
                     for obj in objects_to_delete:
                         obj.delete()
                         count += 1
-                messages.success(request, _("Deleted %(count)d role(s).") % {"count": count})
+                messages.success(
+                    request,
+                    ngettext("Deleted %(count)d role.", "Deleted %(count)d roles.", count) % {"count": count},
+                )
                 return HttpResponseRedirect(return_url)
             except ProtectedError:
                 blocked = ", ".join(str(o) for o in objects_to_delete if o.role_grants.exists())

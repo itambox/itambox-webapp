@@ -12,9 +12,11 @@
     <div class="alert alert-danger" role="alert">
       <h4 class="alert-title">{% translate "Warning: Related Assets" %}</h4>
       <div class="text-secondary">
-        {% translate "There are" %} <strong>{{ related_objects_count }}</strong> {% translate "asset(s) assigned to this role.
-        Deleting this role will prevent these assets from being properly categorized.
-        Consider reassigning assets before deleting this role." %}
+        {% blocktranslate trimmed count count=related_objects_count %}
+          There is <strong>{{ count }}</strong> asset assigned to this role. Deleting this role will prevent the asset from being properly categorized. Consider reassigning it before deleting this role.
+        {% plural %}
+          There are <strong>{{ count }}</strong> assets assigned to this role. Deleting this role will prevent these assets from being properly categorized. Consider reassigning them before deleting this role.
+        {% endblocktranslate %}
       </div>
     </div>
   {% else %}

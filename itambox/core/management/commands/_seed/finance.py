@@ -112,7 +112,7 @@ _CC_TEMPLATES = {
 
 _CONTRACT_TEMPLATES = [
     (
-        "{supplier} Hardware Support — {tenant_code}",
+        "{supplier} Hardware Support: {tenant_code}",
         "maintenance",
         "annual",
         (2_400, 9_600),
@@ -124,7 +124,7 @@ _CONTRACT_TEMPLATES = [
         12,
     ),
     (
-        "{supplier} Premium Care — {tenant_code}",
+        "{supplier} Premium Care: {tenant_code}",
         "maintenance",
         "annual",
         (4_800, 18_000),
@@ -136,7 +136,7 @@ _CONTRACT_TEMPLATES = [
         24,
     ),
     (
-        "{supplier} Network SLA — {tenant_code}",
+        "{supplier} Network SLA: {tenant_code}",
         "support",
         "annual",
         (3_600, 12_000),
@@ -148,7 +148,7 @@ _CONTRACT_TEMPLATES = [
         12,
     ),
     (
-        "{supplier} Software Assurance — {tenant_code}",
+        "{supplier} Software Assurance: {tenant_code}",
         "support",
         "annual",
         (1_200, 6_000),
@@ -160,7 +160,7 @@ _CONTRACT_TEMPLATES = [
         12,
     ),
     (
-        "{supplier} Server Infrastructure SLA — {tenant_code}",
+        "{supplier} Server Infrastructure SLA: {tenant_code}",
         "support",
         "annual",
         (5_000, 22_000),
@@ -172,7 +172,7 @@ _CONTRACT_TEMPLATES = [
         24,
     ),
     (
-        "{supplier} Managed Endpoint Lease — {tenant_code}",
+        "{supplier} Managed Endpoint Lease: {tenant_code}",
         "lease",
         "monthly",
         (800, 3_200),

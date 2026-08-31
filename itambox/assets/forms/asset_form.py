@@ -70,9 +70,9 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
     )
     requestable = forms.ChoiceField(
         choices=[
-            ("", "Inherit from Asset Type (Default)"),
-            ("true", "Yes (Force Requestable)"),
-            ("false", "No (Force Unrequestable)"),
+            ("", _("Inherit from Asset Type (default)")),
+            ("true", _("Yes, force requestable")),
+            ("false", _("No, force not requestable")),
         ],
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -87,7 +87,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
     warranty_type = forms.ChoiceField(
         label=_("Warranty Type"),
         required=False,
-        choices=[("", "---------")] + list(WarrantyTypeChoices.choices),
+        choices=[("", _("Select warranty type"))] + list(WarrantyTypeChoices.choices),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     warranty_start_date = forms.DateField(
@@ -134,7 +134,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "asset_tag": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Leave blank to auto-generate"}
+                attrs={"class": "form-control", "placeholder": _("Leave blank to generate automatically")}
             ),
             "serial_number": forms.TextInput(attrs={"class": "form-control"}),
             "purchase_cost": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
@@ -152,6 +152,11 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             "supplier": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "purchase_order_line": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "cost_center": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+        }
+        help_texts = {
+            "depreciation_override": _(
+                "Override the depreciation policy. Leave empty to use the tenant default or asset-type schedule."
+            ),
         }
 
     def clean_status(self):
@@ -227,6 +232,9 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["cost_center"].label_from_instance = lambda cost_center: (
+            f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
+        )
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True

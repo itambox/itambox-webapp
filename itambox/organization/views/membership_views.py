@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 
@@ -444,7 +444,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
                 self.request,
                 format_html(
                     gettext(
-                        '{user} has no password yet — <a href="{url}">send them a '
+                        '{user} has no password yet. <a href="{url}">Send them a '
                         "password setup link</a> so they can sign in."
                     ),
                     user=str(membership.user),
@@ -458,7 +458,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
                 self.request,
                 _(
                     "%(user)s is now a member of %(tenant)s but has no permissions "
-                    "yet — edit the membership to assign a role."
+                    "yet. Edit the membership to assign a role."
                 )
                 % {"user": membership.user, "tenant": membership.tenant},
             )
@@ -639,7 +639,12 @@ class MembershipBulkEditView(ObjectBulkEditView):
                             )
                         if roles_to_remove:
                             self._remove_own_scopes(obj, roles_to_remove)
-                messages.success(request, _("Updated %(count)d membership(s).") % {"count": len(objects)})
+                count = len(objects)
+                messages.success(
+                    request,
+                    ngettext("Updated %(count)d membership.", "Updated %(count)d memberships.", count)
+                    % {"count": count},
+                )
                 return HttpResponseRedirect(return_url)
         else:
             form = MembershipBulkRoleForm()

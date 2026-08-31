@@ -10,6 +10,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from assets.model_book_value import compute_book_value
 from core.currency import CurrencyField
@@ -243,7 +244,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         return due is not None and timezone.now() > due
 
     def get_status_display(self):
-        return self.status.name if self.status else "—"
+        return self.status.name if self.status else _("Not set")
 
     @property
     def eol_date(self):
@@ -262,16 +263,16 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
             today = datetime.date.today()
             if today >= eol:
-                return "Expired"
+                return str(_("Expired"))
 
             delta = relativedelta(eol, today)
             parts = []
             if delta.years > 0:
-                parts.append(f"{delta.years} year{'s' if delta.years != 1 else ''}")
+                parts.append(ngettext("%(count)s year", "%(count)s years", delta.years) % {"count": delta.years})
             if delta.months > 0:
-                parts.append(f"{delta.months} month{'s' if delta.months != 1 else ''}")
-            return ", ".join(parts) or "Less than a month"
-        return "—"
+                parts.append(ngettext("%(count)s month", "%(count)s months", delta.months) % {"count": delta.months})
+            return ", ".join(parts) or str(_("Less than a month"))
+        return str(_("Not set"))
 
     @property
     def total_cost_of_ownership(self):

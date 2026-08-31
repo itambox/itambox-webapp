@@ -195,7 +195,7 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         if proposed < assigned:
             raise ValidationError(
                 {
-                    "seats": _("Cannot set seats to %(seats)s — %(n)s are already assigned.")
+                    "seats": _("Cannot set the seat count to %(seats)s because %(n)s seats are already assigned.")
                     % {
                         "seats": proposed,
                         "n": assigned,

@@ -1,4 +1,5 @@
 {% load i18n %}
+{% translate "No notes" as no_notes %}
 <dl class="row mb-0">
   <dt class="col-sm-4">{% translate "Requester:" %}</dt>
   <dd class="col-sm-8">
@@ -38,6 +39,6 @@
   </dd>
   <dt class="col-sm-4">{% translate "Requester Notes:" %}</dt>
   <dd class="col-sm-8 text-secondary">
-    {{ object.notes|linebreaksbr|default:"—" }}
+    {{ object.notes|linebreaksbr|default:no_notes }}
   </dd>
 </dl>

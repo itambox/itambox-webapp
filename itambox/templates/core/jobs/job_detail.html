@@ -52,11 +52,11 @@
               </tr>
               <tr>
                 <td><strong>{% translate "Started" %}</strong></td>
-                <td class="text-muted text-end">{% if object.started %}{{ object.started|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</td>
+                <td class="text-muted text-end">{% if object.started %}{{ object.started|date:"Y-m-d H:i:s" }}{% else %}{% translate "Not started" %}{% endif %}</td>
               </tr>
               <tr>
                 <td><strong>{% translate "Completed" %}</strong></td>
-                <td class="text-muted text-end">{% if object.completed %}{{ object.completed|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</td>
+                <td class="text-muted text-end">{% if object.completed %}{{ object.completed|date:"Y-m-d H:i:s" }}{% else %}{% translate "Not completed" %}{% endif %}</td>
               </tr>
               {% if object.result %}
                 <tr>

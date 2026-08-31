@@ -630,30 +630,6 @@
     {
       "path": "itambox/assets/tables.py",
       "code": "B907",
-      "message": "'changelog_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "changelog_li = (\n            f'<li><a class=\"dropdown-item\" href=\"{changelog_url}\">'\n            f'<i class=\"mdi mdi-history me-1\"></i>Changelog</a></li>'\n        )",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
-      "message": "'clone_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += f'<a class=\"btn btn-sm btn-action\" href=\"{clone_url}\" title=\"Copy/Clone\"><i class=\"mdi mdi-content-copy\"></i></a>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Name(id='can_clone', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
-      "message": "'del_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += f'<a class=\"btn btn-sm btn-action btn-action-danger\" href=\"{del_url}\" title=\"Delete\"><i class=\"mdi mdi-trash-can-outline\"></i></a>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):orelse/If:Name(id='can_delete', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
       "message": "'purge_confirm' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "purge_btn = (\n                f'<a class=\"btn btn-sm btn-soft-danger\" href=\"{purge_url}\" '\n                f'hx-post=\"{purge_url}\" hx-target=\"#object-list-dynamic-content\" '\n                f'hx-confirm=\"{purge_confirm}\" '\n                f'title=\"{purge_title}\" aria-label=\"{purge_title}\">'\n                f'<i class=\"mdi mdi-delete-forever\"></i></a>'\n            )",
       "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Compare(left=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='record', ctx=Load()), Constant(value='deleted_at'), Constant(value=None)], keywords=[]), ops=[IsNot()], comparators=[Constant(value=None)]):body",
@@ -698,22 +674,6 @@
       "source": "restore_btn = (\n                f'<a class=\"btn btn-sm btn-soft-success me-1\" href=\"{restore_url}\" '\n                f'hx-post=\"{restore_url}\" hx-target=\"#object-list-dynamic-content\" '\n                f'hx-confirm=\"{restore_confirm}\" '\n                f'title=\"{restore_title}\" aria-label=\"{restore_title}\">'\n                f'<i class=\"mdi mdi-backup-restore\"></i></a>'\n            )",
       "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Compare(left=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='record', ctx=Load()), Constant(value='deleted_at'), Constant(value=None)], keywords=[]), ops=[IsNot()], comparators=[Constant(value=None)]):body",
       "count": 2
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
-      "message": "line too long (134 > 120 characters)",
-      "source": "            html += f'<a class=\"btn btn-sm btn-action\" href=\"{clone_url}\" title=\"Copy/Clone\"><i class=\"mdi mdi-content-copy\"></i></a>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Name(id='can_clone', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
-      "message": "line too long (151 > 120 characters)",
-      "source": "            html += f'<a class=\"btn btn-sm btn-action btn-action-danger\" href=\"{del_url}\" title=\"Delete\"><i class=\"mdi mdi-trash-can-outline\"></i></a>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):orelse/If:Name(id='can_delete', ctx=Load()):body",
-      "count": 1
     },
     {
       "path": "itambox/assets/tables.py",
@@ -4134,14 +4094,6 @@
     {
       "path": "itambox/core/templatetags/utility_tags.py",
       "code": "F401",
-      "message": "'django.utils.translation.gettext_lazy as _' imported but unused",
-      "source": "from django.utils.translation import gettext_lazy as _  # Import gettext_lazy",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "F401",
       "message": "'urllib.parse.urlencode' imported but unused",
       "source": "from urllib.parse import urlencode",
       "context": "Module:body",
@@ -4972,38 +4924,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/tables.py",
-      "code": "B950",
-      "message": "line too long (136 > 120 characters)",
-      "source": "            <a class=\"btn btn-sm btn-outline-danger btn-icon\" href=\"{% url 'extras:scheduledreport_delete' record.pk %}\" title=\"Delete\">",
-      "context": "Module:body/ClassDef:ScheduledReportTable:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tables.py",
-      "code": "B950",
-      "message": "line too long (137 > 120 characters)",
-      "source": "            <a class=\"btn btn-sm btn-outline-secondary btn-icon\" href=\"{% url 'extras:scheduledreport_update' record.pk %}\" title=\"Edit\">",
-      "context": "Module:body/ClassDef:ScheduledReportTable:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tables.py",
-      "code": "B950",
-      "message": "line too long (140 > 120 characters)",
-      "source": "            <a class=\"btn btn-sm btn-outline-danger btn-icon\" href=\"{% url 'extras:notificationchannel_delete' record.pk %}\" title=\"Delete\">",
-      "context": "Module:body/ClassDef:NotificationChannelTable:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tables.py",
-      "code": "B950",
-      "message": "line too long (141 > 120 characters)",
-      "source": "            <a class=\"btn btn-sm btn-outline-secondary btn-icon\" href=\"{% url 'extras:notificationchannel_update' record.pk %}\" title=\"Edit\">",
-      "context": "Module:body/ClassDef:NotificationChannelTable:body",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/tests/test_bookmarks_watch.py",
       "code": "B017",
       "message": "`assertRaises(Exception)` and `pytest.raises(Exception)` should be considered evil. They can lead to your test passing even if the code being tested is never executed due to a typo. Assert for a more specific exception (builtin or custom), or use `assertRaisesRegex` (if using `assertRaises`), or add the `match` keyword argument (if using `pytest.raises`), or use the context manager form with a target.",
@@ -5553,46 +5473,6 @@
       "message": "'.kit_forms.KitItemForm' imported but unused",
       "source": "from .kit_forms import (",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/forms/accessory_forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(Column(\"manufacturer\", css_class=\"col-md-6\"), Column(\"name\", css_class=\"col-md-6\")),\n            Row(\n                Column(\"supplier\", css_class=\"col-md-4\"),\n                Column(\"part_number\", css_class=\"col-md-4\"),\n                Column(\"ean\", css_class=\"col-md-4\"),\n            ),\n            Row(Column(\"slug\", css_class=\"col-md-6\"), Column(\"category\", css_class=\"col-md-6\")),\n            Row(Column(\"min_qty\", css_class=\"col-md-6\"), Column(\"tenant\", css_class=\"col-md-6\")),\n            Row(Column(\"allow_overallocate\", css_class=\"col-md-6\")),\n            Row(Column(\"tags\", css_class=\"col-md-12\")),\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:AccessoryForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/forms/component_forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(Column(\"component\", css_class=\"col-md-6\"), Column(\"from_location\", css_class=\"col-md-6\")),\n            Row(\n                Column(\"assigned_holder\", css_class=\"col-md-4\"),\n                Column(\"assigned_location\", css_class=\"col-md-4\"),\n                Column(\"assigned_asset\", css_class=\"col-md-4\"),\n            ),\n            Row(\n                Column(\"qty\", css_class=\"col-md-6\"),\n            ),\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:ComponentAllocationForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/forms/component_forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(Column(\"component\", css_class=\"col-md-6\"), Column(\"location\", css_class=\"col-md-6\")),\n            \"qty\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:ComponentStockForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/forms/component_forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(Column(\"manufacturer\", css_class=\"col-md-6\"), Column(\"name\", css_class=\"col-md-6\")),\n            Row(\n                Column(\"supplier\", css_class=\"col-md-4\"),\n                Column(\"part_number\", css_class=\"col-md-4\"),\n                Column(\"ean\", css_class=\"col-md-4\"),\n            ),\n            Row(Column(\"slug\", css_class=\"col-md-6\"), Column(\"category\", css_class=\"col-md-6\")),\n            Row(Column(\"min_qty\", css_class=\"col-md-6\"), Column(\"tenant\", css_class=\"col-md-6\")),\n            Row(Column(\"allow_overallocate\", css_class=\"col-md-6\")),\n            Row(Column(\"tags\", css_class=\"col-md-12\")),\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:ComponentForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/forms/consumable_forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(Column(\"manufacturer\", css_class=\"col-md-6\"), Column(\"name\", css_class=\"col-md-6\")),\n            Row(\n                Column(\"supplier\", css_class=\"col-md-4\"),\n                Column(\"part_number\", css_class=\"col-md-4\"),\n                Column(\"ean\", css_class=\"col-md-4\"),\n            ),\n            Row(Column(\"slug\", css_class=\"col-md-6\"), Column(\"category\", css_class=\"col-md-6\")),\n            Row(Column(\"min_qty\", css_class=\"col-md-6\"), Column(\"tenant\", css_class=\"col-md-6\")),\n            Row(Column(\"allow_overallocate\", css_class=\"col-md-6\")),\n            Row(Column(\"tags\", css_class=\"col-md-12\")),\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:ConsumableForm:body/FunctionDef:__init__:body",
       "count": 1
     },
     {
@@ -6908,30 +6788,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/forms/assetholder_form.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(\n                Column(\"first_name\", css_class=\"form-group col-md-6 mb-0\"),\n                Column(\"last_name\", css_class=\"form-group col-md-6 mb-0\"),\n                css_class=\"mb-3\",\n            ),\n            Row(\n                Column(\"upn\", css_class=\"form-group col-md-6 mb-0\"),\n                Column(\"email\", css_class=\"form-group col-md-6 mb-0\"),\n                css_class=\"mb-3\",\n            ),\n            Row(\n                Column(\"tenant\", css_class=\"form-group col-md-6 mb-0\"),\n                Column(\"user\", css_class=\"form-group col-md-6 mb-0\"),\n                css_class=\"mb-3\",\n            ),\n            \"description\",\n            \"comments\",\n            \"tags\",\n            HTML('<div class=\"mt-4\"></div>'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n        )",
-      "context": "Module:body/ClassDef:AssetHolderForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/assetholder_form.py",
-      "code": "B950",
-      "message": "line too long (164 > 120 characters)",
-      "source": "                \"User Principal Name \u2014 the login identity in Active Directory / Entra ID (e.g. jdoe@corp.com). Used to match this holder to directory sync sources.\"",
-      "context": "Module:body/ClassDef:AssetHolderForm:body/ClassDef:Meta:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/helpers.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "helper.layout.append(\n        HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\" data-no-dirty-track=\"true\">Cancel</a>')\n    )",
-      "context": "Module:body/FunctionDef:add_standard_buttons:body",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/forms/helpers.py",
       "code": "F401",
       "message": "'crispy_forms.helper.FormHelper' imported but unused",
@@ -7097,22 +6953,6 @@
       "message": "'core.models.VaultModel' imported but unused",
       "source": "from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel, VaultModel",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/tables.py",
-      "code": "B950",
-      "message": "line too long (144 > 120 characters)",
-      "source": "            '<div class=\"d-inline-block\"><button type=\"button\" class=\"btn btn-sm btn-outline-success text-success\" hx-post=\"{}\" hx-swap=\"none\">'",
-      "context": "Module:body/ClassDef:AssetAssignmentTable:body/FunctionDef:render_checkin_btn:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/tables.py",
-      "code": "B950",
-      "message": "line too long (176 > 120 characters)",
-      "source": "        <a href=\"{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}\" class=\"btn btn-sm btn-action btn-action-danger px-2\" title=\"Delete\">",
-      "context": "Module:body/ClassDef:ContactAssignmentTable:body",
       "count": 1
     },
     {

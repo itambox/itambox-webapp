@@ -213,9 +213,14 @@ class SubscriptionRenewView(SecuredObjectActionMixin, LoginRequiredMixin, Permis
                     object_id=subscription.pk,
                     user=request.user,
                     comment=(
-                        f"Renewed subscription. Next renewal date: {renewal_date}. "
-                        f"Cost: {renewal_cost or '—'} {subscription.currency}."
-                    ),
+                        "Renewed subscription. Next renewal date: %(renewal_date)s. "
+                        "Cost: %(renewal_cost)s %(currency)s."
+                    )
+                    % {
+                        "renewal_date": renewal_date,
+                        "renewal_cost": renewal_cost if renewal_cost is not None else "Not set",
+                        "currency": subscription.currency,
+                    },
                 )
 
             messages.success(request, _("Subscription '%(name)s' renewed successfully.") % {"name": subscription.name})

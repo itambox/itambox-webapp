@@ -46,7 +46,7 @@
   </div>
   <hr class="my-4">
   <h4 class="card-title text-primary mb-3">{% translate "Role grants" %}</h4>
-  <p class="text-muted small">{% translate "Each grant carries one role and one or more additive scopes." %}</p>
+  <p class="text-muted small">{% translate "Each entry assigns one role and shows where it applies." %}</p>
   {% if grants %}
     <div class="table-responsive">
       <table class="table table-hover align-middle border mb-0">
@@ -92,10 +92,10 @@
                 {% if grant.valid_until %}
                   <div class="text-muted small">{% translate "Until" %} {{ grant.valid_until|date:"Y-m-d H:i" }}</div>
                 {% elif not grant.reason %}
-                  <span class="text-muted">—</span>
+                  <span class="text-muted">{% translate "Not set" %}</span>
                 {% endif %}
               </td>
-              <td>{% if grant.granted_by %}{{ grant.granted_by }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td>{% if grant.granted_by %}{{ grant.granted_by }}{% else %}<span class="text-muted">{% translate "Not recorded" %}</span>{% endif %}</td>
               <td>{{ grant.granted_at|date:"Y-m-d H:i" }}</td>
             </tr>
           {% endfor %}
@@ -103,11 +103,11 @@
       </table>
     </div>
   {% else %}
-    <p class="text-muted mb-0"><em>{% translate "No direct role grants — this membership may still inherit access from groups." %}</em></p>
+    <p class="text-muted mb-0"><em>{% translate "No direct role grants. This membership may still inherit access from groups." %}</em></p>
   {% endif %}
   <hr class="my-4">
-  <h4 class="card-title text-primary mb-3">{% translate "Granted role permissions" %}</h4>
-  <p class="text-muted small">{% translate "Read-only view of the permission sets attached directly to this membership." %}</p>
+  <h4 class="card-title text-primary mb-3">{% translate "Permissions from assigned roles" %}</h4>
+  <p class="text-muted small">{% translate "Permissions provided directly by this membership's role assignments." %}</p>
   {% if grants %}
     <div class="d-flex flex-column gap-2">
       {% for grant in grants %}
