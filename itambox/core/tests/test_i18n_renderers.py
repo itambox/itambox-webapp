@@ -13,12 +13,9 @@ from assets.tables import (
     AssetMaintenanceTable,
     AssetRequestTable,
     AssetTable,
-    AssetTypeTable,
     CategoryTable,
     WarrantyTable,
 )
-from assets.views.reservation_views import AssetReservationDeleteView
-from assets.views.warranty_views import WarrantyDeleteView, WarrantyDetailView
 from compliance.views_audit import AuditSessionTable
 from core.tables import AssigneeColumn
 from core.templatetags.utility_tags import absolute, localize_journal_comment
