@@ -146,6 +146,38 @@ class ScopeMapValidationTests(unittest.TestCase):
         }
         self.assertTrue(required.issubset(document["scopes"]))
 
+    def test_aggregate_bulk_basket_regression_has_a_focused_scope(self):
+        root = Path(__file__).resolve().parents[2]
+        document = json.loads((root / "scripts" / "e2e_scope_map.yaml").read_text(encoding="utf-8"))
+        selection = build_selection(
+            document,
+            root,
+            event_name="pull_request",
+            base_sha=BASE,
+            head_sha=HEAD,
+            merge_base_sha=MERGE,
+            changes=[
+                {
+                    "status": "A",
+                    "old_path": None,
+                    "new_path": "itambox/tests/e2e/spec/regressions/aggregate-bulk-basket-switch-back.spec.ts",
+                }
+            ],
+        )
+        self.assertEqual(selection["mode"], "selected")
+        self.assertEqual(
+            selection["scopes"],
+            ["legacy-smoke", "regression:aggregate-bulk-basket", "smoke"],
+        )
+        self.assertEqual(
+            selection["spec_paths"],
+            [
+                "spec/legacy-smoke",
+                "spec/regressions/aggregate-bulk-basket-switch-back.spec.ts",
+                "spec/smoke",
+            ],
+        )
+
     def test_real_map_explicitly_classifies_every_tracked_known_production_file(self):
         root = Path(__file__).resolve().parents[2]
         document = json.loads((root / "scripts" / "e2e_scope_map.yaml").read_text(encoding="utf-8"))
