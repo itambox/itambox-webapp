@@ -36,9 +36,10 @@ class VisibleFormHelpTextTests(SimpleTestCase):
         }
         for (form_class, field_name), text in expected.items():
             with self.subTest(form=form_class.__name__, field=field_name):
-                self.assertEqual(str(form_class.base_fields[field_name].help_text), text)
-                self.assertNotIn("—", text)
-                self.assertNotIn("–", text)
+                rendered_help_text = str(form_class.base_fields[field_name].help_text)
+                self.assertEqual(rendered_help_text, text)
+                self.assertNotIn("—", rendered_help_text)
+                self.assertNotIn("–", rendered_help_text)
 
     def test_new_form_copy_is_translated_and_dash_free(self):
         with override("de"):
@@ -56,9 +57,8 @@ class VisibleFormHelpTextTests(SimpleTestCase):
                 "Garantieart auswählen",
             )
             label = str(
-                CostCenterTable.render_parent(
-                    None,
-                    SimpleNamespace(code="FIN", name="Finance", get_absolute_url=lambda: "/cost-centers/1/"),
+                CostCenterTable([]).render_parent(
+                    SimpleNamespace(code="FIN", name="Finance", get_absolute_url=lambda: "/cost-centers/1/")
                 )
             )
             self.assertIn("FIN: Finance", label)

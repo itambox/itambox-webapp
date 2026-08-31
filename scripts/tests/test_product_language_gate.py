@@ -53,6 +53,16 @@ class ProductLanguageGateTests(unittest.TestCase):
             findings = MODULE.scan_python(path, "itambox/example/copy.py")
             self.assertEqual([finding.line for finding in findings], [1, 2, 3, 4])
 
+    def test_python_scan_checks_crispy_html_and_submit_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(
+                Path(directory),
+                "copy.py",
+                "HTML('<span>left — right</span>')\nSubmit('submit', 'left – right')",
+            )
+            findings = MODULE.scan_python(path, "itambox/forms/copy.py")
+            self.assertEqual([finding.line for finding in findings], [1, 2])
+
     def test_python_scan_checks_direct_form_message_and_model_string_literals(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self.write(

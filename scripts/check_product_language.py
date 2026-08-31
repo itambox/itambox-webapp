@@ -30,8 +30,15 @@ TRANSLATION_CALLS = {
     "ngettext": (0, 1),
     "pgettext": (1,),
     "npgettext": (1, 2),
+    "_lazy": (0,),
 }
-PRESENTATION_CALLS = {"format_html": (0,), "format_html_join": (1,), "mark_safe": (0,)}
+PRESENTATION_CALLS = {
+    "format_html": (0,),
+    "format_html_join": (1,),
+    "mark_safe": (0,),
+    "HTML": (0,),
+    "Submit": (1,),
+}
 JS_TRANSLATION_CALL = re.compile(r"\b(?:gettext|ngettext|pgettext|npgettext)\s*\(")
 JS_STRING = re.compile(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", re.S)
 JS_CODEPOINT_CALL = re.compile(r"\bString\.from(?:CharCode|CodePoint)\s*\(\s*(0x[0-9a-f]+|\d+)\s*\)", re.I)

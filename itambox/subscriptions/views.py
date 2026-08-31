@@ -212,13 +212,13 @@ class SubscriptionRenewView(SecuredObjectActionMixin, LoginRequiredMixin, Permis
                     model=obj_type,
                     object_id=subscription.pk,
                     user=request.user,
-                    comment=_(
+                    comment=(
                         "Renewed subscription. Next renewal date: %(renewal_date)s. "
                         "Cost: %(renewal_cost)s %(currency)s."
                     )
                     % {
                         "renewal_date": renewal_date,
-                        "renewal_cost": renewal_cost if renewal_cost is not None else _("Not set"),
+                        "renewal_cost": renewal_cost if renewal_cost is not None else "Not set",
                         "currency": subscription.currency,
                     },
                 )

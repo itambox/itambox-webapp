@@ -198,7 +198,7 @@ msgid "Select a target tenant before scanning."
 msgstr "Wählen Sie vor dem Scannen einen Ziel-Mandanten aus."
 
 #: .\static\dist\itambox.js:1
-#, python-format
+#, javascript-format
 msgid "%(count)s asset from another tenant is kept aside. Switch the target tenant to see it."
 msgid_plural "%(count)s assets from another tenant are kept aside. Switch the target tenant to see them."
 msgstr[0] "%(count)s Asset aus einem anderen Mandanten wird zurückgehalten. Wechseln Sie den Ziel-Mandanten, um es anzuzeigen."

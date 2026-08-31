@@ -10202,6 +10202,7 @@ msgstr "Für eine Garantie ist ein Startdatum erforderlich."
 
 # --- Automated Remediation Translations (ITAMbox Audit) ---
 #: itambox/extras/templates/extras/dashboard/widgets/licenses.html:9
+#, python-format
 msgid "%(allocated)s/%(total)s seats (%(pct)s%%)"
 msgstr "%(allocated)s/%(total)s Plätze (%(pct)s %%)"
 
@@ -10776,11 +10777,6 @@ msgstr "Bestellungen entgegennehmen"
 #, python-brace-format
 msgid "Recycle Bin: {verbose_name_plural}"
 msgstr "Papierkorb: {verbose_name_plural}"
-
-#: itambox/subscriptions/views.py:216
-#, python-format
-msgid "Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s."
-msgstr "Abonnement verlängert. Nächster Verlängerungstermin: %(renewal_date)s. Kosten: %(renewal_cost)s %(currency)s."
 
 #: itambox/organization/forms/membership_form.py:281
 msgid "Required and must be in the future when assigning an elevated role directly to this member."
@@ -13613,3 +13609,127 @@ msgstr "Vertrag"
 
 msgid "Send test notification"
 msgstr "Testbenachrichtigung senden"
+
+#: itambox/extras/dashboard/widgets.py
+msgid "180 Days"
+msgstr "180 Tage"
+
+msgid "30 Days"
+msgstr "30 Tage"
+
+msgid "365 Days"
+msgstr "365 Tage"
+
+msgid "60 Days"
+msgstr "60 Tage"
+
+msgid "90 Days (Default)"
+msgstr "90 Tage (Standard)"
+
+msgid "Accessories, consumables, and components below minimum quantity"
+msgstr "Zubehör, Verbrauchsmaterialien und Komponenten unter der Mindestmenge"
+
+msgid "Active Repairs & Maintenances"
+msgstr "Aktive Reparaturen und Wartungen"
+
+msgid "Active subscriptions renewing within 90 days"
+msgstr "Aktive Abonnements mit Verlängerung innerhalb von 90 Tagen"
+
+msgid "All Actions"
+msgstr "Alle Aktionen"
+
+msgid "Asset Age Distribution"
+msgstr "Altersverteilung der Assets"
+
+msgid "Asset Status Labels"
+msgstr "Status-Labels der Assets"
+
+msgid "Bar"
+msgstr "Balken"
+
+msgid "Bar Chart"
+msgstr "Balkendiagramm"
+
+msgid "Breakdown of assets by age bucket and average age"
+msgstr "Aufschlüsselung der Assets nach Altersgruppe und Durchschnittsalter"
+
+msgid "Costed Asset Count"
+msgstr "Anzahl bewerteter Assets"
+
+msgid "Creations Only"
+msgstr "Nur Erstellungen"
+
+msgid "Deletions Only"
+msgstr "Nur Löschungen"
+
+msgid "Display arbitrary custom content. Markdown is supported."
+msgstr "Beliebige benutzerdefinierte Inhalte anzeigen. Markdown wird unterstützt."
+
+msgid "Display counts of object types with links to their list views."
+msgstr "Anzahlen von Objekttypen mit Links zu ihren Listen anzeigen."
+
+msgid "Donut chart showing asset distribution by status label"
+msgstr "Ringdiagramm mit der Verteilung der Assets nach Status-Label"
+
+msgid "Doughnut"
+msgstr "Ringdiagramm"
+
+msgid "EOL Planning Alerts"
+msgstr "EOL-Planungswarnungen"
+
+msgid "Financial Overview"
+msgstr "Finanzübersicht"
+
+msgid "Hardware expiring within 90 days or already past EOL"
+msgstr "Hardware, deren EOL innerhalb von 90 Tagen erreicht wird oder bereits überschritten ist"
+
+msgid "List Format"
+msgstr "Listenformat"
+
+msgid "Low Stock Alerts"
+msgstr "Warnungen bei niedrigem Bestand"
+
+msgid "Note"
+msgstr "Notiz"
+
+msgid "Object Counts"
+msgstr "Objektanzahlen"
+
+msgid "Ongoing repairs and maintenance tasks with associated costs"
+msgstr "Laufende Reparatur- und Wartungsaufgaben mit den zugehörigen Kosten"
+
+msgid "Pie"
+msgstr "Kreisdiagramm"
+
+msgid "Pie Chart"
+msgstr "Kreisdiagramm"
+
+msgid "Purchase cost grouped by tenant (top 8)"
+msgstr "Anschaffungskosten nach Mandant gruppiert (Top 8)"
+
+msgid "Quick-access list of objects you have starred (personal, per-user)"
+msgstr "Schnellzugriffsliste Ihrer markierten Objekte (persönlich, je Benutzer)"
+
+msgid "Recent object changes across the system (create, update, delete)"
+msgstr "Letzte Objektänderungen im gesamten System (Erstellen, Aktualisieren, Löschen)"
+
+msgid "Simple List"
+msgstr "Einfache Liste"
+
+msgid "Software License Seats"
+msgstr "Softwarelizenzplätze"
+
+msgid "Tenant Spend"
+msgstr "Ausgaben nach Mandant"
+
+msgid "Top 5 licenses by seat utilization percentage"
+msgstr "Top 5 Lizenzen nach Auslastungsgrad der Plätze"
+
+msgid "Total cost of ownership, purchase costs, maintenance, and salvage values"
+msgstr "Gesamtbetriebskosten, Anschaffungskosten, Wartung und Restwerte"
+
+msgid "Upcoming Renewals"
+msgstr "Anstehende Verlängerungen"
+
+msgid "Updates Only"
+msgstr "Nur Aktualisierungen"

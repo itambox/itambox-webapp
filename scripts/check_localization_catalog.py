@@ -19,7 +19,7 @@ PO_PATHS = {
     "django": ROOT / "itambox/locale/de/LC_MESSAGES/django.po",
     "djangojs": ROOT / "itambox/locale/de/LC_MESSAGES/djangojs.po",
 }
-PY_CALLS = {"_", "gettext", "gettext_lazy", "gettext_noop", "ngettext", "pgettext", "npgettext"}
+PY_CALLS = {"_", "gettext", "gettext_lazy", "gettext_noop", "ngettext", "pgettext", "npgettext", "_lazy"}
 JS_CALL_START = re.compile(r"\b(gettext|ngettext|pgettext|npgettext)\s*\(")
 BLOCK = re.compile(
     r"{%[-+]?\s*blocktrans(?:late)?(?P<opts>[^%]*)%}(?P<body>.*?){%[-+]?\s*endblocktrans(?:late)?\s*[-+]?%}",

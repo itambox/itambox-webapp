@@ -62,7 +62,6 @@ class CountLinkColumn(tables.Column):
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe('<span class="text-success"><i class="mdi mdi-check-circle-outline"></i></span>')
     FALSE_MARK = mark_safe('<span class="text-danger"><i class="mdi mdi-close-circle-outline"></i></span>')
-    EMPTY_MARK = format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def __init__(self, *args, true_mark=None, false_mark=None, **kwargs):
         self.true_mark = true_mark if true_mark is not None else self.TRUE_MARK
@@ -72,9 +71,9 @@ class BooleanColumn(tables.Column):
     def render(self, value):
         if value is True:
             return self.true_mark
-        elif value is False:
+        if value is False:
             return self.false_mark
-        return self.EMPTY_MARK
+        return format_html('<span class="text-muted">{}</span>', _("Not set"))
 
 
 class IDColumn(tables.Column):
@@ -334,8 +333,6 @@ class AssigneeColumn(tables.Column):
             AssetAssignment-like model.
     """
 
-    EMPTY_MARK = format_html('<span class="text-muted">{}</span>', _("Not set"))
-
     def __init__(
         self,
         *args,
@@ -384,7 +381,7 @@ class AssigneeColumn(tables.Column):
                 return str(holder)
 
         if hasattr(record, "active_assignment") and record.active_assignment is None:
-            return self.EMPTY_MARK
+            return format_html('<span class="text-muted">{}</span>', _("Not set"))
 
         if self.location_field and hasattr(record, self.location_field):
             loc = getattr(record, self.location_field)
@@ -397,7 +394,7 @@ class AssigneeColumn(tables.Column):
 
         if self._empty_text is not None:
             return self._empty_text
-        return self.EMPTY_MARK
+        return format_html('<span class="text-muted">{}</span>', _("Not set"))
 
     def _build_cache(self, table, model_class, cache_attr):
         from django.contrib.contenttypes.models import ContentType

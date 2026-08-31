@@ -121,6 +121,16 @@ class LocalizationCatalogGateTests(unittest.TestCase):
             self.assertIn(("django", "Stock status"), sources)
             self.assertEqual(sources[("djangojs", "One day")]["plural"], "%(count)s days")
 
+    def test_python_gettext_aliases_are_extracted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "copy.py"
+            path.write_text("_lazy('Bookmarks')", encoding="utf-8")
+            sources = {}
+
+            MODULE.source_python(path, "itambox/users/views.py", sources)
+
+            self.assertIn(("django", "Bookmarks"), sources)
+
     def test_template_source_extraction_ignores_non_rendered_comments(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "copy.html"

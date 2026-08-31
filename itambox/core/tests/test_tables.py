@@ -18,7 +18,7 @@ from assets.models import (
 )
 from assets.tables import AssetMaintenanceTable, AssetTable, AssetTypeTable, WarrantyTable
 from core.models import ObjectChange
-from core.tables import AssigneeColumn, BaseTable, ObjectChangeTable
+from core.tables import AssigneeColumn, BaseTable, BooleanColumn, ObjectChangeTable
 from extras.models import NotificationChannel
 from itambox.middleware import _request_id
 from organization.models import Location, Site
@@ -41,6 +41,16 @@ class BaseTableEmptyValueTest(SimpleTestCase):
         self.assertIn("Not set", rendered)
         self.assertNotIn("—", rendered)
         self.assertNotIn("–", rendered)
+
+
+class TableLocalizationTests(SimpleTestCase):
+    def test_boolean_empty_label_resolves_when_the_cell_is_rendered(self):
+        column = BooleanColumn()
+
+        with translation.override("de"):
+            self.assertIn("Nicht festgelegt", str(column.render(None)))
+        with translation.override("en"):
+            self.assertIn("Not set", str(column.render(None)))
 
 
 class AssetTableLocalizationTest(SimpleTestCase):
@@ -188,9 +198,9 @@ class CoreTablesTestCase(TestCase):
         rendered_1 = column.render(asset_checked_out.pk, asset_checked_out, col_bound, table)
         self.assertIn(f'Location: <a href="{location.get_absolute_url()}">{location.name}</a>', rendered_1)
 
-        # Render check for Asset 2 (available)
-        rendered_2 = column.render(asset_available.pk, asset_available, col_bound, table)
-        self.assertEqual(rendered_2, column.EMPTY_MARK)
+        with translation.override("de"):
+            rendered_2 = column.render(asset_available.pk, asset_available, col_bound, table)
+        self.assertIn("Nicht festgelegt", rendered_2)
 
     def test_table_optimizations(self):
         class DummyTable(BaseTable):

@@ -194,7 +194,7 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
 
     def value_purchase_date(self, value):
         # Format date if it exists
-        return value.strftime("%Y-%m-%d") if value else _("Not set")
+        return value.strftime("%Y-%m-%d") if value else ""
 
     def render_actions(self, record):
         if getattr(record, "deleted_at", None) is not None:
