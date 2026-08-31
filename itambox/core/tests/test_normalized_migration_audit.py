@@ -5,14 +5,20 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import scripts.migration_audit as migration_audit
-from scripts.migration_audit import (
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+# Pytest root is ``itambox``; expose the sibling audit-script namespace.
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+import scripts.migration_audit as migration_audit  # noqa: E402
+from scripts.migration_audit import (  # noqa: E402
     NORMALIZED_POST_TRANSITION_DISPOSITIONS,
     POST_TRANSITION_DISPOSITION_GROUPS,
     POST_TRANSITION_MIGRATIONS,
@@ -24,8 +30,6 @@ from scripts.migration_audit import (
     main,
     validate_preflight_manifest,
 )
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 class NormalizedMigrationAuditTests(unittest.TestCase):
