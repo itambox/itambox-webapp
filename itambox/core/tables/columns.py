@@ -5,6 +5,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from core.html_styles import color_chip_class, safe_hex_color
+from core.tables.constants import TABLE_EMPTY_VALUE
 from itambox.utils import get_model_viewname
 
 
@@ -20,7 +21,7 @@ class ColorChipColumn(tables.Column):
 
     def render(self, value):
         if not value:
-            return format_html('<span class="text-muted">{}</span>', _("Not set"))
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
         safe_color = safe_hex_color(value.color)
         color_class, style_block = color_chip_class(safe_color)
         return format_html(
@@ -73,7 +74,7 @@ class BooleanColumn(tables.Column):
             return self.true_mark
         if value is False:
             return self.false_mark
-        return format_html('<span class="text-muted">{}</span>', _("Not set"))
+        return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
 
 
 class IDColumn(tables.Column):
@@ -381,7 +382,7 @@ class AssigneeColumn(tables.Column):
                 return str(holder)
 
         if hasattr(record, "active_assignment") and record.active_assignment is None:
-            return format_html('<span class="text-muted">{}</span>', _("Not set"))
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
 
         if self.location_field and hasattr(record, self.location_field):
             loc = getattr(record, self.location_field)
@@ -394,7 +395,7 @@ class AssigneeColumn(tables.Column):
 
         if self._empty_text is not None:
             return self._empty_text
-        return format_html('<span class="text-muted">{}</span>', _("Not set"))
+        return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
 
     def _build_cache(self, table, model_class, cache_attr):
         from django.contrib.contenttypes.models import ContentType

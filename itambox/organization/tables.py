@@ -11,6 +11,7 @@ from django_tables2.utils import A
 from assets.models import Asset, AssetAssignment
 from core.html_styles import status_color_class
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
+from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.tables import TagColumn
 
 from .models import (
@@ -114,7 +115,7 @@ class SiteTable(BaseTable):
                 color_class,
                 display,
             )
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
 
 class LocationTable(BaseTable):
@@ -144,7 +145,7 @@ class LocationTable(BaseTable):
                 color_class,
                 display,
             )
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
 
 class TenantGroupTable(BaseTable):
@@ -345,7 +346,7 @@ class RoleTable(BaseTable):
     def render_tenant(self, value, record):
         tenant = record.tenant
         if tenant is None:
-            return _("Not set")
+            return TABLE_EMPTY_VALUE
         return format_html('<a href="{}">{}</a>', tenant.get_absolute_url(), tenant)
 
     def render_shared(self, value, record):
@@ -434,7 +435,7 @@ class CostCenterTable(BaseTable):
 
     def render_parent(self, value):
         if not value:
-            return _("Not set")
+            return TABLE_EMPTY_VALUE
         label = f"{value.code}: {value.name}" if value.code else value.name
         return format_html('<a href="{}">{}</a>', value.get_absolute_url(), label)
 

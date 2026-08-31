@@ -4,6 +4,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
+from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.tables import TagColumn
 
 from .models import License, LicenseSeatAssignment
@@ -146,7 +147,7 @@ class LicenseSeatAssignmentTable(BaseTable):
                 holder = target
                 via_asset = True
         if holder is None:
-            return _("Not set")
+            return TABLE_EMPTY_VALUE
         url = reverse("organization:assetholder_detail", kwargs={"pk": holder.pk})
         label = holder.upn or str(holder)
         if via_asset:

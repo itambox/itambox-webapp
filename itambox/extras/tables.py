@@ -13,6 +13,7 @@ from django_tables2.utils import A
 
 from core.html_styles import color_chip_class, safe_hex_color
 from core.tables import ActionsColumn, BaseTable, BooleanColumn, ToggleColumn
+from core.tables.constants import TABLE_EMPTY_VALUE
 from core.templatetags.utility_tags import localize_journal_comment
 
 from .models import (
@@ -148,7 +149,7 @@ class EventRuleTable(BaseTable):
     def render_conditions(self, value):
         if value:
             return format_html('<span class="badge bg-warning">{}</span>', _("Withdrawn"))
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
 
 class LabelTemplateTable(BaseTable):
@@ -188,7 +189,7 @@ class TagTable(BaseTable):
             normalized = safe_hex_color(value)
             color_class, style_block = color_chip_class(normalized)
             return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
-        return _("Not set")
+        return TABLE_EMPTY_VALUE
 
 
 class CustomFieldTable(BaseTable):
@@ -274,7 +275,7 @@ class JournalEntryTable(BaseTable):
 
     def render_content_object(self, value):
         if value is None:
-            return format_html('<span class="text-muted">{}</span>', _("Not set"))
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
         get_url = getattr(value, "get_absolute_url", None)
         url = None
         if get_url is not None:
@@ -374,14 +375,14 @@ class WebhookDeliveryTable(BaseTable):
 
     def render_delivery_id(self, value):
         if not value:
-            return format_html('<span class="text-muted">{}</span>', _("Not set"))
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
         return format_html('<code title="{}">{}</code>', value, str(value)[:8])
 
     def render_event(self, value, record):
         if record.test_send:
             return _("Test webhook")
         if value is None:
-            return format_html('<span class="text-muted">{}</span>', _("Not set"))
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
         return value.get_action_display()
 
     def render_status(self, value, record):
@@ -395,11 +396,11 @@ class WebhookDeliveryTable(BaseTable):
         return format_html('<span class="badge bg-{}">{}</span>', color, record.get_status_display())
 
     def render_response_code(self, value):
-        return value if value is not None else format_html('<span class="text-muted">{}</span>', _("Not set"))
+        return value if value is not None else format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
 
     def render_error_message(self, value):
         if not value:
-            return format_html('<span class="text-muted">{}</span>', _("Not set"))
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
         truncated = Truncator(str(value)).chars(80)
         return format_html('<span title="{}">{}</span>', value, truncated)
 
