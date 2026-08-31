@@ -56,19 +56,16 @@ test.describe('aggregate bulk basket switch-back regression (issue #438)', { tag
 
     // The setup API uses the existing E2E superuser token only to provision
     // disposable records. Browser authorization is still exercised by the
-    // aggregate lars.eklund session above and throughout the journey.
-    // Disposal creates protected audit history, so use the repository's
-    // established protected-history cleanup strategy for these disposable rows.
+    // aggregate lars.eklund session above and throughout the journey. The
+    // pending job is cancelled before worker execution, so the factory's
+    // default cleanup removes the still-live assets after the test.
     const assetA1 = await createOwnedAsset(api, cleanup, tenantA.id, `${runId}-a1`, {
-      preserveProtectedHistory: true,
       tagScope: 'issue438',
     });
     const assetA2 = await createOwnedAsset(api, cleanup, tenantA.id, `${runId}-a2`, {
-      preserveProtectedHistory: true,
       tagScope: 'issue438',
     });
     const assetB1 = await createOwnedAsset(api, cleanup, tenantB.id, `${runId}-b1`, {
-      preserveProtectedHistory: true,
       tagScope: 'issue438',
     });
 
