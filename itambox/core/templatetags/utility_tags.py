@@ -4,6 +4,7 @@
 
 # itambox/templatetags/utility_tags.py
 import json
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
 from django import template
@@ -44,7 +45,9 @@ def localize_journal_comment(comment):
     if " " not in cost_and_currency:
         return comment
     renewal_cost, currency = cost_and_currency.rsplit(" ", 1)
-    if renewal_cost == "Not set":
+    try:
+        Decimal(renewal_cost)
+    except InvalidOperation:
         renewal_cost = _("Not set")
     return _("Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s.") % {
         "renewal_date": renewal_date,

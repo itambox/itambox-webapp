@@ -61,6 +61,10 @@ class TableLocalizationTests(SimpleTestCase):
                 localize_journal_comment(comment),
                 "Abonnement verlängert. Nächster Verlängerungstermin: 2026-09-01. Kosten: Nicht festgelegt EUR.",
             )
+            self.assertIn(
+                "Kosten: Nicht festgelegt EUR.",
+                localize_journal_comment("Renewed subscription. Next renewal date: 2026-09-01. Cost: — EUR."),
+            )
         with translation.override("en"):
             self.assertEqual(localize_journal_comment(comment), comment)
         self.assertEqual(localize_journal_comment("A user-written journal entry."), "A user-written journal entry.")
