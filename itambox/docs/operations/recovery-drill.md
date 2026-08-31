@@ -71,6 +71,25 @@ mkdir -p evidence
 Do not copy `.env`, dumps, archives, plaintext tokens, encryption keys, or the
 probe key into an issue, pull request, CI log, or evidence JSON file.
 
+## Migration baseline recognition gate
+
+The current candidate ships a read-only `migration_baseline_preflight` command and
+checked manifest. The gate is a cleanup-release admission check, not a substitute
+for the ordinary transition upgrade. In this Path C drill, a restored pre-squash
+predecessor is expected to report `complete-old-history-no-replacement` (non-zero)
+before the normal candidate migration; after that migration completes, rerun the
+gate and require `complete-replacement-recognition` (zero). A future cleanup
+release must run the gate before any cleanup migration writes and stop on every
+non-zero result. The command only reads `django_migrations` and cannot detect a
+failed non-atomic migration whose operations ran before its recorder row committed.
+For any interrupted or failed run, restore first and compare schema, data, and
+protected-canary evidence; do not infer safety from a missing recorder row.
+
+The checked layout remains transitional. This gate does not remove migration
+files, change `replaces`, write recorder rows, or authorize arbitrary release
+skips. The future normalized-baseline state is valid only after a separately
+reviewed manifest/layout transition.
+
 ## Record immutable inputs and build exact application images
 
 Record non-secret inputs in `evidence/drill-inputs.txt`. The two project names
@@ -190,6 +209,7 @@ restore_drill_project() {
   compose=(
     docker compose -p "$project" -f "$COMPOSE_FILE" -f "$override"
   )
+  # Verify the recovery-set checksums before using any artifact.
   (cd "$RECOVERY_SET" && sha256sum -c SHA256SUMS)
   cmp -- "$RECOVERY_SET/environment" "$DRILL_ENV_FILE"
 
@@ -231,18 +251,27 @@ git show "$CANDIDATE_REVISION:itambox/core/management/commands/capture_recovery_
   > "$PROBE_DIR/capture_recovery_evidence.py"
 git show "$CANDIDATE_REVISION:itambox/core/management/commands/capture_schema_evidence.py" \
   > "$PROBE_DIR/capture_schema_evidence.py"
-sha256sum "$PROBE_DIR"/*.py > evidence/probe-sha256.txt
 
 export RECOVERY_PROBE_MOUNT="$PROBE_DIR/capture_recovery_evidence.py:/app/core/management/commands/capture_recovery_evidence.py:ro"
 export SCHEMA_PROBE_MOUNT="$PROBE_DIR/capture_schema_evidence.py:/app/core/management/commands/capture_schema_evidence.py:ro"
+
+git show "$CANDIDATE_REVISION:itambox/core/migration_preflight.py" \
+  > "$PROBE_DIR/migration_preflight.py"
+git show "$CANDIDATE_REVISION:itambox/core/management/commands/migration_baseline_preflight.py" \
+  > "$PROBE_DIR/migration_baseline_preflight.py"
+git show "$CANDIDATE_REVISION:itambox/core/migration_baseline_manifest.json" \
+  > "$PROBE_DIR/migration_baseline_manifest.json"
+sha256sum "$PROBE_DIR"/*.py "$PROBE_DIR/migration_baseline_manifest.json" > evidence/probe-sha256.txt
+
+export MIGRATION_PREFLIGHT_MODULE_MOUNT="$PROBE_DIR/migration_preflight.py:/app/core/migration_preflight.py:ro"
+export MIGRATION_PREFLIGHT_COMMAND_MOUNT="$PROBE_DIR/migration_baseline_preflight.py:/app/core/management/commands/migration_baseline_preflight.py:ro"
+export MIGRATION_PREFLIGHT_MANIFEST_MOUNT="$PROBE_DIR/migration_baseline_manifest.json:/app/core/migration_baseline_manifest.json:ro"
 ```
 
 Use these same files for predecessor, restored, upgraded, rollback, and fresh
 captures. If a command is incompatible with the predecessor model API, the drill
 fails closed; update the probe compatibly and review its new checksum rather than
 modifying the predecessor.
-
-Verify the recovery-set checksums before using any artifact:
 
 ```bash
 (cd "$RECOVERY_SET" && sha256sum -c SHA256SUMS)
@@ -394,6 +423,18 @@ The helper does not start app/worker:
 
 ```bash
 restore_drill_project "$UPGRADE_PROJECT" "$UPGRADE_OVERRIDE"
+if docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE" \
+  run --rm -T --no-deps --no-build \
+  -v "$MIGRATION_PREFLIGHT_MODULE_MOUNT" \
+  -v "$MIGRATION_PREFLIGHT_COMMAND_MOUNT" \
+  -v "$MIGRATION_PREFLIGHT_MANIFEST_MOUNT" \
+  app python manage.py migration_baseline_preflight --format=json \
+  > evidence/predecessor-migration-preflight.json \
+  2> evidence/predecessor-migration-preflight.stderr; then
+  echo 'predecessor unexpectedly reports a transitioned baseline' >&2
+  exit 1
+fi
+python -c "import json; r=json.load(open('evidence/predecessor-migration-preflight.json')); assert r['state'] == 'complete-old-history-no-replacement'"
 upgrade_compose up -d --no-build app worker
 verify_app_revision "$UPGRADE_PROJECT" "$PREDECESSOR_REVISION"
 upgrade_compose exec -T app python manage.py check
@@ -462,6 +503,10 @@ upgrade_compose up -d --no-build app worker
 verify_app_revision "$UPGRADE_PROJECT" "$CANDIDATE_REVISION"
 upgrade_compose exec -T app python manage.py check
 upgrade_compose exec -T app python manage.py migrate --check
+upgrade_compose run --rm -T --no-deps --no-build \
+  app python manage.py migration_baseline_preflight --format=json \
+  > evidence/upgraded-migration-preflight.json \
+  2> evidence/upgraded-migration-preflight.stderr
 upgrade_compose ps app worker
 upgrade_compose logs --tail=100 app worker
 ```
@@ -526,6 +571,10 @@ fresh_compose run --rm -T --no-deps --no-build \
   app python manage.py check
 fresh_compose run --rm -T --no-deps --no-build \
   app python manage.py migrate --check
+fresh_compose run --rm -T --no-deps --no-build \
+  app python manage.py migration_baseline_preflight --format=json \
+  > evidence/fresh-migration-preflight.json \
+  2> evidence/fresh-migration-preflight.stderr
 fresh_compose run --rm -T --no-deps --no-build \
   app python manage.py showmigrations --plan \
   > evidence/fresh-migrations.txt

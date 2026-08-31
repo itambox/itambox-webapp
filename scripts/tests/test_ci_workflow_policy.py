@@ -258,6 +258,20 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         self.assertIn('- "itambox/schema.yaml"', self.workflow_text)
         self.assertIn('- "scripts/openapi_diagnostics_baseline.json"', self.workflow_text)
 
+    def test_migration_preflight_manifest_changes_trigger_ci(self):
+        self.assertIn('- "itambox/core/migration_baseline_manifest.json"', self.workflow_text)
+        self.assertTrue(triggers_ci(self.workflow_text, "itambox/core/migration_baseline_manifest.json"))
+
+    def test_migration_baseline_preflight_runs_after_fresh_migrate(self):
+        steps = load_steps()
+        names = [step.get("name") for step in steps if step.get("name")]
+        preflight = step_named(steps, "Verify migration baseline recognition")
+        self.assertIn("migration_baseline_preflight --format=json", preflight.get("run", ""))
+        self.assertLess(
+            names.index("Apply migrations to a fresh database"), names.index("Verify migration baseline recognition")
+        )
+        self.assertLess(names.index("Verify migration baseline recognition"), names.index("Run Django system checks"))
+
     def test_exception_policy_changes_trigger_ci_and_run_the_gate(self):
         self.assertIn('- "scripts/exception_baseline.json"', self.workflow_text)
         self.assertTrue(triggers_ci(self.workflow_text, "scripts/check_exception_policy.py"))
