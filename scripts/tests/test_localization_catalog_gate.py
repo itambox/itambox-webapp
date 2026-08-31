@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
 import sys
 import tempfile
 import unittest
@@ -154,6 +155,27 @@ class LocalizationCatalogGateTests(unittest.TestCase):
 
     def test_current_catalog_passes_source_contract(self):
         self.assertEqual(MODULE.main(), 0)
+
+    def test_compiled_catalog_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            po_path = root / "django.po"
+            mo_path = root / "django.mo"
+            source_po = MODULE.PO_PATHS["django"]
+            source_mo = source_po.with_suffix(".mo")
+            po_path.write_text(source_po.read_text(encoding="utf-8-sig"), encoding="utf-8")
+            po_path.write_text(
+                po_path.read_text(encoding="utf-8").replace("Nicht festgelegt", "Nicht gesetzt", 1), encoding="utf-8"
+            )
+            shutil.copyfile(source_mo, mo_path)
+            MODULE.PO_PATHS["django"] = po_path
+            try:
+                entries, _ = MODULE.parse_po(po_path)
+                failures = MODULE.compiled_catalog_failures("django", entries)
+            finally:
+                MODULE.PO_PATHS["django"] = source_po
+
+            self.assertTrue(any("compiled catalog mismatch" in failure for failure in failures))
 
 
 if __name__ == "__main__":

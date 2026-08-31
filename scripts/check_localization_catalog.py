@@ -9,7 +9,9 @@ normalizes those identities before comparing them with the PO files.
 from __future__ import annotations
 
 import ast
+import gettext
 import re
+import struct
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -455,12 +457,48 @@ def catalog_failures(domain: str, entries: dict, duplicates: list[str], sources:
     return failures
 
 
+def compiled_catalog_failures(domain: str, entries: dict[str, dict]) -> list[str]:
+    """Require the committed GNU MO catalog to match the active PO entries."""
+    mo_path = PO_PATHS[domain].with_suffix(".mo")
+    try:
+        with mo_path.open("rb") as handle:
+            compiled = gettext.GNUTranslations(handle)._catalog
+    except (OSError, EOFError, UnicodeError, ValueError, struct.error) as exc:
+        return [f"{domain}: cannot read compiled catalog {mo_path}: {exc}"]
+
+    expected_keys = set()
+    failures = []
+    for key, entry in entries.items():
+        if key == "":
+            continue
+        if "msgid_plural" in entry:
+            expected_values = (str(entry.get("0", "")), str(entry.get("1", "")))
+            expected_keys.update((key, index) for index in range(len(expected_values)))
+            actual_values = tuple(compiled.get((key, index)) for index in range(len(expected_values)))
+        else:
+            expected_values = (str(entry.get("msgstr", "")),)
+            expected_keys.add(key)
+            actual_values = (compiled.get(key),)
+        if actual_values != expected_values:
+            failures.append(f"{domain}: compiled catalog mismatch {key!r}")
+
+    actual_keys = {key for key in compiled if key != ""}
+    missing = sorted(expected_keys - actual_keys, key=repr)
+    stale = sorted(actual_keys - expected_keys, key=repr)
+    if missing:
+        failures.append(f"{domain}: compiled catalog missing {missing[:5]}")
+    if stale:
+        failures.append(f"{domain}: compiled catalog stale {stale[:5]}")
+    return failures
+
+
 def main() -> int:
     sources = all_sources()
     catalogs = {domain: parse_po(path) for domain, path in PO_PATHS.items()}
     failures = []
     for domain, (entries, duplicates) in catalogs.items():
         failures.extend(catalog_failures(domain, entries, duplicates, sources))
+        failures.extend(compiled_catalog_failures(domain, entries))
     if failures:
         print("Localization catalog gate failed:")
         print("\n".join(f"- {failure}" for failure in failures))
