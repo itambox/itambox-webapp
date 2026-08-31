@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
 from core.forms import JournalEntryForm
+from core.job_access import visible_jobs_for_user
 from extras.filters import JournalEntryFilterSet
 from extras.forms import JournalEntryFilterForm
 from extras.models import FileAttachment, ImageAttachment, JournalEntry
@@ -65,29 +66,22 @@ def _attachment_parent_for_change(request, content_type, object_id):
 
 
 def _attachment_parent_for_view(request, content_type, object_id):
-    """Return the default-manager parent only when object view access is held.
+    """Return a visible parent only when object view access is held.
 
-    Attachment files live under /media/ and are served directly by the web
-    server, so the attachment rows themselves are the only authorization point:
-    without this check a file would be reachable purely by guessing its pk
-    (cross-tenant file IDOR). Reads resolve the parent through its default
-    (scoped) manager and require the object-bound ``view_<parent>`` permission
-    (for a tenant-less parent the permission falls back to the user's ambient
-    tenant, which is strictly stronger than the removed active-tenant-equality
-    check that required no permission at all); every failure is a 404. This
-    intentionally replaces the old
-    active-tenant-equality check (which allowed any authenticated user to read
-    an unscoped global parent's attachment and denied authorized aggregate-
-    scope Job attachments when no single active tenant was set) with the
-    canonical membership-based object permission semantics of
-    ``TenantMembershipBackend``: for tenant-scoped parents the scoped manager
-    keeps ordinary cross-tenant denial, while an aggregate-scope Job is served
-    only when the user holds the object-bound job view permission.
+    Job attachments use the same complete active-scope visibility policy as Job
+    list and detail views. Other parent models retain their generic default-
+    manager lookup. Every failure is a 404 so attachment IDs are not enumerable.
     """
     model_class = content_type.model_class()
     if model_class is None:
         raise Http404
-    parent = model_class._default_manager.filter(pk=object_id).first()
+
+    if model_class._meta.label_lower == "core.job":
+        queryset = visible_jobs_for_user(request.user)
+    else:
+        queryset = model_class._default_manager.all()
+
+    parent = queryset.filter(pk=object_id).first()
     if parent is None:
         raise Http404
     app_label = model_class._meta.app_label
