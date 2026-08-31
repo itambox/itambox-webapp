@@ -6,7 +6,7 @@ import * as path from 'path';
 
 const aggregateStorageState = path.resolve(__dirname, '../../.auth/aggregate.json');
 const TENANT_A_SLUG = 'helix-rnd';
-const TENANT_B_SLUG = 'helix-mfg';
+const TENANT_B_SLUG = process.env.E2E_AGGREGATE_SECOND_TENANT_SLUG || 'helix-mfg';
 
 type AccessibleTenant = {
   id: string;
@@ -35,6 +35,7 @@ test.describe('aggregate bulk basket switch-back regression (issue #438)', { tag
 
   test('restores tenant A basket rows and proceeds after A to B to A, then submits only A', async ({
     page,
+    playwright,
     api,
     cleanup,
     runId,
@@ -54,18 +55,30 @@ test.describe('aggregate bulk basket switch-back regression (issue #438)', { tag
     const tenantA = accessibleTenant(accessibleTenants, TENANT_A_SLUG);
     const tenantB = accessibleTenant(accessibleTenants, TENANT_B_SLUG);
 
-    // The setup API uses the existing E2E superuser token only to provision
-    // disposable records. Browser authorization is still exercised by the
-    // aggregate lars.eklund session above and throughout the journey. The
-    // pending job is cancelled before worker execution, so the factory's
-    // default cleanup removes the still-live assets after the test.
+    // The setup API uses the existing E2E token for tenant A. A second
+    // tenant-bound setup context is created only for B because TokenAuthentication
+    // rejects cross-tenant writes; the browser session remains the aggregate
+    // principal throughout. Register it before asset cleanup so it is disposed
+    // after the owned records are deleted.
+    const secondaryToken = process.env.E2E_API_TOKEN_SECONDARY;
+    if (!secondaryToken) {
+      throw new Error('E2E_API_TOKEN_SECONDARY is required for secondary-tenant REST setup.');
+    }
+    const apiSecondary = await playwright.request.newContext({
+      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      extraHTTPHeaders: { Authorization: `Token ${secondaryToken}` },
+    });
+    cleanup.add('dispose secondary-tenant setup client', async () => {
+      await apiSecondary.dispose();
+    });
+
     const assetA1 = await createOwnedAsset(api, cleanup, tenantA.id, `${runId}-a1`, {
       tagScope: 'issue438',
     });
     const assetA2 = await createOwnedAsset(api, cleanup, tenantA.id, `${runId}-a2`, {
       tagScope: 'issue438',
     });
-    const assetB1 = await createOwnedAsset(api, cleanup, tenantB.id, `${runId}-b1`, {
+    const assetB1 = await createOwnedAsset(apiSecondary, cleanup, tenantB.id, `${runId}-b1`, {
       tagScope: 'issue438',
     });
 

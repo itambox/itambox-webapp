@@ -136,6 +136,7 @@ jobs:
       E2E_OPERATOR_USERNAME: e2e-operator
       E2E_VIEWER_USERNAME: e2e-viewer
       E2E_TENANT_SLUG: helix-rnd
+      E2E_AGGREGATE_SECOND_TENANT_SLUG: helix-mfg
       E2E_ISOLATION_TENANT_SLUG: e2e-isolation-tenant
       E2E_TENANT_GROUP_NAME: E2E Tenant Read-Only Group
       E2E_BASE_URL: http://localhost:8000
@@ -363,6 +364,13 @@ jobs:
               is_provider=False,
               deleted_at__isnull=True,
           )
+          aggregate_second_tenant = Tenant._base_manager.get(
+              slug=os.environ["E2E_AGGREGATE_SECOND_TENANT_SLUG"],
+              is_provider=False,
+              deleted_at__isnull=True,
+          )
+          if aggregate_second_tenant.pk == tenant.pk:
+              raise RuntimeError("Aggregate E2E setup tenants must be distinct")
           isolation_tenant, _ = Tenant._base_manager.get_or_create(
               slug=os.environ["E2E_ISOLATION_TENANT_SLUG"],
               defaults={"name": "E2E Isolation Tenant", "is_provider": False},
@@ -491,11 +499,21 @@ jobs:
               write_enabled=True,
               description="GitHub Actions E2E SCIM",
           )
+          Token.objects.filter(user=user, description="GitHub Actions E2E aggregate setup").delete()
+          secondary_token = Token.objects.create(
+              user=user,
+              tenant=aggregate_second_tenant,
+              write_enabled=True,
+              description="GitHub Actions E2E aggregate setup",
+          )
           plaintext = token.key
+          secondary_plaintext = secondary_token.key
           print(f"::add-mask::{plaintext}")
+          print(f"::add-mask::{secondary_plaintext}")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               env_file.write(f"E2E_SCIM_TOKEN={plaintext}\n")
               env_file.write(f"E2E_API_TOKEN={plaintext}\n")
+              env_file.write(f"E2E_API_TOKEN_SECONDARY={secondary_plaintext}\n")
               env_file.write(f"E2E_TENANT_ID={tenant.pk}\n")
               env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\n")
           PY
