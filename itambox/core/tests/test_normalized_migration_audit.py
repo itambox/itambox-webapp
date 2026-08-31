@@ -5,11 +5,16 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 import scripts.migration_audit as migration_audit
 from scripts.migration_audit import (
@@ -29,7 +34,7 @@ from scripts.migration_audit import (
 class NormalizedMigrationAuditTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.repository_root = Path(__file__).resolve().parents[2]
+        cls.repository_root = REPOSITORY_ROOT
         cls.authoritative_directory = tempfile.TemporaryDirectory()
         cls.authoritative_root = Path(cls.authoritative_directory.name) / "fixture"
         cls.trusted = _load_trusted_normalized_evidence(str(cls.repository_root))
