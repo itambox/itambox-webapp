@@ -4094,14 +4094,6 @@
     {
       "path": "itambox/core/templatetags/utility_tags.py",
       "code": "F401",
-      "message": "'django.utils.translation.gettext_lazy as _' imported but unused",
-      "source": "from django.utils.translation import gettext_lazy as _  # Import gettext_lazy",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "F401",
       "message": "'urllib.parse.urlencode' imported but unused",
       "source": "from urllib.parse import urlencode",
       "context": "Module:body",

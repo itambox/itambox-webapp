@@ -7,11 +7,11 @@ from assets.models import Asset, AssetRequest, AssetType
 
 class AssetRequestForm(forms.ModelForm):
     CATEGORY_CHOICES = [
-        ("asset_type", "Asset Type (General Model)"),
-        ("asset", "Specific Asset (by Tag)"),
-        ("component", "Component"),
-        ("accessory", "Accessory"),
-        ("consumable", "Consumable"),
+        ("asset_type", _("Asset Type (General Model)")),
+        ("asset", _("Specific Asset (by Tag)")),
+        ("component", _("Component")),
+        ("accessory", _("Accessory")),
+        ("consumable", _("Consumable")),
     ]
     request_category = forms.ChoiceField(
         choices=CATEGORY_CHOICES,
@@ -22,10 +22,10 @@ class AssetRequestForm(forms.ModelForm):
     )
 
     TARGET_CHOICES = [
-        ("", "Myself"),
-        ("assetholder", "Asset Holder"),
-        ("location", "Location"),
-        ("asset", "Asset"),
+        ("", _("Myself")),
+        ("assetholder", _("Asset Holder")),
+        ("location", _("Location")),
+        ("asset", _("Asset")),
     ]
 
     target_type = forms.ChoiceField(

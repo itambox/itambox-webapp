@@ -369,7 +369,7 @@
                       <strong>{{ entry.user }}</strong>
                       <small class="text-muted">{{ entry.created|date:"Y-m-d H:i" }}</small>
                     </div>
-                    <p class="mb-0 mt-1">{{ entry.comment|linebreaksbr }}</p>
+                    <p class="mb-0 mt-1">{{ entry.comment|localize_journal_comment|linebreaksbr }}</p>
                   </li>
                 {% endfor %}
               </ul>

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 from django.utils.translation import override
 
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
+from assets.forms.checkout_forms import AssetCheckOutForm
+from assets.forms.request_forms import AssetRequestForm
 from assets.models import Asset, AssetReservation, Warranty
 from assets.models.choices import WarrantyTypeChoices
 from inventory.forms.accessory_forms import AccessoryForm
@@ -15,6 +18,7 @@ from inventory.forms.consumable_forms import ConsumableForm
 from licenses.forms import LicenseForm
 from organization.tables import CostCenterTable
 from procurement.models import Contract
+from subscriptions.forms import SubscriptionCheckoutForm
 
 
 class VisibleFormHelpTextTests(SimpleTestCase):
@@ -64,6 +68,64 @@ class VisibleFormHelpTextTests(SimpleTestCase):
             self.assertIn("FIN: Finance", label)
             self.assertNotIn("—", label)
             self.assertNotIn("–", label)
+
+    def test_target_type_choices_are_translated(self):
+        expected = {
+            AssetCheckOutForm: ["Asset-Inhaber", "Lagerort", "Asset"],
+            AssetRequestForm: ["Ich selbst", "Asset-Inhaber", "Lagerort", "Asset"],
+            SubscriptionCheckoutForm: ["Mitarbeiter / Asset-Inhaber", "Hardware-Asset", "Lagerort"],
+        }
+        with override("de"):
+            for form_class, labels in expected.items():
+                with self.subTest(form=form_class.__name__):
+                    actual = [str(label) for _, label in form_class.base_fields["target_type"].choices]
+                    self.assertEqual(actual, labels)
+
+    def test_subscription_renewal_days_use_german_singular_and_plural(self):
+        values = {
+            "provider": None,
+            "type": "saas",
+            "status": "active",
+            "get_type_display": lambda: "SaaS",
+            "get_status_display": lambda: "Active",
+            "vendor_contract_auto_renews": False,
+            "tenant": None,
+            "owner": None,
+            "start_date": None,
+            "term_months": None,
+            "billing_cycle": None,
+            "renewal_date": None,
+            "cancellation_date": None,
+            "contract_reference": None,
+            "cost_center": None,
+            "renewal_cost": None,
+            "annual_cost": None,
+            "licensed_quantity": None,
+            "currency": "EUR",
+            "days_until_renewal": 1,
+        }
+        with override("de"):
+            singular = render_to_string(
+                "subscriptions/includes/detail/subscription_info.html", {"object": SimpleNamespace(**values)}
+            )
+            values["days_until_renewal"] = 2
+            plural = render_to_string(
+                "subscriptions/includes/detail/subscription_info.html", {"object": SimpleNamespace(**values)}
+            )
+            values["days_until_renewal"] = -1
+            overdue_singular = render_to_string(
+                "subscriptions/includes/detail/subscription_info.html", {"object": SimpleNamespace(**values)}
+            )
+            values["days_until_renewal"] = -2
+            overdue_plural = render_to_string(
+                "subscriptions/includes/detail/subscription_info.html", {"object": SimpleNamespace(**values)}
+            )
+        self.assertIn("1 Tag", singular)
+        self.assertNotIn("1 Tage", singular)
+        self.assertIn("2 Tage", plural)
+        self.assertIn("1 Tag überfällig", overdue_singular)
+        self.assertNotIn("1 Tage überfällig", overdue_singular)
+        self.assertIn("2 Tage überfällig", overdue_plural)
 
 
 class StablePresentationContractTests(SimpleTestCase):

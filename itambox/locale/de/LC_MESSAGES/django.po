@@ -8286,12 +8286,10 @@ msgid "Quick-add %(model_label)s"
 msgstr "%(model_label)s schnell hinzufügen"
 
 #, python-format
-msgid ""
-"Background worker online (%(n)s cluster running). Webhook &amp; notification"
-" deliveries are being processed."
-msgstr ""
-"Hintergrund-Worker online (%(n)s Cluster aktiv). Webhook- &amp; "
-"Benachrichtigungszustellungen werden verarbeitet."
+msgid "Background worker online (%(n)s cluster running). Webhook &amp; notification deliveries are being processed."
+msgid_plural "Background workers online (%(n)s clusters running). Webhook &amp; notification deliveries are being processed."
+msgstr[0] "Hintergrund-Worker online (%(n)s Cluster aktiv). Webhook- und Benachrichtigungszustellungen werden verarbeitet."
+msgstr[1] "Hintergrund-Worker online (%(n)s Cluster aktiv). Webhook- und Benachrichtigungszustellungen werden verarbeitet."
 
 msgid ""
 "No background worker is running. Webhook &amp; notification deliveries will "
@@ -9394,14 +9392,8 @@ msgstr "Laufzeit:"
 msgid "Next Renewal:"
 msgstr "Nächste Verlängerung:"
 
-msgid "days overdue"
-msgstr "Tage überfällig"
-
 msgid "Today"
 msgstr "Heute"
-
-msgid "days"
-msgstr "Tage"
 
 msgid "Cancelled:"
 msgstr "Gekündigt:"
@@ -13733,3 +13725,26 @@ msgstr "Anstehende Verlängerungen"
 
 msgid "Updates Only"
 msgstr "Nur Aktualisierungen"
+
+#: itambox/assets/forms/request_forms.py
+msgid "Asset Type (General Model)"
+msgstr "Asset-Typ (allgemeines Modell)"
+
+msgid "Specific Asset (by Tag)"
+msgstr "Konkretes Asset (nach Inventarnummer)"
+
+#: itambox/subscriptions/forms.py
+msgid "Employee / Asset Holder"
+msgstr "Mitarbeiter / Asset-Inhaber"
+
+#: itambox/compliance/audit_services.py
+msgid "The selected target location is inactive or not authorized."
+msgstr "Der ausgewählte Zielstandort ist inaktiv oder nicht autorisiert."
+
+msgid "The selected target location is outside the audit session's tenant."
+msgstr "Der ausgewählte Zielstandort gehört nicht zum Mandanten der Prüfsitzung."
+
+#: itambox/core/templatetags/utility_tags.py
+#, python-format
+msgid "Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s."
+msgstr "Abonnement verlängert. Nächster Verlängerungstermin: %(renewal_date)s. Kosten: %(renewal_cost)s %(currency)s."

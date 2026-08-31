@@ -88,14 +88,14 @@ FROZEN_CONTRACT_COPY = {
     ),
 }
 
-# These model string representations are stable API/history contracts. Their
-# normal web detail, delete, table, and filter consumers must use a separate
-# presentation label instead of changing the model representation.
-FROZEN_STRING_CONTRACTS = {
-    ("itambox/assets/models/lifecycle.py", "Warranty"),
-    ("itambox/assets/models/lifecycle.py", "AssetReservation"),
-    ("itambox/organization/models.py", "CostCenter"),
-    ("itambox/procurement/models.py", "Contract"),
+# These exact literal fragments are retained only in model string
+# representations for compatibility with stored/audit/API-facing values. The
+# rest of each expression remains subject to the product-language scan.
+FROZEN_STRING_LITERALS = {
+    ("itambox/assets/models/lifecycle.py", "Warranty", " – "),
+    ("itambox/assets/models/lifecycle.py", "AssetReservation", " – "),
+    ("itambox/organization/models.py", "CostCenter", " – "),
+    ("itambox/procurement/models.py", "Contract", " – "),
 }
 
 
@@ -274,8 +274,7 @@ class PythonProductCopyVisitor(ast.NodeVisitor):
 
     def visit_Return(self, node: ast.Return):
         if self.function_stack and self.function_stack[-1] == "__str__":
-            if not (self.class_stack and (self.relative, self.class_stack[-1]) in FROZEN_STRING_CONTRACTS):
-                self._scan_expression(node.value, "__str__", node.lineno)
+            self._scan_expression(node.value, "__str__", node.lineno)
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign):
@@ -315,8 +314,11 @@ class PythonProductCopyVisitor(ast.NodeVisitor):
             if node.func.id in TRANSLATION_CALLS or node.func.id in PRESENTATION_CALLS:
                 return
         values = literal_fragments(node) if include_fragments or constant_text(node) is None else [constant_text(node)]
+        class_name = self.class_stack[-1] if self.class_stack else None
         for value in values:
             if value is None or (self.relative, value) in FROZEN_CONTRACT_COPY:
+                continue
+            if (self.relative, class_name, value) in FROZEN_STRING_LITERALS:
                 continue
             tokens = forbidden_tokens(value)
             if tokens:
@@ -342,11 +344,13 @@ def scan_python_calls(tree: ast.AST, relative: str) -> list[Finding]:
                 continue
             argument = node.args[position]
             value = constant_text(argument)
-            if value is None or (relative, value) in FROZEN_CONTRACT_COPY:
-                continue
-            tokens = forbidden_tokens(value)
-            if tokens:
-                findings.append(Finding(relative, node.lineno, node.func.id, tokens))
+            values = [value] if value is not None else literal_fragments(argument)
+            for value in values:
+                if value is None or (relative, value) in FROZEN_CONTRACT_COPY:
+                    continue
+                tokens = forbidden_tokens(value)
+                if tokens:
+                    findings.append(Finding(relative, node.lineno, node.func.id, tokens))
     return findings
 
 

@@ -4,7 +4,7 @@
     <div class="alert alert-success border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
       <i class="mdi mdi-check-circle-outline me-2 fs-3"></i>
       <div>
-        {% blocktranslate with n=worker_status.cluster_count %}Background worker online ({{ n }} cluster running). Webhook &amp; notification deliveries are being processed.{% endblocktranslate %}
+        {% blocktranslate count n=worker_status.cluster_count %}Background worker online ({{ n }} cluster running). Webhook &amp; notification deliveries are being processed.{% plural %}Background workers online ({{ n }} clusters running). Webhook &amp; notification deliveries are being processed.{% endblocktranslate %}
       </div>
     </div>
   {% elif worker_status.detectable and not worker_status.online %}

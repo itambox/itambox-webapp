@@ -47,11 +47,21 @@
     {% if object.days_until_renewal is not None %}
       <span class="badge {% if object.days_until_renewal < 0 %}bg-danger{% elif object.days_until_renewal <= 30 %}bg-warning{% elif object.days_until_renewal <= 90 %}bg-info{% else %}bg-success{% endif %} ms-1">
         {% if object.days_until_renewal < 0 %}
-          {{ object.days_until_renewal|stringformat:"+d"|slice:"1:" }} {% translate "days overdue" %}
+          {% with days=object.days_until_renewal|absolute %}
+            {% blocktranslate trimmed count count=days %}
+              {{ count }} day overdue
+            {% plural %}
+              {{ count }} days overdue
+            {% endblocktranslate %}
+          {% endwith %}
         {% elif object.days_until_renewal == 0 %}
           {% translate "Today" %}
         {% else %}
-          {{ object.days_until_renewal }} {% translate "days" %}
+          {% blocktranslate trimmed count count=object.days_until_renewal %}
+            {{ count }} day
+          {% plural %}
+            {{ count }} days
+          {% endblocktranslate %}
         {% endif %}
       </span>
     {% endif %}

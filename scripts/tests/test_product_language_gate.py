@@ -63,6 +63,33 @@ class ProductLanguageGateTests(unittest.TestCase):
             findings = MODULE.scan_python(path, "itambox/forms/copy.py")
             self.assertEqual([finding.line for finding in findings], [1, 2])
 
+    def test_frozen_string_allowlist_only_allows_the_exact_compatibility_fragment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(
+                Path(directory),
+                "model.py",
+                "class Warranty:\n"
+                "    def __str__(self):\n"
+                "        return f'{self.name} – {self.name}'\n\n"
+                "class WarrantyChanged:\n"
+                "    def __str__(self):\n"
+                "        return f'new – {self.name}'\n",
+            )
+            findings = MODULE.scan_python(path, "itambox/assets/models/lifecycle.py")
+            self.assertEqual([(finding.line, finding.tokens) for finding in findings], [(7, ("en dash",))])
+
+    def test_dynamic_presentation_f_string_literals_are_scanned(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(
+                Path(directory),
+                "copy.py",
+                "from django.utils.html import format_html\n"
+                "def render(value):\n"
+                "    return format_html(f'left – {value}')\n",
+            )
+            findings = MODULE.scan_python(path, "itambox/forms/copy.py")
+            self.assertEqual([(finding.line, finding.field) for finding in findings], [(3, "format_html")])
+
     def test_python_scan_checks_direct_form_message_and_model_string_literals(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self.write(

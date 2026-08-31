@@ -454,9 +454,9 @@ class SubscriptionCancelForm(forms.Form):
 
 class SubscriptionCheckoutForm(forms.Form):
     TARGET_CHOICES = [
-        ("holder", "Employee / Asset Holder"),
-        ("asset", "Hardware Asset"),
-        ("location", "Location"),
+        ("holder", _("Employee / Asset Holder")),
+        ("asset", _("Hardware Asset")),
+        ("location", _("Location")),
     ]
 
     target_type = forms.ChoiceField(

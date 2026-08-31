@@ -887,9 +887,9 @@ def _frozen_rehome_location(
         .first()
     )
     if location is None:
-        raise PermissionDenied("The selected target location is inactive or not authorized.")
+        raise PermissionDenied(_("The selected target location is inactive or not authorized."))
     if session.tenant_id is not None and location.tenant_id != session.tenant_id:
-        raise PermissionDenied("The selected target location is outside the audit session's tenant.")
+        raise PermissionDenied(_("The selected target location is outside the audit session's tenant."))
     return location
 
 

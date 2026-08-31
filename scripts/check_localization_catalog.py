@@ -247,7 +247,7 @@ def iter_js_string_literals(text: str):
     """Yield quoted JS string literals with linear-time scanning."""
     index = 0
     while index < len(text):
-        if text[index] not in {"'", '"'}:
+        if text[index] not in {"'", '"', "`"}:
             index += 1
             continue
         quote = text[index]

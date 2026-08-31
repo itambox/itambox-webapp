@@ -92,20 +92,20 @@ class AuditSessionTable(BaseTable):
         fields = ("pk", "name", "location", "status", "started_at", "completed_at", "actions")
         default_columns = ("pk", "name", "location", "status", "started_at", "completed_at", "actions")
 
-    def render_status(self, value):
+    def render_status(self, value, record):
         badges = {
             "planned": "bg-secondary text-secondary-fg",
             "active": "bg-primary text-primary-fg",
             "completed": "bg-success text-success-fg",
         }
         badge_class = badges.get(value, "bg-secondary text-secondary-fg")
-        display = value.title() if value else "Planned"
+        display = record.get_status_display() if value else _("Planned")
         from django.utils.html import format_html
 
         return format_html('<span class="badge {}">{}</span>', badge_class, display)
 
     def render_location(self, value):
-        return value or "Global (All Locations)"
+        return value or _("Global (All Locations)")
 
     def render_completed_at(self, value):
         return value.strftime("%Y-%m-%d %H:%M") if value else _("Not completed")

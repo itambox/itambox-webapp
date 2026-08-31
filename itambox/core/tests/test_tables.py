@@ -19,6 +19,7 @@ from assets.models import (
 from assets.tables import AssetMaintenanceTable, AssetTable, AssetTypeTable, WarrantyTable
 from core.models import ObjectChange
 from core.tables import AssigneeColumn, BaseTable, BooleanColumn, ObjectChangeTable
+from core.templatetags.utility_tags import localize_journal_comment
 from extras.models import NotificationChannel
 from itambox.middleware import _request_id
 from organization.models import Location, Site
@@ -51,6 +52,18 @@ class TableLocalizationTests(SimpleTestCase):
             self.assertIn("Nicht festgelegt", str(column.render(None)))
         with translation.override("en"):
             self.assertIn("Not set", str(column.render(None)))
+
+    def test_subscription_renewal_journal_is_localized_only_when_rendered(self):
+        comment = "Renewed subscription. Next renewal date: 2026-09-01. Cost: Not set EUR."
+
+        with translation.override("de"):
+            self.assertEqual(
+                localize_journal_comment(comment),
+                "Abonnement verlängert. Nächster Verlängerungstermin: 2026-09-01. Kosten: Nicht festgelegt EUR.",
+            )
+        with translation.override("en"):
+            self.assertEqual(localize_journal_comment(comment), comment)
+        self.assertEqual(localize_journal_comment("A user-written journal entry."), "A user-written journal entry.")
 
 
 class AssetTableLocalizationTest(SimpleTestCase):

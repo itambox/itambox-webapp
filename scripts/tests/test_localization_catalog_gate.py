@@ -105,6 +105,16 @@ class LocalizationCatalogGateTests(unittest.TestCase):
             ['"A \\"quoted\\" value"', "'B\\\\\\'s value'"],
         )
 
+    def test_javascript_template_literal_gettext_is_extracted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "copy.ts"
+            path.write_text("gettext(`Visible label`)", encoding="utf-8")
+            sources = {}
+
+            MODULE.source_javascript(path, "itambox/static/src/copy.ts", sources)
+
+            self.assertIn(("djangojs", "Visible label"), sources)
+
     def test_constant_source_extraction_handles_python_and_javascript_concatenation(self):
         with tempfile.TemporaryDirectory() as directory:
             tmp_path = Path(directory)
