@@ -5,16 +5,11 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-if str(REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 import scripts.migration_audit as migration_audit
 from scripts.migration_audit import (
@@ -29,6 +24,8 @@ from scripts.migration_audit import (
     main,
     validate_preflight_manifest,
 )
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 class NormalizedMigrationAuditTests(unittest.TestCase):
@@ -643,11 +640,22 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
         contract_path = base / "contract.json"
         manifest_path = base / "manifest.json"
         output_path = base / "audit.json"
-        contract_path.write_text(json.dumps(contract), encoding="utf-8")
-        manifest_path.write_text(json.dumps(self._runtime_manifest(contract)), encoding="utf-8")
+        runtime_manifest = self._runtime_manifest(contract)
+
+        def load_external_fixture(path):
+            if path == contract_path:
+                return contract
+            if path == manifest_path:
+                return runtime_manifest
+            self.fail(f"unexpected normalized CLI fixture input: {path}")
+
         live_output = self.repository_root / "scripts/migration_audit.json"
         before = live_output.read_bytes()
-        with temporary_directory, contextlib.redirect_stdout(io.StringIO()):
+        with (
+            temporary_directory,
+            contextlib.redirect_stdout(io.StringIO()),
+            patch("scripts.migration_audit.load_preflight_manifest", side_effect=load_external_fixture),
+        ):
             result = main(
                 [
                     "--layout",
@@ -665,6 +673,8 @@ class NormalizedMigrationAuditTests(unittest.TestCase):
             rendered = json.loads(output_path.read_text(encoding="utf-8"))
         self.assertEqual(result, 0)
         self.assertEqual(rendered["layout"], "normalized")
+        self.assertFalse(contract_path.exists())
+        self.assertFalse(manifest_path.exists())
         self.assertEqual(live_output.read_bytes(), before)
 
 
