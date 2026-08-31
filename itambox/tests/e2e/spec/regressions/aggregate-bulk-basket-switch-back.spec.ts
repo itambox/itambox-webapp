@@ -84,12 +84,12 @@ test.describe('aggregate bulk basket switch-back regression (issue #438)', { tag
       await row.locator('input[type="checkbox"][name="pk"]').check();
     }
 
-    const checkinButton = page.locator('.btn-bulk-scan-seed[data-scan-url*="checkin/scan"]');
-    await expect(checkinButton).toHaveCount(1);
-    await expect(checkinButton).toBeEnabled();
+    const disposeButton = page.locator('.btn-bulk-scan-seed[data-scan-url*="dispose/scan"]');
+    await expect(disposeButton).toHaveCount(1);
+    await expect(disposeButton).toBeEnabled();
     await Promise.all([
-      page.waitForURL(/\/assets\/assets\/checkin\/scan\//),
-      checkinButton.click(),
+      page.waitForURL(/\/assets\/assets\/dispose\/scan\//),
+      disposeButton.click(),
     ]);
 
     const tenantSelect = page.locator('#scan-basket-form select[name="tenant"]');
