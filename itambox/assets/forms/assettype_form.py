@@ -11,7 +11,7 @@ from core.forms import SlugModelForm
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import CustomField, CustomFieldset, Tag
 
-from ..models import AssetRole, AssetType, AssetTypeFieldset, Manufacturer
+from ..models import AssetRole, AssetType, AssetTypeFieldset, Category, Manufacturer
 
 
 class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
@@ -84,6 +84,14 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             return [int(value) for value in values if str(value).isdigit()]
         if self.instance and self.instance.pk:
             return list(self.instance.fieldset_memberships.order_by("position").values_list("fieldset_id", flat=True))
+        if not self._custom_fieldsets_explicit:
+            category_id = getattr(self._draft_category, "pk", self._draft_category)
+            if category_id:
+                return list(
+                    Category.objects.filter(pk=category_id, default_fieldset_memberships__isnull=False)
+                    .values_list("default_fieldset_memberships__fieldset_id", flat=True)
+                    .order_by("default_fieldset_memberships__position")
+                )
         initial = self.initial.get("custom_fieldsets", [])
         if hasattr(initial, "values_list"):
             return list(initial.values_list("pk", flat=True))
@@ -103,6 +111,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         )
 
     def __init__(self, *args, **kwargs):
+        supplied_initial = kwargs.get("initial") or {}
+        self._custom_fieldsets_explicit = "custom_fieldsets" in supplied_initial
+        self._draft_category = supplied_initial.get("category")
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
