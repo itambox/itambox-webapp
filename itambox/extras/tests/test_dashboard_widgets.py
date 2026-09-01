@@ -561,6 +561,8 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
             managed_scope=RoleGrantScope.SCOPE_TENANT,
             assigned_tenants=[self.tenant_b],
         )
+        role_a.permissions = ["inventory.view_accessory"]
+        role_a.save(update_fields=["permissions"])
         from inventory.models import Accessory, AccessoryStock
 
         accessory_a = Accessory.objects.create(

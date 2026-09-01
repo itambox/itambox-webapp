@@ -470,10 +470,16 @@ class ManagedDashboardRenderTests(TestCase):
         request.active_all_accessible = False
         return request
 
+    def _grant_financial_view_permissions(self):
+        self.role.permissions = ["assets.view_asset", "assets.view_assetmaintenance"]
+        self.role.save(update_fields=["permissions"])
+        self.user.refresh_from_db()
+
     def _render_context(self, request, dashboard, layout_index=0):
         return {"request": request, "active_dashboard": dashboard}, dashboard.layout[layout_index]
 
     def test_managed_only_user_can_target_customer_and_render_customer_data_only(self):
+        self._grant_financial_view_permissions()
         self.assertEqual(accessible_tenant_ids(self.user), {self.provider.pk, self.customer.pk})
         self.assertFalse(Membership.objects.filter(user=self.user, tenant=self.customer).exists())
         dashboard = Dashboard.objects.create(
@@ -498,7 +504,32 @@ class ManagedDashboardRenderTests(TestCase):
         self.assertNotIn("1,500", financial_rendered)
         self.assertNotIn("3,500", financial_rendered)
 
+    def test_managed_target_without_resource_permission_fails_closed(self):
+        self.role.permissions = []
+        self.role.save(update_fields=["permissions"])
+        dashboard = Dashboard.objects.create(
+            user=self.user,
+            name="No Resource Permission Board",
+            tenant=self.customer,
+            layout=[
+                {"widget": "financial-overview", "title": "Finance", "visible": True, "config": {}},
+            ],
+        )
+        request = self.make_request()
+
+        denied = render_widget({"request": request, "active_dashboard": dashboard}, dashboard.layout[0])
+        self.assertEqual(denied, "")
+
+        self.role.permissions = ["assets.view_asset", "assets.view_assetmaintenance"]
+        self.role.save(update_fields=["permissions"])
+        self.user.refresh_from_db()
+        allowed = render_widget({"request": request, "active_dashboard": dashboard}, dashboard.layout[0])
+
+        self.assertIn("2,500", allowed)
+        self.assertNotIn("1,500", allowed)
+
     def test_per_widget_target_works_on_unbound_dashboard(self):
+        self._grant_financial_view_permissions()
         dashboard = Dashboard.objects.create(
             user=self.user,
             name="Unbound Board",
@@ -521,6 +552,7 @@ class ManagedDashboardRenderTests(TestCase):
         self.assertNotIn("3,500", rendered)
 
     def test_dashboard_target_overrides_conflicting_widget_target(self):
+        self._grant_financial_view_permissions()
         dashboard = Dashboard.objects.create(
             user=self.user,
             name="Precedence Board",
@@ -562,6 +594,7 @@ class ManagedDashboardRenderTests(TestCase):
         self.assertIs(get_current_tenant(), self.provider)
 
     def test_target_render_restores_request_context_and_session(self):
+        self._grant_financial_view_permissions()
         dashboard = Dashboard.objects.create(
             user=self.user,
             name="Restoration Board",
@@ -597,6 +630,8 @@ class ManagedDashboardRenderTests(TestCase):
         self.assertEqual(dict(request.session.items()), before_session)
 
     def test_target_render_restores_absent_request_attribute_after_exception(self):
+        self._grant_financial_view_permissions()
+
         class ExplodingWidget(dashboard_widgets.DashboardWidget):
             def get_context(self, request):
                 raise RuntimeError("widget exploded")
@@ -630,6 +665,7 @@ class ManagedDashboardRenderTests(TestCase):
         self.assertEqual(dict(request.session.items()), before_session)
 
     def test_revoked_target_fails_closed_without_process_restart(self):
+        self._grant_financial_view_permissions()
         dashboard = Dashboard.objects.create(
             user=self.user,
             name="Revocable Board",

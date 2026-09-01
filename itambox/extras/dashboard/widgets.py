@@ -244,6 +244,7 @@ class DashboardWidget:
     template_name = None  # Template for widget body content
     icon = "view-grid-outline"  # MDI icon name (without 'mdi-' prefix) for the header chip
     admin_only = False  # Restricted to global administrators
+    required_target_permissions = ()
 
     def __init__(self, config=None):
         self.config = config or {}
@@ -281,6 +282,14 @@ class DashboardWidget:
             return user.is_superuser or (hasattr(user, "is_staff") and user.is_staff)
         return True
 
+    def get_required_target_permissions(self):
+        return tuple(self.required_target_permissions)
+
+    def has_target_permissions(self, request, target):
+        return all(
+            request.user.has_perm(permission, obj=target) for permission in self.get_required_target_permissions()
+        )
+
     @property
     def display_title(self):
         return self.config.get("title") or self.title
@@ -301,6 +310,8 @@ class DashboardWidget:
 
         requested, target = _request_target_scope(request, self.config)
         if requested and target is None:
+            return ""
+        if requested and not self.has_target_permissions(request, target):
             return ""
 
         def render_body():
@@ -409,6 +420,7 @@ OBJECT_COUNT_MODEL_CHOICES = [
 @register_widget
 class ObjectCountsWidget(DashboardWidget):
     widget_id = "object-counts"
+    required_target_permissions = ()
     icon = "counter"
     title = _lazy("Object Counts")
     description = _lazy("Display counts of object types with links to their list views.")
@@ -423,6 +435,13 @@ class ObjectCountsWidget(DashboardWidget):
             choices=OBJECT_COUNT_MODEL_CHOICES,
             widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
             required=False,
+        )
+
+    def get_required_target_permissions(self):
+        selected = self.get_config_value("models", [])
+        return tuple(
+            f"{app_label}.view_{model_name}"
+            for app_label, model_name in (key.split(".", 1) for key in selected if "." in key)
         )
 
     def _get_model_label(self, key):
@@ -478,6 +497,7 @@ class ObjectCountsWidget(DashboardWidget):
 @register_widget
 class FinancialWidget(DashboardWidget):
     widget_id = "financial-overview"
+    required_target_permissions = ("assets.view_asset", "assets.view_assetmaintenance")
     icon = "wallet-outline"
     title = _lazy("Financial Overview")
     description = _lazy("Total cost of ownership, purchase costs, maintenance, and salvage values")
@@ -633,6 +653,7 @@ class FinancialWidget(DashboardWidget):
 @register_widget
 class StatusLabelsWidget(DashboardWidget):
     widget_id = "status-labels"
+    required_target_permissions = ("assets.view_asset",)
     icon = "label-multiple-outline"
     title = _lazy("Asset Status Labels")
     description = _lazy("Donut chart showing asset distribution by status label")
@@ -689,6 +710,7 @@ class StatusLabelsWidget(DashboardWidget):
 @register_widget
 class LicenseWidget(DashboardWidget):
     widget_id = "license-utilization"
+    required_target_permissions = ("licenses.view_license",)
     icon = "certificate-outline"
     title = _lazy("Software License Seats")
     description = _lazy("Top 5 licenses by seat utilization percentage")
@@ -734,6 +756,7 @@ class LicenseWidget(DashboardWidget):
 @register_widget
 class MaintenanceWidget(DashboardWidget):
     widget_id = "active-maintenances"
+    required_target_permissions = ("assets.view_assetmaintenance", "assets.view_asset")
     icon = "wrench-outline"
     title = _lazy("Active Repairs & Maintenances")
     description = _lazy("Ongoing repairs and maintenance tasks with associated costs")
@@ -793,6 +816,7 @@ class MaintenanceWidget(DashboardWidget):
 @register_widget
 class EOLAlertsWidget(DashboardWidget):
     widget_id = "eol-alerts"
+    required_target_permissions = ("assets.view_asset", "assets.view_assettype")
     icon = "calendar-alert"
     title = _lazy("EOL Planning Alerts")
     description = _lazy("Hardware expiring within 90 days or already past EOL")
@@ -862,6 +886,7 @@ class EOLAlertsWidget(DashboardWidget):
 @register_widget
 class ChangelogWidget(DashboardWidget):
     widget_id = "recent-activity"
+    required_target_permissions = ("core.view_objectchange",)
     icon = "history"
     title = _lazy("Change Log")
     description = _lazy("Recent object changes across the system (create, update, delete)")
@@ -948,6 +973,7 @@ class ChangelogWidget(DashboardWidget):
 @register_widget
 class RenewalsWidget(DashboardWidget):
     widget_id = "upcoming-renewals"
+    required_target_permissions = ("subscriptions.view_subscription",)
     icon = "autorenew"
     title = _lazy("Upcoming Renewals")
     description = _lazy("Active subscriptions renewing within 90 days")
@@ -1073,6 +1099,17 @@ class LowStockWidget(DashboardWidget):
             widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
             required=False,
         )
+
+    def get_required_target_permissions(self):
+        permissions = []
+        for key, permission in (
+            ("include_accessories", "inventory.view_accessory"),
+            ("include_consumables", "inventory.view_consumable"),
+            ("include_components", "inventory.view_component"),
+        ):
+            if self.get_config_value(key, True):
+                permissions.append(permission)
+        return tuple(permissions)
 
     def get_context(self, request):
         # Item querysets are scoped by the canonical manager (get_scoped_queryset
@@ -1259,6 +1296,7 @@ class BookmarksWidget(DashboardWidget):
 @register_widget
 class AssetAgeWidget(DashboardWidget):
     widget_id = "asset-age"
+    required_target_permissions = ("assets.view_asset",)
     icon = "chart-bar"
     title = _lazy("Asset Age Distribution")
     description = _lazy("Breakdown of assets by age bucket and average age")
@@ -1326,6 +1364,7 @@ class AssetAgeWidget(DashboardWidget):
 @register_widget
 class TenantSpendWidget(DashboardWidget):
     widget_id = "tenant-spend"
+    required_target_permissions = ("assets.view_asset",)
     icon = "cash-multiple"
     title = _lazy("Tenant Spend")
     description = _lazy("Purchase cost grouped by tenant (top 8)")
