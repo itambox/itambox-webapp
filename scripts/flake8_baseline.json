@@ -340,30 +340,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "layout_elements.extend(\n            [\n                Fieldset(\n                    _(\"Additional Information\"),\n                    \"comments\",\n                    Row(\n                        Column(\"tags\", css_class=\"col-md-8\"),\n                    ),\n                ),\n                HTML('<div class=\"mt-3\">'),\n                Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n                HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n                HTML(\"</div>\"),\n            ]\n        )",
-      "context": "Module:body/ClassDef:AssetTypeForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "code": "C901",
-      "message": "'AssetTypeForm.__init__' is too complex (20)",
-      "source": "    def __init__(self, *args, **kwargs):",
-      "context": "Module:body/ClassDef:AssetTypeForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Div' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/category_form.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
