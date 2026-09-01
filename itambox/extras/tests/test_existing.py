@@ -271,7 +271,7 @@ class CustomFieldViewTests(TestCase):
             {
                 "name": "building_floor",
                 "label": "Building Floor",
-                "field_type": CustomField.FIELD_TYPE_NUMBER,
+                "field_type": CustomField.FIELD_TYPE_INTEGER,
                 "required": "on",
             },
         )

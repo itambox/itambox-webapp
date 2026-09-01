@@ -20,6 +20,7 @@ from assets.models import (
     AssetRequest,
     AssetRole,
     AssetType,
+    AssetTypeFieldset,
     Category,
     Depreciation,
     Manufacturer,
@@ -31,7 +32,7 @@ from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.serialization import serialize_object
 from core.tests.mixins import TenantTestMixin, grant
-from extras.models import CustomField, CustomFieldset
+from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -983,10 +984,19 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
     def test_dynamic_custom_fieldsets_and_form_saving(self):
         # 1. Create custom fields
         sim_field = CustomField.objects.create(
-            name="sim_number", label="SIM Number", field_type=CustomField.FIELD_TYPE_TEXT, required=True
+            name="sim_number",
+            label="SIM Number",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET,
+            required=True,
         )
         screen_field = CustomField.objects.create(
-            name="screen_size", label="Screen Size", field_type=CustomField.FIELD_TYPE_NUMBER, required=False
+            name="screen_size",
+            label="Screen Size",
+            field_type=CustomField.FIELD_TYPE_DECIMAL,
+            scope=CustomField.SCOPE_ASSET,
+            decimal_scale=1,
+            required=False,
         )
 
         # object_types must be set so CF applies to Asset
@@ -995,13 +1005,22 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         screen_field.object_types.add(asset_ct)
 
         # 2. Create fieldset and link fields
-        fieldset = CustomFieldset.objects.create(name="Phone Specs")
-        fieldset.fields.add(sim_field, screen_field)
+        fieldset = CustomFieldset.objects.create(
+            name="Phone Specs",
+            namespace="local",
+            slug="phone-specs",
+            label="Phone Specs",
+        )
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=sim_field, position=10)
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=screen_field, position=20)
 
         # 3. Create asset type with fieldset
         asset_type = AssetType.objects.create(
-            manufacturer=self.manufacturer, model="iPhone 15", slug="apple-iphone-15", custom_fieldset=fieldset
+            manufacturer=self.manufacturer,
+            model="iPhone 15",
+            slug="apple-iphone-15",
         )
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
 
         # 4. Bind and save AssetForm with custom fields
         form_data = {
