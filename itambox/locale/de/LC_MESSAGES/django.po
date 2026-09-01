@@ -3588,23 +3588,14 @@ msgstr "Dashboards"
 msgid "Text"
 msgstr "Text"
 
-msgid "Number"
-msgstr "Zahl"
-
 msgid "Date"
 msgstr "Datum"
 
 msgid "Boolean"
 msgstr "Boolescher Wert"
 
-msgid "Select / Dropdown"
-msgstr "Auswahl / Dropdown"
-
 msgid "Field Name"
 msgstr "Feldname"
-
-msgid "Slug-like name (e.g. sim_card_number)"
-msgstr "Slug-artiger Name (z. B. sim_card_number)"
 
 msgid "Display Label"
 msgstr "Anzeige-Label"
@@ -3638,9 +3629,6 @@ msgstr ""
 
 msgid "Custom Field"
 msgstr "Benutzerdefiniertes Feld"
-
-msgid "Fieldset Name"
-msgstr "Feldgruppenname"
 
 #| msgid "Proceeds"
 msgid "Processed"
@@ -10496,8 +10484,6 @@ msgstr "Wählen Sie eine Benutzergruppe aus, die zu einem Mandanten gehört."
 msgid "Choose a valid role coverage option."
 msgstr "Wählen Sie einen gültigen Geltungsbereich für die Rolle aus."
 
-
-
 #: itambox/organization/models.py:894
 msgid "Choose either a member or a user group for this role, not both."
 msgstr "Wählen Sie für diese Rolle entweder ein Mitglied oder eine Benutzergruppe aus, nicht beides."
@@ -10694,8 +10680,6 @@ msgstr "Nicht abgeschlossen"
 #: itambox/templates/organization/resource_grant_expiry_run_detail.html:21
 msgid "Not finished"
 msgstr "Nicht abgeschlossen"
-
-
 
 #: itambox/extras/tables.py:604
 msgid "Not sent"
@@ -13744,3 +13728,176 @@ msgstr "Der ausgewählte Zielstandort gehört nicht zum Mandanten der Prüfsitzu
 #, python-format
 msgid "Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s."
 msgstr "Abonnement verlängert. Nächster Verlängerungstermin: %(renewal_date)s. Kosten: %(renewal_cost)s %(currency)s."
+
+
+#: itambox/extras/customfields.py
+msgid "A field cannot be set and cleared together."
+msgstr "Ein Feld kann nicht gleichzeitig gesetzt und gelöscht werden."
+
+#: itambox/extras/models.py
+msgid "Asset Type and Asset"
+msgstr "Asset-Typ und Asset"
+
+#: itambox/extras/models.py
+msgid "Decimal"
+msgstr "Dezimalzahl"
+
+#: itambox/assets/models/catalog.py
+msgid "Deprecated"
+msgstr "Veraltet"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Each specification fieldset may only be selected once."
+msgstr "Jede Spezifikationsfeldgruppe darf nur einmal ausgewählt werden."
+
+#: itambox/extras/customfields.py
+msgid "Enter a base-10 decimal without an exponent."
+msgstr "Gib eine Dezimalzahl ohne Exponent ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a boolean."
+msgstr "Gib einen Wahrheitswert ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a canonical decimal value."
+msgstr "Gib eine kanonische Dezimalzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a date."
+msgstr "Gib ein Datum ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a decimal value."
+msgstr "Gib eine Dezimalzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a valid hostname."
+msgstr "Gib einen gültigen Hostnamen ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter an ISO date."
+msgstr "Gib ein ISO-Datum ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter an integer."
+msgstr "Gib eine Ganzzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter text."
+msgstr "Gib Text ein."
+
+#: itambox/extras/models.py
+msgid "Integer"
+msgstr "Ganzzahl"
+
+#: itambox/extras/models.py
+msgid "Legacy Custom Fields"
+msgstr "Alte benutzerdefinierte Felder"
+
+#: itambox/extras/models.py
+msgid "Legacy Fieldset Name"
+msgstr "Name der alten Feldgruppe"
+
+#: itambox/assets/models/catalog.py
+msgid "Library"
+msgstr "Bibliothek"
+
+#: itambox/assets/models/catalog.py
+msgid "Local"
+msgstr "Lokal"
+
+#: itambox/extras/customfields.py
+msgid "Maximum temperature must not be below minimum."
+msgstr "Die Höchsttemperatur darf nicht unter der Mindesttemperatur liegen."
+
+#: itambox/extras/models.py
+msgid "Multi select"
+msgstr "Mehrfachauswahl"
+
+#: itambox/extras/customfields.py
+msgid "Negative zero is not allowed."
+msgstr "Negativ null ist nicht zulässig."
+
+#: itambox/extras/customfields.py
+msgid "Null is not allowed for this field."
+msgstr "Null ist für dieses Feld nicht zulässig."
+
+#: itambox/extras/customfields.py
+msgid "Select a list of values."
+msgstr "Wähle eine Werteliste aus."
+
+#: itambox/extras/customfields.py
+msgid "Select a valid choice."
+msgstr "Wähle eine gültige Option aus."
+
+#: itambox/extras/customfields.py
+msgid "Select one value."
+msgstr "Wähle einen Wert aus."
+
+#: itambox/extras/customfields.py
+msgid "Select unique valid choices."
+msgstr "Wähle eindeutige gültige Optionen aus."
+
+#: itambox/extras/models.py
+msgid "Single select"
+msgstr "Einzelauswahl"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Specification fieldsets"
+msgstr "Spezifikationsfeldgruppen"
+
+#: itambox/extras/models.py
+msgid "Stable JSON key (e.g. sim_card_number)"
+msgstr "Stabiler JSON-Schlüssel (z. B. sim_card_number)"
+
+#: itambox/extras/customfields.py
+msgid "The choice definition is invalid."
+msgstr "Die Auswahldefinition ist ungültig."
+
+#: itambox/extras/customfields.py
+msgid "The decimal definition is invalid."
+msgstr "Die Dezimaldefinition ist ungültig."
+
+#: itambox/extras/customfields.py
+msgid "The decimal value is too large."
+msgstr "Die Dezimalzahl ist zu groß."
+
+#: itambox/extras/customfields.py
+msgid "The field type is unsupported."
+msgstr "Der Feldtyp wird nicht unterstützt."
+
+#: itambox/extras/customfields.py
+msgid "The integer is outside the supported range."
+msgstr "Die Ganzzahl liegt außerhalb des unterstützten Bereichs."
+
+#: itambox/assets/models/catalog.py
+msgid "The library Asset Type identity is immutable after creation."
+msgstr "Die Identität des Asset-Typs aus der Bibliothek kann nach der Erstellung nicht geändert werden."
+
+#: itambox/extras/customfields.py
+msgid "The text is too long."
+msgstr "Der Text ist zu lang."
+
+#: itambox/extras/customfields.py
+msgid "The value has an invalid format."
+msgstr "Der Wert hat ein ungültiges Format."
+
+#: itambox/extras/customfields.py
+msgid "The value is above the allowed maximum."
+msgstr "Der Wert liegt über dem zulässigen Maximum."
+
+#: itambox/extras/customfields.py
+msgid "The value is below the allowed minimum."
+msgstr "Der Wert liegt unter dem zulässigen Minimum."
+
+#: itambox/extras/models.py
+msgid "This value is immutable after creation."
+msgstr "Dieser Wert kann nach der Erstellung nicht geändert werden."
+
+#: itambox/extras/customfields.py
+msgid "Too many values were selected."
+msgstr "Es wurden zu viele Werte ausgewählt."
+
+#: itambox/extras/customfields.py
+msgid "Unknown custom field key."
+msgstr "Unbekannter Schlüssel für ein benutzerdefiniertes Feld."
