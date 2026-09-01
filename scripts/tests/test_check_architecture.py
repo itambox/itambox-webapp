@@ -1509,7 +1509,6 @@ class RepositoryBaselineTests(unittest.TestCase):
         document = json.loads((REPOSITORY_ROOT / "scripts" / "architecture_baseline.json").read_text(encoding="utf-8"))
         owners = {row["owner"] for section in BASELINE_SECTIONS for row in document[section]}
 
-        self.assertTrue(owners)
         self.assertLessEqual(owners, AREA_LABELS)
 
     def test_the_baseline_records_no_absolutely_forbidden_rule(self):

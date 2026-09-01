@@ -372,9 +372,6 @@ def recipient_assignment_union(queryset, assignment_model):
     """Extend a tenant-scoped assignment queryset with live rows TARGETING the
     active tenant (ADR-0001 phase 4b: recipients may view inbound cross-tenant
     assignments and run the return workflow). No active tenant → unchanged."""
-    # inline import: cycle: break an inventory <-> core import cycle at load
-    from core.managers import get_current_tenant
-
     tenant = get_current_tenant()
     if tenant is None:
         return queryset

@@ -1457,12 +1457,6 @@
     },
     {
       "path": "itambox/extras/dashboard/widgets.py",
-      "context": "ClassDef:DashboardWidget/FunctionDef:get_config_form",
-      "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
       "context": "ClassDef:EOLAlertsWidget/FunctionDef:get_context",
       "statement": "from assets.models import AssetType",
       "count": 1

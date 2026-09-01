@@ -11419,10 +11419,6 @@ msgstr "Test-Webhook senden"
 msgid "Redeliver a webhook delivery"
 msgstr "Webhook-Zustellung erneut zustellen"
 
-#: itambox/extras/dashboard/views.py:280
-msgid "You are not a member of the selected tenant."
-msgstr "Sie sind kein Mitglied des ausgewählten Mandanten."
-
 #: itambox/extras/export_views.py:165
 msgid "One or more selected IDs are invalid."
 msgstr "Mindestens eine ausgewählte ID ist ungültig."

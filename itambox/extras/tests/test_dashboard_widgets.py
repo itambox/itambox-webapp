@@ -1,11 +1,19 @@
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import PermissionDenied
+from django.db import connection
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 from assets.models import Asset, AssetMaintenance, AssetType, Manufacturer, StatusLabel
 from core.managers import (
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_tenant,
+    get_current_tenant_group,
     set_current_all_accessible,
     set_current_membership,
     set_current_tenant,
@@ -30,7 +38,7 @@ from extras.dashboard.widgets import (
 )
 from itambox.middleware import set_current_user
 from licenses.models import License
-from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant
+from organization.models import AssetHolder, Location, Membership, Role, RoleGrantScope, Site, Tenant
 from subscriptions.models import Provider, Subscription
 
 User = get_user_model()
@@ -146,6 +154,9 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         contextvars after each test."""
         request = self.factory.get("/")
         request.user = user
+        middleware = SessionMiddleware(lambda req: None)
+        middleware.process_request(request)
+        request.session.save()
         set_current_user(user)
         set_current_tenant_group(None)
         set_current_all_accessible(False)
@@ -464,3 +475,122 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         ctx_admin_status = widget_status.get_context(self.make_request(self.admin))
         # Admin should see total_assets = 1 (Tenant A's asset) and not 2
         self.assertEqual(ctx_admin_status["total_assets"], 1)
+
+    def test_staff_widget_target_choices_use_canonical_managed_reach(self):
+        self.tenant_a.is_provider = True
+        self.tenant_a.save(update_fields=["is_provider"])
+        self.tenant_b.managed_by = self.tenant_a
+        self.tenant_b.save(update_fields=["managed_by"])
+        role_a = Role.objects.get(tenant=self.tenant_a, name="Member A")
+        grant(
+            self.user_a,
+            self.tenant_a,
+            role_a,
+            reach="managed",
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
+            assigned_tenants=[self.tenant_b],
+        )
+        tenant_c = Tenant.objects.create(name="Tenant C", slug="tenant-c")
+        tenant_d = Tenant.objects.create(
+            name="Tenant D Deleted",
+            slug="tenant-d-deleted",
+            deleted_at=timezone.now(),
+        )
+        self.user_a.is_staff = True
+        self.user_a.save(update_fields=["is_staff"])
+        request = self.make_request(self.user_a)
+        before = (
+            get_current_tenant(),
+            get_current_tenant_group(),
+            get_current_membership(),
+            get_current_all_accessible(),
+            request.active_tenant,
+            request.active_tenant_group,
+            request.active_membership,
+            request.active_all_accessible,
+            dict(request.session.items()),
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            form = StatusLabelsWidget().get_config_form(request=request)
+
+        choices = dict(form.fields["tenant_id"].choices)
+        catalogue_queries = [
+            query["sql"]
+            for query in queries
+            if 'ORDER BY "organization_tenant"."name" ASC, "organization_tenant"."id" ASC' in query["sql"]
+        ]
+        self.assertEqual(set(choices), {"", str(self.tenant_a.pk), str(self.tenant_b.pk)})
+        self.assertEqual(choices[""], "All Tenants")
+        self.assertNotIn(str(tenant_c.pk), choices)
+        self.assertNotIn(str(tenant_d.pk), choices)
+        self.assertEqual(len(catalogue_queries), 1)
+        self.assertEqual(
+            (
+                get_current_tenant(),
+                get_current_tenant_group(),
+                get_current_membership(),
+                get_current_all_accessible(),
+                request.active_tenant,
+                request.active_tenant_group,
+                request.active_membership,
+                request.active_all_accessible,
+                dict(request.session.items()),
+            ),
+            before,
+        )
+
+        forged = StatusLabelsWidget().get_config_form(
+            data={"chart_type": "list", "tenant_id": str(tenant_c.pk)},
+            request=request,
+        )
+        self.assertFalse(forged.is_valid())
+        self.assertIn("Select a valid choice", forged.errors["tenant_id"][0])
+
+    def test_managed_target_low_stock_render_uses_customer_scope(self):
+        self.tenant_a.is_provider = True
+        self.tenant_a.save(update_fields=["is_provider"])
+        self.tenant_b.managed_by = self.tenant_a
+        self.tenant_b.save(update_fields=["managed_by"])
+        role_a = Role.objects.get(tenant=self.tenant_a, name="Member A")
+        grant(
+            self.user_a,
+            self.tenant_a,
+            role_a,
+            reach="managed",
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
+            assigned_tenants=[self.tenant_b],
+        )
+        role_a.permissions = ["inventory.view_accessory"]
+        role_a.save(update_fields=["permissions"])
+        from inventory.models import Accessory, AccessoryStock
+
+        accessory_a = Accessory.objects.create(
+            name="Provider accessory",
+            manufacturer=self.mfr,
+            min_qty=5,
+            tenant=self.tenant_a,
+        )
+        AccessoryStock.objects.create(accessory=accessory_a, location=self.loc_a, qty=10)
+        accessory_b = Accessory.objects.create(
+            name="Customer accessory",
+            manufacturer=self.mfr,
+            min_qty=5,
+            tenant=self.tenant_b,
+        )
+        AccessoryStock.objects.create(accessory=accessory_b, location=self.loc_b, qty=0)
+        request = self.make_request(self.user_a)
+        widget = LowStockWidget(
+            config={
+                "config": {
+                    "tenant_id": str(self.tenant_b.pk),
+                    "include_consumables": False,
+                    "include_components": False,
+                }
+            }
+        )
+
+        rendered = widget.render(request)
+
+        self.assertIn("Customer accessory", rendered)
+        self.assertNotIn("Provider accessory", rendered)

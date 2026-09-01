@@ -28,7 +28,7 @@ from itambox.views.generic import (
 from itambox.views.generic.utils import safe_return_url
 from organization.services.role_grant_validation import validate_role_grant
 
-from ..access import tenant_access_report
+from ..access import accessible_tenant_ids, get_descendant_tenant_group_ids, tenant_access_report
 from ..filters import MembershipFilterSet
 from ..forms import MembershipBulkRoleForm, MembershipFilterForm, MembershipForm
 from ..models import Membership, RoleGrant, RoleGrantScope, Tenant
@@ -134,10 +134,6 @@ class MembershipListView(ObjectListView):
         empty-set fallback in practice (middleware always resolves them an active
         tenant, group, or all-accessible scope).
         """
-        # inline import: cycle: keep accessible_tenant_ids as the single source of truth
-        # without a module-load cycle risk.
-        from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
-
         if active_group is not None:
             group_ids = get_descendant_tenant_group_ids(active_group.pk)
             base = Tenant._base_manager.filter(

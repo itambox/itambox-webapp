@@ -1,5 +1,6 @@
 import json
 import re
+from contextlib import contextmanager
 from datetime import date, timedelta
 from html import unescape
 from types import SimpleNamespace
@@ -18,6 +19,8 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
 
 from assets.models import Asset, AssetMaintenance, StatusLabel
+from core.context import override_current_tenant_scope
+from core.tenant_access import accessible_tenant_ids, active_membership
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -30,6 +33,7 @@ from inventory.models import (
     ConsumableStock,
 )
 from licenses.models import License
+from organization.models import Tenant
 from subscriptions.models import Subscription
 
 # -----------------------------------------------------------------------------
@@ -60,66 +64,126 @@ def get_registered_widgets():
 # -----------------------------------------------------------------------------
 
 
+_TARGET_SCOPE_ATTR = "_dashboard_target_scope"
+_MISSING = object()
+
+
+def dashboard_target_tenants(user):
+    """Return every live tenant the user may target from a dashboard."""
+    if user is None or not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
+        return Tenant._base_manager.none()
+    if getattr(user, "is_superuser", False):
+        return Tenant._base_manager.filter(deleted_at__isnull=True).order_by("name", "pk")
+    return Tenant._base_manager.filter(
+        pk__in=accessible_tenant_ids(user),
+        deleted_at__isnull=True,
+    ).order_by("name", "pk")
+
+
+def _coerce_target_tenant_id(raw_tenant_id):
+    if raw_tenant_id is None or raw_tenant_id == "" or isinstance(raw_tenant_id, bool):
+        return None
+    if isinstance(raw_tenant_id, int):
+        return raw_tenant_id
+    if isinstance(raw_tenant_id, str) and raw_tenant_id.isdecimal():
+        return int(raw_tenant_id)
+    return None
+
+
+def resolve_dashboard_target_tenant(user, raw_tenant_id):
+    """Return one authorized live target, or ``None`` without disclosing it."""
+    tenant_id = _coerce_target_tenant_id(raw_tenant_id)
+    if tenant_id is None:
+        return None
+    return dashboard_target_tenants(user).filter(pk=tenant_id).first()
+
+
+def _target_tenant_value(config):
+    if not isinstance(config, dict):
+        return False, None
+    nested_config = config.get("config")
+    if isinstance(nested_config, dict) and "tenant_id" in nested_config:
+        raw_tenant_id = nested_config["tenant_id"]
+    elif "tenant_id" in config:
+        raw_tenant_id = config["tenant_id"]
+    else:
+        return False, None
+    return raw_tenant_id not in (None, ""), raw_tenant_id
+
+
+def _resolve_target_tenant(config, user=None):
+    """Resolve a configured target using the canonical dashboard access policy."""
+    requested, raw_tenant_id = _target_tenant_value(config)
+    if not requested:
+        return None
+    return resolve_dashboard_target_tenant(user, raw_tenant_id)
+
+
+def _request_target_scope(request, config):
+    requested, raw_tenant_id = _target_tenant_value(config)
+    if not requested:
+        return False, None
+    marker = getattr(request, _TARGET_SCOPE_ATTR, _MISSING)
+    if marker is not _MISSING:
+        return True, marker[0]
+    return True, resolve_dashboard_target_tenant(getattr(request, "user", None), raw_tenant_id)
+
+
+@contextmanager
+def _dashboard_render_scope(request, target):
+    """Overlay target tenant state for one widget render and restore it exactly."""
+    attr_names = ("active_tenant", "active_tenant_group", "active_membership", "active_all_accessible")
+    previous_attrs = {
+        name: (True, getattr(request, name)) if hasattr(request, name) else (False, None) for name in attr_names
+    }
+    previous_marker = (
+        (True, getattr(request, _TARGET_SCOPE_ATTR)) if hasattr(request, _TARGET_SCOPE_ATTR) else (False, None)
+    )
+    membership = active_membership(request.user, target.pk)
+    with override_current_tenant_scope(target, membership):
+        try:
+            request.active_tenant = target
+            request.active_tenant_group = None
+            request.active_membership = membership
+            request.active_all_accessible = False
+            setattr(request, _TARGET_SCOPE_ATTR, (target, membership))
+            yield
+        finally:
+            if previous_marker[0]:
+                setattr(request, _TARGET_SCOPE_ATTR, previous_marker[1])
+            else:
+                delattr(request, _TARGET_SCOPE_ATTR)
+            for name, (present, value) in previous_attrs.items():
+                if present:
+                    setattr(request, name, value)
+                else:
+                    delattr(request, name)
+
+
 def get_scoped_queryset(model_class, request, config=None):
-    """Return ``model_class`` rows visible under the request's canonical tenant
-    scope, optionally narrowed to a single explicitly targeted tenant.
-
-    ``model_class.objects`` is the canonical tenant-scoping manager: it already
-    resolves the active scope from the request/contextvars bound by
-    ``TenantMiddleware`` — a single tenant, a tenant group, the member
-    "all accessible tenants" aggregate, the superuser global view, or a
-    fail-closed empty set. This helper deliberately does NOT re-derive tenant
-    membership; the previous second scoping layer honoured only
-    ``request.active_tenant`` and, on the all-accessible scope, collapsed the
-    aggregate to the member's first ``AssetHolder`` profile (or ``qs.none()``
-    when they had none) — the root cause of issue #133.
-
-    A ``config['tenant_id']`` — per-widget targeting by an authorized global
-    administrator, or a tenant-bound dashboard injected by the ``render_widget``
-    template tag — is applied as a pure NARROWING overlay on top of that scope,
-    so it can only ever restrict, never widen, what the viewer may already see.
-    """
+    """Return rows under the request scope and an authorized explicit target."""
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return model_class.objects.none()
 
-    qs = model_class.objects.all()
+    requested, target = _request_target_scope(request, config)
+    if not requested:
+        return model_class.objects.all()
+    if target is None:
+        return model_class.objects.none()
 
-    target = _resolve_target_tenant(config)
-    if target is not None:
-        qs = _narrow_queryset_to_tenant(qs, model_class, target.pk)
-    return qs
+    marker = getattr(request, _TARGET_SCOPE_ATTR, _MISSING)
+    if marker is not _MISSING and marker[0] is target:
+        qs = model_class.objects.all()
+        return _narrow_queryset_to_tenant(qs, model_class, target.pk)
 
-
-def _resolve_target_tenant(config):
-    """Resolve the explicit per-widget target tenant from ``config['tenant_id']``.
-
-    Resolution goes through the tenant-scoped ``Tenant.objects`` manager, so the
-    id is honoured only when the viewer may actually reach that tenant under the
-    active scope (a superuser resolves any tenant; a member resolves only an
-    accessible one). An unresolved id yields ``None`` — i.e. no narrowing — so a
-    tenant-bound dashboard pointing at a tenant the member cannot access falls
-    back to their canonical scope instead of leaking or blanking arbitrarily.
-    """
-    tenant_id = (config or {}).get("tenant_id")
-    if not tenant_id:
-        return None
-    # inline import: cycle: avoid an extras.dashboard.widgets -> organization.models
-    # import cycle at app load.
-    from organization.models import Tenant
-
-    return Tenant.objects.filter(pk=tenant_id).first()
+    with override_current_tenant_scope(target, active_membership(user, target.pk)):
+        qs = model_class.objects.all()
+        return _narrow_queryset_to_tenant(qs, model_class, target.pk)
 
 
 def _narrow_queryset_to_tenant(qs, model_class, tenant_id):
-    """Intersect ``qs`` with a single tenant, applied on top of the canonical
-    manager scope so a tenant the viewer cannot access simply yields no rows.
-
-    Resolves the tenant column the way the tenant-scoping manager does: a direct
-    ``tenant`` field, else the model's declared ``tenant_lookup`` relation (e.g.
-    ``asset__tenant`` for ``AssetMaintenance``). Global catalogue tables with
-    neither (e.g. ``StatusLabel``) are returned unchanged.
-    """
+    """Intersect a canonical queryset with one authorized tenant."""
     try:
         model_class._meta.get_field("tenant")
         return qs.filter(tenant_id=tenant_id)
@@ -180,6 +244,7 @@ class DashboardWidget:
     template_name = None  # Template for widget body content
     icon = "view-grid-outline"  # MDI icon name (without 'mdi-' prefix) for the header chip
     admin_only = False  # Restricted to global administrators
+    required_target_permissions = ()
 
     def __init__(self, config=None):
         self.config = config or {}
@@ -199,9 +264,7 @@ class DashboardWidget:
         # If request is provided and user is staff/superuser, dynamically inject a 'tenant_id' field
         if request and (request.user.is_superuser or (hasattr(request.user, "is_staff") and request.user.is_staff)):
             if self.widget_id != "tenant-spend":  # exclude tenant-spend widget which is global
-                from organization.models import Tenant
-
-                tenants = Tenant.objects.all().order_by("name")
+                tenants = dashboard_target_tenants(request.user)
                 choices = [("", _("All Tenants"))] + [(str(t.id), t.name) for t in tenants]
                 form.fields["tenant_id"] = forms.ChoiceField(
                     label=_("Target Tenant Context"),
@@ -219,6 +282,14 @@ class DashboardWidget:
             return user.is_superuser or (hasattr(user, "is_staff") and user.is_staff)
         return True
 
+    def get_required_target_permissions(self):
+        return tuple(self.required_target_permissions)
+
+    def has_target_permissions(self, request, target):
+        return all(
+            request.user.has_perm(permission, obj=target) for permission in self.get_required_target_permissions()
+        )
+
     @property
     def display_title(self):
         return self.config.get("title") or self.title
@@ -231,14 +302,27 @@ class DashboardWidget:
         return {}
 
     def render(self, request):
-        """Render the widget body HTML."""
+        """Render the widget body HTML under any authorized explicit target."""
         if not self.has_permission(request):
             return mark_safe(
                 f'<div class="text-danger text-center py-4">{_("Restricted to Global Administrators.")}</div>'
             )
-        ctx = self.get_context(request)
-        ctx["widget"] = self
-        return render_to_string(self.get_template_name(), ctx, request=request)
+
+        requested, target = _request_target_scope(request, self.config)
+        if requested and target is None:
+            return ""
+        if requested and not self.has_target_permissions(request, target):
+            return ""
+
+        def render_body():
+            ctx = self.get_context(request)
+            ctx["widget"] = self
+            return render_to_string(self.get_template_name(), ctx, request=request)
+
+        if requested:
+            with _dashboard_render_scope(request, target):
+                return render_body()
+        return render_body()
 
     def get_footer_links(self, request):
         """Return a list of dictionaries with 'url' and 'label' for card footer buttons."""
@@ -336,6 +420,7 @@ OBJECT_COUNT_MODEL_CHOICES = [
 @register_widget
 class ObjectCountsWidget(DashboardWidget):
     widget_id = "object-counts"
+    required_target_permissions = ()
     icon = "counter"
     title = _lazy("Object Counts")
     description = _lazy("Display counts of object types with links to their list views.")
@@ -350,6 +435,13 @@ class ObjectCountsWidget(DashboardWidget):
             choices=OBJECT_COUNT_MODEL_CHOICES,
             widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
             required=False,
+        )
+
+    def get_required_target_permissions(self):
+        selected = self.get_config_value("models", [])
+        return tuple(
+            f"{app_label}.view_{model_name}"
+            for app_label, model_name in (key.split(".", 1) for key in selected if "." in key)
         )
 
     def _get_model_label(self, key):
@@ -405,6 +497,7 @@ class ObjectCountsWidget(DashboardWidget):
 @register_widget
 class FinancialWidget(DashboardWidget):
     widget_id = "financial-overview"
+    required_target_permissions = ("assets.view_asset", "assets.view_assetmaintenance")
     icon = "wallet-outline"
     title = _lazy("Financial Overview")
     description = _lazy("Total cost of ownership, purchase costs, maintenance, and salvage values")
@@ -560,6 +653,7 @@ class FinancialWidget(DashboardWidget):
 @register_widget
 class StatusLabelsWidget(DashboardWidget):
     widget_id = "status-labels"
+    required_target_permissions = ("assets.view_asset",)
     icon = "label-multiple-outline"
     title = _lazy("Asset Status Labels")
     description = _lazy("Donut chart showing asset distribution by status label")
@@ -616,6 +710,7 @@ class StatusLabelsWidget(DashboardWidget):
 @register_widget
 class LicenseWidget(DashboardWidget):
     widget_id = "license-utilization"
+    required_target_permissions = ("licenses.view_license",)
     icon = "certificate-outline"
     title = _lazy("Software License Seats")
     description = _lazy("Top 5 licenses by seat utilization percentage")
@@ -661,6 +756,7 @@ class LicenseWidget(DashboardWidget):
 @register_widget
 class MaintenanceWidget(DashboardWidget):
     widget_id = "active-maintenances"
+    required_target_permissions = ("assets.view_assetmaintenance", "assets.view_asset")
     icon = "wrench-outline"
     title = _lazy("Active Repairs & Maintenances")
     description = _lazy("Ongoing repairs and maintenance tasks with associated costs")
@@ -720,6 +816,7 @@ class MaintenanceWidget(DashboardWidget):
 @register_widget
 class EOLAlertsWidget(DashboardWidget):
     widget_id = "eol-alerts"
+    required_target_permissions = ("assets.view_asset", "assets.view_assettype")
     icon = "calendar-alert"
     title = _lazy("EOL Planning Alerts")
     description = _lazy("Hardware expiring within 90 days or already past EOL")
@@ -789,6 +886,7 @@ class EOLAlertsWidget(DashboardWidget):
 @register_widget
 class ChangelogWidget(DashboardWidget):
     widget_id = "recent-activity"
+    required_target_permissions = ("core.view_objectchange",)
     icon = "history"
     title = _lazy("Change Log")
     description = _lazy("Recent object changes across the system (create, update, delete)")
@@ -875,6 +973,7 @@ class ChangelogWidget(DashboardWidget):
 @register_widget
 class RenewalsWidget(DashboardWidget):
     widget_id = "upcoming-renewals"
+    required_target_permissions = ("subscriptions.view_subscription",)
     icon = "autorenew"
     title = _lazy("Upcoming Renewals")
     description = _lazy("Active subscriptions renewing within 90 days")
@@ -1001,6 +1100,17 @@ class LowStockWidget(DashboardWidget):
             required=False,
         )
 
+    def get_required_target_permissions(self):
+        permissions = []
+        for key, permission in (
+            ("include_accessories", "inventory.view_accessory"),
+            ("include_consumables", "inventory.view_consumable"),
+            ("include_components", "inventory.view_component"),
+        ):
+            if self.get_config_value(key, True):
+                permissions.append(permission)
+        return tuple(permissions)
+
     def get_context(self, request):
         # Item querysets are scoped by the canonical manager (get_scoped_queryset
         # for accessories/consumables; Component.objects for components). The
@@ -1010,7 +1120,16 @@ class LowStockWidget(DashboardWidget):
         # tenant-bound-dashboard target additionally narrows both sides to that
         # one tenant (issue #133: no more active-tenant/AssetHolder fallback).
         # The per-item-type work lives in helpers so this stays simple.
-        target = _resolve_target_tenant(self.config.get("config", {}))
+        requested, target = _request_target_scope(request, self.config)
+        if requested and target is None:
+            return {
+                "low_stock_accessories": [],
+                "low_stock_consumables": [],
+                "low_stock_components": [],
+                "low_stock_accessory_count": 0,
+                "low_stock_consumable_count": 0,
+                "low_stock_component_count": 0,
+            }
         target_id = target.pk if target is not None else None
 
         low_accessories = (
@@ -1177,6 +1296,7 @@ class BookmarksWidget(DashboardWidget):
 @register_widget
 class AssetAgeWidget(DashboardWidget):
     widget_id = "asset-age"
+    required_target_permissions = ("assets.view_asset",)
     icon = "chart-bar"
     title = _lazy("Asset Age Distribution")
     description = _lazy("Breakdown of assets by age bucket and average age")
@@ -1244,6 +1364,7 @@ class AssetAgeWidget(DashboardWidget):
 @register_widget
 class TenantSpendWidget(DashboardWidget):
     widget_id = "tenant-spend"
+    required_target_permissions = ("assets.view_asset",)
     icon = "cash-multiple"
     title = _lazy("Tenant Spend")
     description = _lazy("Purchase cost grouped by tenant (top 8)")

@@ -27,6 +27,7 @@ from core.context import (
     _issued_system_authorizations,
     _request_id,
     _system_authorization_scope,
+    override_current_tenant_scope,
 )
 from core.managers import get_current_membership, get_current_tenant
 from core.models import _user_validation_cache
@@ -248,3 +249,54 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
 
         self.assertIsNone(get_current_tenant())
         self.assertIsNone(get_current_membership())
+
+    def test_override_current_tenant_scope_restores_all_outer_values(self):
+        outer_tenant = object()
+        outer_group = object()
+        outer_membership = object()
+        outer_cache = {"outer": [1]}
+        _current_tenant.set(outer_tenant)
+        _current_tenant_group.set(outer_group)
+        _current_membership.set(outer_membership)
+        _current_all_accessible.set(True)
+        _descendant_group_ids_cache.set(outer_cache)
+        inner_tenant = object()
+        inner_membership = object()
+
+        with override_current_tenant_scope(inner_tenant, inner_membership):
+            self.assertIs(_current_tenant.get(), inner_tenant)
+            self.assertIsNone(_current_tenant_group.get())
+            self.assertIs(_current_membership.get(), inner_membership)
+            self.assertFalse(_current_all_accessible.get())
+            self.assertIsNone(_descendant_group_ids_cache.get())
+
+        self.assertIs(_current_tenant.get(), outer_tenant)
+        self.assertIs(_current_tenant_group.get(), outer_group)
+        self.assertIs(_current_membership.get(), outer_membership)
+        self.assertTrue(_current_all_accessible.get())
+        self.assertIs(_descendant_group_ids_cache.get(), outer_cache)
+
+    def test_override_current_tenant_scope_restores_nested_and_exception_state(self):
+        outer_tenant = object()
+        outer_group = object()
+        outer_membership = object()
+        outer_cache = {"outer": [2]}
+        _current_tenant.set(outer_tenant)
+        _current_tenant_group.set(outer_group)
+        _current_membership.set(outer_membership)
+        _current_all_accessible.set(True)
+        _descendant_group_ids_cache.set(outer_cache)
+
+        with self.assertRaisesRegex(RuntimeError, "inner failure"):
+            with override_current_tenant_scope(object()):
+                with override_current_tenant_scope(object(), object()):
+                    self.assertIsNone(_current_tenant_group.get())
+                    self.assertFalse(_current_all_accessible.get())
+                    self.assertIsNone(_descendant_group_ids_cache.get())
+                    raise RuntimeError("inner failure")
+
+        self.assertIs(_current_tenant.get(), outer_tenant)
+        self.assertIs(_current_tenant_group.get(), outer_group)
+        self.assertIs(_current_membership.get(), outer_membership)
+        self.assertTrue(_current_all_accessible.get())
+        self.assertIs(_descendant_group_ids_cache.get(), outer_cache)
