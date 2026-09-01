@@ -14,13 +14,14 @@ def _qualified_identity(fieldset):
     return f"{fieldset.namespace}/{fieldset.slug}"
 
 
-def _resolve_composed_fields(asset_type, scopes, stored_values):
+def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None):
+    """Resolve an already ordered fieldset sequence for a domain form or object."""
+    stored_values = dict(stored_values or {})
     resolved = []
     by_key = {}
-    memberships = asset_type.fieldset_memberships.select_related("fieldset").order_by("position", "fieldset__slug")
-    for composition in memberships:
-        identity = _qualified_identity(composition.fieldset)
-        field_memberships = composition.fieldset.field_memberships.select_related("custom_field").order_by(
+    for fieldset in fieldsets:
+        identity = _qualified_identity(fieldset)
+        field_memberships = fieldset.field_memberships.select_related("custom_field").order_by(
             "position", "custom_field__name"
         )
         for membership in field_memberships:
@@ -47,10 +48,15 @@ def _resolve_composed_fields(asset_type, scopes, stored_values):
     return resolved
 
 
+def _composed_fieldsets(asset_type):
+    memberships = asset_type.fieldset_memberships.select_related("fieldset").order_by("position", "fieldset__slug")
+    return [membership.fieldset for membership in memberships]
+
+
 def resolve_asset_type_custom_fields(asset_type):
     stored_values = dict(asset_type.custom_field_data or {})
-    return _resolve_composed_fields(
-        asset_type,
+    return resolve_fieldsets_custom_fields(
+        _composed_fieldsets(asset_type),
         {CustomField.SCOPE_ASSET_TYPE, CustomField.SCOPE_BOTH},
         stored_values,
     )
@@ -58,8 +64,8 @@ def resolve_asset_type_custom_fields(asset_type):
 
 def resolve_asset_custom_fields(asset_type, stored_values=None):
     stored_values = dict(stored_values or {})
-    resolved = _resolve_composed_fields(
-        asset_type,
+    resolved = resolve_fieldsets_custom_fields(
+        _composed_fieldsets(asset_type),
         {CustomField.SCOPE_ASSET, CustomField.SCOPE_BOTH},
         stored_values,
     )

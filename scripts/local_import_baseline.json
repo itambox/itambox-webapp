@@ -40,24 +40,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "context": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "statement": "from ..models import AssetType as AssetTypeModel",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "context": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "context": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "statement": "from extras.models import CustomField, CustomFieldset",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/category_form.py",
       "context": "ClassDef:CategoryForm/FunctionDef:__init__",
       "statement": "from crispy_forms.helper import FormHelper",
