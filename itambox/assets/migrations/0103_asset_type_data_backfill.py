@@ -375,6 +375,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("assets", "0102_asset_type_composition_schema"),
         ("extras", "0114_asset_type_definition_schema"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [migrations.RunPython(forward, reverse)]

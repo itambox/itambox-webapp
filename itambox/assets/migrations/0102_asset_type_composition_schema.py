@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('assets', '0101_seed_canonical_missing_status'),
         ('extras', '0114_asset_type_definition_schema'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [

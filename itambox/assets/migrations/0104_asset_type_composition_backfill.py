@@ -33,6 +33,9 @@ def reverse(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("assets", "0103_asset_type_data_backfill")]
+    dependencies = [
+        ("assets", "0103_asset_type_data_backfill"),
+        ("users", "0100_issue88_shard_62_users_relations"),
+    ]
 
     operations = [migrations.RunPython(forward, reverse)]

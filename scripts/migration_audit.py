@@ -18,6 +18,9 @@ OPERATION_TYPES = (
 )
 POST_TRANSITION_MIGRATIONS = {
     "assets.0101_seed_canonical_missing_status",
+    "assets.0102_asset_type_composition_schema",
+    "assets.0103_asset_type_data_backfill",
+    "assets.0104_asset_type_composition_backfill",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -36,6 +39,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
+    "extras.0114_asset_type_definition_schema",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -70,6 +74,22 @@ def _dispositions(disposition, rationale, migration_ids):
 # This is a checked, human-reviewed policy. It is intentionally independent of
 # migration/function names, reversibility syntax, and operation implementation.
 SEMANTIC_DISPOSITIONS = {
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Converts legacy custom-field identities, types, relational choices, memberships, and stored JSON values "
+            "into the Issue #479 additive definition schema while preserving unknown keys and aborting on ambiguity."
+        ),
+        {"assets.0103_asset_type_data_backfill"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Copies the legacy singular Asset Type fieldset relation into the ordered plural composition before the "
+            "later clean-cut removal of the migration-input column."
+        ),
+        {"assets.0104_asset_type_composition_backfill"},
+    ),
     **_dispositions(
         "upgrade-only",
         (
