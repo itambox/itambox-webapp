@@ -3,6 +3,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.translation import gettext
 
 from core.tests.mixins import grant
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
@@ -347,6 +348,6 @@ class AllManagedScopeConflictTests(TestCase):
         self.assertFalse(form.is_valid())
         errors = " ".join(form.managed_formset.non_form_errors())
         self.assertIn(
-            "'All managed tenants' already covers every other selection for that role.",
+            gettext("'All managed tenants' already covers every other selection for that role."),
             errors,
         )
