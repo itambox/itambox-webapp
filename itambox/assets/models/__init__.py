@@ -29,9 +29,12 @@ from assets.models.catalog import (
     AssetRole,
     Manufacturer,
     Depreciation,
+    AssetTypeLibrary,
     AssetType,
+    AssetTypeFieldset,
     Supplier,
     Category,
+    CategoryDefaultFieldset,
 )
 
 # ── 3. Core asset + state machine ────────────────────────────────────────────
@@ -74,9 +77,12 @@ __all__ = [
     "AssetRole",
     "Manufacturer",
     "Depreciation",
+    "AssetTypeLibrary",
     "AssetType",
+    "AssetTypeFieldset",
     "Supplier",
     "Category",
+    "CategoryDefaultFieldset",
     # asset
     "AssetStateMachine",
     "Asset",
