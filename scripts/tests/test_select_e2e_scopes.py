@@ -13,8 +13,10 @@ from scripts.select_e2e_scopes import (
     ScopeMapError,
     SelectionError,
     _matches,
+    build_e2e_identity,
     build_selection,
     canonical_json,
+    collect_git_changes,
     parse_name_status_z,
     validate_scope_map,
     validate_selection,
@@ -111,6 +113,101 @@ class NameStatusParsingTests(unittest.TestCase):
             with self.subTest(data=data):
                 with self.assertRaises(SelectionError):
                     parse_name_status_z(data)
+
+
+class GitIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        subprocess.run(["git", "init", "--initial-branch=main"], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=self.root, check=True)
+        subprocess.run(["git", "config", "user.name", "E2E Test"], cwd=self.root, check=True)
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def commit(self, message):
+        subprocess.run(["git", "add", "."], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-m", message], cwd=self.root, check=True, capture_output=True)
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.root, text=True).strip()
+
+    def test_one_file_pr_diff_cannot_inherit_stale_files_or_change_logical_merge_base(self):
+        for relative, content in (
+            ("itambox/compliance/tests/test_lifecycle_successor.py", "deadline = 10\\n"),
+            ("itambox/organization/models.py", "unchanged organization source\\n"),
+            ("scripts/coverage_baseline.json", "{}\\n"),
+            ("scripts/resource_grant_test_manifest.json", "{}\\n"),
+        ):
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        base = self.commit("base")
+        target = self.root / "itambox/compliance/tests/test_lifecycle_successor.py"
+        target.write_text("deadline = 30\\n", encoding="utf-8")
+        head = self.commit("head")
+
+        merge_base, changes = collect_git_changes(
+            self.root,
+            event_name="pull_request",
+            base_sha=base,
+            head_sha=head,
+        )
+        self.assertEqual(merge_base, base)
+        self.assertEqual(
+            [(change.status, change.new_path) for change in changes],
+            [("M", "itambox/compliance/tests/test_lifecycle_successor.py")],
+        )
+
+    def test_raw_head_identity_records_synthetic_merge_without_using_it_for_diff(self):
+        (self.root / "file.txt").write_text("base\\n", encoding="utf-8")
+        base = self.commit("base")
+        (self.root / "file.txt").write_text("head\\n", encoding="utf-8")
+        head = self.commit("head")
+        synthetic = "f" * 40
+
+        identity = build_e2e_identity(
+            self.root,
+            event_name="pull_request",
+            base_sha=base,
+            head_sha=head,
+            checkout_sha=head,
+            synthetic_merge_sha=synthetic,
+        )
+        selection = build_selection(
+            _map_document(self.root),
+            self.root,
+            event_name="pull_request",
+            base_sha=base,
+            head_sha=head,
+            merge_base_sha=base,
+            changes=[{"status": "M", "new_path": "file.txt"}],
+        )
+
+        for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest"):
+            self.assertEqual(identity[key], selection[key])
+        self.assertEqual(identity["provenance_schema"], 2)
+        self.assertEqual(identity["head_sha"], head)
+        self.assertEqual(identity["merge_base_sha"], base)
+        self.assertEqual(identity["tested_checkout_sha"], head)
+        self.assertEqual(identity["tested_checkout_kind"], "head")
+        self.assertEqual(identity["synthetic_merge_sha"], synthetic)
+
+    def test_raw_head_identity_rejects_synthetic_merge_as_tested_checkout(self):
+        (self.root / "file.txt").write_text("base\\n", encoding="utf-8")
+        base = self.commit("base")
+        (self.root / "file.txt").write_text("head\\n", encoding="utf-8")
+        head = self.commit("head")
+        synthetic = "f" * 40
+
+        with self.assertRaises(SelectionError):
+            build_e2e_identity(
+                self.root,
+                event_name="pull_request",
+                base_sha=base,
+                head_sha=head,
+                checkout_sha=synthetic,
+                synthetic_merge_sha=synthetic,
+            )
 
 
 class ScopeMapValidationTests(unittest.TestCase):

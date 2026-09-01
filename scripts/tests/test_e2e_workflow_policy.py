@@ -71,6 +71,35 @@ class E2EWorkflowTopologyTests(unittest.TestCase):
                 self.assertIn(required, execution)
         self.assertNotIn("npm test\n", execution)
 
+    def test_pull_request_uses_raw_head_checkout_and_independent_identity_inputs(self):
+        raw_head_ref = (
+            "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+        )
+        for job in ("detect-e2e-scope", "e2e-selected", "e2e-gate"):
+            with self.subTest(job=job):
+                self.assertRegex(
+                    self.workflow,
+                    rf"(?ms)^  {re.escape(job)}:.*?{re.escape(raw_head_ref)}",
+                )
+        for required in ("E2E_EVENT_NAME", "E2E_PR_BASE_SHA", "E2E_PR_HEAD_SHA", "E2E_WORKFLOW_SHA"):
+            with self.subTest(required=required):
+                self.assertIn(required, self.workflow)
+        self.assertIn("tested_checkout_sha", self.workflow)
+        self.assertIn("synthetic_merge_sha", self.workflow)
+
+    def test_gate_consumes_recorded_current_identity_instead_of_rebuilding_from_selection(self):
+        gate = self.workflow.split("  e2e-gate:", 1)[1]
+        self.assertIn("e2e-current-identity.json", gate)
+        self.assertRegex(
+            gate, r"(?ms)current_identity\s*=\s*load\(Path\(\"artifacts/run/e2e-current-identity.json\"\)\)"
+        )
+        self.assertIn("build_e2e_identity", gate)
+        self.assertIn('["git", "rev-parse", "HEAD"]', gate)
+        self.assertIn("E2E gate provenance mismatch for", gate)
+        self.assertIn('"selection": execution.get("selection")', gate)
+        self.assertNotIn('"selection": selection,\n                  "tested_checkout_sha": execution.get', gate)
+        self.assertEqual(gate.count("current ="), 2)
+
     def test_gate_delegates_policy_to_stdlib_script_and_fails_closed(self):
         gate = self.workflow.split("  e2e-gate:", 1)[1]
         self.assertIn("scripts/check_e2e_gate.py", gate)

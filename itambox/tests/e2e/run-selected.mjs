@@ -538,6 +538,7 @@ async function main() {
   const productReportTests = report.tests.filter((test) => test.spec.startsWith('spec/'));
   const execution = {
     schema: 1,
+    selection,
     selection_identity: discovery.selection_identity,
     tested_checkout_sha: testedCheckoutSha,
     selected_spec_paths: selectedSpecPaths,

@@ -32,6 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -152,6 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python 3.12
@@ -580,6 +582,9 @@ jobs:
         working-directory: ./
         env:
           E2E_EVENT_NAME: ${{ github.event_name }}
+          E2E_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          E2E_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          E2E_WORKFLOW_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
           python - <<'PY'
@@ -587,6 +592,8 @@ jobs:
           import os
           import subprocess
           from pathlib import Path
+
+          from scripts.select_e2e_scopes import SelectionError, build_e2e_identity
 
           selection_path = Path("artifacts/selection/e2e-selection.json")
           selection = json.loads(selection_path.read_text(encoding="utf-8"))
@@ -596,16 +603,39 @@ jobs:
               capture_output=True,
               text=True,
           ).stdout.strip()
-          kind = "merge_candidate" if selection["event_name"] == "pull_request" and checkout != selection["head_sha"] else "head"
-          identity = {
-              key: selection[key]
-              for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest")
-          }
-          identity.update({"tested_checkout_sha": checkout, "tested_checkout_kind": kind})
+          event_name = os.environ["E2E_EVENT_NAME"]
+          if event_name == "pull_request":
+              base_sha = os.environ["E2E_PR_BASE_SHA"]
+              head_sha = os.environ["E2E_PR_HEAD_SHA"]
+              synthetic_merge_sha = os.environ["E2E_WORKFLOW_SHA"]
+          else:
+              base_sha = checkout
+              head_sha = checkout
+              synthetic_merge_sha = None
+          try:
+              identity = build_e2e_identity(
+                  ".",
+                  event_name=event_name,
+                  base_sha=base_sha,
+                  head_sha=head_sha,
+                  checkout_sha=checkout,
+                  synthetic_merge_sha=synthetic_merge_sha,
+              )
+          except SelectionError as exc:
+              raise SystemExit(f"E2E provenance derivation failed: {exc}") from exc
+          for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest"):
+              if selection.get(key) != identity[key]:
+                  raise SystemExit(
+                      f"E2E provenance mismatch for {key}: "
+                      f"selection={selection.get(key)!r}, derived={identity[key]!r}"
+                  )
           output = Path("artifacts/e2e-current-identity.json")
           output.parent.mkdir(parents=True, exist_ok=True)
           output.write_text(json.dumps(identity, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-          print(f"E2E tested checkout recorded as {checkout} ({kind}).")
+          print(
+              f"E2E provenance recorded: event={event_name}, base={base_sha}, head={head_sha}, "
+              f"merge_base={identity['merge_base_sha']}, checkout={checkout}, kind=head."
+          )
           PY
 
       - name: Run selected/full Playwright qualification
@@ -690,7 +720,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - name: Download detector evidence
         if: always()
         continue-on-error: true
@@ -711,11 +742,16 @@ jobs:
           EXECUTION_RESULT: ${{ needs.e2e-selected.result }}
           # detector_result/execution_result are consumed by the stdlib gate envelope.
           EVENT_NAME: ${{ github.event_name }}
+          E2E_EVENT_NAME: ${{ github.event_name }}
+          E2E_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          E2E_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          E2E_WORKFLOW_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
           python - <<'PY'
           import json
           import os
+          import subprocess
           from pathlib import Path
 
           def load(path):
@@ -724,6 +760,60 @@ jobs:
           selection = load(Path("artifacts/selection/e2e-selection.json"))
           execution = load(Path("artifacts/run/e2e-execution.json"))
           certification = load(Path("artifacts/run/e2e-certification.json"))
+          current_identity = load(Path("artifacts/run/e2e-current-identity.json"))
+          if selection is not None:
+              from scripts.select_e2e_scopes import SelectionError, build_e2e_identity
+
+              checkout = subprocess.run(
+                  ["git", "rev-parse", "HEAD"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout.strip()
+              event_name = os.environ["E2E_EVENT_NAME"]
+              if event_name == "pull_request":
+                  base_sha = os.environ["E2E_PR_BASE_SHA"]
+                  head_sha = os.environ["E2E_PR_HEAD_SHA"]
+                  synthetic_merge_sha = os.environ["E2E_WORKFLOW_SHA"]
+              else:
+                  base_sha = checkout
+                  head_sha = checkout
+                  synthetic_merge_sha = None
+              try:
+                  expected_identity = build_e2e_identity(
+                      ".",
+                      event_name=event_name,
+                      base_sha=base_sha,
+                      head_sha=head_sha,
+                      checkout_sha=checkout,
+                      synthetic_merge_sha=synthetic_merge_sha,
+                  )
+              except SelectionError as exc:
+                  raise SystemExit(f"E2E gate provenance derivation failed: {exc}") from exc
+              for key in sorted(set(selection) & set(expected_identity)):
+                  if selection.get(key) != expected_identity.get(key):
+                      raise SystemExit(
+                          f"E2E gate provenance mismatch for {key}: "
+                          f"selection={selection.get(key)!r}, derived={expected_identity.get(key)!r}"
+                      )
+              if current_identity is not None:
+                  if not isinstance(current_identity, dict):
+                      raise SystemExit("E2E gate provenance is not an object")
+                  for key in sorted(set(current_identity) | set(expected_identity)):
+                      if current_identity.get(key) != expected_identity.get(key):
+                          raise SystemExit(
+                              f"E2E gate provenance mismatch for {key}: "
+                              f"recorded={current_identity.get(key)!r}, derived={expected_identity.get(key)!r}"
+                          )
+              if selection["mode"] != "none" and current_identity is None:
+                  raise SystemExit("E2E gate provenance is missing for selected/full execution")
+              current = (
+                  {key: expected_identity[key] for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest")}
+                  if selection["mode"] == "none"
+                  else current_identity
+              )
+          else:
+              current = {}
           detector = {
               "result": os.environ["DETECTOR_RESULT"],
               "selection": selection,
@@ -732,30 +822,15 @@ jobs:
           if os.environ["EXECUTION_RESULT"] == "success" and execution is not None and selection is not None:
               execution_input = {
                   "result": "success",
-                  "selection": selection,
+                  "selection": execution.get("selection"),
                   "tested_checkout_sha": execution.get("tested_checkout_sha", ""),
                   "selection_artifact_exists": True,
                   "discovery_artifact_exists": Path("artifacts/run/e2e-discovery.json").is_file(),
                   "report_artifact_exists": Path("artifacts/run/e2e-playwright.json").is_file(),
                   "certification_artifact_exists": Path("artifacts/run/e2e-certification.json").is_file(),
               }
-              runtime_sha = execution.get("tested_checkout_sha")
           else:
               execution_input = {"result": os.environ["EXECUTION_RESULT"]}
-              runtime_sha = None
-          current = {}
-          if selection is not None:
-              current = {
-                  key: selection[key]
-                  for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest")
-              }
-              if runtime_sha:
-                  current["tested_checkout_sha"] = runtime_sha
-                  current["tested_checkout_kind"] = (
-                      "merge_candidate"
-                      if selection["event_name"] == "pull_request" and runtime_sha != selection["head_sha"]
-                      else "head"
-                  )
           gate_input = {
               "schema": 1,
               "detector": detector,

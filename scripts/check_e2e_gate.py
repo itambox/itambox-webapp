@@ -26,7 +26,7 @@ DIGEST_RE = selector.DIGEST_RE
 KNOWN_EVENTS = selector.KNOWN_EVENTS
 SCHEMA = selector.SCHEMA
 SHA_RE = selector.SHA_RE
-RUNTIME_KEYS = frozenset({"tested_checkout_sha", "tested_checkout_kind"})
+RUNTIME_KEYS = frozenset({"provenance_schema", "tested_checkout_sha", "tested_checkout_kind", "synthetic_merge_sha"})
 SELECTION_KEYS = selector.SELECTION_KEYS
 SelectionError = selector.SelectionError
 canonical_json = selector.canonical_json
@@ -68,11 +68,27 @@ def _exact_keys(value: Mapping[str, Any], expected: frozenset[str], label: str) 
         raise GateInputError(f"{label} has invalid keys; missing={missing}, unknown={unknown}")
 
 
+def _validate_runtime_identity(value: Mapping[str, Any], label: str) -> None:
+    if type(value["provenance_schema"]) is not int or value["provenance_schema"] != selector.PROVENANCE_SCHEMA:
+        raise _InvalidEvidence(f"{label}.provenance_schema must be {selector.PROVENANCE_SCHEMA}")
+    if not isinstance(value["tested_checkout_sha"], str) or SHA_RE.fullmatch(value["tested_checkout_sha"]) is None:
+        raise _InvalidEvidence(f"{label}.tested_checkout_sha is malformed")
+    if value["tested_checkout_kind"] != "head":
+        raise _InvalidEvidence(f"{label}.tested_checkout_kind must be head")
+    synthetic_merge_sha = value["synthetic_merge_sha"]
+    if value["event_name"] == "pull_request":
+        if not isinstance(synthetic_merge_sha, str) or SHA_RE.fullmatch(synthetic_merge_sha) is None:
+            raise _InvalidEvidence(f"{label}.synthetic_merge_sha is malformed")
+    elif synthetic_merge_sha is not None:
+        raise _InvalidEvidence(f"{label}.synthetic_merge_sha is only valid for pull_request events")
+
+
 def _identity(value: Any, label: str, *, allow_runtime: bool = False) -> dict[str, str]:
     if not isinstance(value, dict):
         raise _InvalidEvidence(f"{label} is not a complete identity object")
     allowed = IDENTITY_KEYS | (RUNTIME_KEYS if allow_runtime else set())
-    missing = sorted(IDENTITY_KEYS - set(value))
+    required = IDENTITY_KEYS | (RUNTIME_KEYS if allow_runtime else set())
+    missing = sorted(required - set(value))
     unknown = sorted(set(value) - allowed)
     if missing or unknown:
         raise _InvalidEvidence(f"{label} is not a complete identity object: missing={missing}, unknown={unknown}")
@@ -83,19 +99,16 @@ def _identity(value: Any, label: str, *, allow_runtime: bool = False) -> dict[st
             raise _InvalidEvidence(f"{label}.{key} is malformed")
     if not isinstance(value["changed_path_digest"], str) or DIGEST_RE.fullmatch(value["changed_path_digest"]) is None:
         raise _InvalidEvidence(f"{label}.changed_path_digest is malformed")
-    if allow_runtime and "tested_checkout_sha" in value:
-        if not isinstance(value["tested_checkout_sha"], str) or SHA_RE.fullmatch(value["tested_checkout_sha"]) is None:
-            raise _InvalidEvidence(f"{label}.tested_checkout_sha is malformed")
-        if value.get("tested_checkout_kind") not in {"head", "merge_candidate"}:
-            raise _InvalidEvidence(f"{label}.tested_checkout_kind is malformed")
+    if allow_runtime:
+        _validate_runtime_identity(value, label)
     return {key: value[key] for key in IDENTITY_KEYS}
 
 
 def _runtime_checkout(value: Mapping[str, Any], selection: Mapping[str, Any]) -> str:
     checkout = value.get("tested_checkout_sha", selection["head_sha"])
     kind = value.get("tested_checkout_kind", "head")
-    if checkout != selection["head_sha"] and kind != "merge_candidate":
-        raise _InvalidEvidence("a checkout different from the selected head must be marked merge_candidate")
+    if checkout != selection["head_sha"] or kind != "head":
+        raise _InvalidEvidence("E2E must certify the raw PR-head checkout")
     return checkout
 
 
@@ -313,23 +326,30 @@ def _validate_certification(
     current: Mapping[str, str],
     runtime_checkout_sha: str,
     runtime_checkout_kind: str,
+    synthetic_merge_sha: str | None,
 ) -> None:
     if not isinstance(certification, dict):
         raise _InvalidEvidence("certification artifact is missing or malformed")
-    required = {"schema", "success", "verdict", *IDENTITY_KEYS}
+    required = {"schema", "success", "verdict", *IDENTITY_KEYS, *RUNTIME_KEYS}
     if not required.issubset(certification):
         raise _InvalidEvidence("certification artifact is incomplete")
     if type(certification["schema"]) is not int or certification["schema"] != SCHEMA:
         raise _InvalidEvidence("certification schema is unsupported")
     if certification["success"] is not True or certification["verdict"] != "passed":
         raise _InvalidEvidence("certification did not pass")
-    identity = _identity({key: certification[key] for key in IDENTITY_KEYS}, "certification identity")
+    identity = _identity(
+        {key: certification[key] for key in IDENTITY_KEYS | RUNTIME_KEYS},
+        "certification identity",
+        allow_runtime=True,
+    )
     if identity != selected_identity or identity != current:
         raise _InvalidEvidence("certification identity does not match selection/current event")
-    if "tested_checkout_sha" in certification and certification["tested_checkout_sha"] != runtime_checkout_sha:
+    if certification["tested_checkout_sha"] != runtime_checkout_sha:
         raise _InvalidEvidence("certification tested checkout does not match current event checkout")
-    if "tested_checkout_kind" in certification and certification["tested_checkout_kind"] != runtime_checkout_kind:
+    if certification["tested_checkout_kind"] != runtime_checkout_kind:
         raise _InvalidEvidence("certification tested checkout kind does not match current event")
+    if certification["synthetic_merge_sha"] != synthetic_merge_sha:
+        raise _InvalidEvidence("certification synthetic merge SHA does not match current event")
 
 
 def _evaluate_required_execution(
@@ -339,6 +359,7 @@ def _evaluate_required_execution(
     current: Mapping[str, str],
     runtime_checkout_sha: str,
     runtime_checkout_kind: str,
+    synthetic_merge_sha: str | None,
     certification: Any,
 ) -> dict[str, Any]:
     _validate_required_artifacts(execution)
@@ -356,6 +377,7 @@ def _evaluate_required_execution(
         current,
         runtime_checkout_sha,
         runtime_checkout_kind,
+        synthetic_merge_sha,
     )
     return {"schema": SCHEMA, "success": True, "verdict": "passed", "mode": selection["mode"], "reasons": []}
 
@@ -368,6 +390,7 @@ def _evaluate_execution_mode(
     current: Mapping[str, str],
     runtime_checkout_sha: str,
     runtime_checkout_kind: str,
+    synthetic_merge_sha: str | None,
     certification: Any,
 ) -> dict[str, Any]:
     if mode == "none":
@@ -383,6 +406,7 @@ def _evaluate_execution_mode(
             current,
             runtime_checkout_sha,
             runtime_checkout_kind,
+            synthetic_merge_sha,
             certification,
         )
     except _InvalidEvidence as exc:
@@ -397,14 +421,25 @@ def evaluate_gate(value: Any) -> dict[str, Any]:
         return _failed(None, f"detector job result was {detector['result']}")
     if not detector["artifact_exists"]:
         return _failed(None, "detector selection artifact is absent")
+    selection = None
     try:
         selection = _basic_selection(detector["selection"], "detector selection")
-        current = _identity(value["current"], "current identity", allow_runtime=True)
-        runtime_checkout_sha = _runtime_checkout(value["current"], selection)
-        runtime_checkout_kind = value["current"].get("tested_checkout_kind", "head")
     except _InvalidEvidence as exc:
         return _failed(None, str(exc))
     mode = selection["mode"]
+    try:
+        if mode == "none":
+            current = _identity(value["current"], "current identity")
+            runtime_checkout_sha = selection["head_sha"]
+            runtime_checkout_kind = "head"
+            synthetic_merge_sha = None
+        else:
+            current = _identity(value["current"], "current identity", allow_runtime=True)
+            runtime_checkout_sha = _runtime_checkout(value["current"], selection)
+            runtime_checkout_kind = value["current"].get("tested_checkout_kind", "head")
+            synthetic_merge_sha = value["current"]["synthetic_merge_sha"]
+    except _InvalidEvidence as exc:
+        return _failed(None, str(exc))
     selected_identity = {key: selection[key] for key in IDENTITY_KEYS}
     if current != selected_identity:
         return _failed(mode, "current identity does not match detector selection")
@@ -417,6 +452,7 @@ def evaluate_gate(value: Any) -> dict[str, Any]:
         current,
         runtime_checkout_sha,
         runtime_checkout_kind,
+        synthetic_merge_sha,
         value["certification"],
     )
 

@@ -30,6 +30,7 @@ CHANGE_STATUSES = frozenset({"A", "M", "D", "R", "C"})
 SELECTIVE_EVENTS = frozenset({"pull_request"})
 AUTHORITATIVE_FULL_EVENTS = frozenset({"push", "schedule", "workflow_dispatch", "workflow_call", "release"})
 KNOWN_EVENTS = SELECTIVE_EVENTS | AUTHORITATIVE_FULL_EVENTS
+PROVENANCE_SCHEMA = 2
 
 REQUIRED_APP_SCOPES = frozenset(
     {
@@ -1180,6 +1181,54 @@ def collect_git_changes(
     _resolve_commit(root, actual_merge, "merge_base_sha")
     raw_changes = _git(root, ["diff", "--name-status", "-z", "-M", "-C", actual_merge, head_sha, "--"])
     return actual_merge, parse_name_status_z(raw_changes)
+
+
+def build_e2e_identity(
+    repo_root: str | Path,
+    *,
+    event_name: str,
+    base_sha: str,
+    head_sha: str,
+    checkout_sha: str,
+    synthetic_merge_sha: str | None = None,
+) -> dict[str, str | None]:
+    """Derive the canonical E2E provenance from independent Git inputs."""
+
+    if event_name not in KNOWN_EVENTS:
+        raise SelectionError(f"unsupported E2E event {event_name!r}")
+    try:
+        _validate_sha(checkout_sha, "tested checkout SHA")
+        if synthetic_merge_sha is not None:
+            _validate_sha(synthetic_merge_sha, "synthetic merge SHA")
+    except ValueError as exc:
+        raise SelectionError(str(exc)) from exc
+    if event_name == "pull_request":
+        if synthetic_merge_sha is None:
+            raise SelectionError("pull-request provenance is missing synthetic merge SHA")
+        if checkout_sha != head_sha:
+            raise SelectionError("pull-request E2E checkout must be the raw PR head")
+    elif synthetic_merge_sha is not None:
+        raise SelectionError("non-pull-request provenance must not contain synthetic merge SHA")
+    if checkout_sha != head_sha:
+        raise SelectionError("tested checkout SHA must equal the selected PR head")
+
+    merge_base_sha, changes = collect_git_changes(
+        repo_root,
+        event_name=event_name,
+        base_sha=base_sha,
+        head_sha=head_sha,
+    )
+    return {
+        "provenance_schema": PROVENANCE_SCHEMA,
+        "event_name": event_name,
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+        "merge_base_sha": merge_base_sha,
+        "changed_path_digest": changed_path_digest(changes),
+        "tested_checkout_sha": checkout_sha,
+        "tested_checkout_kind": "head",
+        "synthetic_merge_sha": synthetic_merge_sha,
+    }
 
 
 def _write_canonical(path: str | Path, value: Mapping[str, Any]) -> None:

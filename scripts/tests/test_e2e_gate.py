@@ -10,6 +10,7 @@ from scripts.check_e2e_gate import GateInputError, evaluate_gate
 BASE = "a" * 40
 HEAD = "b" * 40
 MERGE = "c" * 40
+SYNTHETIC = "e" * 40
 DIGEST = "sha256:" + "d" * 64
 
 
@@ -21,6 +22,13 @@ class GatePolicyTests(unittest.TestCase):
             "head_sha": HEAD,
             "merge_base_sha": MERGE,
             "changed_path_digest": DIGEST,
+        }
+        self.runtime_identity = {
+            **self.identity,
+            "provenance_schema": 2,
+            "tested_checkout_sha": HEAD,
+            "tested_checkout_kind": "head",
+            "synthetic_merge_sha": SYNTHETIC,
         }
         self.selection = {
             "schema": 1,
@@ -39,7 +47,7 @@ class GatePolicyTests(unittest.TestCase):
                 }
             ],
         }
-        self.certification = {"schema": 1, "success": True, "verdict": "passed", **self.identity}
+        self.certification = {"schema": 1, "success": True, "verdict": "passed", **self.runtime_identity}
         self.base = {
             "schema": 1,
             "detector": {
@@ -57,7 +65,7 @@ class GatePolicyTests(unittest.TestCase):
                 "certification_artifact_exists": True,
             },
             "certification": copy.deepcopy(self.certification),
-            "current": copy.deepcopy(self.identity),
+            "current": copy.deepcopy(self.runtime_identity),
         }
 
     def test_selected_success_requires_all_evidence_and_passes(self):
@@ -67,6 +75,7 @@ class GatePolicyTests(unittest.TestCase):
 
     def test_validated_none_succeeds_without_playwright_artifacts(self):
         value = copy.deepcopy(self.base)
+        value["current"] = copy.deepcopy(self.identity)
         value["detector"]["selection"]["mode"] = "none"
         value["detector"]["selection"]["scopes"] = []
         value["detector"]["selection"]["spec_paths"] = []
@@ -75,6 +84,21 @@ class GatePolicyTests(unittest.TestCase):
         value["certification"] = None
         result = evaluate_gate(value)
         self.assertTrue(result["success"])
+
+        value = copy.deepcopy(self.base)
+        value["current"] = {}
+        value["detector"]["selection"]["mode"] = "none"
+        value["detector"]["selection"]["scopes"] = []
+        value["detector"]["selection"]["spec_paths"] = []
+        value["detector"]["selection"]["reasons"] = []
+        value["execution"] = {"result": "skipped"}
+        value["certification"] = None
+        self.assertFalse(evaluate_gate(value)["success"])
+        value["current"] = {
+            key: value["detector"]["selection"][key]
+            for key in ("event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest")
+        }
+        self.assertTrue(evaluate_gate(value)["success"])
 
     def test_every_detector_non_success_fails(self):
         for result_value in ("failure", "cancelled", "skipped", "timed_out"):
@@ -129,15 +153,48 @@ class GatePolicyTests(unittest.TestCase):
         value["certification"] = {"not": "a certification"}
         self.assertFalse(evaluate_gate(value)["success"])
 
-    def test_merge_candidate_checkout_is_accepted_only_with_explicit_kind(self):
+    def test_merge_candidate_checkout_is_rejected(self):
         value = copy.deepcopy(self.base)
         runtime = "e" * 40
         value["current"].update(tested_checkout_sha=runtime, tested_checkout_kind="merge_candidate")
         value["execution"]["tested_checkout_sha"] = runtime
         value["certification"]["tested_checkout_sha"] = runtime
-        self.assertTrue(evaluate_gate(value)["success"])
+        self.assertFalse(evaluate_gate(value)["success"])
 
-    def test_invalid_gate_input_raises_instead_of_defaulting_green(self):
+    def test_pr_runtime_identity_requires_synthetic_merge_provenance(self):
+        value = copy.deepcopy(self.base)
+        value["current"].pop("synthetic_merge_sha")
+        result = evaluate_gate(value)
+        self.assertFalse(result["success"])
+        self.assertIn("synthetic_merge_sha", " ".join(result["reasons"]))
+
+    def test_execution_selection_mismatch_is_not_masked_by_detector_selection(self):
+        value = copy.deepcopy(self.base)
+        stale_selection = copy.deepcopy(self.selection)
+        stale_selection["mode"] = "full"
+        stale_selection["scopes"] = ["all"]
+        stale_selection["spec_paths"] = ["spec"]
+        stale_selection["reasons"] = []
+        value["execution"]["selection"] = stale_selection
+        self.assertFalse(evaluate_gate(value)["success"])
+
+    def test_certification_requires_matching_runtime_provenance(self):
+        for key in ("provenance_schema", "tested_checkout_sha", "tested_checkout_kind", "synthetic_merge_sha"):
+            value = copy.deepcopy(self.base)
+            value["certification"].pop(key)
+            with self.subTest(key=key):
+                self.assertFalse(evaluate_gate(value)["success"])
+
+        value = copy.deepcopy(self.base)
+        value["certification"]["synthetic_merge_sha"] = "f" * 40
+        self.assertFalse(evaluate_gate(value)["success"])
+        value = copy.deepcopy(self.base)
+        value["current"]["provenance_schema"] = 2.0
+        self.assertFalse(evaluate_gate(value)["success"])
+        value = copy.deepcopy(self.base)
+        value["certification"]["provenance_schema"] = 2.0
+        self.assertFalse(evaluate_gate(value)["success"])
+
         for value in ({}, {"schema": 99}, {"schema": 1, "detector": None}):
             with self.subTest(value=value), self.assertRaises(GateInputError):
                 evaluate_gate(value)
@@ -162,6 +219,10 @@ class GatePolicyTests(unittest.TestCase):
             "head_sha": HEAD,
             "merge_base_sha": HEAD,
             "changed_path_digest": DIGEST,
+            "provenance_schema": 2,
+            "tested_checkout_sha": HEAD,
+            "tested_checkout_kind": "head",
+            "synthetic_merge_sha": None,
         }
         value["execution"]["selection"] = copy.deepcopy(value["detector"]["selection"])
         value["certification"] = {"schema": 1, "success": True, "verdict": "passed", **value["current"]}
