@@ -766,7 +766,7 @@ class AuditLifecyclePostgresRaceTests(TransactionTestCase):
 
     def _wait_for_lock(self, pid_queue, needle, error_queue=None):
         pid = pid_queue.get(timeout=5)
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + 10
         last_row = None
         while time.monotonic() < deadline:
             with connection.cursor() as cursor:
@@ -780,6 +780,28 @@ class AuditLifecyclePostgresRaceTests(TransactionTestCase):
             time.sleep(0.01)
         errors = list(error_queue.queue) if error_queue is not None else []
         self.fail(f"backend {pid} did not reach the expected row lock; last={last_row!r}; errors={errors!r}")
+
+    def _wait_for_blocking_lock(self, pid_queue, error_queue=None, blocking_pid=None):
+        pid = pid_queue.get(timeout=5)
+        deadline = time.monotonic() + 10
+        last_row = None
+        while time.monotonic() < deadline:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT wait_event_type, pg_blocking_pids(pid) FROM pg_stat_activity WHERE pid = %s",
+                    [pid],
+                )
+                last_row = cursor.fetchone()
+            if (
+                last_row
+                and last_row[0] == "Lock"
+                and last_row[1]
+                and (blocking_pid is None or blocking_pid in last_row[1])
+            ):
+                return pid
+            time.sleep(0.01)
+        errors = list(error_queue.queue) if error_queue is not None else []
+        self.fail(f"backend {pid} did not reach the expected blocking lock; last={last_row!r}; errors={errors!r}")
 
     def _asset_locker_worker(self, locked, release, errors):
         db = connections["default"]
@@ -1003,7 +1025,7 @@ class AuditLifecyclePostgresRaceTests(TransactionTestCase):
         with transaction.atomic():
             Asset._base_manager.select_for_update().get(pk=self.asset.pk)
             close_thread.start()
-            self._wait_for_lock(close_pid, "auditsession", close_errors)
+            self._wait_for_blocking_lock(close_pid, close_errors)
             scan_thread.start()
             scan_pid.get(timeout=5)
         close_thread.join(timeout=5)
