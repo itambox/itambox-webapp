@@ -3,7 +3,15 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from extras.models import CustomField, CustomFieldset, Dashboard, Tag
+from extras.models import (
+    CustomField,
+    CustomFieldChoice,
+    CustomFieldChoiceSet,
+    CustomFieldset,
+    CustomFieldsetField,
+    Dashboard,
+    Tag,
+)
 
 User = get_user_model()
 
@@ -62,13 +70,26 @@ class CustomFieldModelTests(TestCase):
         self.assertTrue(cf.required)
 
     def test_custom_field_choices_for_select(self):
+        choice_set = CustomFieldChoiceSet.objects.create(namespace="local", slug="environment", label="Environment")
+        for position, (key, label) in enumerate(
+            (("production", "Production"), ("staging", "Staging"), ("development", "Development")), start=1
+        ):
+            CustomFieldChoice.objects.create(
+                choice_set=choice_set,
+                key=key,
+                label=label,
+                position=position * 10,
+            )
         cf = CustomField.objects.create(
             name="env",
             label="Environment",
-            field_type=CustomField.FIELD_TYPE_SELECT,
-            choices="Production\nStaging\nDevelopment",
+            field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            choice_set=choice_set,
+            max_values=1,
         )
-        self.assertEqual(cf.choices, "Production\nStaging\nDevelopment")
+        self.assertEqual(
+            list(cf.choice_set.choices.values_list("key", flat=True)), ["production", "staging", "development"]
+        )
 
     def test_custom_field_name_is_slug(self):
         cf = CustomField.objects.create(name="my_custom_field", label="My Custom Field", field_type="text")
@@ -78,9 +99,15 @@ class CustomFieldModelTests(TestCase):
 class CustomFieldsetModelTests(TestCase):
     def test_custom_fieldset_creation(self):
         cf1 = CustomField.objects.create(name="field_a", label="Field A", field_type="text")
-        cf2 = CustomField.objects.create(name="field_b", label="Field B", field_type="number")
-        cfs = CustomFieldset.objects.create(name="Asset Details")
-        cfs.fields.add(cf1, cf2)
+        cf2 = CustomField.objects.create(name="field_b", label="Field B", field_type="decimal", decimal_scale=2)
+        cfs = CustomFieldset.objects.create(
+            name="Asset Details",
+            namespace="local",
+            slug="asset-details",
+            label="Asset Details",
+        )
+        CustomFieldsetField.objects.create(fieldset=cfs, custom_field=cf1, position=10)
+        CustomFieldsetField.objects.create(fieldset=cfs, custom_field=cf2, position=20)
         self.assertEqual(str(cfs), "Asset Details")
         self.assertEqual(cfs.fields.count(), 2)
 
