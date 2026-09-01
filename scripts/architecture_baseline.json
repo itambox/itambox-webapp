@@ -4,48 +4,5 @@
   "policy_sha256": "ff7e0451191c36776439863a53260530bca229457cab7b7962e808141e5622a5",
   "cycles": [],
   "layer_exceptions": [],
-  "unsupported_cycle_claims": [
-    {
-      "id": "itambox/extras/dashboard/widgets.py|FunctionDef:_resolve_target_tenant|from organization.models import Tenant",
-      "source": "extras.dashboard.widgets",
-      "path": "itambox/extras/dashboard/widgets.py",
-      "scope": "FunctionDef:_resolve_target_tenant",
-      "statement": "from organization.models import Tenant",
-      "targets": [
-        "organization.models"
-      ],
-      "owner": "area:frontend",
-      "disposition": "debt",
-      "removal_issue": 447,
-      "removal_direction": "Hoist `from organization.models import Tenant` to module top in itambox/extras/dashboard/widgets.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.models shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/inventory/services.py|FunctionDef:recipient_assignment_union|from core.managers import get_current_tenant",
-      "source": "inventory.services",
-      "path": "itambox/inventory/services.py",
-      "scope": "FunctionDef:recipient_assignment_union",
-      "statement": "from core.managers import get_current_tenant",
-      "targets": [
-        "core.managers"
-      ],
-      "owner": "area:inventory",
-      "disposition": "debt",
-      "removal_issue": 447,
-      "removal_direction": "Hoist `from core.managers import get_current_tenant` to module top in itambox/inventory/services.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.managers shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/organization/views/membership_views.py|ClassDef:MembershipListView/FunctionDef:_context_tenant_ids|from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids",
-      "source": "organization.views.membership_views",
-      "path": "itambox/organization/views/membership_views.py",
-      "scope": "ClassDef:MembershipListView/FunctionDef:_context_tenant_ids",
-      "statement": "from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids",
-      "targets": [
-        "organization.access"
-      ],
-      "owner": "area:organization",
-      "disposition": "debt",
-      "removal_issue": 447,
-      "removal_direction": "Hoist `from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids` to module top in itambox/organization/views/membership_views.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access shares no strongly connected component with this module in either graph."
-    }
-  ]
+  "unsupported_cycle_claims": []
 }

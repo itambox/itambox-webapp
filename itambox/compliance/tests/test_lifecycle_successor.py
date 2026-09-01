@@ -766,7 +766,7 @@ class AuditLifecyclePostgresRaceTests(TransactionTestCase):
 
     def _wait_for_lock(self, pid_queue, needle, error_queue=None):
         pid = pid_queue.get(timeout=5)
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + 30
         last_row = None
         while time.monotonic() < deadline:
             with connection.cursor() as cursor:

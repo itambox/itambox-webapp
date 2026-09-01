@@ -204,6 +204,24 @@ def get_current_all_accessible() -> bool:
     return _current_all_accessible.get()
 
 
+@contextmanager
+def override_current_tenant_scope(tenant: Optional[Any], membership: Optional[Any] = None):
+    """Temporarily bind one tenant scope and restore the exact outer state."""
+    tenant_token = _current_tenant.set(tenant)
+    group_token = _current_tenant_group.set(None)
+    membership_token = _current_membership.set(membership)
+    all_accessible_token = _current_all_accessible.set(False)
+    cache_token = _descendant_group_ids_cache.set(None)
+    try:
+        yield
+    finally:
+        _descendant_group_ids_cache.reset(cache_token)
+        _current_all_accessible.reset(all_accessible_token)
+        _current_membership.reset(membership_token)
+        _current_tenant_group.reset(group_token)
+        _current_tenant.reset(tenant_token)
+
+
 def get_current_request_id():
     return _request_id.get()
 

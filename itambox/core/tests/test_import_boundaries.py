@@ -230,6 +230,91 @@ class RequestContextLeafTests(SimpleTestCase):
         )
 
 
+class DashboardAndResidualImportTests(SimpleTestCase):
+    def _function_source(self, relative_path, class_name, function_name):
+        tree = ast.parse((PROJECT_ROOT / relative_path).read_text(encoding="utf-8"))
+        if class_name is None:
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
+                    return ast.unparse(node)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == function_name:
+                        return ast.unparse(child)
+        raise AssertionError(f"Could not find {class_name}.{function_name}")
+
+    def test_issue_447_residual_imports_are_module_top(self):
+        widgets = ast.parse(_module_path("extras.dashboard.widgets").read_text(encoding="utf-8"))
+        top_tenant_imports = [
+            node
+            for node in widgets.body
+            if isinstance(node, ast.ImportFrom)
+            and node.module == "organization.models"
+            and any(alias.name == "Tenant" for alias in node.names)
+        ]
+        self.assertEqual(len(top_tenant_imports), 1)
+        for function_name in ("_resolve_target_tenant", "get_config_form"):
+            source = self._function_source(
+                "extras/dashboard/widgets.py",
+                "DashboardWidget" if function_name == "get_config_form" else None,
+                function_name,
+            )
+            self.assertNotIn("from organization.models import Tenant", source)
+
+        inventory = ast.parse((PROJECT_ROOT / "inventory/services.py").read_text(encoding="utf-8"))
+        self.assertTrue(
+            any(
+                isinstance(node, ast.ImportFrom)
+                and node.module == "core.managers"
+                and any(alias.name == "get_current_tenant" for alias in node.names)
+                for node in inventory.body
+            )
+        )
+        recipient = next(
+            node
+            for node in ast.walk(inventory)
+            if isinstance(node, ast.FunctionDef) and node.name == "recipient_assignment_union"
+        )
+        self.assertFalse(
+            any(
+                isinstance(node, ast.ImportFrom)
+                and node.module == "core.managers"
+                and any(alias.name == "get_current_tenant" for alias in node.names)
+                for node in ast.walk(recipient)
+            )
+        )
+
+        membership = ast.parse((PROJECT_ROOT / "organization/views/membership_views.py").read_text(encoding="utf-8"))
+        access_import = next(
+            node
+            for node in membership.body
+            if isinstance(node, ast.ImportFrom) and node.level == 2 and node.module == "access"
+        )
+        self.assertEqual(
+            {alias.name for alias in access_import.names},
+            {"accessible_tenant_ids", "get_descendant_tenant_group_ids", "tenant_access_report"},
+        )
+        context_ids = next(
+            node
+            for node in ast.walk(membership)
+            if isinstance(node, ast.FunctionDef) and node.name == "_context_tenant_ids"
+        )
+        self.assertFalse(
+            any(
+                isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == "organization.access"
+                for node in ast.walk(context_ids)
+            )
+        )
+
+    def test_dashboard_target_authorization_does_not_use_ambient_catalogue_or_membership_rule(self):
+        source = self._function_source("extras/dashboard/widgets.py", "DashboardWidget", "get_config_form")
+        self.assertNotIn("Tenant.objects", source)
+
+        create_source = self._function_source("extras/dashboard/views.py", "DashboardCreateView", "post")
+        self.assertNotIn("Membership.objects", create_source)
+
+
 class RequestContextReExportTests(SimpleTestCase):
     """The re-exports must be the *same objects*, not copies.
 
