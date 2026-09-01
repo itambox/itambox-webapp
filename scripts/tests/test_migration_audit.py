@@ -118,6 +118,31 @@ class MigrationAuditTests(unittest.TestCase):
             ["users.0001_initial"],
         )
 
+    def test_transitional_inventory_preserves_swappable_bootstrap_self_edge(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_migration(
+                root,
+                "users",
+                "0010_user",
+                """
+                from django.conf import settings
+                from django.db import migrations
+
+                class Migration(migrations.Migration):
+                    dependencies = [migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
+                    run_before = [("users", "0001_initial")]
+                    operations = []
+                """,
+            )
+            self._write_plain_migration(root, "users", "0001_initial")
+            inventory = build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+        self.assertIn(
+            ["users.0010_user", "users.0010_user"],
+            inventory["historical_graph"]["edges"],
+        )
+
     def test_render_is_deterministic_and_does_not_import_migrations(self):
         source = """
         raise RuntimeError("this migration must never be imported")

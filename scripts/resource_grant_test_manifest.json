@@ -1,6 +1,6 @@
 {
   "base_commit": "27f82ca4398d933b9017c2a2abdbd9d43ebf7284",
-  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
+  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, the migration-baseline preflight gate, and the normalized migration audit contract. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
     "itambox/assets/tests/test_audit_cadence.py",
     "itambox/assets/tests/test_audits.py",
@@ -99,6 +99,7 @@
     "scripts/tests/test_localization_catalog_gate.py",
     "scripts/tests/test_product_language_gate.py",
     "scripts/tests/test_migration_audit.py",
+    "itambox/core/tests/test_normalized_migration_audit.py",
     "scripts/tests/test_select_e2e_scopes.py",
     "scripts/tests/test_typing_policy.py",
     "itambox/core/tests/test_views.py",
@@ -216,6 +217,7 @@
     "scripts/tests/test_localization_catalog_gate.py",
     "scripts/tests/test_product_language_gate.py",
     "scripts/tests/test_migration_audit.py",
+    "itambox/core/tests/test_normalized_migration_audit.py",
     "scripts/tests/test_select_e2e_scopes.py",
     "scripts/tests/test_typing_policy.py",
     "itambox/core/tests/test_views.py",

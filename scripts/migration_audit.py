@@ -3,13 +3,18 @@
 
 import argparse
 import ast
+import copy
+import functools
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 SCHEMA_VERSION = 3
+TRUSTED_PRE_CLEANUP_REVISION = "49444b4c81abf4d2fe225892ef75a210aa60f13e"
 OPERATION_TYPES = (
     "RunPython",
     "RunSQL",
@@ -52,6 +57,12 @@ ALLOWED_DISPOSITIONS = {
     "upgrade-only",
     "safely-replaced-by-final-schema",
     "review-blocker",
+}
+NORMALIZED_POST_TRANSITION_DISPOSITIONS = frozenset({"RETAIN", "FOLD_INTO_BASELINE", "RETIRE_UPGRADE_ONLY"})
+POST_TRANSITION_DISPOSITION_GROUPS = {
+    "RETAIN": frozenset(POST_TRANSITION_MIGRATIONS),
+    "FOLD_INTO_BASELINE": frozenset(),
+    "RETIRE_UPGRADE_ONLY": frozenset(),
 }
 EXPECTED_BLOCKERS = {
     "organization.0026_remove_tenantrole_tenant_provider_tenant_provider_and_more",
@@ -455,21 +466,869 @@ def _operation_summary(operations_node):
     return summary
 
 
+def _is_strict_swappable_dependency(node):
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "swappable_dependency"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "migrations"
+        and len(node.args) == 1
+        and not node.keywords
+        and isinstance(node.args[0], ast.Attribute)
+        and node.args[0].attr == "AUTH_USER_MODEL"
+        and isinstance(node.args[0].value, ast.Name)
+        and node.args[0].value.id == "settings"
+    )
+
+
+def _strict_migration_pairs(node, field_name):
+    if not isinstance(node, (ast.List, ast.Tuple)):
+        raise ValueError(f"normalized migration {field_name} must be a literal list or tuple")
+    result = []
+    for pair in node.elts:
+        if field_name == "dependencies" and _is_strict_swappable_dependency(pair):
+            result.append({"swappable": "settings.AUTH_USER_MODEL"})
+            continue
+        if not isinstance(pair, ast.Tuple) or len(pair.elts) != 2:
+            raise ValueError(f"normalized migration {field_name} contains an unparsed reference")
+        values = [_literal_string(part) for part in pair.elts]
+        if not all(values):
+            raise ValueError(f"normalized migration {field_name} contains a non-literal reference")
+        result.append(values)
+    return result
+
+
+def _operation_call_name(call, allowed_operation_names):
+    if (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "migrations"
+    ):
+        return call.func.attr
+    if isinstance(call.func, ast.Name) and call.func.id in allowed_operation_names:
+        return call.func.id
+    return None
+
+
+def _semantic_ast(node):
+    return ast.dump(node, annotate_fields=True, include_attributes=False)
+
+
+def _strict_migration_operations(  # noqa: C901 - strict syntax validation enumerates every rejected call shape
+    node,
+    allowed_operation_names=frozenset({"BtreeGistExtension"}),
+):
+    if not isinstance(node, (ast.List, ast.Tuple)):
+        raise ValueError("normalized migration operations must be a literal list or tuple")
+    result = []
+    for operation in node.elts:
+        if not isinstance(operation, ast.Call):
+            raise ValueError("normalized migration operations contains an unparsed operation")
+        operation_name = _operation_call_name(operation, allowed_operation_names)
+        if operation_name is None:
+            raise ValueError("normalized migration operations contains a dynamic or unparsed operation")
+        if any(isinstance(argument, ast.Starred) for argument in operation.args):
+            raise ValueError("normalized migration operation must not use dynamic *args")
+        if any(keyword.arg is None for keyword in operation.keywords):
+            raise ValueError("normalized migration operation must not use dynamic **kwargs")
+        keyword_names = [keyword.arg for keyword in operation.keywords]
+        if len(keyword_names) != len(set(keyword_names)):
+            raise ValueError("normalized migration operation has duplicate keyword arguments")
+
+        representation = {
+            "name": operation_name,
+            "args": [_semantic_ast(argument) for argument in operation.args],
+            "kwargs": [[keyword.arg, _semantic_ast(keyword.value)] for keyword in operation.keywords],
+        }
+        if operation_name == "SeparateDatabaseAndState":
+            allowed = {"database_operations", "state_operations"}
+            unknown = sorted(set(keyword_names) - allowed)
+            if unknown:
+                raise ValueError(f"normalized SeparateDatabaseAndState has unknown keywords: {unknown}")
+            if len(operation.args) > 2:
+                raise ValueError("normalized SeparateDatabaseAndState accepts at most two positional arguments")
+            nested = {}
+            for index, argument in enumerate(operation.args):
+                field_name = ("database_operations", "state_operations")[index]
+                if field_name in keyword_names:
+                    raise ValueError(f"normalized SeparateDatabaseAndState supplies {field_name} twice")
+                nested[field_name] = _strict_migration_operations(argument, allowed_operation_names)
+            for keyword in operation.keywords:
+                nested[keyword.arg] = _strict_migration_operations(keyword.value, allowed_operation_names)
+            representation["nested"] = nested
+        result.append(representation)
+    return result
+
+
+def _is_module_docstring(node, index):
+    return (
+        index == 0
+        and isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
+
+
+def _validate_allowlisted_module_statements(tree):
+    """Admit declarations only; the trusted whole-module AST binds their exact semantics."""
+    for index, node in enumerate(tree.body):
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef)):
+            continue
+        if isinstance(node, ast.ClassDef):
+            continue
+        if _is_module_docstring(node, index):
+            continue
+        if (
+            isinstance(node, ast.Assign)
+            and node.targets
+            and all(isinstance(target, ast.Name) for target in node.targets)
+        ):
+            continue
+        raise ValueError(
+            "normalized migration module-level statement is not allowlisted; "
+            "only trusted imports, helpers, constants, and Migration declarations are permitted"
+        )
+
+
+def _strict_field_assignments(migration_class, field_name):
+    direct_assignments = [
+        node
+        for node in migration_class.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == field_name for target in node.targets)
+    ]
+    if len(direct_assignments) > 1:
+        raise ValueError(f"normalized migration {field_name} has duplicate assignments")
+    for assignment in direct_assignments:
+        if len(assignment.targets) != 1:
+            raise ValueError(f"normalized migration {field_name} must use one direct assignment")
+    return direct_assignments
+
+
+def _validate_normalized_ast_declarations(path, tree, migration_class, *, allow_replaces=False):
+    representation = {}
+    allowed_operation_names = {"BtreeGistExtension"}
+    allowed_operation_names.update(
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name != "Migration"
+        and len(node.bases) == 1
+        and isinstance(node.bases[0], ast.Name)
+        and node.bases[0].id == "Operation"
+        and not node.decorator_list
+        and not node.keywords
+    )
+    for field_name in ("dependencies", "run_before", "replaces", "operations"):
+        assignments = _strict_field_assignments(migration_class, field_name)
+        if not assignments:
+            if field_name in {"dependencies", "operations"}:
+                raise ValueError(f"{path}: normalized migration must directly declare {field_name}")
+            representation[field_name] = []
+            continue
+        if field_name == "operations":
+            representation[field_name] = _strict_migration_operations(
+                assignments[0].value,
+                frozenset(allowed_operation_names),
+            )
+        else:
+            representation[field_name] = _strict_migration_pairs(assignments[0].value, field_name)
+        if field_name == "replaces" and not allow_replaces:
+            raise ValueError(f"{path}: normalized migration layout must not contain a replaces declaration")
+    return representation
+
+
+def _validate_normalized_tree(path, tree, *, allow_replaces=False):
+    _validate_allowlisted_module_statements(tree)
+    all_migration_classes = [
+        node for node in ast.walk(tree) if isinstance(node, ast.ClassDef) and node.name == "Migration"
+    ]
+    direct_migration_classes = [
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Migration"
+    ]
+    if len(all_migration_classes) != 1 or len(direct_migration_classes) != 1:
+        raise ValueError(f"{path}: normalized migration must define exactly one direct Migration class")
+    migration_class = direct_migration_classes[0]
+    expected_base = (
+        len(migration_class.bases) == 1
+        and isinstance(migration_class.bases[0], ast.Attribute)
+        and migration_class.bases[0].attr == "Migration"
+        and isinstance(migration_class.bases[0].value, ast.Name)
+        and migration_class.bases[0].value.id == "migrations"
+    )
+    if not expected_base:
+        raise ValueError(f"{path}: Migration must directly inherit only migrations.Migration")
+    if migration_class.decorator_list:
+        raise ValueError(f"{path}: Migration class must be undecorated")
+    if migration_class.keywords:
+        raise ValueError(f"{path}: Migration class must not use metaclass or class keywords")
+    representation = _validate_normalized_ast_declarations(
+        path,
+        tree,
+        migration_class,
+        allow_replaces=allow_replaces,
+    )
+    return migration_class, representation
+
+
+def _assignment_field_name(node):
+    if not isinstance(node, ast.Assign) or len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+        return None
+    return node.targets[0].id
+
+
+def _literal_migration_reference(node):
+    if not isinstance(node, ast.Tuple) or len(node.elts) != 2:
+        return None
+    values = [_literal_string(part) for part in node.elts]
+    if any(value is None for value in values):
+        return None
+    return ".".join(values)
+
+
+def _normalized_whole_module_ast(tree, *, remove_replaces=False, removed_reference_ids=frozenset()):
+    """Return the trusted semantic contract with only reviewed transition edits normalized."""
+    normalized = copy.deepcopy(tree)
+    migration_class = next(
+        node for node in normalized.body if isinstance(node, ast.ClassDef) and node.name == "Migration"
+    )
+    normalized_body = []
+    for node in migration_class.body:
+        field_name = _assignment_field_name(node)
+        if field_name == "replaces" and remove_replaces:
+            continue
+        if (
+            field_name in {"dependencies", "run_before"}
+            and removed_reference_ids
+            and isinstance(node.value, (ast.List, ast.Tuple))
+        ):
+            node.value.elts = [
+                reference
+                for reference in node.value.elts
+                if _literal_migration_reference(reference) not in removed_reference_ids
+            ]
+            if field_name == "run_before" and not node.value.elts:
+                continue
+        normalized_body.append(node)
+    migration_class.body = normalized_body
+    return _semantic_ast(normalized)
+
+
+def _validate_normalized_migration_paths(source_root):
+    fixture_root = Path(source_root).resolve()
+    if not fixture_root.is_dir():
+        raise ValueError(f"normalized fixture root is not a directory: {source_root}")
+    for path in Path(source_root).glob("*/migrations/*.py"):
+        if path.name == "__init__.py":
+            continue
+        resolved_path = path.resolve()
+        if not resolved_path.is_file() or fixture_root not in resolved_path.parents:
+            raise ValueError(f"normalized migration source escapes the fixture root: {path}")
+        if not path.stem[:1].isdigit():
+            raise ValueError(f"normalized migration module must have a numeric prefix: {path}")
+
+
+def _git_show(repository_root, revision, path):
+    result = subprocess.run(
+        ["git", "-C", str(repository_root), "show", f"{revision}:{path}"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode:
+        raise ValueError(f"trusted pre-cleanup evidence is unavailable: {revision}:{path}")
+    return result.stdout
+
+
+@functools.lru_cache(maxsize=4)
+def _load_trusted_normalized_evidence(  # noqa: C901 - validates every independent evidence invariant
+    repository_root_string,
+):
+    repository_root = Path(repository_root_string)
+    object_check = subprocess.run(
+        ["git", "-C", str(repository_root), "cat-file", "-e", f"{TRUSTED_PRE_CLEANUP_REVISION}^{{commit}}"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if object_check.returncode:
+        raise ValueError("trusted pre-cleanup migration evidence commit is unavailable")
+    try:
+        audit = json.loads(
+            _git_show(
+                repository_root,
+                TRUSTED_PRE_CLEANUP_REVISION,
+                "scripts/migration_audit.json",
+            ).decode("utf-8")
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("trusted pre-cleanup migration audit is malformed") from error
+    if audit.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("trusted pre-cleanup migration audit schema is unsupported")
+
+    replacements = [migration for migration in audit.get("migrations", []) if migration.get("is_replacement") is True]
+    ordered = []
+    for migration in replacements:
+        migration_id = migration.get("id")
+        if not isinstance(migration_id, str):
+            raise ValueError("trusted pre-cleanup migration audit has a malformed replacement ID")
+        match = ISSUE88_SHARD_RE.search(migration_id)
+        if match is None:
+            raise ValueError(f"trusted replacement lacks an issue88 ordinal: {migration_id}")
+        ordered.append((int(match.group(1)), migration))
+    ordered.sort(key=lambda item: item[0])
+    if [ordinal for ordinal, _ in ordered] != list(range(1, len(ordered) + 1)):
+        raise ValueError("trusted replacement shard ordinals are not exhaustive")
+
+    baseline_ids = [migration["id"] for _, migration in ordered]
+    if len(baseline_ids) != len(set(baseline_ids)) or not baseline_ids:
+        raise ValueError("trusted replacement IDs are empty or duplicated")
+    trusted_trees = {}
+    replacement_targets = set()
+    for _, migration in ordered:
+        migration_id = migration["id"]
+        app, name = migration_id.split(".", 1)
+        expected_path = f"itambox/{app}/migrations/{name}.py"
+        if migration.get("path") != expected_path:
+            raise ValueError(f"trusted replacement path does not match its ID: {migration_id}")
+        source = _git_show(repository_root, TRUSTED_PRE_CLEANUP_REVISION, expected_path).decode("utf-8")
+        try:
+            tree = ast.parse(source, filename=f"{TRUSTED_PRE_CLEANUP_REVISION}:{expected_path}")
+            _, representation = _validate_normalized_tree(
+                expected_path,
+                tree,
+                allow_replaces=True,
+            )
+        except (SyntaxError, ValueError) as error:
+            raise ValueError(f"trusted replacement source is malformed: {migration_id}: {error}") from error
+        trusted_replaces = set(migration.get("replaces", []))
+        static_replaces = {".".join(pair) for pair in representation["replaces"]}
+        if not trusted_replaces or trusted_replaces != static_replaces:
+            raise ValueError(f"trusted replacement targets disagree with source: {migration_id}")
+        replacement_targets.update(trusted_replaces)
+        trusted_trees[migration_id] = tree
+
+    historical_ids = audit.get("historical_graph", {}).get("nodes")
+    if not isinstance(historical_ids, list) or set(historical_ids) != replacement_targets:
+        raise ValueError("trusted replacements do not exhaust the pre-cleanup historical graph")
+    historical_id_set = set(historical_ids)
+    module_semantics = {
+        migration_id: _normalized_whole_module_ast(
+            tree,
+            remove_replaces=True,
+            removed_reference_ids=historical_id_set,
+        )
+        for migration_id, tree in trusted_trees.items()
+    }
+    effective_graph = audit.get("effective_graph", {})
+    if set(effective_graph.get("nodes", [])) != set(baseline_ids):
+        raise ValueError("trusted effective graph does not contain exactly the replacement IDs")
+    migrations_by_id = {migration.get("id"): migration for migration in audit.get("migrations", [])}
+    trusted_post_ids = set(audit.get("post_transition_migrations", []))
+    if trusted_post_ids != POST_TRANSITION_MIGRATIONS:
+        raise ValueError("trusted pre-cleanup post-transition migration universe differs from the reviewed set")
+    post_module_semantics = {}
+    for migration_id in sorted(trusted_post_ids):
+        migration = migrations_by_id.get(migration_id)
+        path = migration.get("path") if isinstance(migration, dict) else None
+        if not isinstance(path, str):
+            raise ValueError(f"trusted post-transition migration has no source path: {migration_id}")
+        source = _git_show(repository_root, TRUSTED_PRE_CLEANUP_REVISION, path).decode("utf-8")
+        try:
+            tree = ast.parse(source, filename=f"{TRUSTED_PRE_CLEANUP_REVISION}:{path}")
+            _validate_normalized_tree(path, tree)
+            post_module_semantics[migration_id] = _normalized_whole_module_ast(tree)
+        except (SyntaxError, ValueError) as error:
+            raise ValueError(f"trusted post-transition source is malformed: {migration_id}: {error}") from error
+    return {
+        "baseline_ids": baseline_ids,
+        "deleted_historical_ids": sorted(historical_ids),
+        "root_ids": sorted(effective_graph.get("roots", [])),
+        "baseline_leaf_ids": sorted(effective_graph.get("leaves", [])),
+        "first_party_apps": sorted({migration_id.split(".", 1)[0] for migration_id in baseline_ids}),
+        "module_semantics": module_semantics,
+        "post_module_semantics": post_module_semantics,
+    }
+
+
+def _normalized_contract_list(contract, key):
+    value = contract.get(key)
+    if not isinstance(value, list) or not value or any(not isinstance(item, str) or not item for item in value):
+        raise ValueError(f"normalized migration contract field {key} must be a non-empty list of strings")
+    if len(value) != len(set(value)):
+        raise ValueError(f"normalized migration contract field {key} must be unique")
+    return value
+
+
+def _normalized_post_transition_leaves(contract):
+    value = contract.get("post_transition_leaf_ids")
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+        raise ValueError("normalized migration contract field post_transition_leaf_ids must be a list of strings")
+    if len(value) != len(set(value)):
+        raise ValueError("normalized migration contract field post_transition_leaf_ids must be unique")
+    return value
+
+
+def _validate_normalized_shard_ordinals(baseline_ids):
+    ordinals = []
+    for migration_id in baseline_ids:
+        match = ISSUE88_SHARD_RE.search(migration_id)
+        if match is None:
+            raise ValueError(f"normalized baseline migration is missing an issue88 shard ordinal: {migration_id}")
+        ordinals.append(int(match.group(1)))
+    if ordinals != list(range(1, len(ordinals) + 1)):
+        raise ValueError(f"normalized baseline shard ordinals must be contiguous: {ordinals}")
+
+
+def _validate_normalized_source_ids(migrations, baseline_ids, deleted_historical_ids, first_party_apps):
+    actual_by_id = {migration["id"]: migration for migration in migrations}
+    if len(actual_by_id) != len(migrations):
+        raise ValueError("normalized migration IDs must be unique")
+    actual_ids = set(actual_by_id)
+    baseline_id_set = set(baseline_ids)
+    actual_post_ids = actual_ids - baseline_id_set
+    if actual_post_ids != POST_TRANSITION_MIGRATIONS:
+        raise ValueError(
+            "normalized post-transition IDs must exactly match the closed reviewed set: "
+            f"missing={sorted(POST_TRANSITION_MIGRATIONS - actual_post_ids)}, "
+            f"unknown={sorted(actual_post_ids - POST_TRANSITION_MIGRATIONS)}"
+        )
+    if actual_ids - actual_post_ids != baseline_id_set:
+        raise ValueError(
+            "normalized baseline IDs do not match the current non-post-transition migration files: "
+            f"expected={sorted(baseline_ids)}, actual={sorted(actual_ids - actual_post_ids)}"
+        )
+    if set(first_party_apps) != {migration_id.split(".", 1)[0] for migration_id in actual_ids}:
+        raise ValueError("normalized migration contract first_party_apps do not match the current source")
+    if any(migration["is_replacement"] for migration in migrations):
+        raise ValueError("normalized migration layout must not contain a reintroduced replaces declaration")
+    if set(deleted_historical_ids) & actual_ids:
+        raise ValueError("normalized migration contract deleted_historical_ids are present in the current source")
+    _validate_normalized_shard_ordinals(baseline_ids)
+    return actual_by_id, actual_ids, actual_post_ids
+
+
+def _normalized_post_transition_dispositions():
+    if set(POST_TRANSITION_DISPOSITION_GROUPS) != NORMALIZED_POST_TRANSITION_DISPOSITIONS:
+        raise ValueError("normalized post-transition disposition policy has unknown or missing groups")
+    seen = set()
+    dispositions = {}
+    for disposition, migration_ids in POST_TRANSITION_DISPOSITION_GROUPS.items():
+        overlap = seen & migration_ids
+        if overlap:
+            raise ValueError(f"normalized post-transition dispositions overlap: {sorted(overlap)}")
+        for migration_id in migration_ids:
+            dispositions[migration_id] = disposition
+        seen.update(migration_ids)
+    if seen != POST_TRANSITION_MIGRATIONS:
+        raise ValueError(
+            "normalized post-transition dispositions must cover exactly the closed reviewed ID set: "
+            f"missing={sorted(POST_TRANSITION_MIGRATIONS - seen)}, "
+            f"unknown={sorted(seen - POST_TRANSITION_MIGRATIONS)}"
+        )
+    return dispositions
+
+
+def _validate_normalized_contract_shape(  # noqa: C901 - contract fields deliberately fail closed one by one
+    contract,
+    migrations,
+    trusted,
+):
+    if not isinstance(contract, dict) or contract.get("mode") != "normalized":
+        raise ValueError("normalized migration contract must explicitly set mode=normalized")
+    allowed_fields = {
+        "mode",
+        "fixture_only",
+        "trusted_pre_cleanup_revision",
+        "first_party_apps",
+        "baseline_ids",
+        "deleted_historical_ids",
+        "root_ids",
+        "baseline_leaf_ids",
+        "post_transition_leaf_ids",
+        "special_users_bootstrap",
+    }
+    unsupported_fields = sorted(set(contract) - allowed_fields)
+    if unsupported_fields:
+        raise ValueError(f"normalized migration contract has unsupported self-authorizing fields: {unsupported_fields}")
+    if contract.get("fixture_only") is not True:
+        raise ValueError("normalized migration contract must be explicitly fixture_only")
+    if contract.get("trusted_pre_cleanup_revision") != TRUSTED_PRE_CLEANUP_REVISION:
+        raise ValueError("normalized migration contract must name the trusted pre-cleanup revision")
+    baseline_ids = _normalized_contract_list(contract, "baseline_ids")
+    deleted_historical_ids = _normalized_contract_list(contract, "deleted_historical_ids")
+    root_ids = _normalized_contract_list(contract, "root_ids")
+    baseline_leaf_ids = _normalized_contract_list(contract, "baseline_leaf_ids")
+    post_transition_leaf_ids = _normalized_post_transition_leaves(contract)
+    first_party_apps = contract.get("first_party_apps")
+    if not isinstance(first_party_apps, list) or first_party_apps != sorted(set(first_party_apps)):
+        raise ValueError("normalized migration contract first_party_apps must be sorted and unique")
+
+    evidence_fields = {
+        "baseline_ids": baseline_ids,
+        "deleted_historical_ids": deleted_historical_ids,
+        "root_ids": root_ids,
+        "baseline_leaf_ids": baseline_leaf_ids,
+    }
+    for key, actual in evidence_fields.items():
+        if actual != trusted[key]:
+            raise ValueError(f"normalized migration contract {key} disagrees with trusted pre-cleanup evidence")
+    if first_party_apps != trusted["first_party_apps"]:
+        raise ValueError("normalized migration contract first_party_apps disagrees with trusted pre-cleanup evidence")
+
+    actual_by_id, actual_ids, actual_post_ids = _validate_normalized_source_ids(
+        migrations,
+        baseline_ids,
+        deleted_historical_ids,
+        first_party_apps,
+    )
+    if not set(post_transition_leaf_ids) <= actual_post_ids:
+        raise ValueError(
+            "normalized migration contract post_transition_leaf_ids must name current post-transition migrations"
+        )
+    missing_known_blockers = EXPECTED_BLOCKERS - set(deleted_historical_ids)
+    if missing_known_blockers:
+        raise ValueError(
+            "normalized migration contract deleted_historical_ids must cover known semantic blockers: "
+            f"{sorted(missing_known_blockers)}"
+        )
+    special_users_bootstrap = contract.get("special_users_bootstrap")
+    if not isinstance(special_users_bootstrap, str) or special_users_bootstrap not in set(baseline_ids):
+        raise ValueError("normalized migration contract special_users_bootstrap is not a baseline ID")
+    if special_users_bootstrap != "users.0000_issue88_shard_01_users_bootstrap":
+        raise ValueError("normalized migration contract must preserve the shipped users bootstrap")
+    return {
+        "baseline_ids": baseline_ids,
+        "deleted_historical_ids": deleted_historical_ids,
+        "root_ids": root_ids,
+        "baseline_leaf_ids": baseline_leaf_ids,
+        "post_transition_leaf_ids": post_transition_leaf_ids,
+        "special_users_bootstrap": special_users_bootstrap,
+        "actual_by_id": actual_by_id,
+        "actual_ids": actual_ids,
+        "actual_post_ids": actual_post_ids,
+        "first_party_apps": set(first_party_apps),
+        "post_transition_dispositions": _normalized_post_transition_dispositions(),
+    }
+
+
+def _validate_normalized_semantics(details, trusted):
+    for migration_id in details["baseline_ids"]:
+        actual = _normalized_whole_module_ast(
+            details["actual_by_id"][migration_id]["_normalized_tree"],
+            removed_reference_ids=set(details["deleted_historical_ids"]),
+        )
+        if actual != trusted["module_semantics"][migration_id]:
+            raise ValueError(
+                f"normalized baseline whole-module semantics disagree with trusted pre-cleanup evidence: {migration_id}"
+            )
+    for migration_id, disposition in details["post_transition_dispositions"].items():
+        if disposition != "RETAIN":
+            raise ValueError(f"normalized post-transition disposition must be RETAIN: {migration_id}")
+        actual = _normalized_whole_module_ast(details["actual_by_id"][migration_id]["_normalized_tree"])
+        if actual != trusted["post_module_semantics"][migration_id]:
+            raise ValueError(
+                f"retained post-transition whole-module semantics disagree with trusted pre-cleanup evidence: "
+                f"{migration_id}"
+            )
+
+
+def _validate_normalized_references(details, migrations):
+    deleted_ids = set(details["deleted_historical_ids"])
+    first_party_apps = details["first_party_apps"]
+    actual_ids = details["actual_ids"]
+    for migration in migrations:
+        references = (*migration["dependencies"], *migration["run_before"])
+        for reference in references:
+            if reference in deleted_ids:
+                raise ValueError(f"normalized migration references deleted historical migration: {reference}")
+            if reference.split(".", 1)[0] in first_party_apps and reference not in actual_ids:
+                raise ValueError(f"unknown first-party normalized migration reference: {reference}")
+
+
+def _validate_normalized_order(details):
+    ordered_baseline = [details["actual_by_id"][migration_id] for migration_id in details["baseline_ids"]]
+    for previous, current in zip(ordered_baseline, ordered_baseline[1:], strict=False):
+        if previous["id"] not in current["dependencies"]:
+            raise ValueError(f"normalized baseline order/dependency mismatch: {current['id']} -> {previous['id']}")
+
+
+_RUNTIME_INSPECTOR = r"""
+import ast
+import hashlib
+import importlib.util
+import inspect
+import json
+import os
+import sys
+
+repository_root, payload_path = sys.argv[1:]
+sys.path.insert(0, os.path.join(repository_root, "itambox"))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
+os.environ.setdefault("ITAMBOX_ENV", "dev")
+import django
+django.setup()
+from django.conf import settings
+from django.db.migrations import SeparateDatabaseAndState
+from django.db.migrations.writer import MigrationWriter
+
+swappable_user_dependency = (settings.AUTH_USER_MODEL.split(".", 1)[0], "__first__")
+
+def pairs(value):
+    result = []
+    for item in value:
+        if tuple(item) in {("__setting__", "AUTH_USER_MODEL"), swappable_user_dependency}:
+            result.append({"swappable": "settings.AUTH_USER_MODEL"})
+        else:
+            result.append(list(item))
+    return result
+
+def operations(value):
+    result = []
+    for operation in value:
+        name, deconstructed_args, deconstructed_kwargs = operation.deconstruct()
+        args, kwargs = operation._constructor_args
+        serialized = {
+            "path": name,
+            "args": MigrationWriter.serialize(deconstructed_args)[0],
+            "kwargs": MigrationWriter.serialize(deconstructed_kwargs)[0],
+        }
+        item = {
+            "name": name.rsplit(".", 1)[-1],
+            "arg_count": len(args),
+            "keyword_names": list(kwargs),
+            "value_fingerprint": hashlib.sha256(
+                json.dumps(serialized, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest(),
+        }
+        if item["name"] == "RunPython":
+            callables = {}
+            for field_name in ("code", "reverse_code"):
+                function = getattr(operation, field_name)
+                if function is None:
+                    callables[field_name] = None
+                    continue
+                try:
+                    source = inspect.getsource(function)
+                except (OSError, TypeError) as error:
+                    raise RuntimeError(
+                        f"cannot inspect RunPython {field_name} source for {function!r}"
+                    ) from error
+                callables[field_name] = {
+                    "module": function.__module__,
+                    "qualname": function.__qualname__,
+                    "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+                }
+            item["callables"] = callables
+        if isinstance(operation, SeparateDatabaseAndState):
+            item["nested"] = {
+                "database_operations": operations(operation.database_operations),
+                "state_operations": operations(operation.state_operations),
+            }
+        result.append(item)
+    return result
+
+payload = json.load(open(payload_path, encoding="utf-8"))
+output = {}
+for index, item in enumerate(payload):
+    spec = importlib.util.spec_from_file_location(f"_migration_audit_fixture_{index}", item["path"])
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    cls = module.Migration
+    source = open(item["path"], encoding="utf-8").read()
+    tree = ast.parse(source, filename=item["path"])
+    migration_class = next(
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Migration"
+    )
+    operations_assignment = next(
+        node
+        for node in migration_class.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "operations"
+    )
+    declared_operations = eval(
+        compile(ast.Expression(operations_assignment.value), item["path"], "eval"),
+        module.__dict__,
+    )
+    output[item["id"]] = {
+        "dependencies": pairs(cls.dependencies),
+        "run_before": pairs(cls.run_before),
+        "replaces": pairs(getattr(cls, "replaces", [])),
+        "operations": operations(cls.operations),
+        "declared_operations": operations(declared_operations),
+    }
+print(json.dumps(output, sort_keys=True))
+"""
+
+
+def _runtime_operation_metadata(operations):
+    result = []
+    for operation in operations:
+        item = {
+            "name": operation["name"],
+            "arg_count": len(operation["args"]),
+            "keyword_names": [keyword[0] for keyword in operation["kwargs"]],
+        }
+        if operation["name"] == "SeparateDatabaseAndState":
+            nested = operation.get("nested", {})
+            item["nested"] = {
+                "database_operations": _runtime_operation_metadata(nested.get("database_operations", [])),
+                "state_operations": _runtime_operation_metadata(nested.get("state_operations", [])),
+            }
+        result.append(item)
+    return result
+
+
+def _runtime_operation_shape(operations):
+    result = []
+    for operation in operations:
+        item = {
+            "name": operation.get("name"),
+            "arg_count": operation.get("arg_count"),
+            "keyword_names": operation.get("keyword_names"),
+        }
+        if operation.get("name") == "SeparateDatabaseAndState":
+            nested = operation.get("nested", {})
+            item["nested"] = {
+                "database_operations": _runtime_operation_shape(nested.get("database_operations", [])),
+                "state_operations": _runtime_operation_shape(nested.get("state_operations", [])),
+            }
+        result.append(item)
+    return result
+
+
+def _run_runtime_inspector(repository_root, payload_path):
+    environment = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "PATH", "TEMP", "TMP") if key in os.environ}
+    environment.update(
+        {
+            "ITAMBOX_ENV": "dev",
+            "DJANGO_SETTINGS_MODULE": "core.settings.dev",
+        }
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", _RUNTIME_INSPECTOR, str(repository_root), str(payload_path)],
+            cwd=repository_root / "itambox",
+            env=environment,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ValueError("normalized migration isolated runtime import timed out") from error
+    except OSError as error:
+        raise ValueError(f"normalized migration isolated runtime process failed: {error}") from error
+    if result.returncode:
+        detail = result.stderr.strip().splitlines()[-1:] or ["unknown import failure"]
+        raise ValueError(f"normalized migration isolated runtime import failed: {detail[0]}")
+    return result
+
+
+def _validate_normalized_runtime_import(details, source_root, repository_root):
+    fixture_root = Path(source_root).resolve()
+    payload = []
+    expected = {}
+    for migration_id in sorted(details["actual_ids"]):
+        migration = details["actual_by_id"][migration_id]
+        source_path = (fixture_root.parent / migration["path"]).resolve()
+        if fixture_root not in source_path.parents:
+            raise ValueError(f"normalized runtime import source escapes the fixture root: {migration_id}")
+        static = migration["_normalized_static"]
+        payload.append({"id": migration_id, "path": str(source_path)})
+        expected[migration_id] = {
+            "dependencies": static["dependencies"],
+            "run_before": static["run_before"],
+            "replaces": static["replaces"],
+            "operations": _runtime_operation_metadata(static["operations"]),
+        }
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+        json.dump(payload, handle)
+        payload_path = Path(handle.name)
+    try:
+        result = _run_runtime_inspector(repository_root, payload_path)
+    finally:
+        payload_path.unlink(missing_ok=True)
+    try:
+        actual = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError("normalized migration isolated runtime import returned malformed metadata") from error
+    for migration_id, metadata in actual.items():
+        runtime_operations = metadata.get("operations")
+        declared_operations = metadata.pop("declared_operations", None)
+        if runtime_operations != declared_operations:
+            raise ValueError(
+                f"normalized migration runtime operation values disagree with the trusted declaration: {migration_id}"
+            )
+        metadata["operations"] = _runtime_operation_shape(runtime_operations or [])
+    if actual != expected:
+        mismatches = sorted(
+            migration_id for migration_id in expected if actual.get(migration_id) != expected[migration_id]
+        )
+        first = mismatches[0] if mismatches else "<missing-output>"
+        raise ValueError(
+            "normalized migration runtime metadata disagrees with static representation: "
+            f"{mismatches}; first={first}; static={expected.get(first)!r}; runtime={actual.get(first)!r}"
+        )
+
+
+def _validate_normalized_contract(contract, migrations, source_root, repository_root):
+    """Validate a future normalized layout without changing the live tree."""
+    trusted = _load_trusted_normalized_evidence(str(Path(repository_root).resolve()))
+    details = _validate_normalized_contract_shape(contract, migrations, trusted)
+    _validate_normalized_references(details, migrations)
+    _validate_normalized_semantics(details, trusted)
+    _validate_normalized_order(details)
+    _validate_normalized_runtime_import(details, source_root, Path(repository_root).resolve())
+    return {
+        key: details[key]
+        for key in (
+            "baseline_ids",
+            "deleted_historical_ids",
+            "root_ids",
+            "baseline_leaf_ids",
+            "post_transition_leaf_ids",
+            "special_users_bootstrap",
+            "post_transition_dispositions",
+        )
+    } | {"trusted_pre_cleanup_revision": TRUSTED_PRE_CLEANUP_REVISION}
+
+
 def build_inventory(  # noqa: C901 - graph validation is intentionally one coordinated pass
     source_root,
     semantic_dispositions=None,
     expected_blockers=None,
+    *,
+    layout=None,
+    normalized_contract=None,
+    repository_root=None,
 ):
     source_root = Path(source_root)
+    repository_root = Path(__file__).resolve().parents[1] if repository_root is None else Path(repository_root)
+    using_default_semantic_policy = semantic_dispositions is None
+    using_default_expected_blockers = expected_blockers is None
     semantic_dispositions = SEMANTIC_DISPOSITIONS if semantic_dispositions is None else semantic_dispositions
-    expected_blockers = EXPECTED_BLOCKERS if expected_blockers is None else set(expected_blockers)
+    expected_blockers = set(EXPECTED_BLOCKERS) if expected_blockers is None else set(expected_blockers)
+    layout = "transitional" if layout is None else layout
+    if layout not in {"transitional", "normalized"}:
+        raise ValueError(f"unsupported migration audit layout: {layout}")
+    if layout == "normalized":
+        _validate_normalized_migration_paths(source_root)
     migrations = []
     for path in sorted(source_root.glob("*/migrations/[0-9]*.py")):
         app = path.parent.parent.name
         migration_id = f"{app}.{path.stem}"
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            migration_class = _migration_class(tree)
+            if layout == "normalized":
+                migration_class, normalized_static = _validate_normalized_tree(path, tree)
+            else:
+                migration_class = _migration_class(tree)
+                normalized_static = None
         except (SyntaxError, ValueError) as error:
             raise ValueError(f"{path}: {error}") from error
         dependencies, has_swappable_dependency = _dependencies(_assignment(migration_class, "dependencies"))
@@ -503,6 +1362,8 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
                 "syntactic_facts": {
                     "has_custom_operations": custom_operation_presence,
                 },
+                "_normalized_static": normalized_static,
+                "_normalized_tree": tree if layout == "normalized" else None,
             }
         )
 
@@ -510,15 +1371,29 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
     post_transition_migrations = [
         migration for migration in migrations if migration["id"] in POST_TRANSITION_MIGRATIONS
     ]
-    historical_migrations = [
-        migration
-        for migration in migrations
-        if not migration["is_replacement"] and migration["id"] not in POST_TRANSITION_MIGRATIONS
-    ]
+    normalized_details = None
+    if layout == "normalized":
+        normalized_details = _validate_normalized_contract(
+            normalized_contract,
+            migrations,
+            source_root,
+            repository_root,
+        )
+        historical_migrations = [
+            migration for migration in migrations if migration["id"] in set(normalized_details["baseline_ids"])
+        ]
+    else:
+        historical_migrations = [
+            migration
+            for migration in migrations
+            if not migration["is_replacement"] and migration["id"] not in POST_TRANSITION_MIGRATIONS
+        ]
     node_ids = {migration["id"] for migration in historical_migrations}
     user_bootstraps = sorted(
         migration["id"] for migration in historical_migrations if migration["special_users_bootstrap"]
     )
+    if layout == "normalized":
+        user_bootstraps = [normalized_details["special_users_bootstrap"]]
     user_bootstrap = user_bootstraps[0] if len(user_bootstraps) == 1 else None
     edges = {
         (dependency, migration["id"])
@@ -536,7 +1411,7 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         edges.update(
             (user_bootstrap, migration["id"])
             for migration in historical_migrations
-            if migration["swappable_user_dependency"]
+            if (layout != "normalized" or migration["id"] != user_bootstrap) and migration["swappable_user_dependency"]
         )
     edges = sorted(edges)
     historical_graph = _graph_summary(node_ids, edges)
@@ -611,6 +1486,40 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
     else:
         effective_graph = historical_graph
 
+    if layout == "normalized":
+        if _has_cycle(historical_graph["nodes"], edges):
+            raise ValueError("normalized baseline graph contains a cycle")
+        if historical_graph["roots"] != sorted(normalized_details["root_ids"]):
+            raise ValueError(
+                "normalized baseline roots mismatch: "
+                f"expected={sorted(normalized_details['root_ids'])}, actual={historical_graph['roots']}"
+            )
+        if historical_graph["leaves"] != sorted(normalized_details["baseline_leaf_ids"]):
+            raise ValueError(
+                "normalized baseline leaves mismatch: "
+                f"expected={sorted(normalized_details['baseline_leaf_ids'])}, actual={historical_graph['leaves']}"
+            )
+        post_graph_edges = {tuple(edge) for edge in effective_graph["edges"]}
+        post_ids = {migration["id"] for migration in post_transition_migrations}
+        effective_ids = set(effective_graph["nodes"])
+        for migration in post_transition_migrations:
+            for dependency in migration["dependencies"]:
+                if dependency in effective_ids or dependency in post_ids:
+                    post_graph_edges.add((dependency, migration["id"]))
+            for target in migration["run_before"]:
+                if target in effective_ids or target in post_ids:
+                    post_graph_edges.add((migration["id"], target))
+        post_graph = _graph_summary(effective_ids | post_ids, post_graph_edges)
+        if _has_cycle(post_graph["nodes"], post_graph_edges):
+            raise ValueError("normalized migration graph contains a cycle")
+        if len(post_graph["roots"]) != 1:
+            raise ValueError(f"normalized migration graph must have one root: {post_graph['roots']}")
+        if post_graph["leaves"] != sorted(normalized_details["post_transition_leaf_ids"]):
+            raise ValueError(
+                "normalized post-transition leaves mismatch: "
+                f"expected={sorted(normalized_details['post_transition_leaf_ids'])}, actual={post_graph['leaves']}"
+            )
+
     _validate_post_transition_dependencies(
         post_transition_migrations,
         effective_graph,
@@ -625,6 +1534,15 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         for migration in migrations
         if any(migration["syntactic_facts"]["has_custom_operations"].values())
     }
+    if layout == "normalized" and using_default_semantic_policy:
+        current_migration_ids = {migration["id"] for migration in migrations}
+        semantic_dispositions = {
+            migration_id: policy
+            for migration_id, policy in semantic_dispositions.items()
+            if migration_id in current_migration_ids
+        }
+    if layout == "normalized" and using_default_expected_blockers:
+        expected_blockers = set()
     policy_ids = set(semantic_dispositions)
     malformed_policy = sorted(
         migration_id
@@ -663,7 +1581,7 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
             "local_roots": sorted(app_ids - app_targets),
             "local_leaves": sorted(app_ids - app_sources),
         }
-    return {
+    result = {
         "schema_version": SCHEMA_VERSION,
         "historical_graph": historical_graph,
         "effective_graph": effective_graph,
@@ -711,6 +1629,13 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         },
         "migrations": migrations,
     }
+    if layout == "normalized":
+        result["layout"] = "normalized"
+        result["normalized_contract"] = normalized_details
+    for migration in migrations:
+        migration.pop("_normalized_static", None)
+        migration.pop("_normalized_tree", None)
+    return result
 
 
 _PREFLIGHT_MANIFEST_LIST_FIELDS = (
@@ -826,6 +1751,25 @@ def validate_preflight_manifest_git_objects(manifest, repository_root):
 
 def _preflight_manifest_expected_ids(inventory):
     post_ids = set(inventory["post_transition_migrations"])
+    post_transition_ids = sorted(post_ids)
+    current_graph = _post_transition_graph(inventory)
+    post_transition_leaf_ids = sorted(post_ids - {source for source, _ in current_graph["edges"] if source in post_ids})
+    first_party_apps = sorted({migration["id"].split(".", 1)[0] for migration in inventory["migrations"]})
+    if inventory.get("layout") == "normalized":
+        normalized = inventory["normalized_contract"]
+        historical_ids = sorted(normalized["deleted_historical_ids"])
+        baseline_ids = sorted(normalized["baseline_ids"])
+        return {
+            "first_party_apps": first_party_apps,
+            "historical_ids": historical_ids,
+            "replacement_ids": baseline_ids,
+            "replacement_target_ids": historical_ids,
+            "baseline_ids": baseline_ids,
+            "post_transition_ids": post_transition_ids,
+            "post_transition_leaf_ids": post_transition_leaf_ids,
+            "current_leaf_ids": current_graph["leaves"],
+        }
+
     historical_ids = sorted(
         migration["id"]
         for migration in inventory["migrations"]
@@ -834,11 +1778,8 @@ def _preflight_manifest_expected_ids(inventory):
     replacement_migrations = [migration for migration in inventory["migrations"] if migration["is_replacement"]]
     replacement_ids = sorted(migration["id"] for migration in replacement_migrations)
     replacement_target_ids = sorted(target for migration in replacement_migrations for target in migration["replaces"])
-    post_transition_ids = sorted(post_ids)
-    current_graph = _post_transition_graph(inventory)
-    post_transition_leaf_ids = sorted(post_ids - {source for source, _ in current_graph["edges"] if source in post_ids})
     return {
-        "first_party_apps": sorted({migration["id"].split(".", 1)[0] for migration in inventory["migrations"]}),
+        "first_party_apps": first_party_apps,
         "historical_ids": historical_ids,
         "replacement_ids": replacement_ids,
         "replacement_target_ids": replacement_target_ids,
@@ -860,8 +1801,11 @@ def render_preflight_manifest(inventory, manifest):
 def validate_preflight_manifest(inventory, manifest):
     if manifest.get("schema_version") != 1:
         raise ValueError("migration preflight manifest schema_version must be 1")
-    if manifest.get("layout") != "transitional":
-        raise ValueError("migration preflight manifest layout must match the current transitional source")
+    inventory_layout = inventory.get("layout", "transitional")
+    if manifest.get("layout") != inventory_layout:
+        raise ValueError(f"migration preflight manifest layout must match inventory layout: {inventory_layout}")
+    if inventory_layout not in {"transitional", "normalized"}:
+        raise ValueError("migration preflight manifest layout is invalid")
     for key in _PREFLIGHT_MANIFEST_LIST_FIELDS:
         _manifest_list(manifest, key)
     for key, expected in _preflight_manifest_expected_ids(inventory).items():
@@ -872,6 +1816,32 @@ def validate_preflight_manifest(inventory, manifest):
 
 def render_inventory(inventory):
     return json.dumps(inventory, indent=2, sort_keys=True) + "\n"
+
+
+def _validate_normalized_cli_paths(parser, args, repository_root, source_root, output):
+    if args.layout == "transitional" and args.normalized_contract is not None:
+        parser.error("--normalized-contract requires --layout normalized")
+    if args.layout != "normalized":
+        return
+    if args.source_root is None or args.normalized_contract is None or args.manifest is None or args.output is None:
+        parser.error(
+            "--layout normalized requires explicit --source-root, --normalized-contract, --manifest, and --output"
+        )
+    repository_root = Path(repository_root).resolve()
+    source_root = Path(source_root).resolve()
+    contract_path = args.normalized_contract.resolve()
+    manifest_path = args.manifest.resolve()
+    output = Path(output).resolve()
+    if repository_root == source_root or repository_root in source_root.parents:
+        parser.error("normalized fixture source root must be outside the repository")
+    if repository_root == output or repository_root in output.parents:
+        parser.error("normalized fixture output must be outside the repository")
+    if repository_root in contract_path.parents or contract_path == repository_root:
+        parser.error("normalized fixture contract must be outside the repository")
+    if repository_root in manifest_path.parents or manifest_path == repository_root:
+        parser.error("normalized fixture manifest must be outside the repository")
+    if output in {contract_path, manifest_path} or source_root in output.parents or output == source_root:
+        parser.error("normalized fixture output must not overwrite an input or source root")
 
 
 def main(argv=None):
@@ -889,13 +1859,17 @@ def main(argv=None):
         action="store_true",
         help="refresh source-derived fields in the checked runtime preflight manifest",
     )
+    parser.add_argument("--layout", choices=("transitional", "normalized"), default="transitional")
+    parser.add_argument("--normalized-contract", type=Path, help="explicit future normalized-layout contract")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     repository_root = Path(__file__).resolve().parents[1]
     source_root = args.source_root or repository_root / "itambox"
     canonical_source_root = (repository_root / "itambox").resolve()
     output = args.output or repository_root / "scripts" / "migration_audit.json"
-    inventory = build_inventory(source_root)
+    _validate_normalized_cli_paths(parser, args, repository_root, source_root, output)
+    normalized_contract = load_preflight_manifest(args.normalized_contract) if args.normalized_contract else None
+    inventory = build_inventory(source_root, layout=args.layout, normalized_contract=normalized_contract)
     manifest_is_requested = source_root.resolve() == canonical_source_root or args.manifest is not None
     if args.write_preflight_manifest and args.check:
         parser.error("--check and --write-preflight-manifest are mutually exclusive")

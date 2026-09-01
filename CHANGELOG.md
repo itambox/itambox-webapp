@@ -9,6 +9,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Changed
 
 - Added the read-only `migration_baseline_preflight` release gate and checked manifest. The current migration layout remains transitional; the gate recognizes complete replacement history, rejects old/partial/mixed states before a cleanup attempt, and documents restore-first handling for interrupted non-atomic migrations.
+- Extended the checked migration audit with an explicit, fixture-bound contract for a future normalized baseline; the live transitional layout and migration recorder behavior remain unchanged, and the required transition release still applies.
 
 - Tightened the first organization/membership English copy: role-form guidance, the assign-users explanation, member-selection help, role presets, and user-group help are shorter and more direct; the role assignment page and the permissions-matrix help now render reviewed German translations (part of issue #386).
 - The first German asset UI text chunk uses the established glossary terms and clearer labels for asset types, locations, custody receipts, and warranties.
