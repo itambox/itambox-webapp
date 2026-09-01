@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -42,7 +44,8 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
         )
         environment.object_types.add(asset_type_ct)
         fieldset = CustomFieldset.objects.create(name="Issue 479 Migration Specs")
-        fieldset.fields.add(environment, memory)
+        fieldset.fields.add(memory)
+        fieldset.fields.add(environment)
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
@@ -86,3 +89,32 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
             list(migrated_asset_type.fieldset_memberships.values_list("fieldset_id", "position")),
             [(fieldset.pk, 10)],
         )
+
+    def test_case_folded_fieldset_slugs_are_hashed_by_source_identity(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        lower = CustomFieldset.objects.create(name="foo")
+        upper = CustomFieldset.objects.create(name="Foo")
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        migrated_apps = executor.loader.project_state(self.migrate_to).apps
+        CustomFieldset = migrated_apps.get_model("extras", "CustomFieldset")
+
+        def expected_slug(source):
+            values = ("fieldset", source.name, source.pk)
+            encoded = []
+            for value in values:
+                raw = str(value).encode("utf-8")
+                encoded.append(str(len(raw)).encode("ascii") + b":" + raw)
+            digest = hashlib.sha256(b"\x1f".join(encoded)).hexdigest()[:12]
+            return f"foo-h{digest}"
+
+        migrated_lower = CustomFieldset.objects.get(pk=lower.pk)
+        migrated_upper = CustomFieldset.objects.get(pk=upper.pk)
+        self.assertEqual(migrated_lower.slug, expected_slug(lower))
+        self.assertEqual(migrated_upper.slug, expected_slug(upper))
+        self.assertNotEqual(migrated_lower.slug, migrated_upper.slug)

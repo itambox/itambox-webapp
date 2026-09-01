@@ -1,6 +1,6 @@
 from dataclasses import dataclass, replace
 
-from extras.models import CustomField
+from extras.models import CustomField, CustomFieldset
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,8 @@ def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None):
     resolved = []
     by_key = {}
     for fieldset in fieldsets:
+        if fieldset.deleted_at is not None or fieldset.lifecycle != CustomFieldset.LIFECYCLE_ACTIVE:
+            continue
         identity = _qualified_identity(fieldset)
         field_memberships = fieldset.field_memberships.select_related("custom_field").order_by(
             "position", "custom_field__name"

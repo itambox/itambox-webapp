@@ -102,6 +102,13 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         by_id = CustomFieldset.objects.in_bulk(ids)
         return [by_id[fieldset_id] for fieldset_id in ids if fieldset_id in by_id]
 
+    def clean_custom_fieldsets(self):
+        fieldsets = self.cleaned_data["custom_fieldsets"]
+        raw_ids = self._raw_selected_fieldset_ids()
+        if len(raw_ids) != len(set(raw_ids)):
+            raise forms.ValidationError(_("Each specification fieldset may only be selected once."))
+        return fieldsets
+
     def get_custom_field_definitions(self):
         stored = dict(self.instance.custom_field_data or {}) if self.instance and self.instance.pk else {}
         return resolve_fieldsets_custom_fields(

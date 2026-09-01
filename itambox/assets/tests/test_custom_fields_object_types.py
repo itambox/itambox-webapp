@@ -4,7 +4,9 @@ from django.test import TestCase
 
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
-from assets.models import Asset, AssetRole, AssetType, AssetTypeFieldset, Category, Manufacturer, StatusLabel
+from assets.forms.supplier_form import SupplierForm
+from assets.models import Asset, AssetRole, AssetType, AssetTypeFieldset, Category, Manufacturer, StatusLabel, Supplier
+from extras.customfields import apply_custom_field_filters
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 
 User = get_user_model()
@@ -129,9 +131,6 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
     """The generic mixin renders/persists custom fields for any opted-in model."""
 
     def test_supplier_form_roundtrip(self):
-        from assets.forms.supplier_form import SupplierForm
-        from assets.models import Supplier
-
         supplier_ct = ContentType.objects.get_for_model(Supplier)
         cf = CustomField.objects.create(name="account_no", label="Account Number", field_type="text")
         cf.object_types.add(supplier_ct)
@@ -144,3 +143,94 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
         # Round-trip: the stored value comes back as the form initial.
         form2 = SupplierForm(instance=supplier)
         self.assertEqual(form2.fields["cf_account_no"].initial, "ACC-42")
+
+    def test_supplier_form_applies_definition_lifecycle_to_stored_values(self):
+        supplier_ct = ContentType.objects.get_for_model(Supplier)
+        active = CustomField.objects.create(name="active_note", label="Active note")
+        deprecated = CustomField.objects.create(
+            name="old_note",
+            label="Old note",
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+        )
+        deleted = CustomField.objects.create(
+            name="deleted_note",
+            label="Deleted note",
+            lifecycle=CustomField.LIFECYCLE_DELETED,
+        )
+        for definition in (active, deprecated, deleted):
+            definition.object_types.add(supplier_ct)
+        supplier = Supplier.objects.create(
+            name="Lifecycle Supplier",
+            slug="lifecycle-supplier",
+            custom_field_data={"old_note": "retain", "deleted_note": "preserve"},
+        )
+
+        edit_form = SupplierForm(instance=supplier)
+        self.assertIn("cf_active_note", edit_form.fields)
+        self.assertIn("cf_old_note", edit_form.fields)
+        self.assertTrue(edit_form.fields["cf_old_note"].disabled)
+        self.assertNotIn("cf_deleted_note", edit_form.fields)
+
+        bound_form = SupplierForm(
+            data={
+                "name": supplier.name,
+                "slug": supplier.slug,
+                "cf_active_note": "updated",
+            },
+            instance=supplier,
+        )
+        self.assertTrue(bound_form.is_valid(), bound_form.errors)
+        saved = bound_form.save()
+        self.assertEqual(
+            saved.custom_field_data,
+            {
+                "active_note": "updated",
+                "old_note": "retain",
+                "deleted_note": "preserve",
+            },
+        )
+
+        create_form = SupplierForm()
+        self.assertIn("cf_active_note", create_form.fields)
+        self.assertNotIn("cf_old_note", create_form.fields)
+        self.assertNotIn("cf_deleted_note", create_form.fields)
+
+    def test_supplier_filters_resolve_only_active_definitions(self):
+        supplier_ct = ContentType.objects.get_for_model(Supplier)
+        active = CustomField.objects.create(name="region", label="Region")
+        deprecated = CustomField.objects.create(
+            name="old_region",
+            label="Old region",
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+        )
+        deleted = CustomField.objects.create(
+            name="deleted_region",
+            label="Deleted region",
+            lifecycle=CustomField.LIFECYCLE_DELETED,
+        )
+        for definition in (active, deprecated, deleted):
+            definition.object_types.add(supplier_ct)
+        first = Supplier.objects.create(
+            name="First Supplier",
+            slug="first-supplier",
+            custom_field_data={"region": "north", "old_region": "legacy", "deleted_region": "secret"},
+        )
+        second = Supplier.objects.create(
+            name="Second Supplier",
+            slug="second-supplier",
+            custom_field_data={"region": "south"},
+        )
+        queryset = Supplier.objects.order_by("pk")
+
+        self.assertEqual(
+            list(apply_custom_field_filters(queryset, Supplier, {"cf_region": "north"})),
+            [first],
+        )
+        self.assertEqual(
+            list(apply_custom_field_filters(queryset, Supplier, {"cf_old_region": "legacy"})),
+            [first, second],
+        )
+        self.assertEqual(
+            list(apply_custom_field_filters(queryset, Supplier, {"cf_deleted_region": "secret"})),
+            [first, second],
+        )

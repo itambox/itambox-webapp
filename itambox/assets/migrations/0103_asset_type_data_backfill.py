@@ -2,6 +2,7 @@ import hashlib
 import math
 import re
 import unicodedata
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 
 from django.db import migrations
@@ -72,12 +73,12 @@ def _tuple_bytes(kind, values):
     return b"\x1f".join(_encoded_component(value) for value in (kind, *values))
 
 
-def _stable_slug(kind, visible, values):
+def _stable_slug(kind, visible, values, force_hash=False):
     decomposed = unicodedata.normalize("NFKD", visible)
     ascii_value = "".join(char for char in decomposed if ord(char) < 128 and not unicodedata.combining(char))
     folded = ascii_value.casefold()
     normalized = re.sub(r"[^a-z0-9]+", "-", folded).strip("-")
-    needs_hash = normalized != folded.strip("-") or ascii_value != visible or len(normalized) > 96
+    needs_hash = force_hash or normalized != folded.strip("-") or ascii_value != visible or len(normalized) > 96
     normalized = normalized[:96].rstrip("-")
     digest = hashlib.sha256(_tuple_bytes(kind, values)).hexdigest()[:12]
     if not normalized:
@@ -340,8 +341,25 @@ def forward(apps, schema_editor):
         CustomField._base_manager.using(db_alias).filter(pk=field.pk).update(**updates[field.pk])
 
     legacy_through = CustomFieldset.legacy_fields.through
-    for fieldset in CustomFieldset._base_manager.using(db_alias).order_by("pk"):
-        slug = _stable_slug("fieldset", fieldset.name, (fieldset.name, fieldset.pk))
+    fieldsets = list(CustomFieldset._base_manager.using(db_alias).order_by("pk"))
+    base_slugs = {
+        fieldset.pk: _stable_slug("fieldset", fieldset.name, (fieldset.name, fieldset.pk)) for fieldset in fieldsets
+    }
+    slug_counts = Counter(base_slugs.values())
+    slugs = {
+        fieldset.pk: _stable_slug(
+            "fieldset",
+            fieldset.name,
+            (fieldset.name, fieldset.pk),
+            force_hash=slug_counts[base_slugs[fieldset.pk]] > 1,
+        )
+        for fieldset in fieldsets
+    }
+    if len(slugs.values()) != len(set(slugs.values())):
+        _fail("fieldset_slug_collision")
+
+    for fieldset in fieldsets:
+        slug = slugs[fieldset.pk]
         CustomFieldset._base_manager.using(db_alias).filter(pk=fieldset.pk).update(
             namespace="local",
             slug=slug,

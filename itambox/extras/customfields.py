@@ -237,10 +237,13 @@ def serialize_custom_field_value(value, definition=None):
     return str(value)
 
 
-def custom_fields_for_model(model):
-    """All active CustomFields whose object_types include the given model."""
+def custom_fields_for_model(model, include_inactive=False):
+    """CustomFields whose object_types include the given model."""
     ct = ContentType.objects.get_for_model(model)
-    return CustomField.objects.filter(object_types=ct)
+    queryset = CustomField.objects.filter(object_types=ct)
+    if not include_inactive:
+        queryset = queryset.filter(lifecycle=CustomField.LIFECYCLE_ACTIVE)
+    return queryset
 
 
 def apply_custom_field_filters(queryset, model, params):
@@ -275,7 +278,7 @@ class CustomFieldModelFormMixin:
     custom_fields_fieldset_label = _("Custom Fields")
 
     def get_custom_field_definitions(self):
-        return custom_fields_for_model(self._meta.model)
+        return custom_fields_for_model(self._meta.model, include_inactive=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -287,13 +290,17 @@ class CustomFieldModelFormMixin:
 
         for item in self.get_custom_field_definitions():
             cf = _definition(item)
+            if cf.lifecycle == CustomField.LIFECYCLE_DELETED:
+                continue
+            if cf.lifecycle == CustomField.LIFECYCLE_DEPRECATED and cf.name not in stored:
+                continue
             key = f"cf_{cf.name}"
             if key in self.fields:
                 continue
             form_field = build_custom_field_form_field(
                 cf,
                 stored.get(cf.name),
-                read_only=getattr(item, "read_only", False),
+                read_only=getattr(item, "read_only", False) or cf.lifecycle == CustomField.LIFECYCLE_DEPRECATED,
             )
             if form_field is not None:
                 self.fields[key] = form_field
