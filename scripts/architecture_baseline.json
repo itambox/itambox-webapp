@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "policy_sha256": "ff7e0451191c36776439863a53260530bca229457cab7b7962e808141e5622a5",
+  "policy_sha256": "534f760747aeb49254cee81fda71783243b0b2267311979a871c027b72264563",
   "cycles": [],
   "layer_exceptions": [],
   "unsupported_cycle_claims": []
