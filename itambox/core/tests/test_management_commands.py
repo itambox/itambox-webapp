@@ -9,8 +9,10 @@ from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
 from core.management.commands._seed.access import check_seed_access_invariants
 from core.management.commands._seed.inventory import check_seed_inventory_invariants
+from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import EmailSettings, Job
+from extras.models import CustomFieldset
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -65,6 +67,27 @@ class ManagementCommandsTestCase(TransactionTestCase):
         # (the guard that prevents an accidental production wipe).
         call_command("seed_data", production=True, force=True, stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Database seeding complete", self.stdout.getvalue())
+
+    def test_seed_catalog_writes_ordered_custom_fieldset_memberships(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+
+        fieldset = CustomFieldset.objects.get(name="Laptop / Workstation Specs")
+        self.assertEqual(
+            list(fieldset.field_memberships.values_list("custom_field__name", "position")),
+            [
+                ("cpu", 10),
+                ("ram_gb", 20),
+                ("storage_gb", 30),
+                ("storage_type", 40),
+                ("gpu", 50),
+                ("cpu_architecture", 60),
+                ("hostname", 70),
+                ("os_version", 80),
+                ("encrypted", 90),
+                ("department", 100),
+            ],
+        )
 
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
         with override_settings(SEED_PASSWORD="configured-seed-password"):

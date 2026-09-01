@@ -16,6 +16,8 @@ Designed to be mixed into ``Command`` in seed_data.py:
 and ``self._providers``. It reads ``self._status_label_defs()`` from Command.
 """
 
+from extras.models import CustomFieldsetField
+
 
 class SeedCatalogMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
@@ -261,7 +263,17 @@ class SeedCatalogMixin:
 
         def fieldset(name, *field_names):
             fs, _ = CustomFieldset.objects.get_or_create(name=name)
-            fs.fields.set([self._custom_fields[f] for f in field_names])
+            fs.field_memberships.all().delete()
+            CustomFieldsetField.objects.bulk_create(
+                [
+                    CustomFieldsetField(
+                        fieldset=fs,
+                        custom_field=self._custom_fields[field_name],
+                        position=index * 10,
+                    )
+                    for index, field_name in enumerate(field_names, start=1)
+                ]
+            )
             return fs
 
         self._fs_laptop = fieldset(

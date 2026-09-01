@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.utils import timezone
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.models import AssetType, AssetTypeFieldset, Manufacturer
@@ -53,6 +54,25 @@ class CustomFieldCompositionTests(TestCase):
 
         asset_fields = resolve_asset_custom_fields(self.asset_type)
         self.assertEqual([item.definition.name for item in asset_fields], ["shared", "asset_only", global_asset.name])
+
+    def test_resolver_omits_fields_from_inactive_fieldsets_without_removing_values(self):
+        deleted_field = self._field("deleted_fieldset_value", CustomField.SCOPE_ASSET_TYPE)
+        deprecated_field = self._field("deprecated_fieldset_value", CustomField.SCOPE_ASSET_TYPE)
+        CustomFieldsetField.objects.create(fieldset=self.first, custom_field=deleted_field, position=10)
+        CustomFieldsetField.objects.create(fieldset=self.second, custom_field=deprecated_field, position=10)
+        stored = {
+            "deleted_fieldset_value": "preserve deleted",
+            "deprecated_fieldset_value": "preserve deprecated",
+        }
+        self.asset_type.custom_field_data = stored
+        self.asset_type.save(update_fields=["custom_field_data"])
+        CustomFieldset.all_objects.filter(pk=self.first.pk).update(deleted_at=timezone.now())
+        self.second.lifecycle = CustomFieldset.LIFECYCLE_DEPRECATED
+        self.second.save(update_fields=["lifecycle"])
+
+        self.assertEqual(resolve_asset_type_custom_fields(self.asset_type), [])
+        self.asset_type.refresh_from_db()
+        self.assertEqual(self.asset_type.custom_field_data, stored)
 
     def test_patch_preserves_unrendered_values_and_distinguishes_false_zero_empty_and_null(self):
         flag = self._field("flag", CustomField.SCOPE_ASSET, field_type=CustomField.FIELD_TYPE_BOOLEAN)
