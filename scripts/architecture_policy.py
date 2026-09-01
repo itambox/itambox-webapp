@@ -198,6 +198,7 @@ PLATFORM_LAYER_PREFIXES = {
 # of the fingerprint; a rule defect belongs in the tables above instead, because
 # an override map that absorbs rule defects rots into a lookup table.
 MODULE_LAYER_OVERRIDES = {
+    "assets.customfields": "domain-service",
     "assets.depreciation": "domain-service",
     "assets.scanning": "domain-service",
     "compliance.checks": "composition",
