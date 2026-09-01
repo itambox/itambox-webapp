@@ -6220,6 +6220,134 @@
     },
     {
       "dependencies": [
+        "assets.0101_seed_canonical_missing_status",
+        "extras.0114_asset_type_definition_schema",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0102_asset_type_composition_schema",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0102_asset_type_composition_schema.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "assets.0102_asset_type_composition_schema",
+        "extras.0114_asset_type_definition_schema",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0103_asset_type_data_backfill",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0103_asset_type_data_backfill.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Converts legacy custom-field identities, types, relational choices, memberships, and stored JSON values into the Issue #479 additive definition schema while preserving unknown keys and aborting on ambiguity."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "assets.0103_asset_type_data_backfill",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0104_asset_type_composition_backfill",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0104_asset_type_composition_backfill.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Copies the legacy singular Asset Type fieldset relation into the ordered plural composition before the later clean-cut removal of the migration-input column."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -11546,6 +11674,47 @@
         "has_custom_operations": {
           "BtreeGistExtension": false,
           "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "contenttypes.0002_remove_content_type_name",
+        "extras.0113_upgrade_legacy_webhook_retry_schedules",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0114_asset_type_definition_schema",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0114_asset_type_definition_schema.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
           "RunSQL": false,
           "SeparateDatabaseAndState": false
         }
@@ -18058,6 +18227,9 @@
   ],
   "post_transition_migrations": [
     "assets.0101_seed_canonical_missing_status",
+    "assets.0102_asset_type_composition_schema",
+    "assets.0103_asset_type_data_backfill",
+    "assets.0104_asset_type_composition_backfill",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -18076,6 +18248,7 @@
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
+    "extras.0114_asset_type_definition_schema",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -18130,6 +18303,8 @@
       "assets.0042_depreciation_v2",
       "assets.0044_assetrole_allows_components",
       "assets.0049_supplier_contacts_unification",
+      "assets.0103_asset_type_data_backfill",
+      "assets.0104_asset_type_composition_backfill",
       "compliance.0009_auditsession_assetaudit",
       "compliance.0010_repoint_audit_contenttypes",
       "compliance.0012_null_to_empty_strings",
@@ -18363,7 +18538,7 @@
         ]
       }
     },
-    "post_transition_migrations": 28,
+    "post_transition_migrations": 32,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
