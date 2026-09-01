@@ -324,14 +324,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/asset_form.py",
-      "code": "F401",
-      "message": "'extras.models.Tag' imported but unused",
-      "source": "from extras.models import CustomField, Tag",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/assetrole_form.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
