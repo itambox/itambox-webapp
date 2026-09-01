@@ -37,6 +37,12 @@ validate_selection = selector.validate_selection
 
 
 IDENTITY_KEYS = frozenset({"event_name", "base_sha", "head_sha", "merge_base_sha", "changed_path_digest"})
+RUNTIME_KEYS = frozenset({"provenance_schema", "tested_checkout_sha", "tested_checkout_kind", "synthetic_merge_sha"})
+SETUP_PROJECT_DEPENDENCIES = {
+    "admin": ("setup-admin", "setup-aggregate"),
+    "operator": ("setup-operator",),
+    "viewer": ("setup-viewer",),
+}
 DISCOVERY_REQUIRED_KEYS = frozenset(
     {
         "schema",
@@ -53,6 +59,7 @@ DISCOVERY_OPTIONAL_KEYS = frozenset({"only", "registered_spec_paths"})
 EXECUTION_REQUIRED_KEYS = frozenset(
     {
         "schema",
+        "selection",
         "selection_identity",
         "tested_checkout_sha",
         "selected_spec_paths",
@@ -68,7 +75,6 @@ DISCOVERED_TEST_KEYS = frozenset({"id", "spec", "project"})
 EXECUTED_TEST_KEYS = frozenset({"id", "spec", "project", "status", "attempts"})
 ATTEMPT_KEYS = frozenset({"retry", "status", "identity"})
 CLEANUP_KEYS = frozenset({"success", "failures"})
-REQUIRED_SETUP_PROJECTS = ["setup-admin", "setup-aggregate", "setup-operator", "setup-viewer"]
 ATTEMPT_STATUSES = frozenset({"passed", "failed", "timed_out", "interrupted"})
 
 
@@ -113,11 +119,27 @@ def _sorted_unique_strings(value: Any, label: str, *, nonempty: bool = False) ->
     return value
 
 
+def _validate_runtime_identity(result: Mapping[str, Any], label: str, event_name: str) -> None:
+    if type(result["provenance_schema"]) is not int or result["provenance_schema"] != selector.PROVENANCE_SCHEMA:
+        raise CertificationError(f"{label}.provenance_schema must be {selector.PROVENANCE_SCHEMA}")
+    if not isinstance(result["tested_checkout_sha"], str) or not SHA_RE.fullmatch(result["tested_checkout_sha"]):
+        raise CertificationError(f"{label}.tested_checkout_sha is not a canonical Git SHA")
+    if result["tested_checkout_kind"] != "head":
+        raise CertificationError(f"{label}.tested_checkout_kind must be head")
+    synthetic_merge_sha = result["synthetic_merge_sha"]
+    if event_name == "pull_request":
+        if not isinstance(synthetic_merge_sha, str) or not SHA_RE.fullmatch(synthetic_merge_sha):
+            raise CertificationError(f"{label}.synthetic_merge_sha is not a canonical Git SHA")
+    elif synthetic_merge_sha is not None:
+        raise CertificationError(f"{label}.synthetic_merge_sha is only valid for pull_request events")
+
+
 def _identity(value: Any, label: str, *, allow_runtime: bool = False) -> dict[str, str]:
     result = _object(value, label)
-    allowed = IDENTITY_KEYS | ({"tested_checkout_sha", "tested_checkout_kind"} if allow_runtime else set())
+    allowed = IDENTITY_KEYS | (RUNTIME_KEYS if allow_runtime else set())
     actual = set(result)
-    missing = sorted(IDENTITY_KEYS - actual)
+    required = IDENTITY_KEYS | (RUNTIME_KEYS if allow_runtime else set())
+    missing = sorted(required - actual)
     unknown = sorted(actual - allowed)
     if missing or unknown:
         raise CertificationError(f"{label} has invalid keys; missing={missing}, unknown={unknown}")
@@ -130,21 +152,16 @@ def _identity(value: Any, label: str, *, allow_runtime: bool = False) -> dict[st
     digest = result["changed_path_digest"]
     if not isinstance(digest, str) or not DIGEST_RE.fullmatch(digest):
         raise CertificationError(f"{label}.changed_path_digest is not canonical")
-    if allow_runtime and "tested_checkout_sha" in result:
-        if not isinstance(result["tested_checkout_sha"], str) or not SHA_RE.fullmatch(result["tested_checkout_sha"]):
-            raise CertificationError(f"{label}.tested_checkout_sha is not a canonical Git SHA")
-        if result.get("tested_checkout_kind") not in {"head", "merge_candidate"}:
-            raise CertificationError(f"{label}.tested_checkout_kind is unsupported")
+    if allow_runtime:
+        _validate_runtime_identity(result, label, event_name)
     return {key: result[key] for key in IDENTITY_KEYS}
 
 
 def _runtime_checkout(current: Mapping[str, Any], selection: Mapping[str, Any]) -> tuple[str, str]:
     checkout = current.get("tested_checkout_sha", selection["head_sha"])
     kind = current.get("tested_checkout_kind", "head")
-    if checkout != selection["head_sha"] and kind != "merge_candidate":
-        raise CertificationError("a checkout different from the PR head must be marked merge_candidate")
-    if checkout == selection["head_sha"] and kind not in {"head", "merge_candidate"}:
-        raise CertificationError("tested checkout kind is invalid")
+    if checkout != selection["head_sha"] or kind != "head":
+        raise CertificationError("E2E must certify the raw PR-head checkout")
     return checkout, kind
 
 
@@ -285,6 +302,15 @@ def _validate_discovered_specs(
             raise CertificationError(f"selected path {selected!r} discovered no tests")
 
 
+def _expected_setup_projects(discovered_tests: Sequence[Mapping[str, Any]]) -> list[str]:
+    projects = {test["project"] for test in discovered_tests}
+    unknown = sorted(projects - set(SETUP_PROJECT_DEPENDENCIES) - {"anonymous", "remote-smoke"})
+    if unknown:
+        raise CertificationError(f"discovery contains unsupported Playwright projects {unknown}")
+    expected = {setup_project for project in projects for setup_project in SETUP_PROJECT_DEPENDENCIES.get(project, ())}
+    return sorted(expected)
+
+
 def _validate_discovery(
     discovery: Any,
     expected_identity: Mapping[str, str],
@@ -306,11 +332,15 @@ def _validate_discovery(
     )
     if selected_paths != selection["spec_paths"]:
         raise CertificationError("discovery selected paths do not match the selection")
-    setup_projects = _sorted_unique_strings(value["setup_projects"], "discovery setup_projects", nonempty=True)
-    if setup_projects != REQUIRED_SETUP_PROJECTS:
-        raise CertificationError(f"discovery must include exactly the setup projects {REQUIRED_SETUP_PROJECTS}")
     discovered_specs = _sorted_unique_strings(value["discovered_specs"], "discovered_specs", nonempty=True)
     discovered_tests = _validate_test_rows(value["discovered_tests"], "discovered_tests", execution=False)
+    expected_setup_projects = _expected_setup_projects(discovered_tests)
+    setup_projects = _sorted_unique_strings(value["setup_projects"], "discovery setup_projects", nonempty=True)
+    if setup_projects != expected_setup_projects:
+        raise CertificationError(
+            "discovery setup projects do not match discovered project dependencies; "
+            f"expected={expected_setup_projects}, actual={setup_projects}"
+        )
     if any(test["spec"] not in set(discovered_specs) for test in discovered_tests):
         raise CertificationError("a discovered test names a spec absent from discovered_specs")
     _validate_discovered_specs(discovered_specs, selected_paths, discovered_tests)
@@ -328,11 +358,12 @@ def _validate_discovery(
 
 def _validate_checkout(value: Any, expected: str, label: str) -> None:
     if value != expected or not SHA_RE.fullmatch(str(value)):
-        raise CertificationError(f"{label} tested checkout does not match the intended merge candidate")
+        raise CertificationError(f"{label} tested checkout does not match the intended raw PR head")
 
 
 def _validate_execution(
     execution: Any,
+    expected_selection: Mapping[str, Any],
     expected_identity: Mapping[str, str],
     runtime_checkout_sha: str,
     selected_paths: Sequence[str],
@@ -344,6 +375,8 @@ def _validate_execution(
     _validate_report_metadata(value)
     if type(value["schema"]) is not int or value["schema"] != SCHEMA:
         raise CertificationError(f"execution schema must be {SCHEMA}")
+    if value["selection"] != expected_selection:
+        raise CertificationError("execution selection does not match the detector selection")
     if _identity(value["selection_identity"], "execution selection identity") != expected_identity:
         raise CertificationError("execution identity does not match the selection")
     _validate_checkout(value["tested_checkout_sha"], runtime_checkout_sha, "execution")
@@ -421,15 +454,23 @@ def certify_run(
         discovery, expected_identity, runtime_checkout_sha, selection, repo_root, scope_map
     )
     retry_count = _validate_execution(
-        execution, expected_identity, runtime_checkout_sha, selected_paths, discovered_specs, discovered_tests
+        execution,
+        selection,
+        expected_identity,
+        runtime_checkout_sha,
+        selected_paths,
+        discovered_specs,
+        discovered_tests,
     )
     result = {
         "schema": SCHEMA,
         "success": True,
         "verdict": "passed",
         **expected_identity,
+        "provenance_schema": current_identity["provenance_schema"],
         "tested_checkout_sha": runtime_checkout_sha,
         "tested_checkout_kind": runtime_checkout_kind,
+        "synthetic_merge_sha": current_identity["synthetic_merge_sha"],
         "selection_mode": selection["mode"],
         "selected_spec_path_count": len(selected_paths),
         "discovered_spec_count": len(discovered_specs),
@@ -493,6 +534,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--head-sha", "--current-head-sha", dest="head_sha")
     parser.add_argument("--merge-base-sha", "--current-merge-base-sha", dest="merge_base_sha")
     parser.add_argument("--changed-path-digest", "--current-changed-path-digest", dest="changed_path_digest")
+    parser.add_argument("--tested-checkout-sha", dest="tested_checkout_sha")
+    parser.add_argument("--tested-checkout-kind", dest="tested_checkout_kind")
+    parser.add_argument("--synthetic-merge-sha", dest="synthetic_merge_sha")
     parser.add_argument("--output", type=Path, required=True, help="canonical certification artifact to create")
     parser.add_argument(
         "--github-step-summary",
@@ -520,21 +564,45 @@ def main(argv: Sequence[str] | None = None) -> int:
         execution = _load_required(beneath_root(args.execution), "E2E execution envelope")
         if args.current_identity:
             current = _load_required(beneath_root(args.current_identity), "current E2E identity")
-            if any((args.event_name, args.base_sha, args.head_sha, args.merge_base_sha, args.changed_path_digest)):
+            if any(
+                (
+                    args.event_name,
+                    args.base_sha,
+                    args.head_sha,
+                    args.merge_base_sha,
+                    args.changed_path_digest,
+                    args.tested_checkout_sha,
+                    args.tested_checkout_kind,
+                    args.synthetic_merge_sha,
+                )
+            ):
                 raise CertificationError("use --current-identity or individual current identity flags, not both")
         else:
-            values = (args.event_name, args.base_sha, args.head_sha, args.merge_base_sha, args.changed_path_digest)
-            if any(value is None for value in values):
+            logical_values = (
+                args.event_name,
+                args.base_sha,
+                args.head_sha,
+                args.merge_base_sha,
+                args.changed_path_digest,
+            )
+            runtime_values = (args.tested_checkout_sha, args.tested_checkout_kind)
+            if any(value is None for value in (*logical_values, *runtime_values)):
                 raise CertificationError(
-                    "current identity requires --event-name, --base-sha, --head-sha, --merge-base-sha, "
-                    "and --changed-path-digest"
+                    "current identity requires logical identity flags plus "
+                    "--tested-checkout-sha and --tested-checkout-kind"
                 )
+            if args.event_name == "pull_request" and args.synthetic_merge_sha is None:
+                raise CertificationError("pull_request current identity requires --synthetic-merge-sha")
             current = {
                 "event_name": args.event_name,
                 "base_sha": args.base_sha,
                 "head_sha": args.head_sha,
                 "merge_base_sha": args.merge_base_sha,
                 "changed_path_digest": args.changed_path_digest,
+                "provenance_schema": selector.PROVENANCE_SCHEMA,
+                "tested_checkout_sha": args.tested_checkout_sha,
+                "tested_checkout_kind": args.tested_checkout_kind,
+                "synthetic_merge_sha": args.synthetic_merge_sha,
             }
         result = certify_run(selection, discovery, execution, current, root, scope_map)
         output = beneath_root(args.output)

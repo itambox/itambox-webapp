@@ -7,9 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.certify_e2e_run import CertificationError, certify_run
+from scripts.certify_e2e_run import CertificationError, _parser, certify_run
 from scripts.select_e2e_scopes import build_selection, validate_scope_map
 from scripts.tests.test_select_e2e_scopes import BASE, HEAD, MERGE, _map_document
+
+SYNTHETIC = "d" * 40
 
 
 class CertificationTests(unittest.TestCase):
@@ -34,6 +36,13 @@ class CertificationTests(unittest.TestCase):
             "merge_base_sha": MERGE,
             "changed_path_digest": self.selection["changed_path_digest"],
         }
+        self.current_identity = {
+            **self.identity,
+            "provenance_schema": 2,
+            "tested_checkout_sha": HEAD,
+            "tested_checkout_kind": "head",
+            "synthetic_merge_sha": SYNTHETIC,
+        }
         self.discovery = {
             "schema": 1,
             "selection_identity": copy.deepcopy(self.identity),
@@ -51,7 +60,7 @@ class CertificationTests(unittest.TestCase):
                 "spec/smoke/contract.spec.ts",
             ],
             "discovered_tests": [
-                {"id": "assets::contract", "spec": "spec/apps/assets/contract.spec.ts", "project": "operator"},
+                {"id": "assets::contract", "spec": "spec/apps/assets/contract.spec.ts", "project": "admin"},
                 {
                     "id": "custody::contract",
                     "spec": "spec/contracts/asset-custody/contract.spec.ts",
@@ -60,11 +69,12 @@ class CertificationTests(unittest.TestCase):
                 {"id": "legacy::contract", "spec": "spec/legacy-smoke/contract.spec.ts", "project": "operator"},
                 {"id": "smoke::contract", "spec": "spec/smoke/contract.spec.ts", "project": "operator"},
             ],
-            "setup_projects": ["setup-admin", "setup-aggregate", "setup-operator", "setup-viewer"],
+            "setup_projects": ["setup-admin", "setup-aggregate", "setup-operator"],
             "focused": False,
         }
         self.execution = {
             "schema": 1,
+            "selection": copy.deepcopy(self.selection),
             "selection_identity": copy.deepcopy(self.identity),
             "tested_checkout_sha": HEAD,
             "selected_spec_paths": copy.deepcopy(self.discovery["selected_spec_paths"]),
@@ -94,7 +104,7 @@ class CertificationTests(unittest.TestCase):
             selection if selection is not None else self.selection,
             discovery,
             execution if execution is not None else self.execution,
-            current if current is not None else self.identity,
+            current if current is not None else self.current_identity,
             self.root,
             self.scope_map,
         )
@@ -104,9 +114,43 @@ class CertificationTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["verdict"], "passed")
         self.assertEqual(result["tested_checkout_sha"], HEAD)
+        self.assertEqual(result["provenance_schema"], 2)
+        self.assertEqual(result["synthetic_merge_sha"], SYNTHETIC)
         self.assertEqual(result["discovered_test_count"], 4)
         self.assertEqual(result["executed_test_count"], 4)
         self.assertEqual(result["retry_count"], 0)
+
+    def test_selected_run_requires_only_the_setup_projects_used_by_selected_projects(self):
+        discovery = copy.deepcopy(self.discovery)
+        discovery["setup_projects"] = ["setup-admin", "setup-aggregate", "setup-operator"]
+        result = self.run_certification(discovery=discovery)
+        self.assertTrue(result["success"])
+
+    def test_synthetic_merge_checkout_is_rejected_by_the_raw_head_contract(self):
+        runtime = "e" * 40
+        current = copy.deepcopy(self.identity)
+        current.update(
+            tested_checkout_sha=runtime,
+            tested_checkout_kind="merge_candidate",
+            synthetic_merge_sha=SYNTHETIC,
+            provenance_schema=2,
+        )
+        discovery = copy.deepcopy(self.discovery)
+        discovery["tested_checkout_sha"] = runtime
+        execution = copy.deepcopy(self.execution)
+        execution["tested_checkout_sha"] = runtime
+        with self.assertRaises(CertificationError):
+            self.run_certification(discovery=discovery, execution=execution, current=current)
+
+    def test_execution_selection_mismatch_is_rejected(self):
+        execution = copy.deepcopy(self.execution)
+        execution["selection"] = copy.deepcopy(self.selection)
+        execution["selection"]["mode"] = "full"
+        execution["selection"]["scopes"] = ["all"]
+        execution["selection"]["spec_paths"] = ["spec"]
+        execution["selection"]["reasons"] = []
+        with self.assertRaises(CertificationError):
+            self.run_certification(execution=execution)
 
     def test_selected_path_with_no_discovered_tests_fails(self):
         discovery = copy.deepcopy(self.discovery)
@@ -174,8 +218,12 @@ class CertificationTests(unittest.TestCase):
             self.run_certification(execution=cleanup_failed)
 
     def test_identity_mismatch_missing_setup_or_missing_report_fails(self):
-        for key, value in (("head_sha", "d" * 40), ("changed_path_digest", "sha256:" + "0" * 64)):
-            current = copy.deepcopy(self.identity)
+        for key, value in (
+            ("head_sha", "d" * 40),
+            ("merge_base_sha", "e" * 40),
+            ("changed_path_digest", "sha256:" + "0" * 64),
+        ):
+            current = copy.deepcopy(self.current_identity)
             current[key] = value
             with self.subTest(key=key), self.assertRaises(CertificationError):
                 self.run_certification(current=current)
@@ -188,25 +236,73 @@ class CertificationTests(unittest.TestCase):
         with self.assertRaises(CertificationError):
             self.run_certification(discovery=None)
 
-    def test_current_merge_candidate_checkout_is_explicitly_certified(self):
+    def test_current_merge_candidate_checkout_is_rejected(self):
         runtime = "f" * 40
         selection = copy.deepcopy(self.selection)
         discovery = copy.deepcopy(self.discovery)
         execution = copy.deepcopy(self.execution)
         current = copy.deepcopy(self.identity)
-        current.update(tested_checkout_sha=runtime, tested_checkout_kind="merge_candidate")
+        current.update(
+            tested_checkout_sha=runtime,
+            tested_checkout_kind="merge_candidate",
+            synthetic_merge_sha=SYNTHETIC,
+            provenance_schema=2,
+        )
         discovery["tested_checkout_sha"] = runtime
         execution["tested_checkout_sha"] = runtime
-        result = self.run_certification(
-            selection=selection,
-            discovery=discovery,
-            execution=execution,
-            current=current,
-        )
-        self.assertTrue(result["success"])
-        self.assertEqual(result["tested_checkout_kind"], "merge_candidate")
+        with self.assertRaises(CertificationError):
+            self.run_certification(
+                selection=selection,
+                discovery=discovery,
+                execution=execution,
+                current=current,
+            )
 
-    def test_full_run_must_discover_complete_spec_tree(self):
+    def test_pr_runtime_identity_requires_synthetic_merge_provenance(self):
+        current = copy.deepcopy(self.identity)
+        current.update(provenance_schema=2, tested_checkout_sha=HEAD, tested_checkout_kind="head")
+        with self.assertRaises(CertificationError):
+            self.run_certification(current=current)
+
+    def test_provenance_schema_rejects_non_integer_values(self):
+        current = copy.deepcopy(self.current_identity)
+        current["provenance_schema"] = 2.0
+        with self.assertRaises(CertificationError):
+            self.run_certification(current=current)
+
+    def test_cli_identity_flags_include_the_complete_runtime_contract(self):
+        args = _parser().parse_args(
+            [
+                "--selection",
+                "selection.json",
+                "--discovery",
+                "discovery.json",
+                "--execution",
+                "execution.json",
+                "--output",
+                "certification.json",
+                "--event-name",
+                "pull_request",
+                "--base-sha",
+                BASE,
+                "--head-sha",
+                HEAD,
+                "--merge-base-sha",
+                MERGE,
+                "--changed-path-digest",
+                "sha256:" + "0" * 64,
+                "--tested-checkout-sha",
+                HEAD,
+                "--tested-checkout-kind",
+                "head",
+                "--synthetic-merge-sha",
+                SYNTHETIC,
+            ]
+        )
+        self.assertEqual(args.tested_checkout_sha, HEAD)
+        self.assertEqual(args.tested_checkout_kind, "head")
+        self.assertEqual(args.synthetic_merge_sha, SYNTHETIC)
+
         selection = build_selection(
             self.scope_map,
             self.root,
@@ -231,9 +327,11 @@ class CertificationTests(unittest.TestCase):
         discovery["selection_identity"] = copy.deepcopy(full_identity)
         discovery["tested_checkout_sha"] = HEAD
         discovery["selected_spec_paths"] = ["spec"]
+        discovery["setup_projects"] = ["setup-operator"]
         discovery["discovered_specs"] = all_specs
         discovery["discovered_tests"] = [{"id": spec, "spec": spec, "project": "operator"} for spec in all_specs]
         execution = copy.deepcopy(self.execution)
+        execution["selection"] = copy.deepcopy(selection)
         execution["selection_identity"] = copy.deepcopy(full_identity)
         execution["tested_checkout_sha"] = HEAD
         execution["selected_spec_paths"] = ["spec"]
@@ -258,6 +356,10 @@ class CertificationTests(unittest.TestCase):
                 "head_sha": HEAD,
                 "merge_base_sha": HEAD,
                 "changed_path_digest": selection["changed_path_digest"],
+                "provenance_schema": 2,
+                "tested_checkout_sha": HEAD,
+                "tested_checkout_kind": "head",
+                "synthetic_merge_sha": None,
             },
         )
         self.assertTrue(result["success"])
@@ -274,6 +376,10 @@ class CertificationTests(unittest.TestCase):
                     "head_sha": HEAD,
                     "merge_base_sha": HEAD,
                     "changed_path_digest": selection["changed_path_digest"],
+                    "provenance_schema": 2,
+                    "tested_checkout_sha": HEAD,
+                    "tested_checkout_kind": "head",
+                    "synthetic_merge_sha": None,
                 },
             )
 
