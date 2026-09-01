@@ -4,8 +4,8 @@ from django.test import TestCase
 
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
-from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel
-from extras.models import CustomField, CustomFieldset
+from assets.models import Asset, AssetRole, AssetType, AssetTypeFieldset, Category, Manufacturer, StatusLabel
+from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 
 User = get_user_model()
 
@@ -28,19 +28,49 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         self.assettype_ct = ContentType.objects.get_for_model(AssetType)
 
         # Spec fields (apply to AssetType)
-        self.cf_cpu = CustomField.objects.create(name="cpu", label="CPU Model", field_type="text")
+        self.cf_cpu = CustomField.objects.create(
+            name="cpu",
+            label="CPU Model",
+            field_type="text",
+            scope=CustomField.SCOPE_ASSET_TYPE,
+        )
         self.cf_cpu.object_types.add(self.assettype_ct)
-        self.cf_ram = CustomField.objects.create(name="ram_gb", label="RAM (GB)", field_type="number")
+        self.cf_ram = CustomField.objects.create(
+            name="ram_gb",
+            label="RAM (GB)",
+            field_type="decimal",
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            decimal_scale=0,
+        )
         self.cf_ram.object_types.add(self.assettype_ct)
 
         # Per-device fields (apply to Asset)
-        self.cf_hostname = CustomField.objects.create(name="hostname", label="Hostname", field_type="text")
+        self.cf_hostname = CustomField.objects.create(
+            name="hostname",
+            label="Hostname",
+            field_type="text",
+            scope=CustomField.SCOPE_ASSET,
+        )
         self.cf_hostname.object_types.add(self.asset_ct)
-        self.cf_encrypted = CustomField.objects.create(name="encrypted", label="Disk Encrypted", field_type="boolean")
+        self.cf_encrypted = CustomField.objects.create(
+            name="encrypted",
+            label="Disk Encrypted",
+            field_type="boolean",
+            scope=CustomField.SCOPE_ASSET,
+        )
         self.cf_encrypted.object_types.add(self.asset_ct)
 
-        self.fieldset = CustomFieldset.objects.create(name="Laptop Specs")
-        self.fieldset.fields.add(self.cf_cpu, self.cf_ram, self.cf_hostname, self.cf_encrypted)
+        self.fieldset = CustomFieldset.objects.create(
+            name="Laptop Specs",
+            namespace="local",
+            slug="laptop-specs",
+            label="Laptop Specs",
+        )
+        for position, field in enumerate(
+            (self.cf_cpu, self.cf_ram, self.cf_hostname, self.cf_encrypted),
+            start=1,
+        ):
+            CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=field, position=position * 10)
 
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
@@ -48,8 +78,8 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             slug="dell-latitude-5550",
             category=self.category,
             asset_role=self.role,
-            custom_fieldset=self.fieldset,
         )
+        AssetTypeFieldset.objects.create(asset_type=self.asset_type, fieldset=self.fieldset, position=10)
 
     def test_object_types_assignment(self):
         self.assertIn(self.assettype_ct, self.cf_cpu.object_types.all())
@@ -77,7 +107,12 @@ class CustomFieldsObjectTypesTestCase(TestCase):
 
     def test_global_asset_field_shows_without_fieldset(self):
         # A field targeting Asset that belongs to no fieldset applies globally.
-        cf_global = CustomField.objects.create(name="cost_center", label="Cost Center", field_type="text")
+        cf_global = CustomField.objects.create(
+            name="cost_center",
+            label="Cost Center",
+            field_type="text",
+            scope=CustomField.SCOPE_ASSET,
+        )
         cf_global.object_types.add(self.asset_ct)
         asset = Asset.objects.create(
             name="Plain Laptop",

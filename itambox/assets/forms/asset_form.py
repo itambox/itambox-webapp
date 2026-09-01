@@ -1,14 +1,14 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
 from django import forms
-from django.contrib.contenttypes.models import ContentType
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from assets.customfields import resolve_asset_custom_fields
 from core.forms import CrispyFormMixin, scope_tenant_field
-from extras.models import CustomField, Tag
+from extras.customfields import apply_custom_field_patch, build_custom_field_form_field
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
@@ -415,58 +415,6 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         if not current_role and selected_asset_type.asset_role:
             self.fields["asset_role"].initial = selected_asset_type.asset_role
 
-    def _custom_field_queryset(self, selected_asset_type):
-        """Per-device custom fields: globally-applicable Asset fields (not bound
-        to any fieldset) plus the selected asset type's fieldset fields that
-        target Asset."""
-        asset_ct = ContentType.objects.get_for_model(Asset)
-        custom_fields = CustomField.objects.filter(object_types=asset_ct, fieldsets__isnull=True)
-        if selected_asset_type and selected_asset_type.custom_fieldset:
-            custom_fields = custom_fields | selected_asset_type.custom_fieldset.fields.filter(object_types=asset_ct)
-        return custom_fields.distinct()
-
-    def _build_custom_form_field(self, field, initial_value):
-        """Build the form field for one CustomField, or None for unknown types."""
-        if field.field_type == CustomField.FIELD_TYPE_TEXT:
-            return forms.CharField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value,
-                widget=forms.TextInput(attrs={"class": "form-control"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_NUMBER:
-            return forms.DecimalField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value,
-                widget=forms.NumberInput(attrs={"class": "form-control"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_DATE:
-            return forms.DateField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value,
-                widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_BOOLEAN:
-            return forms.BooleanField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value or False,
-                widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_SELECT:
-            choice_lines = [line.strip() for line in (field.choices or "").split("\n") if line.strip()]
-            choices = [("", "---------")] + [(choice, choice) for choice in choice_lines]
-            return forms.ChoiceField(
-                label=field.label,
-                required=field.required,
-                choices=choices,
-                initial=initial_value,
-                widget=forms.Select(attrs={"class": "form-select"}),
-            )
-        return None
-
     def _configure_custom_fields(self, selected_asset_type):
         """Attach the dynamic ``cf_*`` fields and record their layout order."""
         stored_values = {}
@@ -474,11 +422,18 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             stored_values = self.instance.custom_field_data
 
         self.custom_field_keys = []
-        for field in self._custom_field_queryset(selected_asset_type):
+        self.custom_field_definitions = {}
+        resolved_fields = resolve_asset_custom_fields(selected_asset_type, stored_values)
+        for resolved in resolved_fields:
+            field = resolved.definition
             field_key = f"cf_{field.name}"
             self.custom_field_keys.append(field_key)
-
-            form_field = self._build_custom_form_field(field, stored_values.get(field.name))
+            self.custom_field_definitions[field_key] = field
+            form_field = build_custom_field_form_field(
+                field,
+                stored_values.get(field.name),
+                read_only=resolved.read_only,
+            )
             if form_field:
                 self.fields[field_key] = form_field
 
@@ -572,21 +527,20 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
 
-        custom_field_data = {}
-        for key, value in self.cleaned_data.items():
-            if key.startswith("cf_"):
-                field_name = key[3:]
-                if value is not None:
-                    if isinstance(value, (int, float, bool)):
-                        custom_field_data[field_name] = value
-                    elif hasattr(value, "isoformat"):
-                        custom_field_data[field_name] = value.isoformat()
-                    else:
-                        custom_field_data[field_name] = str(value)
-                else:
-                    custom_field_data[field_name] = None
-
-        instance.custom_field_data = custom_field_data
+        submitted = {}
+        for key, definition in self.custom_field_definitions.items():
+            if key not in self.cleaned_data or self.fields[key].disabled:
+                continue
+            value = self.cleaned_data[key]
+            if value is None and not definition.nullable:
+                continue
+            submitted[definition.name] = value
+        if submitted:
+            instance.custom_field_data = apply_custom_field_patch(
+                instance.custom_field_data or {},
+                self.custom_field_definitions.values(),
+                submitted,
+            )
 
         if commit:
             instance.save()

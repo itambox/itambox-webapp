@@ -64,11 +64,13 @@ def resolve_asset_type_custom_fields(asset_type):
 
 def resolve_asset_custom_fields(asset_type, stored_values=None):
     stored_values = dict(stored_values or {})
-    resolved = resolve_fieldsets_custom_fields(
-        _composed_fieldsets(asset_type),
-        {CustomField.SCOPE_ASSET, CustomField.SCOPE_BOTH},
-        stored_values,
-    )
+    resolved = []
+    if asset_type is not None:
+        resolved = resolve_fieldsets_custom_fields(
+            _composed_fieldsets(asset_type),
+            {CustomField.SCOPE_ASSET, CustomField.SCOPE_BOTH},
+            stored_values,
+        )
     seen = {item.definition.name for item in resolved}
     global_fields = CustomField.objects.filter(
         scope__in=(CustomField.SCOPE_ASSET, CustomField.SCOPE_BOTH),
