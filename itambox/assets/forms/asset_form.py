@@ -8,7 +8,14 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.customfields import resolve_asset_custom_fields
 from core.forms import CrispyFormMixin, scope_tenant_field
-from extras.customfields import apply_custom_field_patch, build_custom_field_form_field
+from extras.customfields import (
+    apply_custom_field_patch,
+    build_custom_field_clear_form_field,
+    build_custom_field_form_field,
+    clean_custom_field_form_values,
+    custom_field_clear_key,
+    is_omitted_optional_single_select,
+)
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
@@ -206,7 +213,12 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     "warranty_end_date",
                     _("End date cannot be before the start date."),
                 )
-        return cleaned_data
+        return clean_custom_field_form_values(
+            self,
+            cleaned_data,
+            self.custom_field_definitions,
+            self.custom_field_clear_keys,
+        )
 
     def create_inline_warranty(self, asset):
         cd = self.cleaned_data
@@ -423,6 +435,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         self.custom_field_keys = []
         self.custom_field_definitions = {}
+        self.custom_field_clear_keys = {}
         resolved_fields = resolve_asset_custom_fields(selected_asset_type, stored_values)
         for resolved in resolved_fields:
             field = resolved.definition
@@ -436,6 +449,10 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             )
             if form_field:
                 self.fields[field_key] = form_field
+                if not form_field.disabled:
+                    clear_key = custom_field_clear_key(field.name)
+                    self.fields[clear_key] = build_custom_field_clear_form_field()
+                    self.custom_field_clear_keys[field_key] = clear_key
 
     def _build_layout(self, cancel_url):
         # Grouped, standardized section order: Identity -> Classification ->
@@ -485,7 +502,13 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             cf_divs = []
             for i in range(0, len(self.custom_field_keys), 2):
                 chunk = self.custom_field_keys[i : i + 2]
-                row_cols = [Div(key, css_class="col-md-6") for key in chunk]
+                row_cols = []
+                for key in chunk:
+                    clear_key = self.custom_field_clear_keys.get(key)
+                    fields = [key]
+                    if clear_key:
+                        fields.append(clear_key)
+                    row_cols.append(Div(*fields, css_class="col-md-6"))
                 cf_divs.append(Div(*row_cols, css_class="row"))
             layout_elements.append(Fieldset(_("Custom Specifications"), *cf_divs, css_class="mb-4 border p-3 rounded"))
 
@@ -528,18 +551,26 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         instance = super().save(commit=False)
 
         submitted = {}
+        clear_keys = set()
         for key, definition in self.custom_field_definitions.items():
             if key not in self.cleaned_data or self.fields[key].disabled:
                 continue
             value = self.cleaned_data[key]
+            clear_key = self.custom_field_clear_keys.get(key)
+            if clear_key and self.cleaned_data.get(clear_key):
+                clear_keys.add(definition.name)
+                continue
+            if is_omitted_optional_single_select(definition, value):
+                continue
             if value is None and not definition.nullable:
                 continue
             submitted[definition.name] = value
-        if submitted:
+        if submitted or clear_keys:
             instance.custom_field_data = apply_custom_field_patch(
                 instance.custom_field_data or {},
                 self.custom_field_definitions.values(),
                 submitted,
+                clear_keys=clear_keys,
             )
 
         if commit:

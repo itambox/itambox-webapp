@@ -4767,24 +4767,8 @@
       "path": "itambox/extras/forms.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            \"label\",\n            \"name\",\n            \"field_type\",\n            \"choices\",\n            Div(\"required\", css_class=\"mb-3 form-check\"),\n            \"object_types\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">{_(\"Cancel\")}</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:CustomFieldForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.helper.layout = Layout(\n            \"name\",\n            \"description\",\n            \"content_type\",\n            Div(\"shared\", css_class=\"mb-3 form-check\"),\n            Div(\"enabled\", css_class=\"mb-3 form-check\"),\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">{_(\"Cancel\")}</a>'),\n            HTML(\"</div>\"),\n        )",
       "context": "Module:body/ClassDef:SavedFilterForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            \"name\",\n            \"fields\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">{_(\"Cancel\")}</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:CustomFieldsetForm:body/FunctionDef:__init__:body",
       "count": 1
     },
     {

@@ -22,6 +22,43 @@ def _definition(item):
     return getattr(item, "definition", item)
 
 
+def is_omitted_optional_single_select(definition, value):
+    return definition.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT and value == "" and not definition.required
+
+
+def custom_field_clear_key(field_name):
+    return f"cf_{field_name}__clear"
+
+
+def build_custom_field_clear_form_field():
+    return forms.BooleanField(
+        required=False,
+        label=_("Remove value"),
+        help_text=_("Explicitly remove the stored value."),
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+
+def clean_custom_field_form_values(form, cleaned_data, custom_field_definitions, clear_keys=None):
+    clear_keys = clear_keys or {}
+    for key, definition in custom_field_definitions.items():
+        if key not in cleaned_data or form.fields[key].disabled:
+            continue
+        value = cleaned_data[key]
+        clear_key = clear_keys.get(key)
+        if clear_key and cleaned_data.get(clear_key):
+            continue
+        if is_omitted_optional_single_select(definition, value):
+            continue
+        if value is None and not definition.nullable:
+            continue
+        try:
+            cleaned_data[key] = validate_custom_field_value(definition, value)
+        except ValidationError as exc:
+            form.add_error(key, exc)
+    return cleaned_data
+
+
 def _parse_decimal(cf, value):
     if isinstance(value, bool) or value is None:
         raise ValidationError(_("Enter a decimal value."), code="INVALID_TYPE")
@@ -284,6 +321,7 @@ class CustomFieldModelFormMixin:
         super().__init__(*args, **kwargs)
         self.custom_field_keys = getattr(self, "custom_field_keys", [])
         self.custom_field_definitions = getattr(self, "custom_field_definitions", {})
+        self.custom_field_clear_keys = getattr(self, "custom_field_clear_keys", {})
         stored = {}
         if self.instance is not None and self.instance.pk:
             stored = dict(getattr(self.instance, "custom_field_data", None) or {})
@@ -306,6 +344,10 @@ class CustomFieldModelFormMixin:
                 self.fields[key] = form_field
                 self.custom_field_keys.append(key)
                 self.custom_field_definitions[key] = cf
+                if not form_field.disabled:
+                    clear_key = custom_field_clear_key(cf.name)
+                    self.fields[clear_key] = build_custom_field_clear_form_field()
+                    self.custom_field_clear_keys[key] = clear_key
 
     def append_custom_fields_to_layout(self):
         """Append injected cf_ fields to an existing crispy helper layout."""
@@ -317,38 +359,48 @@ class CustomFieldModelFormMixin:
         rows = []
         for index in range(0, len(self.custom_field_keys), 2):
             chunk = self.custom_field_keys[index : index + 2]
-            rows.append(Div(*[Div(key, css_class="col-md-6") for key in chunk], css_class="row"))
+            cells = []
+            for key in chunk:
+                clear_key = self.custom_field_clear_keys.get(key)
+                fields = [key]
+                if clear_key:
+                    fields.append(clear_key)
+                cells.append(Div(*fields, css_class="col-md-6"))
+            rows.append(Div(*cells, css_class="row"))
         helper.layout.append(Fieldset(self.custom_fields_fieldset_label, *rows, css_class="mb-4 border p-3 rounded"))
 
     def clean(self):
         cleaned_data = super().clean()
-        for key, definition in self.custom_field_definitions.items():
-            if key not in cleaned_data or self.fields[key].disabled:
-                continue
-            value = cleaned_data[key]
-            if value is None and not definition.nullable:
-                continue
-            try:
-                cleaned_data[key] = validate_custom_field_value(definition, value)
-            except ValidationError as exc:
-                self.add_error(key, exc)
-        return cleaned_data
+        return clean_custom_field_form_values(
+            self,
+            cleaned_data,
+            self.custom_field_definitions,
+            self.custom_field_clear_keys,
+        )
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         submitted = {}
+        clear_keys = set()
         for key, definition in self.custom_field_definitions.items():
             if key not in self.cleaned_data or self.fields[key].disabled:
                 continue
             value = self.cleaned_data[key]
+            clear_key = self.custom_field_clear_keys.get(key)
+            if clear_key and self.cleaned_data.get(clear_key):
+                clear_keys.add(definition.name)
+                continue
+            if is_omitted_optional_single_select(definition, value):
+                continue
             if value is None and not definition.nullable:
                 continue
             submitted[definition.name] = value
-        if submitted:
+        if submitted or clear_keys:
             instance.custom_field_data = apply_custom_field_patch(
                 getattr(instance, "custom_field_data", None) or {},
                 self.custom_field_definitions.values(),
                 submitted,
+                clear_keys=clear_keys,
             )
         if commit:
             instance.save()
