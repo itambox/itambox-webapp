@@ -166,6 +166,7 @@ class _ManagedDefinitionMixin(models.Model):
     last_reconciled_at = models.DateTimeField(null=True, blank=True)
 
     immutable_fields = ()
+    soft_delete_preserve_references = True
 
     class Meta:
         abstract = True

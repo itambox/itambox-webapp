@@ -1080,12 +1080,6 @@
     {
       "path": "itambox/core/mixins.py",
       "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
-      "statement": "from core.choices import ObjectChangeActionChoices",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/mixins.py",
-      "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
       "statement": "from django.db import transaction",
       "count": 1
     },
