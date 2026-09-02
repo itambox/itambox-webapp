@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 
 from assets.models import (
@@ -61,8 +62,19 @@ class AssetTypeCompositionFoundationTests(TestCase):
             asset_type.save()
 
         asset_type.refresh_from_db()
-        asset_type.fieldset_memberships.all().delete()
         asset_type.delete()
+        asset_type.refresh_from_db()
+        self.assertIsNotNone(asset_type.deleted_at)
+        self.assertEqual(
+            list(asset_type.fieldset_memberships.values_list("fieldset_id", "position")),
+            [(first.pk, 10), (second.pk, 20)],
+        )
+        asset_type.restore()
+        asset_type.refresh_from_db()
+        self.assertIsNone(asset_type.deleted_at)
+        self.assertEqual(asset_type.fieldset_memberships.count(), 2)
+        with self.assertRaises(ProtectedError), transaction.atomic():
+            asset_type.delete(force_hard_delete=True)
         with self.assertRaises(IntegrityError), transaction.atomic():
             AssetType.objects.create(
                 manufacturer=manufacturer,

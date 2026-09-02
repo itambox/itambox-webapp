@@ -2,6 +2,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from core.choices import ObjectChangeActionChoices
 from core.serialization import serialize_object
 from core.slugs import generate_unique_slug
 from itambox.registry import registry
@@ -193,13 +194,13 @@ class SoftDeleteMixin(models.Model):
             from django.db import transaction
 
             with transaction.atomic():
-                if hasattr(self, "_changelog_action"):
-                    from core.choices import ObjectChangeActionChoices
-
-                    self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
-
                 if hasattr(self, "snapshot") and callable(self.snapshot):
                     self.snapshot()
+                self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
+
+                if getattr(self, "soft_delete_preserve_references", False):
+                    self.soft_delete()
+                    return
 
                 # Recurse and soft-delete/hard-delete cascading relations
                 from django.db.models.deletion import Collector

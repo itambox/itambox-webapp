@@ -227,6 +227,7 @@ class AssetTypeLibrary(ChangeLoggingMixin, BaseModel):
 
 class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
     changelog_global = True  # global reference data → changelog attributed to tenant=None
+    soft_delete_preserve_references = True
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Defines a specific type of asset (e.g., a specific laptop model)."""
