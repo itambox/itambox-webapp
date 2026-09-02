@@ -7,12 +7,16 @@ from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
+from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
+from assets.forms.asset_form import AssetForm
+from assets.forms.assettype_form import AssetTypeForm
+from assets.models import Asset, AssetType, Category
 from core.management.commands._seed.access import check_seed_access_invariants
 from core.management.commands._seed.inventory import check_seed_inventory_invariants
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import EmailSettings, Job
-from extras.models import CustomFieldset
+from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -68,26 +72,61 @@ class ManagementCommandsTestCase(TransactionTestCase):
         call_command("seed_data", production=True, force=True, stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Database seeding complete", self.stdout.getvalue())
 
-    def test_seed_catalog_writes_ordered_custom_fieldset_memberships(self):
+    def test_seed_catalog_writes_normative_compute_fieldset_memberships(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
 
-        fieldset = CustomFieldset.objects.get(name="Laptop / Workstation Specs")
+        fieldset = CustomFieldset.objects.get(namespace="itambox", slug="compute-memory")
+        self.assertEqual(fieldset.name, "Compute and Memory")
+        self.assertEqual(fieldset.management_kind, CustomFieldset.MANAGEMENT_CORE)
         self.assertEqual(
             list(fieldset.field_memberships.values_list("custom_field__name", "position")),
             [
-                ("cpu", 10),
-                ("ram_gb", 20),
-                ("storage_gb", 30),
-                ("storage_type", 40),
-                ("gpu", 50),
-                ("cpu_architecture", 60),
-                ("hostname", 70),
-                ("os_version", 80),
-                ("encrypted", 90),
-                ("department", 100),
+                ("processor_model", 10),
+                ("core_count", 20),
+                ("memory_capacity", 30),
+                ("memory_type", 40),
             ],
         )
+
+    def test_seed_catalog_writes_complete_normative_composition(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        choice_ids = dict(CustomFieldChoiceSet.objects.values_list("slug", "pk"))
+        command._seed_catalog()
+        self.assertEqual(dict(CustomFieldChoiceSet.objects.values_list("slug", "pk")), choice_ids)
+        self.assertEqual(CustomField.objects.filter(management_kind=CustomField.MANAGEMENT_CORE).count(), 48)
+        self.assertEqual(CustomFieldChoiceSet.objects.filter(namespace="itambox").count(), 13)
+        self.assertEqual(CustomFieldset.objects.filter(namespace="itambox").count(), 12)
+
+        for field in CustomField.objects.filter(management_kind=CustomField.MANAGEMENT_CORE):
+            self.assertFalse(field.required)
+            self.assertIn(field.scope, {choice[0] for choice in CustomField.SCOPE_CHOICES})
+            if field.field_type in {CustomField.FIELD_TYPE_SINGLE_SELECT, CustomField.FIELD_TYPE_MULTI_SELECT}:
+                self.assertIsNotNone(field.choice_set_id)
+            if field.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT:
+                self.assertEqual(field.max_values, 1)
+
+        asset_type = AssetType.objects.get(slug="dell-latitude-5550")
+        self.assertIsNone(asset_type.custom_fieldset_id)
+        self.assertGreater(asset_type.fieldset_memberships.count(), 1)
+        self.assertEqual(
+            list(asset_type.fieldset_memberships.values_list("fieldset__slug", "position")),
+            [(slug, index * 10) for index, slug in enumerate(command._category_fieldsets["laptops"], start=1)],
+        )
+        self.assertEqual(
+            list(
+                Category.objects.get(slug="laptops").default_fieldset_memberships.values_list(
+                    "fieldset__slug", "position"
+                )
+            ),
+            [(slug, index * 10) for index, slug in enumerate(command._category_fieldsets["laptops"], start=1)],
+        )
+        stored_keys = set(asset_type.custom_field_data)
+        resolved_keys = {item.definition.name for item in resolve_asset_type_custom_fields(asset_type)}
+        self.assertTrue(stored_keys)
+        self.assertTrue(stored_keys.issubset(resolved_keys))
+        self.assertFalse(stored_keys & {"cpu", "ram_gb", "storage_gb", "storage_type", "os_version"})
 
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
         with override_settings(SEED_PASSWORD="configured-seed-password"):
@@ -129,6 +168,25 @@ class ManagementCommandsTestCase(TransactionTestCase):
             )
             self.assertGreaterEqual(total_stock, allocated, component.pk)
             self.assertEqual(component.available, total_stock - allocated)
+
+        asset_type = AssetType._base_manager.get(slug="dell-latitude-5550")
+        asset = Asset._base_manager.filter(asset_type=asset_type).first()
+        self.assertIsNotNone(asset)
+        asset_type_form = AssetTypeForm(instance=asset_type)
+        asset_form = AssetForm(instance=asset)
+        self.assertIn("cf_processor_model", asset_type_form.fields)
+        self.assertIn("cf_memory_capacity", asset_type_form.fields)
+        self.assertIn("cf_hostname", asset_form.fields)
+        self.assertIn("cf_operating_system_family", asset_form.fields)
+        self.assertTrue({item.definition.name for item in resolve_asset_type_custom_fields(asset_type)})
+        self.assertTrue(
+            {item.definition.name for item in resolve_asset_custom_fields(asset_type, asset.custom_field_data)}
+        )
+        self.assertTrue(
+            set(asset.custom_field_data).issubset(
+                {item.definition.name for item in resolve_asset_custom_fields(asset_type, asset.custom_field_data)}
+            )
+        )
 
         for item, assignment_model, stock_model, field in (
             (Accessory, AccessoryAssignment, AccessoryStock, "accessory"),
