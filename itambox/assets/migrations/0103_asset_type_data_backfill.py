@@ -12,6 +12,13 @@ class MigrationConflict(RuntimeError):
     pass
 
 
+EXPECTED_ADOPTION_SOURCE_PREIMAGES = {
+    "ram_gb": ("RAM (GB)", "number", "", False, {"assets.assettype"}),
+    "storage_gb": ("Storage (GB)", "number", "", False, {"assets.assettype"}),
+    "poe_budget_w": ("PoE Budget (Watts)", "number", "", False, {"assets.assettype"}),
+    "hostname": ("Hostname", "text", "", False, {"assets.asset"}),
+    "firmware_version": ("Firmware Version", "text", "", False, {"assets.asset"}),
+}
 ADOPTION_FIELDS = {
     "ram_gb": {
         "name": "memory_capacity",
@@ -123,6 +130,44 @@ def _signature(field, content_type_labels):
     return hashlib.sha256(b"\x1f".join(encoded)).hexdigest()
 
 
+def _expected_adoption_signature(source_key):
+    label, field_type, choices, required, object_types = EXPECTED_ADOPTION_SOURCE_PREIMAGES[source_key]
+    values = [source_key, label, field_type, choices, "true" if required else "false"]
+    encoded = [_encoded_component(value) for value in values]
+    encoded.append(_encoded_component("\x1e".join(sorted(object_types))))
+    return hashlib.sha256(b"\x1f".join(encoded)).hexdigest()
+
+
+def _preflight_adoption_sources(fields, signatures, key_map):
+    candidates = [field for field in fields if field.name in EXPECTED_ADOPTION_SOURCE_PREIMAGES]
+    if not candidates:
+        return
+    if len(candidates) != len(EXPECTED_ADOPTION_SOURCE_PREIMAGES):
+        _fail("adoption_source_set")
+    by_name = {field.name: field for field in candidates}
+    if len(by_name) != len(candidates):
+        _fail("adoption_source_duplicate")
+    for source_key, expected in EXPECTED_ADOPTION_SOURCE_PREIMAGES.items():
+        field = by_name[source_key]
+        if field.deleted_at is not None or signatures[source_key] != _expected_adoption_signature(source_key):
+            _fail("adoption_source_signature")
+        label, field_type, choices, required, object_types = expected
+        actual_types = {
+            f"{content_type.app_label}.{content_type.model}" for content_type in field.object_types.all()
+        }
+        if (field.label, field.field_type, field.choices or "", field.required, actual_types) != (
+            label,
+            field_type,
+            choices,
+            required,
+            object_types,
+        ):
+            _fail("adoption_source_signature")
+    adoption_targets = {value["name"] for value in ADOPTION_FIELDS.values()}
+    if any(field.name not in EXPECTED_ADOPTION_SOURCE_PREIMAGES and key_map[field.name] in adoption_targets for field in fields):
+        _fail("adoption_target_collision")
+
+
 def _json_models(apps):
     models_with_data = []
     for model in apps.get_models():
@@ -229,6 +274,14 @@ def forward(apps, schema_editor):
             _fail("key_collision")
         used_keys.add(target)
         key_map[field.name] = target
+
+    _preflight_adoption_sources(fields, signatures, key_map)
+    for field in fields:
+        adoption = ADOPTION_FIELDS.get(field.name)
+        if adoption and adoption["field_type"] == "decimal":
+            values = _values_for_key(json_models, field.name, db_alias)
+            if any(value is None or _scale(value) > adoption["decimal_scale"] for value in values):
+                _fail("adoption_decimal_value")
 
     converters = {}
     updates = {}
