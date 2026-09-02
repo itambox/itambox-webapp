@@ -16,7 +16,7 @@ reads ``self._tenants`` / ``self._tenant_meta`` / ``self._tenant_holders`` /
 ``self._assets_by_tenant``, ``self._laptops_by_tenant``,
 ``self._primary_laptop_by_holder``, ``self._retired_assets`` and ``self._servers``.
 
-The ``PRICES`` / ``HW_SUPPLIERS`` class attributes and the ``_os_for`` helper
+The ``_os_family_for`` helper
 live here and are also read by later phases (maintenance, procurement) via the
 shared Command instance.
 """
@@ -67,18 +67,22 @@ class SeedAssetsMixin:
     }
     HW_SUPPLIERS = ["dell-direct", "apple-business", "cdw-deutschland", "bechtle-ag", "insight-enterprises"]
 
-    def _os_for(self, atype_slug):
+    def _os_family_for(self, atype_slug):
         if "macbook" in atype_slug or "mac-studio" in atype_slug:
-            return random.choice(["macOS Sequoia 15.1", "macOS Sonoma 14.6"])
-        if "iphone" in atype_slug or "ipad" in atype_slug:
-            return random.choice(["iOS 17.6", "iPadOS 17.6"])
+            return "macos"
+        if "iphone" in atype_slug:
+            return "ios"
+        if "ipad" in atype_slug:
+            return "ipados"
         if "galaxy" in atype_slug:
-            return "Android 14"
+            return "android"
         if atype_slug in ("dell-poweredge-r760", "hpe-proliant-dl380-g11"):
-            return random.choice(["VMware ESXi 8.0u2", "Ubuntu Server 24.04 LTS", "Windows Server 2022"])
+            return "linux"
+        if atype_slug in ("cisco-catalyst-9300", "unifi-switch-pro-48", "meraki-mr46", "unifi-dream-machine-pro"):
+            return "network_os"
         if "thinkpad" in atype_slug or "precision" in atype_slug:
-            return random.choice(["Windows 11 23H2", "Ubuntu 24.04 LTS"])
-        return "Windows 11 23H2"
+            return random.choice(["windows", "linux"])
+        return "windows"
 
     def _seed_component_allocation(self, allocation_model, component, qty, asset):
         """Create a planned component allocation through the authorized seam.
@@ -272,7 +276,7 @@ class SeedAssetsMixin:
             years_old = random.choice([0, 1, 1, 2, 2, 3])
             p_date = days_ago(years_old * 365 + random.randint(0, 300))
             warranty = p_date + datetime.timedelta(days=(atype.eol_months or 36) * 30)
-            fs_name = atype.custom_fieldset.name if atype.custom_fieldset else ""
+            category_slug = atype.category.slug if atype.category else ""
 
             base_location = None if (holder and status_slug == "in-use") else location
             salvage = round(cost * 0.1, 2)
@@ -317,24 +321,23 @@ class SeedAssetsMixin:
             tag = asset.asset_tag
             host = f"{code.lower()}-{tag.split('-')[-1]}"
             cv = {}
-            if fs_name == "Laptop / Workstation Specs":
-                cv = {"hostname": host, "os_version": self._os_for(atype_slug), "encrypted": True, "department": dept}
-            elif fs_name == "Mobile Device Specs":
+            if category_slug in {"laptops", "desktops"}:
+                cv = {"hostname": host, "operating_system_family": self._os_family_for(atype_slug)}
+            elif category_slug in {"mobile-phones", "tablets"}:
+                cv = {"operating_system_family": self._os_family_for(atype_slug)}
+            elif category_slug in {"servers", "storage-devices"}:
                 cv = {
-                    "os_version": self._os_for(atype_slug),
-                    "sim_number": f"+49-170-{random.randint(1000000, 9999999)}",
-                    "imei": f"35{random.randint(100000000000, 999999999999)}",
-                }
-            elif fs_name == "Server Specs":
-                cv = {"hostname": f"{host}.svc.local", "os_version": self._os_for(atype_slug)}
-            elif fs_name == "Network Device Specs":
-                cv = {
-                    "hostname": f"{host}.net.local",
-                    "ip_address": f"10.{random.randint(10, 250)}.{random.randint(0, 254)}.{random.randint(1, 254)}",
+                    "hostname": f"{host}.svc.local",
+                    "operating_system_family": self._os_family_for(atype_slug),
                     "firmware_version": f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}",
                 }
-            elif fs_name == "AV & Conference Specs":
-                cv = {"mounted_state": random.choice(["Wall-Mounted", "Table-Top"])}
+            elif category_slug == "network-devices":
+                cv = {
+                    "hostname": f"{host}.net.local",
+                    "firmware_version": f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}",
+                }
+            elif category_slug == "conference-systems":
+                cv = {"operating_system_family": "embedded"}
             # Name is the model only (e.g. "Catalyst 9300"); the unique asset_tag is its
             # own field and column, not baked into the display name.
             asset.custom_field_data = cv
@@ -545,21 +548,19 @@ class SeedAssetsMixin:
             meta = self._tenant_meta[slug]
             for lt in self._laptops_by_tenant[slug]:
                 agent = "Lansweeper" if meta["industry"] == "Asset Management" else "Intune"
-                # OS title (resolve the detected OS string back to a catalogue product).
-                os_str = lt.custom_field_data.get("os_version", "Windows 11 23H2")
-                os_sw = (
-                    "macOS Sequoia"
-                    if "macOS" in os_str
-                    else "Ubuntu Pro 24.04"
-                    if "Ubuntu" in os_str
-                    else "Windows 11 Enterprise"
-                )
+                # OS family is a stable choice key in the final core vocabulary.
+                os_family = lt.custom_field_data.get("operating_system_family", "windows")
+                os_sw = {
+                    "macos": "macOS Sequoia",
+                    "linux": "Ubuntu Pro 24.04",
+                    "windows": "Windows 11 Enterprise",
+                }.get(os_family, "Windows 11 Enterprise")
                 os_obj = self._software.get(os_sw)
                 if os_obj:
                     _, c = InstalledSoftware.objects.get_or_create(
                         asset=lt,
                         software=os_obj,
-                        version_detected=os_str,
+                        version_detected=os_family,
                         defaults={
                             "discovered_by_agent": agent,
                             "install_date": lt.purchase_date,

@@ -822,12 +822,6 @@
     {
       "path": "itambox/core/management/commands/_seed/catalog.py",
       "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
-      "statement": "from extras.models import CustomField, CustomFieldset, Tag",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
       "statement": "from inventory.models import Accessory, Component, Consumable",
       "count": 1
     },
