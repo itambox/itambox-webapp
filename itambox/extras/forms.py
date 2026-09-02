@@ -370,8 +370,6 @@ class CustomFieldsetForm(forms.ModelForm):
         instance = super().save(commit=False)
         if self._managed_read_only:
             return instance
-        if not instance.name:
-            instance.name = (instance.label or instance.slug)[:100]
         if not commit:
             return instance
 

@@ -160,7 +160,7 @@ class CustomFieldsetListView(ObjectListView):
 
 
 class CustomFieldsetDetailView(ObjectDetailView):
-    queryset = CustomFieldset.objects.all().prefetch_related("fields", "asset_types")
+    queryset = CustomFieldset.objects.all().prefetch_related("fields", "asset_type_memberships")
 
     layout = (((Panel("info", _("Custom Field Set Details")),),),)
 

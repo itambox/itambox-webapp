@@ -16,14 +16,12 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
+from assets.choices import RequestStatusChoices
+from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.tasks.labels import _default_label_card, generate_base64_barcode, render_labels_pdf
 from compliance.audit_services import audit_asset_from_form
-from compliance.services import scope_custody_receipts
-
-logger = logging.getLogger(__name__)
-
-from assets.choices import RequestStatusChoices
 from compliance.models import CustodyReceipt
+from compliance.services import scope_custody_receipts
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 from itambox.panels import Panel
@@ -46,9 +44,10 @@ from software.models import InstalledSoftware
 from software.tables import InstalledSoftwareTable
 
 from .. import filters, forms, tables
-from ..models import Asset, AssetAssignment, StatusLabel
+from ..models import Asset, AssetAssignment, AssetTypeFieldset
 from ..services import checkin_asset, checkout_asset
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -86,7 +85,6 @@ class AssetDetailView(ObjectDetailView):
         "location",
         "asset_type",
         "asset_type__manufacturer",
-        "asset_type__custom_fieldset",
     ).prefetch_related(
         "tags",
         "maintenances",
@@ -97,7 +95,12 @@ class AssetDetailView(ObjectDetailView):
             ),
             to_attr="prefetched_active_assignments",
         ),
-        "asset_type__custom_fieldset__fields",
+        Prefetch(
+            "asset_type__fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field"
+            ),
+        ),
         "component_allocations__component",
         "component_allocations__component__manufacturer",
     )
@@ -125,6 +128,10 @@ class AssetDetailView(ObjectDetailView):
 
         active_assignment = asset.active_assignment
         context["assignment"] = active_assignment
+        context["asset_type_specification_fields"] = (
+            resolve_asset_type_custom_fields(asset.asset_type) if asset.asset_type else []
+        )
+        context["asset_specification_fields"] = resolve_asset_custom_fields(asset.asset_type, asset.custom_field_data)
 
         sw_qs = InstalledSoftware.objects.filter(asset=asset).select_related("software", "software__manufacturer")
         sw_table = InstalledSoftwareTable(sw_qs)

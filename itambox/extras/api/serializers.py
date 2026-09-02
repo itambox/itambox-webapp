@@ -9,6 +9,7 @@ from extras.models import (
     AlertLog,
     AlertRule,
     CustomField,
+    CustomFieldChoiceSet,
     CustomFieldset,
     Dashboard,
     Event,
@@ -39,6 +40,34 @@ def _is_secret_config_key(key):
     return any(hint in k for hint in _SECRET_CONFIG_HINTS)
 
 
+def _custom_field_type_errors(field_type, choice_set, max_values):
+    errors = {}
+    select_types = {CustomField.FIELD_TYPE_SINGLE_SELECT, CustomField.FIELD_TYPE_MULTI_SELECT}
+    if field_type in select_types and choice_set is None:
+        errors["choice_set"] = _("Select fields require a Choice Set.")
+    elif field_type not in select_types and choice_set is not None:
+        errors["choice_set"] = _("Only select fields may reference a Choice Set.")
+    if field_type == CustomField.FIELD_TYPE_SINGLE_SELECT and max_values != 1:
+        errors["max_values"] = _("Single-select fields must limit values to exactly one.")
+    elif field_type == CustomField.FIELD_TYPE_MULTI_SELECT and max_values is None:
+        errors["max_values"] = _("Multi-select fields require a maximum value count.")
+    return errors
+
+
+def _custom_field_scope_errors(scope, object_types):
+    if scope is None:
+        return {"object_types": _("Select at least one model for a generic local field.")} if not object_types else {}
+    expected = {
+        CustomField.SCOPE_ASSET_TYPE: {("assets", "assettype")},
+        CustomField.SCOPE_ASSET: {("assets", "asset")},
+        CustomField.SCOPE_BOTH: {("assets", "asset"), ("assets", "assettype")},
+    }[scope]
+    actual = {(item.app_label, item.model) for item in object_types}
+    if actual != expected:
+        return {"object_types": _("Asset scopes and model applicability must describe the same target set.")}
+    return {}
+
+
 class TagSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:extras_api:tag-detail")
 
@@ -51,23 +80,62 @@ class TagSerializer(BaseModelSerializer):
 class CustomFieldSerializer(BaseModelSerializer):
     field_type_display = serializers.CharField(source="get_field_type_display", read_only=True)
 
-    object_types = serializers.SlugRelatedField(many=True, read_only=True, slug_field="model")
+    choice_set = serializers.PrimaryKeyRelatedField(
+        queryset=CustomFieldChoiceSet.objects.filter(lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE),
+        required=False,
+        allow_null=True,
+    )
+    object_types = serializers.SlugRelatedField(
+        many=True,
+        queryset=ContentType.objects.filter(app_label="assets", model__in=["asset", "assettype"]),
+        slug_field="model",
+        required=False,
+    )
 
     class Meta:
         model = CustomField
         fields = [
             "id",
             "name",
+            "namespace",
             "label",
+            "help_text",
             "field_type",
             "field_type_display",
-            "choices",
+            "scope",
+            "quantity_kind",
+            "canonical_unit",
+            "minimum_value",
+            "maximum_value",
+            "regex",
+            "decimal_scale",
+            "max_values",
+            "text_max_length",
+            "validation_rule",
             "required",
+            "nullable",
+            "mappings",
+            "choice_set",
             "object_types",
             "created_at",
             "updated_at",
         ]
         brief_fields = ["id", "name", "label", "field_type"]
+
+    def validate(self, data):
+        field_type = data.get("field_type", getattr(self.instance, "field_type", None))
+        choice_set = data.get("choice_set", getattr(self.instance, "choice_set", None))
+        max_values = data.get("max_values", getattr(self.instance, "max_values", None))
+        scope = data.get("scope", getattr(self.instance, "scope", None))
+        object_types = list(data["object_types"] or []) if "object_types" in data else []
+        if self.instance is not None and "object_types" not in data:
+            object_types = list(self.instance.object_types.all())
+
+        errors = _custom_field_type_errors(field_type, choice_set, max_values)
+        errors.update(_custom_field_scope_errors(scope, object_types))
+        if errors:
+            raise serializers.ValidationError(errors)
+        return data
 
 
 class CustomFieldsetSerializer(BaseModelSerializer):
@@ -75,8 +143,8 @@ class CustomFieldsetSerializer(BaseModelSerializer):
 
     class Meta:
         model = CustomFieldset
-        fields = ["id", "name", "fields", "created_at", "updated_at"]
-        brief_fields = ["id", "name"]
+        fields = ["id", "namespace", "slug", "label", "description", "fields", "created_at", "updated_at"]
+        brief_fields = ["id", "namespace", "slug", "label"]
 
 
 class DashboardSerializer(serializers.ModelSerializer):

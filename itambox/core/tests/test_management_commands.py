@@ -77,7 +77,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
         command._seed_catalog()
 
         fieldset = CustomFieldset.objects.get(namespace="itambox", slug="compute-memory")
-        self.assertEqual(fieldset.name, "Compute and Memory")
+        self.assertEqual(fieldset.label, "Compute and Memory")
         self.assertEqual(fieldset.management_kind, CustomFieldset.MANAGEMENT_CORE)
         self.assertEqual(
             list(fieldset.field_memberships.values_list("custom_field__name", "position")),
@@ -106,9 +106,15 @@ class ManagementCommandsTestCase(TransactionTestCase):
                 self.assertIsNotNone(field.choice_set_id)
             if field.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT:
                 self.assertEqual(field.max_values, 1)
+            expected_models = {
+                "asset": {"asset"},
+                "asset_type": {"assettype"},
+                "both": {"asset", "assettype"},
+            }[field.scope]
+            self.assertEqual(set(field.object_types.values_list("model", flat=True)), expected_models)
 
         asset_type = AssetType.objects.get(slug="dell-latitude-5550")
-        self.assertIsNone(asset_type.custom_fieldset_id)
+        self.assertFalse(hasattr(asset_type, "custom_fieldset"))
         self.assertGreater(asset_type.fieldset_memberships.count(), 1)
         self.assertEqual(
             list(asset_type.fieldset_memberships.values_list("fieldset__slug", "position")),
@@ -127,6 +133,52 @@ class ManagementCommandsTestCase(TransactionTestCase):
         self.assertTrue(stored_keys)
         self.assertTrue(stored_keys.issubset(resolved_keys))
         self.assertFalse(stored_keys & {"cpu", "ram_gb", "storage_gb", "storage_type", "os_version"})
+
+    def test_seed_catalog_validates_field_before_reconciling_object_types(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        field = CustomField.objects.get(name="form_factor")
+        asset_ct = ContentType.objects.get(app_label="assets", model="asset")
+        field.object_types.set([asset_ct])
+        CustomField.all_objects.filter(pk=field.pk).update(field_type=CustomField.FIELD_TYPE_TEXT)
+
+        with self.assertRaisesRegex(ValueError, "Core field semantics differ for identity: form_factor"):
+            command._seed_catalog()
+
+        field.refresh_from_db()
+        self.assertEqual(set(field.object_types.values_list("model", flat=True)), {"asset"})
+
+    def test_seed_catalog_refuses_local_choice_set_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        choice_set = CustomFieldChoiceSet.all_objects.get(namespace="itambox", slug="form-factor")
+        choice_set.management_kind = CustomFieldChoiceSet.MANAGEMENT_LOCAL
+        choice_set.save(update_fields=["management_kind"])
+
+        with self.assertRaisesRegex(ValueError, "management"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_local_field_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        field = CustomField.all_objects.get(name="processor_model")
+        field.management_kind = CustomField.MANAGEMENT_LOCAL
+        field.save(update_fields=["namespace", "management_kind"])
+
+        with self.assertRaisesRegex(ValueError, "management"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_local_fieldset_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        fieldset = CustomFieldset.all_objects.get(namespace="itambox", slug="compute-memory")
+        fieldset.management_kind = CustomFieldset.MANAGEMENT_LOCAL
+        fieldset.save(update_fields=["management_kind"])
+
+        with self.assertRaisesRegex(ValueError, "management"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
 
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
         with override_settings(SEED_PASSWORD="configured-seed-password"):

@@ -1,12 +1,16 @@
 import hashlib
 import importlib
+import os
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
+from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import SimpleTestCase, TransactionTestCase
+from django.utils import timezone
 
 
 class AdoptionPreflightUnitTests(SimpleTestCase):
@@ -79,10 +83,130 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        recorder = MigrationRecorder(connection)
-        for migration_name in ("0104_asset_type_composition_backfill", "0103_asset_type_data_backfill"):
-            if recorder.migration_qs.filter(app="assets", name=migration_name).exists():
-                recorder.record_unapplied("assets", migration_name)
+        self._schema_name = f"issue479_{os.getpid()}_{uuid4().hex[:12]}"
+        quoted_schema = connection.ops.quote_name(self._schema_name)
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE SCHEMA {quoted_schema}")
+            cursor.execute(f"SET search_path TO {quoted_schema}")
+            MigrationRecorder(connection).ensure_schema()
+            cursor.execute(f"SET search_path TO {quoted_schema}, public")
+
+    def tearDown(self):
+        quoted_schema = connection.ops.quote_name(self._schema_name)
+        try:
+            super().tearDown()
+        finally:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET search_path TO public")
+                    cursor.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+            finally:
+                ContentType.objects.clear_cache()
+
+    def test_core_seed_creates_object_type_contenttypes_on_fresh_upgrade(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        ContentType = old_apps.get_model("contenttypes", "ContentType")
+        ContentType._base_manager.filter(app_label="assets", model__in=["asset", "assettype"]).delete()
+
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        MigrationExecutor(connection).migrate(target)
+        migrated_apps = MigrationExecutor(connection).loader.project_state(target).apps
+        CustomField = migrated_apps.get_model("extras", "CustomField")
+        for name, expected_models in (
+            ("processor_model", {"asset", "assettype"}),
+            ("hostname", {"asset"}),
+        ):
+            field = CustomField.objects.get(name=name)
+            self.assertEqual(set(field.object_types.values_list("model", flat=True)), expected_models)
+
+    def test_fieldset_cutover_catches_up_post_0103_legacy_rows(self):
+        executor = MigrationExecutor(connection)
+        pre_cutover = [
+            ("assets", "0104_asset_type_composition_backfill"),
+            ("extras", "0114_asset_type_definition_schema"),
+        ]
+        executor.migrate(pre_cutover)
+        old_apps = executor.loader.project_state(pre_cutover).apps
+        CustomField = old_apps.get_model("extras", "CustomField")
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        Manufacturer = old_apps.get_model("assets", "Manufacturer")
+        AssetType = old_apps.get_model("assets", "AssetType")
+
+        field = CustomField.objects.create(
+            name="legacy_select_late",
+            label="Late Legacy Select",
+            field_type="select",
+            choices="Production\nStaging",
+        )
+        stable_field = CustomField.objects.create(
+            name="legacy_select_stable",
+            label="Stable Legacy Select",
+            field_type="select",
+            choices="stable",
+        )
+        fieldset = CustomFieldset.objects.create(
+            name="Late Legacy Fieldset",
+            slug=None,
+        )
+        manufacturer = Manufacturer.objects.create(name="Late Legacy Maker")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Late Legacy Model",
+            slug="late-legacy-model",
+            custom_field_data={"legacy_select_late": "Production", "legacy_select_stable": "stable"},
+        )
+        fieldset.legacy_fields.add(field, stable_field)
+
+        target = [("assets", "0107_asset_type_library_contract"), ("extras", "0115_asset_type_fieldset_cutover")]
+        MigrationExecutor(connection).migrate(target)
+        migrated_apps = MigrationExecutor(connection).loader.project_state(target).apps
+        CustomField = migrated_apps.get_model("extras", "CustomField")
+        CustomFieldset = migrated_apps.get_model("extras", "CustomFieldset")
+        AssetType = migrated_apps.get_model("assets", "AssetType")
+
+        migrated_field = CustomField.objects.get(pk=field.pk)
+        migrated_stable_field = CustomField.objects.get(pk=stable_field.pk)
+        migrated_fieldset = CustomFieldset.objects.get(pk=fieldset.pk)
+        migrated_asset_type = AssetType.objects.get(pk=asset_type.pk)
+        self.assertEqual(migrated_field.field_type, "single-select")
+        self.assertEqual(migrated_stable_field.field_type, "single-select")
+        self.assertEqual(
+            list(migrated_stable_field.choice_set.choices.values_list("label", flat=True)),
+            ["stable"],
+        )
+        self.assertEqual(
+            list(migrated_field.choice_set.choices.values_list("label", flat=True)),
+            ["Production", "Staging"],
+        )
+        self.assertTrue(migrated_fieldset.slug)
+        self.assertEqual(migrated_asset_type.custom_field_data["legacy_select_late"], "production")
+        self.assertEqual(migrated_asset_type.custom_field_data["legacy_select_stable"], "stable")
+        self.assertEqual(
+            list(migrated_fieldset.fields.values_list("name", flat=True)),
+            ["legacy_select_late", "legacy_select_stable"],
+        )
+
+    def test_fieldset_cutover_backfills_unique_non_null_slugs(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        first = CustomFieldset.objects.create(name="Legacy Fieldset")
+        second = CustomFieldset.objects.create(name="Legacy-Fieldset")
+
+        target = [("assets", "0107_asset_type_library_contract"), ("extras", "0115_asset_type_fieldset_cutover")]
+        MigrationExecutor(connection).migrate(target)
+        migrated_apps = MigrationExecutor(connection).loader.project_state(target).apps
+        CustomFieldset = migrated_apps.get_model("extras", "CustomFieldset")
+        migrated_first = CustomFieldset.objects.get(pk=first.pk)
+        migrated_second = CustomFieldset.objects.get(pk=second.pk)
+        self.assertFalse(migrated_apps.get_model("extras", "CustomFieldset")._meta.get_field("slug").null)
+        self.assertTrue(migrated_first.slug)
+        self.assertTrue(migrated_second.slug)
+        self.assertNotEqual(migrated_first.slug, migrated_second.slug)
 
     def test_legacy_definitions_values_and_composition_are_preserved(self):
         executor = MigrationExecutor(connection)
@@ -90,6 +214,11 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
         old_apps = executor.loader.project_state(self.migrate_from).apps
 
         ContentType = old_apps.get_model("contenttypes", "ContentType")
+        for model in ("assettype", "asset"):
+            ContentType.objects.get_or_create(
+                app_label="assets",
+                model=model,
+            )
         CustomField = old_apps.get_model("extras", "CustomField")
         CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
         Manufacturer = old_apps.get_model("assets", "Manufacturer")
@@ -164,6 +293,14 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
             [(fieldset.pk, 10)],
         )
 
+        executor = MigrationExecutor(connection)
+        executor.migrate([("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")])
+        adopted_apps = executor.loader.project_state(
+            [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        ).apps
+        adopted_memory = adopted_apps.get_model("extras", "CustomField").objects.get(name="memory_capacity")
+        self.assertEqual((adopted_memory.field_type, adopted_memory.management_kind), ("decimal", "core"))
+
     def test_case_folded_fieldset_slugs_are_hashed_by_source_identity(self):
         executor = MigrationExecutor(connection)
         executor.migrate(self.migrate_from)
@@ -192,3 +329,107 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
         self.assertEqual(migrated_lower.slug, expected_slug(lower))
         self.assertEqual(migrated_upper.slug, expected_slug(upper))
         self.assertNotEqual(migrated_lower.slug, migrated_upper.slug)
+
+    def test_core_seed_refuses_local_field_identity(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        CustomField = old_apps.get_model("extras", "CustomField")
+        CustomField.objects.create(
+            name="form_factor",
+            label="Local form factor",
+            field_type="text",
+            namespace="local",
+            management_kind="local",
+            version=1,
+            lifecycle="active",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_field_identity_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_fieldset_identity(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        CustomFieldset.objects.create(
+            name="Local compute memory",
+            namespace="itambox",
+            slug="compute-memory",
+            label="Local compute memory",
+            management_kind="local",
+            lifecycle="active",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_fieldset_identity_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_fieldset_tombstone(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        CustomFieldset.objects.create(
+            name="Deleted compute memory",
+            namespace="itambox",
+            slug="compute-memory",
+            label="Deleted compute memory",
+            management_kind="local",
+            lifecycle="deleted",
+            deleted_at=timezone.now(),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_fieldset_identity_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_choice_set_tombstone(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        ChoiceSet = old_apps.get_model("extras", "CustomFieldChoiceSet")
+        ChoiceSet.objects.create(
+            namespace="itambox",
+            slug="form-factor",
+            label="Reserved",
+            management_kind="local",
+            lifecycle="deleted",
+            deleted_at=timezone.now(),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_choice_set_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_asset_type_cutover_reverse_is_explicitly_refused(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(
+            [("assets", "0108_asset_type_singular_cutover"), ("extras", "0115_asset_type_fieldset_cutover")]
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:reverse_refused"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0107_asset_type_library_contract"), ("extras", "0115_asset_type_fieldset_cutover")]
+            )
+
+    def test_fieldset_cutover_reverse_is_explicitly_refused(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(
+            [("assets", "0107_asset_type_library_contract"), ("extras", "0115_asset_type_fieldset_cutover")]
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:reverse_refused"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0107_asset_type_library_contract"), ("extras", "0114_asset_type_definition_schema")]
+            )

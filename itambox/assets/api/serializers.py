@@ -130,7 +130,6 @@ class AssetTypeSerializer(BaseModelSerializer):
             "assetrole_id",
             "depreciation",
             "depreciation_id",
-            "custom_fieldset",
             "custom_field_data",
             "image",
             "requestable",

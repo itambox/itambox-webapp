@@ -9,7 +9,6 @@ class AssetTypeFormPreservationTests(TestCase):
     def test_duplicate_submitted_fieldset_ids_are_a_form_error(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         fieldset = CustomFieldset.objects.create(
-            name="Specifications",
             namespace="local",
             slug="specifications",
             label="Specifications",
@@ -29,13 +28,11 @@ class AssetTypeFormPreservationTests(TestCase):
     def test_new_draft_copies_ordered_category_defaults_once(self):
         category = Category.objects.create(name="Servers", slug="servers")
         first = CustomFieldset.objects.create(
-            name="Compute",
             namespace="local",
             slug="compute",
             label="Compute",
         )
         second = CustomFieldset.objects.create(
-            name="Physical",
             namespace="local",
             slug="physical",
             label="Physical",
@@ -71,7 +68,6 @@ class AssetTypeFormPreservationTests(TestCase):
             scope=CustomField.SCOPE_ASSET_TYPE,
         )
         fieldset = CustomFieldset.objects.create(
-            name="Specifications",
             namespace="local",
             slug="specifications",
             label="Specifications",

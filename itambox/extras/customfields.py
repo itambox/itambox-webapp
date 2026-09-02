@@ -8,7 +8,6 @@ from crispy_forms.layout import Div, Fieldset
 from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from extras.models import CustomField
@@ -283,6 +282,25 @@ def custom_fields_for_model(model, include_inactive=False):
     return queryset
 
 
+def _custom_field_filter_lookup(definition, name, value):
+    if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN and isinstance(value, str):
+        if value.casefold() not in ("true", "false"):
+            return None
+        value = value.casefold() == "true"
+    elif definition.field_type == CustomField.FIELD_TYPE_INTEGER and isinstance(value, str):
+        try:
+            value = int(value)
+        except ValueError:
+            return None
+    try:
+        if definition.field_type == CustomField.FIELD_TYPE_MULTI_SELECT:
+            value = validate_custom_field_value(definition, [value])[0]
+            return f"custom_field_data__{name}__contains", [value]
+        return f"custom_field_data__{name}", validate_custom_field_value(definition, value)
+    except ValidationError:
+        return None
+
+
 def apply_custom_field_filters(queryset, model, params):
     """Filter a queryset by ``cf_<name>=<value>`` request parameters."""
     definitions = {field.name: field for field in custom_fields_for_model(model)}
@@ -293,19 +311,11 @@ def apply_custom_field_filters(queryset, model, params):
         definition = definitions.get(name)
         if definition is None:
             continue
-        candidates = [value]
-        if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN and value.casefold() in ("true", "false"):
-            candidates.append(value.casefold() == "true")
-        elif definition.field_type == CustomField.FIELD_TYPE_INTEGER:
-            try:
-                candidates.append(int(value))
-            except ValueError:
-                pass
-        query = Q()
-        lookup = f"custom_field_data__{name}"
-        for candidate in candidates:
-            query |= Q(**{lookup: candidate})
-        queryset = queryset.filter(query)
+        lookup = _custom_field_filter_lookup(definition, name, value)
+        if lookup is None:
+            return queryset.none()
+        lookup_name, lookup_value = lookup
+        queryset = queryset.filter(**{lookup_name: lookup_value})
     return queryset
 
 

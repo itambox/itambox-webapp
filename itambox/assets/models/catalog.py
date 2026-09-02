@@ -291,14 +291,6 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     eol_months = models.PositiveIntegerField(
         null=True, blank=True, verbose_name=_("EOL (Months)"), help_text=_("Lifespan in months before EOL replacement")
     )
-    custom_fieldset = models.ForeignKey(
-        CustomFieldset,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="asset_types",
-        verbose_name=_("Custom Fieldset"),
-    )
     custom_fieldsets = models.ManyToManyField(
         CustomFieldset,
         related_name="composed_asset_types",
@@ -348,11 +340,6 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["manufacturer", "model"],
-                condition=models.Q(deleted_at__isnull=True),
-                name="unique_manufacturer_model_active",
-            ),
             models.UniqueConstraint(
                 fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_assettype_slug_active"
             ),

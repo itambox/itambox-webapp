@@ -21,6 +21,10 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0102_asset_type_composition_schema",
     "assets.0103_asset_type_data_backfill",
     "assets.0104_asset_type_composition_backfill",
+    "assets.0105_asset_type_core_adoption",
+    "assets.0106_asset_type_core_seed",
+    "assets.0107_asset_type_library_contract",
+    "assets.0108_asset_type_singular_cutover",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -40,6 +44,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "extras.0114_asset_type_definition_schema",
+    "extras.0115_asset_type_fieldset_cutover",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -142,6 +147,22 @@ SEMANTIC_DISPOSITIONS = {
             "endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue secrets."
         ),
         {"extras.0113_upgrade_legacy_webhook_retry_schedules"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Adopts exactly the five preflight-authenticated legacy core candidates, validates their converted values, "
+            "and switches their final core ownership and Asset/AssetType scopes before the final seed."
+        ),
+        {"assets.0105_asset_type_core_adoption"},
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Creates and reconciles the normative 48-field core vocabulary, thirteen choice sets, twelve ordered "
+            "fieldsets, and field memberships without creating concrete Asset Types."
+        ),
+        {"assets.0106_asset_type_core_seed"},
     ),
     **_dispositions(
         "required-fresh",
@@ -266,6 +287,17 @@ SEMANTIC_DISPOSITIONS = {
             "mutating delivery_status; fully reversible."
         ),
         {"extras.0108_alertlog_delivery_outcome"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Performs the irreversible clean cutover from the singular/legacy fieldset columns to the final relational "
+            "contract; reverse migration is refused before any destructive rollback operation."
+        ),
+        {
+            "assets.0108_asset_type_singular_cutover",
+            "extras.0115_asset_type_fieldset_cutover",
+        },
     ),
 }
 
