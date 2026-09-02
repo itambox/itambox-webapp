@@ -298,11 +298,6 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
     field_type = models.CharField(
         max_length=16, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
     )
-    choices = models.TextField(
-        blank=True,
-        verbose_name=_("Choices"),
-        help_text=_("New-line separated list of choices (only for 'select' type)"),
-    )
     scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, null=True, blank=True)
     quantity_kind = models.CharField(max_length=32, null=True, blank=True)
     canonical_unit = models.CharField(max_length=16, null=True, blank=True)
@@ -324,8 +319,6 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
         blank=True,
     )
     replaced_by = models.CharField(max_length=190, null=True, blank=True)
-    legacy_source_key = models.CharField(max_length=64, null=True, blank=True)
-    legacy_source_signature = models.CharField(max_length=64, null=True, blank=True)
     object_types = models.ManyToManyField(
         "contenttypes.ContentType",
         related_name="custom_fields",
@@ -343,9 +336,7 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
         verbose_name = _("Custom Field")
         verbose_name_plural = _("Custom Fields")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfield_name_active"
-            ),
+            models.UniqueConstraint(fields=["name"], name="unique_customfield_name"),
             models.CheckConstraint(
                 condition=models.Q(minimum_value__isnull=True)
                 | models.Q(maximum_value__isnull=True)
@@ -402,13 +393,6 @@ class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, Sof
     changelog_global = True  # global config → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, verbose_name=_("Legacy Fieldset Name"))
-    legacy_fields = models.ManyToManyField(
-        CustomField,
-        related_name="legacy_fieldsets",
-        blank=True,
-        verbose_name=_("Legacy Custom Fields"),
-    )
     fields = models.ManyToManyField(
         CustomField,
         related_name="fieldsets",
@@ -423,8 +407,6 @@ class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, Sof
     )
     slug = models.CharField(
         max_length=127,
-        null=True,
-        blank=True,
         validators=[RegexValidator(r"^[a-z0-9][a-z0-9._-]{0,126}$")],
     )
     label = models.CharField(max_length=200, blank=True, default="")
@@ -438,14 +420,11 @@ class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, Sof
         verbose_name = _("Custom Fieldset")
         verbose_name_plural = _("Custom Fieldsets")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfieldset_name_active"
-            ),
             models.UniqueConstraint(fields=["namespace", "slug"], name="unique_customfieldset_identity"),
         ]
 
     def __str__(self):
-        return self.label or self.name
+        return self.label
 
     def get_absolute_url(self):
         return reverse("extras:customfieldset_detail", kwargs={"pk": self.pk})

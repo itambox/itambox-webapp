@@ -64,7 +64,7 @@
     "users.0100_issue88_shard_62_users_relations"
   ],
   "current_leaf_ids": [
-    "assets.0104_asset_type_composition_backfill",
+    "assets.0108_asset_type_singular_cutover",
     "compliance.0105_custodyhandoffdelivery",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0103_tenant_resource_grant_expiry",
@@ -355,6 +355,10 @@
     "assets.0102_asset_type_composition_schema",
     "assets.0103_asset_type_data_backfill",
     "assets.0104_asset_type_composition_backfill",
+    "assets.0105_asset_type_core_adoption",
+    "assets.0106_asset_type_core_seed",
+    "assets.0107_asset_type_library_contract",
+    "assets.0108_asset_type_singular_cutover",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -374,6 +378,7 @@
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "extras.0114_asset_type_definition_schema",
+    "extras.0115_asset_type_fieldset_cutover",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -385,7 +390,7 @@
     "users.0103_oidcidentity"
   ],
   "post_transition_leaf_ids": [
-    "assets.0104_asset_type_composition_backfill",
+    "assets.0108_asset_type_singular_cutover",
     "compliance.0105_custodyhandoffdelivery",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0103_tenant_resource_grant_expiry",

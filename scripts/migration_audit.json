@@ -6348,6 +6348,179 @@
     },
     {
       "dependencies": [
+        "assets.0104_asset_type_composition_backfill",
+        "extras.0114_asset_type_definition_schema",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0105_asset_type_core_adoption",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0105_asset_type_core_adoption.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Adopts exactly the five preflight-authenticated legacy core candidates, validates their converted values, and switches their final core ownership and Asset/AssetType scopes before the final seed."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "assets.0105_asset_type_core_adoption",
+        "extras.0114_asset_type_definition_schema",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0106_asset_type_core_seed",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0106_asset_type_core_seed.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "required-fresh",
+        "rationale": "Creates and reconciles the normative 48-field core vocabulary, thirteen choice sets, twelve ordered fieldsets, and field memberships without creating concrete Asset Types."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "assets.0106_asset_type_core_seed",
+        "extras.0114_asset_type_definition_schema",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0107_asset_type_library_contract",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0107_asset_type_library_contract.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "assets.0107_asset_type_library_contract",
+        "extras.0115_asset_type_fieldset_cutover",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0108_asset_type_singular_cutover",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0108_asset_type_singular_cutover.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Performs the irreversible clean cutover from the singular/legacy fieldset columns to the final relational contract; reverse migration is refused before any destructive rollback operation."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -11715,6 +11888,50 @@
         "has_custom_operations": {
           "BtreeGistExtension": false,
           "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "assets.0107_asset_type_library_contract",
+        "extras.0114_asset_type_definition_schema",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0115_asset_type_fieldset_cutover",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 2,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0115_asset_type_fieldset_cutover.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Performs the irreversible clean cutover from the singular/legacy fieldset columns to the final relational contract; reverse migration is refused before any destructive rollback operation."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
           "RunSQL": false,
           "SeparateDatabaseAndState": false
         }
@@ -18230,6 +18447,10 @@
     "assets.0102_asset_type_composition_schema",
     "assets.0103_asset_type_data_backfill",
     "assets.0104_asset_type_composition_backfill",
+    "assets.0105_asset_type_core_adoption",
+    "assets.0106_asset_type_core_seed",
+    "assets.0107_asset_type_library_contract",
+    "assets.0108_asset_type_singular_cutover",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -18249,6 +18470,7 @@
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "extras.0114_asset_type_definition_schema",
+    "extras.0115_asset_type_fieldset_cutover",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -18275,6 +18497,7 @@
       "assets.0100_issue88_shard_42_assets_relations",
       "assets.0100_issue88_shard_43_assets_seed",
       "assets.0101_seed_canonical_missing_status",
+      "assets.0106_asset_type_core_seed",
       "extras.0108_alertlog_delivery_outcome"
     ],
     "review_blocker": [
@@ -18305,6 +18528,8 @@
       "assets.0049_supplier_contacts_unification",
       "assets.0103_asset_type_data_backfill",
       "assets.0104_asset_type_composition_backfill",
+      "assets.0105_asset_type_core_adoption",
+      "assets.0108_asset_type_singular_cutover",
       "compliance.0009_auditsession_assetaudit",
       "compliance.0010_repoint_audit_contenttypes",
       "compliance.0012_null_to_empty_strings",
@@ -18339,6 +18564,7 @@
       "extras.0110_issue445_task_paths",
       "extras.0112_backfill_webhookdelivery_targets",
       "extras.0113_upgrade_legacy_webhook_retry_schedules",
+      "extras.0115_asset_type_fieldset_cutover",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -18538,7 +18764,7 @@
         ]
       }
     },
-    "post_transition_migrations": 32,
+    "post_transition_migrations": 37,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

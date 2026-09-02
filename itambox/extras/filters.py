@@ -58,12 +58,14 @@ class CustomFieldsetFilterSet(django_filters.FilterSet):
 
     class Meta:
         model = CustomFieldset
-        fields = ["name"]
+        fields = ["namespace", "slug", "label"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(Q(name__icontains=value)).distinct()
+        return queryset.filter(
+            Q(namespace__icontains=value) | Q(slug__icontains=value) | Q(label__icontains=value)
+        ).distinct()
 
 
 class SavedFilterFilterSet(BaseFilterSet):

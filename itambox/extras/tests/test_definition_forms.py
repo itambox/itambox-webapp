@@ -107,7 +107,7 @@ class CustomDefinitionFormTests(TestCase):
         form = CustomFieldsetForm(data=data)
         self.assertTrue(form.is_valid(), form.errors)
         fieldset = form.save()
-        self.assertEqual(fieldset.name, "Ordered form")
+        self.assertEqual(fieldset.label, "Ordered form")
         self.assertEqual(
             list(fieldset.field_memberships.values_list("custom_field__name", "position")),
             [("second_field", 10), ("first_field", 30)],
@@ -147,7 +147,6 @@ class CustomDefinitionFormTests(TestCase):
         self.assertTrue(all(field.disabled for field in core_field_form.fields.values()))
 
         core_fieldset = CustomFieldset.objects.create(
-            name="Core form fieldset",
             namespace="itambox",
             slug="core-form",
             label="Core form fieldset",

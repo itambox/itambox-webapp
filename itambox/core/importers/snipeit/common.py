@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
 
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, ValidationError
 from django.utils.text import slugify
 
 from core.tasks.context import TaskContext
@@ -13,13 +13,13 @@ from core.tasks.context import TaskContext
 _FIELD_FORMAT_MAP = {
     "TEXT": "text",
     "TEXTAREA": "text",
-    "NUMERIC": "number",
+    "NUMERIC": "decimal",
     "DATE": "date",
     "BOOLEAN": "boolean",
     "CHECKBOX": "boolean",
-    "LIST": "select",
-    "LISTBOX": "select",
-    "RADIO": "select",
+    "LIST": "single-select",
+    "LISTBOX": "single-select",
+    "RADIO": "single-select",
 }
 
 _MAINTENANCE_TYPE_MAP = {
@@ -78,6 +78,113 @@ def _parse_decimal(val) -> Decimal | None:
         return Decimal(str(val)).quantize(Decimal("0.01"))
     except (InvalidOperation, TypeError):
         return None
+
+
+def _canonical_snipeit_decimal(definition, value):
+    scale = definition.decimal_scale
+    if scale is None or not 0 <= scale <= 6:
+        raise ValidationError("The decimal definition is invalid.", code="INVALID_RANGE")
+    raw = str(value).strip()
+    if "e" in raw.casefold() or raw.startswith("+"):
+        raise ValidationError("Enter a base-10 decimal without an exponent.", code="INVALID_VALUE")
+    try:
+        decimal_value = Decimal(raw)
+        quantized = decimal_value.quantize(Decimal(1).scaleb(-scale))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValidationError("Enter a decimal value.", code="INVALID_VALUE") from exc
+    if quantized != decimal_value:
+        raise ValidationError("Enter a decimal value at the defined scale.", code="INVALID_VALUE")
+    if definition.minimum_value is not None and quantized < definition.minimum_value:
+        raise ValidationError("The value is below the allowed minimum.", code="INVALID_RANGE")
+    if definition.maximum_value is not None and quantized > definition.maximum_value:
+        raise ValidationError("The value is above the allowed maximum.", code="INVALID_RANGE")
+    return format(quantized, f".{scale}f")
+
+
+def _canonical_snipeit_integer(definition, value):
+    if isinstance(value, bool):
+        raise ValidationError("Enter an integer.", code="INVALID_TYPE")
+    if isinstance(value, str):
+        try:
+            value = int(value.strip())
+        except ValueError as exc:
+            raise ValidationError("Enter an integer.", code="INVALID_TYPE") from exc
+    if not isinstance(value, int):
+        raise ValidationError("Enter an integer.", code="INVALID_TYPE")
+    if definition.minimum_value is not None and Decimal(value) < definition.minimum_value:
+        raise ValidationError("The value is below the allowed minimum.", code="INVALID_RANGE")
+    if definition.maximum_value is not None and Decimal(value) > definition.maximum_value:
+        raise ValidationError("The value is above the allowed maximum.", code="INVALID_RANGE")
+    return value
+
+
+def _canonical_snipeit_boolean(value):
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    if isinstance(value, bool):
+        return value
+    raise ValidationError("Enter a boolean value.", code="INVALID_TYPE")
+
+
+def _snipeit_choice_key(definition, value):
+    if not isinstance(value, str) or definition.choice_set is None:
+        raise ValidationError("Select a valid choice.", code="INVALID_CHOICE")
+    choices = list(definition.choice_set.choices.filter(lifecycle="active"))
+    key_matches = [choice.key for choice in choices if choice.key == value]
+    if len(key_matches) == 1:
+        return key_matches[0]
+    label_matches = [choice.key for choice in choices if choice.label == value]
+    if len(label_matches) == 1:
+        return label_matches[0]
+    raise ValidationError("Select a valid choice.", code="INVALID_CHOICE")
+
+
+def _canonical_snipeit_boolean_field(definition, value):
+    return _canonical_snipeit_boolean(value)
+
+
+def _canonical_snipeit_date(definition, value):
+    parsed = _parse_date(str(value).strip())
+    if parsed is None:
+        raise ValidationError("Enter a date.", code="INVALID_VALUE")
+    return parsed.isoformat()
+
+
+def _canonical_snipeit_single_select(definition, value):
+    return _snipeit_choice_key(definition, value)
+
+
+def _canonical_snipeit_multi_select(definition, value):
+    values = [item.strip() for item in value.splitlines() if item.strip()] if isinstance(value, str) else value
+    if not isinstance(values, list):
+        raise ValidationError("Select unique valid choices.", code="INVALID_TYPE")
+    return [_snipeit_choice_key(definition, item) for item in values]
+
+
+def _canonical_snipeit_text(definition, value):
+    if not isinstance(value, str):
+        raise ValidationError("Enter text.", code="INVALID_TYPE")
+    if definition.text_max_length is not None and len(value) > definition.text_max_length:
+        raise ValidationError("The text is too long.", code="INVALID_RANGE")
+    return value
+
+
+def canonicalize_snipeit_custom_field_value(definition, value):
+    handlers = {
+        "integer": _canonical_snipeit_integer,
+        "decimal": _canonical_snipeit_decimal,
+        "boolean": _canonical_snipeit_boolean_field,
+        "date": _canonical_snipeit_date,
+        "single-select": _canonical_snipeit_single_select,
+        "multi-select": _canonical_snipeit_multi_select,
+        "text": _canonical_snipeit_text,
+    }
+    handler = handlers.get(definition.field_type)
+    return handler(definition, value) if handler else value
 
 
 def _clean_field_name(db_column: str) -> str:

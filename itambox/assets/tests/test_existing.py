@@ -337,8 +337,8 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertContains(response, "16GB DDR5 RAM")
         self.assertContains(response, "Qty: <strong>2</strong>")
 
-    def test_asset_detail_without_custom_fieldset_shows_specs_card(self):
-        self.assertIsNone(self.asset_type.custom_fieldset)
+    def test_asset_detail_without_composition_still_shows_specs_card(self):
+        self.assertFalse(hasattr(self.asset_type, "custom_fieldset"))
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Assigned System Hardware Specifications")
@@ -1006,7 +1006,6 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
 
         # 2. Create fieldset and link fields
         fieldset = CustomFieldset.objects.create(
-            name="Phone Specs",
             namespace="local",
             slug="phone-specs",
             label="Phone Specs",

@@ -19,13 +19,11 @@ class AssetTypeCompositionFoundationTests(TestCase):
         library = AssetTypeLibrary.objects.create(namespace="acme", release="2026.09")
         manufacturer = Manufacturer.objects.create(name="Example Networks", slug="example-networks")
         first = CustomFieldset.objects.create(
-            name="Product",
             namespace="local",
             slug="product",
             label="Product",
         )
         second = CustomFieldset.objects.create(
-            name="Networking",
             namespace="local",
             slug="networking",
             label="Networking",

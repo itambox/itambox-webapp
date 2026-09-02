@@ -42,7 +42,9 @@ class CustomFieldFilterSetTest(TestCase):
 
     def test_filter_empty_search(self):
         filterset = CustomFieldFilterSet(data={}, queryset=CustomField.objects.all())
-        self.assertEqual(filterset.qs.count(), 2)
+        self.assertGreaterEqual(filterset.qs.count(), 2)
+        self.assertIn(self.cf1, filterset.qs)
+        self.assertIn(self.cf2, filterset.qs)
 
     def test_filter_search_name(self):
         filterset = CustomFieldFilterSet(data={"q": "cost"}, queryset=CustomField.objects.all())
@@ -64,12 +66,18 @@ class CustomFieldFilterSetTest(TestCase):
 
 class CustomFieldsetFilterSetTest(TestCase):
     def setUp(self):
-        self.cfs1 = CustomFieldset.objects.create(name="Server Configuration")
-        self.cfs2 = CustomFieldset.objects.create(name="Network Configuration")
+        self.cfs1 = CustomFieldset.objects.create(
+            namespace="local", slug="server-configuration", label="Server Configuration"
+        )
+        self.cfs2 = CustomFieldset.objects.create(
+            namespace="local", slug="network-configuration", label="Network Configuration"
+        )
 
     def test_fieldset_filter_empty_search(self):
         filterset = CustomFieldsetFilterSet(data={}, queryset=CustomFieldset.objects.all())
-        self.assertEqual(filterset.qs.count(), 2)
+        self.assertGreaterEqual(filterset.qs.count(), 2)
+        self.assertIn(self.cfs1, filterset.qs)
+        self.assertIn(self.cfs2, filterset.qs)
 
     def test_fieldset_filter_search_name(self):
         filterset = CustomFieldsetFilterSet(data={"q": "Server"}, queryset=CustomFieldset.objects.all())

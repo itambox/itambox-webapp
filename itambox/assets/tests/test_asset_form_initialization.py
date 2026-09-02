@@ -354,7 +354,7 @@ class AssetFormLayoutTests(TestCase):
 
     def test_custom_specifications_section_is_inserted_before_the_warranty_section(self):
         CustomField.objects.create(
-            name="hostname",
+            name="test_hostname",
             label="Hostname",
             field_type=CustomField.FIELD_TYPE_TEXT,
             scope=CustomField.SCOPE_ASSET,
@@ -435,20 +435,20 @@ class AssetFormCustomFieldTests(TestCase):
         self.assertFalse(form.fields["cf_optional"].required)
 
     def test_stored_values_seed_the_field_initials(self):
-        self._asset_custom_field(name="hostname", label="Hostname", field_type="text")
+        self._asset_custom_field(name="test_hostname", label="Hostname", field_type="text")
         asset = Asset.objects.create(
             name="Stored",
             asset_tag="STORED-1",
             status=self.status,
-            custom_field_data={"hostname": "srv-01"},
+            custom_field_data={"test_hostname": "srv-01"},
         )
 
         form, _ = build_form_without_sequence(instance=asset)
 
-        self.assertEqual(form.fields["cf_hostname"].initial, "srv-01")
+        self.assertEqual(form.fields["cf_test_hostname"].initial, "srv-01")
 
     def test_fieldset_fields_of_the_selected_asset_type_are_added_once(self):
-        self._asset_custom_field(name="hostname", label="Hostname", field_type="text")
+        self._asset_custom_field(name="test_hostname", label="Hostname", field_type="text")
         scoped_field = self._asset_custom_field(name="rack", label="Rack", field_type="text")
         spec_field = CustomField.objects.create(
             name="cpu",
@@ -457,7 +457,6 @@ class AssetFormCustomFieldTests(TestCase):
             scope=CustomField.SCOPE_ASSET_TYPE,
         )
         fieldset = CustomFieldset.objects.create(
-            name="Server Specs",
             namespace="local",
             slug="server-specs",
             label="Server Specs",
@@ -469,7 +468,7 @@ class AssetFormCustomFieldTests(TestCase):
 
         form, _ = build_form_without_sequence(initial={"asset_type": asset_type.pk})
 
-        self.assertEqual(form.custom_field_keys.count("cf_hostname"), 1)
+        self.assertEqual(form.custom_field_keys.count("cf_test_hostname"), 1)
         self.assertIn("cf_rack", form.custom_field_keys)
         self.assertNotIn("cf_cpu", form.custom_field_keys)
 

@@ -3350,14 +3350,6 @@ msgstr "Erstellt vor"
 msgid "Hexadecimal color code (e.g., 00ff00 for green)."
 msgstr "Hexadezimaler Farbcode (z. B. 00ff00 für Grün)."
 
-msgid ""
-"Models this field applies to. Fields applying to Asset Type act as hardware "
-"specifications; fields applying to Asset are per-device details."
-msgstr ""
-"Modelle, für die dieses Feld gilt. Felder, die für den Asset-Typ gelten, "
-"fungieren als Hardware-Spezifikationen; Felder, die für ein Asset gelten, "
-"sind gerätespezifische Details."
-
 msgid "Custom"
 msgstr "Benutzerdefiniert"
 
@@ -3602,15 +3594,6 @@ msgstr "Anzeige-Label"
 
 msgid "Field Type"
 msgstr "Feldtyp"
-
-#| msgid "Choices:"
-msgid "Choices"
-msgstr "Auswahloptionen"
-
-msgid "New-line separated list of choices (only for 'select' type)"
-msgstr ""
-"Durch Zeilenumbrüche getrennte Liste von Auswahlmöglichkeiten (nur für Typ "
-"'select')"
 
 msgid "Required"
 msgstr "Erforderlich"
@@ -7424,9 +7407,6 @@ msgstr "Modellname:"
 
 msgid "Part Number:"
 msgstr "Teilenummer:"
-
-msgid "Custom Fieldset:"
-msgstr "Benutzerdefiniertes Feldset:"
 
 msgid "Depreciation Policy:"
 msgstr "Abschreibungsregel:"
@@ -13790,14 +13770,6 @@ msgstr "Gib Text ein."
 msgid "Integer"
 msgstr "Ganzzahl"
 
-#: itambox/extras/models.py
-msgid "Legacy Custom Fields"
-msgstr "Alte benutzerdefinierte Felder"
-
-#: itambox/extras/models.py
-msgid "Legacy Fieldset Name"
-msgstr "Name der alten Feldgruppe"
-
 #: itambox/assets/models/catalog.py
 msgid "Library"
 msgstr "Bibliothek"
@@ -13901,3 +13873,83 @@ msgstr "Es wurden zu viele Werte ausgewählt."
 #: itambox/extras/customfields.py
 msgid "Unknown custom field key."
 msgstr "Unbekannter Schlüssel für ein benutzerdefiniertes Feld."
+
+#: itambox/extras/forms.py
+msgid "Applicability"
+msgstr "Anwendbarkeit"
+
+#: itambox/extras/forms.py
+msgid "Asset scopes and model applicability must describe the same target set."
+msgstr "Asset-Bereiche und Modellanwendbarkeit müssen dieselbe Zielmenge beschreiben."
+
+#: itambox/extras/forms.py
+msgid "Decimal fields require a scale."
+msgstr "Dezimalfelder benötigen eine Skalierung."
+
+#: itambox/extras/forms.py
+msgid "Every field position must be a positive integer."
+msgstr "Jede Feldposition muss eine positive Ganzzahl sein."
+
+#: itambox/extras/customfields.py
+msgid "Explicitly remove the stored value."
+msgstr "Gespeicherten Wert explizit entfernen."
+
+#: itambox/extras/forms.py
+msgid "Field positions must be unique."
+msgstr "Feldpositionen müssen eindeutig sein."
+
+#: itambox/extras/forms.py
+msgid "Multi-select fields require a maximum value count."
+msgstr "Mehrfachauswahlfelder benötigen eine maximale Anzahl von Werten."
+
+#: itambox/extras/forms.py
+msgid "Non-asset fields use the selected model relation. Asset scopes derive their Asset and Asset Type relations."
+msgstr "Nicht-Asset-Felder verwenden die ausgewählte Modellbeziehung. Asset-Bereiche leiten ihre Asset- und Asset-Typ-Beziehungen ab."
+
+#: itambox/extras/forms.py
+msgid "Only decimal fields may define a scale."
+msgstr "Nur Dezimalfelder dürfen eine Skalierung definieren."
+
+#: itambox/extras/forms.py
+msgid "Only select fields may reference a Choice Set."
+msgstr "Nur Auswahlfelder dürfen auf ein Auswahlset verweisen."
+
+#: itambox/extras/forms.py
+msgid "Optional JSON object mapping field keys to positive positions. Omitted keys use selection order."
+msgstr "Optionales JSON-Objekt, das Feldschlüssel positiven Positionen zuordnet. Nicht angegebene Schlüssel verwenden die Auswahlreihenfolge."
+
+#: itambox/extras/forms.py
+msgid "Ordered fields"
+msgstr "Geordnete Felder"
+
+#: itambox/extras/forms.py
+msgid "Positions must be a JSON object."
+msgstr "Positionen müssen ein JSON-Objekt sein."
+
+#: itambox/extras/forms.py
+msgid "Remove value"
+msgstr "Wert entfernen"
+
+#: itambox/extras/forms.py
+msgid "Scope and validation"
+msgstr "Geltungsbereich und Validierung"
+
+#: itambox/extras/forms.py
+msgid "Select at least one model for a generic local field."
+msgstr "Wählen Sie für ein allgemeines lokales Feld mindestens ein Modell aus."
+
+#: itambox/extras/forms.py
+msgid "Select fields require a Choice Set."
+msgstr "Auswahlfelder benötigen ein Auswahlset."
+
+#: itambox/extras/forms.py
+msgid "Single-select fields must limit values to exactly one."
+msgstr "Einzelauswahlfelder müssen die Werte auf genau einen begrenzen."
+
+#: itambox/templates/assets/includes/detail/assettype_info.html
+msgid "Specification Sections:"
+msgstr "Spezifikationsabschnitte:"
+
+#: itambox/templates/assets/assets/asset_detail.html
+msgid "Values inherited from the selected Asset Type"
+msgstr "Vom ausgewählten Asset-Typ geerbte Werte"

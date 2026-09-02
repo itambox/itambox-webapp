@@ -1,13 +1,15 @@
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
+from django.utils import timezone
 
+from assets.customfields import resolve_asset_type_custom_fields
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
 from assets.forms.supplier_form import SupplierForm
 from assets.models import Asset, AssetRole, AssetType, AssetTypeFieldset, Category, Manufacturer, StatusLabel, Supplier
 from extras.customfields import apply_custom_field_filters
-from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 User = get_user_model()
 
@@ -47,13 +49,13 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         self.cf_ram.object_types.add(self.assettype_ct)
 
         # Per-device fields (apply to Asset)
-        self.cf_hostname = CustomField.objects.create(
-            name="hostname",
+        self.cf_test_hostname = CustomField.objects.create(
+            name="test_hostname",
             label="Hostname",
             field_type="text",
             scope=CustomField.SCOPE_ASSET,
         )
-        self.cf_hostname.object_types.add(self.asset_ct)
+        self.cf_test_hostname.object_types.add(self.asset_ct)
         self.cf_encrypted = CustomField.objects.create(
             name="encrypted",
             label="Disk Encrypted",
@@ -63,13 +65,12 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         self.cf_encrypted.object_types.add(self.asset_ct)
 
         self.fieldset = CustomFieldset.objects.create(
-            name="Laptop Specs",
             namespace="local",
             slug="laptop-specs",
             label="Laptop Specs",
         )
         for position, field in enumerate(
-            (self.cf_cpu, self.cf_ram, self.cf_hostname, self.cf_encrypted),
+            (self.cf_cpu, self.cf_ram, self.cf_test_hostname, self.cf_encrypted),
             start=1,
         ):
             CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=field, position=position * 10)
@@ -85,13 +86,13 @@ class CustomFieldsObjectTypesTestCase(TestCase):
 
     def test_object_types_assignment(self):
         self.assertIn(self.assettype_ct, self.cf_cpu.object_types.all())
-        self.assertIn(self.asset_ct, self.cf_hostname.object_types.all())
+        self.assertIn(self.asset_ct, self.cf_test_hostname.object_types.all())
 
     def test_asset_type_form_renders_only_spec_fields(self):
         form = AssetTypeForm(instance=self.asset_type)
         self.assertIn("cf_cpu", form.fields)
         self.assertIn("cf_ram_gb", form.fields)
-        self.assertNotIn("cf_hostname", form.fields)
+        self.assertNotIn("cf_test_hostname", form.fields)
         self.assertNotIn("cf_encrypted", form.fields)
 
     def test_asset_form_renders_only_device_fields(self):
@@ -104,7 +105,7 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         form = AssetForm(instance=asset)
         self.assertNotIn("cf_cpu", form.fields)
         self.assertNotIn("cf_ram_gb", form.fields)
-        self.assertIn("cf_hostname", form.fields)
+        self.assertIn("cf_test_hostname", form.fields)
         self.assertIn("cf_encrypted", form.fields)
 
     def test_global_asset_field_shows_without_fieldset(self):
@@ -124,7 +125,69 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         form = AssetForm(instance=asset)
         self.assertIn("cf_cost_center", form.fields)
         # Fieldset-bound fields don't leak onto assets of other/no types.
-        self.assertNotIn("cf_hostname", form.fields)
+        self.assertNotIn("cf_test_hostname", form.fields)
+
+    def test_resolver_excludes_soft_deleted_definition_from_active_composition(self):
+        deleted = CustomField.objects.create(
+            name="deleted_spec",
+            label="Deleted specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+            deleted_at=timezone.now(),
+        )
+        CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=deleted, position=50)
+
+        resolved = resolve_asset_type_custom_fields(self.asset_type)
+
+        self.assertNotIn("deleted_spec", {item.definition.name for item in resolved})
+
+    def test_asset_type_filters_canonical_decimal_and_multi_select_values(self):
+        decimal = CustomField.objects.create(
+            name="exact_capacity",
+            label="Exact capacity",
+            field_type=CustomField.FIELD_TYPE_DECIMAL,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            decimal_scale=3,
+        )
+        decimal.object_types.add(self.assettype_ct)
+        choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="protocol-filter-choices",
+            label="Protocol filter choices",
+        )
+        for position, key in enumerate(("red", "blue"), start=1):
+            CustomFieldChoice.objects.create(choice_set=choice_set, key=key, label=key.title(), position=position * 10)
+        multi = CustomField.objects.create(
+            name="protocols",
+            label="Protocols",
+            field_type=CustomField.FIELD_TYPE_MULTI_SELECT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            max_values=2,
+            choice_set=choice_set,
+        )
+        multi.object_types.add(self.assettype_ct)
+        asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Filtered Laptop",
+            slug="filtered-laptop",
+            custom_field_data={"exact_capacity": "16.000", "protocols": ["blue", "red"]},
+        )
+
+        queryset = AssetType.objects.filter(pk=asset_type.pk)
+
+        self.assertEqual(
+            list(apply_custom_field_filters(queryset, AssetType, {"cf_exact_capacity": "16"})),
+            [asset_type],
+        )
+        self.assertEqual(
+            list(apply_custom_field_filters(queryset, AssetType, {"cf_protocols": "red"})),
+            [asset_type],
+        )
+        self.assertEqual(
+            apply_custom_field_filters(queryset, AssetType, {"cf_exact_capacity": "not-a-number"}).count(),
+            0,
+        )
 
 
 class GenericCustomFieldFormMixinTestCase(TestCase):

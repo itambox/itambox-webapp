@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from dateutil.relativedelta import relativedelta
 from django.apps import apps
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from core.importers.snipeit.common import (
@@ -13,6 +14,7 @@ from core.importers.snipeit.common import (
     _nested_str,
     _parse_date,
     _parse_decimal,
+    canonicalize_snipeit_custom_field_value,
     tenant_for,
 )
 from core.importers.snipeit.contracts import ImportContext, StageResult
@@ -170,7 +172,10 @@ class HardwareImporter:
                 continue
             local_field = self.dependencies.custom_fields.get(field_info.get("field") or "")
             if local_field:
-                data[local_field.name] = value
+                try:
+                    data[local_field.name] = canonicalize_snipeit_custom_field_value(local_field, value)
+                except ValidationError as exc:
+                    raise ValueError(f"Invalid value for imported custom field: {local_field.name}") from exc
         return data
 
     def _upsert_warranty(self, Warranty, asset, purchase_date, warranty_expiration, supplier) -> None:

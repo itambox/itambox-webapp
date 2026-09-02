@@ -23,14 +23,21 @@ def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None):
         if fieldset.deleted_at is not None or fieldset.lifecycle != CustomFieldset.LIFECYCLE_ACTIVE:
             continue
         identity = _qualified_identity(fieldset)
-        field_memberships = fieldset.field_memberships.select_related("custom_field").order_by(
-            "position", "custom_field__name"
-        )
+        field_memberships = getattr(fieldset, "_prefetched_objects_cache", {}).get("field_memberships")
+        if field_memberships is None:
+            field_memberships = fieldset.field_memberships.select_related("custom_field").order_by(
+                "position", "custom_field__name"
+            )
+        else:
+            field_memberships = sorted(
+                field_memberships,
+                key=lambda membership: (membership.position, membership.custom_field.name),
+            )
         for membership in field_memberships:
             definition = membership.custom_field
             if definition.scope not in scopes:
                 continue
-            if definition.lifecycle == CustomField.LIFECYCLE_DELETED:
+            if definition.deleted_at is not None or definition.lifecycle == CustomField.LIFECYCLE_DELETED:
                 continue
             if definition.lifecycle == CustomField.LIFECYCLE_DEPRECATED and definition.name not in stored_values:
                 continue
@@ -51,7 +58,14 @@ def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None):
 
 
 def _composed_fieldsets(asset_type):
-    memberships = asset_type.fieldset_memberships.select_related("fieldset").order_by("position", "fieldset__slug")
+    memberships = getattr(asset_type, "_prefetched_objects_cache", {}).get("fieldset_memberships")
+    if memberships is None:
+        memberships = asset_type.fieldset_memberships.select_related("fieldset").order_by("position", "fieldset__slug")
+    else:
+        memberships = sorted(
+            memberships,
+            key=lambda membership: (membership.position, membership.fieldset.slug or ""),
+        )
     return [membership.fieldset for membership in memberships]
 
 

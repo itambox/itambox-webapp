@@ -103,7 +103,6 @@ class CustomFieldsetModelTests(TestCase):
         cf1 = CustomField.objects.create(name="field_a", label="Field A", field_type="text")
         cf2 = CustomField.objects.create(name="field_b", label="Field B", field_type="decimal", decimal_scale=2)
         cfs = CustomFieldset.objects.create(
-            name="Asset Details",
             namespace="local",
             slug="asset-details",
             label="Asset Details",
@@ -114,17 +113,17 @@ class CustomFieldsetModelTests(TestCase):
         self.assertEqual(cfs.fields.count(), 2)
 
     def test_custom_fieldset_absolute_url(self):
-        cfs = CustomFieldset.objects.create(name="Server Config")
+        cfs = CustomFieldset.objects.create(namespace="local", slug="server-config", label="Server Config")
         url = cfs.get_absolute_url()
         self.assertIn(str(cfs.pk), url)
 
-    def test_custom_fieldset_name_unique(self):
-        CustomFieldset.objects.create(name="Unique Set")
+    def test_custom_fieldset_identity_unique(self):
+        CustomFieldset.objects.create(namespace="local", slug="unique-set", label="Unique Set")
         with self.assertRaises(IntegrityError):
-            CustomFieldset.objects.create(name="Unique Set")
+            CustomFieldset.objects.create(namespace="local", slug="unique-set", label="Different label")
 
     def test_custom_fieldset_empty_fields(self):
-        cfs = CustomFieldset.objects.create(name="Empty Set")
+        cfs = CustomFieldset.objects.create(namespace="local", slug="empty-set", label="Empty Set")
         self.assertEqual(cfs.fields.count(), 0)
 
 
@@ -299,7 +298,11 @@ class CustomFieldsetViewTests(TestCase):
             username="testadmin", password="testpassword", is_staff=True, is_superuser=True
         )
         self.client.login(username="testadmin", password="testpassword")
-        self.cfs = CustomFieldset.objects.create(name="Network Config")
+        self.cfs = CustomFieldset.objects.create(
+            namespace="local",
+            slug="network-config",
+            label="Network Config",
+        )
 
     def test_list_view(self):
         url = reverse("extras:customfieldset_list")
@@ -327,7 +330,9 @@ class CustomFieldsetViewTests(TestCase):
             form = response.context.get("form")
             if form:
                 self.fail(f"Form invalid. Errors: {form.errors}")
-        self.assertTrue(CustomFieldset.objects.filter(name="Server Specs").exists())
+        self.assertTrue(
+            CustomFieldset.objects.filter(namespace="local", slug="server-specs", label="Server Specs").exists()
+        )
 
     def test_delete_view_post(self):
         url = reverse("extras:customfieldset_delete", kwargs={"pk": self.cfs.pk})

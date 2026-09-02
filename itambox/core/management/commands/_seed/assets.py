@@ -76,6 +76,8 @@ class SeedAssetsMixin:
             return "ipados"
         if "galaxy" in atype_slug:
             return "android"
+        if atype_slug == "synology-ds1823xs":
+            return "embedded"
         if atype_slug in ("dell-poweredge-r760", "hpe-proliant-dl380-g11"):
             return "linux"
         if atype_slug in ("cisco-catalyst-9300", "unifi-switch-pro-48", "meraki-mr46", "unifi-dream-machine-pro"):
@@ -83,6 +85,20 @@ class SeedAssetsMixin:
         if "thinkpad" in atype_slug or "precision" in atype_slug:
             return random.choice(["windows", "linux"])
         return "windows"
+
+    def _os_version_for(self, atype_slug, os_family=None):
+        os_family = os_family or self._os_family_for(atype_slug)
+        versions = {
+            "macos": "macOS Sequoia 15.1",
+            "ios": "iOS 17.6",
+            "ipados": "iPadOS 17.6",
+            "android": "Android 14",
+            "embedded": "DSM 7.2",
+            "network_os": "Network OS 17.12",
+            "linux": "Ubuntu 24.04 LTS",
+            "windows": "Windows 11 23H2",
+        }
+        return versions.get(os_family, os_family)
 
     def _seed_component_allocation(self, allocation_model, component, qty, asset):
         """Create a planned component allocation through the authorized seam.
@@ -550,6 +566,7 @@ class SeedAssetsMixin:
                 agent = "Lansweeper" if meta["industry"] == "Asset Management" else "Intune"
                 # OS family is a stable choice key in the final core vocabulary.
                 os_family = lt.custom_field_data.get("operating_system_family", "windows")
+                os_version = self._os_version_for(lt.asset_type.slug, os_family)
                 os_sw = {
                     "macos": "macOS Sequoia",
                     "linux": "Ubuntu Pro 24.04",
@@ -560,7 +577,7 @@ class SeedAssetsMixin:
                     _, c = InstalledSoftware.objects.get_or_create(
                         asset=lt,
                         software=os_obj,
-                        version_detected=os_family,
+                        version_detected=os_version,
                         defaults={
                             "discovered_by_agent": agent,
                             "install_date": lt.purchase_date,

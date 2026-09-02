@@ -36,13 +36,12 @@ class AssetFormValuePreservationTests(TestCase):
     def test_asset_update_uses_plural_composition_and_preserves_unrendered_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         fieldset = CustomFieldset.objects.create(
-            name="Device details",
             namespace="local",
             slug="device-details",
             label="Device details",
         )
         visible = CustomField.objects.create(
-            name="hostname",
+            name="test_hostname",
             namespace="local",
             label="Hostname",
             scope=CustomField.SCOPE_ASSET,
@@ -55,7 +54,6 @@ class AssetFormValuePreservationTests(TestCase):
         )
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=visible, position=10)
         hidden_fieldset = CustomFieldset.objects.create(
-            name="Hidden details",
             namespace="local",
             slug="hidden-details",
             label="Hidden details",
@@ -69,7 +67,7 @@ class AssetFormValuePreservationTests(TestCase):
             asset_tag="DEVICE-1",
             asset_type=asset_type,
             status=status,
-            custom_field_data={"hostname": "old", "hidden_device_value": "keep", "unknown": "keep"},
+            custom_field_data={"test_hostname": "old", "hidden_device_value": "keep", "unknown": "keep"},
         )
 
         form = AssetForm(
@@ -94,18 +92,18 @@ class AssetFormValuePreservationTests(TestCase):
                 "depreciation_override": "",
                 "notes": "",
                 "requestable": "",
-                "cf_hostname": "updated",
+                "cf_test_hostname": "updated",
             },
             instance=asset,
         )
 
-        self.assertIn("cf_hostname", form.fields)
+        self.assertIn("cf_test_hostname", form.fields)
         self.assertNotIn("cf_hidden_device_value", form.fields)
         self.assertTrue(form.is_valid(), form.errors)
         saved = form.save()
         self.assertEqual(
             saved.custom_field_data,
-            {"hostname": "updated", "hidden_device_value": "keep", "unknown": "keep"},
+            {"test_hostname": "updated", "hidden_device_value": "keep", "unknown": "keep"},
         )
 
     def test_optional_single_select_may_remain_empty_without_invalid_choice(self):

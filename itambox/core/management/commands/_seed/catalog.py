@@ -24,56 +24,87 @@ from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
 
 
-def _reconcile_core_choice_sets(choice_set_data):
-    choice_sets = {}
-    for slug, (label, choices) in choice_set_data.items():
-        choice_set, _ = CustomFieldChoiceSet.objects.get_or_create(
-            namespace="itambox",
-            slug=slug,
-            defaults={
-                "label": label,
-                "management_kind": CustomFieldChoiceSet.MANAGEMENT_CORE,
-                "version": 1,
-                "lifecycle": CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
-            },
-        )
-        choice_set.label = label
-        choice_set.management_kind = CustomFieldChoiceSet.MANAGEMENT_CORE
-        choice_set.version = 1
-        choice_set.lifecycle = CustomFieldChoiceSet.LIFECYCLE_ACTIVE
-        choice_set.save(update_fields=["label", "management_kind", "version", "lifecycle"])
-        existing_choices = {
-            choice.key: choice for choice in CustomFieldChoice.all_objects.filter(choice_set=choice_set)
-        }
-        desired_keys = set()
-        for index, (key, choice_label) in enumerate(choices, start=1):
-            desired_keys.add(key)
-            choice, created = CustomFieldChoice.all_objects.get_or_create(
+def _get_core_choice_set(slug, label):
+    matches = list(CustomFieldChoiceSet.all_objects.filter(namespace="itambox", slug=slug))
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core Choice Set identity: itambox/{slug}")
+    if matches and matches[0].deleted_at is not None:
+        raise ValueError(f"Core Choice Set identity is reserved by a tombstone: itambox/{slug}")
+    if matches and matches[0].management_kind != CustomFieldChoiceSet.MANAGEMENT_CORE:
+        raise ValueError(f"Core Choice Set identity has incompatible management: itambox/{slug}")
+    if matches:
+        return matches[0]
+    return CustomFieldChoiceSet.objects.create(
+        namespace="itambox",
+        slug=slug,
+        label=label,
+        management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
+        version=1,
+        lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+    )
+
+
+def _reconcile_core_choice_rows(choice_set, slug, choices):
+    existing_choices = list(CustomFieldChoice.all_objects.filter(choice_set=choice_set).order_by("position", "key"))
+    if len(existing_choices) > 64:
+        raise ValueError(f"Core Choice Set has more than 64 choices: itambox/{slug}")
+    for rank, choice in enumerate(existing_choices, start=1):
+        CustomFieldChoice.all_objects.filter(pk=choice.pk).update(position=1000000000 + rank)
+    existing_by_key = {choice.key: choice for choice in existing_choices}
+    desired_keys = set()
+    for index, (key, choice_label) in enumerate(choices, start=1):
+        desired_keys.add(key)
+        choice = existing_by_key.get(key)
+        if choice is not None and choice.deleted_at is not None:
+            raise ValueError(f"Core Choice identity is reserved by a tombstone: itambox/{slug}#{key}")
+        if choice is None:
+            CustomFieldChoice.objects.create(
                 choice_set=choice_set,
                 key=key,
-                defaults={
-                    "label": choice_label,
-                    "position": index * 10,
-                    "management_kind": CustomFieldChoice.MANAGEMENT_CORE,
-                    "version": 1,
-                    "lifecycle": CustomFieldChoice.LIFECYCLE_ACTIVE,
-                },
+                label=choice_label,
+                position=index * 10,
+                management_kind=CustomFieldChoice.MANAGEMENT_CORE,
+                version=1,
+                lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
             )
-            if not created:
-                choice.label = choice_label
-                choice.position = index * 10
-                choice.management_kind = CustomFieldChoice.MANAGEMENT_CORE
-                choice.version = 1
-                choice.lifecycle = CustomFieldChoice.LIFECYCLE_ACTIVE
-                choice.deleted_at = None
-                choice.save()
-        for key, choice in existing_choices.items():
-            if key not in desired_keys and choice.deleted_at is None:
-                choice.lifecycle = CustomFieldChoice.LIFECYCLE_DELETED
-                choice.deleted_at = timezone.now()
-                choice.save(update_fields=["lifecycle", "deleted_at"])
-        choice_sets[slug] = choice_set
-    return choice_sets
+            continue
+        choice.label = choice_label
+        choice.position = index * 10
+        choice.management_kind = CustomFieldChoice.MANAGEMENT_CORE
+        choice.version = 1
+        choice.lifecycle = CustomFieldChoice.LIFECYCLE_ACTIVE
+        choice.save(update_fields=["label", "position", "management_kind", "version", "lifecycle"])
+    for choice in existing_choices:
+        if choice.key not in desired_keys and choice.deleted_at is None:
+            choice.lifecycle = CustomFieldChoice.LIFECYCLE_DELETED
+            choice.deleted_at = timezone.now()
+            choice.save(update_fields=["lifecycle", "deleted_at"])
+
+
+def _reconcile_core_choice_set(slug, label, choices):
+    choice_set = _get_core_choice_set(slug, label)
+    choice_set.label = label
+    choice_set.management_kind = CustomFieldChoiceSet.MANAGEMENT_CORE
+    choice_set.version = 1
+    choice_set.lifecycle = CustomFieldChoiceSet.LIFECYCLE_ACTIVE
+    choice_set.save(update_fields=["label", "management_kind", "version", "lifecycle"])
+    _reconcile_core_choice_rows(choice_set, slug, choices)
+    return choice_set
+
+
+def _reconcile_core_choice_sets(choice_set_data):
+    return {
+        slug: _reconcile_core_choice_set(slug, label, choices) for slug, (label, choices) in choice_set_data.items()
+    }
+
+
+def _validate_core_field_identity(matches, key):
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core field identity: {key}")
+    if matches and matches[0].deleted_at is not None:
+        raise ValueError(f"Core field identity is reserved by a tombstone: {key}")
+    if matches and matches[0].management_kind != CustomField.MANAGEMENT_CORE:
+        raise ValueError(f"Core field identity has incompatible management: {key}")
 
 
 def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
@@ -107,7 +138,6 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
                 "management_kind": "core",
                 "version": 1,
                 "lifecycle": "active",
-                "choices": "",
                 "mappings": [],
                 "choice_set": choice_sets.get(row["choice_set"]),
             }
@@ -115,37 +145,80 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
         for key in ("minimum_value", "maximum_value"):
             if options[key] is not None:
                 options[key] = Decimal(options[key])
-        field, created = CustomField.objects.get_or_create(name=row["key"], defaults=options)
-        if not created:
-            for key, value in options.items():
-                setattr(field, key, value)
-            field.save()
-        if row["scope"] == "asset_type":
-            content_types = [assettype_ct]
-        elif row["scope"] == "asset":
-            content_types = [asset_ct]
-        else:
-            content_types = [asset_ct, assettype_ct]
-        field.object_types.set(content_types)
+        matches = list(CustomField.all_objects.filter(name=row["key"]))
+        _validate_core_field_identity(matches, row["key"])
+        field = matches[0] if matches else CustomField.objects.create(name=row["key"], **options)
+        immutable_fields = (
+            "name",
+            "namespace",
+            "field_type",
+            "scope",
+            "quantity_kind",
+            "canonical_unit",
+            "minimum_value",
+            "maximum_value",
+            "regex",
+            "decimal_scale",
+            "max_values",
+            "text_max_length",
+            "validation_rule",
+            "nullable",
+            "choice_set_id",
+        )
+        if matches:
+            for key in immutable_fields:
+                desired = (
+                    row["key"]
+                    if key == "name"
+                    else (
+                        options["choice_set"].pk
+                        if key == "choice_set_id" and options["choice_set"]
+                        else options.get(key)
+                    )
+                )
+                current = field.choice_set_id if key == "choice_set_id" else getattr(field, key)
+                if current != desired:
+                    raise ValueError(f"Core field semantics differ for identity: {row['key']}")
+            for key in ("label", "help_text", "required", "mappings", "management_kind", "version", "lifecycle"):
+                setattr(field, key, options[key])
+            field.save(
+                update_fields=["label", "help_text", "required", "mappings", "management_kind", "version", "lifecycle"]
+            )
+        target_content_types = {
+            "asset": [asset_ct],
+            "asset_type": [assettype_ct],
+            "both": [asset_ct, assettype_ct],
+        }[options["scope"]]
+        field.object_types.set(target_content_types)
         custom_fields[row["key"]] = field
     return custom_fields
+
+
+def _get_core_fieldset(slug, label):
+    matches = list(CustomFieldset.all_objects.filter(namespace="itambox", slug=slug))
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core fieldset identity: itambox/{slug}")
+    if matches and matches[0].deleted_at is not None:
+        raise ValueError(f"Core fieldset identity is reserved by a tombstone: itambox/{slug}")
+    if matches and matches[0].management_kind != CustomFieldset.MANAGEMENT_CORE:
+        raise ValueError(f"Core fieldset identity has incompatible management: itambox/{slug}")
+    if matches:
+        return matches[0]
+    return CustomFieldset.objects.create(
+        namespace="itambox",
+        slug=slug,
+        label=label,
+        description=f"Normative {label.lower()} specification section.",
+        management_kind=CustomFieldset.MANAGEMENT_CORE,
+        version=1,
+        lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+    )
 
 
 def _reconcile_core_fieldsets(field_rows, fieldset_labels, custom_fields):
     fieldsets = {}
     for slug, label in fieldset_labels.items():
-        fieldset, _ = CustomFieldset.objects.get_or_create(
-            name=label,
-            defaults={
-                "namespace": "itambox",
-                "slug": slug,
-                "label": label,
-                "description": f"Normative {label.lower()} specification section.",
-                "management_kind": "core",
-                "version": 1,
-                "lifecycle": "active",
-            },
-        )
+        fieldset = _get_core_fieldset(slug, label)
         fieldset.namespace = "itambox"
         fieldset.slug = slug
         fieldset.label = label
@@ -241,7 +314,8 @@ def _add_default_demo_specs(specs, atype_slug, category_slug):
             "conference-systems": "appliance",
         }.get(category_slug, "other"),
     )
-    specs.setdefault("operating_system_family", _demo_operating_system_family(atype_slug))
+    if category_slug != "monitors":
+        specs.setdefault("operating_system_family", _demo_operating_system_family(atype_slug))
     if category_slug in {"laptops", "desktops", "servers", "storage-devices"}:
         specs.setdefault("memory_type", "ddr5")
         specs.setdefault("ethernet_port_count", 1)
@@ -253,9 +327,15 @@ def _add_default_demo_specs(specs, atype_slug, category_slug):
         specs.setdefault("ethernet_speeds", [])
         specs.setdefault("usb_port_count", 1)
     elif category_slug == "network-devices":
-        specs.setdefault("ethernet_speeds", ["1g", "10g"])
+        specs.setdefault("ethernet_speeds", ["10g", "1g"])
         specs.setdefault("usb_port_count", 1)
-        specs.setdefault("network_functions", ["switch"] if "switch" in atype_slug else ["gateway"])
+        specs.setdefault(
+            "network_functions",
+            {
+                "meraki-mr46": ["wlan_ap"],
+                "unifi-dream-machine-pro": ["firewall", "router"],
+            }.get(atype_slug, ["switch"] if "switch" in atype_slug else ["gateway"]),
+        )
     if "wifi_standards" not in specs and category_slug in {"laptops", "desktops", "mobile-phones", "tablets"}:
         specs["wifi_standards"] = ["802_11ac", "802_11ax"]
     if "management_protocols" not in specs and category_slug in {
@@ -1738,7 +1818,6 @@ class SeedCatalogMixin:
                     "library_release": None,
                 },
             )
-            obj.custom_fieldset = None
             obj.custom_field_data = specs
             obj.management_kind = AssetType.MANAGEMENT_LOCAL
             obj.region = ""

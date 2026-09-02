@@ -1,4 +1,7 @@
+from django.db import connection
+from django.db.models import Prefetch
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
@@ -12,13 +15,11 @@ class CustomFieldCompositionTests(TestCase):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         self.asset_type = AssetType.objects.create(manufacturer=manufacturer, model="Device", slug="example-device")
         self.first = CustomFieldset.objects.create(
-            name="First",
             namespace="local",
             slug="first",
             label="First",
         )
         self.second = CustomFieldset.objects.create(
-            name="Second",
             namespace="local",
             slug="second",
             label="Second",
@@ -28,6 +29,24 @@ class CustomFieldCompositionTests(TestCase):
 
     def _field(self, name, scope, **kwargs):
         return CustomField.objects.create(name=name, namespace="local", label=name, scope=scope, **kwargs)
+
+    def test_resolver_uses_prefetched_composition_without_extra_queries(self):
+        field = self._field("prefetched_field", CustomField.SCOPE_ASSET_TYPE)
+        CustomFieldsetField.objects.create(fieldset=self.first, custom_field=field, position=10)
+        asset_type = AssetType.objects.prefetch_related(
+            Prefetch(
+                "fieldset_memberships",
+                queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                    "fieldset__field_memberships__custom_field"
+                ),
+            )
+        ).get(pk=self.asset_type.pk)
+
+        with CaptureQueriesContext(connection) as queries:
+            resolved = resolve_asset_type_custom_fields(asset_type)
+
+        self.assertEqual([item.definition.name for item in resolved], ["prefetched_field"])
+        self.assertEqual(len(queries), 0)
 
     def test_resolver_orders_deduplicates_scopes_and_retains_deprecated_values(self):
         first_only = self._field("first_only", CustomField.SCOPE_ASSET_TYPE)
