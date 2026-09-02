@@ -156,9 +156,14 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         if self.custom_field_keys:
             rows = []
             for index in range(0, len(self.custom_field_keys), 2):
-                rows.append(
-                    Row(*[Column(key, css_class="col-md-6") for key in self.custom_field_keys[index : index + 2]])
-                )
+                columns = []
+                for key in self.custom_field_keys[index : index + 2]:
+                    fields = [key]
+                    clear_key = self.custom_field_clear_keys.get(key)
+                    if clear_key:
+                        fields.append(clear_key)
+                    columns.append(Column(*fields, css_class="col-md-6"))
+                rows.append(Row(*columns))
             layout_elements.append(Fieldset(_("Specifications"), *rows))
         else:
             layout_elements.append(

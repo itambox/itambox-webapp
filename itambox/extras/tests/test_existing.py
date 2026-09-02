@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
+from assets.models import Asset
 from extras.models import (
     CustomField,
     CustomFieldChoice,
@@ -270,8 +272,11 @@ class CustomFieldViewTests(TestCase):
             url,
             {
                 "name": "building_floor",
+                "namespace": "local",
                 "label": "Building Floor",
                 "field_type": CustomField.FIELD_TYPE_INTEGER,
+                "scope": CustomField.SCOPE_ASSET,
+                "object_types": [ContentType.objects.get_for_model(Asset).pk],
                 "required": "on",
             },
         )
@@ -312,7 +317,10 @@ class CustomFieldsetViewTests(TestCase):
         response = self.client.post(
             url,
             {
-                "name": "Server Specs",
+                "namespace": "local",
+                "slug": "server-specs",
+                "label": "Server Specs",
+                "description": "Server hardware specifications.",
             },
         )
         if response.status_code != 302:

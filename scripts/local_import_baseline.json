@@ -1458,12 +1458,6 @@
     {
       "path": "itambox/extras/forms.py",
       "context": "ClassDef:CustomFieldForm/FunctionDef:__init__",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "context": "ClassDef:CustomFieldForm/FunctionDef:__init__",
       "statement": "from itambox.registry import registry",
       "count": 1
     },
