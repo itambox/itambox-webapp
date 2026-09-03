@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.db import migrations
@@ -56,8 +57,17 @@ def _content_type_ids(apps, db_alias, scope):
 
 
 def _get_core_fieldset(CustomFieldset, db_alias, slug, label):
-    existing = list(CustomFieldset._base_manager.using(db_alias).filter(namespace="itambox", slug=slug))
-    if len(existing) > 1 or existing and (existing[0].deleted_at is not None or existing[0].management_kind != "core"):
+    existing = list(CustomFieldset._base_manager.using(db_alias).filter(slug=slug))
+    if (
+        len(existing) > 1
+        or existing
+        and (
+            existing[0].namespace != "itambox"
+            or existing[0].deleted_at is not None
+            or existing[0].management_kind != "core"
+            or existing[0].lifecycle != "active"
+        )
+    ):
         _fail("core_fieldset_identity_collision")
     if existing:
         return existing[0]
@@ -73,8 +83,101 @@ def _get_core_fieldset(CustomFieldset, db_alias, slug, label):
     )
 
 
+def _json_models(apps):
+    return [
+        model
+        for model in apps.get_models()
+        if any(field.name == "custom_field_data" for field in model._meta.concrete_fields)
+    ]
+
+
+def _validate_core_numeric(row, value):
+    if row["field_type"] == "integer":
+        if isinstance(value, bool) or not isinstance(value, int):
+            _fail("core_value")
+        decimal_value = Decimal(value)
+    else:
+        scale = row["decimal_scale"]
+        if not isinstance(value, str):
+            _fail("core_value")
+        grammar = rf"-?(0|[1-9][0-9]*){('.' + '[0-9]' * scale) if scale else ''}"
+        if re.fullmatch(grammar, value) is None or value == "-0":
+            _fail("core_value")
+        decimal_value = Decimal(value)
+    minimum = row.get("minimum")
+    maximum = row.get("maximum")
+    if minimum is not None and decimal_value < Decimal(minimum):
+        _fail("core_value")
+    if maximum is not None and decimal_value > Decimal(maximum):
+        _fail("core_value")
+
+
+def _validate_core_select(row, value):
+    choices = dict(CHOICE_SETS[row["choice_set"]][1])
+    if row["field_type"] == "single-select":
+        if not isinstance(value, str) or value not in choices:
+            _fail("core_value")
+        return
+    if (
+        not isinstance(value, list)
+        or len(value) > (row.get("max_values") or 64)
+        or len(value) != len(set(value))
+        or any(not isinstance(item, str) or item not in choices for item in value)
+    ):
+        _fail("core_value")
+
+
+def _validate_core_value(row, value):
+    if value is None:
+        _fail("core_value")
+    field_type = row["field_type"]
+    if field_type in {"integer", "decimal"}:
+        _validate_core_numeric(row, value)
+        return
+    if field_type == "boolean":
+        if not isinstance(value, bool):
+            _fail("core_value")
+        return
+    if field_type == "text":
+        if not isinstance(value, str) or len(value) > (row.get("text_max_length") or 4096):
+            _fail("core_value")
+        if row.get("regex") and re.fullmatch(row["regex"], value, flags=re.ASCII) is None:
+            _fail("core_value")
+        if row.get("validation_rule") == "rfc1123_hostname" and (
+            not 1 <= len(value) <= 253
+            or value.endswith(".")
+            or any(
+                re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) is None
+                for label in value.split(".")
+            )
+        ):
+            _fail("core_value")
+        return
+    if field_type in {"single-select", "multi-select"}:
+        _validate_core_select(row, value)
+
+
+def _validate_existing_core_values(apps, db_alias):
+    definitions = {row["key"]: row for row in FIELDS}
+    for model in _json_models(apps):
+        for data in model._base_manager.using(db_alias).values_list("custom_field_data", flat=True).iterator():
+            if not isinstance(data, dict):
+                _fail("core_value")
+            validated_values = {}
+            for key, value in data.items():
+                row = definitions.get(key)
+                if row is not None:
+                    _validate_core_value(row, value)
+                    validated_values[key] = value
+            minimum = validated_values.get("operating_temperature_min")
+            maximum = validated_values.get("operating_temperature_max")
+            if minimum is not None and maximum is not None and Decimal(minimum) > Decimal(maximum):
+                _fail("core_value")
+
+
 def forward(apps, schema_editor):
     db_alias = schema_editor.connection.alias
+    _validate_existing_core_values(apps, db_alias)
     CustomField = apps.get_model("extras", "CustomField")
     CustomFieldChoiceSet = apps.get_model("extras", "CustomFieldChoiceSet")
     CustomFieldChoice = apps.get_model("extras", "CustomFieldChoice")
@@ -84,15 +187,20 @@ def forward(apps, schema_editor):
 
     choice_sets = {}
     for slug, (label, choices) in CHOICE_SETS.items():
-        existing_choice_sets = list(
-            CustomFieldChoiceSet._base_manager.using(db_alias).filter(namespace="itambox", slug=slug)
-        )
-        if len(existing_choice_sets) > 1:
+        existing_choice_sets = list(CustomFieldChoiceSet._base_manager.using(db_alias).filter(slug=slug))
+        if (
+            len(existing_choice_sets) > 1
+            or existing_choice_sets
+            and (
+                existing_choice_sets[0].namespace != "itambox"
+                or existing_choice_sets[0].deleted_at is not None
+                or existing_choice_sets[0].management_kind != "core"
+                or existing_choice_sets[0].lifecycle != "active"
+            )
+        ):
             _fail("core_choice_set_collision")
         if existing_choice_sets:
             choice_set = existing_choice_sets[0]
-            if choice_set.deleted_at is not None or choice_set.management_kind != "core":
-                _fail("core_choice_set_collision")
         else:
             choice_set = CustomFieldChoiceSet._base_manager.using(db_alias).create(
                 namespace="itambox",
@@ -117,12 +225,13 @@ def forward(apps, schema_editor):
         existing_choice_rows = list(
             CustomFieldChoice._base_manager.using(db_alias)
             .filter(choice_set_id=choice_set.pk)
-            .values("key", "deleted_at", "management_kind")
+            .values("key", "deleted_at", "management_kind", "lifecycle")
         )
         existing_keys = {row["key"] for row in existing_choice_rows}
         desired_keys = {key for key, _ in choices}
         if existing_keys - desired_keys or any(
-            row["deleted_at"] is not None or row["management_kind"] != "core" for row in existing_choice_rows
+            row["deleted_at"] is not None or row["management_kind"] != "core" or row["lifecycle"] != "active"
+            for row in existing_choice_rows
         ):
             _fail("core_choice_set_collision")
         for index, (key, choice_label) in enumerate(choices, start=1):
@@ -155,6 +264,7 @@ def forward(apps, schema_editor):
                 existing[0].deleted_at is not None
                 or existing[0].namespace != "itambox"
                 or existing[0].management_kind != "core"
+                or existing[0].lifecycle != "active"
             )
         ):
             _fail("core_field_identity_collision")
@@ -191,6 +301,14 @@ def forward(apps, schema_editor):
             last_reconciled_at=None,
         )
         fieldsets_by_slug[slug] = fieldset
+        expected_field_ids = {fields_by_name[row["key"]].pk for row in FIELDS if row["fieldset"] == slug}
+        existing_field_ids = set(
+            CustomFieldsetField._base_manager.using(db_alias)
+            .filter(fieldset_id=fieldset.pk)
+            .values_list("custom_field_id", flat=True)
+        )
+        if existing_field_ids - expected_field_ids:
+            _fail("core_fieldset_membership_collision")
         CustomFieldsetField._base_manager.using(db_alias).filter(fieldset_id=fieldset.pk).delete()
 
     for row in FIELDS:

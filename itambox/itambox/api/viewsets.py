@@ -92,6 +92,11 @@ class ITAMBoxModelViewSet(
     drf_mixins.ListModelMixin,
     BaseViewSet,
 ):
+    @staticmethod
+    def _ensure_unmanaged_definition(instance):
+        if getattr(instance, "management_kind", "local") != "local":
+            raise PermissionDenied("Managed definitions cannot be mutated through the API.")
+
     def get_object_with_snapshot(self):
         obj = super().get_object()
         if hasattr(obj, "snapshot"):
@@ -262,6 +267,7 @@ class ITAMBoxModelViewSet(
         return response
 
     def perform_update(self, serializer):
+        self._ensure_unmanaged_definition(serializer.instance)
         model = self._get_model(serializer=serializer)
         logger.info(f"Updating {model._meta.verbose_name} {serializer.instance} (PK: {serializer.instance.pk})")
 
@@ -292,6 +298,7 @@ class ITAMBoxModelViewSet(
         try:
             with transaction.atomic(using=router.db_for_write(model)):
                 locked = model.objects.select_for_update().get(pk=serializer.instance.pk)
+                self._ensure_unmanaged_definition(locked)
                 self._validate_etag(self.request, locked)
                 instance = serializer.save(**save_kwargs)
                 self._validate_objects(instance)
@@ -312,14 +319,16 @@ class ITAMBoxModelViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance):
+        self._ensure_unmanaged_definition(instance)
         model = self._get_model(instance=instance)
         logger.info(f"Deleting {model._meta.verbose_name} {instance} (PK: {instance.pk})")
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
                 locked = model.objects.select_for_update().get(pk=instance.pk)
+                self._ensure_unmanaged_definition(locked)
                 self._validate_etag(self.request, locked)
-                super().perform_destroy(instance)
+                super().perform_destroy(locked)
         except ObjectDoesNotExist:
             logger.warning(
                 "perform_destroy: %s pk=%s not visible in tenant scope; denying.",

@@ -29,7 +29,7 @@ from assets.models import (
     Supplier,
     Warranty,
 )
-from extras.api.serializers import TagSerializer
+from extras.api.serializers import CustomFieldDataValidationMixin, TagSerializer
 from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from itambox.api.fields import RelatedObjectCountField
 from organization.api.serializers import (
@@ -100,7 +100,7 @@ class DepreciationSerializer(BaseModelSerializer):
         brief_fields = ["id", "name", "months"]
 
 
-class AssetTypeSerializer(BaseModelSerializer):
+class AssetTypeSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
     manufacturer = NestedManufacturerSerializer(read_only=True)
     manufacturer_id = serializers.PrimaryKeyRelatedField(
         queryset=Manufacturer.objects.all(), source="manufacturer", write_only=True
@@ -143,7 +143,7 @@ class AssetTypeSerializer(BaseModelSerializer):
 
 
 @extend_schema_serializer(component_name="AssetResource")
-class AssetSerializer(BaseModelSerializer):
+class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetType.objects.all(), source="asset_type", write_only=True

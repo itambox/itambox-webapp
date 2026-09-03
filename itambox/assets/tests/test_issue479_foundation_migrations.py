@@ -122,6 +122,61 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
             field = CustomField.objects.get(name=name)
             self.assertEqual(set(field.object_types.values_list("model", flat=True)), expected_models)
 
+    def test_core_seed_rejects_values_invalidated_by_core_contract(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0102_asset_type_composition_schema"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        ContentType = old_apps.get_model("contenttypes", "ContentType")
+        asset_type_ct = ContentType.objects.get_or_create(app_label="assets", model="assettype")[0]
+        asset_ct = ContentType.objects.get_or_create(app_label="assets", model="asset")[0]
+        CustomField = old_apps.get_model("extras", "CustomField")
+        source_fields = (
+            ("ram_gb", "RAM (GB)", "number", asset_type_ct),
+            ("storage_gb", "Storage (GB)", "number", asset_type_ct),
+            ("poe_budget_w", "PoE Budget (Watts)", "number", asset_type_ct),
+            ("hostname", "Hostname", "text", asset_ct),
+            ("firmware_version", "Firmware Version", "text", asset_ct),
+        )
+        for name, label, field_type, content_type in source_fields:
+            field = CustomField.objects.create(name=name, label=label, field_type=field_type, choices="")
+            field.object_types.add(content_type)
+        Manufacturer = old_apps.get_model("assets", "Manufacturer")
+        AssetType = old_apps.get_model("assets", "AssetType")
+        manufacturer = Manufacturer.objects.create(name="Invalid Core Value Maker", slug="invalid-core-value-maker")
+        AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Invalid Core Value Model",
+            slug="invalid-core-value-model",
+            custom_field_data={"analog_input_count": "1.5", "operating_system_family": "not-a-choice"},
+        )
+
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_value"):
+            MigrationExecutor(connection).migrate(target)
+
+    def test_core_seed_rejects_inverted_temperature_range(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0102_asset_type_composition_schema"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        Manufacturer = old_apps.get_model("assets", "Manufacturer")
+        AssetType = old_apps.get_model("assets", "AssetType")
+        manufacturer = Manufacturer.objects.create(name="Inverted Temperature Maker", slug="inverted-temperature-maker")
+        AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Inverted Temperature Model",
+            slug="inverted-temperature-model",
+            custom_field_data={
+                "operating_temperature_min": "10.00",
+                "operating_temperature_max": "-10.00",
+            },
+        )
+
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_value"):
+            MigrationExecutor(connection).migrate(target)
+
     def test_fieldset_cutover_catches_up_post_0103_legacy_rows(self):
         executor = MigrationExecutor(connection)
         pre_cutover = [
@@ -371,6 +426,59 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
                 [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
             )
 
+    def test_core_seed_refuses_unexpected_fieldset_membership(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        CustomField = old_apps.get_model("extras", "CustomField")
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        CustomFieldsetField = old_apps.get_model("extras", "CustomFieldsetField")
+        fieldset = CustomFieldset.objects.create(
+            name="Compute memory",
+            namespace="itambox",
+            slug="compute-memory",
+            label="Compute memory",
+            management_kind="core",
+            lifecycle="active",
+        )
+        unexpected = CustomField.objects.create(
+            name="unexpected_field",
+            label="Unexpected field",
+            field_type="text",
+            scope="asset_type",
+            namespace="itambox",
+            management_kind="core",
+            lifecycle="active",
+            version=1,
+        )
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=unexpected, position=999)
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_fieldset_membership_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_fieldset_namespace_collision(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        CustomFieldset = old_apps.get_model("extras", "CustomFieldset")
+        CustomFieldset.objects.create(
+            name="Local compute memory",
+            namespace="local",
+            slug="compute-memory",
+            label="Local compute memory",
+            management_kind="local",
+            lifecycle="active",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_fieldset_identity_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
     def test_core_seed_refuses_fieldset_tombstone(self):
         executor = MigrationExecutor(connection)
         pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
@@ -388,6 +496,84 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
         )
 
         with self.assertRaisesRegex(RuntimeError, "issue479:core_fieldset_identity_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_choice_set_namespace_collision(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        ChoiceSet = old_apps.get_model("extras", "CustomFieldChoiceSet")
+        ChoiceSet.objects.create(
+            namespace="local",
+            slug="form-factor",
+            label="Local form factor",
+            management_kind="local",
+            lifecycle="active",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_choice_set_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_field_lifecycle_collision(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        ChoiceSet = old_apps.get_model("extras", "CustomFieldChoiceSet")
+        CustomField = old_apps.get_model("extras", "CustomField")
+        choice_set = ChoiceSet.objects.create(
+            namespace="itambox",
+            slug="form-factor",
+            label="Form factor",
+            management_kind="core",
+            lifecycle="active",
+        )
+        CustomField.objects.create(
+            name="form_factor",
+            label="Form factor",
+            field_type="single-select",
+            scope="asset_type",
+            namespace="itambox",
+            choice_set=choice_set,
+            management_kind="core",
+            lifecycle="deprecated",
+            version=1,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_field_identity_collision"):
+            MigrationExecutor(connection).migrate(
+                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+            )
+
+    def test_core_seed_refuses_choice_lifecycle_collision(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        ChoiceSet = old_apps.get_model("extras", "CustomFieldChoiceSet")
+        Choice = old_apps.get_model("extras", "CustomFieldChoice")
+        choice_set = ChoiceSet.objects.create(
+            namespace="itambox",
+            slug="form-factor",
+            label="Form factor",
+            management_kind="core",
+            lifecycle="active",
+        )
+        Choice.objects.create(
+            choice_set=choice_set,
+            key="notebook",
+            label="Notebook",
+            position=999,
+            management_kind="core",
+            lifecycle="deprecated",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_choice_set_collision"):
             MigrationExecutor(connection).migrate(
                 [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
             )

@@ -16,6 +16,7 @@ from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
+    is_managed_definition,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import resolve_view_model, safe_return_url
@@ -33,6 +34,12 @@ class ObjectEditView(
     def has_permission(self):
         if not user_can_mutate_model(self.request.user, self._get_model()):
             return False
+        if self.kwargs.get("pk") or self.kwargs.get("slug"):
+            try:
+                if is_managed_definition(self.get_object()):
+                    return False
+            except Http404:
+                return False
         perms = self.get_permission_required()
         return self.request.user.has_perms(perms, obj=PermissionResolver.object_under_check(self))
 

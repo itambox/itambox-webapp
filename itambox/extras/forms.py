@@ -16,6 +16,7 @@ from core.features import report_designer_probe
 from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
 
+from .customfields import validate_custom_field_regex
 from .filters import TagFilter
 from .models import (
     CustomField,
@@ -253,6 +254,11 @@ class CustomFieldForm(forms.ModelForm):
             cleaned_data["mappings"] = []
         if self._managed_read_only:
             return cleaned_data
+        if cleaned_data.get("regex"):
+            try:
+                validate_custom_field_regex(cleaned_data["regex"])
+            except ValidationError as exc:
+                self.add_error("regex", exc)
         _validate_custom_field_type_contract(self, cleaned_data)
         _validate_custom_field_numeric_contract(self, cleaned_data)
         _validate_custom_field_scope_contract(self, cleaned_data)

@@ -38,6 +38,12 @@ class CustomDefinitionFormTests(TestCase):
         data.update(overrides)
         return data
 
+    def test_definition_form_rejects_invalid_regex(self):
+        form = CustomFieldForm(data=self._asset_scope_data(name="invalid_regex", regex="["))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("regex", form.errors)
+
     def test_select_requires_choice_set_and_single_select_requires_exactly_one(self):
         missing_choice_set = CustomFieldForm(
             data=self._asset_scope_data(

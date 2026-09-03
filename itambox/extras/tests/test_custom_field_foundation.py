@@ -7,6 +7,67 @@ from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, 
 
 
 class CustomFieldDefinitionFoundationTests(TestCase):
+    def test_generic_bulk_guard_detects_managed_definitions(self):
+        from itambox.views.generic.bulk import _has_managed_definition_rows
+
+        field = CustomField.objects.create(
+            name="managed_bulk_field",
+            label="Managed Bulk Field",
+            management_kind=CustomField.MANAGEMENT_CORE,
+        )
+
+        self.assertTrue(_has_managed_definition_rows(CustomField.objects.all(), CustomField))
+        self.assertTrue(_has_managed_definition_rows([CustomField.objects.get(pk=field.pk)], CustomField))
+
+    def test_invalid_custom_field_regex_fails_closed(self):
+        from types import SimpleNamespace
+
+        from extras.customfields import validate_custom_field_value
+
+        definition = SimpleNamespace(
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            regex="[",
+            text_max_length=None,
+        )
+        with self.assertRaises(ValidationError):
+            validate_custom_field_value(definition, "value")
+
+    def test_overlapping_alternation_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a|aa)+$")
+
+    def test_bounded_overlapping_alternation_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a|aa){1,100000}$")
+
+    def test_nested_bounded_repeat_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a{1,100000}){1,2}$")
+
+    def test_adjacent_unbounded_repeats_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^a*a*a*a*a*a*a*a*a*a*b$")
+
+    def test_oversized_regex_repeat_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a|aa){1,999999999999999999999999}$")
+
+    def test_group_wrapped_unbounded_repeats_regex_fail_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a+)(a+)(a+)(a+)(a+)(a+)(a+)(a+)b$")
+
     def test_stable_definitions_and_ordered_membership_are_relational(self):
         choice_set = CustomFieldChoiceSet.objects.create(
             namespace="local",

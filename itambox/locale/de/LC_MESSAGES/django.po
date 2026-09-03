@@ -19,6 +19,12 @@ msgstr ""
 msgid "Assets"
 msgstr "Assets"
 
+msgid "The regular expression is invalid."
+msgstr "Der reguläre Ausdruck ist ungültig."
+
+msgid "The regular expression is too complex."
+msgstr "Der reguläre Ausdruck ist zu komplex."
+
 msgid "Either holder_id, location_id, or asset_target_id must be provided."
 msgstr ""
 "Es muss entweder holder_id, location_id oder asset_target_id angegeben "
@@ -13945,6 +13951,10 @@ msgstr "Auswahlfelder benötigen ein Auswahlset."
 #: itambox/extras/forms.py
 msgid "Single-select fields must limit values to exactly one."
 msgstr "Einzelauswahlfelder müssen die Werte auf genau einen begrenzen."
+
+#: itambox/itambox/api/base.py
+msgid "Custom field data must be an object."
+msgstr "Daten benutzerdefinierter Felder müssen ein Objekt sein."
 
 #: itambox/templates/assets/includes/detail/assettype_info.html
 msgid "Specification Sections:"

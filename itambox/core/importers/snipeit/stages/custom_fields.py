@@ -26,6 +26,20 @@ class FieldsetDependencies:
     fieldsets: MutableMapping[int, object]
 
 
+def _source_checksum(context, definition_kind, source_id):
+    source_url = str(getattr(context.client, "base_url", "")).rstrip("/")
+    if not source_url:
+        raise ValueError("Cannot establish Snipe-IT source identity")
+    tenant = context.default_tenant
+    tenant_id = getattr(tenant, "pk", None)
+    if tenant_id is None:
+        client_context = getattr(context.client, "context", None)
+        tenant_id = getattr(client_context, "tenant_id", None)
+    target_scope = f"tenant:{tenant_id}" if tenant_id is not None else "source-global"
+    material = "\x1f".join(("snipeit", definition_kind, source_url, target_scope, str(source_id)))
+    return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 class CustomFieldImporter:
     key = "fields"
 
@@ -33,17 +47,23 @@ class CustomFieldImporter:
         self.context = context
         self.dependencies = dependencies
 
+    def _source_checksum(self, definition_kind, source_id):
+        return _source_checksum(self.context, definition_kind, source_id)
+
     @staticmethod
     def _choice_labels(raw_choices):
         return [value.strip() for value in (raw_choices or "").splitlines() if value.strip()]
 
     def _get_choice_set(self, choice_set_model, source_id, label):
         slug = f"snipeit-{source_id}"
+        source_checksum = self._source_checksum("choice-set", source_id)
         choice_set = choice_set_model.all_objects.filter(namespace="local", slug=slug).first()
         if choice_set is not None and choice_set.deleted_at is not None:
             raise ValueError("Snipe-IT Choice Set identity is reserved by a tombstone")
         if choice_set is not None and choice_set.management_kind != "local":
             raise ValueError("Cannot update a managed Choice Set from Snipe-IT")
+        if choice_set is not None and choice_set.source_checksum != source_checksum:
+            raise ValueError("Cannot claim an unprovenanced Choice Set from Snipe-IT")
         if choice_set is None:
             choice_set = choice_set_model.objects.create(
                 namespace="local",
@@ -52,6 +72,7 @@ class CustomFieldImporter:
                 management_kind="local",
                 version=1,
                 lifecycle="active",
+                source_checksum=source_checksum,
             )
         return choice_set
 
@@ -173,10 +194,6 @@ class CustomFieldImporter:
                 raw_choices,
             )
 
-    @staticmethod
-    def _source_checksum(source_id):
-        return "sha256:" + hashlib.sha256(f"snipeit-custom-field:{source_id}".encode("ascii")).hexdigest()
-
     def _upsert(self, model, asset_ct, choice_set_model, choice_model, row) -> tuple[object, Outcome]:
         source_id = row["id"]
         db_column = row.get("db_column_name") or ""
@@ -196,7 +213,7 @@ class CustomFieldImporter:
             "required": False,
             "nullable": False,
             "mappings": [],
-            "source_checksum": self._source_checksum(source_id),
+            "source_checksum": self._source_checksum("custom-field", source_id),
             "decimal_scale": 2 if field_type == "decimal" else None,
             "choice_set": None,
         }
@@ -205,10 +222,10 @@ class CustomFieldImporter:
             raise ValueError("Snipe-IT Custom Field identity is reserved by a tombstone")
         if obj and obj.management_kind != "local":
             raise ValueError("Cannot update a managed Custom Field from Snipe-IT")
-        if obj and not self.context.update:
-            return obj, "skipped"
         if obj and obj.source_checksum != defaults["source_checksum"]:
             raise ValueError("Cannot claim an unprovenanced Custom Field from Snipe-IT")
+        if obj and not self.context.update:
+            return obj, "skipped"
         self._apply_choice_set_defaults(
             defaults,
             obj,
@@ -264,6 +281,9 @@ class FieldsetImporter:
         self.context = context
         self.dependencies = dependencies
 
+    def _source_checksum(self, source_id):
+        return _source_checksum(self.context, "fieldset", source_id)
+
     def _reconcile_memberships(self, membership_model, fieldset, row):
         field_payload = row.get("fields")
         if not isinstance(field_payload, Mapping) or "rows" not in field_payload:
@@ -297,6 +317,7 @@ class FieldsetImporter:
             "management_kind": "local",
             "version": 1,
             "lifecycle": "active",
+            "source_checksum": self._source_checksum(source_id),
         }
         obj = model.all_objects.filter(namespace="local", slug=slug).first()
         created = False
@@ -304,6 +325,8 @@ class FieldsetImporter:
             raise ValueError("Snipe-IT Fieldset identity is reserved by a tombstone")
         if obj and obj.management_kind != "local":
             raise ValueError("Cannot update a managed Fieldset from Snipe-IT")
+        if obj and obj.source_checksum != defaults["source_checksum"]:
+            raise ValueError("Cannot claim an unprovenanced Fieldset from Snipe-IT")
         if obj:
             if not self.context.update:
                 return obj, "skipped"
