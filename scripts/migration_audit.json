@@ -6521,6 +6521,49 @@
     },
     {
       "dependencies": [
+        "assets.0108_asset_type_singular_cutover",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0109_alter_assettype_lifecycle",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0109_alter_assettype_lifecycle.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Normalizes historical lifecycle='deleted' rows to the final active/deprecated contract and records missing deletion timestamps; the reverse is explicitly refused because the original state is not recoverable."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -11924,6 +11967,49 @@
       "reviewed_disposition": {
         "disposition": "upgrade-only",
         "rationale": "Performs the irreversible clean cutover from the singular/legacy fieldset columns to the final relational contract; reverse migration is refused before any destructive rollback operation."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "extras.0115_asset_type_fieldset_cutover",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0116_alter_customfield_lifecycle_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0116_alter_customfield_lifecycle_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Normalizes historical lifecycle='deleted' rows to the final active/deprecated contract and records missing deletion timestamps; the reverse is explicitly refused because the original state is not recoverable."
       },
       "run_before": [],
       "special_users_bootstrap": false,
@@ -18451,6 +18537,7 @@
     "assets.0106_asset_type_core_seed",
     "assets.0107_asset_type_library_contract",
     "assets.0108_asset_type_singular_cutover",
+    "assets.0109_alter_assettype_lifecycle",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -18471,6 +18558,7 @@
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "extras.0114_asset_type_definition_schema",
     "extras.0115_asset_type_fieldset_cutover",
+    "extras.0116_alter_customfield_lifecycle_and_more",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -18530,6 +18618,7 @@
       "assets.0104_asset_type_composition_backfill",
       "assets.0105_asset_type_core_adoption",
       "assets.0108_asset_type_singular_cutover",
+      "assets.0109_alter_assettype_lifecycle",
       "compliance.0009_auditsession_assetaudit",
       "compliance.0010_repoint_audit_contenttypes",
       "compliance.0012_null_to_empty_strings",
@@ -18565,6 +18654,7 @@
       "extras.0112_backfill_webhookdelivery_targets",
       "extras.0113_upgrade_legacy_webhook_retry_schedules",
       "extras.0115_asset_type_fieldset_cutover",
+      "extras.0116_alter_customfield_lifecycle_and_more",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -18764,7 +18854,7 @@
         ]
       }
     },
-    "post_transition_migrations": 37,
+    "post_transition_migrations": 39,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

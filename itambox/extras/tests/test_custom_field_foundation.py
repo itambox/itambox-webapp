@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.test import TestCase
+from django.utils import timezone
 
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
@@ -32,17 +33,86 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         with self.assertRaises(ValidationError):
             validate_custom_field_value(definition, "value")
 
+    def test_definition_contract_rejects_unknown_validation_rule_at_model_boundary(self):
+        field = CustomField(
+            name="unknown_validation_rule",
+            label="Unknown validation rule",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET,
+            validation_rule="unknown-rule",
+        )
+
+        with self.assertRaises(ValidationError) as raised:
+            field.full_clean()
+
+        self.assertIn("validation_rule", raised.exception.message_dict)
+
+    def test_managed_definition_lifecycle_uses_deleted_at_for_delete_state(self):
+        self.assertNotIn("deleted", dict(CustomField.LIFECYCLE_CHOICES))
+        field = CustomField.objects.create(
+            name="lifecycle_state_field",
+            label="Lifecycle state field",
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        )
+
+        field.delete()
+        field.refresh_from_db()
+        self.assertIsNotNone(field.deleted_at)
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
+
+        field.restore()
+        field.refresh_from_db()
+        self.assertIsNone(field.deleted_at)
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
+
+    def test_legacy_deleted_lifecycle_is_normalized_on_restore(self):
+        field = CustomField.objects.create(
+            name="legacy_deleted_lifecycle",
+            label="Legacy deleted lifecycle",
+        )
+        CustomField.all_objects.filter(pk=field.pk).update(lifecycle="deleted", deleted_at=timezone.now())
+
+        field.refresh_from_db()
+        field.restore()
+        field.refresh_from_db()
+        self.assertIsNone(field.deleted_at)
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_DEPRECATED)
+
     def test_overlapping_alternation_regex_fails_closed(self):
         from extras.customfields import validate_custom_field_regex
 
         with self.assertRaises(ValidationError):
-            validate_custom_field_regex(r"^(a|aa)+$")
+            validate_custom_field_regex(r"^(a|b)+$")
+
+    def test_nested_alternation_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^((a|aa))+$")
+
+    def test_nested_non_capturing_alternation_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(?:(?:a|aa))+$")
+
+    def test_omitted_lower_bound_nested_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a{,3})+$")
+
+    def test_nested_optional_repeat_regex_fails_closed(self):
+        from extras.customfields import validate_custom_field_regex
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_regex(r"^(a?)+$")
 
     def test_bounded_overlapping_alternation_regex_fails_closed(self):
         from extras.customfields import validate_custom_field_regex
 
         with self.assertRaises(ValidationError):
-            validate_custom_field_regex(r"^(a|aa){1,100000}$")
+            validate_custom_field_regex(r"^(a|b){1,100000}$")
 
     def test_nested_bounded_repeat_regex_fails_closed(self):
         from extras.customfields import validate_custom_field_regex
@@ -60,7 +130,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         from extras.customfields import validate_custom_field_regex
 
         with self.assertRaises(ValidationError):
-            validate_custom_field_regex(r"^(a|aa){1,999999999999999999999999}$")
+            validate_custom_field_regex(r"^(a|b){1,999999999999999999999999}$")
 
     def test_group_wrapped_unbounded_repeats_regex_fail_closed(self):
         from extras.customfields import validate_custom_field_regex

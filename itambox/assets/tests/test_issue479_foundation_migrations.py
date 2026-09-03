@@ -155,6 +155,44 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
         with self.assertRaisesRegex(RuntimeError, "issue479:core_value"):
             MigrationExecutor(connection).migrate(target)
 
+    def test_core_seed_rejects_malformed_decimal_text(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0102_asset_type_composition_schema"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        Manufacturer = old_apps.get_model("assets", "Manufacturer")
+        AssetType = old_apps.get_model("assets", "AssetType")
+        manufacturer = Manufacturer.objects.create(name="Malformed Decimal Maker", slug="malformed-decimal-maker")
+        AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Malformed Decimal Model",
+            slug="malformed-decimal-model",
+            custom_field_data={"memory_capacity": "1x000"},
+        )
+
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_value"):
+            MigrationExecutor(connection).migrate(target)
+
+    def test_core_seed_rejects_signed_zero_decimal_text(self):
+        executor = MigrationExecutor(connection)
+        pre_seed = [("assets", "0102_asset_type_composition_schema"), ("extras", "0114_asset_type_definition_schema")]
+        executor.migrate(pre_seed)
+        old_apps = executor.loader.project_state(pre_seed).apps
+        Manufacturer = old_apps.get_model("assets", "Manufacturer")
+        AssetType = old_apps.get_model("assets", "AssetType")
+        manufacturer = Manufacturer.objects.create(name="Signed Zero Maker", slug="signed-zero-maker")
+        AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Signed Zero Model",
+            slug="signed-zero-model",
+            custom_field_data={"memory_capacity": "-0.000"},
+        )
+
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        with self.assertRaisesRegex(RuntimeError, "issue479:core_value"):
+            MigrationExecutor(connection).migrate(target)
+
     def test_core_seed_rejects_inverted_temperature_range(self):
         executor = MigrationExecutor(connection)
         pre_seed = [("assets", "0102_asset_type_composition_schema"), ("extras", "0114_asset_type_definition_schema")]
@@ -459,7 +497,7 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
                 [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
             )
 
-    def test_core_seed_refuses_fieldset_namespace_collision(self):
+    def test_core_seed_allows_local_fieldset_same_slug(self):
         executor = MigrationExecutor(connection)
         pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
         executor.migrate(pre_seed)
@@ -474,10 +512,12 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
             lifecycle="active",
         )
 
-        with self.assertRaisesRegex(RuntimeError, "issue479:core_fieldset_identity_collision"):
-            MigrationExecutor(connection).migrate(
-                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
-            )
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        MigrationExecutor(connection).migrate(target)
+        migrated_apps = MigrationExecutor(connection).loader.project_state(target).apps
+        CustomFieldset = migrated_apps.get_model("extras", "CustomFieldset")
+        self.assertTrue(CustomFieldset.objects.filter(namespace="local", slug="compute-memory").exists())
+        self.assertTrue(CustomFieldset.objects.filter(namespace="itambox", slug="compute-memory").exists())
 
     def test_core_seed_refuses_fieldset_tombstone(self):
         executor = MigrationExecutor(connection)
@@ -500,7 +540,7 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
                 [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
             )
 
-    def test_core_seed_refuses_choice_set_namespace_collision(self):
+    def test_core_seed_allows_local_choice_set_same_slug(self):
         executor = MigrationExecutor(connection)
         pre_seed = [("assets", "0105_asset_type_core_adoption"), ("extras", "0114_asset_type_definition_schema")]
         executor.migrate(pre_seed)
@@ -514,10 +554,12 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
             lifecycle="active",
         )
 
-        with self.assertRaisesRegex(RuntimeError, "issue479:core_choice_set_collision"):
-            MigrationExecutor(connection).migrate(
-                [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
-            )
+        target = [("assets", "0106_asset_type_core_seed"), ("extras", "0114_asset_type_definition_schema")]
+        MigrationExecutor(connection).migrate(target)
+        migrated_apps = MigrationExecutor(connection).loader.project_state(target).apps
+        ChoiceSet = migrated_apps.get_model("extras", "CustomFieldChoiceSet")
+        self.assertTrue(ChoiceSet.objects.filter(namespace="local", slug="form-factor").exists())
+        self.assertTrue(ChoiceSet.objects.filter(namespace="itambox", slug="form-factor").exists())
 
     def test_core_seed_refuses_field_lifecycle_collision(self):
         executor = MigrationExecutor(connection)

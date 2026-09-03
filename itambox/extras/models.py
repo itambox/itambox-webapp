@@ -26,6 +26,8 @@ from core.models import BaseModel, ChangeLoggingMixin
 from core.report_keys import unknown_column_keys
 from core.validators import validate_external_url, validate_file_attachment, validate_image_attachment
 
+from .definition_contract import validate_custom_field_definition_contract
+
 
 def has_authored_conditions(conditions):
     """Return whether conditions contain authored expressions or an unexpected form."""
@@ -150,11 +152,9 @@ class _ManagedDefinitionMixin(models.Model):
 
     LIFECYCLE_ACTIVE = "active"
     LIFECYCLE_DEPRECATED = "deprecated"
-    LIFECYCLE_DELETED = "deleted"
     LIFECYCLE_CHOICES = [
         (LIFECYCLE_ACTIVE, _("Active")),
         (LIFECYCLE_DEPRECATED, _("Deprecated")),
-        (LIFECYCLE_DELETED, _("Deleted")),
     ]
 
     management_kind = models.CharField(max_length=16, choices=MANAGEMENT_KIND_CHOICES, default=MANAGEMENT_LOCAL)
@@ -184,6 +184,27 @@ class _ManagedDefinitionMixin(models.Model):
         }
         if changed:
             raise ValidationError(changed)
+
+    def restore(self):
+        """Restore a definition and normalize the pre-cutover deleted state."""
+        update_fields = ["deleted_at"]
+        self.deleted_at = None
+        if self.lifecycle == "deleted":
+            self.lifecycle = self.LIFECYCLE_DEPRECATED
+            update_fields.append("lifecycle")
+        self._skip_custom_field_applicability = True
+        try:
+            self.save(update_fields=update_fields)
+        finally:
+            del self._skip_custom_field_applicability
+
+    def soft_delete(self):
+        self.deleted_at = timezone.now()
+        self._skip_custom_field_applicability = True
+        try:
+            self.save(update_fields=["deleted_at"])
+        finally:
+            del self._skip_custom_field_applicability
 
     def save(self, *args, **kwargs):
         self._validate_immutable_fields()
@@ -378,6 +399,41 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
 
     def __str__(self):
         return f"{self.label} ({self.get_field_type_display()})"
+
+    def clean(self):
+        super().clean()
+
+        object_types = (
+            None
+            if getattr(self, "_skip_custom_field_applicability", False)
+            else self.object_types.all()
+            if self.pk
+            else None
+        )
+        self.validate_definition_contract(object_types=object_types)
+
+    def validate_definition_contract(self, *, object_types=None):
+        validate_custom_field_definition_contract(
+            field_type=self.field_type,
+            scope=self.scope,
+            quantity_kind=self.quantity_kind,
+            canonical_unit=self.canonical_unit,
+            minimum_value=self.minimum_value,
+            maximum_value=self.maximum_value,
+            regex=self.regex,
+            decimal_scale=self.decimal_scale,
+            max_values=self.max_values,
+            text_max_length=self.text_max_length,
+            validation_rule=self.validation_rule,
+            mappings=self.mappings,
+            choice_set=self.choice_set,
+            object_types=object_types,
+            management_kind=self.management_kind,
+            lifecycle=self.lifecycle,
+            deleted_at=self.deleted_at,
+            required=self.required,
+            nullable=self.nullable,
+        )
 
     def get_absolute_url(self):
         return reverse("extras:customfield_detail", kwargs={"pk": self.pk})

@@ -13888,9 +13888,6 @@ msgstr "Anwendbarkeit"
 msgid "Asset scopes and model applicability must describe the same target set."
 msgstr "Asset-Bereiche und Modellanwendbarkeit müssen dieselbe Zielmenge beschreiben."
 
-#: itambox/extras/forms.py
-msgid "Decimal fields require a scale."
-msgstr "Dezimalfelder benötigen eine Skalierung."
 
 #: itambox/extras/forms.py
 msgid "Every field position must be a positive integer."
@@ -13940,9 +13937,6 @@ msgstr "Wert entfernen"
 msgid "Scope and validation"
 msgstr "Geltungsbereich und Validierung"
 
-#: itambox/extras/forms.py
-msgid "Select at least one model for a generic local field."
-msgstr "Wählen Sie für ein allgemeines lokales Feld mindestens ein Modell aus."
 
 #: itambox/extras/forms.py
 msgid "Select fields require a Choice Set."
@@ -13963,3 +13957,27 @@ msgstr "Spezifikationsabschnitte:"
 #: itambox/templates/assets/assets/asset_detail.html
 msgid "Values inherited from the selected Asset Type"
 msgstr "Vom ausgewählten Asset-Typ geerbte Werte"
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch 'clear' must be a list of field keys."
+msgstr "Die Liste für 'clear' muss Schlüssel benutzerdefinierter Felder enthalten."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch 'set' must be an object."
+msgstr "Der Wert für 'set' muss ein Objekt sein."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch contains an unknown operation."
+msgstr "Der Custom-Field-Patch enthält eine unbekannte Operation."
+
+#: itambox/extras/definition_contract.py
+msgid "Decimal fields require a scale from 0 to 6."
+msgstr "Dezimalfelder benötigen eine Skalierung von 0 bis 6."
+
+#: itambox/extras/definition_contract.py
+msgid "Select at least one model for a generic local field."
+msgstr "Wählen Sie für ein allgemeines lokales Feld mindestens ein Modell aus."
+
+#: itambox/extras/definition_contract.py
+msgid "Choice Sets must be active and not deleted."
+msgstr "Auswahlsets müssen aktiv und dürfen nicht gelöscht sein."

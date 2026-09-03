@@ -57,7 +57,7 @@ class CustomFieldImporter:
     def _get_choice_set(self, choice_set_model, source_id, label):
         slug = f"snipeit-{source_id}"
         source_checksum = self._source_checksum("choice-set", source_id)
-        choice_set = choice_set_model.all_objects.filter(namespace="local", slug=slug).first()
+        choice_set = choice_set_model.all_objects.select_for_update().filter(namespace="local", slug=slug).first()
         if choice_set is not None and choice_set.deleted_at is not None:
             raise ValueError("Snipe-IT Choice Set identity is reserved by a tombstone")
         if choice_set is not None and choice_set.management_kind != "local":
@@ -86,9 +86,58 @@ class CustomFieldImporter:
             deleted_at=None,
         )
 
+    @staticmethod
+    def _label_match(existing_choices, choice_label, used_existing_ids):
+        return next(
+            (
+                choice
+                for choice in existing_choices
+                if choice.deleted_at is None and choice.pk not in used_existing_ids and choice.label == choice_label
+            ),
+            None,
+        )
+
+    def _desired_choice_keys(self, existing_choices, choices):
+        existing_by_key = {choice.key: choice for choice in existing_choices}
+        used_keys = set()
+        generated_choices = [(self._choice_key(choice_label, used_keys), choice_label) for choice_label in choices]
+        used_existing_ids = set()
+        assignments = []
+        for generated_key, choice_label in generated_choices:
+            existing = existing_by_key.get(generated_key)
+            if existing is not None and existing.deleted_at is None and existing.label == choice_label:
+                assigned_key = existing.key
+                used_existing_ids.add(existing.pk)
+            else:
+                label_match = self._label_match(existing_choices, choice_label, used_existing_ids)
+                assigned_key = label_match.key if label_match is not None else None
+                if label_match is not None:
+                    used_existing_ids.add(label_match.pk)
+            assignments.append((generated_key, choice_label, assigned_key))
+        remaining_existing = [
+            choice for choice in existing_choices if choice.deleted_at is None and choice.pk not in used_existing_ids
+        ]
+        for index, (generated_key, choice_label, assigned_key) in enumerate(assignments):
+            if assigned_key is None and remaining_existing:
+                assignments[index] = (generated_key, choice_label, remaining_existing.pop(0).key)
+        reserved_keys = {assigned_key for _, _, assigned_key in assignments if assigned_key is not None}
+        generated_keys = {generated_key for generated_key, _, _ in assignments}
+        used_output_keys = set()
+        desired_choices = []
+        for generated_key, choice_label, assigned_key in assignments:
+            key = assigned_key
+            if key is None:
+                key = generated_key
+                if key in reserved_keys or key in used_output_keys:
+                    available_keys = reserved_keys | generated_keys | used_output_keys
+                    key = self._choice_key(choice_label, available_keys)
+            used_output_keys.add(key)
+            desired_choices.append((key or generated_key, choice_label))
+        return existing_by_key, desired_choices
+
     def _reconcile_choice_rows(self, choice_model, choice_set, choices):
         existing_choices = list(
-            choice_model.all_objects.filter(choice_set_id=choice_set.pk).order_by("position", "key")
+            choice_model.all_objects.select_for_update().filter(choice_set_id=choice_set.pk).order_by("position", "key")
         )
         if any(choice.management_kind != "local" for choice in existing_choices):
             raise ValueError("Cannot update managed Choices from Snipe-IT")
@@ -98,9 +147,7 @@ class CustomFieldImporter:
             strict=True,
         ):
             choice_model.all_objects.filter(pk=choice.pk).update(position=temporary_position)
-        used_keys = set()
-        desired_choices = [(self._choice_key(choice_label, used_keys), choice_label) for choice_label in choices]
-        existing_by_key = {choice.key: choice for choice in existing_choices}
+        existing_by_key, desired_choices = self._desired_choice_keys(existing_choices, choices)
         desired_keys = {key for key, _ in desired_choices}
         if any(
             (choice := existing_by_key.get(key)) is not None and choice.deleted_at is not None
@@ -185,7 +232,17 @@ class CustomFieldImporter:
         defaults["max_values"] = 1
         if obj is not None and "field_values" not in row:
             defaults["choice_set"] = obj.choice_set
-        elif not self.context.dry_run:
+        elif self.context.dry_run:
+            defaults["choice_set"] = choice_set_model(
+                namespace="local",
+                slug=f"snipeit-{source_id}",
+                label=f"{label} choices",
+                management_kind="local",
+                version=1,
+                lifecycle="active",
+                source_checksum=self._source_checksum("choice-set", source_id),
+            )
+        else:
             defaults["choice_set"] = self._choice_set(
                 choice_set_model,
                 choice_model,
@@ -217,7 +274,7 @@ class CustomFieldImporter:
             "decimal_scale": 2 if field_type == "decimal" else None,
             "choice_set": None,
         }
-        obj = model.all_objects.filter(name=raw_name).first()
+        obj = model.all_objects.select_for_update().filter(name=raw_name).first()
         if obj and obj.deleted_at is not None:
             raise ValueError("Snipe-IT Custom Field identity is reserved by a tombstone")
         if obj and obj.management_kind != "local":
@@ -237,6 +294,10 @@ class CustomFieldImporter:
             label,
             raw_choices,
         )
+        candidate = obj or model()
+        for field, value in defaults.items():
+            setattr(candidate, field, value)
+        candidate.validate_definition_contract(object_types=[asset_ct])
         if obj:
             if not self.context.dry_run:
                 for field, value in defaults.items():
@@ -319,7 +380,7 @@ class FieldsetImporter:
             "lifecycle": "active",
             "source_checksum": self._source_checksum(source_id),
         }
-        obj = model.all_objects.filter(namespace="local", slug=slug).first()
+        obj = model.all_objects.select_for_update().filter(namespace="local", slug=slug).first()
         created = False
         if obj and obj.deleted_at is not None:
             raise ValueError("Snipe-IT Fieldset identity is reserved by a tombstone")
