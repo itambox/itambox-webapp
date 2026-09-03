@@ -25,6 +25,38 @@ class Command(BaseCommand):
             help="Show what would be purged without actually deleting anything",
         )
 
+    def _process_model(self, model, cutoff, dry_run):
+        if model._meta.abstract:
+            return 0, 0
+        manager = getattr(model, "all_objects", model._base_manager)
+        queryset = manager.filter(deleted_at__lt=cutoff)
+        count = queryset.count()
+        if count == 0:
+            return 0, 0
+        if getattr(model, "preserve_tombstones", False):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Skipped {count} permanent {model._meta.verbose_name_plural} tombstone(s) "
+                    f"(deleted before {cutoff.date()})"
+                )
+            )
+            return 0, count
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"[DRY RUN] Would purge {count} {model._meta.verbose_name_plural} (deleted before {cutoff.date()})"
+                )
+            )
+            return count, 0
+        purged = 0
+        for obj in queryset.iterator(chunk_size=500):
+            purge_object(obj)
+            purged += 1
+        self.stdout.write(
+            self.style.SUCCESS(f"Purged {purged} {model._meta.verbose_name_plural} (deleted before {cutoff.date()})")
+        )
+        return purged, 0
+
     def handle(self, *args, **options):
         days = options["days"]
         dry_run = options["dry_run"]
@@ -39,41 +71,19 @@ class Command(BaseCommand):
         with TaskContext(tenant_id=None, user_id=None):
             models_with_soft_delete = registry.get_models_with_feature("soft_delete")
             total_purged = 0
+            total_skipped = 0
 
             for model in models_with_soft_delete:
-                if model._meta.abstract:
-                    continue
-                manager = getattr(model, "all_objects", model._base_manager)
-                queryset = manager.filter(deleted_at__lt=cutoff)
-                count = queryset.count()
-                if count == 0:
-                    continue
-
-                if dry_run:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"[DRY RUN] Would purge {count} {model._meta.verbose_name_plural} "
-                            f"(deleted before {cutoff.date()})"
-                        )
-                    )
-                    total_purged += count
-                    continue
-
-                purged = 0
-                for obj in queryset.iterator(chunk_size=500):
-                    purge_object(obj)
-                    purged += 1
-
+                purged, skipped = self._process_model(model, cutoff, dry_run)
                 total_purged += purged
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Purged {purged} {model._meta.verbose_name_plural} (deleted before {cutoff.date()})"
-                    )
-                )
+                total_skipped += skipped
 
             if dry_run:
                 self.stdout.write(self.style.WARNING(f"[DRY RUN] Total objects that would be purged: {total_purged}"))
-            elif total_purged == 0:
+            elif total_purged == 0 and total_skipped == 0:
                 self.stdout.write(self.style.SUCCESS("No soft-deleted objects to purge."))
             else:
-                self.stdout.write(self.style.SUCCESS(f"Total objects purged: {total_purged}"))
+                if total_purged:
+                    self.stdout.write(self.style.SUCCESS(f"Total objects purged: {total_purged}"))
+                if total_skipped:
+                    self.stdout.write(self.style.WARNING(f"Total permanent tombstones skipped: {total_skipped}"))

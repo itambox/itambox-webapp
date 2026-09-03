@@ -27,6 +27,8 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0108_asset_type_singular_cutover",
     "assets.0109_alter_assettype_lifecycle",
     "assets.0110_alter_assettypefieldset_asset_type",
+    "assets.0111_alter_categorydefaultfieldset_category",
+    "assets.0112_alter_assettype_library_definition_key_and_more",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",

@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.models import AssetType, AssetTypeFieldset, Manufacturer
-from extras.customfields import apply_custom_field_patch
-from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from extras.customfields import apply_custom_field_patch, build_custom_field_form_field, validate_custom_field_value
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 
 class CustomFieldCompositionTests(TestCase):
@@ -47,6 +47,39 @@ class CustomFieldCompositionTests(TestCase):
 
         self.assertEqual([item.definition.name for item in resolved], ["prefetched_field"])
         # One set-based query resolves unbound globals; composed memberships add no per-field queries.
+        self.assertEqual(len(queries), 1)
+
+    def test_prefetched_choice_values_do_not_add_per_field_queries(self):
+        choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="prefetched-choice-values",
+            label="Prefetched choice values",
+        )
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="one", label="One", position=10)
+        choice_field = self._field(
+            "prefetched_choice",
+            CustomField.SCOPE_ASSET_TYPE,
+            field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            choice_set=choice_set,
+            max_values=1,
+        )
+        CustomFieldsetField.objects.create(fieldset=self.first, custom_field=choice_field, position=10)
+        asset_type = AssetType.objects.prefetch_related(
+            Prefetch(
+                "fieldset_memberships",
+                queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                    "fieldset__field_memberships__custom_field__object_types",
+                    "fieldset__field_memberships__custom_field__choice_set__choices",
+                ),
+            )
+        ).get(pk=self.asset_type.pk)
+
+        with CaptureQueriesContext(connection) as queries:
+            resolved = resolve_asset_type_custom_fields(asset_type)
+            form_field = build_custom_field_form_field(resolved[0].definition)
+            self.assertEqual(validate_custom_field_value(resolved[0], "one"), "one")
+
+        self.assertEqual(form_field.choices, [("", "---------"), ("one", "One")])
         self.assertEqual(len(queries), 1)
 
     def test_resolver_orders_deduplicates_scopes_and_retains_deprecated_values(self):

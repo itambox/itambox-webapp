@@ -229,6 +229,37 @@ class CustomFieldAPISerializerContractTests(TestCase):
         with self.assertRaises(PermissionDenied):
             view.form_valid(form)
 
+    def test_html_edit_preserves_validated_scalar_values_under_lock(self):
+        field = CustomField.objects.create(
+            name="html_scalar_edit",
+            label="Old label",
+            scope=CustomField.SCOPE_ASSET,
+        )
+        field.object_types.add(self.asset_ct)
+
+        class BoundForm:
+            def __init__(self, instance):
+                self.instance = instance
+                self.cleaned_data = {}
+
+            def save(self):
+                self.instance.save()
+                return self.instance
+
+        field.label = "New label"
+        form = BoundForm(field)
+        view = ObjectEditView()
+        view.model = CustomField
+        view.object = field
+        view.request = RequestFactory().post("/", data={"return_url": "/"})
+        view.request._messages = CookieStorage(view.request)
+
+        response = view.form_valid(form)
+
+        self.assertEqual(response.status_code, 302)
+        field.refresh_from_db()
+        self.assertEqual(field.label, "New label")
+
     def test_html_delete_rechecks_managed_definition_before_delete(self):
         from types import SimpleNamespace
 
@@ -263,6 +294,52 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "manufacturer_id": manufacturer.pk,
                 "specification_patch": {"set": {"api_integer_value": "1.0"}},
             }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("specification_patch", serializer.errors)
+
+    def test_required_asset_type_field_is_required_on_rest_create(self):
+        field = CustomField.objects.create(
+            name="required_rest_spec",
+            label="Required REST specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            required=True,
+        )
+        field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Required REST Manufacturer")
+        serializer = AssetTypeSerializer(
+            data={
+                "model": "Required REST Type",
+                "slug": "required-rest-type",
+                "manufacturer_id": manufacturer.pk,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("specification_patch", serializer.errors)
+
+    def test_required_asset_type_field_cannot_be_cleared(self):
+        field = CustomField.objects.create(
+            name="required_clear_spec",
+            label="Required clear specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            required=True,
+        )
+        field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Required clear Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Required clear Type",
+            slug="required-clear-type",
+            manufacturer=manufacturer,
+            custom_field_data={"required_clear_spec": "keep"},
+        )
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={"specification_patch": {"clear": ["required_clear_spec"]}},
+            partial=True,
         )
 
         self.assertFalse(serializer.is_valid())

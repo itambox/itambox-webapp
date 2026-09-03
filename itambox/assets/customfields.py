@@ -33,7 +33,10 @@ def _iter_fieldset_memberships(fieldset):
     if field_memberships is None:
         return (
             fieldset.field_memberships.select_related("custom_field")
-            .prefetch_related("custom_field__object_types")
+            .prefetch_related(
+                "custom_field__object_types",
+                "custom_field__choice_set__choices",
+            )
             .order_by("position", "custom_field__name")
         )
     return sorted(
@@ -109,6 +112,7 @@ def resolve_effective_custom_fields(fieldsets, target_model, scopes, stored_valu
             Q(object_types__app_label="assets", object_types__model=target_model)
             | Q(object_types__isnull=True, scope__in=scopes)
         )
+        .prefetch_related("object_types", "choice_set__choices")
         .distinct()
         .order_by("name")
     )
@@ -129,11 +133,16 @@ def resolve_effective_custom_fields(fieldsets, target_model, scopes, stored_valu
 
 
 def _composed_fieldsets(asset_type):
+    if not getattr(asset_type, "pk", None):
+        return []
     memberships = getattr(asset_type, "_prefetched_objects_cache", {}).get("fieldset_memberships")
     if memberships is None:
         memberships = (
             asset_type.fieldset_memberships.select_related("fieldset")
-            .prefetch_related("fieldset__field_memberships__custom_field__object_types")
+            .prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types",
+                "fieldset__field_memberships__custom_field__choice_set__choices",
+            )
             .order_by("position", "fieldset__slug")
         )
     else:

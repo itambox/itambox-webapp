@@ -29,6 +29,7 @@ from assets.models import (
     AssetRole,
     AssetTagSequence,
     AssetType,
+    AssetTypeFieldset,
     Category,
     Depreciation,
     Manufacturer,
@@ -85,7 +86,14 @@ class AssetStateActionPermissions(TokenPermissions):
 class AssetViewSet(ITAMBoxModelViewSet):
     permission_classes = [AssetStateActionPermissions, StrictTenantPermission]
     queryset = Asset.objects.select_related("asset_role", "asset_type__manufacturer", "location").prefetch_related(
-        Prefetch("assignments", queryset=AssetAssignment.objects.filter(is_active=True), to_attr="_active_assignments")
+        Prefetch("assignments", queryset=AssetAssignment.objects.filter(is_active=True), to_attr="_active_assignments"),
+        Prefetch(
+            "asset_type__fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types",
+                "fieldset__field_memberships__custom_field__choice_set__choices",
+            ),
+        ),
     )
     serializer_class = AssetSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -163,7 +171,16 @@ class ManufacturerViewSet(ITAMBoxModelViewSet):
 
 
 class AssetTypeViewSet(ITAMBoxModelViewSet):
-    queryset = AssetType.objects.select_related("manufacturer").prefetch_related("tags").all()
+    queryset = AssetType.objects.select_related("manufacturer").prefetch_related(
+        "tags",
+        Prefetch(
+            "fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types",
+                "fieldset__field_memberships__custom_field__choice_set__choices",
+            ),
+        ),
+    )
     serializer_class = AssetTypeSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetTypeFilterSet

@@ -141,6 +141,7 @@ class Dashboard(models.Model):
 
 
 class _ManagedDefinitionMixin(models.Model):
+    preserve_tombstones = True
     MANAGEMENT_CORE = "core"
     MANAGEMENT_LIBRARY = "library"
     MANAGEMENT_LOCAL = "local"

@@ -48,7 +48,7 @@ def lock_unmanaged_definition(obj):
         locked = manager.using(using).select_for_update().get(pk=obj.pk)
         if is_managed_definition(locked):
             raise PermissionDenied("Managed definitions cannot be mutated through ordinary HTML actions.")
-        yield locked
+        yield obj
 
 
 class CachedObjectMixin:

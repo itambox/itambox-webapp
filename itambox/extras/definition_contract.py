@@ -188,6 +188,13 @@ def _count_unbounded_repeats(pattern):
     return count
 
 
+INLINE_FLAGS_RE = re.compile(r"\(\?[aiLmsux-]+(?::|\))")
+
+
+def _has_inline_flags(pattern):
+    return INLINE_FLAGS_RE.search(pattern) is not None
+
+
 def _has_backreference(pattern):
     return re.search(r"\\(?:[1-9]|g<|k<)|\(\?P=", pattern) is not None
 
@@ -195,9 +202,11 @@ def _has_backreference(pattern):
 def validate_custom_field_regex(pattern):
     if not isinstance(pattern, str) or len(pattern) > 256:
         raise ValidationError(_("The regular expression is invalid."), code="INVALID_REGEX")
+    if _has_inline_flags(pattern):
+        raise ValidationError(_("Inline regular-expression flags are not allowed."), code="INVALID_REGEX")
     try:
         re.compile(pattern, re.ASCII)
-    except (re.error, OverflowError) as exc:
+    except (re.error, OverflowError, ValueError) as exc:
         raise ValidationError(_("The regular expression is invalid."), code="INVALID_REGEX") from exc
     if _has_backreference(pattern) or _has_nested_repetition_risk(pattern):
         raise ValidationError(_("The regular expression is too complex."), code="INVALID_REGEX")

@@ -22,6 +22,27 @@ def _definition(item):
     return getattr(item, "definition", item)
 
 
+def validate_required_custom_field_values(definitions, values):
+    missing = sorted(
+        definition.name
+        for item in definitions
+        for definition in (_definition(item),)
+        if definition.required
+        and definition.deleted_at is None
+        and (definition.lifecycle != CustomField.LIFECYCLE_DEPRECATED or definition.name in values)
+        and definition.name not in values
+    )
+    if missing:
+        raise ValidationError(
+            {name: _("This field is required.") for name in missing},
+            code="REQUIRED_FIELD",
+        )
+
+
+def _coerce_boolean_form_value(value):
+    return str(value).casefold() == "true"
+
+
 def is_omitted_optional_single_select(definition, value):
     return definition.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT and value == "" and not definition.required
 
@@ -143,10 +164,20 @@ def _validate_boolean(cf, value):
     return value
 
 
-def _active_choice_keys(cf):
+def _active_choice_rows(cf):
     if cf.choice_set_id is None:
         raise ValidationError(_("The choice definition is invalid."), code="INVALID_CHOICE")
-    return set(cf.choice_set.choices.filter(lifecycle=CustomField.LIFECYCLE_ACTIVE).values_list("key", flat=True))
+    choice_set = cf.choice_set
+    if choice_set.deleted_at is not None or choice_set.lifecycle != CustomField.LIFECYCLE_ACTIVE:
+        raise ValidationError(_("The choice set is not active."), code="INVALID_CHOICE")
+    cached_choices = getattr(choice_set, "_prefetched_objects_cache", {}).get("choices")
+    if cached_choices is not None:
+        return [choice for choice in cached_choices if choice.lifecycle == CustomField.LIFECYCLE_ACTIVE]
+    return list(choice_set.choices.filter(lifecycle=CustomField.LIFECYCLE_ACTIVE))
+
+
+def _active_choice_keys(cf):
+    return {choice.key for choice in _active_choice_rows(cf)}
 
 
 def _validate_single_select(cf, value):
@@ -211,6 +242,7 @@ def apply_custom_field_patch(existing, definitions, submitted, clear_keys=()):
         merged.pop(key, None)
     for key, value in submitted.items():
         merged[key] = validate_custom_field_value(definitions_by_key[key], value, merged)
+    validate_required_custom_field_values(definitions_by_key.values(), merged)
 
     maximum = definitions_by_key.get("operating_temperature_max")
     if maximum and _definition(maximum).validation_rule == "temperature_max_gte_min":
@@ -248,17 +280,24 @@ def build_custom_field_form_field(cf, initial_value=None, read_only=False):
     if cf.field_type == CustomField.FIELD_TYPE_DATE:
         return forms.DateField(widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}), **common)
     if cf.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+        if cf.required:
+            return forms.TypedChoiceField(
+                choices=(("true", _("Yes")), ("false", _("No"))),
+                coerce=_coerce_boolean_form_value,
+                widget=forms.Select(attrs={"class": "form-select"}),
+                **common,
+            )
         common["initial"] = initial_value if initial_value is not None else False
         return forms.BooleanField(widget=forms.CheckboxInput(attrs={"class": "form-check-input"}), **common)
     if cf.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT:
-        choices = list(cf.choice_set.choices.filter(lifecycle=CustomField.LIFECYCLE_ACTIVE).values_list("key", "label"))
+        choices = [(choice.key, choice.label) for choice in _active_choice_rows(cf)]
         return forms.ChoiceField(
             choices=[("", "---------"), *choices],
             widget=forms.Select(attrs={"class": "form-select"}),
             **common,
         )
     if cf.field_type == CustomField.FIELD_TYPE_MULTI_SELECT:
-        choices = list(cf.choice_set.choices.filter(lifecycle=CustomField.LIFECYCLE_ACTIVE).values_list("key", "label"))
+        choices = [(choice.key, choice.label) for choice in _active_choice_rows(cf)]
         return forms.MultipleChoiceField(
             choices=choices,
             widget=forms.SelectMultiple(attrs={"class": "form-select"}),
