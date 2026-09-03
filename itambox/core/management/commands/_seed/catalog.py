@@ -195,6 +195,8 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
             management_kind=options["management_kind"],
             lifecycle=options["lifecycle"],
             deleted_at=None,
+            name=row["key"],
+            namespace=options["namespace"],
         )
         matches = list(CustomField.all_objects.filter(name=row["key"]))
         _validate_core_field_identity(matches, row["key"])

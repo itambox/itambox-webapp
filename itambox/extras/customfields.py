@@ -194,13 +194,17 @@ def validate_custom_field_value(cf, value, merged_values=None):
 
 def apply_custom_field_patch(existing, definitions, submitted, clear_keys=()):
     """Apply an explicit merge patch while preserving every unmentioned key."""
-    definitions_by_key = {_definition(item).name: _definition(item) for item in definitions}
+    definitions_by_key = {_definition(item).name: item for item in definitions}
     submitted_keys = set(submitted)
     clear_keys = set(clear_keys)
     if submitted_keys & clear_keys:
         raise ValidationError(_("A field cannot be set and cleared together."), code="CONFLICT_CLEAR_OVERLAP")
     if (submitted_keys | clear_keys) - definitions_by_key.keys():
         raise ValidationError(_("Unknown custom field key."), code="UNKNOWN_FIELD_KEY")
+
+    for key in submitted_keys | clear_keys:
+        if getattr(definitions_by_key[key], "read_only", False):
+            raise ValidationError(_("Deprecated custom fields are read-only."), code="READ_ONLY_FIELD")
 
     merged = dict(existing or {})
     for key in clear_keys:

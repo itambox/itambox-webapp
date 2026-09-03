@@ -1,6 +1,4 @@
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
-from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 
 from assets.models import (
@@ -71,13 +69,15 @@ class AssetTypeCompositionFoundationTests(TestCase):
         asset_type.refresh_from_db()
         self.assertIsNone(asset_type.deleted_at)
         self.assertEqual(asset_type.fieldset_memberships.count(), 2)
-        with self.assertRaises(ProtectedError), transaction.atomic():
-            asset_type.delete(force_hard_delete=True)
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            AssetType.objects.create(
-                manufacturer=manufacturer,
-                model="Switch 48P replacement",
-                slug="example-networks-switch-48p-replacement",
-                library=library,
-                library_definition_key="switch-48p-rev-b",
-            )
+        asset_type_pk = asset_type.pk
+        asset_type.delete(force_hard_delete=True)
+        self.assertFalse(AssetType._base_manager.filter(pk=asset_type_pk).exists())
+        self.assertFalse(AssetTypeFieldset.objects.filter(asset_type_id=asset_type_pk).exists())
+        replacement = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Switch 48P replacement",
+            slug="example-networks-switch-48p-replacement",
+            library=library,
+            library_definition_key="switch-48p-rev-b",
+        )
+        self.assertEqual(replacement.library_definition_key, "switch-48p-rev-b")

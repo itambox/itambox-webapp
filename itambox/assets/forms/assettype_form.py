@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from assets.customfields import resolve_fieldsets_custom_fields
+from assets.customfields import resolve_effective_custom_fields
 from core.forms import SlugModelForm
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import CustomField, CustomFieldset, Tag
@@ -111,8 +111,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def get_custom_field_definitions(self):
         stored = dict(self.instance.custom_field_data or {}) if self.instance and self.instance.pk else {}
-        return resolve_fieldsets_custom_fields(
+        return resolve_effective_custom_fields(
             self._selected_fieldsets(),
+            "assettype",
             {CustomField.SCOPE_ASSET_TYPE, CustomField.SCOPE_BOTH},
             stored,
         )

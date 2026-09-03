@@ -108,6 +108,20 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         self.assertIn("cf_test_hostname", form.fields)
         self.assertIn("cf_encrypted", form.fields)
 
+    def test_composed_field_is_filtered_by_target_object_type(self):
+        wrong_target = CustomField.objects.create(
+            name="wrong_target_spec",
+            label="Wrong target specification",
+            field_type="text",
+            scope=CustomField.SCOPE_ASSET_TYPE,
+        )
+        wrong_target.object_types.add(self.asset_ct)
+        CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=wrong_target, position=50)
+
+        resolved = resolve_asset_type_custom_fields(self.asset_type)
+
+        self.assertNotIn("wrong_target_spec", {item.definition.name for item in resolved})
+
     def test_global_asset_field_shows_without_fieldset(self):
         # A field targeting Asset that belongs to no fieldset applies globally.
         cf_global = CustomField.objects.create(

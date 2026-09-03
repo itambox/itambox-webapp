@@ -173,19 +173,38 @@ Export Template), custom field values are included.
 
 ### REST API
 
-Custom field values are accessible via the REST API under the `custom_fields`
-attribute on each object. Use the **Field Name** (slug) as the key:
+Custom field values are returned in the read-only `custom_field_data` attribute.
+The keys are the **Field Name** (slug):
 
 ```json
 {
   "id": 42,
   "asset_tag": "IT-00042",
-  "custom_fields": {
+  "custom_field_data": {
     "sim_card_number": "8944100030001234567",
     "support_tier": "Gold"
   }
 }
 ```
+
+Writes use the separate `specification_patch` envelope. `set` contains values
+keyed by Field Name and `clear` contains the names to remove:
+
+```json
+{
+  "specification_patch": {
+    "set": {"support_tier": "Platinum"},
+    "clear": ["sim_card_number"]
+  }
+}
+```
+
+`custom_field_data` is not a write target. Values that are no longer represented
+by an active field definition remain readable and are preserved by ordinary
+updates; they can only be changed through a valid explicit patch while their
+field definition is writable. A field literally named `set` or `clear` is
+addressed inside the `set`/`clear` operation, for example
+`{"specification_patch": {"set": {"set": "value"}}}`.
 
 ---
 

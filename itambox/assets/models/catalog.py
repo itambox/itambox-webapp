@@ -388,7 +388,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
 
 class AssetTypeFieldset(BaseModel):
-    asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name="fieldset_memberships")
+    asset_type = models.ForeignKey(AssetType, on_delete=models.CASCADE, related_name="fieldset_memberships")
     fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="asset_type_memberships")
     position = models.PositiveIntegerField()
 

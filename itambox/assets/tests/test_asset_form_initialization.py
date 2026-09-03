@@ -15,6 +15,7 @@ behaviour-neutral.
 from unittest.mock import patch
 
 from crispy_forms.layout import Fieldset
+from django.contrib.contenttypes.models import ContentType
 from django.template.loader import render_to_string
 from django.test import TestCase
 from django.urls import reverse
@@ -393,6 +394,15 @@ class AssetFormCustomFieldTests(TestCase):
 
         self.assertEqual(form.custom_field_keys, ["cf_alpha", "cf_mid", "cf_zeta"])
 
+    def test_generic_asset_field_uses_object_types_for_global_resolution(self):
+        field = self._asset_custom_field(name="generic_asset_detail", label="Generic asset detail", scope=None)
+        field.object_types.add(ContentType.objects.get_for_model(Asset))
+
+        form, _ = build_form_without_sequence()
+
+        self.assertIn("cf_generic_asset_detail", form.fields)
+        self.assertIn("cf_generic_asset_detail", form.custom_field_keys)
+
     def test_each_supported_field_type_builds_its_form_field(self):
         self._asset_custom_field(name="txt", label="A Text", field_type="text")
         self._asset_custom_field(name="num", label="B Number", field_type="integer")
@@ -408,6 +418,7 @@ class AssetFormCustomFieldTests(TestCase):
             label="E Select",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
             choice_set=choice_set,
+            max_values=1,
         )
 
         form, _ = build_form_without_sequence()

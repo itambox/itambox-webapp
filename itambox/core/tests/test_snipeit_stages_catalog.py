@@ -230,7 +230,11 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert updated.counts.updated == 1
         assert obj.label == "Updated CPU"
         assert obj.field_type == "single-select"
-        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["one"]
+        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["three"]
+        retired_choice = obj.choice_set.choices.model.all_objects.get(key="one")
+        assert retired_choice.label == "one"
+        assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
+        assert retired_choice.deleted_at is not None
 
     def test_custom_field_import_refuses_same_id_from_another_source(self):
         from extras.models import CustomField
@@ -503,10 +507,13 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         field.refresh_from_db()
         choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
-        assert [key for key, _label in choices] == original_keys
-        assert choices == [(original_keys[0], "Uno"), (original_keys[1], "Two")]
+        retired_choice = field.choice_set.choices.model.all_objects.get(key=original_keys[0])
+        assert choices == [("uno", "Uno"), (original_keys[1], "Two")]
+        assert retired_choice.label == "One"
+        assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
+        assert retired_choice.deleted_at is not None
 
-    def test_custom_field_choice_keys_survive_label_change_with_existing_label(self):
+    def test_custom_field_choice_removal_and_unrelated_addition_never_reuses_old_key(self):
         deps = CustomFieldDependencies({})
         row = {
             "id": 141,
@@ -527,8 +534,12 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         )
 
         field.refresh_from_db()
-        choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
-        assert choices == [(original_keys[1], "Two"), (original_keys[0], "Three")]
+        active_choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
+        retired_choice = field.choice_set.choices.model.all_objects.get(key=original_keys[0])
+        assert active_choices == [(original_keys[1], "Two"), ("three", "Three")]
+        assert retired_choice.label == "One"
+        assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
+        assert retired_choice.deleted_at is not None
 
     def test_custom_field_long_names_get_stable_collision_free_keys(self):
         from extras.models import CustomField

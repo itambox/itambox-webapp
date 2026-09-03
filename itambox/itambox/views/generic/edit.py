@@ -17,6 +17,7 @@ from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
     is_managed_definition,
+    lock_unmanaged_definition,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import resolve_view_model, safe_return_url
@@ -166,7 +167,10 @@ class ObjectEditView(
                     )
                     return self.form_invalid(form)
 
-        self.object = form.save()
+        write_target = self.object if self.object is not None else form.instance
+        with lock_unmanaged_definition(write_target) as locked_object:
+            form.instance = locked_object
+            self.object = form.save()
         msg_verb = _("Created") if is_creating else _("Modified")
         msg_link = (
             f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>"

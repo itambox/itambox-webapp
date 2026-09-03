@@ -38,6 +38,26 @@ class CustomDefinitionFormTests(TestCase):
         data.update(overrides)
         return data
 
+    def test_asset_scope_derives_object_types_before_contract_validation(self):
+        form = CustomFieldForm(data=self._asset_scope_data(object_types=[]))
+
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertEqual(set(saved.object_types.values_list("model", flat=True)), {"asset"})
+
+    def test_temperature_cross_field_rule_is_reserved_to_core_identity(self):
+        form = CustomFieldForm(
+            data=self._asset_scope_data(
+                name="custom_temperature_max",
+                field_type=CustomField.FIELD_TYPE_DECIMAL,
+                decimal_scale="2",
+                validation_rule="temperature_max_gte_min",
+            )
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("validation_rule", form.errors)
+
     def test_definition_form_rejects_invalid_regex(self):
         form = CustomFieldForm(data=self._asset_scope_data(name="invalid_regex", regex="["))
 
