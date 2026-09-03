@@ -16,6 +16,7 @@ from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
     is_managed_definition,
+    lock_unmanaged_definition,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import resolve_view_model, safe_return_url
@@ -67,7 +68,9 @@ class ObjectDeleteView(
         obj_repr = self.get_object_display()
         model = self.object.__class__
         try:
-            self.object.delete()
+            with lock_unmanaged_definition(self.object) as locked_object:
+                self.object = locked_object
+                self.object.delete()
             messages.success(
                 self.request,
                 _("Deleted %(model)s %(object)s.") % {"model": model._meta.verbose_name, "object": obj_repr},

@@ -4,9 +4,10 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.messages.storage.cookie import CookieStorage
 from django.core.exceptions import PermissionDenied
 from django.db import connection
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
@@ -14,6 +15,7 @@ from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer
 from extras.api.serializers import CustomFieldSerializer, CustomFieldsetSerializer
 from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 from itambox.api.viewsets import ITAMBoxModelViewSet
+from itambox.views.generic import ObjectDeleteView, ObjectEditView
 
 
 class CustomFieldAPISerializerContractTests(TestCase):
@@ -209,6 +211,41 @@ class CustomFieldAPISerializerContractTests(TestCase):
         self.assertIsNone(field.deleted_at)
         self.assertEqual(field.management_kind, CustomField.MANAGEMENT_LIBRARY)
 
+    def test_html_edit_rechecks_managed_definition_before_save(self):
+        from types import SimpleNamespace
+
+        field = CustomField.objects.create(name="html_edit_lock", label="HTML edit lock")
+        CustomField.all_objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
+        view = ObjectEditView()
+        view.model = CustomField
+        view.object = field
+        view.request = SimpleNamespace(POST={})
+        form = SimpleNamespace(
+            instance=field,
+            cleaned_data={},
+            save=lambda: self.fail("managed definition was saved"),
+        )
+
+        with self.assertRaises(PermissionDenied):
+            view.form_valid(form)
+
+    def test_html_delete_rechecks_managed_definition_before_delete(self):
+        from types import SimpleNamespace
+
+        field = CustomField.objects.create(name="html_delete_lock", label="HTML delete lock")
+        CustomField.all_objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
+        view = ObjectDeleteView()
+        view.model = CustomField
+        view.object = field
+        view.request = RequestFactory().post("/")
+        view.request._messages = CookieStorage(view.request)
+
+        with self.assertRaises(PermissionDenied):
+            view.form_valid(SimpleNamespace())
+
+        field.refresh_from_db()
+        self.assertIsNone(field.deleted_at)
+
     def test_asset_type_api_rejects_noncanonical_custom_field_value(self):
         definition = CustomField.objects.create(
             name="api_integer_value",
@@ -224,13 +261,101 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "model": "API Test Type",
                 "slug": "api-test-type",
                 "manufacturer_id": manufacturer.pk,
-                "custom_field_data": {"api_integer_value": "1.0"},
+                "specification_patch": {"set": {"api_integer_value": "1.0"}},
             }
         )
 
         self.assertFalse(serializer.is_valid())
-        self.assertIn("custom_field_data", serializer.errors)
-        self.assertNotIn("Unknown custom field key.", str(serializer.errors))
+        self.assertIn("specification_patch", serializer.errors)
+
+    def test_get_to_put_roundtrip_preserves_unknown_stored_keys(self):
+        field = CustomField.objects.create(
+            name="roundtrip_spec",
+            label="Roundtrip specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+        )
+        field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Roundtrip Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Roundtrip Type",
+            slug="roundtrip-type",
+            manufacturer=manufacturer,
+            custom_field_data={"roundtrip_spec": "keep", "removed_fieldset": "preserve"},
+        )
+
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={"custom_field_data": asset_type.custom_field_data},
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        asset_type.refresh_from_db()
+        self.assertEqual(
+            asset_type.custom_field_data,
+            {"roundtrip_spec": "keep", "removed_fieldset": "preserve"},
+        )
+
+    def test_deprecated_specification_is_read_only_through_rest(self):
+        field = CustomField.objects.create(
+            name="deprecated_spec",
+            label="Deprecated specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+        )
+        field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Deprecated Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Deprecated Type",
+            slug="deprecated-type",
+            manufacturer=manufacturer,
+            custom_field_data={"deprecated_spec": "old"},
+        )
+
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={"specification_patch": {"set": {"deprecated_spec": "new"}}},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("specification_patch", serializer.errors)
+
+    def test_set_and_clear_are_valid_custom_field_names_inside_patch(self):
+        for name in ("set", "clear"):
+            field = CustomField.objects.create(
+                name=name,
+                label=name.title(),
+                field_type=CustomField.FIELD_TYPE_TEXT,
+                scope=CustomField.SCOPE_ASSET_TYPE,
+            )
+            field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Reserved Name Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Reserved Name Type",
+            slug="reserved-name-type",
+            manufacturer=manufacturer,
+            custom_field_data={"clear": "remove", "set": "old"},
+        )
+
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={
+                "specification_patch": {
+                    "set": {"set": "new"},
+                    "clear": ["clear"],
+                }
+            },
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.custom_field_data, {"set": "new"})
 
     def test_asset_type_api_patch_preserves_values_and_enforces_composition(self):
         visible = CustomField.objects.create(
@@ -248,7 +373,9 @@ class CustomFieldAPISerializerContractTests(TestCase):
         visible.object_types.add(self.asset_type_ct)
         outside.object_types.add(self.asset_type_ct)
         fieldset = CustomFieldset.objects.create(namespace="local", slug="api-composed", label="API composed")
+        outside_fieldset = CustomFieldset.objects.create(namespace="local", slug="api-outside", label="API outside")
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=visible, position=10)
+        CustomFieldsetField.objects.create(fieldset=outside_fieldset, custom_field=outside, position=10)
         manufacturer = Manufacturer.objects.create(name="Composition API Manufacturer")
         asset_type = AssetType.objects.create(
             model="Composition API Type",
@@ -260,7 +387,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
 
         serializer = AssetTypeSerializer(
             instance=asset_type,
-            data={"custom_field_data": {"visible_spec": "new"}},
+            data={"specification_patch": {"set": {"visible_spec": "new"}}},
             partial=True,
         )
         self.assertTrue(serializer.is_valid(), serializer.errors)
@@ -273,7 +400,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
 
         clear_serializer = AssetTypeSerializer(
             instance=asset_type,
-            data={"custom_field_data": {"clear": ["visible_spec"]}},
+            data={"specification_patch": {"clear": ["visible_spec"]}},
             partial=True,
         )
         self.assertTrue(clear_serializer.is_valid(), clear_serializer.errors)
@@ -283,11 +410,11 @@ class CustomFieldAPISerializerContractTests(TestCase):
 
         invalid = AssetTypeSerializer(
             instance=asset_type,
-            data={"custom_field_data": {"outside_spec": "must reject"}},
+            data={"specification_patch": {"set": {"outside_spec": "must reject"}}},
             partial=True,
         )
         self.assertFalse(invalid.is_valid())
-        self.assertIn("custom_field_data", invalid.errors)
+        self.assertIn("specification_patch", invalid.errors)
 
     def test_asset_type_api_create_accepts_applicable_custom_field_data(self):
         field = CustomField.objects.create(
@@ -302,11 +429,13 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "model": "Create API Model",
                 "slug": "create-api-model",
                 "manufacturer_id": manufacturer.pk,
-                "custom_field_data": {"create_spec": "created"},
+                "specification_patch": {"set": {"create_spec": "created"}},
             }
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
+        created = serializer.save()
+        self.assertEqual(created.custom_field_data, {"create_spec": "created"})
 
     def test_asset_type_api_create_rejects_fieldset_only_custom_field_data(self):
         field = CustomField.objects.create(
@@ -323,12 +452,12 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "model": "Fieldset Create API Model",
                 "slug": "fieldset-create-api-model",
                 "manufacturer_id": manufacturer.pk,
-                "custom_field_data": {"fieldset_only_create_spec": "must reject"},
+                "specification_patch": {"set": {"fieldset_only_create_spec": "must reject"}},
             }
         )
 
         self.assertFalse(serializer.is_valid())
-        self.assertIn("custom_field_data", serializer.errors)
+        self.assertIn("specification_patch", serializer.errors)
 
     def test_asset_api_type_switch_uses_new_composition_for_custom_field_patch(self):
         old_field = CustomField.objects.create(
@@ -356,7 +485,10 @@ class CustomFieldAPISerializerContractTests(TestCase):
 
         serializer = AssetSerializer(
             instance=asset,
-            data={"asset_type_id": new_type.pk, "custom_field_data": {"new_asset_spec": "new"}},
+            data={
+                "asset_type_id": new_type.pk,
+                "specification_patch": {"set": {"new_asset_spec": "new"}},
+            },
             partial=True,
         )
 

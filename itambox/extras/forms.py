@@ -172,6 +172,14 @@ class CustomFieldForm(forms.ModelForm):
         self.fields["object_types"].help_text = _(
             "Non-asset fields use the selected model relation. Asset scopes derive their Asset and Asset Type relations."
         )
+        submitted_scope = self.data.get("scope") if self.is_bound else self.initial.get("scope")
+        selected_scope = submitted_scope or getattr(self.instance, "scope", None)
+        if selected_scope in {
+            CustomField.SCOPE_ASSET_TYPE,
+            CustomField.SCOPE_ASSET,
+            CustomField.SCOPE_BOTH,
+        }:
+            self.fields["object_types"].disabled = True
         self._managed_read_only = bool(
             self.instance.pk
             and self.instance.management_kind in {CustomField.MANAGEMENT_CORE, CustomField.MANAGEMENT_LIBRARY}
@@ -235,6 +243,13 @@ class CustomFieldForm(forms.ModelForm):
             _add_immutable_tamper_errors(self, CustomField)
         if self._managed_read_only:
             return cleaned_data
+        if cleaned_data.get("scope"):
+            expected_models = {
+                CustomField.SCOPE_ASSET_TYPE: ["assettype"],
+                CustomField.SCOPE_ASSET: ["asset"],
+                CustomField.SCOPE_BOTH: ["asset", "assettype"],
+            }[cleaned_data["scope"]]
+            cleaned_data["object_types"] = ContentType.objects.filter(app_label="assets", model__in=expected_models)
         errors = custom_field_definition_contract_errors(
             field_type=cleaned_data.get("field_type"),
             scope=cleaned_data.get("scope"),
@@ -253,6 +268,8 @@ class CustomFieldForm(forms.ModelForm):
             management_kind=cleaned_data.get("management_kind", self.instance.management_kind or "local"),
             lifecycle=cleaned_data.get("lifecycle", self.instance.lifecycle or "active"),
             deleted_at=self.instance.deleted_at,
+            name=cleaned_data.get("name"),
+            namespace=cleaned_data.get("namespace"),
         )
         for field_name, message in errors.items():
             form_name = "choice_set" if field_name == "choice_set_id" else field_name
@@ -260,13 +277,6 @@ class CustomFieldForm(forms.ModelForm):
                 self.add_error(form_name, message)
             else:
                 self.add_error(None, message)
-        if cleaned_data.get("scope"):
-            expected_models = {
-                CustomField.SCOPE_ASSET_TYPE: ["assettype"],
-                CustomField.SCOPE_ASSET: ["asset"],
-                CustomField.SCOPE_BOTH: ["asset", "assettype"],
-            }[cleaned_data["scope"]]
-            cleaned_data["object_types"] = ContentType.objects.filter(app_label="assets", model__in=expected_models)
         return cleaned_data
 
     def save(self, commit=True):

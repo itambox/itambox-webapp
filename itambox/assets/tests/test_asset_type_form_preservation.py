@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 
 from assets.forms import AssetTypeForm
@@ -6,6 +7,20 @@ from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 
 
 class AssetTypeFormPreservationTests(TestCase):
+    def test_unbound_generic_asset_type_field_is_rendered(self):
+        field = CustomField.objects.create(
+            name="generic_asset_type_spec",
+            namespace="local",
+            label="Generic Asset Type specification",
+            scope=None,
+        )
+        field.object_types.add(ContentType.objects.get_for_model(AssetType))
+
+        form = AssetTypeForm()
+
+        self.assertIn("cf_generic_asset_type_spec", form.fields)
+        self.assertIn("cf_generic_asset_type_spec", form.custom_field_keys)
+
     def test_duplicate_submitted_fieldset_ids_are_a_form_error(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         fieldset = CustomFieldset.objects.create(
@@ -61,7 +76,7 @@ class AssetTypeFormPreservationTests(TestCase):
             label="Visible specification",
             scope=CustomField.SCOPE_ASSET_TYPE,
         )
-        CustomField.objects.create(
+        hidden = CustomField.objects.create(
             name="hidden_spec",
             namespace="local",
             label="Hidden specification",
@@ -72,6 +87,12 @@ class AssetTypeFormPreservationTests(TestCase):
             slug="specifications",
             label="Specifications",
         )
+        hidden_fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="hidden-specifications",
+            label="Hidden Specifications",
+        )
+        CustomFieldsetField.objects.create(fieldset=hidden_fieldset, custom_field=hidden, position=10)
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=visible, position=10)
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,

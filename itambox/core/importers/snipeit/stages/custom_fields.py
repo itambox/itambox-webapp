@@ -114,12 +114,6 @@ class CustomFieldImporter:
                 if label_match is not None:
                     used_existing_ids.add(label_match.pk)
             assignments.append((generated_key, choice_label, assigned_key))
-        remaining_existing = [
-            choice for choice in existing_choices if choice.deleted_at is None and choice.pk not in used_existing_ids
-        ]
-        for index, (generated_key, choice_label, assigned_key) in enumerate(assignments):
-            if assigned_key is None and remaining_existing:
-                assignments[index] = (generated_key, choice_label, remaining_existing.pop(0).key)
         reserved_keys = {assigned_key for _, _, assigned_key in assignments if assigned_key is not None}
         generated_keys = {generated_key for generated_key, _, _ in assignments}
         used_output_keys = set()

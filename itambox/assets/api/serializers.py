@@ -14,6 +14,7 @@ from assets.api.nested_serializers import (
     NestedManufacturerSerializer,
 )
 from assets.customfields import (
+    ResolvedCustomField,
     resolve_asset_custom_fields,
     resolve_asset_type_creation_custom_fields,
     resolve_asset_type_custom_fields,
@@ -106,6 +107,7 @@ class DepreciationSerializer(BaseModelSerializer):
 
 
 class AssetTypeSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
+    specification_patch = serializers.JSONField(write_only=True, required=False)
     manufacturer = NestedManufacturerSerializer(read_only=True)
     manufacturer_id = serializers.PrimaryKeyRelatedField(
         queryset=Manufacturer.objects.all(), source="manufacturer", write_only=True
@@ -141,6 +143,7 @@ class AssetTypeSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
             "depreciation",
             "depreciation_id",
             "custom_field_data",
+            "specification_patch",
             "image",
             "requestable",
             "description",
@@ -154,6 +157,7 @@ class AssetTypeSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
 
 @extend_schema_serializer(component_name="AssetResource")
 class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
+    specification_patch = serializers.JSONField(write_only=True, required=False)
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetType.objects.all(), source="asset_type", write_only=True
@@ -183,7 +187,7 @@ class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
     assigned_to = serializers.SerializerMethodField()
     cost_center: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
 
-    def get_custom_field_definitions(self):
+    def get_custom_field_definitions(self) -> list[ResolvedCustomField] | tuple[()]:
         instance = self.instance
         target_asset_type = getattr(instance, "asset_type", None) if isinstance(instance, Asset) else None
         raw_asset_type_id = self.initial_data.get("asset_type_id") if hasattr(self, "initial_data") else None
@@ -227,6 +231,7 @@ class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
             "last_audited",
             "last_audited_by",
             "custom_field_data",
+            "specification_patch",
             "requestable",
             "notes",
             "tags",

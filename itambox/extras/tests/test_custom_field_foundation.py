@@ -1,9 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from django.utils import timezone
 
+from core.purge_handlers import purge_object
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 
@@ -240,9 +240,25 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         self.assertIsNone(fieldset.deleted_at)
         self.assertIsNone(field.deleted_at)
         self.assertIsNone(choice_set.deleted_at)
-        with self.assertRaises(ProtectedError), transaction.atomic():
-            fieldset.delete(force_hard_delete=True)
-        with self.assertRaises(ProtectedError), transaction.atomic():
-            field.delete(force_hard_delete=True)
-        with self.assertRaises(ProtectedError), transaction.atomic():
-            choice_set.delete(force_hard_delete=True)
+
+        from assets.models import AssetType, AssetTypeFieldset, Manufacturer
+
+        manufacturer = Manufacturer.objects.create(name="Purge Manufacturer", slug="purge-manufacturer")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Purge Asset Type",
+            slug="purge-asset-type",
+        )
+        asset_type_membership = AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+
+        purge_object(asset_type)
+        self.assertFalse(AssetTypeFieldset.objects.filter(pk=asset_type_membership.pk).exists())
+
+        purge_object(fieldset)
+        self.assertFalse(CustomFieldsetField.objects.filter(pk=membership.pk).exists())
+        self.assertFalse(CustomFieldset.all_objects.filter(pk=fieldset.pk).exists())
+
+        purge_object(field)
+        purge_object(choice_set)
+        self.assertFalse(CustomFieldChoice.all_objects.filter(pk=choice.pk).exists())
+        self.assertFalse(CustomFieldChoiceSet.all_objects.filter(pk=choice_set.pk).exists())

@@ -244,7 +244,7 @@ class CustomFieldChoice(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, 
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 
-    choice_set = models.ForeignKey(CustomFieldChoiceSet, on_delete=models.PROTECT, related_name="choices")
+    choice_set = models.ForeignKey(CustomFieldChoiceSet, on_delete=models.CASCADE, related_name="choices")
     key = models.CharField(
         max_length=63,
         validators=[RegexValidator(r"^[a-z0-9][a-z0-9_]{0,62}$")],
@@ -433,6 +433,8 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
             deleted_at=self.deleted_at,
             required=self.required,
             nullable=self.nullable,
+            name=self.name,
+            namespace=self.namespace,
         )
 
     def get_absolute_url(self):
@@ -487,7 +489,7 @@ class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, Sof
 
 
 class CustomFieldsetField(BaseModel):
-    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="field_memberships")
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.CASCADE, related_name="field_memberships")
     custom_field = models.ForeignKey(CustomField, on_delete=models.PROTECT, related_name="fieldset_memberships")
     position = models.PositiveIntegerField()
 

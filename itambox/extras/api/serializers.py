@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
@@ -49,35 +49,33 @@ class CustomFieldDataValidationMixin:
     def get_custom_field_definitions(self):
         return custom_fields_for_model(self.Meta.model)
 
+    def get_extra_kwargs(self):
+        extra_kwargs = super().get_extra_kwargs()
+        custom_field_kwargs = dict(extra_kwargs.get("custom_field_data", {}))
+        custom_field_kwargs["read_only"] = True
+        extra_kwargs["custom_field_data"] = custom_field_kwargs
+        return extra_kwargs
+
     def get_existing_custom_field_data(self):
         instance = self.instance
         if instance is None or isinstance(instance, (list, tuple)):
             return {}
         return getattr(instance, "custom_field_data", None) or {}
 
-    @staticmethod
-    def split_custom_field_patch(value):
-        if not ({"set", "clear"} & value.keys()):
-            return value, ()
+    def validate_specification_patch(self, value):
+        if not isinstance(value, Mapping):
+            raise serializers.ValidationError(_("Custom field specification patch must be an object."))
         unknown_operations = set(value) - {"set", "clear"}
         if unknown_operations:
-            raise DjangoValidationError(_("Custom field patch contains an unknown operation."))
+            raise serializers.ValidationError(_("Custom field patch contains an unknown operation."))
         submitted = value.get("set", {})
         clear_keys = value.get("clear", [])
         if not isinstance(submitted, Mapping):
-            raise DjangoValidationError(_("Custom field patch 'set' must be an object."))
+            raise serializers.ValidationError(_("Custom field patch 'set' must be an object."))
         if not isinstance(clear_keys, list) or any(not isinstance(key, str) for key in clear_keys):
-            raise DjangoValidationError(_("Custom field patch 'clear' must be a list of field keys."))
-        return submitted, clear_keys
-
-    def validate_custom_field_data(self, value):
-        if value is None:
-            return value
-        if not isinstance(value, Mapping):
-            raise serializers.ValidationError(_("Custom field data must be an object."))
+            raise serializers.ValidationError(_("Custom field patch 'clear' must be a list of field keys."))
         try:
-            submitted, clear_keys = self.split_custom_field_patch(value)
-            return apply_custom_field_patch(
+            merged = apply_custom_field_patch(
                 self.get_existing_custom_field_data(),
                 self.get_custom_field_definitions(),
                 submitted,
@@ -85,6 +83,25 @@ class CustomFieldDataValidationMixin:
             )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.messages) from exc
+        return {"set": dict(submitted), "clear": list(clear_keys), "_merged": merged}
+
+    def create(self, validated_data):
+        patch = validated_data.pop("specification_patch", None)
+        with transaction.atomic():
+            instance = super().create(validated_data)
+            if patch is not None:
+                instance.custom_field_data = patch["_merged"]
+                instance.save(update_fields=["custom_field_data"])
+        return instance
+
+    def update(self, instance, validated_data):
+        patch = validated_data.pop("specification_patch", None)
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            if patch is not None:
+                instance.custom_field_data = patch["_merged"]
+                instance.save(update_fields=["custom_field_data"])
+        return instance
 
 
 class TagSerializer(BaseModelSerializer):
@@ -164,6 +181,8 @@ class CustomFieldSerializer(BaseModelSerializer):
             management_kind=data.get("management_kind", getattr(instance, "management_kind", "local")),
             lifecycle=data.get("lifecycle", getattr(instance, "lifecycle", "active")),
             deleted_at=getattr(instance, "deleted_at", None),
+            name=data.get("name", getattr(instance, "name", None)),
+            namespace=data.get("namespace", getattr(instance, "namespace", None)),
         )
         if instance is not None:
             for model_field in CustomField.immutable_fields:

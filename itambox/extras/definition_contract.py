@@ -259,7 +259,7 @@ def _regex_definition_errors(field_type, regex):
     return {}
 
 
-def _rule_definition_errors(field_type, validation_rule):
+def _rule_definition_errors(field_type, validation_rule, name, namespace, management_kind):
     if validation_rule is None:
         return {}
     expected_type = VALIDATION_RULE_TYPES.get(validation_rule)
@@ -267,6 +267,10 @@ def _rule_definition_errors(field_type, validation_rule):
         return {"validation_rule": "Unsupported validation rule."}
     if field_type != expected_type:
         return {"validation_rule": "The validation rule does not match the field type."}
+    if validation_rule == "temperature_max_gte_min" and (
+        name != "operating_temperature_max" or namespace != "itambox" or management_kind != "core"
+    ):
+        return {"validation_rule": "This cross-field rule is reserved for its registered Core definition."}
     return {}
 
 
@@ -355,6 +359,8 @@ def custom_field_definition_contract_errors(
     deleted_at=None,
     required=None,
     nullable=None,
+    name=None,
+    namespace=None,
 ):
     """Return field-level errors for one complete custom-field definition."""
     errors = {}
@@ -362,7 +368,7 @@ def custom_field_definition_contract_errors(
         _basic_definition_errors(field_type, scope, management_kind, lifecycle, minimum_value, maximum_value),
         _numeric_metadata_errors(field_type, decimal_scale, text_max_length, minimum_value, maximum_value),
         _regex_definition_errors(field_type, regex),
-        _rule_definition_errors(field_type, validation_rule),
+        _rule_definition_errors(field_type, validation_rule, name, namespace, management_kind),
         _quantity_definition_errors(field_type, quantity_kind, canonical_unit),
         _choice_definition_errors(field_type, choice_set, max_values),
         _applicability_errors(scope, object_types),
