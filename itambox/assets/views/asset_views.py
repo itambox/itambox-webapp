@@ -98,7 +98,7 @@ class AssetDetailView(ObjectDetailView):
         Prefetch(
             "asset_type__fieldset_memberships",
             queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
-                "fieldset__field_memberships__custom_field"
+                "fieldset__field_memberships__custom_field__object_types"
             ),
         ),
         "component_allocations__component",
