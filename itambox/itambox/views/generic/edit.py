@@ -168,8 +168,7 @@ class ObjectEditView(
                     return self.form_invalid(form)
 
         write_target = self.object if self.object is not None else form.instance
-        with lock_unmanaged_definition(write_target) as locked_object:
-            form.instance = locked_object
+        with lock_unmanaged_definition(write_target):
             self.object = form.save()
         msg_verb = _("Created") if is_creating else _("Modified")
         msg_link = (

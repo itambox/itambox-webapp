@@ -1,9 +1,11 @@
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.contrib.messages.storage.cookie import CookieStorage
+from django.test import RequestFactory, TestCase
 
 from assets.forms import AssetTypeForm
 from assets.models import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from itambox.views.generic import ObjectEditView
 
 
 class AssetTypeFormPreservationTests(TestCase):
@@ -67,6 +69,64 @@ class AssetTypeFormPreservationTests(TestCase):
         draft = AssetTypeForm(initial={"category": category.pk})
 
         self.assertEqual(draft.fields["custom_fieldsets"].initial, [])
+
+    def test_category_defaults_survive_soft_delete_and_are_removed_by_hard_purge(self):
+        category = Category.objects.create(name="Category with defaults", slug="category-with-defaults")
+        fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="category-defaults",
+            label="Category defaults",
+        )
+        membership = CategoryDefaultFieldset.objects.create(category=category, fieldset=fieldset, position=10)
+
+        category.delete()
+        category.refresh_from_db()
+        self.assertIsNotNone(category.deleted_at)
+        self.assertEqual(CategoryDefaultFieldset.objects.get(pk=membership.pk).position, 10)
+
+        category.restore()
+        category.refresh_from_db()
+        self.assertIsNone(category.deleted_at)
+        self.assertEqual(CategoryDefaultFieldset.objects.get(pk=membership.pk).position, 10)
+
+        category_pk = category.pk
+        category.delete(force_hard_delete=True)
+        self.assertFalse(Category._base_manager.filter(pk=category_pk).exists())
+        self.assertFalse(CategoryDefaultFieldset.objects.filter(pk=membership.pk).exists())
+
+    def test_html_edit_preserves_scalar_and_fieldset_changes_under_lock(self):
+        manufacturer = Manufacturer.objects.create(name="Lock Example", slug="lock-example")
+        first = CustomFieldset.objects.create(namespace="local", slug="first-lock", label="First lock")
+        second = CustomFieldset.objects.create(namespace="local", slug="second-lock", label="Second lock")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Old model",
+            slug="old-model",
+            description="Old description",
+        )
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=first, position=10)
+        form_data = {
+            "manufacturer": manufacturer.pk,
+            "model": "New model",
+            "slug": "old-model",
+            "description": "New description",
+            "custom_fieldsets": [str(second.pk)],
+        }
+        form = AssetTypeForm(data=form_data, instance=asset_type)
+        self.assertTrue(form.is_valid(), form.errors)
+        view = ObjectEditView()
+        view.model = AssetType
+        view.object = asset_type
+        view.request = RequestFactory().post("/", data={**form_data, "return_url": "/"})
+        view.request._messages = CookieStorage(view.request)
+
+        response = view.form_valid(form)
+
+        self.assertEqual(response.status_code, 302)
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.model, "New model")
+        self.assertEqual(asset_type.description, "New description")
+        self.assertEqual(list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)), [second.pk])
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")

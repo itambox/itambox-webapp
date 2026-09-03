@@ -1,9 +1,15 @@
+from datetime import timedelta
+from io import StringIO
+
+from django.contrib.contenttypes.models import ContentType
+from django.core import management
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
-from core.purge_handlers import purge_object
+from assets.models import Supplier
+from core.purge_handlers import TombstonePurgeBlocked, purge_object
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 
@@ -32,6 +38,22 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             validate_custom_field_value(definition, "value")
+
+    def test_incompatible_inline_regex_flags_fail_closed(self):
+        from types import SimpleNamespace
+
+        from extras.customfields import validate_custom_field_value
+
+        definition = SimpleNamespace(
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            regex="(?u)^a$",
+            text_max_length=None,
+            validation_rule=None,
+            nullable=False,
+        )
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_value(definition, "a")
 
     def test_definition_contract_rejects_unknown_validation_rule_at_model_boundary(self):
         field = CustomField(
@@ -191,6 +213,56 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             CustomFieldChoiceSet.objects.create(namespace="local", slug="reserved-identity", label="Reused identity")
 
+    def test_required_generic_model_save_is_enforced(self):
+        field = CustomField.objects.create(
+            name="required_supplier_field",
+            label="Required supplier field",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            required=True,
+        )
+        field.object_types.add(ContentType.objects.get_for_model(Supplier))
+
+        with self.assertRaises(ValidationError):
+            Supplier.objects.create(name="Missing required value", slug="missing-required-value")
+
+    def test_deleted_choice_set_rejects_new_choice_values(self):
+        from extras.customfields import validate_custom_field_value
+
+        choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="deleted-choice-set",
+            label="Deleted choice set",
+        )
+        choice = CustomFieldChoice.objects.create(choice_set=choice_set, key="one", label="One", position=10)
+        field = CustomField.objects.create(
+            name="deleted_choice_field",
+            label="Deleted choice field",
+            field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            choice_set=choice_set,
+            max_values=1,
+        )
+        choice_set.delete()
+
+        with self.assertRaises(ValidationError):
+            validate_custom_field_value(field, choice.key)
+
+    def test_generic_purge_preserves_schema_definition_tombstones(self):
+        field = CustomField.objects.create(
+            name="permanent_schema_tombstone",
+            label="Permanent schema tombstone",
+            scope=CustomField.SCOPE_ASSET,
+        )
+        field.object_types.add(ContentType.objects.get(app_label="assets", model="asset"))
+        field.delete()
+        old_deleted_at = timezone.now() - timedelta(days=31)
+        CustomField.all_objects.filter(pk=field.pk).update(deleted_at=old_deleted_at)
+        output = StringIO()
+
+        management.call_command("purge_deleted", days=30, stdout=output)
+
+        self.assertTrue(CustomField.all_objects.filter(pk=field.pk).exists())
+        self.assertIn("Skipped", output.getvalue())
+
     def test_soft_delete_preserves_references_and_restore_keeps_composition(self):
         choice_set = CustomFieldChoiceSet.objects.create(
             namespace="local",
@@ -254,11 +326,10 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         purge_object(asset_type)
         self.assertFalse(AssetTypeFieldset.objects.filter(pk=asset_type_membership.pk).exists())
 
-        purge_object(fieldset)
-        self.assertFalse(CustomFieldsetField.objects.filter(pk=membership.pk).exists())
-        self.assertFalse(CustomFieldset.all_objects.filter(pk=fieldset.pk).exists())
-
-        purge_object(field)
-        purge_object(choice_set)
-        self.assertFalse(CustomFieldChoice.all_objects.filter(pk=choice.pk).exists())
-        self.assertFalse(CustomFieldChoiceSet.all_objects.filter(pk=choice_set.pk).exists())
+        fieldset.delete()
+        field.delete()
+        choice_set.delete()
+        for definition in (fieldset, field, choice_set):
+            with self.assertRaises(TombstonePurgeBlocked):
+                purge_object(definition)
+            self.assertTrue(definition.__class__.all_objects.filter(pk=definition.pk).exists())

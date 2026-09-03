@@ -24,6 +24,7 @@ from model_bakery import baker
 from assets.forms.asset_form import AssetForm
 from assets.models import Asset, AssetRole, AssetTagSequence, AssetType, AssetTypeFieldset, StatusLabel
 from core.tests.mixins import TenantTestMixin
+from extras.customfields import build_custom_field_form_field
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 from organization.models import CostCenter, Location, Site, Tenant
 from procurement.models import PurchaseOrderLine
@@ -402,6 +403,17 @@ class AssetFormCustomFieldTests(TestCase):
 
         self.assertIn("cf_generic_asset_detail", form.fields)
         self.assertIn("cf_generic_asset_detail", form.custom_field_keys)
+
+    def test_required_boolean_accepts_explicit_false_and_true(self):
+        field = self._asset_custom_field(
+            name="required_boolean", label="Required boolean", field_type="boolean", required=True
+        )
+
+        form_field = build_custom_field_form_field(field)
+
+        self.assertEqual(form_field.__class__.__name__, "TypedChoiceField")
+        self.assertIs(form_field.clean("false"), False)
+        self.assertIs(form_field.clean("true"), True)
 
     def test_each_supported_field_type_builds_its_form_field(self):
         self._asset_custom_field(name="txt", label="A Text", field_type="text")

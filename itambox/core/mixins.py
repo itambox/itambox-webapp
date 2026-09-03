@@ -60,6 +60,28 @@ class CustomFieldDataMixin(models.Model):
     class Meta:
         abstract = True
 
+    def clean(self):
+        super().clean()
+        # inline import: app-registry: defer domain resolvers and avoid the core/extras model cycle
+        from extras.customfields import validate_required_custom_field_values
+
+        if self._meta.label_lower == "assets.assettype":
+            # inline import: cycle: defer the AssetType resolver until models are loaded
+            from assets.customfields import resolve_asset_type_custom_fields
+
+            definitions = resolve_asset_type_custom_fields(self)
+        elif self._meta.label_lower == "assets.asset":
+            # inline import: cycle: defer the Asset resolver until models are loaded
+            from assets.customfields import resolve_asset_custom_fields
+
+            definitions = resolve_asset_custom_fields(self.asset_type, self.custom_field_data)
+        else:
+            # inline import: cycle: defer the generic resolver until models are loaded
+            from extras.customfields import custom_fields_for_model
+
+            definitions = custom_fields_for_model(self.__class__, include_inactive=True)
+        validate_required_custom_field_values(definitions, self.custom_field_data or {})
+
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

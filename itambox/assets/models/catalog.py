@@ -4,6 +4,7 @@ Supplier, Category — shared reference data that assets point into.
 
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -14,6 +15,50 @@ from core.managers import AllObjectsManager, SoftDeleteManager
 from core.mixins import AutoSlugMixin, CustomFieldDataMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from extras.models import CustomFieldset
+
+_LIBRARY_NAMESPACE_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$")
+_LIBRARY_DEFINITION_KEY_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$")
+_LIBRARY_RELEASE_VALIDATOR = RegexValidator(r"^[A-Za-z0-9][A-Za-z0-9._+\-]{0,63}$")
+_SOURCE_CHECKSUM_VALIDATOR = RegexValidator(r"^sha256:[0-9a-f]{64}$")
+
+
+def _asset_type_field_validation_errors(asset_type):
+    errors = {}
+    for field_name, value, validator in (
+        ("library_definition_key", asset_type.library_definition_key, _LIBRARY_DEFINITION_KEY_VALIDATOR),
+        ("library_release", asset_type.library_release, _LIBRARY_RELEASE_VALIDATOR),
+        ("source_checksum", asset_type.source_checksum, _SOURCE_CHECKSUM_VALIDATOR),
+    ):
+        if value is None:
+            continue
+        try:
+            validator(value)
+        except ValidationError as exc:
+            errors[field_name] = exc.messages
+    return errors
+
+
+def _asset_type_identity_errors(asset_type):
+    errors = {}
+    has_library_identity = any(
+        value not in (None, "")
+        for value in (
+            asset_type.library_id,
+            asset_type.library_definition_key,
+            asset_type.library_release,
+            asset_type.source_checksum,
+        )
+    )
+    if asset_type.management_kind == "library":
+        if asset_type.library_id is None:
+            errors["library"] = _("Library-managed Asset Types require a Library.")
+        if not asset_type.library_definition_key:
+            errors["library_definition_key"] = _("Library-managed Asset Types require a non-empty definition key.")
+        if not asset_type.library_release:
+            errors["library_release"] = _("Library-managed Asset Types require a release.")
+    elif has_library_identity:
+        errors["management_kind"] = _("Only library-managed Asset Types may carry Library identity or provenance.")
+    return errors
 
 
 class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -211,15 +256,37 @@ class Depreciation(StandardModel, SoftDeleteMixin):
 class AssetTypeLibrary(ChangeLoggingMixin, BaseModel):
     changelog_global = True
 
-    namespace = models.CharField(max_length=62, unique=True)
-    release = models.CharField(max_length=64)
-    source_checksum = models.CharField(max_length=71, null=True, blank=True)
+    namespace = models.CharField(max_length=62, unique=True, validators=[_LIBRARY_NAMESPACE_VALIDATOR])
+    release = models.CharField(max_length=64, validators=[_LIBRARY_RELEASE_VALIDATOR])
+    source_checksum = models.CharField(
+        max_length=71,
+        null=True,
+        blank=True,
+        validators=[_SOURCE_CHECKSUM_VALIDATOR],
+    )
     installed_at = models.DateTimeField(default=timezone.now)
     managed_paths = models.JSONField(default=dict, blank=True)
     last_reconciled_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["namespace"]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        for field_name, value, validator in (
+            ("namespace", self.namespace, _LIBRARY_NAMESPACE_VALIDATOR),
+            ("release", self.release, _LIBRARY_RELEASE_VALIDATOR),
+            ("source_checksum", self.source_checksum, _SOURCE_CHECKSUM_VALIDATOR),
+        ):
+            if value is None and field_name == "source_checksum":
+                continue
+            try:
+                validator(value)
+            except ValidationError as exc:
+                errors[field_name] = exc.messages
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return self.namespace
@@ -277,9 +344,24 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         null=True,
         blank=True,
     )
-    library_definition_key = models.CharField(max_length=127, null=True, blank=True)
-    library_release = models.CharField(max_length=64, null=True, blank=True)
-    source_checksum = models.CharField(max_length=71, null=True, blank=True)
+    library_definition_key = models.CharField(
+        max_length=127,
+        null=True,
+        blank=True,
+        validators=[_LIBRARY_DEFINITION_KEY_VALIDATOR],
+    )
+    library_release = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        validators=[_LIBRARY_RELEASE_VALIDATOR],
+    )
+    source_checksum = models.CharField(
+        max_length=71,
+        null=True,
+        blank=True,
+        validators=[_SOURCE_CHECKSUM_VALIDATOR],
+    )
     managed_paths = models.JSONField(default=dict, blank=True)
     last_reconciled_at = models.DateTimeField(null=True, blank=True)
     lifecycle = models.CharField(max_length=16, choices=LIFECYCLE_CHOICES, default=LIFECYCLE_ACTIVE)
@@ -353,6 +435,26 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
                 ),
                 name="assettype_library_identity_complete",
             ),
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(management_kind="library")
+                        & models.Q(library__isnull=False)
+                        & models.Q(library_definition_key__isnull=False)
+                        & ~models.Q(library_definition_key="")
+                        & models.Q(library_release__isnull=False)
+                        & ~models.Q(library_release="")
+                    )
+                    | (
+                        models.Q(management_kind__in=["core", "local"])
+                        & models.Q(library__isnull=True)
+                        & models.Q(library_definition_key__isnull=True)
+                        & models.Q(library_release__isnull=True)
+                        & models.Q(source_checksum__isnull=True)
+                    )
+                ),
+                name="assettype_management_library_coherence",
+            ),
         ]
         verbose_name = _("Asset Type")
         verbose_name_plural = _("Asset Types")
@@ -371,6 +473,15 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
             self.lifecycle = self.LIFECYCLE_DEPRECATED
             update_fields.append("lifecycle")
         self.save(update_fields=update_fields)
+
+    def clean(self):
+        super().clean()
+        errors = {
+            **_asset_type_field_validation_errors(self),
+            **_asset_type_identity_errors(self),
+        }
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -448,6 +559,7 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
+    soft_delete_preserve_references = True
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
     color = models.CharField(
@@ -497,7 +609,7 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
 
 class CategoryDefaultFieldset(BaseModel):
-    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="default_fieldset_memberships")
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="default_fieldset_memberships")
     fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="category_default_memberships")
     position = models.PositiveIntegerField()
 

@@ -85,6 +85,19 @@ class CustomFieldDataValidationMixin:
             raise serializers.ValidationError(exc.messages) from exc
         return {"set": dict(submitted), "clear": list(clear_keys), "_merged": merged}
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if "specification_patch" not in attrs:
+            try:
+                apply_custom_field_patch(
+                    self.get_existing_custom_field_data(),
+                    self.get_custom_field_definitions(),
+                    {},
+                )
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"specification_patch": exc.messages}) from exc
+        return attrs
+
     def create(self, validated_data):
         patch = validated_data.pop("specification_patch", None)
         if patch is not None:

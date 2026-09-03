@@ -14,6 +14,59 @@ from extras.models import CustomFieldset
 
 
 class AssetTypeCompositionFoundationTests(TestCase):
+    def test_management_kind_requires_coherent_library_identity(self):
+        with self.assertRaises(ValidationError):
+            AssetTypeLibrary.objects.create(namespace="Bad Namespace", release="2026.09")
+
+        library = AssetTypeLibrary.objects.create(namespace="identity", release="2026.09")
+        manufacturer = Manufacturer.objects.create(name="Identity Manufacturer", slug="identity-manufacturer")
+        invalid_variants = (
+            {
+                "management_kind": AssetType.MANAGEMENT_LOCAL,
+                "library": library,
+                "library_definition_key": "local-with-library",
+                "library_release": "2026.09",
+            },
+            {
+                "management_kind": AssetType.MANAGEMENT_LIBRARY,
+                "library_definition_key": None,
+                "library_release": "2026.09",
+            },
+            {
+                "management_kind": AssetType.MANAGEMENT_LIBRARY,
+                "library": library,
+                "library_definition_key": "",
+                "library_release": "2026.09",
+            },
+            {
+                "management_kind": AssetType.MANAGEMENT_LIBRARY,
+                "library": library,
+                "library_definition_key": "missing-release",
+                "library_release": None,
+            },
+            {
+                "management_kind": AssetType.MANAGEMENT_LIBRARY,
+                "library": library,
+                "library_definition_key": "invalid key",
+                "library_release": "2026.09",
+            },
+            {
+                "management_kind": AssetType.MANAGEMENT_LIBRARY,
+                "library": library,
+                "library_definition_key": "valid-key",
+                "library_release": "invalid release",
+            },
+        )
+
+        for index, variant in enumerate(invalid_variants):
+            with self.subTest(index=index), self.assertRaises(ValidationError):
+                AssetType.objects.create(
+                    manufacturer=manufacturer,
+                    model=f"Invalid identity {index}",
+                    slug=f"invalid-identity-{index}",
+                    **variant,
+                )
+
     def test_library_identity_composition_and_category_defaults_are_relational(self):
         library = AssetTypeLibrary.objects.create(namespace="acme", release="2026.09")
         manufacturer = Manufacturer.objects.create(name="Example Networks", slug="example-networks")
@@ -59,8 +112,10 @@ class AssetTypeCompositionFoundationTests(TestCase):
                 manufacturer=manufacturer,
                 model="Duplicate Switch 48P",
                 slug="duplicate-switch-48p",
+                management_kind=AssetType.MANAGEMENT_LIBRARY,
                 library=library,
                 library_definition_key="switch-48p-rev-b",
+                library_release="2026.09",
             )
 
         asset_type.library_definition_key = "renamed-definition"
@@ -87,7 +142,9 @@ class AssetTypeCompositionFoundationTests(TestCase):
             manufacturer=manufacturer,
             model="Switch 48P replacement",
             slug="example-networks-switch-48p-replacement",
+            management_kind=AssetType.MANAGEMENT_LIBRARY,
             library=library,
             library_definition_key="switch-48p-rev-b",
+            library_release="2026.09",
         )
         self.assertEqual(replacement.library_definition_key, "switch-48p-rev-b")

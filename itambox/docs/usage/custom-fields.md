@@ -28,31 +28,29 @@ has a core set of attributes:
 | Type | Slug | Input Widget | Example Use |
 |------|------|-------------|-------------|
 | Text | `text` | Single-line text input | Asset tag aliases, notes |
-| Number | `number` | Number input | CPU core count, rack unit position |
+| Integer | `integer` | Number input | CPU core count, rack unit position |
+| Decimal | `decimal` | Number input with configured scale | Power draw, capacity, temperature |
 | Date | `date` | Date picker | Warranty end, inspection date |
-| Boolean | `boolean` | Checkbox / toggle | "Under support contract", "Hazardous material" |
-| Select / Dropdown | `select` | Dropdown list | Tier level, department, site code |
+| Boolean | `boolean` | Checkbox / Yes-No selector | "Under support contract", "Hazardous material" |
+| Single Select | `single-select` | Dropdown | Tier level, department, site code |
+| Multi Select | `multi-select` | Multi-select dropdown | Supported protocols, capabilities |
 
 ### Configuring Choices
 
-When the field type is **Select / Dropdown**, use the **Choices** field to
-define the allowed values. Enter one choice per line:
+When the field type is **Single Select** or **Multi Select**, select a
+**Choice Set** containing the allowed choices. Choice keys are stable machine
+identifiers; labels may be changed, but a key must never be reused for a new
+meaning. Removed choices remain as deprecated tombstones so existing stored
+values cannot silently change meaning.
 
-```
-Platinum
-Gold
-Silver
-Bronze
-```
-
-The first value is not treated as a default — the dropdown will render an
-empty option unless the field is marked **Required**.
+The first active choice is not treated as a default — forms render an empty
+option for Single Select unless the field is marked **Required**.
 
 > [!IMPORTANT]
-> Changing the choices list after data has been entered does **not** migrate
-> existing values. If you remove a choice that is currently assigned to an
-> object, that value is preserved in the database but the field will display
-> as a plain text value rather than a dropdown selection on the next edit.
+> Choice labels are presentation data; changing a label does not change the
+> stored key. Removing a choice deprecates its key and preserves existing JSON
+> values. The key remains reserved and cannot be assigned to a later unrelated
+> choice.
 
 ---
 
@@ -95,7 +93,7 @@ The **Required** checkbox on each custom field controls server-side validation:
 
 | Setting | Behaviour |
 |---------|-----------|
-| **Required** (checked) | The field must be populated before the object can be saved. The form shows an asterisk and validates on submit. |
+| **Required** (checked) | The field must be present before the object can be saved. Text, numeric, date, and select fields reject an omitted value; a required Boolean uses an explicit Yes/No input, so both `true` and `false` are valid answers. |
 | **Optional** (unchecked) | The field can be left blank. |
 
 > [!WARNING]
@@ -222,8 +220,9 @@ addressed inside the `set`/`clear` operation, for example
   populated or set to Optional.
 
 **Dropdown shows no choices**
-: The field type is Select / Dropdown but the **Choices** field is empty.
-  Add one choice per line in the field's Choices textarea.
+: The field type is Single Select / Multi Select but no active Choice Set is
+  assigned, or the assigned Choice Set has no active choices. Assign a Choice
+  Set and add active choices through the Choice Set management surface.
 
 **Custom field value is missing from exports**
 : Ensure the custom field column is toggled on in the export column selector.
