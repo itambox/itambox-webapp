@@ -88,13 +88,13 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         from extras.customfields import validate_custom_field_regex
 
         with self.assertRaises(ValidationError):
-            validate_custom_field_regex(r"^((a|aa))+$")
+            validate_custom_field_regex(r"^((a|b))+$")
 
     def test_nested_non_capturing_alternation_regex_fails_closed(self):
         from extras.customfields import validate_custom_field_regex
 
         with self.assertRaises(ValidationError):
-            validate_custom_field_regex(r"^(?:(?:a|aa))+$")
+            validate_custom_field_regex(r"^(?:(?:a|b))+$")
 
     def test_omitted_lower_bound_nested_regex_fails_closed(self):
         from extras.customfields import validate_custom_field_regex
