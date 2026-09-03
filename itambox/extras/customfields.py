@@ -213,7 +213,7 @@ def apply_custom_field_patch(existing, definitions, submitted, clear_keys=()):
         merged[key] = validate_custom_field_value(definitions_by_key[key], value, merged)
 
     maximum = definitions_by_key.get("operating_temperature_max")
-    if maximum and maximum.validation_rule == "temperature_max_gte_min":
+    if maximum and _definition(maximum).validation_rule == "temperature_max_gte_min":
         minimum_value = merged.get("operating_temperature_min")
         maximum_value = merged.get("operating_temperature_max")
         if minimum_value is not None and maximum_value is not None:

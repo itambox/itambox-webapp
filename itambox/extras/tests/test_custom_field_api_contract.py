@@ -268,6 +268,36 @@ class CustomFieldAPISerializerContractTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("specification_patch", serializer.errors)
 
+    def test_asset_type_temperature_rule_patch_returns_validation_error(self):
+        minimum = CustomField.objects.get(name="operating_temperature_min")
+        maximum = CustomField.objects.get(name="operating_temperature_max")
+        CustomFieldsetField.objects.filter(custom_field__in=(minimum, maximum)).delete()
+        minimum.object_types.add(self.asset_type_ct)
+        maximum.object_types.add(self.asset_type_ct)
+        self.assertEqual(maximum.validation_rule, "temperature_max_gte_min")
+        manufacturer = Manufacturer.objects.create(name="Temperature Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Temperature Type",
+            slug="temperature-type",
+            manufacturer=manufacturer,
+        )
+
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={
+                "specification_patch": {
+                    "set": {
+                        "operating_temperature_min": "10.0",
+                        "operating_temperature_max": "5.0",
+                    }
+                }
+            },
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("specification_patch", serializer.errors)
+
     def test_get_to_put_roundtrip_preserves_unknown_stored_keys(self):
         field = CustomField.objects.create(
             name="roundtrip_spec",
@@ -493,6 +523,64 @@ class CustomFieldAPISerializerContractTests(TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        asset.refresh_from_db()
+        self.assertEqual(asset.asset_type_id, new_type.pk)
+        self.assertEqual(asset.custom_field_data, {"new_asset_spec": "new"})
+
+    def test_untyped_asset_api_patch_resolves_global_asset_field(self):
+        field = CustomField.objects.create(
+            name="untyped_asset_spec",
+            label="Untyped asset specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET,
+        )
+        field.object_types.add(self.asset_ct)
+        asset = Asset.objects.create(
+            name="Untyped asset",
+            asset_tag="UNTYPED-1",
+            custom_field_data={},
+        )
+
+        serializer = AssetSerializer(
+            instance=asset,
+            data={"specification_patch": {"set": {"untyped_asset_spec": "value"}}},
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        asset.refresh_from_db()
+        self.assertEqual(asset.custom_field_data, {"untyped_asset_spec": "value"})
+
+    def test_specification_patch_updates_with_one_model_save(self):
+        field = CustomField.objects.create(
+            name="single_save_spec",
+            label="Single save specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+        )
+        field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Single Save Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Single Save Type",
+            slug="single-save-type",
+            manufacturer=manufacturer,
+            custom_field_data={"single_save_spec": "old"},
+        )
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={"specification_patch": {"set": {"single_save_spec": "new"}}},
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        with patch.object(asset_type, "save", wraps=asset_type.save) as save:
+            serializer.save()
+
+        self.assertEqual(save.call_count, 1)
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.custom_field_data, {"single_save_spec": "new"})
 
     def test_custom_field_bulk_delete_rejects_managed_definition_selection(self):
         user = get_user_model().objects.create_superuser(

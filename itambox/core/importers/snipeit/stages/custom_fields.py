@@ -115,6 +115,7 @@ class CustomFieldImporter:
                     used_existing_ids.add(label_match.pk)
             assignments.append((generated_key, choice_label, assigned_key))
         reserved_keys = {assigned_key for _, _, assigned_key in assignments if assigned_key is not None}
+        existing_keys = set(existing_by_key)
         generated_keys = {generated_key for generated_key, _, _ in assignments}
         used_output_keys = set()
         desired_choices = []
@@ -122,8 +123,8 @@ class CustomFieldImporter:
             key = assigned_key
             if key is None:
                 key = generated_key
-                if key in reserved_keys or key in used_output_keys:
-                    available_keys = reserved_keys | generated_keys | used_output_keys
+                if key in reserved_keys or key in used_output_keys or key in existing_keys:
+                    available_keys = reserved_keys | generated_keys | existing_keys | used_output_keys
                     key = self._choice_key(choice_label, available_keys)
             used_output_keys.add(key)
             desired_choices.append((key or generated_key, choice_label))

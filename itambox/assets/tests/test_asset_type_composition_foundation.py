@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from assets.models import (
@@ -52,6 +53,15 @@ class AssetTypeCompositionFoundationTests(TestCase):
             list(category.default_fieldset_memberships.values_list("fieldset__slug", "position")),
             [("product", 10), ("networking", 20)],
         )
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AssetType.objects.create(
+                manufacturer=manufacturer,
+                model="Duplicate Switch 48P",
+                slug="duplicate-switch-48p",
+                library=library,
+                library_definition_key="switch-48p-rev-b",
+            )
 
         asset_type.library_definition_key = "renamed-definition"
         with self.assertRaises(ValidationError):

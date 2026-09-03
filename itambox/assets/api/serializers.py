@@ -197,10 +197,8 @@ class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
             # broad except: boundary-isolation: asset_type_id reports invalid relation input separately
             except (AssetType.DoesNotExist, TypeError, ValueError):
                 pass
-        if target_asset_type is not None:
-            existing_data = getattr(instance, "custom_field_data", None) if isinstance(instance, Asset) else None
-            return resolve_asset_custom_fields(target_asset_type, existing_data)
-        return ()
+        existing_data = getattr(instance, "custom_field_data", None) if isinstance(instance, Asset) else None
+        return resolve_asset_custom_fields(target_asset_type, existing_data)
 
     class Meta:
         model = Asset

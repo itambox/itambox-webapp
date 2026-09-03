@@ -513,6 +513,35 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
         assert retired_choice.deleted_at is not None
 
+    def test_generated_choice_key_collision_never_reuses_different_label(self):
+        deps = CustomFieldDependencies({})
+        row = {
+            "id": 180,
+            "db_column_name": "_snipeit_stable_choice_normalization_180",
+            "name": "Stable Choice Normalization",
+            "format": "LIST",
+            "field_values": "A-B",
+        }
+        self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
+        field = deps.custom_fields[row["db_column_name"]]
+        original_key = field.choice_set.choices.get(label="A-B").key
+
+        self._run(
+            lambda context: CustomFieldImporter(context, deps),
+            "/api/v1/fields",
+            [{**row, "field_values": "A B"}],
+            update=True,
+        )
+
+        field.refresh_from_db()
+        active_choices = dict(field.choice_set.choices.values_list("label", "key"))
+        retired_choice = field.choice_set.choices.model.all_objects.get(key=original_key)
+        assert "A B" in active_choices
+        assert active_choices["A B"] != original_key
+        assert retired_choice.label == "A-B"
+        assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
+        assert retired_choice.deleted_at is not None
+
     def test_custom_field_choice_removal_and_unrelated_addition_never_reuses_old_key(self):
         deps = CustomFieldDependencies({})
         row = {

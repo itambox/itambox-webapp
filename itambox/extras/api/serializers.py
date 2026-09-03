@@ -87,21 +87,17 @@ class CustomFieldDataValidationMixin:
 
     def create(self, validated_data):
         patch = validated_data.pop("specification_patch", None)
+        if patch is not None:
+            validated_data["custom_field_data"] = patch["_merged"]
         with transaction.atomic():
-            instance = super().create(validated_data)
-            if patch is not None:
-                instance.custom_field_data = patch["_merged"]
-                instance.save(update_fields=["custom_field_data"])
-        return instance
+            return super().create(validated_data)
 
     def update(self, instance, validated_data):
         patch = validated_data.pop("specification_patch", None)
+        if patch is not None:
+            validated_data["custom_field_data"] = patch["_merged"]
         with transaction.atomic():
-            instance = super().update(instance, validated_data)
-            if patch is not None:
-                instance.custom_field_data = patch["_merged"]
-                instance.save(update_fields=["custom_field_data"])
-        return instance
+            return super().update(instance, validated_data)
 
 
 class TagSerializer(BaseModelSerializer):
