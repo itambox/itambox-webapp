@@ -25,6 +25,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0106_asset_type_core_seed",
     "assets.0107_asset_type_library_contract",
     "assets.0108_asset_type_singular_cutover",
+    "assets.0109_alter_assettype_lifecycle",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -45,6 +46,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
     "extras.0114_asset_type_definition_schema",
     "extras.0115_asset_type_fieldset_cutover",
+    "extras.0116_alter_customfield_lifecycle_and_more",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -297,6 +299,17 @@ SEMANTIC_DISPOSITIONS = {
         {
             "assets.0108_asset_type_singular_cutover",
             "extras.0115_asset_type_fieldset_cutover",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Normalizes historical lifecycle='deleted' rows to the final active/deprecated contract and records "
+            "missing deletion timestamps; the reverse is explicitly refused because the original state is not recoverable."
+        ),
+        {
+            "assets.0109_alter_assettype_lifecycle",
+            "extras.0116_alter_customfield_lifecycle_and_more",
         },
     ),
 }

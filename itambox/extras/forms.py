@@ -16,7 +16,7 @@ from core.features import report_designer_probe
 from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
 
-from .customfields import validate_custom_field_regex
+from .definition_contract import custom_field_definition_contract_errors
 from .filters import TagFilter
 from .models import (
     CustomField,
@@ -75,49 +75,23 @@ class TagFilterForm(FilterForm):
     filterset_class = TagFilter
 
 
-def _validate_custom_field_type_contract(form, cleaned_data):
-    field_type = cleaned_data.get("field_type")
-    choice_set = cleaned_data.get("choice_set")
-    max_values = cleaned_data.get("max_values")
-    select_types = {CustomField.FIELD_TYPE_SINGLE_SELECT, CustomField.FIELD_TYPE_MULTI_SELECT}
-    if field_type in select_types and choice_set is None:
-        form.add_error("choice_set", _("Select fields require a Choice Set."))
-    elif field_type not in select_types and choice_set is not None:
-        form.add_error("choice_set", _("Only select fields may reference a Choice Set."))
-    if field_type == CustomField.FIELD_TYPE_SINGLE_SELECT and max_values != 1:
-        form.add_error("max_values", _("Single-select fields must limit values to exactly one."))
-    if field_type == CustomField.FIELD_TYPE_MULTI_SELECT and max_values is None:
-        form.add_error("max_values", _("Multi-select fields require a maximum value count."))
-
-
-def _validate_custom_field_numeric_contract(form, cleaned_data):
-    field_type = cleaned_data.get("field_type")
-    decimal_scale = cleaned_data.get("decimal_scale")
-    if field_type == CustomField.FIELD_TYPE_DECIMAL and decimal_scale is None:
-        form.add_error("decimal_scale", _("Decimal fields require a scale."))
-    if field_type != CustomField.FIELD_TYPE_DECIMAL and decimal_scale is not None:
-        form.add_error("decimal_scale", _("Only decimal fields may define a scale."))
-
-
-def _validate_custom_field_scope_contract(form, cleaned_data):
-    scope = cleaned_data.get("scope")
-    object_types = cleaned_data.get("object_types")
-    if scope is None and not object_types:
-        form.add_error("object_types", _("Select at least one model for a generic local field."))
+def _add_immutable_tamper_errors(form, model):
+    if not form.instance.pk:
         return
-    if scope is None:
-        return
-    expected = {
-        CustomField.SCOPE_ASSET_TYPE: {("assets", "assettype")},
-        CustomField.SCOPE_ASSET: {("assets", "asset")},
-        CustomField.SCOPE_BOTH: {("assets", "asset"), ("assets", "assettype")},
-    }[scope]
-    actual = set(object_types.values_list("app_label", "model")) if object_types else set()
-    if actual and actual != expected:
-        form.add_error("object_types", _("Asset scopes and model applicability must describe the same target set."))
-    cleaned_data["object_types"] = ContentType.objects.filter(
-        app_label="assets", model__in=[model for _, model in expected]
-    )
+    for model_field in model.immutable_fields:
+        form_field = "choice_set" if model_field == "choice_set_id" else model_field
+        if form_field not in form.data:
+            continue
+        current = getattr(form.instance, model_field)
+        submitted = form.data.get(form_field)
+        if form_field == "choice_set":
+            try:
+                submitted = None if submitted in (None, "") else int(submitted)
+            except (TypeError, ValueError):
+                continue
+            current = form.instance.choice_set_id
+        if submitted != current:
+            form.add_error(form_field, _("This value is immutable after creation."))
 
 
 class CustomFieldForm(forms.ModelForm):
@@ -205,6 +179,11 @@ class CustomFieldForm(forms.ModelForm):
         if self._managed_read_only:
             for field in self.fields.values():
                 field.disabled = True
+        elif self.instance.pk:
+            for field_name in CustomField.immutable_fields:
+                form_name = "choice_set" if field_name == "choice_set_id" else field_name
+                if form_name in self.fields:
+                    self.fields[form_name].disabled = True
 
         button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = reverse("extras:customfield_list")
@@ -252,16 +231,42 @@ class CustomFieldForm(forms.ModelForm):
         cleaned_data = super().clean()
         if cleaned_data.get("mappings") is None:
             cleaned_data["mappings"] = []
+        if not self._managed_read_only:
+            _add_immutable_tamper_errors(self, CustomField)
         if self._managed_read_only:
             return cleaned_data
-        if cleaned_data.get("regex"):
-            try:
-                validate_custom_field_regex(cleaned_data["regex"])
-            except ValidationError as exc:
-                self.add_error("regex", exc)
-        _validate_custom_field_type_contract(self, cleaned_data)
-        _validate_custom_field_numeric_contract(self, cleaned_data)
-        _validate_custom_field_scope_contract(self, cleaned_data)
+        errors = custom_field_definition_contract_errors(
+            field_type=cleaned_data.get("field_type"),
+            scope=cleaned_data.get("scope"),
+            quantity_kind=cleaned_data.get("quantity_kind"),
+            canonical_unit=cleaned_data.get("canonical_unit"),
+            minimum_value=cleaned_data.get("minimum_value"),
+            maximum_value=cleaned_data.get("maximum_value"),
+            regex=cleaned_data.get("regex"),
+            decimal_scale=cleaned_data.get("decimal_scale"),
+            max_values=cleaned_data.get("max_values"),
+            text_max_length=cleaned_data.get("text_max_length"),
+            validation_rule=cleaned_data.get("validation_rule"),
+            mappings=cleaned_data.get("mappings"),
+            choice_set=cleaned_data.get("choice_set"),
+            object_types=cleaned_data.get("object_types"),
+            management_kind=cleaned_data.get("management_kind", self.instance.management_kind or "local"),
+            lifecycle=cleaned_data.get("lifecycle", self.instance.lifecycle or "active"),
+            deleted_at=self.instance.deleted_at,
+        )
+        for field_name, message in errors.items():
+            form_name = "choice_set" if field_name == "choice_set_id" else field_name
+            if form_name in self.fields:
+                self.add_error(form_name, message)
+            else:
+                self.add_error(None, message)
+        if cleaned_data.get("scope"):
+            expected_models = {
+                CustomField.SCOPE_ASSET_TYPE: ["assettype"],
+                CustomField.SCOPE_ASSET: ["asset"],
+                CustomField.SCOPE_BOTH: ["asset", "assettype"],
+            }[cleaned_data["scope"]]
+            cleaned_data["object_types"] = ContentType.objects.filter(app_label="assets", model__in=expected_models)
         return cleaned_data
 
     def save(self, commit=True):
@@ -326,6 +331,9 @@ class CustomFieldsetForm(forms.ModelForm):
         if self._managed_read_only:
             for field in self.fields.values():
                 field.disabled = True
+        elif self.instance.pk:
+            for field_name in CustomFieldset.immutable_fields:
+                self.fields[field_name].disabled = True
 
         button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = reverse("extras:customfieldset_list")
@@ -358,6 +366,8 @@ class CustomFieldsetForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        if not self._managed_read_only:
+            _add_immutable_tamper_errors(self, CustomFieldset)
         if self._managed_read_only:
             return cleaned_data
         positions = cleaned_data.get("field_positions") or {}

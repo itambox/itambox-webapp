@@ -21,11 +21,12 @@ from decimal import Decimal
 from django.utils import timezone
 
 from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
+from extras.definition_contract import validate_custom_field_definition_contract
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
 
 
 def _get_core_choice_set(slug, label):
-    matches = list(CustomFieldChoiceSet.all_objects.filter(slug=slug))
+    matches = list(CustomFieldChoiceSet.all_objects.filter(namespace="itambox", slug=slug))
     if len(matches) > 1:
         raise ValueError(f"Ambiguous core Choice Set identity: itambox/{slug}")
     if matches and matches[0].deleted_at is not None:
@@ -98,7 +99,7 @@ def _reconcile_core_choice_rows(choice_set, slug, choices):
         choice.save(update_fields=["label", "position", "management_kind", "version", "lifecycle"])
     for choice in existing_choices:
         if choice.key not in desired_keys and choice.deleted_at is None:
-            choice.lifecycle = CustomFieldChoice.LIFECYCLE_DELETED
+            choice.lifecycle = CustomFieldChoice.LIFECYCLE_DEPRECATED
             choice.deleted_at = timezone.now()
             choice.save(update_fields=["lifecycle", "deleted_at"])
 
@@ -171,6 +172,30 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
         for key in ("minimum_value", "maximum_value"):
             if options[key] is not None:
                 options[key] = Decimal(options[key])
+        target_content_types = {
+            "asset": [asset_ct],
+            "asset_type": [assettype_ct],
+            "both": [asset_ct, assettype_ct],
+        }[options["scope"]]
+        validate_custom_field_definition_contract(
+            field_type=options["field_type"],
+            scope=options["scope"],
+            quantity_kind=options.get("quantity_kind"),
+            canonical_unit=options.get("canonical_unit"),
+            minimum_value=options.get("minimum_value"),
+            maximum_value=options.get("maximum_value"),
+            regex=options.get("regex"),
+            decimal_scale=options.get("decimal_scale"),
+            max_values=options.get("max_values"),
+            text_max_length=options.get("text_max_length"),
+            validation_rule=options.get("validation_rule"),
+            mappings=options.get("mappings"),
+            choice_set=options.get("choice_set"),
+            object_types=target_content_types,
+            management_kind=options["management_kind"],
+            lifecycle=options["lifecycle"],
+            deleted_at=None,
+        )
         matches = list(CustomField.all_objects.filter(name=row["key"]))
         _validate_core_field_identity(matches, row["key"])
         field = matches[0] if matches else CustomField.objects.create(name=row["key"], **options)
@@ -210,18 +235,13 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
             field.save(
                 update_fields=["label", "help_text", "required", "mappings", "management_kind", "version", "lifecycle"]
             )
-        target_content_types = {
-            "asset": [asset_ct],
-            "asset_type": [assettype_ct],
-            "both": [asset_ct, assettype_ct],
-        }[options["scope"]]
         field.object_types.set(target_content_types)
         custom_fields[row["key"]] = field
     return custom_fields
 
 
 def _get_core_fieldset(slug, label):
-    matches = list(CustomFieldset.all_objects.filter(slug=slug))
+    matches = list(CustomFieldset.all_objects.filter(namespace="itambox", slug=slug))
     if len(matches) > 1:
         raise ValueError(f"Ambiguous core fieldset identity: itambox/{slug}")
     if matches and matches[0].deleted_at is not None:

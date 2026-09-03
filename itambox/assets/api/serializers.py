@@ -13,6 +13,11 @@ from assets.api.nested_serializers import (
     NestedAssetTypeSerializer,
     NestedManufacturerSerializer,
 )
+from assets.customfields import (
+    resolve_asset_custom_fields,
+    resolve_asset_type_creation_custom_fields,
+    resolve_asset_type_custom_fields,
+)
 from assets.models import (
     Asset,
     AssetAssignment,
@@ -115,6 +120,11 @@ class AssetTypeSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
         queryset=Depreciation.objects.all(), source="depreciation", write_only=True, required=False, allow_null=True
     )
 
+    def get_custom_field_definitions(self):
+        if isinstance(self.instance, AssetType):
+            return resolve_asset_type_custom_fields(self.instance)
+        return resolve_asset_type_creation_custom_fields()
+
     class Meta:
         model = AssetType
         fields = [
@@ -172,6 +182,21 @@ class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     assigned_to = serializers.SerializerMethodField()
     cost_center: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
+
+    def get_custom_field_definitions(self):
+        instance = self.instance
+        target_asset_type = getattr(instance, "asset_type", None) if isinstance(instance, Asset) else None
+        raw_asset_type_id = self.initial_data.get("asset_type_id") if hasattr(self, "initial_data") else None
+        if raw_asset_type_id not in (None, ""):
+            try:
+                target_asset_type = self.fields["asset_type_id"].queryset.get(pk=raw_asset_type_id)
+            # broad except: boundary-isolation: asset_type_id reports invalid relation input separately
+            except (AssetType.DoesNotExist, TypeError, ValueError):
+                pass
+        if target_asset_type is not None:
+            existing_data = getattr(instance, "custom_field_data", None) if isinstance(instance, Asset) else None
+            return resolve_asset_custom_fields(target_asset_type, existing_data)
+        return ()
 
     class Meta:
         model = Asset

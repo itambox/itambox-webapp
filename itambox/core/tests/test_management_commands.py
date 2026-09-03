@@ -160,6 +160,20 @@ class ManagementCommandsTestCase(TransactionTestCase):
         with self.assertRaisesRegex(ValueError, "management"):
             SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
 
+    def test_seed_catalog_allows_local_choice_set_same_slug(self):
+        CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="form-factor",
+            label="Local form factor",
+            management_kind=CustomFieldChoiceSet.MANAGEMENT_LOCAL,
+            lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+        )
+
+        SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+        self.assertTrue(CustomFieldChoiceSet.objects.filter(namespace="local", slug="form-factor").exists())
+        self.assertTrue(CustomFieldChoiceSet.objects.filter(namespace="itambox", slug="form-factor").exists())
+
     def test_seed_catalog_refuses_local_field_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
@@ -179,6 +193,20 @@ class ManagementCommandsTestCase(TransactionTestCase):
 
         with self.assertRaisesRegex(ValueError, "management"):
             SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_allows_local_fieldset_same_slug(self):
+        CustomFieldset.objects.create(
+            namespace="local",
+            slug="compute-memory",
+            label="Local compute memory",
+            management_kind=CustomFieldset.MANAGEMENT_LOCAL,
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+        )
+
+        SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+        self.assertTrue(CustomFieldset.objects.filter(namespace="local", slug="compute-memory").exists())
+        self.assertTrue(CustomFieldset.objects.filter(namespace="itambox", slug="compute-memory").exists())
 
     def test_seed_catalog_refuses_inactive_core_field_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)

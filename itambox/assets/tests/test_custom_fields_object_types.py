@@ -218,7 +218,8 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
         deleted = CustomField.objects.create(
             name="deleted_note",
             label="Deleted note",
-            lifecycle=CustomField.LIFECYCLE_DELETED,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+            deleted_at=timezone.now(),
         )
         for definition in (active, deprecated, deleted):
             definition.object_types.add(supplier_ct)
@@ -269,7 +270,8 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
         deleted = CustomField.objects.create(
             name="deleted_region",
             label="Deleted region",
-            lifecycle=CustomField.LIFECYCLE_DELETED,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+            deleted_at=timezone.now(),
         )
         for definition in (active, deprecated, deleted):
             definition.object_types.add(supplier_ct)

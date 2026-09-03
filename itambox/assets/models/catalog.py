@@ -243,11 +243,9 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     ]
     LIFECYCLE_ACTIVE = "active"
     LIFECYCLE_DEPRECATED = "deprecated"
-    LIFECYCLE_DELETED = "deleted"
     LIFECYCLE_CHOICES = [
         (LIFECYCLE_ACTIVE, _("Active")),
         (LIFECYCLE_DEPRECATED, _("Deprecated")),
-        (LIFECYCLE_DELETED, _("Deleted")),
     ]
 
     manufacturer = models.ForeignKey(
@@ -364,6 +362,15 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     def get_absolute_url(self):
         return reverse("assets:assettype_detail", kwargs={"pk": self.pk})
+
+    def restore(self):
+        """Restore an Asset Type and normalize the pre-cutover deleted state."""
+        update_fields = ["deleted_at"]
+        self.deleted_at = None
+        if self.lifecycle == "deleted":
+            self.lifecycle = self.LIFECYCLE_DEPRECATED
+            update_fields.append("lifecycle")
+        self.save(update_fields=update_fields)
 
     def save(self, *args, **kwargs):
         if self.pk:

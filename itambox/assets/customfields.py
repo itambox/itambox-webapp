@@ -37,7 +37,7 @@ def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None):
             definition = membership.custom_field
             if definition.scope not in scopes:
                 continue
-            if definition.deleted_at is not None or definition.lifecycle == CustomField.LIFECYCLE_DELETED:
+            if definition.deleted_at is not None:
                 continue
             if definition.lifecycle == CustomField.LIFECYCLE_DEPRECATED and definition.name not in stored_values:
                 continue
@@ -78,6 +78,17 @@ def resolve_asset_type_custom_fields(asset_type):
     )
 
 
+def resolve_asset_type_creation_custom_fields():
+    """Return only global Asset Type fields valid before a fieldset composition exists."""
+    return CustomField.objects.filter(
+        object_types__app_label="assets",
+        object_types__model="assettype",
+        fieldset_memberships__isnull=True,
+        lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        deleted_at__isnull=True,
+    ).distinct()
+
+
 def resolve_asset_custom_fields(asset_type, stored_values=None):
     stored_values = dict(stored_values or {})
     resolved = []
@@ -93,7 +104,7 @@ def resolve_asset_custom_fields(asset_type, stored_values=None):
         fieldset_memberships__isnull=True,
     ).order_by("name")
     for definition in global_fields:
-        if definition.name in seen or definition.lifecycle == CustomField.LIFECYCLE_DELETED:
+        if definition.name in seen:
             continue
         if definition.lifecycle == CustomField.LIFECYCLE_DEPRECATED and definition.name not in stored_values:
             continue

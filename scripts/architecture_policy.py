@@ -209,6 +209,7 @@ MODULE_LAYER_OVERRIDES = {
     "core.otp_middleware": "framework",
     "core.paginator": "presentation",
     "extras.customfields": "domain-service",
+    "extras.definition_contract": "domain-model",
     "extras.dashboard.utils": "presentation",
     "extras.management.commands.eventrule_withdrawn_report": "composition",
     "extras.utils": "domain-service",

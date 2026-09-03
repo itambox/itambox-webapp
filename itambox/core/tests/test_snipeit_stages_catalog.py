@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.utils import timezone
 
 from core.importers.snipeit.client import SnipeITClient
@@ -229,7 +230,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert updated.counts.updated == 1
         assert obj.label == "Updated CPU"
         assert obj.field_type == "single-select"
-        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["three"]
+        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["one"]
 
     def test_custom_field_import_refuses_same_id_from_another_source(self):
         from extras.models import CustomField
@@ -370,7 +371,8 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert fieldset.label == "Source A Specs"
         assert second_deps.fieldsets == {}
 
-        from extras.models import CustomField, CustomFieldChoice
+    def test_custom_field_import_refuses_managed_choice_row_and_locks_row(self):
+        from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet
 
         deps = CustomFieldDependencies({})
         row = {
@@ -385,16 +387,28 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         choice = field.choice_set.choices.get(key="stable")
         CustomFieldChoice.all_objects.filter(pk=choice.pk).update(management_kind=CustomFieldChoice.MANAGEMENT_CORE)
 
-        result = self._run(
-            lambda context: CustomFieldImporter(context, deps),
-            "/api/v1/fields",
-            [row],
-            update=True,
-        )
+        statements = []
+
+        def capture(execute, sql, params, many, context):
+            statements.append(sql)
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(capture):
+            result = self._run(
+                lambda context: CustomFieldImporter(context, deps),
+                "/api/v1/fields",
+                [row],
+                update=True,
+            )
 
         choice.refresh_from_db()
         assert result.counts.failed == 1
         assert choice.management_kind == CustomFieldChoice.MANAGEMENT_CORE
+        choice_lock_statements = [
+            sql for sql in statements if '"EXTRAS_CUSTOMFIELDCHOICE"' in sql.upper() and "FOR UPDATE" in sql.upper()
+        ]
+        assert choice_lock_statements
+        assert CustomFieldChoiceSet.objects.filter(pk=field.choice_set_id).exists()
 
     def test_custom_field_choice_keys_remain_distinct_for_normalized_label_collisions(self):
         from extras.models import CustomField
@@ -417,6 +431,104 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert len(set(keys)) == 3
         assert "uber" in keys
         assert all(key.isascii() for key in keys)
+
+        row["field_values"] = "A B\nA-B\nÜber"
+        reordered = self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row], update=True)
+        field.refresh_from_db()
+        labels_to_keys = dict(field.choice_set.choices.values_list("label", "key"))
+        assert reordered.counts.updated == 1
+        assert labels_to_keys["A-B"] == keys[0]
+        assert labels_to_keys["A B"] == keys[1]
+
+        single_row = {
+            "id": 116,
+            "name": "Single collision choice",
+            "db_column_name": "_snipeit_single_collision_choice_116",
+            "format": "LIST",
+            "field_values": "A-B",
+        }
+        self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [single_row])
+        single_field = CustomField._base_manager.get(name="single_collision_choice")
+        original_key = single_field.choice_set.choices.get(label="A-B").key
+        single_row["field_values"] = "A B\nA-B"
+
+        result = self._run(
+            lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [single_row], update=True
+        )
+
+        single_field.refresh_from_db()
+        single_labels_to_keys = dict(single_field.choice_set.choices.values_list("label", "key"))
+        assert result.counts.updated == 1
+        assert single_labels_to_keys["A-B"] == original_key
+        assert len(set(single_labels_to_keys.values())) == 2
+
+    def test_custom_field_dry_run_keeps_single_select_contract_valid(self):
+        from extras.models import CustomField
+
+        deps = CustomFieldDependencies({})
+        row = {
+            "id": 170,
+            "name": "Dry run choices",
+            "db_column_name": "_snipeit_dry_run_choices_170",
+            "format": "LIST",
+            "field_values": "One\nTwo",
+        }
+
+        result = self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row], dry_run=True)
+
+        assert result.counts.created == 1
+        assert result.counts.failed == 0
+        assert deps.custom_fields[row["db_column_name"]].choice_set is not None
+        assert not CustomField._base_manager.filter(name="dry_run_choices").exists()
+
+    def test_custom_field_choice_key_survives_label_change(self):
+        deps = CustomFieldDependencies({})
+        row = {
+            "id": 140,
+            "db_column_name": "_snipeit_stable_choice_label_140",
+            "name": "Stable Choice Labels",
+            "format": "LIST",
+            "field_values": "One\nTwo",
+        }
+        self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
+        field = deps.custom_fields[row["db_column_name"]]
+        original_keys = list(field.choice_set.choices.order_by("position").values_list("key", flat=True))
+
+        self._run(
+            lambda context: CustomFieldImporter(context, deps),
+            "/api/v1/fields",
+            [{**row, "field_values": "Uno\nTwo"}],
+            update=True,
+        )
+
+        field.refresh_from_db()
+        choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
+        assert [key for key, _label in choices] == original_keys
+        assert choices == [(original_keys[0], "Uno"), (original_keys[1], "Two")]
+
+    def test_custom_field_choice_keys_survive_label_change_with_existing_label(self):
+        deps = CustomFieldDependencies({})
+        row = {
+            "id": 141,
+            "db_column_name": "_snipeit_stable_choice_collision_141",
+            "name": "Stable Choice Collision",
+            "format": "LIST",
+            "field_values": "One\nTwo",
+        }
+        self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
+        field = deps.custom_fields[row["db_column_name"]]
+        original_keys = list(field.choice_set.choices.order_by("position").values_list("key", flat=True))
+
+        self._run(
+            lambda context: CustomFieldImporter(context, deps),
+            "/api/v1/fields",
+            [{**row, "field_values": "Two\nThree"}],
+            update=True,
+        )
+
+        field.refresh_from_db()
+        choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
+        assert choices == [(original_keys[1], "Two"), (original_keys[0], "Three")]
 
     def test_custom_field_long_names_get_stable_collision_free_keys(self):
         from extras.models import CustomField
@@ -499,7 +611,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             label="Deleted Stage Field",
             namespace="local",
             scope=CustomField.SCOPE_ASSET,
-            lifecycle=CustomField.LIFECYCLE_DELETED,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
             deleted_at=timezone.now(),
         )
         deps = CustomFieldDependencies({})
@@ -859,13 +971,14 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert not hasattr(obj, "custom_fieldset")
         assert obj.eol_months == 36
         assert len(obj.part_number) == 100
-        assert obj.custom_field_data["snipeit_id"] == "107"
+        assert obj.custom_field_data == {}
+        assert obj.managed_paths == {"snipeit": {"source_url": "https://snipe.example", "source_id": "107"}}
         assert deps.asset_models[107] == obj
 
         skipped = self._run(lambda context: AssetModelImporter(context, deps), "/api/v1/models", [row])
         assert skipped.counts.skipped == 1
 
-        obj.custom_field_data = {"snipeit_id": 107}
+        obj.custom_field_data = {"operator_value": "keep"}
         obj.save(update_fields=["custom_field_data"])
         updated = self._run(
             lambda context: AssetModelImporter(context, deps),
@@ -893,6 +1006,10 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             manufacturer=manufacturer,
             model="Adoption Stage Model",
             slug="adoption-stage-model",
+            managed_paths={
+                "operator": "keep",
+                "snipeit": {"source_url": "https://snipe.example", "source_id": "124"},
+            },
             custom_field_data={"operator_value": "keep"},
         )
         AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
@@ -913,8 +1030,52 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         asset_type.refresh_from_db()
         assert result.counts.updated == 1
-        assert asset_type.custom_field_data == {"operator_value": "keep", "snipeit_id": "124"}
+        assert asset_type.custom_field_data == {"operator_value": "keep"}
+        assert asset_type.managed_paths == {
+            "operator": "keep",
+            "snipeit": {"source_url": "https://snipe.example", "source_id": "124"},
+        }
         assert list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)) == [fieldset.pk]
+
+    def test_asset_model_attribute_match_refuses_unprovenanced_local_asset_type(self):
+        from assets.models import AssetType, AssetTypeFieldset, Manufacturer
+        from extras.models import CustomFieldset
+
+        manufacturer = Manufacturer.objects.create(name="Unprovenanced Stage Maker")
+        fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="unprovenanced-stage-fields",
+            label="Unprovenanced Stage Fields",
+        )
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Unprovenanced Stage Model",
+            slug="unprovenanced-stage-model",
+            custom_field_data={"operator_value": "keep"},
+        )
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+        deps = AssetModelDependencies({126: manufacturer}, {}, {}, {})
+        row = {
+            "id": 126,
+            "name": "Unprovenanced Stage Model",
+            "manufacturer": {"id": 126},
+            "category": None,
+            "fieldset": None,
+        }
+
+        result = self._run(
+            lambda context: AssetModelImporter(context, deps),
+            "/api/v1/models",
+            [row],
+            update=True,
+        )
+
+        asset_type.refresh_from_db()
+        assert result.counts.failed == 1
+        assert asset_type.model == "Unprovenanced Stage Model"
+        assert asset_type.custom_field_data == {"operator_value": "keep"}
+        assert list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)) == [fieldset.pk]
+        assert deps.asset_models == {}
 
     def test_asset_model_attribute_match_refuses_other_source_identity(self):
         from assets.models import AssetType, Manufacturer
@@ -991,7 +1152,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             model="Core Managed Stage Model",
             slug="core-managed-stage-model",
             management_kind=AssetType.MANAGEMENT_CORE,
-            custom_field_data={"snipeit_id": "119"},
+            managed_paths={"snipeit": {"source_url": "https://snipe.example", "source_id": "119"}},
         )
         deps = AssetModelDependencies({119: manufacturer}, {}, {}, {})
         row = {

@@ -1,5 +1,5 @@
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.db import migrations
 
@@ -57,7 +57,7 @@ def _content_type_ids(apps, db_alias, scope):
 
 
 def _get_core_fieldset(CustomFieldset, db_alias, slug, label):
-    existing = list(CustomFieldset._base_manager.using(db_alias).filter(slug=slug))
+    existing = list(CustomFieldset._base_manager.using(db_alias).filter(namespace="itambox", slug=slug))
     if (
         len(existing) > 1
         or existing
@@ -100,10 +100,13 @@ def _validate_core_numeric(row, value):
         scale = row["decimal_scale"]
         if not isinstance(value, str):
             _fail("core_value")
-        grammar = rf"-?(0|[1-9][0-9]*){('.' + '[0-9]' * scale) if scale else ''}"
-        if re.fullmatch(grammar, value) is None or value == "-0":
+        grammar = rf"^-?(0|[1-9][0-9]*)(\.[0-9]{{1,{scale}}})?$"
+        try:
+            decimal_value = Decimal(value)
+        except InvalidOperation:
             _fail("core_value")
-        decimal_value = Decimal(value)
+        if re.fullmatch(grammar, value) is None or (decimal_value.is_zero() and decimal_value.is_signed()):
+            _fail("core_value")
     minimum = row.get("minimum")
     maximum = row.get("maximum")
     if minimum is not None and decimal_value < Decimal(minimum):
@@ -187,7 +190,9 @@ def forward(apps, schema_editor):
 
     choice_sets = {}
     for slug, (label, choices) in CHOICE_SETS.items():
-        existing_choice_sets = list(CustomFieldChoiceSet._base_manager.using(db_alias).filter(slug=slug))
+        existing_choice_sets = list(
+            CustomFieldChoiceSet._base_manager.using(db_alias).filter(namespace="itambox", slug=slug)
+        )
         if (
             len(existing_choice_sets) > 1
             or existing_choice_sets

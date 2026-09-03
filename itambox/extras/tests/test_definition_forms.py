@@ -79,6 +79,25 @@ class CustomDefinitionFormTests(TestCase):
         self.assertEqual(saved.choice_set_id, self.choice_set.pk)
         self.assertEqual(saved.object_types.get().model, "asset")
 
+    def test_definition_form_rejects_deprecated_choice_set(self):
+        deprecated = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="deprecated-form-choices",
+            label="Deprecated form choices",
+            lifecycle=CustomFieldChoiceSet.LIFECYCLE_DEPRECATED,
+        )
+        form = CustomFieldForm(
+            data=self._asset_scope_data(
+                name="deprecated_choice_field",
+                field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+                choice_set=str(deprecated.pk),
+                max_values="1",
+            )
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("choice_set", form.errors)
+
     def test_decimal_requires_scale_and_non_decimal_rejects_scale(self):
         missing_scale = CustomFieldForm(
             data=self._asset_scope_data(name="decimal_field", field_type=CustomField.FIELD_TYPE_DECIMAL)
@@ -94,6 +113,47 @@ class CustomDefinitionFormTests(TestCase):
         )
         self.assertFalse(unexpected_scale.is_valid())
         self.assertIn("decimal_scale", unexpected_scale.errors)
+
+    def test_local_definition_semantic_fields_are_read_only_after_creation(self):
+        field = CustomField.objects.create(
+            name="local_immutable_field",
+            namespace="local",
+            label="Local immutable field",
+            field_type=CustomField.FIELD_TYPE_DECIMAL,
+            scope=CustomField.SCOPE_ASSET,
+            quantity_kind="length",
+            canonical_unit="m",
+            decimal_scale=2,
+            nullable=True,
+        )
+
+        form = CustomFieldForm(instance=field)
+
+        for field_name in CustomField.immutable_fields:
+            form_name = "choice_set" if field_name == "choice_set_id" else field_name
+            self.assertTrue(form.fields[form_name].disabled, form_name)
+        self.assertFalse(form.fields["label"].disabled)
+        self.assertFalse(form.fields["help_text"].disabled)
+
+        tampered = CustomFieldForm(
+            data={"name": "tampered_name", "label": field.label},
+            instance=field,
+        )
+        self.assertFalse(tampered.is_valid())
+        self.assertIn("name", tampered.errors)
+
+    def test_local_fieldset_identity_is_read_only_with_tamper_error(self):
+        fieldset = CustomFieldset.objects.create(namespace="local", slug="immutable-form", label="Immutable Form")
+        form = CustomFieldsetForm(instance=fieldset)
+        self.assertTrue(form.fields["namespace"].disabled)
+        self.assertTrue(form.fields["slug"].disabled)
+
+        tampered = CustomFieldsetForm(
+            data={"namespace": "other", "slug": fieldset.slug, "label": fieldset.label, "description": ""},
+            instance=fieldset,
+        )
+        self.assertFalse(tampered.is_valid())
+        self.assertIn("namespace", tampered.errors)
 
     def test_fieldset_form_persists_post_order_and_explicit_positions(self):
         first = CustomField.objects.create(name="first_field", label="First", field_type=CustomField.FIELD_TYPE_TEXT)
