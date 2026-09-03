@@ -24,6 +24,10 @@ def user_can_mutate_model(user, model):
     return model._meta.label_lower not in SUPERUSER_ONLY_MUTATION_MODELS or bool(user and user.is_superuser)
 
 
+def is_managed_definition(obj):
+    return getattr(obj, "management_kind", None) in {"core", "library"}
+
+
 class CachedObjectMixin:
     """Cache ``get_object()`` for the lifetime of the request.
 

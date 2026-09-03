@@ -1,10 +1,14 @@
+from collections.abc import Mapping
+
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from extras.customfields import apply_custom_field_patch, custom_fields_for_model, validate_custom_field_regex
 from extras.models import (
     AlertLog,
     AlertRule,
@@ -66,6 +70,18 @@ def _custom_field_scope_errors(scope, object_types):
     if actual != expected:
         return {"object_types": _("Asset scopes and model applicability must describe the same target set.")}
     return {}
+
+
+class CustomFieldDataValidationMixin:
+    def validate_custom_field_data(self, value):
+        if value is None:
+            return value
+        if not isinstance(value, Mapping):
+            raise serializers.ValidationError(_("Custom field data must be an object."))
+        try:
+            return apply_custom_field_patch({}, custom_fields_for_model(self.Meta.model), value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
 
 
 class TagSerializer(BaseModelSerializer):
@@ -132,6 +148,12 @@ class CustomFieldSerializer(BaseModelSerializer):
             object_types = list(self.instance.object_types.all())
 
         errors = _custom_field_type_errors(field_type, choice_set, max_values)
+        regex = data["regex"] if "regex" in data else getattr(self.instance, "regex", None)
+        if regex:
+            try:
+                validate_custom_field_regex(regex)
+            except DjangoValidationError as exc:
+                errors["regex"] = exc.messages
         errors.update(_custom_field_scope_errors(scope, object_types))
         if errors:
             raise serializers.ValidationError(errors)

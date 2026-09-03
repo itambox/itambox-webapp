@@ -25,13 +25,17 @@ from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, 
 
 
 def _get_core_choice_set(slug, label):
-    matches = list(CustomFieldChoiceSet.all_objects.filter(namespace="itambox", slug=slug))
+    matches = list(CustomFieldChoiceSet.all_objects.filter(slug=slug))
     if len(matches) > 1:
         raise ValueError(f"Ambiguous core Choice Set identity: itambox/{slug}")
     if matches and matches[0].deleted_at is not None:
         raise ValueError(f"Core Choice Set identity is reserved by a tombstone: itambox/{slug}")
-    if matches and matches[0].management_kind != CustomFieldChoiceSet.MANAGEMENT_CORE:
-        raise ValueError(f"Core Choice Set identity has incompatible management: itambox/{slug}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomFieldChoiceSet.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomFieldChoiceSet.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice Set identity has incompatible management or lifecycle: itambox/{slug}")
     if matches:
         return matches[0]
     return CustomFieldChoiceSet.objects.create(
@@ -44,10 +48,24 @@ def _get_core_choice_set(slug, label):
     )
 
 
+def _validate_core_choice_row(choice, slug, desired_keys):
+    if choice.key not in desired_keys:
+        raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
+    if (
+        choice.deleted_at is not None
+        or choice.management_kind != CustomFieldChoice.MANAGEMENT_CORE
+        or choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice identity has incompatible management or lifecycle: itambox/{slug}#{choice.key}")
+
+
 def _reconcile_core_choice_rows(choice_set, slug, choices):
     existing_choices = list(CustomFieldChoice.all_objects.filter(choice_set=choice_set).order_by("position", "key"))
     if len(existing_choices) > 64:
         raise ValueError(f"Core Choice Set has more than 64 choices: itambox/{slug}")
+    desired_keys = {key for key, _choice_label in choices}
+    for choice in existing_choices:
+        _validate_core_choice_row(choice, slug, desired_keys)
     for rank, choice in enumerate(existing_choices, start=1):
         CustomFieldChoice.all_objects.filter(pk=choice.pk).update(position=1000000000 + rank)
     existing_by_key = {choice.key: choice for choice in existing_choices}
@@ -55,8 +73,12 @@ def _reconcile_core_choice_rows(choice_set, slug, choices):
     for index, (key, choice_label) in enumerate(choices, start=1):
         desired_keys.add(key)
         choice = existing_by_key.get(key)
-        if choice is not None and choice.deleted_at is not None:
-            raise ValueError(f"Core Choice identity is reserved by a tombstone: itambox/{slug}#{key}")
+        if choice is not None and (
+            choice.deleted_at is not None
+            or choice.management_kind != CustomFieldChoice.MANAGEMENT_CORE
+            or choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
+        ):
+            raise ValueError(f"Core Choice identity has incompatible management or lifecycle: itambox/{slug}#{key}")
         if choice is None:
             CustomFieldChoice.objects.create(
                 choice_set=choice_set,
@@ -103,8 +125,12 @@ def _validate_core_field_identity(matches, key):
         raise ValueError(f"Ambiguous core field identity: {key}")
     if matches and matches[0].deleted_at is not None:
         raise ValueError(f"Core field identity is reserved by a tombstone: {key}")
-    if matches and matches[0].management_kind != CustomField.MANAGEMENT_CORE:
-        raise ValueError(f"Core field identity has incompatible management: {key}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomField.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomField.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core field identity has incompatible management or lifecycle: {key}")
 
 
 def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
@@ -195,13 +221,17 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
 
 
 def _get_core_fieldset(slug, label):
-    matches = list(CustomFieldset.all_objects.filter(namespace="itambox", slug=slug))
+    matches = list(CustomFieldset.all_objects.filter(slug=slug))
     if len(matches) > 1:
         raise ValueError(f"Ambiguous core fieldset identity: itambox/{slug}")
     if matches and matches[0].deleted_at is not None:
         raise ValueError(f"Core fieldset identity is reserved by a tombstone: itambox/{slug}")
-    if matches and matches[0].management_kind != CustomFieldset.MANAGEMENT_CORE:
-        raise ValueError(f"Core fieldset identity has incompatible management: itambox/{slug}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomFieldset.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomFieldset.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core fieldset identity has incompatible management or lifecycle: itambox/{slug}")
     if matches:
         return matches[0]
     return CustomFieldset.objects.create(
@@ -227,6 +257,12 @@ def _reconcile_core_fieldsets(field_rows, fieldset_labels, custom_fields):
         fieldset.version = 1
         fieldset.lifecycle = "active"
         fieldset.save()
+        expected_field_ids = {custom_fields[row["key"]].pk for row in field_rows if row["fieldset_slug"] == slug}
+        existing_field_ids = set(
+            CustomFieldsetField._base_manager.filter(fieldset=fieldset).values_list("custom_field_id", flat=True)
+        )
+        if existing_field_ids - expected_field_ids:
+            raise ValueError(f"Core fieldset has an unexpected membership: itambox/{slug}")
         fieldset.field_memberships.all().delete()
         CustomFieldsetField.objects.bulk_create(
             [

@@ -16,7 +16,7 @@ from core.management.commands._seed.inventory import check_seed_inventory_invari
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import EmailSettings, Job
-from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -178,6 +178,73 @@ class ManagementCommandsTestCase(TransactionTestCase):
         fieldset.save(update_fields=["management_kind"])
 
         with self.assertRaisesRegex(ValueError, "management"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_inactive_core_field_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        field = CustomField.all_objects.get(name="processor_model")
+        field.lifecycle = CustomField.LIFECYCLE_DEPRECATED
+        field.save(update_fields=["lifecycle"])
+
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_inactive_core_choice_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        choice_set = CustomFieldChoiceSet.all_objects.get(namespace="itambox", slug="form-factor")
+        choice = choice_set.choices.get(key="notebook")
+        choice.lifecycle = CustomFieldChoice.LIFECYCLE_DEPRECATED
+        choice.save(update_fields=["lifecycle"])
+
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_unexpected_choice_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        choice_set = CustomFieldChoiceSet.all_objects.get(namespace="itambox", slug="form-factor")
+        CustomFieldChoice.objects.create(
+            choice_set=choice_set,
+            key="unexpected-core",
+            label="Unexpected local",
+            position=999,
+            management_kind=CustomFieldChoice.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
+        )
+
+        with self.assertRaisesRegex(ValueError, "Choice identity"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_unexpected_fieldset_membership(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        fieldset = CustomFieldset.all_objects.get(namespace="itambox", slug="compute-memory")
+        unexpected = CustomField.objects.create(
+            name="unexpected_fieldset_child",
+            label="Unexpected fieldset child",
+            field_type="text",
+            scope="asset_type",
+            namespace="local",
+            management_kind=CustomField.MANAGEMENT_LOCAL,
+            version=1,
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        )
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=unexpected, position=999)
+
+        with self.assertRaisesRegex(ValueError, "unexpected membership"):
+            SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
+
+    def test_seed_catalog_refuses_inactive_core_fieldset_identity(self):
+        command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
+        command._seed_catalog()
+        fieldset = CustomFieldset.all_objects.get(namespace="itambox", slug="compute-memory")
+        fieldset.lifecycle = CustomFieldset.LIFECYCLE_DEPRECATED
+        fieldset.save(update_fields=["lifecycle"])
+
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
             SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
 
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):

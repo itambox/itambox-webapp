@@ -32,9 +32,9 @@ from core.tests.mixins import TenantTestMixin
 User = get_user_model()
 
 
-def _make_client(endpoint: str, rows: list[dict]) -> SnipeITClient:
+def _make_client(endpoint: str, rows: list[dict], *, base_url="https://snipe.example") -> SnipeITClient:
     client = SnipeITClient.__new__(SnipeITClient)
-    client.base_url = "https://snipe.example"
+    client.base_url = base_url
     client.PAGE_SIZE = 500
     client.context = SimpleNamespace(provider="snipe-it", tenant_id=None, actor_id=None, request_id=None)
     client.retry_budget_factory = lambda: SimpleNamespace()
@@ -55,19 +55,24 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         self.setup_tenant_context(name="Stage Tenant", slug="stage-tenant")
         self.admin = User.objects.create_superuser(username="stage-admin", email="stage@example.com", password="pw")
 
-    def _context(self, endpoint, rows, *, dry_run=False, update=False):
+    def _context(self, endpoint, rows, *, dry_run=False, update=False, base_url="https://snipe.example", tenant=None):
+        target_tenant = self.tenant if tenant is None else tenant
         return ImportContext(
-            client=_make_client(endpoint, rows),
-            default_tenant=self.tenant,
+            client=_make_client(endpoint, rows, base_url=base_url),
+            default_tenant=target_tenant,
             user=self.admin,
             dry_run=dry_run,
             update=update,
             map_companies=False,
-            reporter=StageReporter(default_tenant=self.tenant, user=self.admin),
+            reporter=StageReporter(default_tenant=target_tenant, user=self.admin),
         )
 
-    def _run(self, importer, endpoint, rows, *, dry_run=False, update=False):
-        return importer(self._context(endpoint, rows, dry_run=dry_run, update=update)).run()
+    def _run(
+        self, importer, endpoint, rows, *, dry_run=False, update=False, base_url="https://snipe.example", tenant=None
+    ):
+        return importer(
+            self._context(endpoint, rows, dry_run=dry_run, update=update, base_url=base_url, tenant=tenant)
+        ).run()
 
     def test_status_labels_create_skip_and_update(self):
         from assets.models import StatusLabel
@@ -226,7 +231,145 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert obj.field_type == "single-select"
         assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["three"]
 
-    def test_custom_field_import_refuses_managed_choice_row_demotion(self):
+    def test_custom_field_import_refuses_same_id_from_another_source(self):
+        from extras.models import CustomField
+
+        row = {
+            "id": 128,
+            "name": "Source A CPU",
+            "db_column_name": "_snipeit_cross_source_cpu_128",
+            "format": "LIST",
+            "field_values": "one",
+        }
+        first_deps = CustomFieldDependencies({})
+        created = self._run(
+            lambda context: CustomFieldImporter(context, first_deps),
+            "/api/v1/fields",
+            [row],
+            base_url="https://snipe-a.example",
+        )
+        field = CustomField._base_manager.get(name="cross_source_cpu")
+
+        second_deps = CustomFieldDependencies({})
+        result = self._run(
+            lambda context: CustomFieldImporter(context, second_deps),
+            "/api/v1/fields",
+            [{**row, "name": "Source B CPU", "field_values": "two"}],
+            update=True,
+            base_url="https://snipe-b.example",
+        )
+
+        field.refresh_from_db()
+        assert created.counts.created == 1
+        assert result.counts.failed == 1
+        assert field.label == "Source A CPU"
+        assert list(field.choice_set.choices.values_list("key", flat=True)) == ["one"]
+        assert second_deps.custom_fields == {}
+
+    def test_custom_field_import_refuses_same_id_from_another_target_tenant(self):
+        from extras.models import CustomField
+        from organization.models import Tenant
+
+        other_tenant = Tenant.objects.create(name="Other Target Tenant", slug="other-target-tenant")
+        row = {
+            "id": 129,
+            "name": "Tenant-Bound CPU",
+            "db_column_name": "_snipeit_cross_tenant_cpu_129",
+            "format": "TEXT",
+        }
+        first_deps = CustomFieldDependencies({})
+        self._run(
+            lambda context: CustomFieldImporter(context, first_deps),
+            "/api/v1/fields",
+            [row],
+            base_url="https://snipe.example",
+            tenant=self.tenant,
+        )
+        field = CustomField._base_manager.get(name="cross_tenant_cpu")
+
+        second_deps = CustomFieldDependencies({})
+        result = self._run(
+            lambda context: CustomFieldImporter(context, second_deps),
+            "/api/v1/fields",
+            [{**row, "name": "Other Tenant CPU"}],
+            update=True,
+            base_url="https://snipe.example",
+            tenant=other_tenant,
+        )
+
+        field.refresh_from_db()
+        assert result.counts.failed == 1
+        assert field.label == "Tenant-Bound CPU"
+        assert second_deps.custom_fields == {}
+
+    def test_choice_set_import_refuses_same_id_from_another_source(self):
+        from extras.models import CustomField
+
+        first_row = {
+            "id": 130,
+            "name": "Source A Choice Field",
+            "db_column_name": "_snipeit_source_a_choice_130",
+            "format": "LIST",
+            "field_values": "one",
+        }
+        first_deps = CustomFieldDependencies({})
+        self._run(
+            lambda context: CustomFieldImporter(context, first_deps),
+            "/api/v1/fields",
+            [first_row],
+            base_url="https://snipe-a.example",
+        )
+        first_field = CustomField._base_manager.get(name="source_a_choice")
+
+        second_deps = CustomFieldDependencies({})
+        result = self._run(
+            lambda context: CustomFieldImporter(context, second_deps),
+            "/api/v1/fields",
+            [
+                {
+                    "id": 130,
+                    "name": "Source B Choice Field",
+                    "db_column_name": "_snipeit_source_b_choice_130",
+                    "format": "LIST",
+                    "field_values": "two",
+                }
+            ],
+            base_url="https://snipe-b.example",
+        )
+
+        first_field.refresh_from_db()
+        assert result.counts.failed == 1
+        assert list(first_field.choice_set.choices.values_list("key", flat=True)) == ["one"]
+        assert not CustomField._base_manager.filter(name="source_b_choice").exists()
+        assert second_deps.custom_fields == {}
+
+    def test_fieldset_import_refuses_same_id_from_another_source(self):
+        from extras.models import CustomFieldset
+
+        first_deps = FieldsetDependencies({}, {})
+        first = self._run(
+            lambda context: FieldsetImporter(context, first_deps),
+            "/api/v1/fieldsets",
+            [{"id": 131, "name": "Source A Specs", "fields": {"rows": []}}],
+            base_url="https://snipe-a.example",
+        )
+        fieldset = CustomFieldset._base_manager.get(namespace="local", slug="snipeit-131")
+
+        second_deps = FieldsetDependencies({}, {})
+        result = self._run(
+            lambda context: FieldsetImporter(context, second_deps),
+            "/api/v1/fieldsets",
+            [{"id": 131, "name": "Source B Specs", "fields": {"rows": []}}],
+            update=True,
+            base_url="https://snipe-b.example",
+        )
+
+        fieldset.refresh_from_db()
+        assert first.counts.created == 1
+        assert result.counts.failed == 1
+        assert fieldset.label == "Source A Specs"
+        assert second_deps.fieldsets == {}
+
         from extras.models import CustomField, CustomFieldChoice
 
         deps = CustomFieldDependencies({})
@@ -320,12 +463,13 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             "format": "TEXT",
         }
 
-        result = self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row], update=True)
+        result = self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row], update=False)
 
         field.refresh_from_db()
         assert result.counts.failed == 1
         assert field.label == "Operator-Owned Field"
         assert field.source_checksum is None
+        assert deps.custom_fields == {}
 
     def test_custom_field_import_refuses_managed_identity(self):
         from extras.models import CustomField

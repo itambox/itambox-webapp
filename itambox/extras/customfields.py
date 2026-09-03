@@ -3,6 +3,7 @@
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from re import _parser as _regex_parser
 
 from crispy_forms.layout import Div, Fieldset
 from django import forms
@@ -96,13 +97,108 @@ def _validate_hostname(value):
     return all(RFC1123_LABEL.fullmatch(label) for label in value.split("."))
 
 
+def _regex_children(opcode, args):
+    if opcode in (_regex_parser.MAX_REPEAT, _regex_parser.MIN_REPEAT, _regex_parser.POSSESSIVE_REPEAT):
+        yield args[2]
+    elif opcode is _regex_parser.SUBPATTERN:
+        yield args[-1]
+    elif opcode is _regex_parser.BRANCH:
+        yield from args[1]
+    elif opcode in (_regex_parser.ASSERT, _regex_parser.ASSERT_NOT):
+        yield args[1]
+    elif opcode is _regex_parser.GROUPREF_EXISTS:
+        yield args[1]
+        if args[2] is not None:
+            yield args[2]
+    elif opcode is _regex_parser.IN:
+        yield args
+
+
+def _contains_regex_opcode(tokens, target):
+    return any(
+        opcode is target or any(_contains_regex_opcode(child, target) for child in _regex_children(opcode, args))
+        for opcode, args in tokens
+    )
+
+
+def _contains_regex_repeat(tokens):
+    repeat_opcodes = (_regex_parser.MAX_REPEAT, _regex_parser.MIN_REPEAT, _regex_parser.POSSESSIVE_REPEAT)
+    return any(
+        opcode in repeat_opcodes or any(_contains_regex_repeat(child) for child in _regex_children(opcode, args))
+        for opcode, args in tokens
+    )
+
+
+def _has_adjacent_unbounded_repeats(tokens):
+    repeat_opcodes = (_regex_parser.MAX_REPEAT, _regex_parser.MIN_REPEAT, _regex_parser.POSSESSIVE_REPEAT)
+    previous_unbounded = False
+    for opcode, args in tokens:
+        if opcode in repeat_opcodes:
+            _minimum, maximum, body = args
+            current_unbounded = maximum == _regex_parser.MAXREPEAT
+            if current_unbounded and previous_unbounded:
+                return True
+            previous_unbounded = current_unbounded
+        else:
+            previous_unbounded = False
+        if any(_has_adjacent_unbounded_repeats(child) for child in _regex_children(opcode, args)):
+            return True
+    return False
+
+
+def _count_unbounded_repeats(tokens):
+    repeat_opcodes = (_regex_parser.MAX_REPEAT, _regex_parser.MIN_REPEAT, _regex_parser.POSSESSIVE_REPEAT)
+    count = 0
+    for opcode, args in tokens:
+        if opcode in repeat_opcodes and args[1] == _regex_parser.MAXREPEAT:
+            count += 1
+        count += sum(_count_unbounded_repeats(child) for child in _regex_children(opcode, args))
+    return count
+
+
+def _has_repeated_alternation(tokens):
+    for opcode, args in tokens:
+        if opcode in (_regex_parser.MAX_REPEAT, _regex_parser.MIN_REPEAT, _regex_parser.POSSESSIVE_REPEAT):
+            _minimum, _maximum, body = args
+            if _contains_regex_opcode(body, _regex_parser.BRANCH) or _contains_regex_repeat(body):
+                return True
+        if any(_has_repeated_alternation(child) for child in _regex_children(opcode, args)):
+            return True
+    return False
+
+
+def validate_custom_field_regex(pattern):
+    if not isinstance(pattern, str) or len(pattern) > 256:
+        raise ValidationError(_("The regular expression is invalid."), code="INVALID_REGEX")
+    try:
+        re.compile(pattern, re.ASCII)
+    except (re.error, OverflowError) as exc:
+        raise ValidationError(_("The regular expression is invalid."), code="INVALID_REGEX") from exc
+    nested_repeat = r"\((?:[^()\\]|\\.)*(?:[+*]|\{\d+(?:,\d*)?\})(?:[^()\\]|\\.)*\)(?:[+*]|\{\d+(?:,\d*)?\})"
+    if re.search(nested_repeat, pattern) or re.search(r"\\(?:[1-9]|g<|k<)|\(\?P=", pattern):
+        raise ValidationError(_("The regular expression is too complex."), code="INVALID_REGEX")
+    try:
+        parsed = _regex_parser.parse(pattern, re.ASCII)
+    except (re.error, OverflowError) as exc:
+        raise ValidationError(_("The regular expression is invalid."), code="INVALID_REGEX") from exc
+    if (
+        _has_repeated_alternation(parsed)
+        or _has_adjacent_unbounded_repeats(parsed)
+        or _count_unbounded_repeats(parsed) > 1
+    ):
+        raise ValidationError(_("The regular expression is too complex."), code="INVALID_REGEX")
+    return pattern
+
+
 def _validate_text(cf, value):
     if not isinstance(value, str):
         raise ValidationError(_("Enter text."), code="INVALID_TYPE")
     if cf.text_max_length is not None and len(value) > cf.text_max_length:
         raise ValidationError(_("The text is too long."), code="INVALID_RANGE")
-    if cf.regex and re.fullmatch(cf.regex, value, flags=re.ASCII) is None:
-        raise ValidationError(_("The value has an invalid format."), code="INVALID_VALUE")
+    if cf.regex:
+        validate_custom_field_regex(cf.regex)
+        if re.fullmatch(cf.regex, value, flags=re.ASCII) is None:
+            raise ValidationError(_("The value has an invalid format."), code="INVALID_VALUE")
     if cf.validation_rule == "rfc1123_hostname" and not _validate_hostname(value):
         raise ValidationError(_("Enter a valid hostname."), code="INVALID_VALUE")
     return value

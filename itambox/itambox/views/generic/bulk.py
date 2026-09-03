@@ -2,6 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db import transaction
 from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
@@ -20,6 +21,19 @@ from itambox.views.generic.utils import safe_return_url
 from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
+
+
+def _has_managed_definition_rows(queryset, model):
+    try:
+        model._meta.get_field("management_kind")
+    except FieldDoesNotExist:
+        return False
+    return any(getattr(row, "management_kind", None) != "local" for row in queryset)
+
+
+def _ensure_unmanaged_definition_rows(queryset, model):
+    if _has_managed_definition_rows(queryset, model):
+        raise PermissionDenied("Managed definitions cannot be mutated through bulk actions.")
 
 
 class ObjectBulkEditView(
@@ -103,6 +117,7 @@ class ObjectBulkEditView(
                 _("Skipped %(count)s %(objects)s you do not have permission to change.")
                 % {"count": skipped, "objects": model._meta.verbose_name_plural},
             )
+        _ensure_unmanaged_definition_rows(queryset, model)
         if not queryset:
             return HttpResponseRedirect(return_url)
 
@@ -261,6 +276,8 @@ class ObjectBulkDeleteView(
                 _("Skipped %(count)s %(objects)s you do not have permission to delete.")
                 % {"count": skipped, "objects": model._meta.verbose_name_plural},
             )
+
+        _ensure_unmanaged_definition_rows(objects_to_delete, model)
 
         if not objects_to_delete:
             messages.warning(
