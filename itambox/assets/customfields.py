@@ -31,7 +31,11 @@ def _definition_applies_to_target(definition, target_model, scopes):
 def _iter_fieldset_memberships(fieldset):
     field_memberships = getattr(fieldset, "_prefetched_objects_cache", {}).get("field_memberships")
     if field_memberships is None:
-        return fieldset.field_memberships.select_related("custom_field").order_by("position", "custom_field__name")
+        return (
+            fieldset.field_memberships.select_related("custom_field")
+            .prefetch_related("custom_field__object_types")
+            .order_by("position", "custom_field__name")
+        )
     return sorted(
         field_memberships,
         key=lambda membership: (membership.position, membership.custom_field.name),
@@ -127,7 +131,11 @@ def resolve_effective_custom_fields(fieldsets, target_model, scopes, stored_valu
 def _composed_fieldsets(asset_type):
     memberships = getattr(asset_type, "_prefetched_objects_cache", {}).get("fieldset_memberships")
     if memberships is None:
-        memberships = asset_type.fieldset_memberships.select_related("fieldset").order_by("position", "fieldset__slug")
+        memberships = (
+            asset_type.fieldset_memberships.select_related("fieldset")
+            .prefetch_related("fieldset__field_memberships__custom_field__object_types")
+            .order_by("position", "fieldset__slug")
+        )
     else:
         memberships = sorted(
             memberships,

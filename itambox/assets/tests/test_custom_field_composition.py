@@ -37,7 +37,7 @@ class CustomFieldCompositionTests(TestCase):
             Prefetch(
                 "fieldset_memberships",
                 queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
-                    "fieldset__field_memberships__custom_field"
+                    "fieldset__field_memberships__custom_field__object_types"
                 ),
             )
         ).get(pk=self.asset_type.pk)
@@ -46,7 +46,8 @@ class CustomFieldCompositionTests(TestCase):
             resolved = resolve_asset_type_custom_fields(asset_type)
 
         self.assertEqual([item.definition.name for item in resolved], ["prefetched_field"])
-        self.assertEqual(len(queries), 0)
+        # One set-based query resolves unbound globals; composed memberships add no per-field queries.
+        self.assertEqual(len(queries), 1)
 
     def test_resolver_orders_deduplicates_scopes_and_retains_deprecated_values(self):
         first_only = self._field("first_only", CustomField.SCOPE_ASSET_TYPE)
