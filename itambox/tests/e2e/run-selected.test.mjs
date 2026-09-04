@@ -68,6 +68,28 @@ test('synthesizes when the attested identity does not match the attempt retry', 
   assert.notEqual(identity, 'e2e-admin-w0-r0-33902272197-lab');
 });
 
+test('resolved collector identity keeps synthesized attempt identities unique', () => {
+  // Playwright JSON report tests for legacy specs carry no usable id/spec
+  // fields; the collector resolves them before building the evidence rows.
+  // The synthesized identity must use those resolved values or every test
+  // in a spec collapses onto one identity (regression for the 2026-09-04
+  // run that collided 40 legacy tests on 'e2e-admin-spec-spec-test-r0').
+  const rawTest = { status: 'passed', results: [] };
+  const spec = 'spec/accessibility/issue101.spec.ts';
+  const firstId = attemptIdentity(
+    { status: 'passed', retry: 0 }, rawTest, 0,
+    { spec, id: 'd5271b4adfaf6988b612-0851ce23573cfd7af394' },
+  );
+  const secondId = attemptIdentity(
+    { status: 'passed', retry: 0 }, rawTest, 0,
+    { spec, id: 'd5271b4adfaf6988b612-2f5af8234244fe826949' },
+  );
+
+  assert.match(firstId, /(?:^|-)r0(?:-|$)/);
+  assert.notEqual(firstId, secondId);
+  assert.ok(!firstId.includes('spec-spec-test'));
+});
+
 test('keeps skipped and failing outcomes fail-closed', () => {
   assert.equal(finalPlaywrightStatus({ status: 'skipped' }, []), 'skipped');
   assert.equal(finalPlaywrightStatus({ status: 'unexpected' }, [{ status: 'failed' }]), 'failed');

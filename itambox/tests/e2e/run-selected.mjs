@@ -372,10 +372,10 @@ function slugify(value) {
   return result || 'test';
 }
 
-function synthesizedAttemptIdentity(test, retry) {
-  const project = slugify(test.projectName || test.project || 'unknown');
-  const spec = slugify(test.spec || 'spec');
-  const id = slugify(test.testId || test.id || `${test.spec || 'spec'}::${test.title || 'test'}`);
+function synthesizedAttemptIdentity(resolved, test, retry) {
+  const project = slugify(test.projectName || test.project || resolved.project || 'unknown');
+  const spec = slugify(resolved.spec || test.spec || 'spec');
+  const id = slugify(resolved.id || test.testId || test.id || `${resolved.spec || 'spec'}::${test.title || 'test'}`);
   return `e2e-${project}-${spec}-${id}-r${retry}`;
 }
 
@@ -391,16 +391,16 @@ function synthesizedAttemptIdentity(test, retry) {
  * identity is synthesized so the evidence file never carries a matching
  * retry/control-character violation.
  */
-export function attemptIdentity(result, test, retry) {
+export function attemptIdentity(result, test, retry, resolved = {}) {
   const attested = identityFromAttachments(result) || identityFromAnnotations(test);
   if (
     attested
-    && !/[ -]/.test(attested)
+    && !/[\u0000-\u001f\u007f]/.test(attested)
     && new RegExp(`(?:^|-)r${retry}(?:-|$)`).test(attested)
   ) {
     return attested;
   }
-  return synthesizedAttemptIdentity(test, retry);
+  return synthesizedAttemptIdentity(resolved, test, retry);
 }
 
 function cleanupStatus(test) {
@@ -451,16 +451,17 @@ function collectExecution(value, output, parentFile = null, parentProject = null
       for (const test of Array.isArray(spec.tests) ? spec.tests : []) {
         if (!specFile) continue;
         const results = Array.isArray(test.results) ? test.results : [];
+        const resolvedId = String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`);
         const attempts = results.map((result, index) => {
           const retry = Number.isInteger(result.retry) ? result.retry : index;
           return {
             retry,
             status: normaliseAttemptStatus(result.status),
-            identity: attemptIdentity(result, test, retry),
+            identity: attemptIdentity(result, test, retry, { spec: specFile, id: resolvedId }),
           };
         });
         output.tests.push({
-          id: String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`),
+          id: resolvedId,
           spec: specFile,
           project: String(test.projectName || project),
           status: finalPlaywrightStatus(test, attempts),
@@ -476,16 +477,17 @@ function collectExecution(value, output, parentFile = null, parentProject = null
       const testFile = normaliseReportPath(String(test.location?.file || file || '')) || file;
       if (!testFile) continue;
       const results = Array.isArray(test.results) ? test.results : [];
+      const resolvedId = String(test.testId || `${testFile}::${test.title || 'test'}`);
       const attempts = results.map((result, index) => {
         const retry = Number.isInteger(result.retry) ? result.retry : index;
         return {
           retry,
           status: normaliseAttemptStatus(result.status),
-          identity: attemptIdentity(result, test, retry),
+          identity: attemptIdentity(result, test, retry, { spec: testFile, id: resolvedId }),
         };
       });
       output.tests.push({
-        id: String(test.testId || `${testFile}::${test.title || 'test'}`),
+        id: resolvedId,
         spec: testFile,
         project: String(test.projectName || project),
         status: finalPlaywrightStatus(test, attempts),
