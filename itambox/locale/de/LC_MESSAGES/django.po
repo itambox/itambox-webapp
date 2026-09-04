@@ -13852,6 +13852,10 @@ msgstr "Die Ganzzahl liegt außerhalb des unterstützten Bereichs."
 msgid "The library Asset Type identity is immutable after creation."
 msgstr "Die Identität des Asset-Typs aus der Bibliothek kann nach der Erstellung nicht geändert werden."
 
+#: itambox/assets/models/catalog.py
+msgid "The library reconciliation state changed after this instance was loaded; refresh it and retry."
+msgstr "Der Reconciliationszustand der Bibliothek hat sich geändert, nachdem diese Instanz geladen wurde; aktualisieren Sie die Instanz und versuchen Sie es erneut."
+
 #: itambox/extras/customfields.py
 msgid "The text is too long."
 msgstr "Der Text ist zu lang."

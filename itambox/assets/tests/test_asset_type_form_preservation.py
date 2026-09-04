@@ -6,7 +6,13 @@ from django.test.utils import CaptureQueriesContext
 
 from assets.forms import AssetTypeForm
 from assets.models import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
-from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from extras.models import (
+    CustomField,
+    CustomFieldChoice,
+    CustomFieldChoiceSet,
+    CustomFieldset,
+    CustomFieldsetField,
+)
 from itambox.views.generic import ObjectEditView
 
 
@@ -230,6 +236,108 @@ class AssetTypeFormPreservationTests(TestCase):
             enlarged_form = AssetTypeForm(instance=asset_type)
         self.assertEqual(len(enlarged_form.custom_field_keys), 6)
         self.assertLessEqual(len(queries), 9)
+
+    def test_asset_type_form_choice_heavy_composition_keeps_constant_queries(self):
+        def build(size):
+            manufacturer = Manufacturer.objects.create(name=f"Choice Bound {size}", slug=f"choice-bound-{size}")
+            asset_type = AssetType.objects.create(
+                manufacturer=manufacturer,
+                model=f"Choice bound {size}",
+                slug=f"choice-bound-type-{size}",
+            )
+            for fieldset_index in range(size):
+                fieldset = CustomFieldset.objects.create(
+                    namespace="local",
+                    slug=f"choice-heavy-{size}-{fieldset_index}",
+                    label=f"Choice heavy {size} {fieldset_index}",
+                )
+                text_field = CustomField.objects.create(
+                    name=f"cf_text_{size}_{fieldset_index}",
+                    namespace="local",
+                    label=f"Text {fieldset_index}",
+                    scope=CustomField.SCOPE_ASSET_TYPE,
+                )
+                integer_field = CustomField.objects.create(
+                    name=f"cf_int_{size}_{fieldset_index}",
+                    namespace="local",
+                    label=f"Integer {fieldset_index}",
+                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    field_type=CustomField.FIELD_TYPE_INTEGER,
+                )
+                single_set = CustomFieldChoiceSet.objects.create(
+                    namespace="local",
+                    slug=f"single-{size}-{fieldset_index}",
+                    label=f"Single {fieldset_index}",
+                )
+                for choice_index in range(3):
+                    CustomFieldChoice.objects.create(
+                        choice_set=single_set,
+                        key=f"single-{size}-{fieldset_index}-{choice_index}",
+                        label=f"Single choice {choice_index}",
+                        position=10 + choice_index,
+                    )
+                single_field = CustomField.objects.create(
+                    name=f"cf_single_{size}_{fieldset_index}",
+                    namespace="local",
+                    label=f"Single {fieldset_index}",
+                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+                    choice_set=single_set,
+                    max_values=1,
+                )
+                multi_set = CustomFieldChoiceSet.objects.create(
+                    namespace="local",
+                    slug=f"multi-{size}-{fieldset_index}",
+                    label=f"Multi {fieldset_index}",
+                )
+                for choice_index in range(4):
+                    CustomFieldChoice.objects.create(
+                        choice_set=multi_set,
+                        key=f"multi-{size}-{fieldset_index}-{choice_index}",
+                        label=f"Multi choice {choice_index}",
+                        position=10 + choice_index,
+                    )
+                multi_field = CustomField.objects.create(
+                    name=f"cf_multi_{size}_{fieldset_index}",
+                    namespace="local",
+                    label=f"Multi {fieldset_index}",
+                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    field_type=CustomField.FIELD_TYPE_MULTI_SELECT,
+                    choice_set=multi_set,
+                    max_values=2,
+                )
+                CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=text_field, position=10)
+                CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=integer_field, position=20)
+                CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=single_field, position=30)
+                CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=multi_field, position=40)
+                AssetTypeFieldset.objects.create(
+                    asset_type=asset_type,
+                    fieldset=fieldset,
+                    position=(fieldset_index + 1) * 10,
+                )
+            return asset_type
+
+        # The same constant query bound must hold when the composition graph is
+        # choice-heavy: fieldsets -> memberships -> custom fields -> object
+        # types and choice sets -> choices. Doubling fieldsets, select fields,
+        # choice sets, and choices must not add per-fieldset, per-field, or
+        # per-choice queries. The bound is 11 (not 9) because a non-null
+        # choice set actually exercises the two prefetch levels that the
+        # text-only fixture skips (Django skips a prefetch chain level whose
+        # parent results are empty): one query for the choice sets and one
+        # for their choices. Both are constant by construction, so the bound
+        # holds at every fixture size.
+        small = build(2)
+        with CaptureQueriesContext(connection) as queries:
+            small_form = AssetTypeForm(instance=small)
+        self.assertEqual(len(small_form.custom_field_keys), 8)
+        self.assertLessEqual(len(queries), 11)
+
+        large = build(4)
+        with CaptureQueriesContext(connection) as queries:
+            large_form = AssetTypeForm(instance=large)
+        self.assertEqual(len(large_form.custom_field_keys), 16)
+        self.assertLessEqual(len(queries), 11)
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")

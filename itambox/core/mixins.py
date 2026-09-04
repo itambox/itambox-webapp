@@ -83,6 +83,14 @@ class CustomFieldDataMixin(models.Model):
         verbose_name=_("Custom Field Data"),
     )
 
+    #: Fields whose limited ``save(update_fields=...)`` must still run the
+    #: dynamic custom-field validator, because changing them alters which
+    #: custom fields are effective for the instance (for example
+    #: ``Asset.asset_type`` changes the composed fieldsets, required fields,
+    #: and Choice Set validity). Concrete models declare their own set; the
+    #: pre-save signal reads it generically so ``core`` stays domain-neutral.
+    custom_field_data_validation_dependencies: frozenset[str] = frozenset()
+
     class Meta:
         abstract = True
 
