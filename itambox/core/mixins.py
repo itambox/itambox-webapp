@@ -62,6 +62,8 @@ class CustomFieldDataMixin(models.Model):
 
     def clean(self):
         super().clean()
+        if getattr(self, "_skip_custom_field_data_validation", False):
+            return
         validator = registry.get_custom_field_data_validator(type(self))
         if validator is not None:
             validator(self)

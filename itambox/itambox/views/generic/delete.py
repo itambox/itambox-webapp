@@ -39,7 +39,7 @@ class ObjectDeleteView(
                 if is_managed_definition(self.get_object()):
                     return False
             except Http404:
-                return False
+                raise
         perms = self.get_permission_required()
         return self.request.user.has_perms(perms, obj=PermissionResolver.object_under_check(self))
 

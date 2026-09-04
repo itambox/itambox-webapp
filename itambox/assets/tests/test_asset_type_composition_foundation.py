@@ -67,6 +67,28 @@ class AssetTypeCompositionFoundationTests(TestCase):
                     **variant,
                 )
 
+    def test_library_identity_db_constraint_rejects_queryset_update(self):
+        library = AssetTypeLibrary.objects.create(namespace="db-identity", release="2026.09")
+        manufacturer = Manufacturer.objects.create(name="DB Identity Manufacturer", slug="db-identity-manufacturer")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="DB identity type",
+            slug="db-identity-type",
+        )
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AssetType._base_manager.filter(pk=asset_type.pk).update(
+                library_id=library.pk,
+                library_definition_key="invalid-local-state",
+                library_release="2026.09",
+            )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AssetType._base_manager.filter(pk=asset_type.pk).update(
+                library_id=library.pk,
+                library_definition_key="invalid-local-state",
+                library_release="",
+            )
+
     def test_library_identity_composition_and_category_defaults_are_relational(self):
         library = AssetTypeLibrary.objects.create(namespace="acme", release="2026.09")
         manufacturer = Manufacturer.objects.create(name="Example Networks", slug="example-networks")

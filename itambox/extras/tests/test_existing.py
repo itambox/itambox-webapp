@@ -64,7 +64,29 @@ class CustomFieldModelTests(TestCase):
 
     def test_custom_field_types(self):
         for ft, ft_label in CustomField.FIELD_TYPE_CHOICES:
-            cf = CustomField.objects.create(name=f"test_{ft}", label=f"Test {ft_label}", field_type=ft)
+            kwargs = {"decimal_scale": 2} if ft == CustomField.FIELD_TYPE_DECIMAL else {}
+            if ft == CustomField.FIELD_TYPE_SINGLE_SELECT:
+                kwargs.update(
+                    choice_set=CustomFieldChoiceSet.objects.create(
+                        namespace="test",
+                        slug=f"{ft}-set",
+                        label=f"{ft_label} set",
+                    ),
+                    max_values=1,
+                )
+            elif ft == CustomField.FIELD_TYPE_MULTI_SELECT:
+                kwargs["choice_set"] = CustomFieldChoiceSet.objects.create(
+                    namespace="test",
+                    slug=f"{ft}-set",
+                    label=f"{ft_label} set",
+                )
+                kwargs["max_values"] = 2
+            cf = CustomField.objects.create(
+                name=f"test_{ft}",
+                label=f"Test {ft_label}",
+                field_type=ft,
+                **kwargs,
+            )
             self.assertEqual(cf.field_type, ft)
 
     def test_custom_field_required(self):

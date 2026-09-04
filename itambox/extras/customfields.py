@@ -22,7 +22,28 @@ def _definition(item):
     return getattr(item, "definition", item)
 
 
+def _required_value_is_present(definition, value):
+    if value is None:
+        return False
+    if definition.field_type in {
+        CustomField.FIELD_TYPE_TEXT,
+        CustomField.FIELD_TYPE_DATE,
+        CustomField.FIELD_TYPE_SINGLE_SELECT,
+    }:
+        return isinstance(value, str) and value != ""
+    if definition.field_type == CustomField.FIELD_TYPE_MULTI_SELECT:
+        return isinstance(value, list) and bool(value) and all(isinstance(item, str) for item in value)
+    if definition.field_type == CustomField.FIELD_TYPE_INTEGER:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if definition.field_type == CustomField.FIELD_TYPE_DECIMAL:
+        return isinstance(value, str) and value != ""
+    if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+        return isinstance(value, bool)
+    return True
+
+
 def validate_required_custom_field_values(definitions, values):
+    values = values or {}
     missing = sorted(
         definition.name
         for item in definitions
@@ -30,7 +51,7 @@ def validate_required_custom_field_values(definitions, values):
         if definition.required
         and definition.deleted_at is None
         and (definition.lifecycle != CustomField.LIFECYCLE_DEPRECATED or definition.name in values)
-        and definition.name not in values
+        and not _required_value_is_present(definition, values.get(definition.name))
     )
     if missing:
         raise ValidationError(
@@ -191,12 +212,13 @@ def _validate_single_select(cf, value):
 def _validate_multi_select(cf, value):
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise ValidationError(_("Select a list of values."), code="INVALID_TYPE")
-    valid_keys = _active_choice_keys(cf)
+    choices_by_key = {choice.key: choice for choice in _active_choice_rows(cf)}
+    valid_keys = set(choices_by_key)
     if len(value) != len(set(value)) or any(item not in valid_keys for item in value):
         raise ValidationError(_("Select unique valid choices."), code="INVALID_CHOICE")
     if cf.max_values is not None and len(value) > cf.max_values:
         raise ValidationError(_("Too many values were selected."), code="INVALID_RANGE")
-    return sorted(value)
+    return sorted(value, key=lambda item: (choices_by_key[item].position, item))
 
 
 VALUE_VALIDATORS = {
@@ -354,10 +376,13 @@ def _custom_field_filter_lookup(definition, name, value):
 
 def apply_custom_field_filters(queryset, model, params):
     """Filter a queryset by ``cf_<name>=<value>`` request parameters."""
+    custom_field_params = {
+        param: value for param, value in params.items() if param.startswith("cf_") and value not in (None, "")
+    }
+    if not custom_field_params:
+        return queryset
     definitions = {field.name: field for field in custom_fields_for_model(model)}
-    for param, value in params.items():
-        if not param.startswith("cf_") or value in (None, ""):
-            continue
+    for param, value in custom_field_params.items():
         name = param[3:]
         definition = definitions.get(name)
         if definition is None:
@@ -430,6 +455,13 @@ class CustomFieldModelFormMixin:
             rows.append(Div(*cells, css_class="row"))
         helper.layout.append(Fieldset(self.custom_fields_fieldset_label, *rows, css_class="mb-4 border p-3 rounded"))
 
+    def _post_clean(self):
+        self.instance._skip_custom_field_data_validation = True
+        try:
+            super()._post_clean()
+        finally:
+            del self.instance._skip_custom_field_data_validation
+
     def clean(self):
         cleaned_data = super().clean()
         return clean_custom_field_form_values(
@@ -456,7 +488,7 @@ class CustomFieldModelFormMixin:
             if value is None and not definition.nullable:
                 continue
             submitted[definition.name] = value
-        if submitted or clear_keys:
+        if self.custom_field_definitions:
             instance.custom_field_data = apply_custom_field_patch(
                 getattr(instance, "custom_field_data", None) or {},
                 self.custom_field_definitions.values(),

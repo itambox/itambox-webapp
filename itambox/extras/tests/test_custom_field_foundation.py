@@ -55,6 +55,55 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         with self.assertRaises(ValidationError):
             validate_custom_field_value(definition, "a")
 
+    def test_required_values_reject_type_specific_empty_values_but_accept_false(self):
+        from types import SimpleNamespace
+
+        from extras.customfields import validate_required_custom_field_values
+
+        def definition(name, field_type):
+            return SimpleNamespace(
+                name=name,
+                field_type=field_type,
+                required=True,
+                deleted_at=None,
+                lifecycle=CustomField.LIFECYCLE_ACTIVE,
+            )
+
+        definitions = [
+            definition("required_text", CustomField.FIELD_TYPE_TEXT),
+            definition("required_multi", CustomField.FIELD_TYPE_MULTI_SELECT),
+            definition("required_boolean", CustomField.FIELD_TYPE_BOOLEAN),
+        ]
+        with self.assertRaises(ValidationError) as raised:
+            validate_required_custom_field_values(
+                definitions,
+                {"required_text": "", "required_multi": [], "required_boolean": False},
+            )
+
+        self.assertEqual(set(raised.exception.message_dict), {"required_text", "required_multi"})
+        with self.assertRaises(ValidationError):
+            validate_required_custom_field_values(
+                [definition("typed_text", CustomField.FIELD_TYPE_TEXT)], {"typed_text": 123}
+            )
+
+    def test_required_single_select_rejects_empty_and_required_nullable_rejects_null(self):
+        from types import SimpleNamespace
+
+        from extras.customfields import validate_required_custom_field_values
+
+        definition = SimpleNamespace(
+            name="required_select",
+            field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            required=True,
+            nullable=True,
+            deleted_at=None,
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        )
+        with self.assertRaises(ValidationError):
+            validate_required_custom_field_values([definition], {"required_select": ""})
+        with self.assertRaises(ValidationError):
+            validate_required_custom_field_values([definition], {"required_select": None})
+
     def test_definition_contract_rejects_unknown_validation_rule_at_model_boundary(self):
         field = CustomField(
             name="unknown_validation_rule",
@@ -246,6 +295,26 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         with self.assertRaises(ValidationError):
             validate_custom_field_value(field, choice.key)
 
+    def test_multi_select_values_are_canonicalized_by_choice_position(self):
+        from extras.customfields import validate_custom_field_value
+
+        choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="ordered-multi",
+            label="Ordered multi",
+        )
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="z-last", label="Last", position=20)
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="a-first", label="First", position=10)
+        field = CustomField.objects.create(
+            name="ordered_multi",
+            label="Ordered multi",
+            field_type=CustomField.FIELD_TYPE_MULTI_SELECT,
+            choice_set=choice_set,
+            max_values=2,
+        )
+
+        self.assertEqual(validate_custom_field_value(field, ["z-last", "a-first"]), ["a-first", "z-last"])
+
     def test_generic_purge_preserves_schema_definition_tombstones(self):
         field = CustomField.objects.create(
             name="permanent_schema_tombstone",
@@ -261,7 +330,9 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         management.call_command("purge_deleted", days=30, stdout=output)
 
         self.assertTrue(CustomField.all_objects.filter(pk=field.pk).exists())
-        self.assertIn("Skipped", output.getvalue())
+        management.call_command("purge_deleted", days=30, stdout=output, dry_run=True)
+
+        self.assertIn("Total permanent tombstones deferred: 1", output.getvalue())
 
     def test_soft_delete_preserves_references_and_restore_keeps_composition(self):
         choice_set = CustomFieldChoiceSet.objects.create(
