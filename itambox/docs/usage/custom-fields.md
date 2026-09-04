@@ -20,7 +20,7 @@ has a core set of attributes:
 | **Field Name** | Database-safe slug identifier (e.g. `sim_card_number`). Lowercase, no spaces. Used in templates and API queries. |
 | **Display Label** | Human-friendly label shown in forms, list headers, and filters. |
 | **Field Type** | Data type the field stores. Controls input widget and validation. |
-| **Choices** | Newline-separated list of allowed values — only applicable for Selection list fields. |
+| **Choice Set** | Relational set of ordered allowed choices for Single Select and Multi Select fields. Choice labels are managed separately from stable keys. |
 | **Required** | If checked, validation requires a non-empty value when saving an object. |
 
 ### Field Types
@@ -93,7 +93,7 @@ The **Required** checkbox on each custom field controls server-side validation:
 
 | Setting | Behaviour |
 |---------|-----------|
-| **Required** (checked) | The field must be present before the object can be saved. Text, numeric, date, and select fields reject an omitted value; a required Boolean uses an explicit Yes/No input, so both `true` and `false` are valid answers. |
+| **Required** (checked) | The field must contain a present, type-valid value before the object can be saved. Empty text (`""`), an empty multi-select (`[]`), an empty single-select, and `null` do not satisfy Required. Numeric zero and Boolean `false` are valid values. A required Boolean uses an explicit Yes/No input. |
 | **Optional** (unchecked) | The field can be left blank. |
 
 > [!WARNING]
@@ -221,8 +221,9 @@ addressed inside the `set`/`clear` operation, for example
 
 **Dropdown shows no choices**
 : The field type is Single Select / Multi Select but no active Choice Set is
-  assigned, or the assigned Choice Set has no active choices. Assign a Choice
-  Set and add active choices through the Choice Set management surface.
+  assigned, or the assigned Choice Set has no active choices. A deleted or
+  deprecated Choice Set is also not valid for new values. Assign an active
+  Choice Set and add active choices through the Choice Set management surface.
 
 **Custom field value is missing from exports**
 : Ensure the custom field column is toggled on in the export column selector.

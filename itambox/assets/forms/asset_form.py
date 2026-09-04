@@ -166,6 +166,13 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             ),
         }
 
+    def _post_clean(self):
+        self.instance._skip_custom_field_data_validation = True
+        try:
+            super()._post_clean()
+        finally:
+            del self.instance._skip_custom_field_data_validation
+
     def clean_status(self):
         status = self.cleaned_data.get("status")
         if isinstance(status, str):
@@ -565,7 +572,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             if value is None and not definition.nullable:
                 continue
             submitted[definition.name] = value
-        if submitted or clear_keys:
+        if self.custom_field_definitions:
             instance.custom_field_data = apply_custom_field_patch(
                 instance.custom_field_data or {},
                 self.custom_field_definitions.values(),

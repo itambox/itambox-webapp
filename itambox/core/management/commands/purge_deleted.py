@@ -80,6 +80,10 @@ class Command(BaseCommand):
 
             if dry_run:
                 self.stdout.write(self.style.WARNING(f"[DRY RUN] Total objects that would be purged: {total_purged}"))
+                if total_skipped:
+                    self.stdout.write(
+                        self.style.WARNING(f"[DRY RUN] Total permanent tombstones deferred: {total_skipped}")
+                    )
             elif total_purged == 0 and total_skipped == 0:
                 self.stdout.write(self.style.SUCCESS("No soft-deleted objects to purge."))
             else:

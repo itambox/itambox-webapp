@@ -128,6 +128,48 @@ class AssetTypeFormPreservationTests(TestCase):
         self.assertEqual(asset_type.description, "New description")
         self.assertEqual(list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)), [second.pk])
 
+    def test_composition_change_with_missing_required_field_is_atomic(self):
+        manufacturer = Manufacturer.objects.create(name="Atomic Example", slug="atomic-example")
+        old_fieldset = CustomFieldset.objects.create(namespace="local", slug="old-composition", label="Old")
+        new_fieldset = CustomFieldset.objects.create(namespace="local", slug="new-composition", label="New")
+        required = CustomField.objects.create(
+            name="required_after_composition",
+            namespace="local",
+            label="Required after composition",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET_TYPE,
+            required=True,
+        )
+        CustomFieldsetField.objects.create(fieldset=new_fieldset, custom_field=required, position=10)
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Old model",
+            slug="atomic-example",
+            description="Old description",
+        )
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=old_fieldset, position=10)
+
+        form = AssetTypeForm(
+            data={
+                "manufacturer": manufacturer.pk,
+                "model": "New model",
+                "slug": "atomic-example",
+                "description": "New description",
+                "custom_fieldsets": [new_fieldset.pk],
+            },
+            instance=asset_type,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("cf_required_after_composition", form.errors)
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.model, "Old model")
+        self.assertEqual(asset_type.description, "Old description")
+        self.assertEqual(
+            list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)),
+            [old_fieldset.pk],
+        )
+
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         visible = CustomField.objects.create(

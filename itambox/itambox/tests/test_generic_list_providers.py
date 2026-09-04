@@ -17,7 +17,7 @@ from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from assets.views.asset_views import AssetListView
 from core.tests.mixins import TenantTestMixin, grant
 from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
-from extras.models import ExportTemplate, LabelTemplate, SavedFilter
+from extras.models import CustomField, ExportTemplate, LabelTemplate, SavedFilter
 from itambox.registry import ListFilterInput
 from itambox.views.generic.extensions import (
     build_list_provider_context,
@@ -70,6 +70,13 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
             custom_field_data={"rack": "other"},
         )
         self.content_type = ContentType.objects.get_for_model(Asset)
+        rack_field = CustomField.objects.create(
+            name="rack",
+            label="Rack",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET,
+        )
+        rack_field.object_types.add(self.content_type)
         self.saved_filter = SavedFilter.objects.create(
             name="Visible saved asset filter",
             content_type=self.content_type,
