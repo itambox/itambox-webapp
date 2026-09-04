@@ -2,6 +2,7 @@ from dataclasses import dataclass, replace
 
 from django.db.models import Q
 
+from extras.customfields import validate_required_custom_field_values
 from extras.models import CustomField, CustomFieldset
 
 
@@ -180,4 +181,18 @@ def resolve_asset_custom_fields(asset_type, stored_values=None):
         "asset",
         {CustomField.SCOPE_ASSET, CustomField.SCOPE_BOTH},
         stored_values,
+    )
+
+
+def validate_asset_type_custom_field_data(asset_type):
+    validate_required_custom_field_values(
+        resolve_asset_type_custom_fields(asset_type),
+        asset_type.custom_field_data or {},
+    )
+
+
+def validate_asset_custom_field_data(asset):
+    validate_required_custom_field_values(
+        resolve_asset_custom_fields(asset.asset_type, asset.custom_field_data),
+        asset.custom_field_data or {},
     )

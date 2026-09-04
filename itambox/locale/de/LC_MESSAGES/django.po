@@ -13946,9 +13946,6 @@ msgstr "Auswahlfelder benötigen ein Auswahlset."
 msgid "Single-select fields must limit values to exactly one."
 msgstr "Einzelauswahlfelder müssen die Werte auf genau einen begrenzen."
 
-#: itambox/itambox/api/base.py
-msgid "Custom field data must be an object."
-msgstr "Daten benutzerdefinierter Felder müssen ein Objekt sein."
 
 #: itambox/templates/assets/includes/detail/assettype_info.html
 msgid "Specification Sections:"
@@ -13977,6 +13974,46 @@ msgstr "Dezimalfelder benötigen eine Skalierung von 0 bis 6."
 #: itambox/extras/definition_contract.py
 msgid "Select at least one model for a generic local field."
 msgstr "Wählen Sie für ein allgemeines lokales Feld mindestens ein Modell aus."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field specification patch must be an object."
+msgstr "Der Patch für benutzerdefinierte Feldspezifikationen muss ein Objekt sein."
+
+#: itambox/extras/customfields.py
+msgid "Deprecated custom fields are read-only."
+msgstr "Veraltete benutzerdefinierte Felder sind schreibgeschützt."
+
+#: itambox/extras/definition_contract.py
+msgid "Inline regular-expression flags are not allowed."
+msgstr "Inline-Flags für reguläre Ausdrücke sind nicht zulässig."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a Library."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen eine Bibliothek."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a non-empty definition key."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen einen nicht leeren Definitionsschlüssel."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a release."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen ein Release."
+
+#: itambox/assets/models/catalog.py
+msgid "Only library-managed Asset Types may carry Library identity or provenance."
+msgstr "Nur von einer Bibliothek verwaltete Asset-Typen dürfen Bibliotheksidentität oder Herkunftsdaten enthalten."
+
+#: itambox/itambox/views/generic/restore.py
+msgid "Skipped %(count)s permanent schema tombstone(s)."
+msgstr "%(count)s dauerhafte Schema-Tombstones übersprungen."
+
+#: itambox/extras/customfields.py
+msgid "The choice set is not active."
+msgstr "Das Auswahlset ist nicht aktiv."
+
+#: itambox/extras/customfields.py
+msgid "This field is required."
+msgstr "Dieses Feld ist erforderlich."
 
 #: itambox/extras/definition_contract.py
 msgid "Choice Sets must be active and not deleted."
