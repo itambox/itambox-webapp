@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -6,6 +8,30 @@ from core.choices import ObjectChangeActionChoices
 from core.serialization import serialize_object
 from core.slugs import generate_unique_slug
 from itambox.registry import registry
+
+_SKIP_CUSTOM_FIELD_DATA_VALIDATION = "_skip_custom_field_data_validation"
+
+
+@contextmanager
+def suppress_custom_field_data_validation(instance):
+    """Temporarily suppress the dynamic custom-field validator on one instance.
+
+    The marker is instance state, so it must be restored exactly: a nested or
+    re-entrant suppression has to preserve an existing marker value, and an
+    exception must never leave the instance in a bypassed state. This helper is
+    the single place that manipulates the marker; ModelForm staging and the
+    pre-save signal both use it so their semantics cannot drift apart.
+    """
+    had_marker = hasattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION)
+    previous = getattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, None)
+    setattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, True)
+    try:
+        yield
+    finally:
+        if had_marker:
+            setattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, previous)
+        else:
+            delattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION)
 
 
 class BookmarkableMixin:
@@ -62,7 +88,7 @@ class CustomFieldDataMixin(models.Model):
 
     def clean(self):
         super().clean()
-        if getattr(self, "_skip_custom_field_data_validation", False):
+        if getattr(self, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, False):
             return
         validator = registry.get_custom_field_data_validator(type(self))
         if validator is not None:

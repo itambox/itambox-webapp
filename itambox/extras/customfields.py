@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from core.mixins import suppress_custom_field_data_validation
 from extras.definition_contract import validate_custom_field_regex
 from extras.models import CustomField
 
@@ -478,11 +479,8 @@ class CustomFieldModelFormMixin:
         helper.layout.append(Fieldset(self.custom_fields_fieldset_label, *rows, css_class="mb-4 border p-3 rounded"))
 
     def _post_clean(self):
-        self.instance._skip_custom_field_data_validation = True
-        try:
+        with suppress_custom_field_data_validation(self.instance):
             super()._post_clean()
-        finally:
-            del self.instance._skip_custom_field_data_validation
 
     def clean(self):
         cleaned_data = super().clean()

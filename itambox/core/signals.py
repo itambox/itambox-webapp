@@ -4,23 +4,15 @@ from django.db import DatabaseError
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
+from core.mixins import suppress_custom_field_data_validation
 from core.models import ChangeLoggingMixin
 
 logger = logging.getLogger(__name__)
 
 
 def _clean_without_custom_field_validation(instance):
-    marker = "_skip_custom_field_data_validation"
-    had_marker = hasattr(instance, marker)
-    previous = getattr(instance, marker, None)
-    setattr(instance, marker, True)
-    try:
+    with suppress_custom_field_data_validation(instance):
         instance.clean()
-    finally:
-        if had_marker:
-            setattr(instance, marker, previous)
-        else:
-            delattr(instance, marker)
 
 
 @receiver(pre_save)
