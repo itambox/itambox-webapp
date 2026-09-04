@@ -239,7 +239,8 @@ class ObjectCloneView(ObjectEditView):
     """
 
     def get_object(self, queryset=None):
-        self.original_object = get_object_or_404(self.model, pk=self.kwargs["pk"])
+        source_queryset = queryset if queryset is not None else self.get_queryset()
+        self.original_object = get_object_or_404(source_queryset, pk=self.kwargs["pk"])
         cloned = self.original_object.clone()
 
         if hasattr(cloned, "name"):

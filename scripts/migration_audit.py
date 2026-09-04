@@ -29,6 +29,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0110_alter_assettypefieldset_asset_type",
     "assets.0111_alter_categorydefaultfieldset_category",
     "assets.0112_alter_assettype_library_definition_key_and_more",
+    "assets.0113_assettype_library_identity_immutable",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -315,6 +316,11 @@ SEMANTIC_DISPOSITIONS = {
             "assets.0109_alter_assettype_lifecycle",
             "extras.0116_alter_customfield_lifecycle_and_more",
         },
+    ),
+    **_dispositions(
+        "required-fresh",
+        "Installs the PostgreSQL trigger that makes Asset Type library identity and provenance immutable after creation, including for QuerySet and direct SQL updates.",
+        {"assets.0113_assettype_library_identity_immutable"},
     ),
 }
 
