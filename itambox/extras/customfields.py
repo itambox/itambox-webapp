@@ -328,6 +328,11 @@ def custom_fields_for_model(model, include_inactive=False):
     return queryset
 
 
+def validate_generic_custom_field_data(instance):
+    definitions = custom_fields_for_model(type(instance), include_inactive=True)
+    validate_required_custom_field_values(definitions, instance.custom_field_data or {})
+
+
 def _custom_field_filter_lookup(definition, name, value):
     if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN and isinstance(value, str):
         if value.casefold() not in ("true", "false"):

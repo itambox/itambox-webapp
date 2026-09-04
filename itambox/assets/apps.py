@@ -1,5 +1,7 @@
 from django.apps import AppConfig
 
+from itambox.registry import registry
+
 
 class AssetsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
@@ -21,3 +23,15 @@ class AssetsConfig(AppConfig):
         from inventory.models_kit_checkout import register_kit_checkout
 
         register_kit_checkout(checkout_kit)
+
+        # inline imports: app-registry: register custom-field validation after all models are loaded.
+        from assets.customfields import validate_asset_custom_field_data, validate_asset_type_custom_field_data
+
+        registry.register_custom_field_data_validator(
+            self.get_model("AssetType"),
+            validate_asset_type_custom_field_data,
+        )
+        registry.register_custom_field_data_validator(
+            self.get_model("Asset"),
+            validate_asset_custom_field_data,
+        )
