@@ -60,3 +60,43 @@ class CustomFieldValidationSuppressionTests(TestCase):
 
         instance.clean.assert_called_once_with()
         self.assertEqual(instance._skip_custom_field_data_validation, "sentinel")
+
+    def test_applicability_dependency_changes_run_full_clean_other_fields_suppress(self):
+        calls = []
+
+        class DummyModel(ChangeLoggingMixin):
+            custom_field_data_validation_dependencies = frozenset({"asset_type"})
+
+            def clean(self):
+                calls.append(("clean", getattr(self, "_skip_custom_field_data_validation", None)))
+
+        instance = DummyModel()
+
+        # Unrelated field-limited saves keep the efficient suppression path.
+        validate_custom_validators_on_save(DummyModel, instance, update_fields={"status"})
+        self.assertEqual(calls, [("clean", True)])
+
+        # A declared applicability dependency must run full dynamic validation.
+        calls.clear()
+        validate_custom_validators_on_save(DummyModel, instance, update_fields={"asset_type"})
+        self.assertEqual(calls, [("clean", None)])
+
+        # custom_field_data itself and full saves keep the full path.
+        calls.clear()
+        validate_custom_validators_on_save(DummyModel, instance, update_fields={"custom_field_data"})
+        self.assertEqual(calls, [("clean", None)])
+
+        calls.clear()
+        validate_custom_validators_on_save(DummyModel, instance, update_fields=None)
+        self.assertEqual(calls, [("clean", None)])
+
+    def test_models_without_dependencies_keep_plain_suppression_semantics(self):
+        class DummyModel(ChangeLoggingMixin):
+            pass
+
+        instance = Mock()
+
+        validate_custom_validators_on_save(DummyModel, instance, update_fields={"asset_type"})
+
+        instance.clean.assert_called_once_with()
+        self.assertTrue(instance._skip_custom_field_data_validation)

@@ -20,7 +20,12 @@ def validate_custom_validators_on_save(sender, instance, update_fields=None, **k
     if not issubclass(sender, ChangeLoggingMixin):
         return
     try:
-        if update_fields is not None and "custom_field_data" not in update_fields:
+        dependencies = getattr(sender, "custom_field_data_validation_dependencies", frozenset())
+        if (
+            update_fields is not None
+            and "custom_field_data" not in update_fields
+            and dependencies.isdisjoint(update_fields)
+        ):
             _clean_without_custom_field_validation(instance)
         else:
             instance.clean()

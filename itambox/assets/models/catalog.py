@@ -2,10 +2,12 @@
 Supplier, Category — shared reference data that assets point into.
 """
 
+from contextlib import contextmanager
+
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.db import connection, models, transaction
+from django.db import DatabaseError, connections, models, router, transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -20,6 +22,55 @@ _LIBRARY_NAMESPACE_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)
 _LIBRARY_DEFINITION_KEY_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$")
 _LIBRARY_RELEASE_VALIDATOR = RegexValidator(r"^[A-Za-z0-9][A-Za-z0-9._+\-]{0,63}$")
 _SOURCE_CHECKSUM_VALIDATOR = RegexValidator(r"^sha256:[0-9a-f]{64}$")
+
+_ASSET_TYPE_RECONCILE_SETTING = "itambox.assettype_reconcile"
+
+
+@contextmanager
+def _library_reconciliation_opt_in(using):
+    """Narrowly opt one write into the reconciliation PostgreSQL guard.
+
+    The ``assets_assettype_library_identity_guard`` trigger only permits
+    release/checksum changes while the transaction-local
+    ``itambox.assettype_reconcile`` setting is ``on``. This helper owns the
+    whole setting lifecycle on the database alias the write actually uses:
+
+    * it captures the previous value (``None`` when the setting is unset),
+    * sets the value to ``on`` locally,
+    * and restores the exact previous value on scope exit, including on
+      exceptions and for nested use — so the opt-in can never leak into an
+      outer transaction and a pre-existing ``on`` state is preserved.
+
+    The trigger remains a fail-closed integrity guard for uncontrolled
+    writes, not a privilege or security boundary: a caller with unrestricted
+    use of the same database role can set the setting itself.
+    """
+    database = connections[using]
+    with database.cursor() as cursor:
+        cursor.execute("SELECT current_setting(%s, true)", [_ASSET_TYPE_RECONCILE_SETTING])
+        # PostgreSQL reports an unset custom setting as NULL; treat the empty
+        # string the same way so an untouched session is never turned into an
+        # explicitly-set one.
+        previous = cursor.fetchone()[0] or None
+        cursor.execute("SELECT set_config(%s, 'on', true)", [_ASSET_TYPE_RECONCILE_SETTING])
+    try:
+        yield
+    finally:
+        # The restore must never swallow the caller's exception: a bare
+        # ``return`` in this generator's finally would terminate the generator
+        # normally and replace the propagating error with StopIteration.
+        if not database.needs_rollback:
+            try:
+                with database.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT set_config(%s, %s, true)",
+                        [_ASSET_TYPE_RECONCILE_SETTING, previous if previous is not None else "off"],
+                    )
+            except DatabaseError:
+                # broad except: boundary-isolation: the write failed and the
+                # transaction is already aborted, so the restore is
+                # best-effort; the enclosing rollback reverts the setting
+                pass
 
 
 def _asset_type_field_validation_errors(asset_type):
@@ -545,30 +596,65 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         """Apply a controlled library reconciliation update.
 
         ``library_id`` and ``library_definition_key`` are immutable source
-        identity and never change here. ``library_release`` and
-        ``source_checksum`` are controlled reconciliation state: this method is
-        the single supported path that may update them. The model save guard and
-        the PostgreSQL trigger enforce the same boundary for ordinary saves and
-        for direct QuerySet/SQL writes (the trigger opts the write in through
-        the transaction-local ``itambox.assettype_reconcile`` setting).
+        identity and never change here. ``library_release``,
+        ``source_checksum``, and ``last_reconciled_at`` are controlled
+        reconciliation state: this method is the single supported path that
+        may update them. The model save guard and the PostgreSQL trigger
+        enforce the same boundary for ordinary saves and for direct
+        QuerySet/SQL writes (the trigger opts the write in through the
+        transaction-local ``itambox.assettype_reconcile`` setting).
+
+        The operation is stale-state safe: it locks the target row, compares
+        the persisted reconciliation state against the caller's loaded state,
+        and fails closed on any mismatch instead of silently overwriting a
+        newer state. A failed reconciliation restores the caller's instance
+        to its previous provenance values.
         """
         self._library_reconciliation_preflight_errors(library_release)
         self._validate_library_reconciliation_values(library_release, source_checksum)
-        self.library_release = library_release
-        self.source_checksum = source_checksum
-        if reconciled_at is not None:
-            self.last_reconciled_at = reconciled_at
-        self._reconcile_library_state = True
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        previous_state = {
+            "library_id": self.library_id,
+            "library_definition_key": self.library_definition_key,
+            "library_release": self.library_release,
+            "source_checksum": self.source_checksum,
+            "last_reconciled_at": self.last_reconciled_at,
+        }
         try:
-            with transaction.atomic():
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT set_config('itambox.assettype_reconcile', 'on', true)")
-                update_fields = ["library_release", "source_checksum"]
-                if reconciled_at is not None:
-                    update_fields.append("last_reconciled_at")
-                self.save(update_fields=update_fields)
-        finally:
-            self._reconcile_library_state = False
+            with transaction.atomic(using=using):
+                locked = type(self).all_objects.using(using).select_for_update().get(pk=self.pk)
+                for field_name in ("library_id", "library_definition_key"):
+                    if getattr(locked, field_name) != previous_state[field_name]:
+                        raise ValidationError(
+                            {field_name: _("The library Asset Type identity is immutable after creation.")}
+                        )
+                for field_name in ("library_release", "source_checksum"):
+                    if getattr(locked, field_name) != previous_state[field_name]:
+                        raise ValidationError(
+                            {
+                                field_name: _(
+                                    "The library reconciliation state changed after this instance was "
+                                    "loaded; refresh it and retry."
+                                )
+                            }
+                        )
+                self.library_release = library_release
+                self.source_checksum = source_checksum
+                self.last_reconciled_at = timezone.now() if reconciled_at is None else reconciled_at
+                self._reconcile_library_state = True
+                try:
+                    with _library_reconciliation_opt_in(using):
+                        self.save(
+                            using=using,
+                            update_fields=["library_release", "source_checksum", "last_reconciled_at"],
+                        )
+                finally:
+                    self._reconcile_library_state = False
+        # broad except: cleanup-reraise: restore the caller's reconciliation state before re-raising
+        except Exception:
+            for field_name, value in previous_state.items():
+                setattr(self, field_name, value)
+            raise
         return self
 
 

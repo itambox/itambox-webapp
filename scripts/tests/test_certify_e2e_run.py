@@ -217,6 +217,27 @@ class CertificationTests(unittest.TestCase):
         with self.assertRaises(CertificationError):
             self.run_certification(execution=cleanup_failed)
 
+    def test_retried_legacy_attempt_without_identity_stays_fail_closed(self):
+        execution = copy.deepcopy(self.execution)
+        legacy = next(test for test in execution["executed_tests"] if test["spec"].startswith("spec/legacy-smoke/"))
+        legacy["attempts"] = [
+            {"retry": 0, "status": "failed", "identity": None},
+            {"retry": 1, "status": "passed", "identity": None},
+        ]
+        legacy["status"] = "passed"
+
+        # The exact malformed case from the 2026-09-04 foundation run: a
+        # legacy spec (no runId fixture) retried after a flaky first attempt.
+        # Null identities are only tolerated for single attempts; a retried
+        # legacy test must still fail closed.
+        with self.assertRaises(CertificationError):
+            self.run_certification(execution=execution)
+
+        # The pre-existing single-attempt allowance for legacy evidence stays.
+        legacy["attempts"] = [{"retry": 0, "status": "passed", "identity": None}]
+        result = self.run_certification(execution=execution)
+        self.assertTrue(result["success"])
+
     def test_identity_mismatch_missing_setup_or_missing_report_fails(self):
         for key, value in (
             ("head_sha", "d" * 40),
