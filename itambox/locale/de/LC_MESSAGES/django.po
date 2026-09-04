@@ -7656,7 +7656,7 @@ msgid "Source Stock Location"
 msgstr "Quell-Lagerort"
 
 msgid "Requester (Myself)"
-msgstr "Anforderer (Ich selbst)"
+msgstr "Anforderer (Mich selbst)"
 
 msgid "Notes &amp; Justification"
 msgstr "Notizen &amp; Begründung"
