@@ -13495,7 +13495,7 @@ msgid "Low stock"
 msgstr "Niedriger Bestand"
 
 msgid "Myself"
-msgstr "Ich selbst"
+msgstr "Mich selbst"
 
 #: itambox/licenses/models.py:90
 msgid "Optional version constraint for this license entitlement (e.g. '2021', '16.x'). Informational only — reconciliation is performed at the Software level (version-agnostic)."
