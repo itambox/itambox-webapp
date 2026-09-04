@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.customfields import resolve_asset_custom_fields
 from core.forms import CrispyFormMixin, scope_tenant_field
+from core.mixins import suppress_custom_field_data_validation
 from extras.customfields import (
     apply_custom_field_patch,
     build_custom_field_clear_form_field,
@@ -167,11 +168,8 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         }
 
     def _post_clean(self):
-        self.instance._skip_custom_field_data_validation = True
-        try:
+        with suppress_custom_field_data_validation(self.instance):
             super()._post_clean()
-        finally:
-            del self.instance._skip_custom_field_data_validation
 
     def clean_status(self):
         status = self.cleaned_data.get("status")
