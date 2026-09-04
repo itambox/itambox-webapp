@@ -200,10 +200,35 @@ class AssetTypeFormPreservationTests(TestCase):
             ]
         )
 
+        # The bound covers the constant AssetType load plus the prefetched
+        # membership graph (fieldsets -> memberships -> custom field ->
+        # object types and choice sets -> choices). Both bounds below assert
+        # this constant graph at two fixture sizes: doubling the selected
+        # fieldsets must not add per-fieldset or per-field queries, which would
+        # break the nine-query ceiling.
         with CaptureQueriesContext(connection) as queries:
             form = AssetTypeForm(instance=asset_type)
-
         self.assertEqual(len(form.custom_field_keys), 3)
+        self.assertLessEqual(len(queries), 9)
+
+        for index in range(3, 6):
+            fieldset = CustomFieldset.objects.create(
+                namespace="local",
+                slug=f"query-bound-{index}",
+                label=f"Query bound {index}",
+            )
+            field = CustomField.objects.create(
+                name=f"query_bound_{index}",
+                namespace="local",
+                label=f"Query bound {index}",
+                scope=CustomField.SCOPE_ASSET_TYPE,
+            )
+            CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
+            AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=(index + 1) * 10)
+
+        with CaptureQueriesContext(connection) as queries:
+            enlarged_form = AssetTypeForm(instance=asset_type)
+        self.assertEqual(len(enlarged_form.custom_field_keys), 6)
         self.assertLessEqual(len(queries), 9)
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
