@@ -1,6 +1,8 @@
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.cookie import CookieStorage
+from django.db import connection
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 
 from assets.forms import AssetTypeForm
 from assets.models import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
@@ -169,6 +171,40 @@ class AssetTypeFormPreservationTests(TestCase):
             list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)),
             [old_fieldset.pk],
         )
+
+    def test_asset_type_form_prefetches_selected_fieldsets_in_constant_queries(self):
+        fieldsets = []
+        for index in range(3):
+            fieldset = CustomFieldset.objects.create(
+                namespace="local",
+                slug=f"query-bound-{index}",
+                label=f"Query bound {index}",
+            )
+            field = CustomField.objects.create(
+                name=f"query_bound_{index}",
+                namespace="local",
+                label=f"Query bound {index}",
+                scope=CustomField.SCOPE_ASSET_TYPE,
+            )
+            CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
+            fieldsets.append(fieldset)
+        asset_type = AssetType.objects.create(
+            manufacturer=Manufacturer.objects.create(name="Query Bound Manufacturer", slug="query-bound-manufacturer"),
+            model="Query bound type",
+            slug="query-bound-type",
+        )
+        AssetTypeFieldset.objects.bulk_create(
+            [
+                AssetTypeFieldset(asset_type=asset_type, fieldset=fieldset, position=(index + 1) * 10)
+                for index, fieldset in enumerate(fieldsets)
+            ]
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            form = AssetTypeForm(instance=asset_type)
+
+        self.assertEqual(len(form.custom_field_keys), 3)
+        self.assertLessEqual(len(queries), 9)
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")

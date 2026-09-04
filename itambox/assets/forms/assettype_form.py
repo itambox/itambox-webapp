@@ -99,7 +99,14 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def _selected_fieldsets(self):
         ids = self._raw_selected_fieldset_ids()
-        by_id = CustomFieldset.objects.in_bulk(ids)
+        by_id = (
+            CustomFieldset.objects.filter(pk__in=ids)
+            .prefetch_related(
+                "field_memberships__custom_field__object_types",
+                "field_memberships__custom_field__choice_set__choices",
+            )
+            .in_bulk(ids)
+        )
         return [by_id[fieldset_id] for fieldset_id in ids if fieldset_id in by_id]
 
     def clean_custom_fieldsets(self):

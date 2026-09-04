@@ -245,6 +245,34 @@ def validate_custom_field_value(cf, value, merged_values=None):
     return validator(cf, value)
 
 
+def _validate_cross_field_rules(definitions_by_key, values):
+    maximum = definitions_by_key.get("operating_temperature_max")
+    if maximum and _definition(maximum).validation_rule == "temperature_max_gte_min":
+        minimum_value = values.get("operating_temperature_min")
+        maximum_value = values.get("operating_temperature_max")
+        if minimum_value is not None and maximum_value is not None:
+            if Decimal(maximum_value) < Decimal(minimum_value):
+                raise ValidationError(_("Maximum temperature must not be below minimum."), code="INVALID_RANGE")
+
+
+def validate_custom_field_data_values(definitions, values):
+    """Validate active stored values while preserving historical definitions."""
+    values = dict(values or {})
+    definitions_by_key = {_definition(item).name: item for item in definitions}
+    for key, value in values.items():
+        item = definitions_by_key.get(key)
+        if item is None:
+            continue
+        definition = _definition(item)
+        if definition.deleted_at is not None or definition.lifecycle != CustomField.LIFECYCLE_ACTIVE:
+            continue
+        if getattr(item, "read_only", False):
+            continue
+        validate_custom_field_value(definition, value, values)
+    validate_required_custom_field_values(definitions_by_key.values(), values)
+    _validate_cross_field_rules(definitions_by_key, values)
+
+
 def apply_custom_field_patch(existing, definitions, submitted, clear_keys=()):
     """Apply an explicit merge patch while preserving every unmentioned key."""
     definitions_by_key = {_definition(item).name: item for item in definitions}
@@ -264,15 +292,7 @@ def apply_custom_field_patch(existing, definitions, submitted, clear_keys=()):
         merged.pop(key, None)
     for key, value in submitted.items():
         merged[key] = validate_custom_field_value(definitions_by_key[key], value, merged)
-    validate_required_custom_field_values(definitions_by_key.values(), merged)
-
-    maximum = definitions_by_key.get("operating_temperature_max")
-    if maximum and _definition(maximum).validation_rule == "temperature_max_gte_min":
-        minimum_value = merged.get("operating_temperature_min")
-        maximum_value = merged.get("operating_temperature_max")
-        if minimum_value is not None and maximum_value is not None:
-            if Decimal(maximum_value) < Decimal(minimum_value):
-                raise ValidationError(_("Maximum temperature must not be below minimum."), code="INVALID_RANGE")
+    validate_custom_field_data_values(definitions_by_key.values(), merged)
     return merged
 
 
@@ -352,7 +372,7 @@ def custom_fields_for_model(model, include_inactive=False):
 
 def validate_generic_custom_field_data(instance):
     definitions = custom_fields_for_model(type(instance), include_inactive=True)
-    validate_required_custom_field_values(definitions, instance.custom_field_data or {})
+    validate_custom_field_data_values(definitions, instance.custom_field_data or {})
 
 
 def _custom_field_filter_lookup(definition, name, value):

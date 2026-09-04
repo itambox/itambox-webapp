@@ -274,6 +274,45 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         with self.assertRaises(ValidationError):
             Supplier.objects.create(name="Missing required value", slug="missing-required-value")
 
+    def test_generic_model_save_rejects_invalid_active_field_values(self):
+        supplier_type = ContentType.objects.get_for_model(Supplier)
+        decimal_field = CustomField.objects.create(
+            name="supplier_decimal_value",
+            label="Supplier decimal value",
+            field_type=CustomField.FIELD_TYPE_DECIMAL,
+            decimal_scale=2,
+        )
+        decimal_field.object_types.add(supplier_type)
+
+        with self.assertRaises(ValidationError):
+            Supplier.objects.create(
+                name="Invalid decimal supplier",
+                slug="invalid-decimal-supplier",
+                custom_field_data={"supplier_decimal_value": "not-a-decimal"},
+            )
+
+        choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="supplier-state-values",
+            label="Supplier state values",
+        )
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="active", label="Active", position=10)
+        select_field = CustomField.objects.create(
+            name="supplier_state_value",
+            label="Supplier state value",
+            field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            choice_set=choice_set,
+            max_values=1,
+        )
+        select_field.object_types.add(supplier_type)
+
+        with self.assertRaises(ValidationError):
+            Supplier.objects.create(
+                name="Invalid choice supplier",
+                slug="invalid-choice-supplier",
+                custom_field_data={"supplier_state_value": "removed"},
+            )
+
     def test_deleted_choice_set_rejects_new_choice_values(self):
         from extras.customfields import validate_custom_field_value
 

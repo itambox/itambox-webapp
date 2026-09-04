@@ -485,10 +485,15 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     def save(self, *args, **kwargs):
         if self.pk:
-            previous = type(self).all_objects.filter(pk=self.pk).values("library_id", "library_definition_key").first()
-            if previous and (
-                previous["library_id"] != self.library_id
-                or previous["library_definition_key"] != self.library_definition_key
+            previous = (
+                type(self)
+                .all_objects.filter(pk=self.pk)
+                .values("library_id", "library_definition_key", "library_release", "source_checksum")
+                .first()
+            )
+            if previous and any(
+                previous[field_name] != getattr(self, field_name)
+                for field_name in ("library_id", "library_definition_key", "library_release", "source_checksum")
             ):
                 raise ValidationError(
                     {

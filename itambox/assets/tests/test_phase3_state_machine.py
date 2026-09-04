@@ -69,6 +69,17 @@ class AssetStateMachineSavePathTest(TenantTestMixin, TestCase):
             self.asset.save()
         self.assertIn("Illegal state transition", str(ctx.exception))
 
+    def test_update_fields_does_not_bypass_status_transition_validation(self):
+        """Field-limited saves still execute non-custom model validation."""
+        self.asset.status = self.archived
+        self.asset.save()
+        self.asset.refresh_from_db()
+
+        self.asset.status = self.deployable
+        with self.assertRaises(ValidationError) as ctx:
+            self.asset.save(update_fields=["status"])
+        self.assertIn("Illegal state transition", str(ctx.exception))
+
     def test_checked_out_asset_cannot_be_archived_via_save(self):
         """An asset with an active assignment must not be archived on save()."""
         from organization.models import AssetHolder

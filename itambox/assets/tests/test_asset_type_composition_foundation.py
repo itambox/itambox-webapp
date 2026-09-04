@@ -89,6 +89,33 @@ class AssetTypeCompositionFoundationTests(TestCase):
                 library_release="",
             )
 
+    def test_library_identity_db_constraint_rejects_valid_identity_rewrite(self):
+        library = AssetTypeLibrary.objects.create(namespace="immutable-db", release="2026.09")
+        manufacturer = Manufacturer.objects.create(name="Immutable DB Manufacturer", slug="immutable-db-manufacturer")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Immutable DB type",
+            slug="immutable-db-type",
+            management_kind=AssetType.MANAGEMENT_LIBRARY,
+            library=library,
+            library_definition_key="original-definition",
+            library_release="2026.09",
+        )
+
+        replacement_library = AssetTypeLibrary.objects.create(namespace="immutable-db-other", release="2026.09")
+        attempted_updates = (
+            {"library_id": replacement_library.pk},
+            {"library_definition_key": "replacement-definition"},
+            {"library_release": "2026.10"},
+            {"source_checksum": "sha256:" + "1" * 64},
+        )
+        for update in attempted_updates:
+            with self.assertRaises(IntegrityError), transaction.atomic():
+                AssetType._base_manager.filter(pk=asset_type.pk).update(**update)
+            asset_type.refresh_from_db()
+
+        self.assertEqual(asset_type.library_definition_key, "original-definition")
+
     def test_library_identity_composition_and_category_defaults_are_relational(self):
         library = AssetTypeLibrary.objects.create(namespace="acme", release="2026.09")
         manufacturer = Manufacturer.objects.create(name="Example Networks", slug="example-networks")
@@ -140,11 +167,15 @@ class AssetTypeCompositionFoundationTests(TestCase):
                 library_release="2026.09",
             )
 
-        asset_type.library_definition_key = "renamed-definition"
-        with self.assertRaises(ValidationError):
-            asset_type.save()
-
-        asset_type.refresh_from_db()
+        for field_name, replacement in (
+            ("library_definition_key", "renamed-definition"),
+            ("library_release", "2026.10"),
+            ("source_checksum", "sha256:" + "1" * 64),
+        ):
+            setattr(asset_type, field_name, replacement)
+            with self.assertRaises(ValidationError):
+                asset_type.save()
+            asset_type.refresh_from_db()
         asset_type.delete()
         asset_type.refresh_from_db()
         self.assertIsNotNone(asset_type.deleted_at)
