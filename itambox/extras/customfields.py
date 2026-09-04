@@ -142,6 +142,8 @@ def _validate_hostname(value):
 def _validate_text(cf, value):
     if not isinstance(value, str):
         raise ValidationError(_("Enter text."), code="INVALID_TYPE")
+    if value == "" and not getattr(cf, "required", False):
+        return value
     if cf.text_max_length is not None and len(value) > cf.text_max_length:
         raise ValidationError(_("The text is too long."), code="INVALID_RANGE")
     if cf.regex:

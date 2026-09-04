@@ -319,7 +319,8 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "required-fresh",
-        "Installs the PostgreSQL trigger that makes Asset Type library identity and provenance immutable after creation, including for QuerySet and direct SQL updates.",
+        "Installs the PostgreSQL trigger that makes Asset Type library identity and provenance "
+        "immutable after creation, including for QuerySet and direct SQL updates.",
         {"assets.0113_assettype_library_identity_immutable"},
     ),
 }
