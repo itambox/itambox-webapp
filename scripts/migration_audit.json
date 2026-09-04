@@ -6713,7 +6713,7 @@
       "replaces": [],
       "reviewed_disposition": {
         "disposition": "required-fresh",
-        "rationale": "Installs the PostgreSQL trigger that makes Asset Type library identity and provenance immutable after creation, including for QuerySet and direct SQL updates."
+        "rationale": "Installs the PostgreSQL trigger that keeps Asset Type library identity immutable and restricts library release/checksum reconciliation-state changes to the controlled reconciliation path, including for QuerySet and direct SQL updates."
       },
       "run_before": [],
       "special_users_bootstrap": false,

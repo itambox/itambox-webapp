@@ -14003,6 +14003,22 @@ msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen ein Release."
 msgid "Only library-managed Asset Types may carry Library identity or provenance."
 msgstr "Nur von einer Bibliothek verwaltete Asset-Typen dürfen Bibliotheksidentität oder Herkunftsdaten enthalten."
 
+#: itambox/assets/models/catalog.py
+msgid "Only library-managed Asset Types may be reconciled."
+msgstr "Nur von einer Bibliothek verwaltete Asset-Typen dürfen abgeglichen werden."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require full library identity before reconciliation."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen vor dem Abgleich eine vollständige Bibliotheksidentität."
+
+#: itambox/assets/models/catalog.py
+msgid "The reconciled library release must not be empty."
+msgstr "Das abgeglichene Bibliotheks-Release darf nicht leer sein."
+
+#: itambox/assets/models/catalog.py
+msgid "The library Asset Type release and checksum may only change through the library reconciliation path."
+msgstr "Release und Prüfsumme von Bibliotheks-Asset-Typen dürfen nur über den Bibliotheks-Abgleich geändert werden."
+
 #: itambox/itambox/views/generic/restore.py
 msgid "Skipped %(count)s permanent schema tombstone(s)."
 msgstr "%(count)s dauerhafte Schema-Tombstones übersprungen."

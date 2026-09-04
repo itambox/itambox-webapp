@@ -5,7 +5,7 @@ Supplier, Category — shared reference data that assets point into.
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import connection, models, transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -491,16 +491,85 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
                 .values("library_id", "library_definition_key", "library_release", "source_checksum")
                 .first()
             )
-            if previous and any(
-                previous[field_name] != getattr(self, field_name)
-                for field_name in ("library_id", "library_definition_key", "library_release", "source_checksum")
-            ):
-                raise ValidationError(
-                    {
-                        "library_definition_key": _("The library Asset Type identity is immutable after creation."),
-                    }
-                )
+            if previous:
+                if any(
+                    previous[field_name] != getattr(self, field_name)
+                    for field_name in ("library_id", "library_definition_key")
+                ):
+                    raise ValidationError(
+                        {
+                            "library_definition_key": _("The library Asset Type identity is immutable after creation."),
+                        }
+                    )
+                if not getattr(self, "_reconcile_library_state", False) and any(
+                    previous[field_name] != getattr(self, field_name)
+                    for field_name in ("library_release", "source_checksum")
+                ):
+                    raise ValidationError(
+                        {
+                            "library_release": _(
+                                "The library Asset Type release and checksum may only change "
+                                "through the library reconciliation path."
+                            ),
+                        }
+                    )
         return super().save(*args, **kwargs)
+
+    def _library_reconciliation_preflight_errors(self, library_release):
+        errors = {}
+        if self.management_kind != self.MANAGEMENT_LIBRARY:
+            errors["management_kind"] = _("Only library-managed Asset Types may be reconciled.")
+        if self.library_id is None or not self.library_definition_key:
+            errors["library_definition_key"] = _(
+                "Library-managed Asset Types require full library identity before reconciliation."
+            )
+        if not library_release:
+            errors["library_release"] = _("The reconciled library release must not be empty.")
+        if errors:
+            raise ValidationError(errors)
+
+    def _validate_library_reconciliation_values(self, library_release, source_checksum):
+        for field_name, value in (
+            ("library_release", library_release),
+            ("source_checksum", source_checksum),
+        ):
+            if value is None:
+                continue
+            field = self._meta.get_field(field_name)
+            try:
+                field.run_validators(value)
+            except ValidationError as exc:
+                raise ValidationError({field_name: exc.messages}) from None
+
+    def apply_library_reconciliation(self, *, library_release, source_checksum, reconciled_at=None):
+        """Apply a controlled library reconciliation update.
+
+        ``library_id`` and ``library_definition_key`` are immutable source
+        identity and never change here. ``library_release`` and
+        ``source_checksum`` are controlled reconciliation state: this method is
+        the single supported path that may update them. The model save guard and
+        the PostgreSQL trigger enforce the same boundary for ordinary saves and
+        for direct QuerySet/SQL writes (the trigger opts the write in through
+        the transaction-local ``itambox.assettype_reconcile`` setting).
+        """
+        self._library_reconciliation_preflight_errors(library_release)
+        self._validate_library_reconciliation_values(library_release, source_checksum)
+        self.library_release = library_release
+        self.source_checksum = source_checksum
+        if reconciled_at is not None:
+            self.last_reconciled_at = reconciled_at
+        self._reconcile_library_state = True
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT set_config('itambox.assettype_reconcile', 'on', true)")
+                update_fields = ["library_release", "source_checksum"]
+                if reconciled_at is not None:
+                    update_fields.append("last_reconciled_at")
+                self.save(update_fields=update_fields)
+        finally:
+            self._reconcile_library_state = False
+        return self
 
 
 class AssetTypeFieldset(BaseModel):
