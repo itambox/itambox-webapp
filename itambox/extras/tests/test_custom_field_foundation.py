@@ -26,6 +26,21 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         self.assertTrue(_has_managed_definition_rows(CustomField.objects.all(), CustomField))
         self.assertTrue(_has_managed_definition_rows([CustomField.objects.get(pk=field.pk)], CustomField))
 
+    def test_optional_rfc1123_text_accepts_empty_value(self):
+        from types import SimpleNamespace
+
+        from extras.customfields import validate_custom_field_value
+
+        definition = SimpleNamespace(
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            regex=None,
+            text_max_length=253,
+            validation_rule="rfc1123_hostname",
+            required=False,
+        )
+
+        self.assertEqual(validate_custom_field_value(definition, ""), "")
+
     def test_invalid_custom_field_regex_fails_closed(self):
         from types import SimpleNamespace
 
