@@ -1,6 +1,12 @@
 import hashlib
 import importlib
+import inspect
 import os
+import signal
+import subprocess
+import sys
+from functools import wraps
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -11,6 +17,71 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import SimpleTestCase, TransactionTestCase
 from django.utils import timezone
+
+_ISOLATED_MIGRATION_ENV = "ITAMBOX_ISSUE479_MIGRATION_CHILD"
+
+
+def _migration_test_nodeid(test_case, method):
+    test_file = Path(inspect.getfile(type(test_case))).resolve()
+    cwd = Path.cwd().resolve()
+    try:
+        relative_file = test_file.relative_to(cwd)
+    except ValueError:
+        relative_file = Path(os.path.relpath(test_file, cwd))
+    return f"{relative_file.as_posix()}::{type(test_case).__name__}::{method.__name__}"
+
+
+def _isolate_migration_test(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if os.environ.get(_ISOLATED_MIGRATION_ENV) == "1":
+            return method(self, *args, **kwargs)
+
+        nodeid = _migration_test_nodeid(self, method)
+        child_env = os.environ.copy()
+        child_env[_ISOLATED_MIGRATION_ENV] = "1"
+        timeout = float(os.environ.get("ITAMBOX_ISSUE479_MIGRATION_TIMEOUT", "900"))
+        popen_kwargs = {
+            "cwd": os.getcwd(),
+            "env": child_env,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "text": True,
+            "encoding": "utf-8",
+            "errors": "replace",
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            popen_kwargs["start_new_session"] = True
+        child = subprocess.Popen([sys.executable, "-m", "pytest", nodeid], **popen_kwargs)
+        try:
+            output, _ = child.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            if os.name == "nt":
+                child.kill()
+            else:
+                os.killpg(child.pid, signal.SIGTERM)
+            try:
+                output, _ = child.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                if os.name == "nt":
+                    child.kill()
+                else:
+                    os.killpg(child.pid, signal.SIGKILL)
+                output, _ = child.communicate()
+            self.fail(f"isolated migration test timed out after {timeout:g}s: {nodeid}\n{output}")
+        if child.returncode:
+            self.fail(f"isolated migration test exited {child.returncode}: {nodeid}\n{output}")
+
+    return wrapper
+
+
+def _isolate_migration_tests(test_class):
+    for name, method in tuple(vars(test_class).items()):
+        if name.startswith("test_"):
+            setattr(test_class, name, _isolate_migration_test(method))
+    return test_class
 
 
 class AdoptionPreflightUnitTests(SimpleTestCase):
@@ -73,6 +144,7 @@ class AdoptionPreflightUnitTests(SimpleTestCase):
         self.assertEqual([(field.name, field.label, field.field_type) for field in fields], before)
 
 
+@_isolate_migration_tests
 @pytest.mark.serial_only
 class AssetTypeFoundationMigrationTests(TransactionTestCase):
     migrate_from = [
