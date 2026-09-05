@@ -116,7 +116,7 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
             self.assertGreaterEqual(len(doc["cases"]), 1, name)
 
     def test_case_ids_are_unique_and_well_formed(self):
-        ids = list(self.cases)
+        ids = [case["id"] for document in self.documents.values() for case in document["cases"]]
         self.assertEqual(len(ids), len(set(ids)), "duplicate case ids in corpus")
         for case_id in ids:
             self.assertRegex(case_id, CASE_ID_PATTERN, case_id)
@@ -294,7 +294,9 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
         self.assertEqual(definition["type"], "decimal")
         self.assertEqual(definition["scale"], 2)
         self.assertIsInstance(invalid_value, str)
-        self.assertIsNone(re.fullmatch(r"-?(?:0|[1-9]\\d*)(?:\\.\\d+)?", invalid_value))
+        decimal_pattern = r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+        self.assertIsNotNone(re.fullmatch(decimal_pattern, "12.30"))
+        self.assertIsNone(re.fullmatch(decimal_pattern, invalid_value))
         self.assertNotIn(field_key, case["operation"]["set"])
         self.assertEqual(preserved_invalid["field"], field_key)
         self.assertEqual(preserved_invalid["value"], invalid_value)
@@ -339,6 +341,10 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
                 self.assertIn(field_key, fields, f"{case_id}: {field_key} lacks a local definition")
                 self.assertIsInstance(fields[field_key], dict, f"{case_id}: malformed {field_key} definition")
         self.assertNotIn("ghost_key", fields)
+        for case_id in ("T02-HIST-009", "T02-HIST-012"):
+            initial = self.cases[case_id][1]["initial_state"]
+            self.assertNotIn("f4_cost", initial["effective_field_keys"])
+            self.assertIn("f4_cost", initial["removed_composition_field_keys"])
 
     def test_manifest_required_categories_are_covered(self):
         coverage = self.manifest["coverage"]

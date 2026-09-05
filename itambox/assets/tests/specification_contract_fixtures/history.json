@@ -144,7 +144,7 @@
       "invariant": "Merge preservation",
       "acceptance": "A05",
       "source_section": "3.2",
-      "initial_state": { "f3_location": "Office", "stored_in_removed_section": true },
+      "initial_state": { "f3_location": "Office", "stored_in_removed_section": true, "effective_field_keys": ["f3_location"], "removed_composition_field_keys": ["f4_cost"] },
       "operation": { "kind": "project", "stored": { "f3_location": "Office", "f4_cost": "12.30" } },
       "expected_result": {
         "outcome": "accepted",
@@ -186,7 +186,7 @@
       "invariant": "Historical cleanup",
       "acceptance": "A05",
       "source_section": "4.4",
-      "initial_state": { "stored": { "ghost_key": "v", "f4_cost": "12.30", "legacy_note": "kept" }, "audit": [] },
+      "initial_state": { "stored": { "ghost_key": "v", "f4_cost": "12.30", "legacy_note": "kept" }, "effective_field_keys": [], "removed_composition_field_keys": ["f4_cost"], "audit": [] },
       "operation": { "kind": "history_cleanup", "keys": ["ghost_key", "f4_cost"] },
       "expected_result": {
         "outcome": "accepted",
