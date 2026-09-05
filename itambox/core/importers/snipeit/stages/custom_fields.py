@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 from django.apps import apps
 from django.db import transaction
-from django.utils import timezone
 
 from core.importers.snipeit.common import _FIELD_FORMAT_MAP, _clean_field_name
 from core.importers.snipeit.contracts import ImportContext, Outcome, StageResult
@@ -57,13 +56,13 @@ class CustomFieldImporter:
     def _get_choice_set(self, choice_set_model, source_id, label):
         slug = f"snipeit-{source_id}"
         source_checksum = self._source_checksum("choice-set", source_id)
-        choice_set = choice_set_model.all_objects.select_for_update().filter(namespace="local", slug=slug).first()
-        if choice_set is not None and choice_set.deleted_at is not None:
-            raise ValueError("Snipe-IT Choice Set identity is reserved by a tombstone")
+        choice_set = choice_set_model.objects.select_for_update().filter(namespace="local", slug=slug).first()
         if choice_set is not None and choice_set.management_kind != "local":
             raise ValueError("Cannot update a managed Choice Set from Snipe-IT")
         if choice_set is not None and choice_set.source_checksum != source_checksum:
             raise ValueError("Cannot claim an unprovenanced Choice Set from Snipe-IT")
+        if choice_set is not None and choice_set.lifecycle != "active":
+            raise ValueError("Cannot reactivate a deprecated Choice Set from Snipe-IT")
         if choice_set is None:
             choice_set = choice_set_model.objects.create(
                 namespace="local",
@@ -78,12 +77,11 @@ class CustomFieldImporter:
 
     @staticmethod
     def _refresh_choice_set(choice_set_model, choice_set, label):
-        choice_set_model.all_objects.filter(pk=choice_set.pk).update(
+        choice_set_model.objects.filter(pk=choice_set.pk).update(
             label=f"{label} choices",
             management_kind="local",
             version=1,
             lifecycle="active",
-            deleted_at=None,
         )
 
     @staticmethod
@@ -92,7 +90,11 @@ class CustomFieldImporter:
             (
                 choice
                 for choice in existing_choices
-                if choice.deleted_at is None and choice.pk not in used_existing_ids and choice.label == choice_label
+                if (
+                    choice.pk not in used_existing_ids
+                    and choice.label == choice_label
+                    and getattr(choice, "lifecycle", "active") == "active"
+                )
             ),
             None,
         )
@@ -105,7 +107,11 @@ class CustomFieldImporter:
         assignments = []
         for generated_key, choice_label in generated_choices:
             existing = existing_by_key.get(generated_key)
-            if existing is not None and existing.deleted_at is None and existing.label == choice_label:
+            if (
+                existing is not None
+                and getattr(existing, "lifecycle", "active") == "active"
+                and existing.label == choice_label
+            ):
                 assigned_key = existing.key
                 used_existing_ids.add(existing.pk)
             else:
@@ -132,47 +138,47 @@ class CustomFieldImporter:
 
     def _reconcile_choice_rows(self, choice_model, choice_set, choices):
         existing_choices = list(
-            choice_model.all_objects.select_for_update().filter(choice_set_id=choice_set.pk).order_by("position", "key")
+            choice_model.objects.select_for_update().filter(choice_set_id=choice_set.pk).order_by("position", "key")
         )
         if any(choice.management_kind != "local" for choice in existing_choices):
             raise ValueError("Cannot update managed Choices from Snipe-IT")
-        for choice, temporary_position in zip(
-            existing_choices,
-            self._temporary_choice_positions(existing_choices),
-            strict=True,
-        ):
-            choice_model.all_objects.filter(pk=choice.pk).update(position=temporary_position)
         existing_by_key, desired_choices = self._desired_choice_keys(existing_choices, choices)
         desired_keys = {key for key, _ in desired_choices}
-        if any(
-            (choice := existing_by_key.get(key)) is not None and choice.deleted_at is not None
-            for key, _ in desired_choices
-        ):
-            raise ValueError("Snipe-IT Choice identity is reserved by a tombstone")
-        choice_model.all_objects.filter(choice_set_id=choice_set.pk, deleted_at__isnull=True).exclude(
-            key__in=desired_keys
-        ).update(lifecycle="deprecated", deleted_at=timezone.now())
-        for position, (key, choice_label) in enumerate(desired_choices, start=1):
+        full_order = self._full_choice_order(existing_choices, desired_choices)
+        positions = {key: position for position, key in enumerate(full_order, start=1)}
+        for choice in existing_choices:
+            if choice.key not in desired_keys:
+                choice_model.objects.filter(pk=choice.pk).update(
+                    lifecycle="deprecated",
+                    position=positions[choice.key],
+                )
+        for key, choice_label in desired_choices:
             choice = existing_by_key.get(key)
             if choice is None:
                 choice_model.objects.create(
                     choice_set=choice_set,
                     key=key,
                     label=choice_label,
-                    position=position * 10,
+                    position=positions[key],
                     management_kind="local",
                     version=1,
                     lifecycle="active",
                 )
                 continue
-            choice_model.all_objects.filter(pk=choice.pk).update(
+            choice_model.objects.filter(pk=choice.pk).update(
                 label=choice_label,
-                position=position * 10,
+                position=positions[key],
                 management_kind="local",
                 version=1,
                 lifecycle="active",
-                deleted_at=None,
             )
+
+    @staticmethod
+    def _full_choice_order(existing_choices, desired_choices):
+        desired_keys = {key for key, _label in desired_choices}
+        return [key for key, _label in desired_choices] + [
+            choice.key for choice in existing_choices if choice.key not in desired_keys
+        ]
 
     def _choice_set(self, choice_set_model, choice_model, source_id, label, raw_choices):
         choices = self._choice_labels(raw_choices)
@@ -180,19 +186,6 @@ class CustomFieldImporter:
         self._refresh_choice_set(choice_set_model, choice_set, label)
         self._reconcile_choice_rows(choice_model, choice_set, choices)
         return choice_set
-
-    @staticmethod
-    def _temporary_choice_positions(existing_choices):
-        if not existing_choices:
-            return []
-        occupied = {choice.position for choice in existing_choices}
-        positions = []
-        for candidate in range(900000, 1000001):
-            if candidate not in occupied:
-                positions.append(candidate)
-                if len(positions) == len(existing_choices):
-                    return positions
-        raise ValueError("Too many choices for safe reconciliation")
 
     @staticmethod
     def _choice_key(label, used=None):
@@ -258,7 +251,7 @@ class CustomFieldImporter:
             "label": label,
             "help_text": "Imported from Snipe-IT",
             "field_type": field_type,
-            "scope": "asset",
+            "activation": "composed",
             "management_kind": "local",
             "version": 1,
             "lifecycle": "active",
@@ -269,13 +262,13 @@ class CustomFieldImporter:
             "decimal_scale": 2 if field_type == "decimal" else None,
             "choice_set": None,
         }
-        obj = model.all_objects.select_for_update().filter(name=raw_name).first()
-        if obj and obj.deleted_at is not None:
-            raise ValueError("Snipe-IT Custom Field identity is reserved by a tombstone")
+        obj = model.objects.select_for_update().filter(name=raw_name).first()
         if obj and obj.management_kind != "local":
             raise ValueError("Cannot update a managed Custom Field from Snipe-IT")
         if obj and obj.source_checksum != defaults["source_checksum"]:
             raise ValueError("Cannot claim an unprovenanced Custom Field from Snipe-IT")
+        if obj and obj.lifecycle != "active":
+            raise ValueError("Cannot reactivate a deprecated Custom Field from Snipe-IT")
         if obj and not self.context.update:
             return obj, "skipped"
         self._apply_choice_set_defaults(
@@ -356,7 +349,7 @@ class FieldsetImporter:
         if field_objects:
             membership_model.objects.bulk_create(
                 [
-                    membership_model(fieldset_id=fieldset.pk, custom_field_id=field.pk, position=index * 10)
+                    membership_model(fieldset_id=fieldset.pk, custom_field_id=field.pk, position=index)
                     for index, field in enumerate(field_objects, start=1)
                 ]
             )
@@ -375,19 +368,19 @@ class FieldsetImporter:
             "lifecycle": "active",
             "source_checksum": self._source_checksum(source_id),
         }
-        obj = model.all_objects.select_for_update().filter(namespace="local", slug=slug).first()
+        obj = model.objects.select_for_update().filter(namespace="local", slug=slug).first()
         created = False
-        if obj and obj.deleted_at is not None:
-            raise ValueError("Snipe-IT Fieldset identity is reserved by a tombstone")
         if obj and obj.management_kind != "local":
             raise ValueError("Cannot update a managed Fieldset from Snipe-IT")
         if obj and obj.source_checksum != defaults["source_checksum"]:
             raise ValueError("Cannot claim an unprovenanced Fieldset from Snipe-IT")
+        if obj and obj.lifecycle != "active":
+            raise ValueError("Cannot reactivate a deprecated Fieldset from Snipe-IT")
         if obj:
             if not self.context.update:
                 return obj, "skipped"
             if not self.context.dry_run:
-                model.all_objects.filter(pk=obj.pk).update(**defaults)
+                model.objects.filter(pk=obj.pk).update(**defaults)
         elif not self.context.dry_run:
             obj = model.objects.create(**defaults)
             created = True
