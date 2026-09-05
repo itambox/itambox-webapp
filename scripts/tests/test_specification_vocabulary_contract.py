@@ -87,25 +87,13 @@ EXPECTED_LOCAL_ONLY_CATEGORIES = {
 class SpecificationVocabularyContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.canonical = json.loads(
-            (FIXTURE_DIR / "canonical-target.json").read_text(encoding="utf-8")
-        )
-        cls.foundation = json.loads(
-            (FIXTURE_DIR / "foundation-baseline.json").read_text(encoding="utf-8")
-        )
+        cls.canonical = json.loads((FIXTURE_DIR / "canonical-target.json").read_text(encoding="utf-8"))
+        cls.foundation = json.loads((FIXTURE_DIR / "foundation-baseline.json").read_text(encoding="utf-8"))
         cls.active_fields = {field["key"]: field for field in cls.canonical["active_fields"]}
-        cls.retired_fields = {
-            field["key"]: field for field in cls.canonical["reserved_retired_fields"]
-        }
+        cls.retired_fields = {field["key"]: field for field in cls.canonical["reserved_retired_fields"]}
         cls.sections = {section["identity"]: section for section in cls.canonical["sections"]}
-        cls.choice_sets = {
-            choice_set["identity"]: choice_set
-            for choice_set in cls.canonical["choice_sets"]
-        }
-        cls.categories = {
-            category["identity"]: category
-            for category in cls.canonical["categories"]
-        }
+        cls.choice_sets = {choice_set["identity"]: choice_set for choice_set in cls.canonical["choice_sets"]}
+        cls.categories = {category["identity"]: category for category in cls.canonical["categories"]}
 
     def test_complete_inventory_counts_and_identity_sets(self):
         self.assertEqual(
@@ -132,9 +120,7 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
         self.assertEqual(len(self.choice_sets), 14)
         self.assertEqual(len(self.categories), 13)
         self.assertEqual(set(self.retired_fields), EXPECTED_RETIRED_FIELDS)
-        self.assertEqual(
-            set(self.active_fields) & set(self.retired_fields), set()
-        )
+        self.assertEqual(set(self.active_fields) & set(self.retired_fields), set())
         self.assertEqual(
             set(self.active_fields) - set(self.foundation_field_keys()),
             EXPECTED_ADDED_FIELDS,
@@ -145,11 +131,7 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
 
     def test_field_metadata_targets_activation_and_requiredness(self):
         self.assertEqual(
-            {
-                field["key"]
-                for field in self.canonical["active_fields"]
-                if "asset" in field["targets"]
-            },
+            {field["key"] for field in self.canonical["active_fields"] if "asset" in field["targets"]},
             EXPECTED_ASSET_TARGET_FIELDS,
         )
         for field in self.canonical["active_fields"]:
@@ -183,10 +165,7 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
         self.assertEqual(member_keys.count("memory_capacity"), 2)
         self.assertEqual(set(member_keys), set(self.active_fields))
         for field in self.canonical["active_fields"]:
-            expected = {
-                (membership["section"], membership["position"])
-                for membership in field["memberships"]
-            }
+            expected = {(membership["section"], membership["position"]) for membership in field["memberships"]}
             actual = {
                 (section["identity"], member["position"])
                 for section in self.canonical["sections"]
@@ -230,9 +209,7 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
                 self.assertIn(field["choice_set"], self.choice_sets)
                 self.assertEqual(self.choice_sets[field["choice_set"]]["lifecycle"], "active")
         self.assertEqual(self.active_fields["storage_interface"]["choice_set"], EXPECTED_ADDED_CHOICE_SET)
-        multi_fields = [
-            field for field in self.canonical["active_fields"] if field["field_type"] == "multi-select"
-        ]
+        multi_fields = [field for field in self.canonical["active_fields"] if field["field_type"] == "multi-select"]
         for field in multi_fields:
             self.assertLessEqual(field["validation"]["max_values"], 64)
         self.assertEqual(
@@ -291,12 +268,15 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
             self.assertEqual(positions, list(range(10, (len(positions) + 1) * 10, 10)))
             for item in category["default_fieldsets"]:
                 self.assertIn(item["fieldset"], self.sections)
-        self.assertNotIn("itambox/virtual-compute", [
-            item["fieldset"]
-            for category in self.canonical["categories"]
-            if category["identity"] != "catalog/virtual-machines"
-            for item in category["default_fieldsets"]
-        ])
+        self.assertNotIn(
+            "itambox/virtual-compute",
+            [
+                item["fieldset"]
+                for category in self.canonical["categories"]
+                if category["identity"] != "catalog/virtual-machines"
+                for item in category["default_fieldsets"]
+            ],
+        )
 
     def test_final_delta_is_explicit_against_foundation_snapshot(self):
         foundation_fields = self.foundation_field_keys()

@@ -122,7 +122,10 @@ class SpecificationContractDTOTests(unittest.TestCase):
             dto.label = "changed"
         probe = subprocess.run(
             [
-                sys.executable, "-I", "-S", "-c",
+                sys.executable,
+                "-I",
+                "-S",
+                "-c",
                 "import importlib, sys; sys.path.insert(0, sys.argv[1]); "
                 "importlib.import_module('extras.services.specifications.contracts'); "
                 "importlib.import_module('extras.services.specifications.codecs'); "

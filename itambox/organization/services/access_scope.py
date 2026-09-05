@@ -126,9 +126,7 @@ class AccessScopeDTO:
             if not isinstance(value, str) or not value:
                 raise ValueError(f"{name} must be a non-empty string")
         if self.valid_until_epoch_seconds is not None:
-            if not isinstance(self.valid_until_epoch_seconds, int) or isinstance(
-                self.valid_until_epoch_seconds, bool
-            ):
+            if not isinstance(self.valid_until_epoch_seconds, int) or isinstance(self.valid_until_epoch_seconds, bool):
                 raise TypeError("valid_until_epoch_seconds must be an integer or None")
             if self.valid_until_epoch_seconds < 0:
                 raise ValueError("valid_until_epoch_seconds must not be negative")
@@ -426,11 +424,7 @@ def _fresh_live_descendant_tenant_group_ids(group_id: int | None) -> set[int]:
     """Read the live group tree without the request-local descendant cache."""
     if group_id is None:
         return set()
-    rows = list(
-        TenantGroup._base_manager.filter(deleted_at__isnull=True)
-        .values("pk", "parent_id")
-        .order_by("pk")
-    )
+    rows = list(TenantGroup._base_manager.filter(deleted_at__isnull=True).values("pk", "parent_id").order_by("pk"))
     live_ids = {row["pk"] for row in rows}
     if group_id not in live_ids:
         return set()
@@ -492,8 +486,7 @@ def _load_membership_evidence(
             tenant__deleted_at__isnull=True,
         )
         .filter(
-            Q(pk__in=membership_ids)
-            | Q(is_active=True, tenant_id__in=accessible_ids),
+            Q(pk__in=membership_ids) | Q(is_active=True, tenant_id__in=accessible_ids),
         )
         .values("pk", "user_id", "tenant_id", "is_active")
         .order_by("pk")
@@ -565,11 +558,7 @@ def _authorization_evidence(
         .order_by("pk")
     )
 
-    membership_ids = {
-        row["membership_id"]
-        for row in grant_rows
-        if row["membership_id"] is not None
-    }
+    membership_ids = {row["membership_id"] for row in grant_rows if row["membership_id"] is not None}
     membership_ids.update(row["membership_id"] for row in group_membership_rows)
     membership_rows = _load_membership_evidence(
         actor_id=actor.pk,
@@ -581,9 +570,7 @@ def _authorization_evidence(
     relevant_tenant_ids.update(row["tenant_id"] for row in membership_rows)
     relevant_tenant_ids.update(row["tenant_id"] for row in user_group_rows)
     relevant_tenant_ids.update(row["tenant_id"] for row in scope_rows if row["tenant_id"] is not None)
-    relevant_tenant_ids.update(
-        row["role__tenant_id"] for row in grant_rows if row["role__tenant_id"] is not None
-    )
+    relevant_tenant_ids.update(row["role__tenant_id"] for row in grant_rows if row["role__tenant_id"] is not None)
     tenant_rows = list(
         Tenant._base_manager.filter(
             pk__in=relevant_tenant_ids,
@@ -634,11 +621,7 @@ def _authorization_evidence(
 def _load_group_topology(group_ids: set[int]) -> list[dict[str, object]]:
     if not group_ids:
         return []
-    rows = list(
-        TenantGroup._base_manager.filter(deleted_at__isnull=True)
-        .values("pk", "parent_id")
-        .order_by("pk")
-    )
+    rows = list(TenantGroup._base_manager.filter(deleted_at__isnull=True).values("pk", "parent_id").order_by("pk"))
     by_id = {row["pk"]: row for row in rows}
     expanded_ids = set(group_ids)
     for group_id in tuple(group_ids):

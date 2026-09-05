@@ -63,7 +63,9 @@ class SpecificationAccessScopeTests(TestCase):
             authentication_revision=authentication_revision_for_actor(user),
         )
 
-    def _request(self, *, actor=None, mode="tenant", tenant_id=None, tenant_group_id=None, permission="assets.view_asset"):
+    def _request(
+        self, *, actor=None, mode="tenant", tenant_id=None, tenant_group_id=None, permission="assets.view_asset"
+    ):
         selector = RequestedScopeSelectorDTO(
             mode=mode,
             tenant_id=tenant_id,
