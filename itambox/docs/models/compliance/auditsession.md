@@ -1,57 +1,87 @@
-# Audit Sessions & Asset Audits
+# Audit Sessions And Asset Audits
 
-An **Audit Session** represents a physical inventory reconciliation campaign — a scheduled sweep to verify the existence, location accuracy, and operational health of assets across a site or globally. Each session produces individual **Asset Audit** records that capture the observed state of every asset scanned during the campaign, including its physical location, status label, auditor identity, and verification method.
+An **Audit Session** is a physical inventory reconciliation campaign. It defines the scope and lifecycle of an audit. Each scan or verification creates an **Asset Audit** observation for a specific asset.
 
----
+For the operator workflow, see [Audits & Custody](../../features/audits-custody.md).
 
-## AuditSession
+## Audit Session Fields
 
-### Attributes
+### Name
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Name** | A clear, descriptive name for the audit campaign (e.g. `Q2 IT Stockroom Audit`). | String (200) | Yes |
-| **Tenant** | The tenant this campaign belongs to. Leave blank for MSP-wide / global sessions. | Foreign Key | No |
-| **Location** | Optional target site/location to scope the audit. If omitted, the campaign applies globally. | Foreign Key | No |
-| **Status** | Session lifecycle state: `Planned`, `Active`, or `Completed`. | Choice | Yes |
-| **Started At** | Timestamp when the audit session was opened (auto-set on creation). | DateTime | Yes |
-| **Completed At** | Timestamp when the session was finalized and closed. | DateTime | No |
-| **Created By** | The administrative user who launched the session. | Foreign Key | Yes |
-| **Reconciliation Report** | Frozen JSON snapshot of the reconciliation report written at close time. Denormalised for long-term readability. | JSON | No |
+A descriptive name for the campaign, such as `Q2 Stockroom Audit`.
 
-### State Machine
+**Required:** Yes.
 
-- **Planned** → **Active**: The session is opened and auditors may begin scanning assets.
-- **Active** → **Completed**: The session is finalized; a reconciliation report is generated and frozen.
-- Once **Completed**, the session is immutable — no further audits may be recorded against it.
+### Tenant
 
-### Expected Assets
+The customer tenant that owns the session when the audit is tenant-scoped. Broader audit scope is still limited by the operator's current authorization.
 
-The `compliance.audit_services.expected_assets_queryset(session, user=...)` service operation determines which assets this session expects to audit. The actor is required explicitly; global sessions are limited to the actor's currently authorized tenants:
-- When a **location** is set, only assets physically assigned to that location are in scope.
-- When **global** (no location), all deployable, pending, and deployed assets (excluding archived) are in scope.
-- Tenant-scoped sessions additionally filter by the session's tenant.
+### Location
 
----
+An optional location used to narrow the expected asset set.
 
-## AssetAudit
+### Status
 
-### Attributes
+The session lifecycle state. The current workflow uses planned, active, and completed states.
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Session** | The parent audit session this record belongs to. May be null for ad-hoc / standalone audits. | Foreign Key | No |
-| **Asset** | The physical asset being verified. SET_NULL on asset deletion preserves audit evidence. | Foreign Key | No |
-| **Auditor** | The user who performed the verification. | Foreign Key | Yes |
-| **Timestamp** | When the audit was recorded (auto-set on creation). | DateTime | Yes |
-| **Location** | The **observed** physical location of the asset during the audit scan. | Foreign Key | Yes |
-| **Status** | The **observed** physical status label of the asset at scan time. | Foreign Key | Yes |
-| **Notes** | Free-text observations or findings from the auditor. | Text | No |
-| **Verification Method** | How the asset was verified: `Barcode Scan`, `RFID Reader`, `Manual Input`, or `Agent API Handshake`. | Choice | Yes |
+**Required:** Yes.
 
-### Constraints & Behaviour
+### Started At
 
-- **Unique per session**: An asset can only be audited once per session (`unique_session_asset` constraint).
-- **Tenant attribution**: The changelog tenant is derived from `asset.tenant` (not the session), ensuring each audit change is visible to the asset's owning tenant even in global/MSP-wide sessions.
-- **Orphan resilience**: When an asset is hard-purged, its audit records are preserved (SET_NULL on the asset FK) — compliance evidence survives asset destruction.
-- **Side effects**: Recording an AssetAudit automatically updates the parent asset's `last_audited` timestamp and `last_audited_by` auditor reference.
+When the audit session began.
+
+### Completed At
+
+When the session was finalized.
+
+### Created By
+
+The user who created the audit session.
+
+### Reconciliation Report
+
+The stored reconciliation result created when the session is completed.
+
+## Asset Audit Fields
+
+### Session
+
+The audit session that contains the observation. Ad-hoc audit observations can exist without a parent session where the current workflow permits it.
+
+### Asset
+
+The asset that was observed. Historical audit evidence can remain after the asset record is no longer present.
+
+### Auditor
+
+The user who performed the verification.
+
+**Required:** Yes.
+
+### Timestamp
+
+When the observation was recorded.
+
+### Location
+
+The location observed during the audit.
+
+### Status
+
+The asset status observed during the audit.
+
+### Notes
+
+Operator notes about the observation or discrepancy.
+
+### Verification Method
+
+How the asset was verified, such as a barcode scan or manual verification where supported by the current UI.
+
+## Session Behavior
+
+An asset is recorded at most once in the same session. Completing a session freezes its reconciliation result and prevents additional normal audit observations for that completed campaign.
+
+The expected asset set depends on the audit scope. A location narrows the campaign, and tenant-scoped sessions stay within that tenant. Broader sessions remain limited to assets the acting user is authorized to access.
+
+Recording an audit also updates the asset's most recent audit information. Do not treat an audit record as a legal certification by itself; it is operational evidence captured by ITAMbox.

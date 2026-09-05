@@ -2,19 +2,56 @@
 
 A **Webhook Endpoint** configures the system to send real-time HTTP POST requests or payloads to external web servers or automation endpoints when matching events occur inside ITAMbox.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Enabled** | Flag indicating if this webhook is active. | Boolean | Yes |
-| **Headers** | Custom HTTP headers sent with the webhook call. | JSON | No |
-| **HTTP Method** | The HTTP verb to use (e.g. `POST`, `PUT`, `PATCH`). | Choice | Yes |
-| **Name** | Unique name identifying the webhook endpoint. | String | Yes |
-| **Retry Backoff** | Time in seconds to wait between retries. | Integer | Yes |
-| **Retry Count** | Maximum retry attempts if the delivery fails. | Integer | Yes |
-| **Secret** | Shared secret used to sign the payload (HMAC-SHA256 signature is included in the headers). | String | No |
-| **Tenant** | Tenant context that owns this webhook. Null implies a global/system-wide webhook. | Foreign Key | No |
-| **URL** | The destination URL to send HTTP payloads to. | String | Yes |
+### Enabled
+
+Flag indicating if this webhook is active.
+
+**Required:** Yes.
+
+### Headers
+
+Custom HTTP headers sent with the webhook call.
+
+### HTTP Method
+
+The HTTP verb to use (e.g. `POST`, `PUT`, `PATCH`).
+
+**Required:** Yes.
+
+### Name
+
+Unique name identifying the webhook endpoint.
+
+**Required:** Yes.
+
+### Retry Backoff
+
+Time in seconds to wait between retries.
+
+**Required:** Yes.
+
+### Retry Count
+
+Maximum retry attempts if the delivery fails.
+
+**Required:** Yes.
+
+### Secret
+
+Shared secret used to sign the payload (HMAC-SHA256 signature is included in the headers).
+
+### Tenant
+
+Tenant context that owns this webhook. Null implies a global/system-wide webhook.
+
+### URL
+
+The destination URL to send HTTP payloads to.
+
+**Required:** Yes.
+
 
 ## Features & Validation
 

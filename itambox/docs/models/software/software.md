@@ -4,19 +4,48 @@ The **Software** model tracks software applications, operating systems, and deve
 
 ---
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Name** | Unique name of the software product (e.g. `Microsoft Visio Professional 2021`). Per-tenant uniqueness is enforced for active records. | String (255) | Yes |
-| **Manufacturer** | The software developer or publisher (e.g. `Microsoft`, `Adobe`). | Foreign Key | Yes |
-| **Version** | Current version string (e.g. `2021`, `16.0`). | String (50) | No |
-| **Category** | Functional classification: `Operating System`, `Productivity`, `Development`, `Security`, `Design`, or `Other`. | Choice | No |
-| **License Type** | Default license model: `Proprietary`, `Open Source`, `Freeware`, `Shareware`, or `Subscription`. | Choice | No |
-| **Website** | Product homepage or vendor URL. | URL | No |
-| **Description** | Optional free-text description of the software product. | Text | No |
-| **Tenant** | Owning tenant. A null tenant denotes a shared/global catalogue entry visible to all tenants. | Foreign Key | No |
-| **Tags** | Labels for categorisation and filtering. | M2M | No |
+### Name
+
+Unique name of the software product (e.g. `Microsoft Visio Professional 2021`). Per-tenant uniqueness is enforced for active records.
+
+**Required:** Yes.
+
+### Manufacturer
+
+The software developer or publisher (e.g. `Microsoft`, `Adobe`).
+
+**Required:** Yes.
+
+### Version
+
+Current version string (e.g. `2021`, `16.0`).
+
+### Category
+
+Functional classification: `Operating System`, `Productivity`, `Development`, `Security`, `Design`, or `Other`.
+
+### License Type
+
+Default license model: `Proprietary`, `Open Source`, `Freeware`, `Shareware`, or `Subscription`.
+
+### Website
+
+Product homepage or vendor URL.
+
+### Description
+
+Optional free-text description of the software product.
+
+### Tenant
+
+Owning tenant. A null tenant denotes a shared/global catalogue entry visible to all tenants.
+
+### Tags
+
+Labels for categorisation and filtering.
+
 
 ---
 
@@ -41,4 +70,4 @@ The `reconcile()` method returns a compliance posture snapshot comparing install
 
 ## Relationship to Licenses
 
-Each Software entry is a **catalog definition** — it is distinct from individual licenses and subscriptions. Multiple `License` records (each with seat counts, purchase details, and expiry dates) can reference a single Software entry, enabling SAM (Software Asset Management) reconciliation.
+Each Software entry is a **catalog definition**: it is distinct from individual licenses and subscriptions. Multiple `License` records (each with seat counts, purchase details, and expiry dates) can reference a single Software entry, enabling SAM (Software Asset Management) reconciliation.

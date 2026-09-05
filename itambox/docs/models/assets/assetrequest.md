@@ -4,30 +4,98 @@ An **Asset Request** represents a self-service request submitted by a user for a
 
 ---
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Requester** | The Django user who initiated the request. | Foreign Key | Yes |
-| **Asset** | A specific physical asset being requested (e.g. `ASSET-001054`). Mutually exclusive with Asset Type, Component, Accessory, and Consumable. | Foreign Key | No |
-| **Asset Type** | The catalog model template being requested (e.g. `MacBook Pro 16"`). Mutually exclusive with Asset, Component, Accessory, and Consumable. | Foreign Key | No |
-| **Component** | A component catalog item being requested. Mutually exclusive with Asset, Asset Type, Accessory, and Consumable. | Foreign Key | No |
-| **Accessory** | An accessory catalog item being requested. Mutually exclusive with Asset, Asset Type, Component, and Consumable. | Foreign Key | No |
-| **Consumable** | A consumable catalog item being requested. Mutually exclusive with Asset, Asset Type, Component, and Accessory. | Foreign Key | No |
-| **Quantity** | Number of units requested (applies to accessories, consumables, and components). | Integer | Yes |
-| **Source Location** | The preferred stock location from which items should be drawn. | Foreign Key | No |
-| **Status** | Asset Request lifecycle state: `Pending`, `Approved`, `Awaiting Procurement`, `Denied`, `Fulfilled`, or `Cancelled`. | Choice | Yes |
-| **Request Date** | Timestamp when the request was submitted (auto-set on creation). | DateTime | Yes |
-| **Response Date** | Timestamp when an administrator responded to the request. | DateTime | No |
-| **Responded By** | The administrator who approved, denied, or processed the request. | Foreign Key | No |
-| **Response Notes** | Feedback or explanation supplied by the responding administrator. | Text | No |
-| **Assigned User** | The AssetHolder the requested item should be assigned to (delegated target). | Foreign Key | No |
-| **Assigned Location** | The location the requested item should be assigned to (delegated target). | Foreign Key | No |
-| **Assigned Asset** | The parent asset the requested item should be assigned to (delegated target). | Foreign Key | No |
-| **Parent** | Link to a parent group request for hierarchical (multi-line) requests. | Foreign Key (self) | No |
-| **Is Group** | Whether this request acts as a container grouping child sub-requests. | Boolean | Yes |
-| **Notes** | Justification, requirements, or context added by the requester. | Text | No |
-| **Tenant** | The tenant scope of the request. | Foreign Key | No |
+### Requester
+
+The ITAMbox user who initiated the request.
+
+**Required:** Yes.
+
+### Asset
+
+A specific physical asset being requested (e.g. `ASSET-001054`). Mutually exclusive with Asset Type, Component, Accessory, and Consumable.
+
+### Asset Type
+
+The catalog model template being requested (e.g. `MacBook Pro 16"`). Mutually exclusive with Asset, Component, Accessory, and Consumable.
+
+### Component
+
+A component catalog item being requested. Mutually exclusive with Asset, Asset Type, Accessory, and Consumable.
+
+### Accessory
+
+An accessory catalog item being requested. Mutually exclusive with Asset, Asset Type, Component, and Consumable.
+
+### Consumable
+
+A consumable catalog item being requested. Mutually exclusive with Asset, Asset Type, Component, and Accessory.
+
+### Quantity
+
+Number of units requested (applies to accessories, consumables, and components).
+
+**Required:** Yes.
+
+### Source Location
+
+The preferred stock location from which items should be drawn.
+
+### Status
+
+Asset Request lifecycle state: `Pending`, `Approved`, `Awaiting Procurement`, `Denied`, `Fulfilled`, or `Cancelled`.
+
+**Required:** Yes.
+
+### Request Date
+
+Timestamp when the request was submitted (auto-set on creation).
+
+**Required:** Yes.
+
+### Response Date
+
+Timestamp when an administrator responded to the request.
+
+### Responded By
+
+The administrator who approved, denied, or processed the request.
+
+### Response Notes
+
+Feedback or explanation supplied by the responding administrator.
+
+### Assigned User
+
+The AssetHolder the requested item should be assigned to (delegated target).
+
+### Assigned Location
+
+The location the requested item should be assigned to (delegated target).
+
+### Assigned Asset
+
+The parent asset the requested item should be assigned to (delegated target).
+
+### Parent
+
+Link to a parent group request for hierarchical (multi-line) requests.
+
+### Is Group
+
+Whether this request acts as a container grouping child sub-requests.
+
+**Required:** Yes.
+
+### Notes
+
+Justification, requirements, or context added by the requester.
+
+### Tenant
+
+Tenant that owns or scopes this asset request.
+
 
 ---
 

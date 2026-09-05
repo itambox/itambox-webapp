@@ -4,17 +4,44 @@ A **Cost Center** represents a department or cost code structure within an organ
 
 Cost Centers are organized hierarchically: a top-level parent represents a primary cost center, and child sub-records represent departments inside it.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Code** | Short identifier code (e.g. `CC-RD-100`). | String | Yes |
-| **Description** | Optional details explaining the cost center scope. | Text | No |
-| **Is Active** | Boolean indicating if this cost center is active. Inactive centers are hidden. | Boolean | Yes |
-| **Name** | Display name of the cost center or department (e.g. `Research & Development`). | String | Yes |
-| **Parent** | Optional parent link to another Cost Center, enabling hierarchical nesting. | Foreign Key | No |
-| **Slug** | URL-safe representation. | Slug | Yes |
-| **Tenant** | Optional tenant this cost center is scoped to. | Foreign Key | No |
+### Code
+
+Short identifier code (e.g. `CC-RD-100`).
+
+**Required:** Yes.
+
+### Description
+
+Optional details explaining the cost center scope.
+
+### Is Active
+
+Boolean indicating if this cost center is active. Inactive centers are hidden.
+
+**Required:** Yes.
+
+### Name
+
+Display name of the cost center or department (e.g. `Research & Development`).
+
+**Required:** Yes.
+
+### Parent
+
+Optional parent link to another Cost Center, enabling hierarchical nesting.
+
+### Slug
+
+URL-safe representation.
+
+**Required:** Yes.
+
+### Tenant
+
+Optional tenant this cost center is scoped to.
+
 
 ## Constraints
 

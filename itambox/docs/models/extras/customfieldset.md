@@ -2,12 +2,18 @@
 
 A **Custom Fieldset** groups custom fields together into logical sections on the user interface, improving form organization and layout consistency.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Custom Fields** | The list of custom fields included in this fieldset. | Many-to-Many | No |
-| **Fieldset Name** | The header or section name displayed in user forms. | String | Yes |
+### Custom Fields
+
+The list of custom fields included in this fieldset.
+
+### Fieldset Name
+
+The header or section name displayed in user forms.
+
+**Required:** Yes.
+
 
 ## Features & Validation
 

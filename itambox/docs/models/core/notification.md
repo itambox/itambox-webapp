@@ -4,17 +4,46 @@ A **Notification** represents an in-app alert delivered to a specific user or br
 
 ---
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **User** | The target user for the notification. A null user represents a global broadcast alert visible to all users. | Foreign Key | No |
-| **Subject** | Short title or heading for the notification. | String (255) | Yes |
-| **Message** | Full body text of the notification. | Text | Yes |
-| **Level** | Severity / visual style: `Info`, `Warning`, `Success`, or `Danger`. | Choice | Yes |
-| **Is Read** | Whether the target user has marked the notification as read. Defaults to `False`. | Boolean | Yes |
-| **Target URL** | Optional destination URL opened when the notification is clicked. | String (500) | No |
-| **Created At** | Timestamp when the notification was generated (auto-set). | DateTime | Yes |
+### User
+
+The target user for the notification. A null user represents a global broadcast alert visible to all users.
+
+### Subject
+
+Short title or heading for the notification.
+
+**Required:** Yes.
+
+### Message
+
+Full body text of the notification.
+
+**Required:** Yes.
+
+### Level
+
+Severity / visual style: `Info`, `Warning`, `Success`, or `Danger`.
+
+**Required:** Yes.
+
+### Is Read
+
+Whether the target user has marked the notification as read. Defaults to `False`.
+
+**Required:** Yes.
+
+### Target URL
+
+Optional destination URL opened when the notification is clicked.
+
+### Created At
+
+Timestamp when the notification was generated (auto-set).
+
+**Required:** Yes.
+
 
 ---
 
@@ -23,4 +52,4 @@ A **Notification** represents an in-app alert delivered to a specific user or br
 - **User-scoped**: When `user` is set, the notification is delivered to that specific user's inbox.
 - **Global broadcast**: When `user` is null, the notification is visible to all users (e.g. system maintenance announcements).
 - **Read tracking**: The `is_read` flag and the composite index on `(user, is_read)` enable efficient querying of unread notifications per user.
-- **Click-through**: The optional `target_url` provides deep-linking — clicking the notification can navigate directly to the relevant object or page.
+- **Click-through**: The optional `target_url` provides deep-linking: clicking the notification can navigate directly to the relevant object or page.

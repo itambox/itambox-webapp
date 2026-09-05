@@ -6,22 +6,68 @@ Custody Templates can be scoped globally, to specific Tenant Groups (e.g. parent
 
 ---
 
-## Attributes & Fields
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Category** | The asset category this template overrides for the specified scope. | Foreign Key | No |
-| **Disclaimer** | Short disclaimer printed at the bottom of the signoff receipt. | Text | No |
-| **Email Signature Request** | Sends an email containing a secure signature link to the holder. | Boolean | Yes |
-| **EULA Text** | The legal terms of service shown to the end-user. | Text | Yes |
-| **Is Active** | Deactivate to hide from choices | Boolean | Yes |
-| **Logo** | Custom corporate logo printed on the receipt. | Image | No |
-| **Name** | Descriptive name for this template (e.g. *Standard Laptop EULA*). | String | Yes |
-| **QMS Reference** | Reference ID mapping to an internal Quality Management System document. | String | No |
-| **Require Acceptance** | If checked, checkout blocks/restricts asset status until signed. | Boolean | Yes |
-| **Signature Provider** | The service handling the signature process (e.g., `local` for on-platform canvas, or plugin integrations like `docusign`). | String | Yes |
-| **Tenant** | The specific Tenant scope that this template applies to. | Foreign Key | No |
-| **Tenant Group** | The Tenant Group scope that this template applies to. | Foreign Key | No |
+### Category
+
+The asset category this template overrides for the specified scope.
+
+### Disclaimer
+
+Short disclaimer printed at the bottom of the signoff receipt.
+
+### Email Signature Request
+
+Sends an email containing a secure signature link to the holder.
+
+**Required:** Yes.
+
+### EULA Text
+
+The legal terms of service shown to the end-user.
+
+**Required:** Yes.
+
+### Is Active
+
+Deactivate to hide from choices
+
+**Required:** Yes.
+
+### Logo
+
+Custom corporate logo printed on the receipt.
+
+### Name
+
+Descriptive name for this template (e.g. *Standard Laptop EULA*).
+
+**Required:** Yes.
+
+### QMS Reference
+
+Reference ID mapping to an internal Quality Management System document.
+
+### Require Acceptance
+
+If checked, checkout blocks/restricts asset status until signed.
+
+**Required:** Yes.
+
+### Signature Provider
+
+The service handling the signature process (e.g., `local` for on-platform canvas, or plugin integrations like `docusign`).
+
+**Required:** Yes.
+
+### Tenant
+
+The specific Tenant scope that this template applies to.
+
+### Tenant Group
+
+The Tenant Group scope that this template applies to.
+
 
 ## EULA Overrides & Precedence
 

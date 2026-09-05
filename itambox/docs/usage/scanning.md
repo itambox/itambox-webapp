@@ -1,121 +1,59 @@
 # Scanning Assets
 
-ITAMbox supports barcode and QR-code scanning in two modes: a **hardware scanner** connected to a desktop browser, and a **camera-based scanner** on mobile devices.
+ITAMbox can resolve asset tags, serial numbers, product codes, ITAMbox QR codes, and supported record URLs. Scanning is available for finding records, processing bulk asset actions, and verifying assets during an audit.
 
----
+## Find By Scan
 
-## Hardware / USB Barcode Scanners
+Use **Find by Scan** when you have a device or label but do not know which customer or record contains it.
 
-Most USB / Bluetooth HID barcode scanners emulate a keyboard. To use one:
+1. Open **Find by Scan**.
+2. Scan with a hardware scanner, use the camera action, or enter the code manually.
+3. Review the matching record or result.
 
-1. Open any asset audit session or the **Find by Scan** view (`/scan/resolve/`).
-2. Click inside the scan input field so it has keyboard focus.
-3. Configure your scanner to append **Enter** (newline) after each scan.
-4. Scan the barcode — ITAMbox reads the input and resolves it automatically.
+**Find by Scan searches across tenants the user can access even when another workspace is selected.** It never grants access to an inaccessible tenant.
 
-Supported code formats (handled by the resolve endpoint):
+A product code can identify a model rather than one physical item. When the same code can resolve to more than one asset, ITAMbox reports the ambiguity instead of selecting an arbitrary record.
 
-| Input format | Example | Notes |
-|---|---|---|
-| Bare asset tag | `IT-00042` | Case-insensitive |
-| Serial number | `SN-ABC123` | Matched when no tag found |
-| EAN / GTIN | `4012345678901` | EAN-8/13, GTIN-8/12/13/14, UPC — resolved through the AssetType catalogue (asset) or the inventory item's own EAN |
-| `itambox://` scheme | `itambox://asset/42` or `itambox:IT-00042` | Printed on QR labels |
-| Full HTTP URL | `https://itam.example.com/assets/42/` | Scanned from printed QR code |
+## Hardware Scanners
 
-!!! note "Tenant behavior"
-    The **Find by Scan** flow searches **every tenant you can access**, no
-    matter which tenant is currently selected. A user with no accessible
-    tenant fails closed (404) — nothing ever leaks from tenants the user
-    cannot access. Audit sessions and bulk-scan baskets remain bound to
-    their session tenant: an EAN that matches an AssetType with **exactly
-    one** asset in scope verifies that asset; if several assets share the
-    type, the scan reports the ambiguity instead of picking one silently.
+Most USB and Bluetooth barcode scanners act like keyboards. Configure the scanner to send Enter after the scanned value, place the cursor in the scan field, and scan normally.
 
----
+Rapid duplicate input is suppressed by the scanning interface. If a scanner behaves unexpectedly, test it in a text editor: the value should appear as ordinary text followed by Enter.
 
-## Camera Scanning (Mobile)
+## Camera Scanning
 
-ITAMbox can activate your device camera to scan barcodes and QR codes without a separate scanner app.
+Choose the camera action, allow camera permission, and hold the code in view until it is recognized. Browser camera access normally requires a secure HTTPS connection and can also be blocked by browser or device policy.
 
-!!! warning "HTTPS required for camera access"
-    Mobile browsers (iOS Safari, Android Chrome) only expose the camera API on **secure origins** (`https://`).  If ITAMbox is served over plain `http://`, the camera button will not appear and the browser will silently refuse the `getUserMedia()` call.
+## Bulk Scan Baskets
 
-    **Production deployments must be served over HTTPS.** During local development you can use a self-signed certificate or a tool like [mkcert](https://github.com/FiloSottile/mkcert) to create a locally-trusted certificate.
+ITAMbox provides **Bulk Check-in**, **Bulk Check-out**, and **Bulk Disposal** scan baskets.
 
-To scan with the camera:
+1. Open the required bulk action.
+2. Add assets by scanner, camera, or manual entry.
+3. Review warnings and remove or correct ineligible rows.
+4. Complete the operation fields.
+5. Submit the basket.
 
-1. Open an audit session detail page or the **Find by Scan** view (`/scan/resolve/`).
-2. Tap **Scan with Camera** (the camera icon in the action bar).
-3. Grant camera permission when prompted.
-4. Point the camera at a barcode or QR code — ITAMbox decodes it automatically and resolves the asset.
+Bulk checkout can warn that an asset is currently assigned and will be reassigned. Assets in repair, on order, or archived states are not eligible for checkout. Check-in warns when there is no assignment/location state to return. Disposal skips assets that are already disposed.
 
----
+When the current workspace is **All Tenants**, the basket requires a concrete target tenant before it can resolve and mutate assets. A mixed aggregate view does not make a cross-tenant mutation ambiguous by design.
 
-## Find by Scan & EAN Resolution (`/scan/`)
+Submitting a scan basket creates a [Background Job](../features/background-jobs.md). Open the Job to review progress, completed rows, failures, and generated output.
 
-The **Find by Scan** view resolves any supported code or EAN to the matching target and redirects you to its detail page. The resolution follows a strict hierarchy (cross-tenant for every tenant you can access, and permission-gated):
+## Audit Scanning
 
-1. **Asset Match**: If the code matches an `Asset` (by asset tag, serial number, or a deep link like `itambox://asset/<pk>`), it redirects you directly to the asset's detail page.
-2. **AssetType EAN Match**: If the code matches an `AssetType` EAN, it redirects you to the asset list view filtered to that EAN (`/assets/?ean=<ean>`).
-3. **Inventory EAN Match**: If the code matches a `Component`, `Accessory`, or `Consumable` EAN, it redirects you directly to that inventory item's detail page.
+Audit sessions provide their own scan workflow. Each successful scan verifies the matching asset for that session. Audit sessions remain tenant-bound, unlike Find by Scan.
 
-If no object matches the scanned code, a 404 error is shown. Tenants you cannot access are never searched.
+## Supported Resolution
 
----
-
-## Scanner-Driven Bulk Actions
-
-ITAMbox supports scanner-driven bulk actions (check-out, check-in, and disposal) via a unified **Scan Basket** interface. This scales for high-volume transactions and survives request timeouts by running asynchronously.
-
-### The Scan Basket Page
-1. Navigate to the bulk scan basket page (e.g. `Bulk Check-in` at `/assets/bulk-checkin-scan/`, `Bulk Check-out` at `/assets/bulk-checkout-scan/`, or `Bulk Disposal` at `/assets/bulk-dispose-scan/`).
-2. Add assets to the basket using the mobile camera scanner, keyboard-emulated USB barcode scanner, or manual entry.
-3. The frontend (`scan-basket.ts` / `scanner.ts`) implements throttle limits to prevent duplicate scan bursts from registering.
-4. Active warnings (e.g., "Already checked out", "Already disposed") are shown inline for ineligible scanned rows.
-
-### Asynchronous Execution
-Upon clicking submit, the web thread creates a background `Job` tracking record and enqueues the action into `django-q2` worker tasks:
-*   **Bulk Check-in (`bulk_checkin_task`)**: Checks in the basket assets, allowing state overrides (deployable, pending, undeployable) and target location settings.
-*   **Bulk Check-out (`bulk_checkout_task`)**: Checks out the assets to a single chosen target (holder, location, or parent asset) and sets expected return dates.
-*   **Bulk Disposal (`bulk_dispose_task`)**: Disposes of assets, collecting WEEE compliance flags, data sanitization certificates, sanitized-by values, recipients, and asset-specific financial proceeds.
-
----
-
-## Audit Session Scanning
-
-During an audit campaign, the scan input is embedded in the audit session detail page. Each successful scan:
-
-1. Resolves the code to an asset.
-2. Records the asset as **physically verified** at the campaign location.
-3. Updates the campaign's progress counters in real time (via HTMX).
-
-Duplicate scans within the same session are deduplicated automatically.
-
----
-
-## Action Bar Shortcuts
-
-The scan action bar (visible on audit session pages) provides:
-
-| Button | Action |
-|---|---|
-| **Scan Input** | Text field — type or paste a code, or let a HID scanner inject it |
-| **Scan with Camera** | Activates the device camera (HTTPS required) |
-| **Clear** | Resets the last scan result |
-
----
+For the exact lookup order and ambiguity behavior, see [Scan Code Resolution](../reference/scan-code-resolution.md).
 
 ## Troubleshooting
 
-**Camera button is missing or greyed out**
-: The page is served over `http://`. Switch to `https://` or use mkcert for local dev.
+**Camera action unavailable:** confirm HTTPS and browser camera permission.
 
-**Scanner input is captured by the OS or another app**
-: The scan input field must have keyboard focus. Click the field before scanning.
+**Hardware scan does not submit:** focus the scan field and confirm the device sends Enter.
 
-**Code resolves to the wrong asset**
-: Check that the code format is supported (see table above). `itambox://` scheme codes are printed by the built-in label generator and are always unambiguous.
+**No record found:** enter the asset tag or serial manually, verify access to the expected tenant, and inspect the printed code for damage.
 
-**"403 Forbidden" after a successful scan**
-: The authenticated user lacks the `assets.view_asset` permission for the active tenant.
+**Action unavailable:** check the asset's lifecycle state and your permission for the selected tenant.

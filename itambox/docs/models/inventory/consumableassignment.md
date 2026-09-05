@@ -2,18 +2,46 @@
 
 A **Consumable Consumption** (or assignment) logs the permanent debiting of bulk consumables from stock, assigning custody or cost tracking to specific `Asset Holders` or `Locations`.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Assigned Asset** | The assigned asset of the consumable consumption. | Foreign Key | No |
-| **Assigned Date** | Timestamp of consumption execution. | DateTime | Yes |
-| **Assigned Holder** | The user profile occupying/utilizing the item. | Foreign Key | No |
-| **Assigned Location** | The destination Site Location room. | Foreign Key | No |
-| **Consumable** | The consumable item being assigned. | Foreign Key | Yes |
-| **From Location** | The physical Site Location room warehouse from which the stock is pulled. | Foreign Key | No |
-| **Notes** | The notes of the consumable consumption. | Text | No |
-| **Qty** | The checkout quantity of the consumable consumption. | Integer | Yes |
+### Assigned Asset
+
+Asset associated with this assignment.
+
+### Assigned Date
+
+Timestamp of consumption execution.
+
+**Required:** Yes.
+
+### Assigned Holder
+
+The user profile occupying/utilizing the item.
+
+### Assigned Location
+
+The destination Site Location room.
+
+### Consumable
+
+The consumable item being assigned.
+
+**Required:** Yes.
+
+### From Location
+
+The physical Site Location room warehouse from which the stock is pulled.
+
+### Notes
+
+Optional notes about this consumable consumption.
+
+### Qty
+
+Quantity issued by this assignment.
+
+**Required:** Yes.
+
 
 ## Stock Deductions
 * **On Creation**: If `From Location` is declared, saving a consumption record automatically decrements the `qty` from `ConsumableStock` at that location.

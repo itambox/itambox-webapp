@@ -2,18 +2,46 @@
 
 An **Asset Holder** represents a logical or physical recipient eligible to receive checked-out assets (such as systems, hardware, licenses, accessories, or consumables). This is typically an employee, a contractor, a service department, or a team.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Comments** | The comments of the asset holder. | Text | No |
-| **Description** | The description of the asset holder. | Text | No |
-| **Email** | Contact email address. | Email | No |
-| **First Name** | The first name of the holder. | String | Yes |
-| **Last Name** | The last name of the holder. | String | Yes |
-| **Tenant** | Optional department/tenant this holder is associated with for cost tracking. | Foreign Key | No |
-| **Upn** | The user principal name of the asset holder. | String | Yes |
-| **User** | Optional link to a Django user authentication profile. A user may be linked to multiple AssetHolders. | ForeignKey | No |
+### Comments
+
+Additional comments about this asset holder.
+
+### Description
+
+Human-readable description of this asset holder.
+
+### Email
+
+Contact email address.
+
+### First Name
+
+The holder's given name.
+
+**Required:** Yes.
+
+### Last Name
+
+The holder's family name.
+
+**Required:** Yes.
+
+### Tenant
+
+Optional department/tenant this holder is associated with for cost tracking.
+
+### Upn
+
+The holder's user principal name, when one is known.
+
+**Required:** Yes.
+
+### User
+
+Optional link to an ITAMbox user account. A user may be linked to multiple Asset Holders.
+
 
 ## Property Properties
 

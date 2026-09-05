@@ -2,16 +2,40 @@
 
 A **Custom Field** allows organizations to dynamically extend core models (such as Assets, Asset Types, and Tenants) with user-defined attributes without altering the database schema.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Choices** | Newline-separated list of values (only applicable if Type is Selection list). | Text | No |
-| **Field Type** | Data type of the field (e.g., Text, Integer, Date, Boolean, Selection list). | Choice | Yes |
-| **Display Label** | User-friendly label shown in forms and list headers. | String | Yes |
-| **Field Name** | Slug-like database identifier (e.g., `sim_card_number`). | Slug | Yes |
-| **Object Types** | The Django models this field applies to. | Many-to-Many | No |
-| **Required** | If checked, validation requires a value to be set. | Boolean | Yes |
+### Choices
+
+Newline-separated list of values (only applicable if Type is Selection list).
+
+### Field Type
+
+Data type of the field (e.g., Text, Integer, Date, Boolean, Selection list).
+
+**Required:** Yes.
+
+### Display Label
+
+User-friendly label shown in forms and list headers.
+
+**Required:** Yes.
+
+### Field Name
+
+Slug-like database identifier (e.g., `sim_card_number`).
+
+**Required:** Yes.
+
+### Object Types
+
+The ITAMbox object types to which this field applies.
+
+### Required
+
+If checked, validation requires a value to be set.
+
+**Required:** Yes.
+
 
 ## Features & Validation
 

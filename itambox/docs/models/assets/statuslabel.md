@@ -10,15 +10,34 @@
 4. **Undeployable**: The asset is broken, undergoing repair, lost, or otherwise unavailable.
 5. **Archived**: The asset has been decommissioned, recycled, or sold, and is preserved for historical auditing.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Color** | Hexadecimal color code for visual badge indicators. | Hex Color | No |
-| **Description** | Optional notes describing when to use this label. | Text | No |
-| **Name** | Unique name of the status label (e.g., `Staged & Ready`). | String | Yes |
-| **Slug** | URL-safe name representation. | Slug | Yes |
-| **Type** | One of the five core Meta-Types. | Choice | Yes |
+### Color
+
+Hexadecimal color code for visual badge indicators.
+
+### Description
+
+Optional notes describing when to use this label.
+
+### Name
+
+Unique name of the status label (e.g., `Staged & Ready`).
+
+**Required:** Yes.
+
+### Slug
+
+URL-safe name representation.
+
+**Required:** Yes.
+
+### Type
+
+One of the five core Meta-Types.
+
+**Required:** Yes.
+
 
 ## Use Cases
 You can create custom, highly detailed labels for your workflows while preserving global compliance:

@@ -143,10 +143,17 @@ class NavigationPolicyTest(unittest.TestCase):
                         "index.md",
                         "dashboard.md",
                         "operations/",
+                        "getting-started/",
+                        "features/",
                         "usage/",
+                        "configuration/",
+                        "customization/",
+                        "administration/",
+                        "best-practices/",
                         "models/",
                         "integration/",
                         "plugins/",
+                        "reference/",
                         "security/",
                     )
                 ),
@@ -179,6 +186,66 @@ class PublicLinkPolicyTest(unittest.TestCase):
                 if not resolved.exists():
                     broken.append(f"{relative}: {target} -> {resolved.relative_to(REPOSITORY_ROOT)} missing")
         self.assertEqual(broken, [], "broken local documentation links:\n" + "\n".join(broken))
+
+
+class PublicDocumentationQualityPolicyTest(unittest.TestCase):
+    """Protect a few high-value editorial and compatibility invariants."""
+
+    USER_WORKFLOW_DIRS = ("getting-started", "features")
+    USER_WORKFLOW_PAGES = (
+        "usage/scanning.md",
+        "usage/depreciation.md",
+        "usage/asset-requests-and-reservations.md",
+        "usage/kits-and-components.md",
+        "usage/software-catalog-and-maintenance.md",
+        "usage/alerts-and-notifications.md",
+        "usage/reports-and-exports.md",
+        "usage/contracts-and-purchase-orders.md",
+        "usage/cost-centers-and-regions.md",
+        "usage/sso-and-mfa.md",
+        "usage/api-tokens-and-scim.md",
+    )
+
+    def _workflow_pages(self):
+        pages = [DOCS_ROOT / relative for relative in self.USER_WORKFLOW_PAGES]
+        for dirname in self.USER_WORKFLOW_DIRS:
+            pages.extend(sorted((DOCS_ROOT / dirname).rglob("*.md")))
+        return pages
+
+    def test_user_workflows_do_not_depend_on_source_filenames_or_raw_route_instructions(self):
+        source_filename = re.compile(r"(?<![\w.-])[\w./-]+\.(?:py|ts)(?![\w.-])")
+        violations = []
+        for path in self._workflow_pages():
+            text = path.read_text(encoding="utf-8")
+            for line_no, line in enumerate(text.splitlines(), start=1):
+                if source_filename.search(line):
+                    violations.append(f"{path.relative_to(DOCS_ROOT)}:{line_no}: source filename: {line.strip()}")
+                if re.search(r"\b(?:navigate|go|browse|open)\s+to\s+`?/[A-Za-z0-9_/.-]+", line, re.I):
+                    violations.append(f"{path.relative_to(DOCS_ROOT)}:{line_no}: raw route instruction: {line.strip()}")
+        self.assertEqual(violations, [], "implementation leakage in user workflows:\n" + "\n".join(violations))
+
+    def test_public_docs_use_the_itambox_brand(self):
+        violations = []
+        for path in DOCS_ROOT.rglob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            if "Asset Box" in text or "ITAMBox" in text or "Itambox" in text:
+                violations.append(path.relative_to(DOCS_ROOT).as_posix())
+        self.assertEqual(violations, [], "incorrect ITAMbox brand casing/name in: " + ", ".join(violations))
+
+    def test_model_reference_avoids_framework_field_tables_and_generic_descriptions(self):
+        violations = []
+        generic = re.compile(r"\bThe (?:notes|comments|description) of the [A-Za-z ]+\.?$", re.I | re.M)
+        for path in sorted((DOCS_ROOT / "models").rglob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            if "| Field | Description | Type | Required |" in text:
+                violations.append(f"{path.relative_to(DOCS_ROOT)}: framework-style field table")
+            if generic.search(text):
+                violations.append(f"{path.relative_to(DOCS_ROOT)}: generic field description")
+        self.assertEqual(violations, [], "low-value Data Model prose:\n" + "\n".join(violations))
+
+    def test_event_rule_compatibility_anchor_is_preserved(self):
+        webhooks = (DOCS_ROOT / "usage" / "webhooks-and-automation.md").read_text(encoding="utf-8")
+        self.assertIn("event-rule-conditions-withdrawn-for-10", webhooks)
 
 
 class OperatorConfigurationPolicyTest(unittest.TestCase):

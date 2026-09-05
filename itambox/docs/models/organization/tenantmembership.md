@@ -4,14 +4,32 @@ A **Tenant Membership** links a standard User account to a specific Tenant and a
 
 ---
 
-## Attributes & Fields
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Joined At** | The timestamp when the membership was created. | DateTime | Yes (Auto) |
-| **Role** | The Tenant Role mapping permissions to the user. | Foreign Key | Yes |
-| **Tenant** | The Tenant the user is becoming a member of. | Foreign Key | Yes |
-| **User** | The User account being granted access. | Foreign Key | Yes |
+### Joined At
+
+The timestamp when the membership was created.
+
+**Required:** Yes (Auto).
+
+### Role
+
+The Tenant Role mapping permissions to the user.
+
+**Required:** Yes.
+
+### Tenant
+
+The Tenant the user is becoming a member of.
+
+**Required:** Yes.
+
+### User
+
+The User account being granted access.
+
+**Required:** Yes.
+
 
 ## Multi-Tenancy Scope
 A user can hold multiple memberships across different tenants. When making API or GraphQL queries, the system scopes the active data visibility and allowed operations based on the tenant context specified in the query/session header and the corresponding user's `TenantMembership` role permissions.

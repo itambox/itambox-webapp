@@ -4,19 +4,52 @@ An **API Token** is a bearer credential used for authenticating REST API request
 
 ---
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **User** | The Django user account the token authenticates as. | Foreign Key | Yes |
-| **Tenant** | The tenant scope of the token. Defaults to the ambient request tenant at creation time. | Foreign Key | Yes |
-| **Description** | Human-readable label for the token (e.g. "CI/CD pipeline", "Lansweeper integration"). | String (200) | No |
-| **Write Enabled** | Whether the token grants write (POST/PUT/PATCH/DELETE) access in addition to read. Defaults to `True`. | Boolean | Yes |
-| **Expires** | Optional expiry date. Tokens without an expiry never expire. | DateTime | No |
-| **Created** | Timestamp when the token was generated (auto-set). | DateTime | Yes |
-| **Last Used** | Timestamp of the most recent authenticated request using this token. Updated on each use. | DateTime | No |
-| **Allowed IPs** | Array of permitted IPv4/IPv6 networks in CIDR notation (e.g. `["192.168.1.0/24", "10.0.0.5"]`). Leave blank to allow any source address. | Array (String) | No |
-| **Key Preview** | First 8 characters of the plaintext token, stored for identification in the admin UI. Not a secret. | String (16) | No |
+### User
+
+The ITAMbox user account represented by the token.
+
+**Required:** Yes.
+
+### Tenant
+
+Tenant that owns or scopes this api token.
+
+**Required:** Yes.
+
+### Description
+
+Human-readable label for the token (e.g. "CI/CD pipeline", "Lansweeper integration").
+
+### Write Enabled
+
+Whether the token grants write (POST/PUT/PATCH/DELETE) access in addition to read. Defaults to `True`.
+
+**Required:** Yes.
+
+### Expires
+
+Optional expiry date. Tokens without an expiry never expire.
+
+### Created
+
+Timestamp when the token was generated (auto-set).
+
+**Required:** Yes.
+
+### Last Used
+
+Timestamp of the most recent authenticated request using this token. Updated on each use.
+
+### Allowed IPs
+
+Array of permitted IPv4/IPv6 networks in CIDR notation (e.g. `["192.168.1.0/24", "10.0.0.5"]`). Leave blank to allow any source address.
+
+### Key Preview
+
+First 8 characters of the plaintext token, stored for identification in the admin UI. Not a secret.
+
 
 ---
 
@@ -27,7 +60,7 @@ An **API Token** is a bearer credential used for authenticating REST API request
 The plaintext token is **never stored**. At creation time:
 1. A 40-character hex secret is generated via `secrets.token_hex(20)`.
 2. It is combined with a server-side **pepper** (rotatable secret configured via `ITAMBOX_API_TOKEN_PEPPERS`) using HMAC-SHA256.
-3. Only the digest and pepper ID are persisted — the plaintext is returned once and discarded.
+3. Only the digest and pepper ID are persisted: the plaintext is returned once and discarded.
 
 Token lookup (`Token.find_by_key`) compares the presented plaintext against HMAC digests computed with every configured pepper, supporting zero-downtime pepper rotation.
 

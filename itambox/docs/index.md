@@ -1,62 +1,38 @@
-# Introduction to ITAMbox
+# ITAMbox Documentation
 
-ITAMbox is an enterprise-grade IT Asset Management (ITAM) platform designed to track the complete lifecycle of physical and digital infrastructure. ITAMbox serves as a centralized source of truth for your organizational hardware, software licenses, SaaS subscriptions, and operation compliance.
+ITAMbox is a self-hosted IT asset management system for organizations and managed service providers. It brings hardware, software, subscriptions, procurement, custody, maintenance, and operational records into one tenant-aware system.
 
-## Operational Modules
+The documentation is organized by what you are trying to do rather than by the source code that implements it.
 
-ITAMbox is organized into the following functional modules:
+## Start Here
 
-### Organization
-Establish the physical geography (Regions, Sites, Locations) and financial structure (Tenants, Cost Centers, Asset Holders) of your enterprise. Every asset, license, and subscription is scoped to a tenant for data isolation and cost allocation.
+If you are deploying ITAMbox for the first time, begin with [Planning Your Deployment](getting-started/planning.md). It explains the core objects and a practical order for creating or importing data.
 
-### Assets
-Track serialized physical systems — laptops, servers, switches, and peripherals. Manage the full model catalog (Asset Types, Manufacturers, Categories, Status Labels), depreciation schedules, warranties, and the complete check-out/check-in lifecycle.
+If you already have data in the system, these pages cover the workflows used most often:
 
-### Inventory & Stock
-Manage bulk non-serialized items: accessories (keyboards, cables), consumables (thermal paste, batteries), and modular hardware components (RAM, SSDs, CPUs). Automatic stock-level tracking with per-location quantities, reorder alerts, and asset allocation.
+- [Workspaces](features/workspaces.md) explains single-tenant, tenant-group, and **All Tenants** views.
+- [Assets and Assignments](features/assets-assignments.md) covers the operational asset lifecycle.
+- [Search, Filters, and Tables](features/search-tables.md) explains how lists, filters, selection, and exports work together.
+- [Scanning Assets](usage/scanning.md) covers **Find by Scan**, scan baskets, and audit scanning.
+- [Background Jobs](features/background-jobs.md) explains long-running operations and generated files.
+- [Reports, Exports, and Labels](usage/reports-and-exports.md) explains the different output workflows.
 
-### Software & Licenses
-Maintain a software catalog and track license entitlements — seat counts, product keys (encrypted at rest), expiration dates, and check-out assignments to users or assets.
+## How ITAMbox Organizes Data
 
-### SaaS Subscriptions ***(Beta)***
-Manage recurring SaaS contracts with billing cycles, renewal tracking, provider relationships, and user seat allocations. Subscription seats roll up to linked license entitlements.
+A **Tenant** is the main ownership and access boundary for operational data. In an MSP deployment, a tenant normally represents a customer. In an internal deployment, it can represent a business unit or another independently managed scope.
 
-### Procurement ***(Beta)***
-Track the purchasing lifecycle: Purchase Orders with approval workflows, Contracts with SLA tracking, and supplier management. POs support draft → approved → ordered → received states with segregation of duties.
+**Tenant Groups** organize related tenants and can be used as a broader workspace. **Sites** and **Locations** describe physical geography. **Cost Centers** describe financial allocation. **Asset Holders** represent people or other holders that can receive equipment.
 
-### Compliance
-Conduct hardware audits with barcode scanning, generate legally binding custody receipts with digital signatures, and schedule preventive maintenance. Custody receipts capture EULA acceptance with tamper-proof verification hashes.
+An **Asset** is a uniquely tracked physical item. Asset Types, Manufacturers, Categories, Roles, Status Labels, warranties, maintenance records, assignments, and disposal records add the context needed to manage that item through its lifecycle.
 
-### Extras & Customization
-Extend ITAMbox with custom fields, alert rules, webhooks, event-driven automation, saved filters, dashboards, export templates, label/QR code printing, and scheduled reports. The reporting engine and webhook system are ***(Beta)***.
+See [MSP Tenant Design](best-practices/msp-tenant-design.md) for planning guidance and the [Data Model](models/organization/tenant.md) section for field-level definitions.
 
-### Users & Authentication
-Manage Django user accounts, API tokens, role-based access control (RBAC), tenant memberships, and SSO integrations (LDAP, SAML, OIDC). SCIM 2.0 provisioning is available for identity-provider-driven user lifecycle management ***(Beta)***.
+## Documentation Families
 
-### Plugins ***(Experimental)***
-Extend ITAMbox with custom Django apps — add models, REST/GraphQL endpoints, sidebar menus, and template injections without modifying core code. The plugin system follows the NetBox plugin model and is opt-in through `ITAMBOX_PLUGINS`; plugins run as trusted, unsandboxed in-process code (see the [plugin guide](plugins/getting_started.md)).
+**Getting Started** provides guided setup and first workflows. **Features** explains user-visible behavior. **Configuration** covers deployment-controlled settings. **Customization** covers behavior administrators define inside ITAMbox. **Integrations** documents external contracts such as REST, GraphQL, SCIM, discovery, and webhooks. **Administration** covers permissions, Jobs, recovery, and ongoing operations. **Data Model** is the canonical object and field reference.
 
----
+Capability maturity is maintained in one place: [Capability Maturity](operations/capability-maturity.md). Individual feature pages mention limitations only when they materially affect how the feature is used.
 
-## The System Registry & Lifecycle
+## Context-Sensitive Help
 
-Every physical asset or stock item in ITAMbox follows a strict state-governed workflow:
-
-```mermaid
-stateDiagram-v2
-    [*] --> Planned: Procured/Imported
-    Planned --> Available: Delivered to Site
-    Available --> InUse: Checked Out to Holder
-    Available --> PendingRepair: Maintenance Needed
-    PendingRepair --> Available: Repaired
-    InUse --> Available: Checked In
-    InUse --> Archived: Decommissioned/Sold
-    Available --> Archived: Scrapped
-    Archived --> [*]
-```
-
-### Context-Sensitive Help
-Every list, detail, and editing view in ITAMbox features an embedded help icon (`mdi-help-circle`) on the breadcrumb header. Clicking it opens a context-specific static page explaining that specific model's fields, business logic rules, and import/export layouts.
-
-### Module Maturity
-Capabilities marked ***(Beta)*** are functional and in active use, but their data model, API shape, or feature set may change between revisions. The public grades — Stable, Beta, Experimental — and the activation modes of every capability are defined in the [Capability Maturity](operations/capability-maturity.md) guide.
+Many list, detail, and edit pages include a help link. Model views normally open the corresponding Data Model page. Those links are part of the application experience, so the model-reference paths are intentionally kept stable even as the documentation navigation evolves.

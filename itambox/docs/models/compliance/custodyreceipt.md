@@ -14,31 +14,110 @@ When an asset is checked out with **Require Acceptance** active, a Custody Recei
 
 ---
 
-## Attributes & Fields
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Acceptance Method** | The acceptance method of the custody receipt. | String | Yes |
-| **Acceptance Status** | The signature status (`pending`, `accepted`, or `declined`). | Selection | Yes |
-| **Accepted** | The accepted of the custody receipt. | Boolean | Yes |
-| **Accepted Date** | The accepted date of the custody receipt. | Date Time | No |
-| **Asset** | The physical hardware checked out. | Foreign Key | Yes |
-| **Created Date** | The created date of the custody receipt. | Date Time | No |
-| **Custody Template** | The Custody Template rules used to generate this receipt. | Foreign Key | No |
-| **Disclaimer** | The disclaimer of the custody receipt. | Text | No |
-| **EULA Text** | The exact copy of the legal terms signed by the user. | Text | No |
-| **EULA Version** | Version tag (e.g., `1.0`) of the signed terms. | String | Yes |
-| **Holder** | The user or contractor taking custody. | Foreign Key | Yes |
-| **IP Address** | The IP address of the device used to sign the receipt. | IP Address | No |
-| **Qms Reference** | The qms reference of the custody receipt. | String | No |
-| **Signature Canvas** | Base64 canvas stroke vector string representing the user's manual signature. | Text | No |
-| **Signature Data** | The signature data of the custody receipt. | Text | No |
-| **Signature Hash** | Cryptographic SHA-256 hash of the signature image data. | String | No |
-| **Signature Provider** | Service handling the signature (e.g., `local` canvas or `docusign`). | String | Yes |
-| **Signed At** | The timestamp when the digital signature occurred. | DateTime | Yes |
-| **Token** | The token of the custody receipt. | String | Yes |
-| **User Agent** | Browser header info logged at the time of signing. | Text | No |
-| **Verification Hash** | Unique tracking verification string printed on audit exports. | String | No |
+### Acceptance Method
+
+Method used to record acceptance.
+
+**Required:** Yes.
+
+### Acceptance Status
+
+The signature status (`pending`, `accepted`, or `declined`).
+
+**Required:** Yes.
+
+### Accepted
+
+Whether acceptance was recorded.
+
+**Required:** Yes.
+
+### Accepted Date
+
+Date and time acceptance was recorded.
+
+### Asset
+
+The physical hardware checked out.
+
+**Required:** Yes.
+
+### Created Date
+
+Date and time the receipt was created.
+
+### Custody Template
+
+The Custody Template rules used to generate this receipt.
+
+### Disclaimer
+
+Disclaimer text presented with the receipt.
+
+### EULA Text
+
+The agreement text captured with the custody receipt, when applicable.
+
+### EULA Version
+
+Version tag (e.g., `1.0`) of the signed terms.
+
+**Required:** Yes.
+
+### Holder
+
+The user or contractor taking custody.
+
+**Required:** Yes.
+
+### IP Address
+
+The network address recorded with the acceptance event, when available.
+
+### Qms Reference
+
+Optional quality-management reference associated with the receipt.
+
+### Signature Canvas
+
+Base64 canvas stroke vector string representing the user's manual signature.
+
+### Signature Data
+
+Stored signature/acceptance data associated with the receipt.
+
+### Signature Hash
+
+Cryptographic SHA-256 hash of the signature image data.
+
+### Signature Provider
+
+Service handling the signature (e.g., `local` canvas or `docusign`).
+
+**Required:** Yes.
+
+### Signed At
+
+The timestamp when the digital signature occurred.
+
+**Required:** Yes.
+
+### Token
+
+Identifier used by the receipt workflow.
+
+**Required:** Yes.
+
+### User Agent
+
+Browser header info logged at the time of signing.
+
+### Verification Hash
+
+Unique tracking verification string printed on audit exports.
+
 
 ## Verification & Audit Trails
 Each receipt generates a **Verification Hash**. This hash can be verified by internal auditors to match the recorded IP, timestamp, user agent, and signature canvas vector directly back to the database record, ensuring tamper-proof compliance checks.

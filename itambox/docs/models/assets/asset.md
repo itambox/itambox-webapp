@@ -1,12 +1,12 @@
 # Physical Assets
 
-An **Asset** represents a physical, high-value, trackable item (e.g. `Laptop`, `Rack Server`, `Desktop`, `Network Switch`) that is owned, leased, or managed by your organization. Each asset is uniquely identified by an **Asset Tag** and a **Serial Number**.
+An **Asset** represents one physical, trackable item (e.g. `Laptop`, `Rack Server`, `Desktop`, `Network Switch`) that is owned, leased, or managed by your organization. Asset Tags are ITAMbox inventory identifiers; manufacturer Serial Numbers can be recorded separately when available.
 
 ---
 
 ## Status Labels & State Gating
 
-Asset Box utilizes a strict state-governed workflow managed via **Status Labels** and their core **Meta-Types**:
+ITAMbox utilizes a strict state-governed workflow managed via **Status Labels** and their core **Meta-Types**:
 
 | Meta-Type | Operational Meaning | Checkout Availability |
 | --- | --- | --- |
@@ -16,41 +16,116 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | **Undeployable** | Item is broken, lost, or undergoing heavy diagnostic repair. | **No** |
 | **Archived** | Item is decommissioned, sold, recycled, or disposed of. | **No** |
 
-!!! warning "State Synchronization Gating"
-    ITAMbox enforces database-level constraints preventing split-state anomalies. An asset's status cannot be set to a status of type `deployed` unless there is an active `AssetAssignment` record linked to it. Similarly, checking in an asset deletes the active assignment and returns the asset to a `deployable` or `pending` status.
-
 ---
 
-## Attributes & Fields
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Asset Role** | The functional category of the asset (e.g. `Developer Laptop`). | Foreign Key | No |
-| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated from the tag sequence if left blank. | String | No |
-| **Asset Type** | The model template from the Catalog (Manufacturer + Model details). May be blank for assets created before the type catalog is ready. | Foreign Key | No |
-| **Cost Center** | The cost center of the asset. | Foreign Key | No |
-| **Currency** | ISO 4217 code. Leave blank to use the tenant default currency. | Choice | No |
-| **Current Book Value** | Materialized current financial value computed via straight-line depreciation. | Decimal | No (Auto) |
-| **Depreciation Override** | Override depreciation policy — leave empty to use the tenant default or asset-type schedule. | Foreign Key | No |
-| **Depreciation Updated At** | The depreciation updated at of the asset. | Date Time | No |
-| **Disposal Value** | The sign-off value of the asset. | Decimal | No |
-| **Disposed At** | The disposed at of the asset. | Date Time | No |
-| **In Service Date** | Depreciation starts here; falls back to purchase date. | Date | No |
-| **Last Audited** | The timestamp when the asset was last verified during an audit session. | DateTime | No (Auto) |
-| **Last Audited By** | The user account of the auditor who last scanned the asset. | Foreign Key | No (Auto) |
-| **Location** | The physical Site / Location room where the asset resides. | Foreign Key | No |
-| **Name** | A recognizable name for the asset (e.g. `Jane's Workstation`). | String | Yes |
-| **Notes** | The notes of the asset. | Text | No |
-| **Order Number** | The purchase order reference number associated with this procurement. | String | No |
-| **Purchase Cost** | The total cost of acquisition. | Decimal | No |
-| **Purchase Date** | The date the asset was purchased. | Date | No |
-| **Purchase Order Line** | The purchase order line of the asset. | Foreign Key | No |
-| **Requestable** | Toggle allowing end-users to request this asset via self-service. Defaults to enabled. | Boolean | No |
-| **Salvage Value** | Estimated value at the end of its useful lifespan. | Decimal | No |
-| **Serial Number** | The manufacturer's unique hardware serial number. | String | No |
-| **Status** | The current operational Status Label. Falls back to the default status label when not set explicitly. | Foreign Key | No |
-| **Supplier** | The vendor or supplier from whom the asset was purchased. | Foreign Key | No |
-| **Tenant** | Cost center department owning the asset. | Foreign Key | No |
+### Asset Role
+
+The operational role used to classify the asset, when one is assigned.
+
+### Asset Tag
+
+A unique barcode tag (e.g. `ASSET-000102`). Auto-generated from the tag sequence if left blank.
+
+### Asset Type
+
+The model template from the Catalog (Manufacturer + Model details). May be blank for assets created before the type catalog is ready.
+
+### Cost Center
+
+Cost Center used for financial allocation of this physical asset.
+
+### Currency
+
+ISO 4217 code. Leave blank to use the tenant default currency.
+
+### Current Book Value
+
+Materialized current financial value computed via straight-line depreciation.
+
+### Depreciation Override
+
+Override depreciation policy: leave empty to use the tenant default or asset-type schedule.
+
+### Depreciation Updated At
+
+When the stored book-value calculation was last refreshed.
+
+### Disposal Value
+
+The value recorded when the asset was disposed of.
+
+### Disposed At
+
+When the asset was recorded as disposed of.
+
+### In Service Date
+
+Depreciation starts here; falls back to purchase date.
+
+### Last Audited
+
+The timestamp when the asset was last verified during an audit session.
+
+### Last Audited By
+
+The user who most recently verified the asset in an audit.
+
+### Location
+
+The physical Site / Location room where the asset resides.
+
+### Name
+
+A recognizable name for the asset (e.g. `Jane's Workstation`).
+
+**Required:** Yes.
+
+### Notes
+
+Optional notes about this physical asset.
+
+### Order Number
+
+The purchase order reference number associated with this procurement.
+
+### Purchase Cost
+
+The total cost of acquisition.
+
+### Purchase Date
+
+The date the asset was purchased.
+
+### Purchase Order Line
+
+Purchase Order line associated with this record.
+
+### Requestable
+
+Toggle allowing end-users to request this asset via self-service. Defaults to enabled.
+
+### Salvage Value
+
+Estimated value at the end of its useful lifespan.
+
+### Serial Number
+
+The manufacturer's unique hardware serial number.
+
+### Status
+
+The current operational Status Label. Falls back to the default status label when not set explicitly.
+
+### Supplier
+
+The vendor or supplier from whom the asset was purchased.
+
+### Tenant
+
+Tenant that owns and scopes the asset.
+
 
 ## Lifecycle Workflows
 

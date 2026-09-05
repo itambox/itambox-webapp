@@ -1,12 +1,11 @@
 # mkdocs.yml (ITAMbox Root)
-site_name: ITAMbox End-User Documentation
+site_name: ITAMbox Documentation
 site_url: https://docs.itambox.local/
-site_dir: static/docs  # Outputs compiled files directly into Django's static folder
+site_dir: static/docs
 use_directory_urls: false
 
-# Raised above the MkDocs 1.6 defaults (info) so `mkdocs build --strict` fails on
-# them: a new page missing from the nav is unreachable in the built site, and a
-# stale anchor is a dead link that renders as a working one.
+# A strict build is a documentation architecture gate: every public page must
+# be navigable, and local links/anchors must remain resolvable.
 validation:
   nav:
     omitted_files: warn
@@ -16,9 +15,8 @@ validation:
     anchors: warn
     unrecognized_links: warn
 
-
 theme:
-  name: material  # Mirror of NetBox's gorgeous Material for MkDocs theme
+  name: material
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -37,7 +35,6 @@ theme:
   features:
     - content.code.copy
     - navigation.sections
-    - navigation.expand
 
 plugins:
   - search
@@ -56,126 +53,164 @@ markdown_extensions:
       alternate_style: true
 
 nav:
-  - Overview: 'index.md'
-  - Installation: 'operations/installation.md'
-  - Operations:
-      - Capability Maturity: 'operations/capability-maturity.md'
-      - Upgrades: 'operations/upgrades.md'
+  - Introduction: 'index.md'
+
+  - Getting Started:
+      - Planning Your Deployment: 'getting-started/planning.md'
+      - Populating Data: 'getting-started/populating-data.md'
+      - Working Across Tenants: 'getting-started/workspaces.md'
+      - Recording the Asset Lifecycle: 'getting-started/asset-lifecycle.md'
+
+  - Features:
+      - Workspaces: 'features/workspaces.md'
+      - Assets & Assignments: 'features/assets-assignments.md'
+      - Search, Filters & Tables: 'features/search-tables.md'
+      - Scanning: 'usage/scanning.md'
+      - Background Jobs: 'features/background-jobs.md'
+      - Reports, Exports & Labels: 'usage/reports-and-exports.md'
+      - Audits & Custody: 'features/audits-custody.md'
+      - Dashboards: 'dashboard.md'
+      - Asset Requests & Reservations: 'usage/asset-requests-and-reservations.md'
+      - Kits, Components & Stock: 'usage/kits-and-components.md'
+      - Software, Licenses & Maintenance: 'usage/software-catalog-and-maintenance.md'
+      - Depreciation: 'usage/depreciation.md'
+      - Procurement & Contracts: 'usage/contracts-and-purchase-orders.md'
+      - Organization & Cost Centers: 'usage/cost-centers-and-regions.md'
+      - Alerts & Notifications: 'usage/alerts-and-notifications.md'
+      - Sign-In, SSO & MFA: 'usage/sso-and-mfa.md'
+      - API Tokens & Provisioning: 'usage/api-tokens-and-scim.md'
+
+  - Installation & Upgrade:
+      - Installing ITAMbox: 'operations/installation.md'
+      - Upgrading ITAMbox: 'operations/upgrades.md'
       - Backup & Restore: 'operations/backup-restore.md'
+      - Recovery Qualification: 'operations/recovery-drill.md'
+
+  - Configuration:
+      - Configuration Overview: 'configuration/index.md'
+      - Authentication: 'configuration/authentication.md'
+      - Background Jobs: 'configuration/background-jobs.md'
+      - Feature Activation: 'configuration/feature-activation.md'
       - Data Retention: 'operations/data-retention.md'
-      - Recovery Qualification Drill: 'operations/recovery-drill.md'
-      - Resource Grant Expiry: 'operations/resource-grant-expiry.md'
-      - Plugin Removal and Recovery: 'operations/plugin-runbook.md'
-      - Management Commands: 'operations/management-commands.md'
-  - Usage:
-      - Dashboard: 'dashboard.md'
-      - Guides:
-          - Scanning Assets: 'usage/scanning.md'
-          - Depreciation Guide: 'usage/depreciation.md'
-          - Asset Requests & Reservations: 'usage/asset-requests-and-reservations.md'
-          - Kits & Components: 'usage/kits-and-components.md'
-          - Software Catalog & Maintenance: 'usage/software-catalog-and-maintenance.md'
-          - Alerts & Notifications: 'usage/alerts-and-notifications.md'
-          - Custom Fields: 'usage/custom-fields.md'
-          - Reports & Exports: 'usage/reports-and-exports.md'
-          - Webhooks & Automation: 'usage/webhooks-and-automation.md'
-          - Contracts & Purchase Orders: 'usage/contracts-and-purchase-orders.md'
-          - Cost Centers & Regions: 'usage/cost-centers-and-regions.md'
-          - SSO & MFA: 'usage/sso-and-mfa.md'
-          - API Tokens & SCIM: 'usage/api-tokens-and-scim.md'
-      - Model Reference:
-          - Organization & Tenancy:
-              - Sites: 'models/organization/site.md'
-              - Regions: 'models/organization/region.md'
-              - Site Groups: 'models/organization/sitegroup.md'
-              - Locations: 'models/organization/location.md'
-              - Tenants: 'models/organization/tenant.md'
-              - Tenant Groups: 'models/organization/tenantgroup.md'
-              - Tenant Roles: 'models/organization/tenantrole.md'
-              - Tenant Memberships: 'models/organization/tenantmembership.md'
-              - Tenant Invitations: 'models/organization/tenantinvitation.md'
-              - Asset Holders: 'models/organization/assetholder.md'
-              - Contacts: 'models/organization/contact.md'
-              - Contact Roles: 'models/organization/contactrole.md'
-              - Contact Assignments: 'models/organization/contactassignment.md'
-              - Cost Centers: 'models/organization/costcenter.md'
-              - Users: 'models/users/user.md'
-              - API Tokens: 'models/users/token.md'
-          - Physical Assets:
-              - Assets: 'models/assets/asset.md'
-              - Asset Roles: 'models/assets/assetrole.md'
-              - Status Labels: 'models/assets/statuslabel.md'
-              - Asset Types: 'models/assets/assettype.md'
-              - Manufacturers: 'models/assets/manufacturer.md'
-              - Categories: 'models/assets/category.md'
-              - Depreciation Profiles: 'models/assets/depreciation.md'
-              - Asset Tag Sequences: 'models/assets/assettagsequence.md'
-              - Asset Requests: 'models/assets/assetrequest.md'
-              - Audit Sessions: 'models/assets/auditsession.md'
-              - Asset Assignments: 'models/assets/assetassignment.md'
-              - Suppliers: 'models/assets/supplier.md'
-              - Warranties: 'models/assets/warranty.md'
-              - Asset Reservations: 'models/assets/assetreservation.md'
-              - Asset Disposals: 'models/assets/assetdisposal.md'
-          - Hardware Components:
-              - Components: 'models/components/component.md'
-              - Component Stock: 'models/components/componentstock.md'
-              - Component Allocations: 'models/components/componentallocation.md'
-          - Inventory & Stock:
-              - Accessories: 'models/inventory/accessory.md'
-              - Accessory Stock: 'models/inventory/accessorystock.md'
-              - Accessory Assignments: 'models/inventory/accessoryassignment.md'
-              - Consumables: 'models/inventory/consumable.md'
-              - Consumable Stock: 'models/inventory/consumablestock.md'
-              - Consumable Consumptions: 'models/inventory/consumableassignment.md'
-              - Kits: 'models/inventory/kit.md'
-              - Kit Items: 'models/inventory/kititem.md'
-          - Software & SaaS:
-              - Software Catalog: 'models/software/software.md'
-              - Software Licenses: 'models/licenses/license.md'
-              - License Seat Assignments: 'models/licenses/licenseseatassignment.md'
-              - SaaS Subscriptions: 'models/subscriptions/subscription.md'
-              - SaaS Providers: 'models/subscriptions/provider.md'
-              - Subscription Assignments: 'models/subscriptions/subscriptionassignment.md'
-          - Procurement:
-              - Purchase Orders: 'models/procurement/purchaseorder.md'
-              - Purchase Order Lines: 'models/procurement/purchaseorderline.md'
-              - Contracts: 'models/procurement/contract.md'
-              - Fulfillment Links: 'models/procurement/fulfillmentlink.md'
-          - Operations & Compliance:
-              - Asset Maintenances: 'models/compliance/assetmaintenance.md'
-              - Custody Templates: 'models/compliance/custodytemplate.md'
-              - Custody Receipts: 'models/compliance/custodyreceipt.md'
-              - Audit Sessions: 'models/compliance/auditsession.md'
-              - Metadata Tags: 'models/extras/tag.md'
-              - Object Changelog: 'models/core/objectchange.md'
-              - Notifications: 'models/core/notification.md'
-              - Jobs: 'models/core/job.md'
-          - Alerting & Notifications:
-              - Alert Log: 'models/extras/alertlog.md'
-              - Alert Rules: 'models/extras/alertrule.md'
-              - Notification Channels: 'models/extras/notificationchannel.md'
-          - Reporting:
-              - Report Templates: 'models/extras/reporttemplate.md'
-              - Scheduled Reports: 'models/extras/scheduledreport.md'
-          - Customization & Automation:
-              - Custom Fields: 'models/extras/customfield.md'
-              - Custom Fieldsets: 'models/extras/customfieldset.md'
-              - Saved Filters: 'models/extras/savedfilter.md'
-              - Export Templates: 'models/extras/exporttemplate.md'
-              - Label Templates: 'models/extras/labeltemplate.md'
-              - Webhooks: 'models/extras/webhookendpoint.md'
-              - Event Rules: 'models/extras/eventrule.md'
+      - Deployment Security: 'security/deployment-security.md'
+
+  - Customization:
+      - Custom Fields & Fieldsets: 'usage/custom-fields.md'
+      - Alert Rules & Channels: 'customization/alerts.md'
+      - Reporting & Output Templates: 'customization/reporting.md'
+
   - Integrations:
-      - Bulk CSV Import Guide: 'integration/bulk_import_guide.md'
-      - Migrate from Snipe-IT: 'integration/migrate-from-snipe-it.md'
-      - Discovery Sync (Intune): 'integration/discovery-sync.md'
-      - SCIM Provisioning (Beta): 'integration/scim.md'
-      - Plugin Development:
-          - Getting Started: 'plugins/getting_started.md'
-          - Extension Hooks: 'plugins/hooks.md'
-  - Security: 'security/deployment-security.md'
-  - API Reference:
       - REST & GraphQL: 'integration/developer_guide.md'
-      - Plugin API Reference: 'plugins/api_reference.md'
-  - Troubleshooting: 'operations/troubleshooting.md'
+      - Webhooks & Event Rules: 'usage/webhooks-and-automation.md'
+      - SCIM Provisioning: 'integration/scim.md'
+      - Discovery Sync: 'integration/discovery-sync.md'
+      - Bulk CSV Import: 'integration/bulk_import_guide.md'
+      - Migrate from Snipe-IT: 'integration/migrate-from-snipe-it.md'
+
+  - Plugins:
+      - Developing Plugins: 'plugins/getting_started.md'
+      - Extension Hooks: 'plugins/hooks.md'
+      - API Reference: 'plugins/api_reference.md'
+      - Removal & Recovery: 'operations/plugin-runbook.md'
+
+  - Administration:
+      - Permissions & Role Grants: 'administration/permissions.md'
+      - Background Jobs: 'administration/background-jobs.md'
+      - Report Scope Approvals: 'administration/report-scope-approvals.md'
+      - Resource Grant Expiry: 'operations/resource-grant-expiry.md'
+      - Management Commands: 'operations/management-commands.md'
+      - Troubleshooting: 'operations/troubleshooting.md'
+
+  - Best Practices:
+      - MSP Tenant Design: 'best-practices/msp-tenant-design.md'
+      - Lifecycle Data Quality: 'best-practices/lifecycle-data-quality.md'
+
+  - Data Model:
+      - Organization & Tenancy:
+          - Sites: 'models/organization/site.md'
+          - Regions: 'models/organization/region.md'
+          - Site Groups: 'models/organization/sitegroup.md'
+          - Locations: 'models/organization/location.md'
+          - Tenants: 'models/organization/tenant.md'
+          - Tenant Groups: 'models/organization/tenantgroup.md'
+          - Tenant Roles: 'models/organization/tenantrole.md'
+          - Tenant Memberships: 'models/organization/tenantmembership.md'
+          - Tenant Invitations: 'models/organization/tenantinvitation.md'
+          - Asset Holders: 'models/organization/assetholder.md'
+          - Contacts: 'models/organization/contact.md'
+          - Contact Roles: 'models/organization/contactrole.md'
+          - Contact Assignments: 'models/organization/contactassignment.md'
+          - Cost Centers: 'models/organization/costcenter.md'
+          - Users: 'models/users/user.md'
+          - API Tokens: 'models/users/token.md'
+      - Physical Assets:
+          - Assets: 'models/assets/asset.md'
+          - Asset Roles: 'models/assets/assetrole.md'
+          - Status Labels: 'models/assets/statuslabel.md'
+          - Asset Types: 'models/assets/assettype.md'
+          - Manufacturers: 'models/assets/manufacturer.md'
+          - Categories: 'models/assets/category.md'
+          - Depreciation Profiles: 'models/assets/depreciation.md'
+          - Asset Tag Sequences: 'models/assets/assettagsequence.md'
+          - Asset Requests: 'models/assets/assetrequest.md'
+          - Audit Sessions: 'models/assets/auditsession.md'
+          - Asset Assignments: 'models/assets/assetassignment.md'
+          - Suppliers: 'models/assets/supplier.md'
+          - Warranties: 'models/assets/warranty.md'
+          - Asset Reservations: 'models/assets/assetreservation.md'
+          - Asset Disposals: 'models/assets/assetdisposal.md'
+      - Hardware Components:
+          - Components: 'models/components/component.md'
+          - Component Stock: 'models/components/componentstock.md'
+          - Component Allocations: 'models/components/componentallocation.md'
+      - Inventory & Stock:
+          - Accessories: 'models/inventory/accessory.md'
+          - Accessory Stock: 'models/inventory/accessorystock.md'
+          - Accessory Assignments: 'models/inventory/accessoryassignment.md'
+          - Consumables: 'models/inventory/consumable.md'
+          - Consumable Stock: 'models/inventory/consumablestock.md'
+          - Consumable Consumptions: 'models/inventory/consumableassignment.md'
+          - Kits: 'models/inventory/kit.md'
+          - Kit Items: 'models/inventory/kititem.md'
+      - Software & SaaS:
+          - Software Catalog: 'models/software/software.md'
+          - Software Licenses: 'models/licenses/license.md'
+          - License Seat Assignments: 'models/licenses/licenseseatassignment.md'
+          - SaaS Subscriptions: 'models/subscriptions/subscription.md'
+          - SaaS Providers: 'models/subscriptions/provider.md'
+          - Subscription Assignments: 'models/subscriptions/subscriptionassignment.md'
+      - Procurement:
+          - Purchase Orders: 'models/procurement/purchaseorder.md'
+          - Purchase Order Lines: 'models/procurement/purchaseorderline.md'
+          - Contracts: 'models/procurement/contract.md'
+          - Fulfillment Links: 'models/procurement/fulfillmentlink.md'
+      - Operations & Compliance:
+          - Asset Maintenances: 'models/compliance/assetmaintenance.md'
+          - Custody Templates: 'models/compliance/custodytemplate.md'
+          - Custody Receipts: 'models/compliance/custodyreceipt.md'
+          - Audit Sessions: 'models/compliance/auditsession.md'
+          - Metadata Tags: 'models/extras/tag.md'
+          - Object Changelog: 'models/core/objectchange.md'
+          - Notifications: 'models/core/notification.md'
+          - Jobs: 'models/core/job.md'
+      - Alerting & Notifications:
+          - Alert Log: 'models/extras/alertlog.md'
+          - Alert Rules: 'models/extras/alertrule.md'
+          - Notification Channels: 'models/extras/notificationchannel.md'
+      - Reporting:
+          - Report Templates: 'models/extras/reporttemplate.md'
+          - Scheduled Reports: 'models/extras/scheduledreport.md'
+      - Customization & Automation:
+          - Custom Fields: 'models/extras/customfield.md'
+          - Custom Fieldsets: 'models/extras/customfieldset.md'
+          - Saved Filters: 'models/extras/savedfilter.md'
+          - Export Templates: 'models/extras/exporttemplate.md'
+          - Label Templates: 'models/extras/labeltemplate.md'
+          - Webhooks: 'models/extras/webhookendpoint.md'
+          - Event Rules: 'models/extras/eventrule.md'
+
+  - Reference:
+      - Capability Maturity: 'operations/capability-maturity.md'
+      - Workspace Scope: 'reference/workspace-scope.md'
+      - Scan Code Resolution: 'reference/scan-code-resolution.md'
+      - Depreciation Calculations: 'reference/depreciation-calculations.md'

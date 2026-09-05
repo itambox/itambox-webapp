@@ -2,18 +2,46 @@
 
 A **Component Allocation** represents a physical installation mapping record, representing modular hardware parts allocated to a parent serialized asset (e.g. installing `2x Crucial 16GB DDR4 RAM` into `ASSET-000102` server).
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Assigned Asset** | The assigned asset of the component allocation. | Foreign Key | No |
-| **Assigned Date** | The assigned date of the component allocation. | Date Time | Yes |
-| **Assigned Holder** | The assigned holder of the component allocation. | Foreign Key | No |
-| **Assigned Location** | The assigned location of the component allocation. | Foreign Key | No |
-| **Component** | The catalog modular part being allocated. | Foreign Key | Yes |
-| **From Location** | The physical stock location selected by the component Check-out action. Target-only allocation create and asset quick-add leave this empty. | Foreign Key | No |
-| **Notes** | The notes of the component allocation. | Text | No |
-| **Qty** | The checkout quantity of the component allocation. | Integer | Yes |
+### Assigned Asset
+
+Asset associated with this assignment.
+
+### Assigned Date
+
+Date this assignment began.
+
+**Required:** Yes.
+
+### Assigned Holder
+
+Asset Holder associated with this assignment.
+
+### Assigned Location
+
+Location associated with this assignment.
+
+### Component
+
+The catalog modular part being allocated.
+
+**Required:** Yes.
+
+### From Location
+
+The physical stock location selected by the component Check-out action. Target-only allocation create and asset quick-add leave this empty.
+
+### Notes
+
+Optional notes about this component allocation.
+
+### Qty
+
+Quantity issued by this assignment.
+
+**Required:** Yes.
+
 
 ## Automated Stock Control
 * **Target-only allocation create / asset quick-add**: No source pool is accepted. The active allocation reduces availability without changing a stock row.

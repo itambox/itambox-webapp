@@ -2,15 +2,34 @@
 
 A **Notification Channel** defines a destination or medium for alert rules and system notifications, such as SMTP (email) or custom webhook endpoints.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Channel Type** | The type of delivery channel (e.g., SMTP, Webhook, Slack). | Choice | Yes |
-| **Config** | Channel-specific configuration payload (SMTP settings, webhook URLs, authentication tokens, etc.). | JSON | No |
-| **Enabled** | Flag indicating if this channel is active and accepting notifications. | Boolean | Yes |
-| **Name** | Unique user-friendly name for the notification channel. | String | Yes |
-| **Tenant** | The tenant owning this channel. Null represents a system-wide channel. | Foreign Key | No |
+### Channel Type
+
+The type of delivery channel (e.g., SMTP, Webhook, Slack).
+
+**Required:** Yes.
+
+### Config
+
+Channel-specific configuration payload (SMTP settings, webhook URLs, authentication tokens, etc.).
+
+### Enabled
+
+Flag indicating if this channel is active and accepting notifications.
+
+**Required:** Yes.
+
+### Name
+
+Unique user-friendly name for the notification channel.
+
+**Required:** Yes.
+
+### Tenant
+
+The tenant owning this channel. Null represents a system-wide channel.
+
 
 ## Features & Validation
 

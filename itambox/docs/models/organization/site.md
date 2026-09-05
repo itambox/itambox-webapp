@@ -2,24 +2,70 @@
 
 A **Site** represents a physical facility, building, office campus, or data center where hardware assets are located or stored. It serves as the primary container for physical geography inside ITAMbox.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Comments** | Optional internal comments or access notes. | Text | No |
-| **Description** | The description of the site. | String | No |
-| **Facility** | The facility of the site. | String | No |
-| **Group** | The functional or logical site group (e.g. `Corporate Offices`). | Foreign Key | No |
-| **Latitude** | Latitude coordinate of the site for mapping. | Decimal | No |
-| **Longitude** | Longitude coordinate of the site for mapping. | Decimal | No |
-| **Name** | The unique, friendly name of the facility (e.g. `HQ Building A`). | String | Yes |
-| **Physical Address** | The full physical address of the facility. | Text | No |
-| **Region** | The geographic region where this site belongs (e.g. `Europe`). | Foreign Key | No |
-| **Shipping Address** | Dedicated shipping address for hardware deliveries. | String | No |
-| **Slug** | A unique URL-friendly representation of the name (e.g. `hq-building-a`). Auto-generated if blank. | Slug | Yes |
-| **Status** | Current operational status of the site (Active, Planned, Retired). | Choice | Yes |
-| **Tenant** | Optional department or tenant that owns/occupies the site. | Foreign Key | No |
-| **Time Zone** | Local timezone identifier (e.g. `America/New_York`) for scheduling audits. | String | No |
+### Comments
+
+Optional internal comments or access notes.
+
+### Description
+
+Human-readable description of this site.
+
+### Facility
+
+Facility identifier or code associated with the Site.
+
+### Group
+
+The functional or logical site group (e.g. `Corporate Offices`).
+
+### Latitude
+
+Latitude coordinate of the site for mapping.
+
+### Longitude
+
+Longitude coordinate of the site for mapping.
+
+### Name
+
+The site name shown in ITAMbox.
+
+**Required:** Yes.
+
+### Physical Address
+
+The postal or physical address of the site.
+
+### Region
+
+The geographic region where this site belongs (e.g. `Europe`).
+
+### Shipping Address
+
+Dedicated shipping address for hardware deliveries.
+
+### Slug
+
+A unique URL-friendly representation of the name (e.g. `hq-building-a`). Auto-generated if blank.
+
+**Required:** Yes.
+
+### Status
+
+Current operational status of the site (Active, Planned, Retired).
+
+**Required:** Yes.
+
+### Tenant
+
+Optional department or tenant that owns/occupies the site.
+
+### Time Zone
+
+Local timezone identifier (e.g. `America/New_York`) for scheduling audits.
+
 
 ## Relationships
 

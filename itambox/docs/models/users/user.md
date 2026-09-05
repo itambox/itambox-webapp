@@ -1,23 +1,69 @@
 # Users
 
-A **User** represents a user account within the Django authentication system. It manages authentication credentials, user details, security status, and group/permission assignments.
+A **User** represents an account that can sign in to ITAMbox. It stores identity details, account state, security settings, and permission relationships.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Date Joined** | The date and time when the account was registered. | Date Time | Yes |
-| **Email Address** | Email contact address for notifications. | String | No |
-| **First Name** | User's first name. | String | No |
-| **Groups** | Security groups the user belongs to. | Many-to-Many | No |
-| **Active** | Flag specifying if the account is active. Accounts should be deactivated instead of deleted to preserve audit trails. | Boolean | Yes |
-| **Staff Status** | Designates whether the user can access administrative portals. | Boolean | Yes |
-| **Superuser Status** | Grants all system permissions without explicit assignment. | Boolean | Yes |
-| **Last Login** | The last login of the user. | Date Time | No |
-| **Last Name** | User's last name. | String | No |
-| **Password** | Hashed credentials for user login. | String | Yes |
-| **User Permissions** | Direct, granular security permissions assigned to the user. | Many-to-Many | No |
-| **Username** | Unique alphanumeric login username. | String | Yes |
+### Date Joined
+
+The date and time when the account was registered.
+
+**Required:** Yes.
+
+### Email Address
+
+Email contact address for notifications.
+
+### First Name
+
+User's first name.
+
+### Groups
+
+Security groups the user belongs to.
+
+### Active
+
+Flag specifying if the account is active. Accounts should be deactivated instead of deleted to preserve audit trails.
+
+**Required:** Yes.
+
+### Staff Status
+
+Designates whether the user can access administrative portals.
+
+**Required:** Yes.
+
+### Superuser Status
+
+Grants all system permissions without explicit assignment.
+
+**Required:** Yes.
+
+### Last Login
+
+Most recent successful sign-in time for the user.
+
+### Last Name
+
+User's last name.
+
+### Password
+
+Hashed credentials for user login.
+
+**Required:** Yes.
+
+### User Permissions
+
+Direct, granular security permissions assigned to the user.
+
+### Username
+
+Unique alphanumeric login username.
+
+**Required:** Yes.
+
 
 ## Features & Validation
 

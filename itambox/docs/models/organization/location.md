@@ -2,18 +2,48 @@
 
 A **Location** represents a specific room, floor, desk, server rack, or storage closet within a parent **Site**. It allows organizations to track exactly where a physical asset or bulk inventory stock is stored or deployed.
 
-## Attributes
+## Fields
 
-| Field | Description | Type | Required |
-| --- | --- | --- | --- |
-| **Description** | Detailed description of the location or access constraints. | Text | No |
-| **Facility** | Room number, floor number, suite, or building wing. | String | No |
-| **Name** | The unique, friendly name of the location (e.g. `Server Room 3B`, `IT Storage Closet`). | String | Yes |
-| **Parent** | Nested location support, allowing hierarchical structures (e.g., `Rack 12` nested inside `Server Room 3B`). | Foreign Key | No |
-| **Site** | The parent facility or building containing this location. | Foreign Key | Yes |
-| **Slug** | A unique URL-friendly representation of the name (e.g. `server-room-3b`). Auto-generated if blank. | Slug | Yes |
-| **Status** | Current operational status of the location (Active, Planned, Retired). | Choice | Yes |
-| **Tenant** | Optional tenant context that owns or occupies this location. | Foreign Key | No |
+### Description
+
+Detailed description of the location or access constraints.
+
+### Facility
+
+Room number, floor number, suite, or building wing.
+
+### Name
+
+The location name shown in ITAMbox.
+
+**Required:** Yes.
+
+### Parent
+
+Nested location support, allowing hierarchical structures (e.g., `Rack 12` nested inside `Server Room 3B`).
+
+### Site
+
+The parent facility or building containing this location.
+
+**Required:** Yes.
+
+### Slug
+
+A unique URL-friendly representation of the name (e.g. `server-room-3b`). Auto-generated if blank.
+
+**Required:** Yes.
+
+### Status
+
+Current operational status of the location (Active, Planned, Retired).
+
+**Required:** Yes.
+
+### Tenant
+
+Optional tenant context that owns or occupies this location.
+
 
 ## Relationships
 
