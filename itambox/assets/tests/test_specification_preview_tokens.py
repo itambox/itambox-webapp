@@ -13,7 +13,7 @@ from pathlib import Path
 from django.core import signing
 
 _MODULE_PATH = Path(__file__).resolve().parents[1] / "services" / "specifications" / "preview_tokens.py"
-_MODULE_SPEC = importlib.util.spec_from_file_location("assets.services.specifications.preview_tokens", _MODULE_PATH)
+_MODULE_SPEC = importlib.util.spec_from_file_location("_issue479_preview_tokens_unit", _MODULE_PATH)
 if _MODULE_SPEC is None or _MODULE_SPEC.loader is None:
     raise RuntimeError("could not load preview-token kernel")
 _preview_tokens = importlib.util.module_from_spec(_MODULE_SPEC)
@@ -113,6 +113,13 @@ class PreviewTokenKernelTests(unittest.TestCase):
         for token in ("", "not-a-signed-token", "x" * (MAX_PREVIEW_TOKEN_LENGTH + 1)):
             with self.subTest(token_length=len(token)):
                 self._assert_stale(token)
+
+    def test_compressed_tokens_are_outside_the_emitted_format(self):
+        signer = signing.Signer(key=TEST_KEY, salt=PREVIEW_TOKEN_SALT, fallback_keys=())
+        payload = signer.unsign_object(self._issue())
+        compressed = signer.sign_object(payload, compress=True)
+        self.assertTrue(compressed.startswith("."))
+        self._assert_stale(compressed)
 
     def test_expired_and_not_yet_valid_tokens_are_rejected_without_sleeping(self):
         token = self._issue(now=1000)
@@ -244,6 +251,22 @@ class PreviewTokenKernelTests(unittest.TestCase):
 
         self.assertNotIn(TEST_KEY, str(raised.exception))
         self.assertNotIn(token, str(raised.exception))
+
+    def test_collection_does_not_replace_the_canonical_module(self):
+        probe = (
+            "import runpy, sys, types; "
+            "name = 'assets.services.specifications.preview_tokens'; "
+            "sentinel = types.ModuleType(name); sys.modules[name] = sentinel; "
+            "runpy.run_path(sys.argv[1], run_name='preview_token_collection_probe'); "
+            "assert sys.modules[name] is sentinel, 'collection replaced the canonical module'"
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", probe, str(Path(__file__).resolve())],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_import_does_not_load_orm_or_bootstrap_a_database(self):
         repository_root = Path(__file__).resolve().parents[2]

@@ -214,7 +214,7 @@ def verify_preview_token(
     try:
         payload = signer.unsign_object(token)
         claims = _claims_from_payload(payload)
-    except Exception:
+    except (signing.BadSignature, ValueError, TypeError, RecursionError):
         raise PreviewTokenError("invalid_format_or_signature") from None
 
     current_time = _resolve_now(now)
@@ -387,7 +387,13 @@ def _validate_signing_key(key: SigningKey) -> None:
 
 
 def _validate_token_text(token: object) -> None:
-    if not isinstance(token, str) or not token or len(token) > MAX_PREVIEW_TOKEN_LENGTH or not token.isascii():
+    if (
+        not isinstance(token, str)
+        or not token
+        or len(token) > MAX_PREVIEW_TOKEN_LENGTH
+        or not token.isascii()
+        or token.startswith(".")
+    ):
         raise PreviewTokenError("invalid_format")
 
 
