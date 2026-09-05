@@ -237,6 +237,19 @@ class AssetTypeSwitchValidationTests(TestCase):
         self.assertEqual(asset.asset_type_id, plain_type.pk)
         self.assertEqual(asset.custom_field_data, {})
 
+    def test_field_limited_asset_type_switch_via_attname_runs_target_validation(self):
+        asset, plain_type, target_type = _asset_switch_pair()
+
+        # Django accepts the ``attname`` spelling in ``update_fields``; the
+        # dependency guard must not fail open for it.
+        asset.asset_type_id = target_type.pk
+        with self.assertRaises(ValidationError):
+            asset.save(update_fields=["asset_type_id"])
+
+        asset.refresh_from_db()
+        self.assertEqual(asset.asset_type_id, plain_type.pk)
+        self.assertEqual(asset.custom_field_data, {})
+
     def test_field_limited_unrelated_asset_save_keeps_suppression_path(self):
         asset, _, target_type = _asset_switch_pair()
         asset.custom_field_data = {"required_spec": "configured"}

@@ -331,13 +331,13 @@ class AssetTypeFormPreservationTests(TestCase):
         with CaptureQueriesContext(connection) as queries:
             small_form = AssetTypeForm(instance=small)
         self.assertEqual(len(small_form.custom_field_keys), 8)
-        self.assertLessEqual(len(queries), 11)
+        self.assertEqual(len(queries), 11)
 
         large = build(4)
         with CaptureQueriesContext(connection) as queries:
             large_form = AssetTypeForm(instance=large)
         self.assertEqual(len(large_form.custom_field_keys), 16)
-        self.assertLessEqual(len(queries), 11)
+        self.assertEqual(len(queries), 11)
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
