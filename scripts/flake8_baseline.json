@@ -532,7 +532,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "C901",
       "message": "'checkin_asset' is too complex (13)",
       "source": "def checkin_asset(",
@@ -540,7 +540,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "C901",
       "message": "'checkout_asset' is too complex (27)",
       "source": "def checkout_asset(",
@@ -548,7 +548,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "C901",
       "message": "'checkout_kit' is too complex (17)",
       "source": "def checkout_kit(",
@@ -556,7 +556,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "F401",
       "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
       "source": "from django.contrib.contenttypes.models import ContentType",
@@ -564,7 +564,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "F401",
       "message": "'django.db.models.Sum' imported but unused",
       "source": "from django.db.models import Sum",
@@ -572,7 +572,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "F401",
       "message": "'django.shortcuts.get_object_or_404' imported but unused",
       "source": "from django.shortcuts import get_object_or_404",
@@ -580,7 +580,7 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/services.py",
+      "path": "itambox/assets/services/__init__.py",
       "code": "F401",
       "message": "'django.urls.reverse' imported but unused",
       "source": "from django.urls import reverse",
