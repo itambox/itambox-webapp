@@ -13,12 +13,15 @@ import json
 import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime
+from datetime import timezone as datetime_timezone
 from typing import Literal, NewType, TypeAlias
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils import timezone
 
+from core import tenant_access as _tenant_access
 from core import tenant_scope as _tenant_scope
 from organization.models import Membership, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from users.models import GroupMembership, UserGroup
@@ -218,83 +221,28 @@ def resolve_access_scope(request: AccessScopeResolutionRequestDTO) -> AccessScop
         raise TypeError("request must be an AccessScopeResolutionRequestDTO")
 
     try:
-        actor = _reload_authenticated_actor(request.actor.actor_id)
+        actor = _reload_authenticated_actor(request.actor)
         if actor is None:
             return _denied()
-        if authentication_revision_for_actor(actor) != request.actor.authentication_revision:
-            return _denied()
-
         accessible_ids, earliest_expiry, permission_map, grants = _read_provider_data(actor)
-        live_tenant_ids = set(
-            Tenant._base_manager.filter(deleted_at__isnull=True).values_list("pk", flat=True)
+        live_tenant_ids = _live_tenant_ids()
+        _validate_provider_sets(accessible_ids, permission_map, live_tenant_ids)
+        authorized_ids = _authorized_tenant_ids(
+            request.selector,
+            request.required_permission,
+            permission_map,
+            live_tenant_ids,
         )
-        if not accessible_ids.issubset(live_tenant_ids):
-            raise ValueError("provider returned a deleted or missing accessible tenant")
-        if not set(permission_map).issubset(accessible_ids):
-            raise ValueError("permission map is outside the accessible tenant set")
-
-        permission_authorized_ids = {
-            tenant_id
-            for tenant_id, (permissions, _map_expiry) in permission_map.items()
-            if request.required_permission in permissions
-        }
-        selected_ids = _select_requested_tenants(request.selector, live_tenant_ids)
-        if selected_ids is None:
+        if authorized_ids is None:
             return _denied()
-
-        if request.selector.mode == "tenant":
-            authorized_ids = selected_ids & permission_authorized_ids
-            if authorized_ids != selected_ids:
-                return _denied()
-        elif request.selector.mode == "tenant_group":
-            if not selected_ids or not selected_ids.issubset(permission_authorized_ids):
-                return _denied()
-            authorized_ids = selected_ids
-        else:
-            authorized_ids = permission_authorized_ids
-            if not authorized_ids:
-                return _denied()
-
-        actor_auth_revision = authentication_revision_for_actor(actor)
-        authorization_evidence = _authorization_evidence(
+        return _resolved_scope(
+            request=request,
             actor=actor,
-            actor_auth_revision=actor_auth_revision,
-            required_permission=request.required_permission,
             accessible_ids=accessible_ids,
+            earliest_expiry=earliest_expiry,
             permission_map=permission_map,
             grants=grants,
-            selector=request.selector,
             authorized_ids=authorized_ids,
-            earliest_expiry=earliest_expiry,
-        )
-        authorization_revision = AuthorizationRevision(_sha256_json(authorization_evidence))
-        selector_fingerprint = SelectorFingerprint(_selector_fingerprint(request.selector))
-        access_scope_fingerprint = AccessScopeFingerprint(
-            _sha256_json(
-                {
-                    "version": 1,
-                    "actor_id": request.actor.actor_id,
-                    "operation": request.operation,
-                    "required_permission": request.required_permission,
-                    "selector_fingerprint": selector_fingerprint,
-                    "authorization_revision": authorization_revision,
-                    "authorized_tenant_ids": sorted(authorized_ids),
-                    "valid_until_epoch_seconds": _expiry_epoch_seconds(earliest_expiry),
-                }
-            )
-        )
-        access_scope = AccessScopeDTO(
-            mode=request.selector.mode,
-            authorized_tenant_ids=frozenset(authorized_ids),
-            selector_fingerprint=selector_fingerprint,
-            authorization_revision=authorization_revision,
-            access_scope_fingerprint=access_scope_fingerprint,
-            valid_until_epoch_seconds=_expiry_epoch_seconds(earliest_expiry),
-        )
-        return AccessScopeResolvedDTO(
-            outcome="resolved",
-            request=request,
-            access_scope=access_scope,
         )
     # broad except: boundary-isolation: provider, query, or topology errors fail closed to nondisclosing denial
     except Exception as exc:
@@ -303,6 +251,110 @@ def resolve_access_scope(request: AccessScopeResolutionRequestDTO) -> AccessScop
             type(exc).__name__,
         )
         return _denied()
+
+
+def _reload_authenticated_actor(actor_context: ActorContextDTO):
+    actor = _reload_actor(actor_context.actor_id)
+    if actor is None:
+        return None
+    if authentication_revision_for_actor(actor) != actor_context.authentication_revision:
+        return None
+    return actor
+
+
+def _reload_actor(actor_id: int):
+    user_model = get_user_model()
+    return user_model._base_manager.filter(pk=actor_id, is_active=True).first()
+
+
+def _live_tenant_ids() -> set[int]:
+    return set(Tenant._base_manager.filter(deleted_at__isnull=True).values_list("pk", flat=True))
+
+
+def _validate_provider_sets(
+    accessible_ids: set[int],
+    permission_map: Mapping[int, tuple[frozenset[str], datetime | None]],
+    live_tenant_ids: set[int],
+) -> None:
+    if not accessible_ids.issubset(live_tenant_ids):
+        raise ValueError("provider returned a deleted or missing accessible tenant")
+    if not set(permission_map).issubset(accessible_ids):
+        raise ValueError("permission map is outside the accessible tenant set")
+
+
+def _authorized_tenant_ids(
+    selector: RequestedScopeSelectorDTO,
+    required_permission: str,
+    permission_map: Mapping[int, tuple[frozenset[str], datetime | None]],
+    live_tenant_ids: set[int],
+) -> set[int] | None:
+    permission_authorized_ids = {
+        tenant_id
+        for tenant_id, (permissions, _map_expiry) in permission_map.items()
+        if required_permission in permissions
+    }
+    selected_ids = _select_requested_tenants(selector, live_tenant_ids)
+    if selected_ids is None:
+        return None
+    if selector.mode == "all_accessible":
+        return permission_authorized_ids or None
+    if not selected_ids.issubset(permission_authorized_ids):
+        return None
+    return selected_ids
+
+
+def _resolved_scope(
+    *,
+    request: AccessScopeResolutionRequestDTO,
+    actor: object,
+    accessible_ids: set[int],
+    earliest_expiry: datetime | None,
+    permission_map: Mapping[int, tuple[frozenset[str], datetime | None]],
+    grants: tuple[RoleGrant, ...],
+    authorized_ids: set[int],
+) -> AccessScopeResolvedDTO:
+    actor_auth_revision = authentication_revision_for_actor(actor)
+    authorization_evidence = _authorization_evidence(
+        actor=actor,
+        actor_auth_revision=actor_auth_revision,
+        required_permission=request.required_permission,
+        accessible_ids=accessible_ids,
+        permission_map=permission_map,
+        grants=grants,
+        selector=request.selector,
+        authorized_ids=authorized_ids,
+        earliest_expiry=earliest_expiry,
+    )
+    authorization_revision = AuthorizationRevision(_sha256_json(authorization_evidence))
+    selector_fingerprint = SelectorFingerprint(_selector_fingerprint(request.selector))
+    expiry_epoch_seconds = _expiry_epoch_seconds(earliest_expiry)
+    access_scope_fingerprint = AccessScopeFingerprint(
+        _sha256_json(
+            {
+                "version": 1,
+                "actor_id": request.actor.actor_id,
+                "operation": request.operation,
+                "required_permission": request.required_permission,
+                "selector_fingerprint": selector_fingerprint,
+                "authorization_revision": authorization_revision,
+                "authorized_tenant_ids": sorted(authorized_ids),
+                "valid_until_epoch_seconds": expiry_epoch_seconds,
+            }
+        )
+    )
+    access_scope = AccessScopeDTO(
+        mode=request.selector.mode,
+        authorized_tenant_ids=frozenset(authorized_ids),
+        selector_fingerprint=selector_fingerprint,
+        authorization_revision=authorization_revision,
+        access_scope_fingerprint=access_scope_fingerprint,
+        valid_until_epoch_seconds=expiry_epoch_seconds,
+    )
+    return AccessScopeResolvedDTO(
+        outcome="resolved",
+        request=request,
+        access_scope=access_scope,
+    )
 
 
 def reauthorize_access_scope(
@@ -318,37 +370,83 @@ def _read_provider_data(actor: object):
     raw_access = _tenant_scope.accessible_tenant_ids_with_expiry(actor)
     if not isinstance(raw_access, tuple) or len(raw_access) != 2:
         raise ValueError("accessible tenant provider returned malformed data")
-    accessible_ids = _positive_ids(raw_access[0], "accessible tenant id")
+    accessible_ids = _positive_ids(
+        _tenant_access.accessible_tenant_ids(actor),
+        "accessible tenant id",
+    )
+    expiry_ids = _positive_ids(raw_access[0], "accessible tenant id")
+    if expiry_ids != accessible_ids:
+        raise ValueError("tenant access providers returned inconsistent data")
     earliest_expiry = _validate_expiry(raw_access[1])
 
     raw_permission_map = _tenant_scope.build_accessible_tenant_permissions_map(actor)
+    permission_map = _normalize_permission_map(raw_permission_map)
+    grants = _normalize_grants(_tenant_scope.applicable_grants(actor))
+    return accessible_ids, earliest_expiry, permission_map, grants
+
+
+def _normalize_permission_map(raw_permission_map: object) -> dict[int, tuple[frozenset[str], datetime | None]]:
     if not isinstance(raw_permission_map, Mapping):
         raise ValueError("permission provider returned malformed data")
-    permission_map = {}
+    return {
+        tenant_id: (_normalize_permissions(raw_value[0]), _validate_expiry(raw_value[1]))
+        for tenant_id, raw_value in _validated_permission_entries(raw_permission_map)
+    }
+
+
+def _validated_permission_entries(raw_permission_map: Mapping[object, object]):
     for tenant_id, raw_value in raw_permission_map.items():
         _require_positive_id(tenant_id, "permission-map tenant id")
         if not isinstance(raw_value, tuple) or len(raw_value) != 2:
             raise ValueError("permission provider returned a malformed tenant entry")
-        permissions, map_expiry = raw_value
-        if not isinstance(permissions, Iterable) or isinstance(permissions, (str, bytes)):
-            raise ValueError("permission provider returned malformed permissions")
-        normalized_permissions = frozenset()
-        permission_values = []
-        for permission in permissions:
-            if not isinstance(permission, str) or not permission:
-                raise ValueError("permission provider returned a malformed permission")
-            permission_values.append(permission)
-        normalized_permissions = frozenset(permission_values)
-        permission_map[tenant_id] = (normalized_permissions, _validate_expiry(map_expiry))
+        yield tenant_id, raw_value
 
-    raw_grants = _tenant_scope.applicable_grants(actor)
+
+def _normalize_permissions(permissions: object) -> frozenset[str]:
+    if not isinstance(permissions, Iterable) or isinstance(permissions, (str, bytes)):
+        raise ValueError("permission provider returned malformed permissions")
+    values = []
+    for permission in permissions:
+        if not isinstance(permission, str) or not permission:
+            raise ValueError("permission provider returned a malformed permission")
+        values.append(permission)
+    return frozenset(values)
+
+
+def _normalize_grants(raw_grants: object) -> tuple[RoleGrant, ...]:
     if not isinstance(raw_grants, Iterable) or isinstance(raw_grants, (str, bytes)):
         raise ValueError("grant provider returned malformed data")
     grants = tuple(raw_grants)
-    for grant in grants:
-        if not isinstance(grant, RoleGrant) or not getattr(grant, "pk", None):
-            raise ValueError("grant provider returned a malformed grant")
-    return accessible_ids, earliest_expiry, permission_map, grants
+    if any(not isinstance(grant, RoleGrant) or not getattr(grant, "pk", None) for grant in grants):
+        raise ValueError("grant provider returned a malformed grant")
+    return grants
+
+
+def _fresh_live_descendant_tenant_group_ids(group_id: int | None) -> set[int]:
+    """Read the live group tree without the request-local descendant cache."""
+    if group_id is None:
+        return set()
+    rows = list(
+        TenantGroup._base_manager.filter(deleted_at__isnull=True)
+        .values("pk", "parent_id")
+        .order_by("pk")
+    )
+    live_ids = {row["pk"] for row in rows}
+    if group_id not in live_ids:
+        return set()
+    children_by_parent: dict[int, list[int]] = {}
+    for row in rows:
+        parent_id = row["parent_id"]
+        if parent_id is not None:
+            children_by_parent.setdefault(parent_id, []).append(row["pk"])
+    descendants = {group_id}
+    frontier = [group_id]
+    while frontier:
+        children = [child_id for parent_id in frontier for child_id in children_by_parent.get(parent_id, ())]
+        children = [child_id for child_id in children if child_id not in descendants]
+        descendants.update(children)
+        frontier = children
+    return descendants
 
 
 def _select_requested_tenants(
@@ -361,7 +459,7 @@ def _select_requested_tenants(
     if selector.mode == "all_accessible":
         return set()
 
-    group_ids = _tenant_scope.get_descendant_tenant_group_ids(selector.tenant_group_id, live_only=True)
+    group_ids = _fresh_live_descendant_tenant_group_ids(selector.tenant_group_id)
     group_ids = _positive_ids(group_ids, "tenant group id")
     if not group_ids:
         return None
@@ -382,6 +480,30 @@ def _select_requested_tenants(
     return selected_ids if selected_ids else None
 
 
+def _load_membership_evidence(
+    *,
+    actor_id: int,
+    accessible_ids: set[int],
+    membership_ids: set[int],
+) -> list[dict[str, object]]:
+    rows = list(
+        Membership._base_manager.filter(
+            user_id=actor_id,
+            tenant__deleted_at__isnull=True,
+        )
+        .filter(
+            Q(pk__in=membership_ids)
+            | Q(is_active=True, tenant_id__in=accessible_ids),
+        )
+        .values("pk", "user_id", "tenant_id", "is_active")
+        .order_by("pk")
+    )
+    loaded_ids = {row["pk"] for row in rows}
+    if not membership_ids.issubset(loaded_ids):
+        raise ValueError("authorization evidence references a missing membership")
+    return rows
+
+
 def _authorization_evidence(
     *,
     actor: object,
@@ -398,11 +520,6 @@ def _authorization_evidence(
     if len(grant_ids) != len(grants):
         raise ValueError("grant provider returned duplicate grant identities")
 
-    membership_rows = list(
-        Membership._base_manager.filter(user_id=actor.pk)
-        .values("pk", "user_id", "tenant_id", "is_active")
-        .order_by("pk")
-    )
     grant_rows = list(
         RoleGrant._base_manager.filter(pk__in=grant_ids)
         .values(
@@ -445,6 +562,18 @@ def _authorization_evidence(
             "membership__is_active",
         )
         .order_by("pk")
+    )
+
+    membership_ids = {
+        row["membership_id"]
+        for row in grant_rows
+        if row["membership_id"] is not None
+    }
+    membership_ids.update(row["membership_id"] for row in group_membership_rows)
+    membership_rows = _load_membership_evidence(
+        actor_id=actor.pk,
+        accessible_ids=accessible_ids,
+        membership_ids=membership_ids,
     )
 
     relevant_tenant_ids = set(accessible_ids) | set(permission_map) | set(authorized_ids)
@@ -536,18 +665,6 @@ def _selector_fingerprint(selector: RequestedScopeSelectorDTO) -> str:
     )
 
 
-def _selector_payload(selector: RequestedScopeSelectorDTO) -> dict[str, object]:
-    return {
-        "mode": selector.mode,
-        "selected_id": selector.tenant_id if selector.mode == "tenant" else selector.tenant_group_id,
-    }
-
-
-def _reload_authenticated_actor(actor_id: int):
-    user_model = get_user_model()
-    return user_model._base_manager.filter(pk=actor_id, is_active=True).first()
-
-
 def _denied() -> AccessScopeDeniedDTO:
     return AccessScopeDeniedDTO(
         outcome="denied",
@@ -610,7 +727,12 @@ def _canonical_rows(rows: Iterable[Mapping[str, object]]) -> list[dict[str, obje
             elif key.endswith("permissions"):
                 if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
                     raise ValueError("authorization evidence contains malformed permissions")
-                normalized[key] = sorted({permission for permission in value if isinstance(permission, str)})
+                permissions = []
+                for permission in value:
+                    if not isinstance(permission, str) or not permission:
+                        raise ValueError("authorization evidence contains malformed permissions")
+                    permissions.append(permission)
+                normalized[key] = sorted(set(permissions))
             else:
                 normalized[key] = value
         result.append(normalized)

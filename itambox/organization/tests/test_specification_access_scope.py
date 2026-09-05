@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
+from core import tenant_access
 from core.tenant_scope import build_accessible_tenant_permissions_map
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from organization.services.access_scope import (
@@ -306,7 +307,85 @@ class SpecificationAccessScopeTests(TestCase):
         self.assertEqual(before.access_scope.authorization_revision, after.access_scope.authorization_revision)
         self.assertEqual(before.access_scope.access_scope_fingerprint, after.access_scope.access_scope_fingerprint)
 
-    def test_provider_query_errors_fail_closed(self):
+    def test_group_reauthorization_reads_fresh_topology_for_addition_and_removal(self):
+        self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.tenant_a)
+        self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.tenant_b)
+        request = self._request(mode="tenant_group", tenant_group_id=TenantGroupId(self.group.pk))
+        initial = resolve_access_scope(request)
+        self.assertIsInstance(initial, AccessScopeResolvedDTO)
+        authorization = ResolvedAccessAuthorizationDTO(
+            actor=request.actor,
+            request=request,
+            initial_scope=initial.access_scope,
+        )
+
+        child_group = TenantGroup.objects.create(
+            name="Scope Child Group",
+            slug="scope-child-group",
+            parent=self.group,
+        )
+        child_tenant = Tenant.objects.create(
+            name="Scope Child Tenant",
+            slug="scope-child-tenant",
+            managed_by=self.provider,
+            group=child_group,
+        )
+
+        denied = reauthorize_access_scope(authorization)
+        self.assertIsInstance(denied, AccessScopeDeniedDTO)
+
+        self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=child_tenant)
+        expanded = reauthorize_access_scope(authorization)
+        self.assertIsInstance(expanded, AccessScopeResolvedDTO)
+        self.assertEqual(
+            expanded.access_scope.authorized_tenant_ids,
+            frozenset({self.tenant_a.pk, self.tenant_b.pk, child_tenant.pk}),
+        )
+        self.assertNotEqual(
+            initial.access_scope.authorization_revision,
+            expanded.access_scope.authorization_revision,
+        )
+
+        child_group.parent = None
+        child_group.save(update_fields=["parent"])
+        reduced = reauthorize_access_scope(authorization)
+        self.assertIsInstance(reduced, AccessScopeResolvedDTO)
+        self.assertEqual(
+            reduced.access_scope.authorized_tenant_ids,
+            frozenset({self.tenant_a.pk, self.tenant_b.pk}),
+        )
+        self.assertNotEqual(
+            expanded.access_scope.authorization_revision,
+            reduced.access_scope.authorization_revision,
+        )
+
+    def test_stale_membership_to_deleted_tenant_is_irrelevant(self):
+        self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.tenant_a)
+        deleted_tenant = Tenant.objects.create(
+            name="Deleted Scope Tenant",
+            slug="deleted-scope-tenant",
+            managed_by=self.provider,
+        )
+        deleted_tenant.deleted_at = timezone.now()
+        deleted_tenant.save(update_fields=["deleted_at"])
+        Membership.objects.create(user=self.user, tenant=deleted_tenant, is_active=False)
+
+        result = resolve_access_scope(self._request(tenant_id=TenantId(self.tenant_a.pk)))
+
+        self.assertIsInstance(result, AccessScopeResolvedDTO)
+        self.assertEqual(result.access_scope.authorized_tenant_ids, frozenset({self.tenant_a.pk}))
+
+    def test_registered_tenant_access_boundary_supplies_accessible_ids(self):
+        self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.tenant_a)
+        with patch(
+            "organization.services.access_scope._tenant_access.accessible_tenant_ids",
+            wraps=tenant_access.accessible_tenant_ids,
+        ) as accessible_ids:
+            result = resolve_access_scope(self._request(tenant_id=TenantId(self.tenant_a.pk)))
+
+        self.assertIsInstance(result, AccessScopeResolvedDTO)
+        accessible_ids.assert_called_once()
+
         with patch(
             "organization.services.access_scope._tenant_scope.accessible_tenant_ids_with_expiry",
             side_effect=RuntimeError("provider unavailable"),
