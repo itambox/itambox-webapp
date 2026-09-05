@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "language_neutral": true,
+  "domain": "historical validity, deprecated choices and cleanup",
+  "source_sections": ["3.2", "4.3", "4.4", "16"],
+  "context": {
+    "definition_revision": "defn-rev-history-fixture",
+    "target_kind": "asset",
+    "fields": {
+      "status": { "type": "single_select", "required": false, "nullable": false, "choice_set": { "active": ["in_service", "retired"], "deprecated": ["old_status"] } },
+      "tags": { "type": "multi_select", "required": false, "nullable": false, "max_values": 8, "choice_set": { "active": ["active_x", "active_y"], "deprecated": ["old_tag_a", "old_tag_b"] } },
+      "legacy_note": { "type": "text", "required": false, "lifecycle": "deprecated" },
+      "required_status": { "type": "single_select", "required": true, "nullable": false, "choice_set": { "active": ["active_z"], "deprecated": ["old_status_z"] } },
+      "owner_note": { "type": "text", "required": false }
+    },
+    "projection_reason_codes": ["ACTIVE_VALUE", "INACTIVE_COMPOSITION", "DEPRECATED_FIELD", "DEPRECATED_CHOICE", "INVALID_STORED_VALUE", "UNKNOWN_DEFINITION", "MISSING_REQUIRED"]
+  },
+  "cases": [
+    {
+      "id": "T02-HIST-001",
+      "invariant": "Historical validity",
+      "acceptance": "A05",
+      "source_section": "4.4",
+      "initial_state": { "status": "old_status" },
+      "operation": { "kind": "patch", "set": { "status": "old_status" } },
+      "expected_result": { "outcome": "accepted", "stored": { "status": "old_status" } },
+      "expected_unchanged": { "status": "old_status" },
+      "rationale": "For an active Field, a submitted deprecated Choice is accepted only when that exact key already exists in the same locked object's same Field. Here the key is retained; a structurally valid already stored deprecated Choice remains legitimate historical content."
+    },
+    {
+      "id": "T02-HIST-002",
+      "invariant": "Historical validity",
+      "acceptance": "A05",
+      "source_section": "4.3",
+      "initial_state": {},
+      "operation": { "kind": "patch", "set": { "status": "old_status" } },
+      "expected_result": { "outcome": "rejected", "error": "INVALID_CHOICE", "path": ["set", "status"] },
+      "expected_unchanged": {},
+      "rationale": "A deprecated Choice is not accepted as a new selection on an object that never stored it; it is not a currently selectable key."
+    },
+    {
+      "id": "T02-HIST-003",
+      "invariant": "Choice ordering",
+      "acceptance": "A11",
+      "source_section": "4.4",
+      "initial_state": { "tags": ["old_tag_a", "old_tag_b", "active_x"] },
+      "operation": { "kind": "patch", "set": { "tags": ["active_y", "active_x", "old_tag_b"] } },
+      "expected_result": { "outcome": "accepted", "stored": { "tags": ["active_x", "active_y", "old_tag_b"] } },
+      "expected_unchanged": { "old_tag_a": "removed", "old_tag_b": "retained" },
+      "rationale": "A multi-select edit can retain or remove existing deprecated members and add active ones. New canonical writes sort by key; presentation uses current Choice order, never the array's historical order."
+    },
+    {
+      "id": "T02-HIST-004",
+      "invariant": "Historical validity",
+      "acceptance": "A05",
+      "source_section": "4.4",
+      "initial_state": { "tags": ["active_x", "active_y", "old_tag_b"] },
+      "operation": { "kind": "patch", "set": { "tags": ["active_x", "old_tag_a"] } },
+      "expected_result": { "outcome": "rejected", "error": "INVALID_CHOICE", "path": ["set", "tags"] },
+      "expected_unchanged": { "tags": ["active_x", "active_y", "old_tag_b"] },
+      "rationale": "Once removed, a deprecated member cannot be reintroduced by an ordinary edit."
+    },
+    {
+      "id": "T02-HIST-005",
+      "invariant": "Lifecycle",
+      "acceptance": "A05",
+      "source_section": "4.4",
+      "initial_state": { "legacy_note": "kept" },
+      "operation": { "kind": "patch", "set": { "legacy_note": "changed" } },
+      "expected_result": { "outcome": "rejected", "error": "READ_ONLY_FIELD", "path": ["set", "legacy_note"] },
+      "expected_unchanged": { "legacy_note": "kept" },
+      "rationale": "A deprecated Field is read-only: the domain rejects a setter targeting it even if the client sends an unchanged copy. Adapters omit deprecated Fields from setters."
+    },
+    {
+      "id": "T02-HIST-006",
+      "invariant": "Lifecycle",
+      "acceptance": "A05",
+      "source_section": "4.3",
+      "initial_state": {},
+      "operation": { "kind": "project", "stored": {} },
+      "expected_result": {
+        "outcome": "accepted",
+        "missing_required_issues": ["required_status"],
+        "legacy_note_issue": "none"
+      },
+      "expected_unchanged": {},
+      "rationale": "A deprecated Field imposes no requirement; only the active required field is reported as missing (MISSING_REQUIRED)."
+    },
+    {
+      "id": "T02-HIST-007",
+      "invariant": "Merge preservation",
+      "acceptance": "A05",
+      "source_section": "4.3",
+      "initial_state": { "owner_note": "not-a-valid-value", "status": "in_service" },
+      "operation": { "kind": "patch", "set": { "owner_note": "ok" } },
+      "expected_result": { "outcome": "accepted", "stored": { "owner_note": "ok", "status": "in_service" } },
+      "expected_unchanged": { "status": "in_service" },
+      "rationale": "An optional unchanged invalid value is retained and flagged (INVALID_STORED_VALUE), never silently reinterpreted or deleted; an unrelated correction is not rejected because of a historical anomaly."
+    },
+    {
+      "id": "T02-HIST-008",
+      "invariant": "Historical validity",
+      "acceptance": "A05",
+      "source_section": "4.3",
+      "initial_state": { "required_status": "not-a-choice" },
+      "operation": { "kind": "patch", "set": { "status": "in_service" } },
+      "expected_result": { "outcome": "rejected", "error": "REQUIRED_FIELD", "path": ["required_status"] },
+      "expected_unchanged": { "required_status": "not-a-choice" },
+      "rationale": "A structurally invalid value cannot satisfy an active required field; a specification change validates all active required fields in the final target state."
+    },
+    {
+      "id": "T02-HIST-009",
+      "invariant": "Merge preservation",
+      "acceptance": "A05",
+      "source_section": "3.2",
+      "initial_state": { "f3_location": "Office", "stored_in_removed_section": true },
+      "operation": { "kind": "project", "stored": { "f3_location": "Office", "f4_cost": "12.30" } },
+      "expected_result": {
+        "outcome": "accepted",
+        "f4_cost": { "state": "historical", "reason_codes": ["INACTIVE_COMPOSITION"] }
+      },
+      "expected_unchanged": { "stored": { "f3_location": "Office", "f4_cost": "12.30" } },
+      "rationale": "A removed composition key is readable historical data: stored keys project separately and are marked historical, never deleted by composition edits."
+    },
+    {
+      "id": "T02-HIST-010",
+      "invariant": "Merge preservation",
+      "acceptance": "A05",
+      "source_section": "3.2",
+      "initial_state": { "legacy_note": "kept", "stored_in_deprecated_definition": true },
+      "operation": { "kind": "project", "stored": { "legacy_note": "kept" } },
+      "expected_result": {
+        "outcome": "accepted",
+        "legacy_note": { "state": "historical", "reason_codes": ["DEPRECATED_FIELD"] }
+      },
+      "expected_unchanged": { "stored": { "legacy_note": "kept" } },
+      "rationale": "A deprecated definition is readable historical data; its stored value remains visible with the DEPRECATED_FIELD state."
+    },
+    {
+      "id": "T02-HIST-011",
+      "invariant": "Merge preservation",
+      "acceptance": "A05",
+      "source_section": "3.2",
+      "initial_state": { "stored_key_without_definition": true, "stored": { "ghost_key": "v" } },
+      "operation": { "kind": "project", "stored": { "ghost_key": "v" } },
+      "expected_result": {
+        "outcome": "accepted",
+        "ghost_key": { "state": "unknown", "reason_codes": ["UNKNOWN_DEFINITION"] }
+      },
+      "expected_unchanged": { "stored": { "ghost_key": "v" } },
+      "rationale": "An unknown definition is an 'unrecognized stored value' (UNKNOWN_DEFINITION); the stored entry is preserved and reported, never dropped."
+    },
+    {
+      "id": "T02-HIST-012",
+      "invariant": "Historical cleanup",
+      "acceptance": "A05",
+      "source_section": "4.4",
+      "initial_state": { "stored": { "ghost_key": "v", "f4_cost": "12.30", "legacy_note": "kept" }, "audit": [] },
+      "operation": { "kind": "history_cleanup", "keys": ["ghost_key", "f4_cost"] },
+      "expected_result": {
+        "outcome": "accepted",
+        "removed": { "ghost_key": "v", "f4_cost": "12.30" },
+        "audit_records_old_values": true,
+        "stored_after": { "legacy_note": "kept" }
+      },
+      "expected_unchanged": { "legacy_note": "kept" },
+      "rationale": "A separate authorized, previewed historical cleanup command removes selected stored keys including unknown/deprecated/inactive keys and records the old value in ordinary audit/change history under the owner's authorization."
+    },
+    {
+      "id": "T02-HIST-013",
+      "invariant": "Historical cleanup",
+      "acceptance": "A05",
+      "source_section": "4.3",
+      "initial_state": { "stored": { "ghost_key": "v", "required_status": "old_status_z" } },
+      "operation": { "kind": "history_cleanup", "keys": ["ghost_key"] },
+      "expected_result": { "outcome": "accepted", "removed": { "ghost_key": "v" }, "stored_after": { "required_status": "old_status_z" } },
+      "expected_unchanged": { "required_status": "old_status_z" },
+      "rationale": "Historical cleanup that changes no current value is not a pretext to require completion of newly required current data; a grandfathered Choice can satisfy required presence on an existing object."
+    },
+    {
+      "id": "T02-HIST-014",
+      "invariant": "Historical cleanup",
+      "acceptance": "A05",
+      "source_section": "4.4",
+      "initial_state": { "stored": { "legacy_note": "kept" } },
+      "operation": { "kind": "history_cleanup", "keys": ["legacy_note"], "replacement_values": { "legacy_note": "invented-history" } },
+      "expected_result": { "outcome": "rejected", "error": "UNSUPPORTED_STRUCTURE", "path": [] },
+      "expected_unchanged": { "legacy_note": "kept" },
+      "rationale": "Historical cleanup does not accept arbitrary replacement historical values; cleanup removes keys only."
+    },
+    {
+      "id": "T02-HIST-015",
+      "invariant": "Historical validity",
+      "acceptance": "A05",
+      "source_section": "3.1",
+      "initial_state": { "stored": { "status": "old_status", "cost": "broken", "ghost_key": "v", "owner_note": "x" } },
+      "operation": { "kind": "project", "stored": { "status": "old_status", "cost": "broken", "ghost_key": "v", "owner_note": "x" } },
+      "expected_result": {
+        "outcome": "accepted",
+        "entries": {
+          "status": { "state": "historical", "reason_codes": ["DEPRECATED_CHOICE"] },
+          "cost": { "state": "invalid", "reason_codes": ["INVALID_STORED_VALUE"] },
+          "ghost_key": { "state": "unknown", "reason_codes": ["UNKNOWN_DEFINITION"] },
+          "owner_note": { "state": "current", "reason_codes": ["ACTIVE_VALUE"] }
+        }
+      },
+      "expected_unchanged": {
+        "stored": { "status": "old_status", "cost": "broken", "ghost_key": "v", "owner_note": "x" },
+        "reason_code_order": "enum order, no duplicates"
+      },
+      "rationale": "Projection preserves stored entries and independently reports current, historical, invalid or unknown; multiple reasons use the displayed enum order and duplicates are forbidden."
+    }
+  ]
+}
