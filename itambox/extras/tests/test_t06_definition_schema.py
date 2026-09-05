@@ -1,5 +1,5 @@
 from django.core.exceptions import FieldDoesNotExist
-from django.db import DatabaseError, IntegrityError, models
+from django.db import DatabaseError, IntegrityError, models, transaction
 from django.test import TestCase
 from django.test.utils import override_settings
 
@@ -83,7 +83,8 @@ class T06DefinitionSchemaTests(TestCase):
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=1)
 
         with self.assertRaises((IntegrityError, DatabaseError)):
-            CustomField.objects.filter(pk=field.pk).update(activation=CustomField.ACTIVATION_GLOBAL)
+            with transaction.atomic():
+                CustomField.objects.filter(pk=field.pk).update(activation=CustomField.ACTIVATION_GLOBAL)
 
         field.refresh_from_db()
         self.assertEqual(field.activation, CustomField.ACTIVATION_COMPOSED)
@@ -92,7 +93,8 @@ class T06DefinitionSchemaTests(TestCase):
         field = self._field("queryset_delete_guard")
 
         with self.assertRaises((IntegrityError, DatabaseError)):
-            CustomField.objects.filter(pk=field.pk).delete()
+            with transaction.atomic():
+                CustomField.objects.filter(pk=field.pk).delete()
 
         self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
 
