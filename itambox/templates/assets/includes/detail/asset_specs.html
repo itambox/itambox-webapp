@@ -1,44 +1,41 @@
 {% load i18n %}
 {% load utility_tags %}
 {# Panel: Hardware specs #}
-{% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists or object.component_allocations.all %}
+{% if asset_type_specification_fields or object.component_allocations.all %}
   <h4 class="h4 card-title text-secondary mb-3 d-flex align-items-center">
     <i class="mdi mdi-information-outline me-2 text-primary"></i>
     {% translate "Assigned System Hardware Specifications" %}
   </h4>
-  {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists %}
+  {% if asset_type_specification_fields %}
+    <div class="mb-3 text-muted small">{% translate "Values inherited from the selected Asset Type" %}</div>
     <div class="row g-3">
-      {% for field in object.asset_type.custom_fieldset.fields.all %}
-        {% if field.is_asset_type_spec %}
-          {% with val=object.asset_type.custom_field_data|lookup:field.name %}
-            {% if val is not None and val != "" %}
-              <div class="col-md-6">
-                <div class="d-flex align-items-center mb-1">
-                  <span class="badge bg-blue-lt me-2 p-1.5">
-                    <i class="mdi mdi-chip"></i>
-                  </span>
-                  <strong class="text-secondary small uppercase">{{ field.label }}</strong>
-                </div>
-                <div class="ms-7 font-weight-medium">
-                  {% if field.field_type == 'boolean' %}
-                    {% if val %}
-                      <span class="badge bg-green">{% translate "Yes" %}</span>
-                    {% else %}
-                      <span class="badge bg-secondary">{% translate "No" %}</span>
-                    {% endif %}
-                  {% else %}
-                    {{ val }}
-                  {% endif %}
-                </div>
+      {% for resolved in asset_type_specification_fields %}
+        {% with field=resolved.definition val=object.asset_type.custom_field_data|lookup:resolved.definition.name %}
+          {% if val is not None and val != "" %}
+            <div class="col-md-6">
+              <div class="d-flex align-items-center mb-1">
+                <span class="badge bg-blue-lt me-2 p-1.5"><i class="mdi mdi-chip"></i></span>
+                <strong class="text-secondary small uppercase">{{ field.label }}</strong>
               </div>
-            {% endif %}
-          {% endwith %}
-        {% endif %}
+              <div class="ms-7 font-weight-medium">
+                {% if field.field_type == 'boolean' %}
+                  {% if val %}
+                    <span class="badge bg-green">{% translate "Yes" %}</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{% translate "No" %}</span>
+                  {% endif %}
+                {% else %}
+                  {{ val }}
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
       {% endfor %}
     </div>
   {% endif %}
   {% if object.component_allocations.all %}
-    {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists %}
+    {% if asset_type_specification_fields %}
       <hr class="my-4">
     {% endif %}
     <h5 class="h5 text-secondary uppercase mb-3 d-flex align-items-center">
@@ -49,9 +46,7 @@
       {% for allocation in object.component_allocations.all %}
         <div class="col-md-6 col-lg-4">
           <div class="d-flex align-items-center p-2 rounded-2 bg-light border border-dashed border-teal-subtle">
-            <span class="avatar avatar-sm bg-teal-lt text-teal rounded me-3 shadow-sm">
-              <i class="mdi mdi-chip"></i>
-            </span>
+            <span class="avatar avatar-sm bg-teal-lt text-teal rounded me-3 shadow-sm"><i class="mdi mdi-chip"></i></span>
             <div class="flex-fill min-width-0">
               <div class="font-weight-medium text-truncate text-dark small"
                    title="{{ allocation.component }}">

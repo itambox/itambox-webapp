@@ -19,6 +19,12 @@ msgstr ""
 msgid "Assets"
 msgstr "Assets"
 
+msgid "The regular expression is invalid."
+msgstr "Der reguläre Ausdruck ist ungültig."
+
+msgid "The regular expression is too complex."
+msgstr "Der reguläre Ausdruck ist zu komplex."
+
 msgid "Either holder_id, location_id, or asset_target_id must be provided."
 msgstr ""
 "Es muss entweder holder_id, location_id oder asset_target_id angegeben "
@@ -3350,14 +3356,6 @@ msgstr "Erstellt vor"
 msgid "Hexadecimal color code (e.g., 00ff00 for green)."
 msgstr "Hexadezimaler Farbcode (z. B. 00ff00 für Grün)."
 
-msgid ""
-"Models this field applies to. Fields applying to Asset Type act as hardware "
-"specifications; fields applying to Asset are per-device details."
-msgstr ""
-"Modelle, für die dieses Feld gilt. Felder, die für den Asset-Typ gelten, "
-"fungieren als Hardware-Spezifikationen; Felder, die für ein Asset gelten, "
-"sind gerätespezifische Details."
-
 msgid "Custom"
 msgstr "Benutzerdefiniert"
 
@@ -3588,38 +3586,20 @@ msgstr "Dashboards"
 msgid "Text"
 msgstr "Text"
 
-msgid "Number"
-msgstr "Zahl"
-
 msgid "Date"
 msgstr "Datum"
 
 msgid "Boolean"
 msgstr "Boolescher Wert"
 
-msgid "Select / Dropdown"
-msgstr "Auswahl / Dropdown"
-
 msgid "Field Name"
 msgstr "Feldname"
-
-msgid "Slug-like name (e.g. sim_card_number)"
-msgstr "Slug-artiger Name (z. B. sim_card_number)"
 
 msgid "Display Label"
 msgstr "Anzeige-Label"
 
 msgid "Field Type"
 msgstr "Feldtyp"
-
-#| msgid "Choices:"
-msgid "Choices"
-msgstr "Auswahloptionen"
-
-msgid "New-line separated list of choices (only for 'select' type)"
-msgstr ""
-"Durch Zeilenumbrüche getrennte Liste von Auswahlmöglichkeiten (nur für Typ "
-"'select')"
 
 msgid "Required"
 msgstr "Erforderlich"
@@ -3638,9 +3618,6 @@ msgstr ""
 
 msgid "Custom Field"
 msgstr "Benutzerdefiniertes Feld"
-
-msgid "Fieldset Name"
-msgstr "Feldgruppenname"
 
 #| msgid "Proceeds"
 msgid "Processed"
@@ -7437,9 +7414,6 @@ msgstr "Modellname:"
 msgid "Part Number:"
 msgstr "Teilenummer:"
 
-msgid "Custom Fieldset:"
-msgstr "Benutzerdefiniertes Feldset:"
-
 msgid "Depreciation Policy:"
 msgstr "Abschreibungsregel:"
 
@@ -7682,7 +7656,7 @@ msgid "Source Stock Location"
 msgstr "Quell-Lagerort"
 
 msgid "Requester (Myself)"
-msgstr "Anforderer (Ich selbst)"
+msgstr "Anforderer (Mich selbst)"
 
 msgid "Notes &amp; Justification"
 msgstr "Notizen &amp; Begründung"
@@ -10496,8 +10470,6 @@ msgstr "Wählen Sie eine Benutzergruppe aus, die zu einem Mandanten gehört."
 msgid "Choose a valid role coverage option."
 msgstr "Wählen Sie einen gültigen Geltungsbereich für die Rolle aus."
 
-
-
 #: itambox/organization/models.py:894
 msgid "Choose either a member or a user group for this role, not both."
 msgstr "Wählen Sie für diese Rolle entweder ein Mitglied oder eine Benutzergruppe aus, nicht beides."
@@ -10694,8 +10666,6 @@ msgstr "Nicht abgeschlossen"
 #: itambox/templates/organization/resource_grant_expiry_run_detail.html:21
 msgid "Not finished"
 msgstr "Nicht abgeschlossen"
-
-
 
 #: itambox/extras/tables.py:604
 msgid "Not sent"
@@ -13744,3 +13714,331 @@ msgstr "Der ausgewählte Zielstandort gehört nicht zum Mandanten der Prüfsitzu
 #, python-format
 msgid "Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s."
 msgstr "Abonnement verlängert. Nächster Verlängerungstermin: %(renewal_date)s. Kosten: %(renewal_cost)s %(currency)s."
+
+
+#: itambox/extras/customfields.py
+msgid "A field cannot be set and cleared together."
+msgstr "Ein Feld kann nicht gleichzeitig gesetzt und gelöscht werden."
+
+#: itambox/extras/models.py
+msgid "Asset Type and Asset"
+msgstr "Asset-Typ und Asset"
+
+#: itambox/extras/models.py
+msgid "Decimal"
+msgstr "Dezimalzahl"
+
+#: itambox/assets/models/catalog.py
+msgid "Deprecated"
+msgstr "Veraltet"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Each specification fieldset may only be selected once."
+msgstr "Jede Spezifikationsfeldgruppe darf nur einmal ausgewählt werden."
+
+#: itambox/extras/customfields.py
+msgid "Enter a base-10 decimal without an exponent."
+msgstr "Gib eine Dezimalzahl ohne Exponent ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a boolean."
+msgstr "Gib einen Wahrheitswert ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a canonical decimal value."
+msgstr "Gib eine kanonische Dezimalzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a date."
+msgstr "Gib ein Datum ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a decimal value."
+msgstr "Gib eine Dezimalzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a valid hostname."
+msgstr "Gib einen gültigen Hostnamen ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter an ISO date."
+msgstr "Gib ein ISO-Datum ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter an integer."
+msgstr "Gib eine Ganzzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter text."
+msgstr "Gib Text ein."
+
+#: itambox/extras/models.py
+msgid "Integer"
+msgstr "Ganzzahl"
+
+#: itambox/assets/models/catalog.py
+msgid "Library"
+msgstr "Bibliothek"
+
+#: itambox/assets/models/catalog.py
+msgid "Local"
+msgstr "Lokal"
+
+#: itambox/extras/customfields.py
+msgid "Maximum temperature must not be below minimum."
+msgstr "Die Höchsttemperatur darf nicht unter der Mindesttemperatur liegen."
+
+#: itambox/extras/models.py
+msgid "Multi select"
+msgstr "Mehrfachauswahl"
+
+#: itambox/extras/customfields.py
+msgid "Negative zero is not allowed."
+msgstr "Negativ null ist nicht zulässig."
+
+#: itambox/extras/customfields.py
+msgid "Null is not allowed for this field."
+msgstr "Null ist für dieses Feld nicht zulässig."
+
+#: itambox/extras/customfields.py
+msgid "Select a list of values."
+msgstr "Wähle eine Werteliste aus."
+
+#: itambox/extras/customfields.py
+msgid "Select a valid choice."
+msgstr "Wähle eine gültige Option aus."
+
+#: itambox/extras/customfields.py
+msgid "Select one value."
+msgstr "Wähle einen Wert aus."
+
+#: itambox/extras/customfields.py
+msgid "Select unique valid choices."
+msgstr "Wähle eindeutige gültige Optionen aus."
+
+#: itambox/extras/models.py
+msgid "Single select"
+msgstr "Einzelauswahl"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Specification fieldsets"
+msgstr "Spezifikationsfeldgruppen"
+
+#: itambox/extras/models.py
+msgid "Stable JSON key (e.g. sim_card_number)"
+msgstr "Stabiler JSON-Schlüssel (z. B. sim_card_number)"
+
+#: itambox/extras/customfields.py
+msgid "The choice definition is invalid."
+msgstr "Die Auswahldefinition ist ungültig."
+
+#: itambox/extras/customfields.py
+msgid "The decimal definition is invalid."
+msgstr "Die Dezimaldefinition ist ungültig."
+
+#: itambox/extras/customfields.py
+msgid "The decimal value is too large."
+msgstr "Die Dezimalzahl ist zu groß."
+
+#: itambox/extras/customfields.py
+msgid "The field type is unsupported."
+msgstr "Der Feldtyp wird nicht unterstützt."
+
+#: itambox/extras/customfields.py
+msgid "The integer is outside the supported range."
+msgstr "Die Ganzzahl liegt außerhalb des unterstützten Bereichs."
+
+#: itambox/assets/models/catalog.py
+msgid "The library Asset Type identity is immutable after creation."
+msgstr "Die Identität des Asset-Typs aus der Bibliothek kann nach der Erstellung nicht geändert werden."
+
+#: itambox/assets/models/catalog.py
+msgid "The library reconciliation state changed after this instance was loaded; refresh it and retry."
+msgstr "Der Abgleichstatus der Bibliothek hat sich geändert, nachdem diese Instanz geladen wurde; aktualisieren Sie die Instanz und versuchen Sie es erneut."
+
+#: itambox/assets/models/catalog.py
+msgid "The Asset Type must be saved before it can be reconciled."
+msgstr "Der Asset-Typ muss gespeichert sein, bevor er abgeglichen werden kann."
+
+#: itambox/extras/customfields.py
+msgid "The text is too long."
+msgstr "Der Text ist zu lang."
+
+#: itambox/extras/customfields.py
+msgid "The value has an invalid format."
+msgstr "Der Wert hat ein ungültiges Format."
+
+#: itambox/extras/customfields.py
+msgid "The value is above the allowed maximum."
+msgstr "Der Wert liegt über dem zulässigen Maximum."
+
+#: itambox/extras/customfields.py
+msgid "The value is below the allowed minimum."
+msgstr "Der Wert liegt unter dem zulässigen Minimum."
+
+#: itambox/extras/models.py
+msgid "This value is immutable after creation."
+msgstr "Dieser Wert kann nach der Erstellung nicht geändert werden."
+
+#: itambox/extras/customfields.py
+msgid "Too many values were selected."
+msgstr "Es wurden zu viele Werte ausgewählt."
+
+#: itambox/extras/customfields.py
+msgid "Unknown custom field key."
+msgstr "Unbekannter Schlüssel für ein benutzerdefiniertes Feld."
+
+#: itambox/extras/forms.py
+msgid "Applicability"
+msgstr "Anwendbarkeit"
+
+#: itambox/extras/forms.py
+msgid "Asset scopes and model applicability must describe the same target set."
+msgstr "Asset-Bereiche und Modellanwendbarkeit müssen dieselbe Zielmenge beschreiben."
+
+
+#: itambox/extras/forms.py
+msgid "Every field position must be a positive integer."
+msgstr "Jede Feldposition muss eine positive Ganzzahl sein."
+
+#: itambox/extras/customfields.py
+msgid "Explicitly remove the stored value."
+msgstr "Gespeicherten Wert explizit entfernen."
+
+#: itambox/extras/forms.py
+msgid "Field positions must be unique."
+msgstr "Feldpositionen müssen eindeutig sein."
+
+#: itambox/extras/forms.py
+msgid "Multi-select fields require a maximum value count."
+msgstr "Mehrfachauswahlfelder benötigen eine maximale Anzahl von Werten."
+
+#: itambox/extras/forms.py
+msgid "Non-asset fields use the selected model relation. Asset scopes derive their Asset and Asset Type relations."
+msgstr "Nicht-Asset-Felder verwenden die ausgewählte Modellbeziehung. Asset-Bereiche leiten ihre Asset- und Asset-Typ-Beziehungen ab."
+
+#: itambox/extras/forms.py
+msgid "Only decimal fields may define a scale."
+msgstr "Nur Dezimalfelder dürfen eine Skalierung definieren."
+
+#: itambox/extras/forms.py
+msgid "Only select fields may reference a Choice Set."
+msgstr "Nur Auswahlfelder dürfen auf ein Auswahlset verweisen."
+
+#: itambox/extras/forms.py
+msgid "Optional JSON object mapping field keys to positive positions. Omitted keys use selection order."
+msgstr "Optionales JSON-Objekt, das Feldschlüssel positiven Positionen zuordnet. Nicht angegebene Schlüssel verwenden die Auswahlreihenfolge."
+
+#: itambox/extras/forms.py
+msgid "Ordered fields"
+msgstr "Geordnete Felder"
+
+#: itambox/extras/forms.py
+msgid "Positions must be a JSON object."
+msgstr "Positionen müssen ein JSON-Objekt sein."
+
+#: itambox/extras/forms.py
+msgid "Remove value"
+msgstr "Wert entfernen"
+
+#: itambox/extras/forms.py
+msgid "Scope and validation"
+msgstr "Geltungsbereich und Validierung"
+
+
+#: itambox/extras/forms.py
+msgid "Select fields require a Choice Set."
+msgstr "Auswahlfelder benötigen ein Auswahlset."
+
+#: itambox/extras/forms.py
+msgid "Single-select fields must limit values to exactly one."
+msgstr "Einzelauswahlfelder müssen die Werte auf genau einen begrenzen."
+
+
+#: itambox/templates/assets/includes/detail/assettype_info.html
+msgid "Specification Sections:"
+msgstr "Spezifikationsabschnitte:"
+
+#: itambox/templates/assets/assets/asset_detail.html
+msgid "Values inherited from the selected Asset Type"
+msgstr "Vom ausgewählten Asset-Typ geerbte Werte"
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch 'clear' must be a list of field keys."
+msgstr "Die Liste für 'clear' muss Schlüssel benutzerdefinierter Felder enthalten."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch 'set' must be an object."
+msgstr "Der Wert für 'set' muss ein Objekt sein."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch contains an unknown operation."
+msgstr "Der Custom-Field-Patch enthält eine unbekannte Operation."
+
+#: itambox/extras/definition_contract.py
+msgid "Decimal fields require a scale from 0 to 6."
+msgstr "Dezimalfelder benötigen eine Skalierung von 0 bis 6."
+
+#: itambox/extras/definition_contract.py
+msgid "Select at least one model for a generic local field."
+msgstr "Wählen Sie für ein allgemeines lokales Feld mindestens ein Modell aus."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field specification patch must be an object."
+msgstr "Der Patch für benutzerdefinierte Feldspezifikationen muss ein Objekt sein."
+
+#: itambox/extras/customfields.py
+msgid "Deprecated custom fields are read-only."
+msgstr "Veraltete benutzerdefinierte Felder sind schreibgeschützt."
+
+#: itambox/extras/definition_contract.py
+msgid "Inline regular-expression flags are not allowed."
+msgstr "Inline-Flags für reguläre Ausdrücke sind nicht zulässig."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a Library."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen eine Bibliothek."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a non-empty definition key."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen einen nicht leeren Definitionsschlüssel."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a release."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen ein Release."
+
+#: itambox/assets/models/catalog.py
+msgid "Only library-managed Asset Types may carry Library identity or provenance."
+msgstr "Nur von einer Bibliothek verwaltete Asset-Typen dürfen Bibliotheksidentität oder Herkunftsdaten enthalten."
+
+#: itambox/assets/models/catalog.py
+msgid "Only library-managed Asset Types may be reconciled."
+msgstr "Nur von einer Bibliothek verwaltete Asset-Typen dürfen abgeglichen werden."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require full library identity before reconciliation."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen vor dem Abgleich eine vollständige Bibliotheksidentität."
+
+#: itambox/assets/models/catalog.py
+msgid "The reconciled library release must not be empty."
+msgstr "Das abgeglichene Bibliotheks-Release darf nicht leer sein."
+
+#: itambox/assets/models/catalog.py
+msgid "The library Asset Type release and checksum may only change through the library reconciliation path."
+msgstr "Release und Prüfsumme von Bibliotheks-Asset-Typen dürfen nur über den Bibliotheks-Abgleich geändert werden."
+
+#: itambox/itambox/views/generic/restore.py
+msgid "Skipped %(count)s permanent schema tombstone(s)."
+msgstr "%(count)s dauerhafte Schema-Tombstones übersprungen."
+
+#: itambox/extras/customfields.py
+msgid "The choice set is not active."
+msgstr "Das Auswahlset ist nicht aktiv."
+
+#: itambox/extras/customfields.py
+msgid "This field is required."
+msgstr "Dieses Feld ist erforderlich."
+
+#: itambox/extras/definition_contract.py
+msgid "Choice Sets must be active and not deleted."
+msgstr "Auswahlsets müssen aktiv und dürfen nicht gelöscht sein."

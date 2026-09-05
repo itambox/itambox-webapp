@@ -290,7 +290,7 @@ class TestSnipeITImporter(TenantTestMixin):
         assert Location._base_manager.filter(name="Floor 1").exists()
         assert AssetHolder._base_manager.filter(upn="jdoe").exists()
         assert CustomField._base_manager.filter(name="cpu_model").exists()
-        assert CustomFieldset._base_manager.filter(name="Laptop Specs").exists()
+        assert CustomFieldset._base_manager.filter(namespace="local", slug="snipeit-2", label="Laptop Specs").exists()
         assert Asset._base_manager.filter(asset_tag="NW-0001").exists()
 
         assert counts["assets"]["created"] == 1
@@ -307,6 +307,58 @@ class TestSnipeITImporter(TenantTestMixin):
     # ------------------------------------------------------------------
     # Parent-child location hierarchy
     # ------------------------------------------------------------------
+
+    def test_custom_field_values_are_canonicalized_before_storage(self):
+        from assets.models import Asset
+
+        fields = {
+            "total": 3,
+            "rows": [
+                *SNIPE_FIELDS["rows"],
+                {
+                    "id": 4,
+                    "name": "Stage Core Count",
+                    "db_column_name": "_snipeit_stage_core_count_4",
+                    "format": "NUMERIC",
+                    "field_values": None,
+                    "type": "numeric",
+                },
+                {
+                    "id": 5,
+                    "name": "Stage Environment",
+                    "db_column_name": "_snipeit_stage_environment_5",
+                    "format": "LIST",
+                    "field_values": "Production\nStaging",
+                    "type": "list",
+                },
+            ],
+        }
+        hardware = {
+            "total": 1,
+            "rows": [
+                {
+                    **SNIPE_HARDWARE["rows"][0],
+                    "custom_fields": {
+                        "Core Count": {
+                            "field": "_snipeit_stage_core_count_4",
+                            "value": "16",
+                            "field_format": "NUMERIC",
+                        },
+                        "Environment": {
+                            "field": "_snipeit_stage_environment_5",
+                            "value": "Production",
+                            "field_format": "LIST",
+                        },
+                    },
+                }
+            ],
+        }
+
+        self._run(pages={"/api/v1/fields": fields, "/api/v1/hardware": hardware})
+
+        asset = Asset._base_manager.get(asset_tag="NW-0001")
+        assert asset.custom_field_data["stage_core_count"] == "16.00"
+        assert asset.custom_field_data["stage_environment"] == "production"
 
     def test_location_parent_wired_up(self):
         from organization.models import Location

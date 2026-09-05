@@ -12,22 +12,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "scope": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "handler_type": "(TypeError, ValueError)",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "scope": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "handler_type": "CustomFieldset.DoesNotExist",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/disposal_form.py",
       "scope": "ClassDef:AssetDisposalForm/FunctionDef:__init__",
       "handler_type": "Exception",
@@ -337,14 +321,6 @@
       "handler_type": "Exception",
       "classification": "silent",
       "body_sha256": "364df95e791fb96eda26d49af4b0d109a9de9a2e7e4c0bd51b4d5e06e5ede503",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/customfields.py",
-      "scope": "FunctionDef:apply_custom_field_filters",
-      "handler_type": "ValueError",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
       "count": 1
     },
     {

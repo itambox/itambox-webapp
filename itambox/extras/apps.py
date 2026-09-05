@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from django.core.exceptions import FieldDoesNotExist
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models.signals import post_migrate
@@ -59,6 +60,7 @@ class ExtrasConfig(AppConfig):
 
         self._register_capabilities()
         self._register_generic_presentation(EXTRAS_GENERIC_PRESENTATION_PROVIDER)
+        self._register_custom_field_data_validators()
         # ready() must stay query-free: the applied-migration probe below belongs
         # to the post_migrate handler, never to app loading.
         post_migrate.connect(
@@ -67,6 +69,22 @@ class ExtrasConfig(AppConfig):
             dispatch_uid=ALERT_DISPATCH_UID,
             weak=False,
         )
+
+    def _register_custom_field_data_validators(self):
+        # inline import: app-registry: defer custom-field helpers until all models are loaded
+        from extras.customfields import validate_generic_custom_field_data
+
+        for model in self.apps.get_models():
+            if model._meta.abstract or model._meta.label_lower in {"assets.asset", "assets.assettype"}:
+                continue
+            try:
+                model._meta.get_field("custom_field_data")
+            except FieldDoesNotExist:
+                continue
+            generic_presentation_registry.register_custom_field_data_validator(
+                model,
+                validate_generic_custom_field_data,
+            )
 
     def _register_alert_schedule(self, sender, using=DEFAULT_DB_ALIAS, **kwargs):
         """Ensure issue-#445 periodic tasks exist only after their migrations.

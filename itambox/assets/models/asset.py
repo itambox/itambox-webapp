@@ -52,6 +52,12 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
 
+    # Changing the Asset Type changes the effective fieldsets, field
+    # definitions, required fields, and Choice Set validity, so a field-limited
+    # save that touches only ``asset_type`` must still run the dynamic
+    # custom-field validator against the target composition.
+    custom_field_data_validation_dependencies = frozenset({"asset_type"})
+
     # NOTE: asset status is a FK to StatusLabel; the lifecycle vocabulary is
     # StatusLabel.type (assets.choices.StatusTypeChoices), not a local choice set.
 

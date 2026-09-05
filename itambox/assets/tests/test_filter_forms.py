@@ -134,7 +134,7 @@ class AssetTypeFormTest(TestCase):
     def test_asset_type_form_select_fields_have_tom_select(self):
         """Verify that all select fields in AssetTypeForm get the data-tom-select attribute automatically."""
         form = AssetTypeForm()
-        select_fields = ["manufacturer", "category", "asset_role", "custom_fieldset", "depreciation", "tags"]
+        select_fields = ["manufacturer", "category", "asset_role", "custom_fieldsets", "depreciation", "tags"]
         for field_name in select_fields:
             field = form.fields[field_name]
             self.assertIn("data-tom-select", field.widget.attrs)

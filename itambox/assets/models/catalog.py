@@ -2,16 +2,116 @@
 Supplier, Category — shared reference data that assets point into.
 """
 
+from contextlib import contextmanager
+
 from django.contrib.contenttypes.fields import GenericRelation
-from django.db import models
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
+from django.db import DatabaseError, connections, models, router, transaction
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.choices import StatusTypeChoices
 from core.managers import AllObjectsManager, SoftDeleteManager
 from core.mixins import AutoSlugMixin, CustomFieldDataMixin, SoftDeleteMixin
-from core.models import StandardModel
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from extras.models import CustomFieldset
+
+_LIBRARY_NAMESPACE_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$")
+_LIBRARY_DEFINITION_KEY_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$")
+_LIBRARY_RELEASE_VALIDATOR = RegexValidator(r"^[A-Za-z0-9][A-Za-z0-9._+\-]{0,63}$")
+_SOURCE_CHECKSUM_VALIDATOR = RegexValidator(r"^sha256:[0-9a-f]{64}$")
+
+_ASSET_TYPE_RECONCILE_SETTING = "itambox.assettype_reconcile"
+
+
+@contextmanager
+def _library_reconciliation_opt_in(using):
+    """Narrowly opt one write into the reconciliation PostgreSQL guard.
+
+    The ``assets_assettype_library_identity_guard`` trigger only permits
+    release/checksum changes while the transaction-local
+    ``itambox.assettype_reconcile`` setting is ``on``. This helper owns the
+    whole setting lifecycle on the database alias the write actually uses:
+
+    * it captures the previous value (``None`` when the setting is unset),
+    * sets the value to ``on`` locally,
+    * and on scope exit restores the previous value, normalising an unset
+      setting to ``off`` (behaviourally identical for the trigger's
+      ``COALESCE(...,'off')`` check) — including on exceptions and for
+      nested use, so the opt-in can never leak into an outer transaction
+      and a pre-existing ``on`` state is preserved.
+
+    The trigger remains a fail-closed integrity guard for uncontrolled
+    writes, not a privilege or security boundary: a caller with unrestricted
+    use of the same database role can set the setting itself.
+    """
+    database = connections[using]
+    with database.cursor() as cursor:
+        cursor.execute("SELECT current_setting(%s, true)", [_ASSET_TYPE_RECONCILE_SETTING])
+        # PostgreSQL reports an unset custom setting as NULL; treat the empty
+        # string the same way so an untouched session is never turned into an
+        # explicitly-set one.
+        previous = cursor.fetchone()[0] or None
+        cursor.execute("SELECT set_config(%s, 'on', true)", [_ASSET_TYPE_RECONCILE_SETTING])
+    try:
+        yield
+    finally:
+        # The restore must never swallow the caller's exception: a bare
+        # ``return`` in this generator's finally would terminate the generator
+        # normally and replace the propagating error with StopIteration.
+        if not database.needs_rollback:
+            try:
+                with database.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT set_config(%s, %s, true)",
+                        [_ASSET_TYPE_RECONCILE_SETTING, previous if previous is not None else "off"],
+                    )
+            except DatabaseError:
+                # broad except: availability-tradeoff: the write failed and the
+                # transaction is already aborted, so the restore is
+                # best-effort; the enclosing rollback reverts the setting
+                pass
+
+
+def _asset_type_field_validation_errors(asset_type):
+    errors = {}
+    for field_name, value, validator in (
+        ("library_definition_key", asset_type.library_definition_key, _LIBRARY_DEFINITION_KEY_VALIDATOR),
+        ("library_release", asset_type.library_release, _LIBRARY_RELEASE_VALIDATOR),
+        ("source_checksum", asset_type.source_checksum, _SOURCE_CHECKSUM_VALIDATOR),
+    ):
+        if value is None:
+            continue
+        try:
+            validator(value)
+        except ValidationError as exc:
+            errors[field_name] = exc.messages
+    return errors
+
+
+def _asset_type_identity_errors(asset_type):
+    errors = {}
+    has_library_identity = any(
+        value not in (None, "")
+        for value in (
+            asset_type.library_id,
+            asset_type.library_definition_key,
+            asset_type.library_release,
+            asset_type.source_checksum,
+        )
+    )
+    if asset_type.management_kind == "library":
+        if asset_type.library_id is None:
+            errors["library"] = _("Library-managed Asset Types require a Library.")
+        if not asset_type.library_definition_key:
+            errors["library_definition_key"] = _("Library-managed Asset Types require a non-empty definition key.")
+        if not asset_type.library_release:
+            errors["library_release"] = _("Library-managed Asset Types require a release.")
+    elif has_library_identity:
+        errors["management_kind"] = _("Only library-managed Asset Types may carry Library identity or provenance.")
+    return errors
 
 
 class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -206,12 +306,67 @@ class Depreciation(StandardModel, SoftDeleteMixin):
         return reverse("assets:depreciation_detail", kwargs={"pk": self.pk})
 
 
+class AssetTypeLibrary(ChangeLoggingMixin, BaseModel):
+    changelog_global = True
+
+    namespace = models.CharField(max_length=62, unique=True, validators=[_LIBRARY_NAMESPACE_VALIDATOR])
+    release = models.CharField(max_length=64, validators=[_LIBRARY_RELEASE_VALIDATOR])
+    source_checksum = models.CharField(
+        max_length=71,
+        null=True,
+        blank=True,
+        validators=[_SOURCE_CHECKSUM_VALIDATOR],
+    )
+    installed_at = models.DateTimeField(default=timezone.now)
+    managed_paths = models.JSONField(default=dict, blank=True)
+    last_reconciled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["namespace"]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        for field_name, value, validator in (
+            ("namespace", self.namespace, _LIBRARY_NAMESPACE_VALIDATOR),
+            ("release", self.release, _LIBRARY_RELEASE_VALIDATOR),
+            ("source_checksum", self.source_checksum, _SOURCE_CHECKSUM_VALIDATOR),
+        ):
+            if value is None and field_name == "source_checksum":
+                continue
+            try:
+                validator(value)
+            except ValidationError as exc:
+                errors[field_name] = exc.messages
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return self.namespace
+
+
 class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
     changelog_global = True  # global reference data → changelog attributed to tenant=None
+    soft_delete_preserve_references = True
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     slug_source = ("manufacturer__name", "model")
+
+    MANAGEMENT_CORE = "core"
+    MANAGEMENT_LIBRARY = "library"
+    MANAGEMENT_LOCAL = "local"
+    MANAGEMENT_KIND_CHOICES = [
+        (MANAGEMENT_CORE, _("Core")),
+        (MANAGEMENT_LIBRARY, _("Library")),
+        (MANAGEMENT_LOCAL, _("Local")),
+    ]
+    LIFECYCLE_ACTIVE = "active"
+    LIFECYCLE_DEPRECATED = "deprecated"
+    LIFECYCLE_CHOICES = [
+        (LIFECYCLE_ACTIVE, _("Active")),
+        (LIFECYCLE_DEPRECATED, _("Deprecated")),
+    ]
 
     manufacturer = models.ForeignKey(
         "assets.Manufacturer", on_delete=models.PROTECT, related_name="asset_types", verbose_name=_("Manufacturer")
@@ -232,17 +387,48 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         verbose_name=_("EAN"),
         help_text=_("Barcode (EAN / UPC / GTIN) — scanning shows assets of this type."),
     )
+    region = models.CharField(max_length=64, blank=True, default="")
+    configuration = models.CharField(max_length=255, blank=True, default="")
+    management_kind = models.CharField(max_length=16, choices=MANAGEMENT_KIND_CHOICES, default=MANAGEMENT_LOCAL)
+    library = models.ForeignKey(
+        AssetTypeLibrary,
+        on_delete=models.PROTECT,
+        related_name="asset_types",
+        null=True,
+        blank=True,
+    )
+    library_definition_key = models.CharField(
+        max_length=127,
+        null=True,
+        blank=True,
+        validators=[_LIBRARY_DEFINITION_KEY_VALIDATOR],
+    )
+    library_release = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        validators=[_LIBRARY_RELEASE_VALIDATOR],
+    )
+    source_checksum = models.CharField(
+        max_length=71,
+        null=True,
+        blank=True,
+        validators=[_SOURCE_CHECKSUM_VALIDATOR],
+    )
+    managed_paths = models.JSONField(default=dict, blank=True)
+    last_reconciled_at = models.DateTimeField(null=True, blank=True)
+    lifecycle = models.CharField(max_length=16, choices=LIFECYCLE_CHOICES, default=LIFECYCLE_ACTIVE)
+    deprecated_at = models.DateTimeField(null=True, blank=True)
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
 
     eol_months = models.PositiveIntegerField(
         null=True, blank=True, verbose_name=_("EOL (Months)"), help_text=_("Lifespan in months before EOL replacement")
     )
-    custom_fieldset = models.ForeignKey(
+    custom_fieldsets = models.ManyToManyField(
         CustomFieldset,
-        on_delete=models.SET_NULL,
-        null=True,
+        related_name="composed_asset_types",
+        through="AssetTypeFieldset",
         blank=True,
-        related_name="asset_types",
-        verbose_name=_("Custom Fieldset"),
     )
     # custom_field_data JSONField comes from CustomFieldDataMixin
     depreciation = models.ForeignKey(
@@ -288,12 +474,39 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["manufacturer", "model"],
-                condition=models.Q(deleted_at__isnull=True),
-                name="unique_manufacturer_model_active",
+                fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_assettype_slug_active"
             ),
             models.UniqueConstraint(
-                fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_assettype_slug_active"
+                fields=["library", "library_definition_key"],
+                condition=models.Q(library__isnull=False),
+                name="unique_assettype_library_identity",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(library__isnull=True, library_definition_key__isnull=True)
+                    | models.Q(library__isnull=False, library_definition_key__isnull=False)
+                ),
+                name="assettype_library_identity_complete",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(management_kind="library")
+                        & models.Q(library__isnull=False)
+                        & models.Q(library_definition_key__isnull=False)
+                        & ~models.Q(library_definition_key="")
+                        & models.Q(library_release__isnull=False)
+                        & ~models.Q(library_release="")
+                    )
+                    | (
+                        models.Q(management_kind__in=["core", "local"])
+                        & models.Q(library__isnull=True)
+                        & models.Q(library_definition_key__isnull=True)
+                        & models.Q(library_release__isnull=True)
+                        & models.Q(source_checksum__isnull=True)
+                    )
+                ),
+                name="assettype_management_library_coherence",
             ),
         ]
         verbose_name = _("Asset Type")
@@ -304,6 +517,171 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     def get_absolute_url(self):
         return reverse("assets:assettype_detail", kwargs={"pk": self.pk})
+
+    def restore(self):
+        """Restore an Asset Type and normalize the pre-cutover deleted state."""
+        update_fields = ["deleted_at"]
+        self.deleted_at = None
+        if self.lifecycle == "deleted":
+            self.lifecycle = self.LIFECYCLE_DEPRECATED
+            update_fields.append("lifecycle")
+        self.save(update_fields=update_fields)
+
+    def clean(self):
+        super().clean()
+        errors = {
+            **_asset_type_field_validation_errors(self),
+            **_asset_type_identity_errors(self),
+        }
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = (
+                type(self)
+                .all_objects.filter(pk=self.pk)
+                .values("library_id", "library_definition_key", "library_release", "source_checksum")
+                .first()
+            )
+            if previous:
+                if any(
+                    previous[field_name] != getattr(self, field_name)
+                    for field_name in ("library_id", "library_definition_key")
+                ):
+                    raise ValidationError(
+                        {
+                            "library_definition_key": _("The library Asset Type identity is immutable after creation."),
+                        }
+                    )
+                if not getattr(self, "_reconcile_library_state", False) and any(
+                    previous[field_name] != getattr(self, field_name)
+                    for field_name in ("library_release", "source_checksum")
+                ):
+                    raise ValidationError(
+                        {
+                            "library_release": _(
+                                "The library Asset Type release and checksum may only change "
+                                "through the library reconciliation path."
+                            ),
+                        }
+                    )
+        return super().save(*args, **kwargs)
+
+    def _library_reconciliation_preflight_errors(self, library_release):
+        errors = {}
+        if self.management_kind != self.MANAGEMENT_LIBRARY:
+            errors["management_kind"] = _("Only library-managed Asset Types may be reconciled.")
+        if self.pk is None:
+            errors["pk"] = _("The Asset Type must be saved before it can be reconciled.")
+        if self.library_id is None or not self.library_definition_key:
+            errors["library_definition_key"] = _(
+                "Library-managed Asset Types require full library identity before reconciliation."
+            )
+        if not library_release:
+            errors["library_release"] = _("The reconciled library release must not be empty.")
+        if errors:
+            raise ValidationError(errors)
+
+    def _validate_library_reconciliation_values(self, library_release, source_checksum):
+        for field_name, value in (
+            ("library_release", library_release),
+            ("source_checksum", source_checksum),
+        ):
+            if value is None:
+                continue
+            field = self._meta.get_field(field_name)
+            try:
+                field.run_validators(value)
+            except ValidationError as exc:
+                raise ValidationError({field_name: exc.messages}) from None
+
+    def apply_library_reconciliation(self, *, library_release, source_checksum, reconciled_at=None):
+        """Apply a controlled library reconciliation update.
+
+        ``library_id`` and ``library_definition_key`` are immutable source
+        identity and never change here. ``library_release`` and
+        ``source_checksum`` are controlled reconciliation state: this method
+        is the single supported path that may update them, and
+        ``last_reconciled_at`` is stamped as part of the same controlled
+        write. The model save guard and the PostgreSQL trigger enforce the
+        boundary for ``library_release`` and ``source_checksum`` for
+        ordinary saves and for direct QuerySet/SQL writes (the trigger opts
+        the write in through the transaction-local
+        ``itambox.assettype_reconcile`` setting).
+
+        The operation is stale-state safe: it locks the target row, compares
+        the persisted reconciliation state against the caller's loaded state,
+        and fails closed on any mismatch instead of silently overwriting a
+        newer state. A failed reconciliation restores the caller's instance
+        to its previous provenance values.
+        """
+        self._library_reconciliation_preflight_errors(library_release)
+        self._validate_library_reconciliation_values(library_release, source_checksum)
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        previous_state = {
+            "library_id": self.library_id,
+            "library_definition_key": self.library_definition_key,
+            "library_release": self.library_release,
+            "source_checksum": self.source_checksum,
+            "last_reconciled_at": self.last_reconciled_at,
+        }
+        try:
+            with transaction.atomic(using=using):
+                locked = type(self).all_objects.using(using).select_for_update().get(pk=self.pk)
+                for field_name in ("library_id", "library_definition_key"):
+                    if getattr(locked, field_name) != previous_state[field_name]:
+                        raise ValidationError(
+                            {field_name: _("The library Asset Type identity is immutable after creation.")}
+                        )
+                for field_name in ("library_release", "source_checksum"):
+                    if getattr(locked, field_name) != previous_state[field_name]:
+                        raise ValidationError(
+                            {
+                                field_name: _(
+                                    "The library reconciliation state changed after this instance was "
+                                    "loaded; refresh it and retry."
+                                )
+                            }
+                        )
+                self.library_release = library_release
+                self.source_checksum = source_checksum
+                self.last_reconciled_at = timezone.now() if reconciled_at is None else reconciled_at
+                self._reconcile_library_state = True
+                try:
+                    with _library_reconciliation_opt_in(using):
+                        self.save(
+                            using=using,
+                            update_fields=["library_release", "source_checksum", "last_reconciled_at"],
+                        )
+                finally:
+                    self._reconcile_library_state = False
+        # broad except: cleanup-reraise: restore the caller's reconciliation state before re-raising
+        except Exception:
+            for field_name, value in previous_state.items():
+                setattr(self, field_name, value)
+            raise
+        return self
+
+
+class AssetTypeFieldset(BaseModel):
+    asset_type = models.ForeignKey(AssetType, on_delete=models.CASCADE, related_name="fieldset_memberships")
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="asset_type_memberships")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "fieldset__namespace", "fieldset__slug"]
+        constraints = [
+            models.UniqueConstraint(fields=["asset_type", "fieldset"], name="unique_assettype_fieldset"),
+            models.UniqueConstraint(fields=["asset_type", "position"], name="unique_assettype_fieldset_position"),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="assettype_fieldset_position_range",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.asset_type}: {self.fieldset}"
 
 
 class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -347,6 +725,7 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
+    soft_delete_preserve_references = True
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
     color = models.CharField(
@@ -368,6 +747,12 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ),
     )
     tags = models.ManyToManyField("extras.Tag", related_name="categories", blank=True, verbose_name=_("Tags"))
+    default_custom_fieldsets = models.ManyToManyField(
+        CustomFieldset,
+        related_name="default_for_categories",
+        through="CategoryDefaultFieldset",
+        blank=True,
+    )
 
     class Meta:
         ordering = ["name"]
@@ -387,3 +772,23 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
     def get_absolute_url(self):
         return reverse("assets:category_detail", kwargs={"pk": self.pk})
+
+
+class CategoryDefaultFieldset(BaseModel):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="default_fieldset_memberships")
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="category_default_memberships")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "fieldset__namespace", "fieldset__slug"]
+        constraints = [
+            models.UniqueConstraint(fields=["category", "fieldset"], name="unique_category_default_fieldset"),
+            models.UniqueConstraint(fields=["category", "position"], name="unique_category_default_position"),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="category_default_position_range",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.category}: {self.fieldset}"

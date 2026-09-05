@@ -22,9 +22,10 @@ from django.urls import reverse
 from model_bakery import baker
 
 from assets.forms.asset_form import AssetForm
-from assets.models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel
+from assets.models import Asset, AssetRole, AssetTagSequence, AssetType, AssetTypeFieldset, StatusLabel
 from core.tests.mixins import TenantTestMixin
-from extras.models import CustomField, CustomFieldset
+from extras.customfields import build_custom_field_form_field
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 from organization.models import CostCenter, Location, Site, Tenant
 from procurement.models import PurchaseOrderLine
 
@@ -354,8 +355,12 @@ class AssetFormLayoutTests(TestCase):
         self.assertEqual(fieldset_legends(form), self.BASE_LEGENDS)
 
     def test_custom_specifications_section_is_inserted_before_the_warranty_section(self):
-        custom_field = CustomField.objects.create(name="hostname", label="Hostname", field_type="text")
-        custom_field.object_types.add(ContentType.objects.get_for_model(Asset))
+        CustomField.objects.create(
+            name="test_hostname",
+            label="Hostname",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            scope=CustomField.SCOPE_ASSET,
+        )
 
         form, _ = build_form_without_sequence()
 
@@ -375,16 +380,13 @@ class AssetFormCustomFieldTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.asset_ct = ContentType.objects.get_for_model(Asset)
-        cls.assettype_ct = ContentType.objects.get_for_model(AssetType)
         cls.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
 
     def _asset_custom_field(self, **kwargs):
-        custom_field = CustomField.objects.create(**kwargs)
-        custom_field.object_types.add(self.asset_ct)
-        return custom_field
+        kwargs.setdefault("scope", CustomField.SCOPE_ASSET)
+        return CustomField.objects.create(**kwargs)
 
-    def test_custom_field_keys_follow_the_models_label_ordering(self):
+    def test_global_custom_field_keys_follow_stable_key_ordering(self):
         self._asset_custom_field(name="zeta", label="Zeta", field_type="text")
         self._asset_custom_field(name="alpha", label="Alpha", field_type="text")
         self._asset_custom_field(name="mid", label="Mid", field_type="text")
@@ -393,23 +395,55 @@ class AssetFormCustomFieldTests(TestCase):
 
         self.assertEqual(form.custom_field_keys, ["cf_alpha", "cf_mid", "cf_zeta"])
 
+    def test_generic_asset_field_uses_object_types_for_global_resolution(self):
+        field = self._asset_custom_field(name="generic_asset_detail", label="Generic asset detail", scope=None)
+        field.object_types.add(ContentType.objects.get_for_model(Asset))
+
+        form, _ = build_form_without_sequence()
+
+        self.assertIn("cf_generic_asset_detail", form.fields)
+        self.assertIn("cf_generic_asset_detail", form.custom_field_keys)
+
+    def test_required_boolean_accepts_explicit_false_and_true(self):
+        field = self._asset_custom_field(
+            name="required_boolean", label="Required boolean", field_type="boolean", required=True
+        )
+
+        form_field = build_custom_field_form_field(field)
+
+        self.assertEqual(form_field.__class__.__name__, "TypedChoiceField")
+        self.assertIs(form_field.clean("false"), False)
+        self.assertIs(form_field.clean("true"), True)
+
     def test_each_supported_field_type_builds_its_form_field(self):
         self._asset_custom_field(name="txt", label="A Text", field_type="text")
-        self._asset_custom_field(name="num", label="B Number", field_type="number")
+        self._asset_custom_field(name="num", label="B Number", field_type="integer")
+        self._asset_custom_field(name="dec", label="C Decimal", field_type="decimal", decimal_scale=2)
         self._asset_custom_field(name="dat", label="C Date", field_type="date")
         self._asset_custom_field(name="boo", label="D Boolean", field_type="boolean")
-        self._asset_custom_field(name="sel", label="E Select", field_type="select", choices="Red\n Green \n\nBlue")
+        choice_set = CustomFieldChoiceSet.objects.create(namespace="local", slug="colours", label="Colours")
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="red", label="Red", position=1)
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="green", label="Green", position=2)
+        CustomFieldChoice.objects.create(choice_set=choice_set, key="blue", label="Blue", position=3)
+        self._asset_custom_field(
+            name="sel",
+            label="E Select",
+            field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            choice_set=choice_set,
+            max_values=1,
+        )
 
         form, _ = build_form_without_sequence()
 
         self.assertEqual(form.fields["cf_txt"].__class__.__name__, "CharField")
-        self.assertEqual(form.fields["cf_num"].__class__.__name__, "DecimalField")
+        self.assertEqual(form.fields["cf_num"].__class__.__name__, "IntegerField")
+        self.assertEqual(form.fields["cf_dec"].__class__.__name__, "DecimalField")
         self.assertEqual(form.fields["cf_dat"].__class__.__name__, "DateField")
         self.assertEqual(form.fields["cf_boo"].__class__.__name__, "BooleanField")
         self.assertEqual(form.fields["cf_sel"].__class__.__name__, "ChoiceField")
         self.assertEqual(
             form.fields["cf_sel"].choices,
-            [("", "---------"), ("Red", "Red"), ("Green", "Green"), ("Blue", "Blue")],
+            [("", "---------"), ("red", "Red"), ("green", "Green"), ("blue", "Blue")],
         )
         self.assertFalse(form.fields["cf_boo"].initial)
         self.assertEqual(form.fields["cf_txt"].label, "A Text")
@@ -424,30 +458,40 @@ class AssetFormCustomFieldTests(TestCase):
         self.assertFalse(form.fields["cf_optional"].required)
 
     def test_stored_values_seed_the_field_initials(self):
-        self._asset_custom_field(name="hostname", label="Hostname", field_type="text")
+        self._asset_custom_field(name="test_hostname", label="Hostname", field_type="text")
         asset = Asset.objects.create(
             name="Stored",
             asset_tag="STORED-1",
             status=self.status,
-            custom_field_data={"hostname": "srv-01"},
+            custom_field_data={"test_hostname": "srv-01"},
         )
 
         form, _ = build_form_without_sequence(instance=asset)
 
-        self.assertEqual(form.fields["cf_hostname"].initial, "srv-01")
+        self.assertEqual(form.fields["cf_test_hostname"].initial, "srv-01")
 
     def test_fieldset_fields_of_the_selected_asset_type_are_added_once(self):
-        global_field = self._asset_custom_field(name="hostname", label="Hostname", field_type="text")
+        self._asset_custom_field(name="test_hostname", label="Hostname", field_type="text")
         scoped_field = self._asset_custom_field(name="rack", label="Rack", field_type="text")
-        spec_field = CustomField.objects.create(name="cpu", label="CPU", field_type="text")
-        spec_field.object_types.add(self.assettype_ct)
-        fieldset = CustomFieldset.objects.create(name="Server Specs")
-        fieldset.fields.add(global_field, scoped_field, spec_field)
-        asset_type = baker.make(AssetType, custom_fieldset=fieldset)
+        spec_field = CustomField.objects.create(
+            name="cpu",
+            label="CPU",
+            field_type="text",
+            scope=CustomField.SCOPE_ASSET_TYPE,
+        )
+        fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="server-specs",
+            label="Server Specs",
+        )
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=scoped_field, position=10)
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=spec_field, position=20)
+        asset_type = baker.make(AssetType)
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
 
         form, _ = build_form_without_sequence(initial={"asset_type": asset_type.pk})
 
-        self.assertEqual(form.custom_field_keys.count("cf_hostname"), 1)
+        self.assertEqual(form.custom_field_keys.count("cf_test_hostname"), 1)
         self.assertIn("cf_rack", form.custom_field_keys)
         self.assertNotIn("cf_cpu", form.custom_field_keys)
 
@@ -464,7 +508,7 @@ class AssetFormCustomFieldTests(TestCase):
             if isinstance(element, Fieldset) and str(element.legend) == "Custom Specifications"
         )
         rows = [[column.fields[0] for column in row.fields] for row in custom_fieldset.fields]
-        self.assertEqual(rows, [["cf_one", "cf_two"], ["cf_three"]])
+        self.assertEqual(rows, [["cf_one", "cf_three"], ["cf_two"]])
 
 
 def marked_translation(message):

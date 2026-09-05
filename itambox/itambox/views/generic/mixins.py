@@ -1,6 +1,9 @@
+from contextlib import contextmanager
+
 from django.apps import apps
 from django.contrib.auth.mixins import AccessMixin
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured, PermissionDenied
+from django.db import router, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse
@@ -22,6 +25,30 @@ def user_can_mutate_model(user, model):
     if model is None:
         return True
     return model._meta.label_lower not in SUPERUSER_ONLY_MUTATION_MODELS or bool(user and user.is_superuser)
+
+
+def is_managed_definition(obj):
+    return getattr(obj, "management_kind", None) in {"core", "library"}
+
+
+@contextmanager
+def lock_unmanaged_definition(obj):
+    """Lock a definition row and recheck its management state before mutation."""
+    try:
+        type(obj)._meta.get_field("management_kind")
+    except (AttributeError, FieldDoesNotExist):
+        yield obj
+        return
+    if not getattr(obj, "pk", None):
+        yield obj
+        return
+    using = router.db_for_write(type(obj), instance=obj)
+    manager = getattr(type(obj), "all_objects", type(obj)._base_manager)
+    with transaction.atomic(using=using):
+        locked = manager.using(using).select_for_update().get(pk=obj.pk)
+        if is_managed_definition(locked):
+            raise PermissionDenied("Managed definitions cannot be mutated through ordinary HTML actions.")
+        yield obj
 
 
 class CachedObjectMixin:

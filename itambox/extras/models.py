@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -24,6 +25,8 @@ from core.mixins import BookmarkableMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
 from core.report_keys import unknown_column_keys
 from core.validators import validate_external_url, validate_file_attachment, validate_image_attachment
+
+from .definition_contract import validate_custom_field_definition_contract
 
 
 def has_authored_conditions(conditions):
@@ -137,36 +140,207 @@ class Dashboard(models.Model):
             self.save(update_fields=["layout"])
 
 
-class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class _ManagedDefinitionMixin(models.Model):
+    preserve_tombstones = True
+    MANAGEMENT_CORE = "core"
+    MANAGEMENT_LIBRARY = "library"
+    MANAGEMENT_LOCAL = "local"
+    MANAGEMENT_KIND_CHOICES = [
+        (MANAGEMENT_CORE, _("Core")),
+        (MANAGEMENT_LIBRARY, _("Library")),
+        (MANAGEMENT_LOCAL, _("Local")),
+    ]
+
+    LIFECYCLE_ACTIVE = "active"
+    LIFECYCLE_DEPRECATED = "deprecated"
+    LIFECYCLE_CHOICES = [
+        (LIFECYCLE_ACTIVE, _("Active")),
+        (LIFECYCLE_DEPRECATED, _("Deprecated")),
+    ]
+
+    management_kind = models.CharField(max_length=16, choices=MANAGEMENT_KIND_CHOICES, default=MANAGEMENT_LOCAL)
+    version = models.PositiveIntegerField(default=1)
+    lifecycle = models.CharField(max_length=16, choices=LIFECYCLE_CHOICES, default=LIFECYCLE_ACTIVE)
+    deprecated_at = models.DateTimeField(null=True, blank=True)
+    managed_paths = models.JSONField(default=dict, blank=True)
+    source_checksum = models.CharField(max_length=71, null=True, blank=True)
+    last_reconciled_at = models.DateTimeField(null=True, blank=True)
+
+    immutable_fields = ()
+    soft_delete_preserve_references = True
+
+    class Meta:
+        abstract = True
+
+    def _validate_immutable_fields(self):
+        if not self.pk:
+            return
+        previous = type(self).all_objects.filter(pk=self.pk).values(*self.immutable_fields).first()
+        if previous is None:
+            return
+        changed = {
+            field: _("This value is immutable after creation.")
+            for field in self.immutable_fields
+            if previous[field] != getattr(self, field)
+        }
+        if changed:
+            raise ValidationError(changed)
+
+    def restore(self):
+        """Restore a definition and normalize the pre-cutover deleted state."""
+        update_fields = ["deleted_at"]
+        self.deleted_at = None
+        if self.lifecycle == "deleted":
+            self.lifecycle = self.LIFECYCLE_DEPRECATED
+            update_fields.append("lifecycle")
+        self._skip_custom_field_applicability = True
+        try:
+            self.save(update_fields=update_fields)
+        finally:
+            del self._skip_custom_field_applicability
+
+    def soft_delete(self):
+        self.deleted_at = timezone.now()
+        self._skip_custom_field_applicability = True
+        try:
+            self.save(update_fields=["deleted_at"])
+        finally:
+            del self._skip_custom_field_applicability
+
+    def save(self, *args, **kwargs):
+        self._validate_immutable_fields()
+        return super().save(*args, **kwargs)
+
+
+class CustomFieldChoiceSet(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    changelog_global = True
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
+    namespace = models.CharField(
+        max_length=62,
+        validators=[RegexValidator(r"^[a-z][a-z0-9-]{0,61}$")],
+    )
+    slug = models.CharField(
+        max_length=127,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9._-]{0,126}$")],
+    )
+    label = models.CharField(max_length=200)
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
+
+    immutable_fields = ("namespace", "slug")
+
+    class Meta:
+        ordering = ["namespace", "slug"]
+        constraints = [
+            models.UniqueConstraint(fields=["namespace", "slug"], name="unique_customfieldchoiceset_identity"),
+        ]
+
+    def __str__(self):
+        return f"{self.namespace}/{self.slug}"
+
+
+class CustomFieldChoice(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    changelog_global = True
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
+    choice_set = models.ForeignKey(CustomFieldChoiceSet, on_delete=models.CASCADE, related_name="choices")
+    key = models.CharField(
+        max_length=63,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9_]{0,62}$")],
+    )
+    label = models.CharField(max_length=200)
+    position = models.PositiveIntegerField()
+    replaced_by = models.CharField(max_length=254, null=True, blank=True)
+
+    immutable_fields = ("choice_set_id", "key")
+
+    class Meta:
+        ordering = ["position", "key"]
+        constraints = [
+            models.UniqueConstraint(fields=["choice_set", "key"], name="unique_customfieldchoice_key"),
+            models.UniqueConstraint(fields=["choice_set", "position"], name="unique_customfieldchoice_position"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(position__gte=1, position__lte=1000000)
+                    | models.Q(position__gte=1000000001, position__lte=1000000064)
+                ),
+                name="customfieldchoice_position_range",
+            ),
+        ]
+
+    def __str__(self):
+        return self.label
+
+
+class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     changelog_global = True  # global config → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     FIELD_TYPE_TEXT = "text"
-    FIELD_TYPE_NUMBER = "number"
+    FIELD_TYPE_INTEGER = "integer"
+    FIELD_TYPE_DECIMAL = "decimal"
     FIELD_TYPE_DATE = "date"
     FIELD_TYPE_BOOLEAN = "boolean"
-    FIELD_TYPE_SELECT = "select"
+    FIELD_TYPE_SINGLE_SELECT = "single-select"
+    FIELD_TYPE_MULTI_SELECT = "multi-select"
     FIELD_TYPE_CHOICES = [
         (FIELD_TYPE_TEXT, _("Text")),
-        (FIELD_TYPE_NUMBER, _("Number")),
+        (FIELD_TYPE_INTEGER, _("Integer")),
+        (FIELD_TYPE_DECIMAL, _("Decimal")),
         (FIELD_TYPE_DATE, _("Date")),
         (FIELD_TYPE_BOOLEAN, _("Boolean")),
-        (FIELD_TYPE_SELECT, _("Select / Dropdown")),
+        (FIELD_TYPE_SINGLE_SELECT, _("Single select")),
+        (FIELD_TYPE_MULTI_SELECT, _("Multi select")),
     ]
 
-    name = models.SlugField(
-        max_length=50, verbose_name=_("Field Name"), help_text=_("Slug-like name (e.g. sim_card_number)")
+    SCOPE_ASSET_TYPE = "asset_type"
+    SCOPE_ASSET = "asset"
+    SCOPE_BOTH = "both"
+    SCOPE_CHOICES = [
+        (SCOPE_ASSET_TYPE, _("Asset Type")),
+        (SCOPE_ASSET, _("Asset")),
+        (SCOPE_BOTH, _("Asset Type and Asset")),
+    ]
+
+    name = models.CharField(
+        max_length=64,
+        validators=[RegexValidator(r"^[a-z][a-z0-9_]{0,63}$")],
+        verbose_name=_("Field Name"),
+        help_text=_("Stable JSON key (e.g. sim_card_number)"),
     )
-    label = models.CharField(max_length=100, db_index=True, verbose_name=_("Display Label"))
+    namespace = models.CharField(
+        max_length=62,
+        default="local",
+        validators=[RegexValidator(r"^[a-z][a-z0-9-]{0,61}$")],
+    )
+    label = models.CharField(max_length=200, db_index=True, verbose_name=_("Display Label"))
+    help_text = models.TextField(max_length=4096, blank=True, default="")
     field_type = models.CharField(
-        max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
+        max_length=16, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
     )
-    choices = models.TextField(
-        blank=True,
-        verbose_name=_("Choices"),
-        help_text=_("New-line separated list of choices (only for 'select' type)"),
-    )
+    scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, null=True, blank=True)
+    quantity_kind = models.CharField(max_length=32, null=True, blank=True)
+    canonical_unit = models.CharField(max_length=16, null=True, blank=True)
+    minimum_value = models.DecimalField(max_digits=24, decimal_places=6, null=True, blank=True)
+    maximum_value = models.DecimalField(max_digits=24, decimal_places=6, null=True, blank=True)
+    regex = models.CharField(max_length=256, null=True, blank=True)
+    decimal_scale = models.PositiveSmallIntegerField(null=True, blank=True)
+    max_values = models.PositiveSmallIntegerField(null=True, blank=True)
+    text_max_length = models.PositiveSmallIntegerField(null=True, blank=True)
+    validation_rule = models.CharField(max_length=32, null=True, blank=True)
     required = models.BooleanField(default=False, db_index=True, verbose_name=_("Required"))
+    nullable = models.BooleanField(default=False)
+    mappings = models.JSONField(default=list, blank=True)
+    choice_set = models.ForeignKey(
+        CustomFieldChoiceSet,
+        on_delete=models.PROTECT,
+        related_name="fields",
+        null=True,
+        blank=True,
+    )
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
     object_types = models.ManyToManyField(
         "contenttypes.ContentType",
         related_name="custom_fields",
@@ -184,13 +358,85 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         verbose_name = _("Custom Field")
         verbose_name_plural = _("Custom Fields")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfield_name_active"
+            models.UniqueConstraint(fields=["name"], name="unique_customfield_name"),
+            models.CheckConstraint(
+                condition=models.Q(minimum_value__isnull=True)
+                | models.Q(maximum_value__isnull=True)
+                | models.Q(minimum_value__lte=models.F("maximum_value")),
+                name="customfield_minimum_lte_maximum",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(decimal_scale__isnull=True) | models.Q(decimal_scale__lte=6),
+                name="customfield_decimal_scale_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(max_values__isnull=True) | models.Q(max_values__gte=1, max_values__lte=64),
+                name="customfield_max_values_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(text_max_length__isnull=True)
+                | models.Q(text_max_length__gte=1, text_max_length__lte=4096),
+                name="customfield_text_length_range",
             ),
         ]
 
+    immutable_fields = (
+        "name",
+        "namespace",
+        "field_type",
+        "scope",
+        "quantity_kind",
+        "canonical_unit",
+        "minimum_value",
+        "maximum_value",
+        "regex",
+        "decimal_scale",
+        "max_values",
+        "text_max_length",
+        "validation_rule",
+        "nullable",
+        "choice_set_id",
+    )
+
     def __str__(self):
         return f"{self.label} ({self.get_field_type_display()})"
+
+    def clean(self):
+        super().clean()
+
+        object_types = (
+            None
+            if getattr(self, "_skip_custom_field_applicability", False)
+            else self.object_types.all()
+            if self.pk
+            else None
+        )
+        self.validate_definition_contract(object_types=object_types)
+
+    def validate_definition_contract(self, *, object_types=None):
+        validate_custom_field_definition_contract(
+            field_type=self.field_type,
+            scope=self.scope,
+            quantity_kind=self.quantity_kind,
+            canonical_unit=self.canonical_unit,
+            minimum_value=self.minimum_value,
+            maximum_value=self.maximum_value,
+            regex=self.regex,
+            decimal_scale=self.decimal_scale,
+            max_values=self.max_values,
+            text_max_length=self.text_max_length,
+            validation_rule=self.validation_rule,
+            mappings=self.mappings,
+            choice_set=self.choice_set,
+            object_types=object_types,
+            management_kind=self.management_kind,
+            lifecycle=self.lifecycle,
+            deleted_at=self.deleted_at,
+            required=self.required,
+            nullable=self.nullable,
+            name=self.name,
+            namespace=self.namespace,
+        )
 
     def get_absolute_url(self):
         return reverse("extras:customfield_detail", kwargs={"pk": self.pk})
@@ -202,28 +448,65 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return self.object_types.filter(app_label="assets", model="assettype").exists()
 
 
-class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     changelog_global = True  # global config → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, verbose_name=_("Fieldset Name"))
-    fields = models.ManyToManyField(CustomField, related_name="fieldsets", blank=True, verbose_name=_("Custom Fields"))
+    fields = models.ManyToManyField(
+        CustomField,
+        related_name="fieldsets",
+        through="CustomFieldsetField",
+        blank=True,
+        verbose_name=_("Custom Fields"),
+    )
+    namespace = models.CharField(
+        max_length=62,
+        default="local",
+        validators=[RegexValidator(r"^[a-z][a-z0-9-]{0,61}$")],
+    )
+    slug = models.CharField(
+        max_length=127,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9._-]{0,126}$")],
+    )
+    label = models.CharField(max_length=200, blank=True, default="")
+    description = models.TextField(max_length=4096, blank=True, default="")
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
+
+    immutable_fields = ("namespace", "slug")
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["namespace", "slug"]
         verbose_name = _("Custom Fieldset")
         verbose_name_plural = _("Custom Fieldsets")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfieldset_name_active"
+            models.UniqueConstraint(fields=["namespace", "slug"], name="unique_customfieldset_identity"),
+        ]
+
+    def __str__(self):
+        return self.label
+
+    def get_absolute_url(self):
+        return reverse("extras:customfieldset_detail", kwargs={"pk": self.pk})
+
+
+class CustomFieldsetField(BaseModel):
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.CASCADE, related_name="field_memberships")
+    custom_field = models.ForeignKey(CustomField, on_delete=models.PROTECT, related_name="fieldset_memberships")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "custom_field__name"]
+        constraints = [
+            models.UniqueConstraint(fields=["fieldset", "custom_field"], name="unique_customfieldset_field"),
+            models.UniqueConstraint(fields=["fieldset", "position"], name="unique_customfieldset_position"),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="customfieldset_position_range",
             ),
         ]
 
     def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse("extras:customfieldset_detail", kwargs={"pk": self.pk})
+        return f"{self.fieldset}: {self.custom_field}"
 
 
 # Machine-generated event-bus row. Intentionally NOT change-logged: it is

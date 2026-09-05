@@ -40,24 +40,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "context": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "statement": "from ..models import AssetType as AssetTypeModel",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "context": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/assettype_form.py",
-      "context": "ClassDef:AssetTypeForm/FunctionDef:__init__",
-      "statement": "from extras.models import CustomField, CustomFieldset",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/category_form.py",
       "context": "ClassDef:CategoryForm/FunctionDef:__init__",
       "statement": "from crispy_forms.helper import FormHelper",
@@ -840,12 +822,6 @@
     {
       "path": "itambox/core/management/commands/_seed/catalog.py",
       "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
-      "statement": "from extras.models import CustomField, CustomFieldset, Tag",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
       "statement": "from inventory.models import Accessory, Component, Consumable",
       "count": 1
     },
@@ -1099,12 +1075,6 @@
       "path": "itambox/core/management/commands/sync_intune.py",
       "context": "ClassDef:Command/FunctionDef:handle",
       "statement": "from django_q.tasks import async_task",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/mixins.py",
-      "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
-      "statement": "from core.choices import ObjectChangeActionChoices",
       "count": 1
     },
     {
@@ -1396,18 +1366,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/customfields.py",
-      "context": "ClassDef:CustomFieldModelFormMixin/FunctionDef:append_custom_fields_to_layout",
-      "statement": "from crispy_forms.layout import Div, Fieldset",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/customfields.py",
-      "context": "FunctionDef:apply_custom_field_filters",
-      "statement": "from django.db.models import Q",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/dashboard/views.py",
       "context": "ClassDef:DashboardCreateView/FunctionDef:post",
       "statement": "from django.contrib import messages",
@@ -1495,12 +1453,6 @@
       "path": "itambox/extras/dashboard/widgets.py",
       "context": "ClassDef:RenewalsWidget/FunctionDef:get_context",
       "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "context": "ClassDef:CustomFieldForm/FunctionDef:__init__",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
       "count": 1
     },
     {

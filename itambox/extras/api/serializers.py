@@ -1,14 +1,20 @@
+from collections.abc import Mapping
+
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from extras.customfields import apply_custom_field_patch, custom_fields_for_model
+from extras.definition_contract import custom_field_definition_contract_errors
 from extras.models import (
     AlertLog,
     AlertRule,
     CustomField,
+    CustomFieldChoiceSet,
     CustomFieldset,
     Dashboard,
     Event,
@@ -39,6 +45,74 @@ def _is_secret_config_key(key):
     return any(hint in k for hint in _SECRET_CONFIG_HINTS)
 
 
+class CustomFieldDataValidationMixin:
+    def get_custom_field_definitions(self):
+        return custom_fields_for_model(self.Meta.model)
+
+    def get_extra_kwargs(self):
+        extra_kwargs = super().get_extra_kwargs()
+        custom_field_kwargs = dict(extra_kwargs.get("custom_field_data", {}))
+        custom_field_kwargs["read_only"] = True
+        extra_kwargs["custom_field_data"] = custom_field_kwargs
+        return extra_kwargs
+
+    def get_existing_custom_field_data(self):
+        instance = self.instance
+        if instance is None or isinstance(instance, (list, tuple)):
+            return {}
+        return getattr(instance, "custom_field_data", None) or {}
+
+    def validate_specification_patch(self, value):
+        if not isinstance(value, Mapping):
+            raise serializers.ValidationError(_("Custom field specification patch must be an object."))
+        unknown_operations = set(value) - {"set", "clear"}
+        if unknown_operations:
+            raise serializers.ValidationError(_("Custom field patch contains an unknown operation."))
+        submitted = value.get("set", {})
+        clear_keys = value.get("clear", [])
+        if not isinstance(submitted, Mapping):
+            raise serializers.ValidationError(_("Custom field patch 'set' must be an object."))
+        if not isinstance(clear_keys, list) or any(not isinstance(key, str) for key in clear_keys):
+            raise serializers.ValidationError(_("Custom field patch 'clear' must be a list of field keys."))
+        try:
+            merged = apply_custom_field_patch(
+                self.get_existing_custom_field_data(),
+                self.get_custom_field_definitions(),
+                submitted,
+                clear_keys=clear_keys,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return {"set": dict(submitted), "clear": list(clear_keys), "_merged": merged}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if "specification_patch" not in attrs:
+            try:
+                apply_custom_field_patch(
+                    self.get_existing_custom_field_data(),
+                    self.get_custom_field_definitions(),
+                    {},
+                )
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"specification_patch": exc.messages}) from exc
+        return attrs
+
+    def create(self, validated_data):
+        patch = validated_data.pop("specification_patch", None)
+        if patch is not None:
+            validated_data["custom_field_data"] = patch["_merged"]
+        with transaction.atomic():
+            return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        patch = validated_data.pop("specification_patch", None)
+        if patch is not None:
+            validated_data["custom_field_data"] = patch["_merged"]
+        with transaction.atomic():
+            return super().update(instance, validated_data)
+
+
 class TagSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:extras_api:tag-detail")
 
@@ -51,32 +125,110 @@ class TagSerializer(BaseModelSerializer):
 class CustomFieldSerializer(BaseModelSerializer):
     field_type_display = serializers.CharField(source="get_field_type_display", read_only=True)
 
-    object_types = serializers.SlugRelatedField(many=True, read_only=True, slug_field="model")
+    choice_set = serializers.PrimaryKeyRelatedField(
+        queryset=CustomFieldChoiceSet.objects.filter(lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE),
+        required=False,
+        allow_null=True,
+    )
+    object_types = serializers.SlugRelatedField(
+        many=True,
+        queryset=ContentType.objects.filter(app_label="assets", model__in=["asset", "assettype"]),
+        slug_field="model",
+        required=False,
+    )
 
     class Meta:
         model = CustomField
         fields = [
             "id",
             "name",
+            "namespace",
             "label",
+            "help_text",
             "field_type",
             "field_type_display",
-            "choices",
+            "scope",
+            "quantity_kind",
+            "canonical_unit",
+            "minimum_value",
+            "maximum_value",
+            "regex",
+            "decimal_scale",
+            "max_values",
+            "text_max_length",
+            "validation_rule",
             "required",
+            "nullable",
+            "mappings",
+            "choice_set",
             "object_types",
             "created_at",
             "updated_at",
         ]
         brief_fields = ["id", "name", "label", "field_type"]
 
+    def validate(self, data):
+        instance = self.instance
+        object_types = list(data["object_types"] or []) if "object_types" in data else []
+        if instance is not None and "object_types" not in data:
+            object_types = list(instance.object_types.all())
+        errors = custom_field_definition_contract_errors(
+            field_type=data.get("field_type", getattr(instance, "field_type", None)),
+            scope=data.get("scope", getattr(instance, "scope", None)),
+            quantity_kind=data.get("quantity_kind", getattr(instance, "quantity_kind", None)),
+            canonical_unit=data.get("canonical_unit", getattr(instance, "canonical_unit", None)),
+            minimum_value=data.get("minimum_value", getattr(instance, "minimum_value", None)),
+            maximum_value=data.get("maximum_value", getattr(instance, "maximum_value", None)),
+            regex=data.get("regex", getattr(instance, "regex", None)),
+            decimal_scale=data.get("decimal_scale", getattr(instance, "decimal_scale", None)),
+            max_values=data.get("max_values", getattr(instance, "max_values", None)),
+            text_max_length=data.get("text_max_length", getattr(instance, "text_max_length", None)),
+            validation_rule=data.get("validation_rule", getattr(instance, "validation_rule", None)),
+            mappings=data.get("mappings", getattr(instance, "mappings", None)),
+            choice_set=data.get("choice_set", getattr(instance, "choice_set", None)),
+            object_types=object_types,
+            management_kind=data.get("management_kind", getattr(instance, "management_kind", "local")),
+            lifecycle=data.get("lifecycle", getattr(instance, "lifecycle", "active")),
+            deleted_at=getattr(instance, "deleted_at", None),
+            name=data.get("name", getattr(instance, "name", None)),
+            namespace=data.get("namespace", getattr(instance, "namespace", None)),
+        )
+        if instance is not None:
+            for model_field in CustomField.immutable_fields:
+                api_field = "choice_set" if model_field == "choice_set_id" else model_field
+                if api_field not in self.initial_data:
+                    continue
+                current = getattr(instance, model_field)
+                if api_field == "choice_set":
+                    current = instance.choice_set_id
+                    incoming = getattr(data.get(api_field), "pk", data.get(api_field))
+                else:
+                    incoming = data.get(api_field)
+                if incoming != current:
+                    errors[api_field] = [_("This value is immutable after creation.")]
+        if errors:
+            raise serializers.ValidationError(errors)
+        return data
+
 
 class CustomFieldsetSerializer(BaseModelSerializer):
     fields = CustomFieldSerializer(many=True, read_only=True)
 
+    def validate(self, data):
+        if self.instance is not None:
+            errors = {
+                field: [_("This value is immutable after creation.")]
+                for field in CustomFieldset.immutable_fields
+                if field in data and data[field] != getattr(self.instance, field)
+            }
+            if errors:
+                raise serializers.ValidationError(errors)
+        return data
+
     class Meta:
         model = CustomFieldset
-        fields = ["id", "name", "fields", "created_at", "updated_at"]
-        brief_fields = ["id", "name"]
+        fields = ["id", "namespace", "slug", "label", "description", "fields", "created_at", "updated_at"]
+        brief_fields = ["id", "namespace", "slug", "label"]
 
 
 class DashboardSerializer(serializers.ModelSerializer):

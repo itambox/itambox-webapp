@@ -13,6 +13,12 @@ from assets.api.nested_serializers import (
     NestedAssetTypeSerializer,
     NestedManufacturerSerializer,
 )
+from assets.customfields import (
+    ResolvedCustomField,
+    resolve_asset_custom_fields,
+    resolve_asset_type_creation_custom_fields,
+    resolve_asset_type_custom_fields,
+)
 from assets.models import (
     Asset,
     AssetAssignment,
@@ -29,7 +35,7 @@ from assets.models import (
     Supplier,
     Warranty,
 )
-from extras.api.serializers import TagSerializer
+from extras.api.serializers import CustomFieldDataValidationMixin, TagSerializer
 from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from itambox.api.fields import RelatedObjectCountField
 from organization.api.serializers import (
@@ -100,7 +106,8 @@ class DepreciationSerializer(BaseModelSerializer):
         brief_fields = ["id", "name", "months"]
 
 
-class AssetTypeSerializer(BaseModelSerializer):
+class AssetTypeSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
+    specification_patch = serializers.JSONField(write_only=True, required=False)
     manufacturer = NestedManufacturerSerializer(read_only=True)
     manufacturer_id = serializers.PrimaryKeyRelatedField(
         queryset=Manufacturer.objects.all(), source="manufacturer", write_only=True
@@ -114,6 +121,11 @@ class AssetTypeSerializer(BaseModelSerializer):
     depreciation_id = serializers.PrimaryKeyRelatedField(
         queryset=Depreciation.objects.all(), source="depreciation", write_only=True, required=False, allow_null=True
     )
+
+    def get_custom_field_definitions(self):
+        if isinstance(self.instance, AssetType):
+            return resolve_asset_type_custom_fields(self.instance)
+        return resolve_asset_type_creation_custom_fields()
 
     class Meta:
         model = AssetType
@@ -130,8 +142,8 @@ class AssetTypeSerializer(BaseModelSerializer):
             "assetrole_id",
             "depreciation",
             "depreciation_id",
-            "custom_fieldset",
             "custom_field_data",
+            "specification_patch",
             "image",
             "requestable",
             "description",
@@ -144,7 +156,8 @@ class AssetTypeSerializer(BaseModelSerializer):
 
 
 @extend_schema_serializer(component_name="AssetResource")
-class AssetSerializer(BaseModelSerializer):
+class AssetSerializer(CustomFieldDataValidationMixin, BaseModelSerializer):
+    specification_patch = serializers.JSONField(write_only=True, required=False)
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetType.objects.all(), source="asset_type", write_only=True
@@ -173,6 +186,19 @@ class AssetSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     assigned_to = serializers.SerializerMethodField()
     cost_center: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
+
+    def get_custom_field_definitions(self) -> list[ResolvedCustomField] | tuple[()]:
+        instance = self.instance
+        target_asset_type = getattr(instance, "asset_type", None) if isinstance(instance, Asset) else None
+        raw_asset_type_id = self.initial_data.get("asset_type_id") if hasattr(self, "initial_data") else None
+        if raw_asset_type_id not in (None, ""):
+            try:
+                target_asset_type = self.fields["asset_type_id"].queryset.get(pk=raw_asset_type_id)
+            # broad except: boundary-isolation: asset_type_id reports invalid relation input separately
+            except (AssetType.DoesNotExist, TypeError, ValueError):
+                pass
+        existing_data = getattr(instance, "custom_field_data", None) if isinstance(instance, Asset) else None
+        return resolve_asset_custom_fields(target_asset_type, existing_data)
 
     class Meta:
         model = Asset
@@ -203,6 +229,7 @@ class AssetSerializer(BaseModelSerializer):
             "last_audited",
             "last_audited_by",
             "custom_field_data",
+            "specification_patch",
             "requestable",
             "notes",
             "tags",

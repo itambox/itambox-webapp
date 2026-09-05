@@ -16,13 +16,407 @@ Designed to be mixed into ``Command`` in seed_data.py:
 and ``self._providers``. It reads ``self._status_label_defs()`` from Command.
 """
 
+from decimal import Decimal
+
+from django.utils import timezone
+
+from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
+from extras.definition_contract import validate_custom_field_definition_contract
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
+
+
+def _get_core_choice_set(slug, label):
+    matches = list(CustomFieldChoiceSet.all_objects.filter(namespace="itambox", slug=slug))
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core Choice Set identity: itambox/{slug}")
+    if matches and matches[0].deleted_at is not None:
+        raise ValueError(f"Core Choice Set identity is reserved by a tombstone: itambox/{slug}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomFieldChoiceSet.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomFieldChoiceSet.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice Set identity has incompatible management or lifecycle: itambox/{slug}")
+    if matches:
+        return matches[0]
+    return CustomFieldChoiceSet.objects.create(
+        namespace="itambox",
+        slug=slug,
+        label=label,
+        management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
+        version=1,
+        lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+    )
+
+
+def _validate_core_choice_row(choice, slug, desired_keys):
+    if choice.key not in desired_keys:
+        raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
+    if (
+        choice.deleted_at is not None
+        or choice.management_kind != CustomFieldChoice.MANAGEMENT_CORE
+        or choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice identity has incompatible management or lifecycle: itambox/{slug}#{choice.key}")
+
+
+def _reconcile_core_choice_rows(choice_set, slug, choices):
+    existing_choices = list(CustomFieldChoice.all_objects.filter(choice_set=choice_set).order_by("position", "key"))
+    if len(existing_choices) > 64:
+        raise ValueError(f"Core Choice Set has more than 64 choices: itambox/{slug}")
+    desired_keys = {key for key, _choice_label in choices}
+    for choice in existing_choices:
+        _validate_core_choice_row(choice, slug, desired_keys)
+    for rank, choice in enumerate(existing_choices, start=1):
+        CustomFieldChoice.all_objects.filter(pk=choice.pk).update(position=1000000000 + rank)
+    existing_by_key = {choice.key: choice for choice in existing_choices}
+    desired_keys = set()
+    for index, (key, choice_label) in enumerate(choices, start=1):
+        desired_keys.add(key)
+        choice = existing_by_key.get(key)
+        if choice is not None and (
+            choice.deleted_at is not None
+            or choice.management_kind != CustomFieldChoice.MANAGEMENT_CORE
+            or choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
+        ):
+            raise ValueError(f"Core Choice identity has incompatible management or lifecycle: itambox/{slug}#{key}")
+        if choice is None:
+            CustomFieldChoice.objects.create(
+                choice_set=choice_set,
+                key=key,
+                label=choice_label,
+                position=index * 10,
+                management_kind=CustomFieldChoice.MANAGEMENT_CORE,
+                version=1,
+                lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
+            )
+            continue
+        choice.label = choice_label
+        choice.position = index * 10
+        choice.management_kind = CustomFieldChoice.MANAGEMENT_CORE
+        choice.version = 1
+        choice.lifecycle = CustomFieldChoice.LIFECYCLE_ACTIVE
+        choice.save(update_fields=["label", "position", "management_kind", "version", "lifecycle"])
+    for choice in existing_choices:
+        if choice.key not in desired_keys and choice.deleted_at is None:
+            choice.lifecycle = CustomFieldChoice.LIFECYCLE_DEPRECATED
+            choice.deleted_at = timezone.now()
+            choice.save(update_fields=["lifecycle", "deleted_at"])
+
+
+def _reconcile_core_choice_set(slug, label, choices):
+    choice_set = _get_core_choice_set(slug, label)
+    choice_set.label = label
+    choice_set.management_kind = CustomFieldChoiceSet.MANAGEMENT_CORE
+    choice_set.version = 1
+    choice_set.lifecycle = CustomFieldChoiceSet.LIFECYCLE_ACTIVE
+    choice_set.save(update_fields=["label", "management_kind", "version", "lifecycle"])
+    _reconcile_core_choice_rows(choice_set, slug, choices)
+    return choice_set
+
+
+def _reconcile_core_choice_sets(choice_set_data):
+    return {
+        slug: _reconcile_core_choice_set(slug, label, choices) for slug, (label, choices) in choice_set_data.items()
+    }
+
+
+def _validate_core_field_identity(matches, key):
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core field identity: {key}")
+    if matches and matches[0].deleted_at is not None:
+        raise ValueError(f"Core field identity is reserved by a tombstone: {key}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomField.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomField.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core field identity has incompatible management or lifecycle: {key}")
+
+
+def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct):
+    custom_fields = {}
+    for row in field_rows:
+        options = {
+            key: value
+            for key, value in row.items()
+            if key
+            in {
+                "scope",
+                "field_type",
+                "quantity_kind",
+                "canonical_unit",
+                "minimum_value",
+                "maximum_value",
+                "regex",
+                "decimal_scale",
+                "max_values",
+                "text_max_length",
+                "validation_rule",
+            }
+        }
+        options.update(
+            {
+                "namespace": "itambox",
+                "label": row["label"],
+                "help_text": row["label"],
+                "required": False,
+                "nullable": False,
+                "management_kind": "core",
+                "version": 1,
+                "lifecycle": "active",
+                "mappings": [],
+                "choice_set": choice_sets.get(row["choice_set"]),
+            }
+        )
+        for key in ("minimum_value", "maximum_value"):
+            if options[key] is not None:
+                options[key] = Decimal(options[key])
+        target_content_types = {
+            "asset": [asset_ct],
+            "asset_type": [assettype_ct],
+            "both": [asset_ct, assettype_ct],
+        }[options["scope"]]
+        validate_custom_field_definition_contract(
+            field_type=options["field_type"],
+            scope=options["scope"],
+            quantity_kind=options.get("quantity_kind"),
+            canonical_unit=options.get("canonical_unit"),
+            minimum_value=options.get("minimum_value"),
+            maximum_value=options.get("maximum_value"),
+            regex=options.get("regex"),
+            decimal_scale=options.get("decimal_scale"),
+            max_values=options.get("max_values"),
+            text_max_length=options.get("text_max_length"),
+            validation_rule=options.get("validation_rule"),
+            mappings=options.get("mappings"),
+            choice_set=options.get("choice_set"),
+            object_types=target_content_types,
+            management_kind=options["management_kind"],
+            lifecycle=options["lifecycle"],
+            deleted_at=None,
+            name=row["key"],
+            namespace=options["namespace"],
+        )
+        matches = list(CustomField.all_objects.filter(name=row["key"]))
+        _validate_core_field_identity(matches, row["key"])
+        field = matches[0] if matches else CustomField.objects.create(name=row["key"], **options)
+        immutable_fields = (
+            "name",
+            "namespace",
+            "field_type",
+            "scope",
+            "quantity_kind",
+            "canonical_unit",
+            "minimum_value",
+            "maximum_value",
+            "regex",
+            "decimal_scale",
+            "max_values",
+            "text_max_length",
+            "validation_rule",
+            "nullable",
+            "choice_set_id",
+        )
+        if matches:
+            for key in immutable_fields:
+                desired = (
+                    row["key"]
+                    if key == "name"
+                    else (
+                        options["choice_set"].pk
+                        if key == "choice_set_id" and options["choice_set"]
+                        else options.get(key)
+                    )
+                )
+                current = field.choice_set_id if key == "choice_set_id" else getattr(field, key)
+                if current != desired:
+                    raise ValueError(f"Core field semantics differ for identity: {row['key']}")
+            for key in ("label", "help_text", "required", "mappings", "management_kind", "version", "lifecycle"):
+                setattr(field, key, options[key])
+            field.save(
+                update_fields=["label", "help_text", "required", "mappings", "management_kind", "version", "lifecycle"]
+            )
+        field.object_types.set(target_content_types)
+        custom_fields[row["key"]] = field
+    return custom_fields
+
+
+def _get_core_fieldset(slug, label):
+    matches = list(CustomFieldset.all_objects.filter(namespace="itambox", slug=slug))
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core fieldset identity: itambox/{slug}")
+    if matches and matches[0].deleted_at is not None:
+        raise ValueError(f"Core fieldset identity is reserved by a tombstone: itambox/{slug}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomFieldset.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomFieldset.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core fieldset identity has incompatible management or lifecycle: itambox/{slug}")
+    if matches:
+        return matches[0]
+    return CustomFieldset.objects.create(
+        namespace="itambox",
+        slug=slug,
+        label=label,
+        description=f"Normative {label.lower()} specification section.",
+        management_kind=CustomFieldset.MANAGEMENT_CORE,
+        version=1,
+        lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+    )
+
+
+def _reconcile_core_fieldsets(field_rows, fieldset_labels, custom_fields):
+    fieldsets = {}
+    for slug, label in fieldset_labels.items():
+        fieldset = _get_core_fieldset(slug, label)
+        fieldset.namespace = "itambox"
+        fieldset.slug = slug
+        fieldset.label = label
+        fieldset.description = f"Normative {label.lower()} specification section."
+        fieldset.management_kind = "core"
+        fieldset.version = 1
+        fieldset.lifecycle = "active"
+        fieldset.save()
+        expected_field_ids = {custom_fields[row["key"]].pk for row in field_rows if row["fieldset_slug"] == slug}
+        existing_field_ids = set(
+            CustomFieldsetField._base_manager.filter(fieldset=fieldset).values_list("custom_field_id", flat=True)
+        )
+        if existing_field_ids - expected_field_ids:
+            raise ValueError(f"Core fieldset has an unexpected membership: itambox/{slug}")
+        fieldset.field_memberships.all().delete()
+        CustomFieldsetField.objects.bulk_create(
+            [
+                CustomFieldsetField(
+                    fieldset=fieldset,
+                    custom_field=custom_fields[row["key"]],
+                    position=row["position"],
+                )
+                for row in field_rows
+                if row["fieldset_slug"] == slug
+            ]
+        )
+        fieldsets[slug] = fieldset
+    return fieldsets
+
+
+def _seed_core_category_defaults(category_fieldsets, categories, fieldsets):
+    for category_slug, fieldset_slugs in category_fieldsets.items():
+        category = categories[category_slug]
+        category.default_fieldset_memberships.all().delete()
+        CategoryDefaultFieldset.objects.bulk_create(
+            [
+                CategoryDefaultFieldset(category=category, fieldset=fieldsets[slug], position=index * 10)
+                for index, slug in enumerate(fieldset_slugs, start=1)
+            ]
+        )
+
+
+def _demo_operating_system_family(atype_slug):
+    if "macbook" in atype_slug or "mac-studio" in atype_slug:
+        return "macos"
+    if "iphone" in atype_slug:
+        return "ios"
+    if "ipad" in atype_slug:
+        return "ipados"
+    if "galaxy" in atype_slug:
+        return "android"
+    if atype_slug == "synology-ds1823xs":
+        return "embedded"
+    if atype_slug in ("dell-poweredge-r760", "hpe-proliant-dl380-g11"):
+        return "linux"
+    if atype_slug in ("cisco-catalyst-9300", "unifi-switch-pro-48", "meraki-mr46", "unifi-dream-machine-pro"):
+        return "network_os"
+    return "windows"
+
+
+def _translate_legacy_demo_specs(raw_specs):
+    specs = {}
+    if raw_specs.get("cpu"):
+        specs["processor_model"] = raw_specs["cpu"]
+    if "ram_gb" in raw_specs:
+        specs["memory_capacity"] = f"{float(raw_specs['ram_gb']):.3f}"
+    if "storage_gb" in raw_specs:
+        specs["storage_capacity"] = f"{float(raw_specs['storage_gb']):.3f}"
+    if "storage_type" in raw_specs:
+        specs["storage_medium"] = {
+            "NVMe": "nvme_ssd",
+            "SSD": "ssd",
+            "HDD": "hdd",
+            "SSD RAID": "ssd",
+            "SATA SSD": "ssd",
+        }.get(raw_specs["storage_type"], "other")
+    if "screen_size" in raw_specs:
+        specs["display_size"] = f"{float(raw_specs['screen_size']):.2f}"
+    if "port_count" in raw_specs:
+        specs["ethernet_port_count"] = int(raw_specs["port_count"])
+        specs["poe_port_count"] = int(raw_specs["port_count"])
+    if "poe_budget_w" in raw_specs:
+        specs["poe_budget"] = f"{float(raw_specs['poe_budget_w']):.3f}"
+    return specs
+
+
+def _add_default_demo_specs(specs, atype_slug, category_slug):
+    specs.setdefault(
+        "form_factor",
+        {
+            "laptops": "notebook",
+            "desktops": "desktop",
+            "servers": "rack",
+            "storage-devices": "appliance",
+            "mobile-phones": "phone",
+            "tablets": "tablet",
+            "network-devices": "appliance",
+            "monitors": "peripheral",
+            "conference-systems": "appliance",
+        }.get(category_slug, "other"),
+    )
+    if category_slug != "monitors":
+        specs.setdefault("operating_system_family", _demo_operating_system_family(atype_slug))
+    if category_slug in {"laptops", "desktops", "servers", "storage-devices"}:
+        specs.setdefault("memory_type", "ddr5")
+        specs.setdefault("ethernet_port_count", 1)
+        specs.setdefault("ethernet_speeds", ["1g"])
+        specs.setdefault("usb_port_count", 4)
+    elif category_slug in {"mobile-phones", "tablets"}:
+        specs.setdefault("memory_type", "lpddr5")
+        specs.setdefault("ethernet_port_count", 0)
+        specs.setdefault("ethernet_speeds", [])
+        specs.setdefault("usb_port_count", 1)
+    elif category_slug == "network-devices":
+        specs.setdefault("ethernet_speeds", ["10g", "1g"])
+        specs.setdefault("usb_port_count", 1)
+        specs.setdefault(
+            "network_functions",
+            {
+                "meraki-mr46": ["wlan_ap"],
+                "unifi-dream-machine-pro": ["firewall", "router"],
+            }.get(atype_slug, ["switch"] if "switch" in atype_slug else ["gateway"]),
+        )
+    if "wifi_standards" not in specs and category_slug in {"laptops", "desktops", "mobile-phones", "tablets"}:
+        specs["wifi_standards"] = ["802_11ac", "802_11ax"]
+    if "management_protocols" not in specs and category_slug in {
+        "laptops",
+        "desktops",
+        "servers",
+        "storage-devices",
+        "network-devices",
+    }:
+        specs["management_protocols"] = sorted(["https", "ssh"])
+    return specs
+
+
+def _canonical_demo_specs(raw_specs, atype_slug, category_slug):
+    specs = _translate_legacy_demo_specs(raw_specs)
+    return _add_default_demo_specs(specs, atype_slug, category_slug)
+
 
 class SeedCatalogMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_catalog(self):
         from assets.models import AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
-        from extras.models import CustomField, CustomFieldset, Tag
         from inventory.models import Accessory, Component, Consumable
         from software.models import Software
         from subscriptions.models import Provider
@@ -205,41 +599,9 @@ class SeedCatalogMixin:
             if self._demo_depreciation_afa is None:
                 self._demo_depreciation_afa = obj  # first entry = tenant default showcase
 
-        # Custom fields + fieldsets
-        cf_data = [
-            ("hostname", "Hostname", "text", False, None, False),
-            ("os_version", "OS Version", "text", False, None, False),
-            (
-                "department",
-                "Department",
-                "select",
-                False,
-                "Engineering\nFinance\nHR\nMarketing\nSales\nOperations\nResearch\nLegal",
-                False,
-            ),
-            ("encrypted", "Disk Encrypted", "boolean", False, None, False),
-            ("sim_number", "SIM Number", "text", False, None, False),
-            ("imei", "IMEI", "text", False, None, False),
-            ("ip_address", "IP Address", "text", False, None, False),
-            ("firmware_version", "Firmware Version", "text", False, None, False),
-            ("port_count", "Port Count", "number", False, None, True),
-            ("poe_budget_w", "PoE Budget (Watts)", "number", False, None, True),
-            ("screen_size", "Screen Size (inches)", "number", False, None, True),
-            (
-                "mounted_state",
-                "Mounted State",
-                "select",
-                False,
-                "Wall-Mounted\nCeiling-Mounted\nTable-Top\nMobile-Stand",
-                False,
-            ),
-            ("cpu", "CPU Model", "text", False, None, True),
-            ("ram_gb", "RAM (GB)", "number", False, None, True),
-            ("storage_gb", "Storage (GB)", "number", False, None, True),
-            ("storage_type", "Storage Type", "select", False, "NVMe\nSSD\nHDD\nSSD RAID\nSATA SSD", True),
-            ("gpu", "GPU Model", "text", False, None, True),
-            ("cpu_architecture", "CPU Architecture", "select", False, "x86_64\nARM64", True),
-        ]
+        # Normative core vocabulary.  These are global, managed definitions: the
+        # demo seed must exercise the same identities, scopes, types, choice sets,
+        # canonical units, and validation metadata that the final #479 contract uses.
         from django.contrib.contenttypes.models import ContentType
 
         from assets.models import Asset as AssetModel
@@ -248,46 +610,866 @@ class SeedCatalogMixin:
         asset_ct = ContentType.objects.get_for_model(AssetModel)
         assettype_ct = ContentType.objects.get_for_model(AssetTypeModel)
 
-        self._custom_fields = {}
-        for name, label, ftype, required, choices, model_level in cf_data:
-            obj, _ = CustomField.objects.get_or_create(
-                name=name,
-                defaults={"label": label, "field_type": ftype, "required": required, "choices": choices or ""},
-            )
-            # model_level=True described the hardware type (a spec); otherwise
-            # the field is a per-device detail on the asset.
-            obj.object_types.add(assettype_ct if model_level else asset_ct)
-            self._custom_fields[name] = obj
+        choice_set_data = {
+            "form-factor": (
+                "Form factor",
+                [
+                    ("desktop", "Desktop"),
+                    ("notebook", "Notebook"),
+                    ("tablet", "Tablet"),
+                    ("phone", "Phone"),
+                    ("rack", "Rack"),
+                    ("tower", "Tower"),
+                    ("blade", "Blade"),
+                    ("appliance", "Appliance"),
+                    ("peripheral", "Peripheral"),
+                    ("module", "Module"),
+                    ("other", "Other"),
+                ],
+            ),
+            "memory-type": (
+                "Memory type",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("ddr3", "DDR3"),
+                        ("ddr4", "DDR4"),
+                        ("ddr5", "DDR5"),
+                        ("lpddr4x", "LPDDR4X"),
+                        ("lpddr5", "LPDDR5"),
+                        ("lpddr5x", "LPDDR5X"),
+                        ("hbm2", "HBM2"),
+                        ("hbm3", "HBM3"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "storage-medium": (
+                "Storage medium",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("hdd", "Hard disk drive"),
+                        ("ssd", "Solid-state drive"),
+                        ("nvme_ssd", "NVMe solid-state drive"),
+                        ("flash", "Flash"),
+                        ("optical", "Optical"),
+                        ("tape", "Tape"),
+                        ("hybrid", "Hybrid"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "ethernet-speeds": (
+                "Ethernet speeds",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("10m", "10 Mbit/s"),
+                        ("100m", "100 Mbit/s"),
+                        ("1g", "1 Gbit/s"),
+                        ("2_5g", "2.5 Gbit/s"),
+                        ("5g", "5 Gbit/s"),
+                        ("10g", "10 Gbit/s"),
+                        ("25g", "25 Gbit/s"),
+                        ("40g", "40 Gbit/s"),
+                        ("50g", "50 Gbit/s"),
+                        ("100g", "100 Gbit/s"),
+                        ("200g", "200 Gbit/s"),
+                        ("400g", "400 Gbit/s"),
+                    ]
+                ],
+            ),
+            "wifi-standards": (
+                "Wi-Fi standards",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("802_11a", "802.11a"),
+                        ("802_11b", "802.11b"),
+                        ("802_11g", "802.11g"),
+                        ("802_11n", "802.11n"),
+                        ("802_11ac", "802.11ac"),
+                        ("802_11ax", "802.11ax"),
+                        ("802_11be", "802.11be"),
+                    ]
+                ],
+            ),
+            "network-functions": (
+                "Network functions",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("switch", "Switch"),
+                        ("router", "Router"),
+                        ("firewall", "Firewall"),
+                        ("wlan_ap", "WLAN access point"),
+                        ("wlan_controller", "WLAN controller"),
+                        ("load_balancer", "Load balancer"),
+                        ("vpn_gateway", "VPN gateway"),
+                        ("modem", "Modem"),
+                        ("gateway", "Gateway"),
+                        ("bridge", "Bridge"),
+                    ]
+                ],
+            ),
+            "print-technology": (
+                "Print technology",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("laser", "Laser"),
+                        ("inkjet", "Inkjet"),
+                        ("thermal", "Thermal"),
+                        ("dot_matrix", "Dot matrix"),
+                        ("dye_sublimation", "Dye sublimation"),
+                        ("solid_ink", "Solid ink"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "operating-system-family": (
+                "Operating system family",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("windows", "Windows"),
+                        ("windows_server", "Windows Server"),
+                        ("macos", "macOS"),
+                        ("linux", "Linux"),
+                        ("chromeos", "ChromeOS"),
+                        ("ios", "iOS"),
+                        ("ipados", "iPadOS"),
+                        ("android", "Android"),
+                        ("bsd", "BSD"),
+                        ("network_os", "Network OS"),
+                        ("embedded", "Embedded"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "management-protocols": (
+                "Management protocols",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("https", "HTTPS"),
+                        ("ssh", "SSH"),
+                        ("snmpv1", "SNMPv1"),
+                        ("snmpv2c", "SNMPv2c"),
+                        ("snmpv3", "SNMPv3"),
+                        ("redfish", "Redfish"),
+                        ("ipmi", "IPMI"),
+                        ("wsman", "WS-Man"),
+                        ("rest", "REST"),
+                        ("graphql", "GraphQL"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "sensor-types": (
+                "Sensor types",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("temperature", "Temperature"),
+                        ("humidity", "Humidity"),
+                        ("pressure", "Pressure"),
+                        ("light", "Light"),
+                        ("motion", "Motion"),
+                        ("vibration", "Vibration"),
+                        ("current", "Current"),
+                        ("voltage", "Voltage"),
+                        ("power", "Power"),
+                        ("energy", "Energy"),
+                        ("flow", "Flow"),
+                        ("level", "Level"),
+                        ("gas", "Gas"),
+                        ("smoke", "Smoke"),
+                        ("position", "Position"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "industrial-protocols": (
+                "Industrial protocols",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("modbus_rtu", "Modbus RTU"),
+                        ("modbus_tcp", "Modbus TCP"),
+                        ("profinet", "PROFINET"),
+                        ("profibus", "PROFIBUS"),
+                        ("ethernet_ip", "EtherNet/IP"),
+                        ("ethercat", "EtherCAT"),
+                        ("bacnet_ip", "BACnet/IP"),
+                        ("opc_ua", "OPC UA"),
+                        ("canopen", "CANopen"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "regulatory-certifications": (
+                "Regulatory certifications",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("ce", "CE"),
+                        ("fcc", "FCC"),
+                        ("ul", "UL"),
+                        ("csa", "CSA"),
+                        ("ukca", "UKCA"),
+                        ("vcci", "VCCI"),
+                        ("rcm", "RCM"),
+                        ("eac", "EAC"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+            "energy-certifications": (
+                "Energy certifications",
+                [
+                    (key, label)
+                    for key, label in [
+                        ("energy_star", "ENERGY STAR"),
+                        ("epeat_bronze", "EPEAT Bronze"),
+                        ("epeat_silver", "EPEAT Silver"),
+                        ("epeat_gold", "EPEAT Gold"),
+                        ("80plus", "80 PLUS"),
+                        ("80plus_bronze", "80 PLUS Bronze"),
+                        ("80plus_silver", "80 PLUS Silver"),
+                        ("80plus_gold", "80 PLUS Gold"),
+                        ("80plus_platinum", "80 PLUS Platinum"),
+                        ("80plus_titanium", "80 PLUS Titanium"),
+                        ("other", "Other"),
+                    ]
+                ],
+            ),
+        }
+        self._choice_sets = _reconcile_core_choice_sets(choice_set_data)
 
-        def fieldset(name, *field_names):
-            fs, _ = CustomFieldset.objects.get_or_create(name=name)
-            fs.fields.set([self._custom_fields[f] for f in field_names])
-            return fs
+        def field_definition(
+            key,
+            label,
+            scope,
+            field_type,
+            fieldset_slug,
+            position,
+            *,
+            quantity_kind=None,
+            canonical_unit=None,
+            minimum_value=None,
+            maximum_value=None,
+            regex=None,
+            decimal_scale=None,
+            max_values=None,
+            text_max_length=None,
+            choice_set=None,
+            validation_rule=None,
+        ):
+            return {
+                "key": key,
+                "label": label,
+                "scope": scope,
+                "field_type": field_type,
+                "fieldset_slug": fieldset_slug,
+                "position": position,
+                "quantity_kind": quantity_kind,
+                "canonical_unit": canonical_unit,
+                "minimum_value": minimum_value,
+                "maximum_value": maximum_value,
+                "regex": regex,
+                "decimal_scale": decimal_scale,
+                "max_values": max_values,
+                "text_max_length": text_max_length,
+                "choice_set": choice_set,
+                "validation_rule": validation_rule,
+            }
 
-        self._fs_laptop = fieldset(
-            "Laptop / Workstation Specs",
-            "cpu",
-            "ram_gb",
-            "storage_gb",
-            "storage_type",
-            "gpu",
-            "cpu_architecture",
-            "hostname",
-            "os_version",
-            "encrypted",
-            "department",
-        )
-        self._fs_mobile = fieldset(
-            "Mobile Device Specs", "cpu", "ram_gb", "storage_gb", "screen_size", "os_version", "sim_number", "imei"
-        )
-        self._fs_server = fieldset(
-            "Server Specs", "cpu", "ram_gb", "storage_gb", "storage_type", "hostname", "os_version"
-        )
-        self._fs_switch = fieldset(
-            "Network Device Specs", "port_count", "poe_budget_w", "hostname", "ip_address", "firmware_version"
-        )
-        self._fs_av = fieldset("AV & Conference Specs", "screen_size", "mounted_state")
+        field_rows = [
+            field_definition(
+                "form_factor",
+                "Form factor",
+                "asset_type",
+                "single-select",
+                "product-physical",
+                10,
+                choice_set="form-factor",
+                max_values=1,
+            ),
+            field_definition(
+                "rack_units",
+                "Rack units",
+                "asset_type",
+                "decimal",
+                "product-physical",
+                20,
+                quantity_kind="length",
+                canonical_unit="U",
+                minimum_value="0",
+                maximum_value="100",
+                decimal_scale=1,
+            ),
+            field_definition(
+                "weight",
+                "Weight",
+                "asset_type",
+                "decimal",
+                "product-physical",
+                30,
+                quantity_kind="mass",
+                canonical_unit="kg",
+                minimum_value="0",
+                maximum_value="100000",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "ip_rating",
+                "IP rating",
+                "asset_type",
+                "text",
+                "product-physical",
+                40,
+                regex=r"^IP[0-6X][0-9X]K?$",
+                text_max_length=8,
+            ),
+            field_definition(
+                "processor_model", "Processor model", "both", "text", "compute-memory", 10, text_max_length=255
+            ),
+            field_definition(
+                "core_count",
+                "Core count",
+                "both",
+                "integer",
+                "compute-memory",
+                20,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="1048576",
+            ),
+            field_definition(
+                "memory_capacity",
+                "Memory capacity",
+                "both",
+                "decimal",
+                "compute-memory",
+                30,
+                quantity_kind="digital_information",
+                canonical_unit="GiB",
+                minimum_value="0",
+                maximum_value="1048576",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "memory_type",
+                "Memory type",
+                "both",
+                "single-select",
+                "compute-memory",
+                40,
+                choice_set="memory-type",
+                max_values=1,
+            ),
+            field_definition(
+                "storage_capacity",
+                "Storage capacity",
+                "both",
+                "decimal",
+                "storage",
+                10,
+                quantity_kind="digital_information",
+                canonical_unit="GiB",
+                minimum_value="0",
+                maximum_value="1073741824",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "storage_medium",
+                "Storage medium",
+                "both",
+                "single-select",
+                "storage",
+                20,
+                choice_set="storage-medium",
+                max_values=1,
+            ),
+            field_definition(
+                "drive_bay_count",
+                "Drive bay count",
+                "asset_type",
+                "integer",
+                "storage",
+                30,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="65535",
+            ),
+            field_definition("hot_swap_supported", "Hot-swap storage", "asset_type", "boolean", "storage", 40),
+            field_definition(
+                "ethernet_port_count",
+                "Ethernet port count",
+                "asset_type",
+                "integer",
+                "connectivity-io",
+                10,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="65535",
+            ),
+            field_definition(
+                "ethernet_speeds",
+                "Ethernet speeds",
+                "asset_type",
+                "multi-select",
+                "connectivity-io",
+                20,
+                choice_set="ethernet-speeds",
+                max_values=16,
+            ),
+            field_definition(
+                "wifi_standards",
+                "Wi-Fi standards",
+                "asset_type",
+                "multi-select",
+                "connectivity-io",
+                30,
+                choice_set="wifi-standards",
+                max_values=8,
+            ),
+            field_definition(
+                "usb_port_count",
+                "USB port count",
+                "asset_type",
+                "integer",
+                "connectivity-io",
+                40,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="1024",
+            ),
+            field_definition(
+                "network_functions",
+                "Network functions",
+                "asset_type",
+                "multi-select",
+                "network-function",
+                10,
+                choice_set="network-functions",
+                max_values=10,
+            ),
+            field_definition(
+                "switching_capacity",
+                "Switching capacity",
+                "asset_type",
+                "decimal",
+                "network-function",
+                20,
+                quantity_kind="data_rate",
+                canonical_unit="Gbit/s",
+                minimum_value="0",
+                maximum_value="1000000000",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "poe_port_count",
+                "PoE port count",
+                "asset_type",
+                "integer",
+                "network-function",
+                30,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="65535",
+            ),
+            field_definition(
+                "poe_budget",
+                "PoE budget",
+                "asset_type",
+                "decimal",
+                "network-function",
+                40,
+                quantity_kind="power",
+                canonical_unit="W",
+                minimum_value="0",
+                maximum_value="10000000",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "input_voltage",
+                "Input voltage",
+                "asset_type",
+                "decimal",
+                "power-battery",
+                10,
+                quantity_kind="voltage",
+                canonical_unit="V",
+                minimum_value="0",
+                maximum_value="1000000",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "power_consumption_max",
+                "Maximum power consumption",
+                "asset_type",
+                "decimal",
+                "power-battery",
+                20,
+                quantity_kind="power",
+                canonical_unit="W",
+                minimum_value="0",
+                maximum_value="100000000",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "battery_capacity",
+                "Battery capacity",
+                "both",
+                "decimal",
+                "power-battery",
+                30,
+                quantity_kind="energy",
+                canonical_unit="Wh",
+                minimum_value="0",
+                maximum_value="10000000",
+                decimal_scale=3,
+            ),
+            field_definition(
+                "battery_runtime",
+                "Battery runtime",
+                "both",
+                "integer",
+                "power-battery",
+                40,
+                quantity_kind="duration",
+                canonical_unit="min",
+                minimum_value="0",
+                maximum_value="5256000",
+            ),
+            field_definition(
+                "display_size",
+                "Display size",
+                "asset_type",
+                "decimal",
+                "display-av-imaging",
+                10,
+                quantity_kind="length",
+                canonical_unit="in",
+                minimum_value="0",
+                maximum_value="1000",
+                decimal_scale=2,
+            ),
+            field_definition(
+                "display_resolution",
+                "Display resolution",
+                "asset_type",
+                "text",
+                "display-av-imaging",
+                20,
+                regex=r"^[1-9][0-9]{1,4}x[1-9][0-9]{1,4}$",
+                text_max_length=11,
+            ),
+            field_definition("touch_supported", "Touch supported", "asset_type", "boolean", "display-av-imaging", 30),
+            field_definition(
+                "camera_resolution",
+                "Camera resolution",
+                "asset_type",
+                "decimal",
+                "display-av-imaging",
+                40,
+                quantity_kind="resolution",
+                canonical_unit="MP",
+                minimum_value="0",
+                maximum_value="10000",
+                decimal_scale=2,
+            ),
+            field_definition(
+                "print_technology",
+                "Print technology",
+                "asset_type",
+                "single-select",
+                "print-scan",
+                10,
+                choice_set="print-technology",
+                max_values=1,
+            ),
+            field_definition("color_supported", "Color printing", "asset_type", "boolean", "print-scan", 20),
+            field_definition("duplex_supported", "Duplex printing", "asset_type", "boolean", "print-scan", 30),
+            field_definition(
+                "print_speed",
+                "Print speed",
+                "asset_type",
+                "decimal",
+                "print-scan",
+                40,
+                quantity_kind="rate",
+                canonical_unit="pages_per_minute",
+                minimum_value="0",
+                maximum_value="100000",
+                decimal_scale=2,
+            ),
+            field_definition(
+                "operating_system_family",
+                "Operating system family",
+                "both",
+                "single-select",
+                "management-security",
+                10,
+                choice_set="operating-system-family",
+                max_values=1,
+            ),
+            field_definition(
+                "management_protocols",
+                "Management protocols",
+                "asset_type",
+                "multi-select",
+                "management-security",
+                20,
+                choice_set="management-protocols",
+                max_values=16,
+            ),
+            field_definition(
+                "hostname",
+                "Hostname",
+                "asset",
+                "text",
+                "management-security",
+                30,
+                text_max_length=253,
+                validation_rule="rfc1123_hostname",
+            ),
+            field_definition(
+                "firmware_version", "Firmware version", "asset", "text", "management-security", 40, text_max_length=255
+            ),
+            field_definition(
+                "operating_temperature_min",
+                "Minimum operating temperature",
+                "asset_type",
+                "decimal",
+                "environmental-ruggedization",
+                10,
+                quantity_kind="temperature",
+                canonical_unit="°C",
+                minimum_value="-273.15",
+                maximum_value="1000",
+                decimal_scale=2,
+            ),
+            field_definition(
+                "operating_temperature_max",
+                "Maximum operating temperature",
+                "asset_type",
+                "decimal",
+                "environmental-ruggedization",
+                20,
+                quantity_kind="temperature",
+                canonical_unit="°C",
+                minimum_value="-273.15",
+                maximum_value="1000",
+                decimal_scale=2,
+                validation_rule="temperature_max_gte_min",
+            ),
+            field_definition(
+                "outdoor_rated", "Outdoor rated", "asset_type", "boolean", "environmental-ruggedization", 30
+            ),
+            field_definition(
+                "acoustic_level",
+                "Acoustic level",
+                "asset_type",
+                "decimal",
+                "environmental-ruggedization",
+                40,
+                quantity_kind="sound_pressure",
+                canonical_unit="dBA",
+                minimum_value="0",
+                maximum_value="250",
+                decimal_scale=2,
+            ),
+            field_definition(
+                "sensor_types",
+                "Sensor types",
+                "asset_type",
+                "multi-select",
+                "sensors-control",
+                10,
+                choice_set="sensor-types",
+                max_values=32,
+            ),
+            field_definition(
+                "analog_input_count",
+                "Analog input count",
+                "asset_type",
+                "integer",
+                "sensors-control",
+                20,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="65535",
+            ),
+            field_definition(
+                "digital_input_count",
+                "Digital input count",
+                "asset_type",
+                "integer",
+                "sensors-control",
+                30,
+                quantity_kind="count",
+                minimum_value="0",
+                maximum_value="65535",
+            ),
+            field_definition(
+                "industrial_protocols",
+                "Industrial protocols",
+                "asset_type",
+                "multi-select",
+                "sensors-control",
+                40,
+                choice_set="industrial-protocols",
+                max_values=16,
+            ),
+            field_definition(
+                "regulatory_certifications",
+                "Regulatory certifications",
+                "asset_type",
+                "multi-select",
+                "compliance-sustainability",
+                10,
+                choice_set="regulatory-certifications",
+                max_values=16,
+            ),
+            field_definition(
+                "rohs_compliant", "RoHS compliant", "asset_type", "boolean", "compliance-sustainability", 20
+            ),
+            field_definition(
+                "energy_certifications",
+                "Energy certifications",
+                "asset_type",
+                "multi-select",
+                "compliance-sustainability",
+                30,
+                choice_set="energy-certifications",
+                max_values=16,
+            ),
+            field_definition(
+                "country_of_origin",
+                "Country of origin",
+                "asset_type",
+                "text",
+                "compliance-sustainability",
+                40,
+                regex=r"^[A-Z]{2}$",
+                text_max_length=2,
+            ),
+        ]
 
+        if len(field_rows) != 48:
+            raise ValueError("The normative core vocabulary must contain exactly 48 fields.")
+        self._custom_fields = _reconcile_core_fields(field_rows, self._choice_sets, asset_ct, assettype_ct)
+
+        fieldset_labels = {
+            "product-physical": "Product and Physical",
+            "compute-memory": "Compute and Memory",
+            "storage": "Storage",
+            "connectivity-io": "Connectivity and I/O",
+            "network-function": "Network Function",
+            "power-battery": "Power and Battery",
+            "display-av-imaging": "Display, AV and Imaging",
+            "print-scan": "Print and Scan",
+            "management-security": "Management and Security",
+            "environmental-ruggedization": "Environmental and Ruggedization",
+            "sensors-control": "Sensors and Control",
+            "compliance-sustainability": "Compliance and Sustainability",
+        }
+        self._fieldsets = _reconcile_core_fieldsets(field_rows, fieldset_labels, self._custom_fields)
+
+        # Keep these handles for the existing asset-type data table while the
+        # actual composition below is driven only by the plural through model.
+        self._fs_laptop = self._fieldsets["compute-memory"]
+        self._fs_mobile = self._fieldsets["compute-memory"]
+        self._fs_server = self._fieldsets["compute-memory"]
+        self._fs_switch = self._fieldsets["network-function"]
+        self._fs_av = self._fieldsets["display-av-imaging"]
+
+        self._category_fieldsets = {
+            "laptops": [
+                "product-physical",
+                "compute-memory",
+                "storage",
+                "connectivity-io",
+                "display-av-imaging",
+                "management-security",
+                "compliance-sustainability",
+            ],
+            "desktops": [
+                "product-physical",
+                "compute-memory",
+                "storage",
+                "connectivity-io",
+                "management-security",
+                "compliance-sustainability",
+            ],
+            "servers": [
+                "product-physical",
+                "compute-memory",
+                "storage",
+                "connectivity-io",
+                "network-function",
+                "power-battery",
+                "management-security",
+                "compliance-sustainability",
+            ],
+            "storage-devices": [
+                "product-physical",
+                "compute-memory",
+                "storage",
+                "connectivity-io",
+                "power-battery",
+                "management-security",
+                "compliance-sustainability",
+            ],
+            "mobile-phones": [
+                "product-physical",
+                "compute-memory",
+                "storage",
+                "connectivity-io",
+                "power-battery",
+                "display-av-imaging",
+                "management-security",
+                "compliance-sustainability",
+            ],
+            "tablets": [
+                "product-physical",
+                "compute-memory",
+                "storage",
+                "connectivity-io",
+                "power-battery",
+                "display-av-imaging",
+                "management-security",
+                "compliance-sustainability",
+            ],
+            "network-devices": [
+                "product-physical",
+                "connectivity-io",
+                "network-function",
+                "power-battery",
+                "management-security",
+                "environmental-ruggedization",
+                "compliance-sustainability",
+            ],
+            "monitors": [
+                "product-physical",
+                "connectivity-io",
+                "power-battery",
+                "display-av-imaging",
+                "compliance-sustainability",
+            ],
+            "conference-systems": [
+                "product-physical",
+                "connectivity-io",
+                "power-battery",
+                "display-av-imaging",
+                "management-security",
+                "compliance-sustainability",
+            ],
+        }
         # Categories — (slug, color). Every category ships a distinct colour so
         # the colour-chipped category cells (asset / asset-type lists, etc.)
         # always render a swatch instead of a blank.
@@ -333,6 +1515,8 @@ class SeedCatalogMixin:
                 obj.color = color
                 obj.save(update_fields=["color"])
             self._categories[slug] = obj
+
+        _seed_core_category_defaults(self._category_fieldsets, self._categories, self._fieldsets)
 
         # Asset types: (model, slug, mfr, part_number, eol_months, fieldset, depreciation, category, role, specs)
         at_data = [
@@ -669,8 +1853,10 @@ class SeedCatalogMixin:
                 {"screen_size": 0},
             ),
         ]
+
         self._asset_types = {}
-        for model_name, slug, mfr, part, eol, fs, dep, cat, role, specs in at_data:
+        for model_name, slug, mfr, part, eol, _legacy_fs, dep, cat, role, raw_specs in at_data:
+            specs = _canonical_demo_specs(raw_specs, slug, cat)
             obj, _ = AssetType.objects.get_or_create(
                 slug=slug,
                 defaults={
@@ -678,12 +1864,32 @@ class SeedCatalogMixin:
                     "manufacturer": self._manufacturers[mfr],
                     "part_number": part,
                     "eol_months": eol,
-                    "custom_fieldset": fs,
                     "depreciation": self._depreciations[dep],
                     "category": self._categories[cat],
                     "asset_role": self._asset_roles[role],
                     "custom_field_data": specs,
+                    "management_kind": AssetType.MANAGEMENT_LOCAL,
+                    "region": "",
+                    "configuration": "",
+                    "library": None,
+                    "library_definition_key": None,
+                    "library_release": None,
                 },
+            )
+            obj.custom_field_data = specs
+            obj.management_kind = AssetType.MANAGEMENT_LOCAL
+            obj.region = ""
+            obj.configuration = ""
+            obj.library = None
+            obj.library_definition_key = None
+            obj.library_release = None
+            obj.save()
+            obj.fieldset_memberships.all().delete()
+            AssetTypeFieldset.objects.bulk_create(
+                [
+                    AssetTypeFieldset(asset_type=obj, fieldset=self._fieldsets[fieldset_slug], position=index * 10)
+                    for index, fieldset_slug in enumerate(self._category_fieldsets[cat], start=1)
+                ]
             )
             self._asset_types[slug] = obj
 

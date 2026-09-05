@@ -198,8 +198,8 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 28)
-        self.assertEqual(len(manifest["post_transition_leaf_ids"]), 8)
+        self.assertEqual(len(manifest["post_transition_ids"]), 44)
+        self.assertEqual(len(manifest["post_transition_leaf_ids"]), 7)
         self.assertEqual(manifest["baseline_ids"], manifest["replacement_ids"])
 
     def test_checked_manifest_rejects_malformed_shape(self):
