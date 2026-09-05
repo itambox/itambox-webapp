@@ -22,7 +22,7 @@ def _check_identity_duplicates(model, fields, db_alias):
         .annotate(identity_count=Count("pk"))
         .filter(identity_count__gt=1)
     )
-    first = duplicate_groups.first()
+    first = duplicate_groups.order_by(*identity_fields).first()
     if first is not None:
         _fail("ambiguous_identity", f"{model._meta.db_table}:{fields}:{first}")
 
@@ -365,6 +365,7 @@ DROP FUNCTION IF EXISTS extras_permanent_definition_delete_guard();
 class Migration(migrations.Migration):
     dependencies = [
         ("extras", "0117_alter_customfieldchoice_choice_set_and_more"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [

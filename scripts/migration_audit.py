@@ -30,6 +30,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0111_alter_categorydefaultfieldset_category",
     "assets.0112_alter_assettype_library_definition_key_and_more",
     "assets.0113_assettype_library_identity_immutable",
+    "assets.0114_issue479_t06_composition_schema",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -52,6 +53,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0115_asset_type_fieldset_cutover",
     "extras.0116_alter_customfield_lifecycle_and_more",
     "extras.0117_alter_customfieldchoice_choice_set_and_more",
+    "extras.0118_issue479_t06_definition_schema",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -323,6 +325,20 @@ SEMANTIC_DISPOSITIONS = {
         "library release/checksum reconciliation-state changes to the controlled reconciliation path, "
         "including for QuerySet and direct SQL updates.",
         {"assets.0113_assettype_library_identity_immutable"},
+    ),
+    **_dispositions(
+        "required-fresh",
+        "Installs PostgreSQL guards for permanent reusable-definition identities and rejects global-field fieldset membership through direct SQL or ORM writes.",
+        {
+            "extras.0118_issue479_t06_definition_schema",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        "Normalizes predecessor composition positions to dense one-based ordinals and installs deferred owner/position uniqueness.",
+        {
+            "assets.0114_issue479_t06_composition_schema",
+        },
     ),
 }
 
