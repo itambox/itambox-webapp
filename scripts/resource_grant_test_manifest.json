@@ -7,7 +7,7 @@
     "itambox/assets/tests/test_ean.py",
     "itambox/assets/tests/test_existing.py",
     "itambox/core/tests/test_context_isolation.py",
- "itambox/core/tests/test_csv_import_error_contracts.py",
+    "itambox/core/tests/test_csv_import_error_contracts.py",
     "itambox/core/tests/test_delivery_contracts.py",
     "itambox/core/tests/test_e2e_workflow.py",
     "itambox/core/tests/test_global_label_template_permissions.py",
@@ -138,7 +138,8 @@
     "itambox/extras/tests/test_definition_forms.py",
     "itambox/extras/tests/test_existing.py",
     "itambox/extras/tests/test_filters.py",
-    "itambox/assets/tests/test_specification_contract_fixtures.py"
+    "itambox/assets/tests/test_specification_contract_fixtures.py",
+    "itambox/assets/tests/test_specification_service_namespace.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -149,7 +150,7 @@
     "itambox/assets/tests/test_ean.py",
     "itambox/assets/tests/test_existing.py",
     "itambox/core/tests/test_context_isolation.py",
- "itambox/core/tests/test_csv_import_error_contracts.py",
+    "itambox/core/tests/test_csv_import_error_contracts.py",
     "itambox/core/tests/test_delivery_contracts.py",
     "itambox/core/tests/test_e2e_workflow.py",
     "itambox/core/tests/test_global_label_template_permissions.py",
@@ -281,7 +282,8 @@
     "itambox/extras/tests/test_definition_forms.py",
     "itambox/extras/tests/test_existing.py",
     "itambox/extras/tests/test_filters.py",
-    "itambox/assets/tests/test_specification_contract_fixtures.py"
+    "itambox/assets/tests/test_specification_contract_fixtures.py",
+    "itambox/assets/tests/test_specification_service_namespace.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
