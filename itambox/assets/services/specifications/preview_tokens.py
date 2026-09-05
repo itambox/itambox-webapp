@@ -28,10 +28,10 @@ PREVIEW_TOKEN_PURPOSE = "asset-specification-preview"
 PREVIEW_TOKEN_FORMAT_VERSION = 1
 PREVIEW_TOKEN_LIFETIME_SECONDS = 30 * 60
 MAX_PREVIEW_TOKEN_LENGTH = 8192
-MAX_NORMALIZED_INPUT_BYTES = 64 * 1024
+MAX_NORMALIZED_INPUT_BYTES = 10 * 1024 * 1024
 MAX_NORMALIZED_INPUT_DEPTH = 16
 MAX_NORMALIZED_INPUT_ITEMS = 512
-MAX_NORMALIZED_INPUT_NODES = 2048
+MAX_NORMALIZED_INPUT_NODES = 65536
 MAX_NORMALIZED_INPUT_STRING_LENGTH = 4096
 MAX_CLAIM_STRING_LENGTH = 512
 
@@ -158,7 +158,7 @@ def normalized_input_digest(value: object) -> str:
     try:
         encoded = json.dumps(
             envelope,
-            ensure_ascii=True,
+            ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
             allow_nan=False,

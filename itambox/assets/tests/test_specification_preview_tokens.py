@@ -209,6 +209,27 @@ class PreviewTokenKernelTests(unittest.TestCase):
             normalized_input_digest({"too_long": "x" * 5000})
         self._assert_stale("x" * (MAX_PREVIEW_TOKEN_LENGTH + 1))
 
+    def test_digest_accepts_full_effective_field_text_envelope(self):
+        normalized = {
+            "patch": {
+                "set": [{"field_key": f"field_{index}", "value": "🧪" * 4096} for index in range(512)],
+                "clear": [],
+            }
+        }
+        self.assertEqual(len(normalized_input_digest(normalized)), 64)
+
+    def test_digest_accepts_full_effective_field_multiselect_envelope(self):
+        normalized = {
+            "patch": {
+                "set": [
+                    {"field_key": f"field_{index}", "value": [f"choice_{choice:02}" for choice in range(64)]}
+                    for index in range(512)
+                ],
+                "clear": [],
+            }
+        }
+        self.assertEqual(len(normalized_input_digest(normalized)), 64)
+
     def test_key_is_required_and_never_uses_a_test_or_settings_fallback(self):
         with self.assertRaises(TypeError):
             issue_preview_token(self._expectation(), now=TEST_NOW)  # type: ignore[call-arg]
