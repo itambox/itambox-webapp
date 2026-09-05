@@ -20,7 +20,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from core import tenant_scope as _tenant_scope
-from organization.models import Membership, RoleGrant, Tenant, TenantGroup
+from organization.models import Membership, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from users.models import GroupMembership, UserGroup
 
 logger = logging.getLogger(__name__)

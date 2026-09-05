@@ -52,7 +52,7 @@ class SpecificationAccessScopeTests(TestCase):
         self.role = Role.objects.create(
             tenant=self.provider,
             name="Scope reader",
-            permissions=["assets.view_asset", "assets.change_asset"],
+            permissions=["assets.view_asset"],
         )
 
     def _actor(self, user=None):
@@ -253,6 +253,22 @@ class SpecificationAccessScopeTests(TestCase):
     def test_fingerprint_changes_for_required_permission_and_selector(self):
         self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.tenant_a)
         self._grant(scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.tenant_b)
+        editor_role = Role.objects.create(
+            tenant=self.provider,
+            name="Scope editor",
+            permissions=["assets.change_asset"],
+        )
+        editor_grant = RoleGrant.objects.create(
+            membership=self.membership,
+            role=editor_role,
+            reason="Temporary specification test access",
+            valid_until=timezone.now() + timedelta(hours=1),
+        )
+        RoleGrantScope.objects.create(
+            role_grant=editor_grant,
+            scope_type=RoleGrantScope.SCOPE_TENANT,
+            tenant=self.tenant_a,
+        )
         first = resolve_access_scope(self._request(tenant_id=TenantId(self.tenant_a.pk)))
         second = resolve_access_scope(
             self._request(
