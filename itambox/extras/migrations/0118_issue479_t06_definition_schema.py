@@ -133,7 +133,7 @@ def _preflight_lifecycle_and_identity(apps, db_alias):
                     _fail("ambiguous_deprecation_timestamp", f"{model.__name__}:{definition.pk}")
 
 
-def _preflight_and_backfill(apps, schema_editor):
+def _preflight(apps, schema_editor):
     db_alias = schema_editor.connection.alias
     _preflight_applicability(apps, db_alias)
     _preflight_lifecycle_and_identity(apps, db_alias)
@@ -152,6 +152,9 @@ def _preflight_and_backfill(apps, schema_editor):
         db_alias,
     )
 
+
+def _backfill(apps, schema_editor):
+    db_alias = schema_editor.connection.alias
     CustomField = apps.get_model("extras", "CustomField")
     CustomFieldsetField = apps.get_model("extras", "CustomFieldsetField")
     now = timezone.now()
@@ -174,6 +177,11 @@ def _preflight_and_backfill(apps, schema_editor):
                 lifecycle="deprecated",
                 deprecated_at=deprecated_at,
             )
+
+
+def _make_constraints_immediate(apps, schema_editor):
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 def _renumber_positions(model, owner_field, member_sort_fields, db_alias):
@@ -380,7 +388,7 @@ class Migration(migrations.Migration):
                 verbose_name="Activation",
             ),
         ),
-        migrations.RunPython(_preflight_and_backfill, reverse_code=refuse_reverse),
+        migrations.RunPython(_preflight, reverse_code=refuse_reverse),
         migrations.RemoveConstraint(
             model_name="customfieldchoice",
             name="unique_customfieldchoice_position",
@@ -389,11 +397,13 @@ class Migration(migrations.Migration):
             model_name="customfieldsetfield",
             name="unique_customfieldset_position",
         ),
-        migrations.RunPython(_renumber_definition_positions, reverse_code=refuse_reverse),
         migrations.RemoveConstraint(
             model_name="customfieldchoice",
             name="customfieldchoice_position_range",
         ),
+        migrations.RunPython(_backfill, reverse_code=refuse_reverse),
+        migrations.RunPython(_renumber_definition_positions, reverse_code=refuse_reverse),
+        migrations.RunPython(_make_constraints_immediate, reverse_code=refuse_reverse),
         migrations.RemoveField(
             model_name="customfield",
             name="scope",

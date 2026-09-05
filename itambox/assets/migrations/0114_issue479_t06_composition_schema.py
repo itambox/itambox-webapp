@@ -102,6 +102,7 @@ class Migration(migrations.Migration):
             name="unique_category_default_position",
         ),
         migrations.RunPython(renumber_composition, reverse_code=refuse_reverse),
+        migrations.RunSQL("SET CONSTRAINTS ALL IMMEDIATE", reverse_sql=migrations.RunSQL.noop),
         migrations.AddConstraint(
             model_name="assettypefieldset",
             constraint=models.UniqueConstraint(
