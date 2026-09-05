@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import unittest
 from dataclasses import FrozenInstanceError, is_dataclass
@@ -119,7 +120,20 @@ class SpecificationContractDTOTests(unittest.TestCase):
         self.assertTrue(is_dataclass(dto))
         with self.assertRaises(FrozenInstanceError):
             dto.label = "changed"
-        self.assertFalse(any(name == "django" or name.startswith("django.") for name in sys.modules))
+        probe = subprocess.run(
+            [
+                sys.executable, "-I", "-S", "-c",
+                "import importlib, sys; sys.path.insert(0, sys.argv[1]); "
+                "importlib.import_module('extras.services.specifications.contracts'); "
+                "importlib.import_module('extras.services.specifications.codecs'); "
+                "assert not any(n == 'django' or n.startswith('django.') for n in sys.modules)",
+                str(Path(__file__).resolve().parents[2]),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(probe.returncode, 0, probe.stderr)
 
 
 class SpecificationValueCodecTests(unittest.TestCase):
