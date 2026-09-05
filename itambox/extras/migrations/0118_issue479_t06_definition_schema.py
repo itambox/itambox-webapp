@@ -22,7 +22,7 @@ def _check_identity_duplicates(model, fields, db_alias):
         .annotate(identity_count=Count("pk"))
         .filter(identity_count__gt=1)
     )
-    first = duplicate_groups.order_by(*identity_fields).first()
+    first = duplicate_groups.order_by(*fields).first()
     if first is not None:
         _fail("ambiguous_identity", f"{model._meta.db_table}:{fields}:{first}")
 
