@@ -137,7 +137,8 @@
     "itambox/extras/tests/test_custom_field_foundation.py",
     "itambox/extras/tests/test_definition_forms.py",
     "itambox/extras/tests/test_existing.py",
-    "itambox/extras/tests/test_filters.py"
+    "itambox/extras/tests/test_filters.py",
+    "itambox/assets/tests/test_specification_contract_fixtures.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -279,7 +280,8 @@
     "itambox/extras/tests/test_custom_field_foundation.py",
     "itambox/extras/tests/test_definition_forms.py",
     "itambox/extras/tests/test_existing.py",
-    "itambox/extras/tests/test_filters.py"
+    "itambox/extras/tests/test_filters.py",
+    "itambox/assets/tests/test_specification_contract_fixtures.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

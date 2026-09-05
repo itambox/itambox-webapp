@@ -70,15 +70,15 @@ def _load() -> dict:
     return manifest, documents
 
 
-def _truth_table_decision(b, l, r):
+def _truth_table_decision(baseline, local, remote):
     """Section 8.2 decision for a managed path given B, L and R."""
-    if l == b and r == b:
+    if local == baseline and remote == baseline:
         return "unchanged"
-    if l == b and r != b:
+    if local == baseline and remote != baseline:
         return "upstream_safe"
-    if l != b and r == b:
+    if local != baseline and remote == baseline:
         return "local_override"
-    if l == r:
+    if local == remote:
         return "converged"
     return "conflict"
 
@@ -142,7 +142,7 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
         self.assertGreaterEqual(len(self.cases), 1)
 
     def test_rejected_cases_use_stable_issue_codes_and_paths(self):
-        for case_id, (name, case) in self.cases.items():
+        for case_id, (_name, case) in self.cases.items():
             result = case["expected_result"]
             if result.get("outcome") != "rejected":
                 continue
@@ -155,13 +155,13 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
                     self.assertIsInstance(element, str, case_id)
 
     def test_accepted_patch_cases_declare_stored_state(self):
-        for case_id, (name, case) in self.cases.items():
+        for case_id, (_name, case) in self.cases.items():
             result = case["expected_result"]
             if case["operation"].get("kind") == "patch" and result.get("outcome") == "accepted":
                 self.assertIn("stored", result, case_id)
 
     def test_expected_unchanged_matches_initial_state_byte_for_value(self):
-        for case_id, (name, case) in self.cases.items():
+        for case_id, (_name, case) in self.cases.items():
             initial = case["initial_state"]
             unchanged = case["expected_unchanged"]
             for key, value in unchanged.items():
@@ -174,7 +174,7 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
 
     def test_reconciliation_truth_table_matches_section_8_2(self):
         compared = []
-        for case_id, (name, case) in self.cases.items():
+        for case_id, (_name, case) in self.cases.items():
             if case["operation"].get("kind") != "three_way_compare":
                 continue
             state = case["initial_state"]
@@ -207,7 +207,7 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
         )
 
     def test_atomic_list_paths_are_never_index_merged(self):
-        for case_id, (name, case) in self.cases.items():
+        for case_id, (_name, case) in self.cases.items():
             operation = case["operation"]
             if operation.get("kind") != "three_way_compare":
                 continue
@@ -219,11 +219,7 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
                     self.assertIs(result["merged_arrays"], False, case_id)
 
     def test_keep_local_advances_baseline_to_r(self):
-        cases = [
-            case
-            for _, case in self.cases.values()
-            if case["initial_state"].get("chosen") == "keep_local"
-        ]
+        cases = [case for _, case in self.cases.values() if case["initial_state"].get("chosen") == "keep_local"]
         self.assertGreaterEqual(len(cases), 1, "no keep-local resolution case in corpus")
         for case in cases:
             self.assertEqual(
@@ -375,10 +371,7 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
         loaded = {module for module in __import__("sys").modules}
         application_prefixes = ("assets", "itambox", "extras", "organization")
         self.assertFalse(
-            any(
-                module.split(".", 1)[0] in application_prefixes
-                for module in loaded
-            ),
+            any(module.split(".", 1)[0] in application_prefixes for module in loaded),
             f"application modules were loaded: {sorted(loaded & {'assets', 'itambox', 'extras', 'organization'})}",
         )
 
