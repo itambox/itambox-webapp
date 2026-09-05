@@ -140,6 +140,23 @@ class SpecificationContractDTOTests(unittest.TestCase):
 
 
 class SpecificationValueCodecTests(unittest.TestCase):
+    def test_optional_empty_hostname_remains_an_explicit_value(self):
+        definition = field("hostname", "text", validation_data=validation(rule="rfc1123_hostname"))
+        self.assertEqual(normalize_specification_value(definition, ""), "")
+        with self.assertRaises(SpecificationCodecError):
+            normalize_specification_value(definition, "not a hostname")
+
+    def test_optional_empty_text_remains_a_value_with_a_pattern(self):
+        pattern = validation(regex=r"[A-Z]+")
+        optional = field("code", "text", validation_data=pattern)
+        required = field("code", "text", validation_data=pattern, required=True)
+        self.assertEqual(normalize_specification_value(optional, ""), "")
+        self.assertEqual(normalize_specification_value(optional, "ABC"), "ABC")
+        for definition, value in ((optional, "bad"), (required, ""), (required, "bad")):
+            with self.subTest(required=definition.required, value=value):
+                with self.assertRaises(SpecificationCodecError):
+                    normalize_specification_value(definition, value)
+
     def test_text_preserves_whitespace_and_unicode(self):
         value = "  Café\t東京  "
         self.assertEqual(normalize_specification_value(field("note", "text"), value), value)

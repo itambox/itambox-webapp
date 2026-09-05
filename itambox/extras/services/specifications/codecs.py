@@ -231,6 +231,8 @@ def _normalize_text(
         _raise_issue("INVALID_TYPE", path, definition.key)
     _validate_text_characters(definition, value, path)
     _validate_text_length(definition, value, path)
+    if value == "" and not definition.required:
+        return value
     _validate_text_pattern(definition, value, path)
     _validate_text_rule(definition, value, path)
     return value
