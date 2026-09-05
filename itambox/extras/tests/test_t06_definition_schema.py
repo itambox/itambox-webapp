@@ -77,6 +77,25 @@ class T06DefinitionSchemaTests(TestCase):
 
         self.assertEqual(field.activation, CustomField.ACTIVATION_COMPOSED)
 
+    def test_global_activation_switch_with_membership_is_database_guarded(self):
+        field = self._field("activation_guard", activation=CustomField.ACTIVATION_COMPOSED)
+        fieldset = CustomFieldset.objects.create(namespace="local", slug="activation-guard", label="Guard")
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=1)
+
+        with self.assertRaises((IntegrityError, DatabaseError)):
+            CustomField.objects.filter(pk=field.pk).update(activation=CustomField.ACTIVATION_GLOBAL)
+
+        field.refresh_from_db()
+        self.assertEqual(field.activation, CustomField.ACTIVATION_COMPOSED)
+
+    def test_queryset_delete_cannot_bypass_permanent_definition_guard(self):
+        field = self._field("queryset_delete_guard")
+
+        with self.assertRaises((IntegrityError, DatabaseError)):
+            CustomField.objects.filter(pk=field.pk).delete()
+
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
+
     def test_reusable_definition_identity_cannot_be_deleted(self):
         field = self._field("permanent_field")
 
