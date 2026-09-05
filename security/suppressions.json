@@ -6,7 +6,7 @@
       "tool": "gitleaks",
       "finding": "generic-api-key",
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
-      "owner": "@itambox/security",
+      "owner": "@itambox",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3114",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
@@ -23,7 +23,7 @@
       "tool": "gitleaks",
       "finding": "generic-api-key",
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
-      "owner": "@itambox/security",
+      "owner": "@itambox",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3135",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
@@ -40,7 +40,7 @@
       "tool": "gitleaks",
       "finding": "generic-api-key",
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
-      "owner": "@itambox/security",
+      "owner": "@itambox",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3142",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
@@ -57,7 +57,7 @@
       "tool": "gitleaks",
       "finding": "generic-api-key",
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
-      "owner": "@itambox/security",
+      "owner": "@itambox",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2473",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
@@ -74,7 +74,7 @@
       "tool": "gitleaks",
       "finding": "generic-api-key",
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
-      "owner": "@itambox/security",
+      "owner": "@itambox",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2494",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
@@ -91,7 +91,7 @@
       "tool": "gitleaks",
       "finding": "generic-api-key",
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
-      "owner": "@itambox/security",
+      "owner": "@itambox",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2501",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
