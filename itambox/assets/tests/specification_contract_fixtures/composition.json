@@ -101,7 +101,7 @@
         }
       },
       "expected_unchanged": {
-        "total_rendered_field_count": 5,
+        "total_rendered_field_count": 4,
         "field_keys": ["f1_name", "f2_owner", "f3_location", "f4_cost"]
       },
       "rationale": "A duplicate Field used in two sections renders once with both contributing section identities; the same input is never rendered twice, and all occurrences refer to the same Field row."
@@ -266,14 +266,32 @@
       },
       "operation": {
         "kind": "create_with_category",
-        "fieldsets_omitted": true,
-        "fieldsets_explicit_empty": false,
+        "creation_inputs": {
+          "omitted": { "fieldsets": "omitted" },
+          "explicit_empty": { "fieldsets": [] }
+        },
         "later_category_default_change": { "new_default_memberships": [["fs_placement", 1]] }
       },
       "expected_result": {
         "outcome": "accepted",
-        "create_consumed_defaults": true,
-        "preview_token_required": true,
+        "creation_outcomes": {
+          "omitted": {
+            "fieldsets_input": "omitted",
+            "create_consumed_defaults": true,
+            "memberships": [["fs_personal", 1], ["fs_placement", 2]],
+            "preview_token_required": true,
+            "category_default_snapshot_revision_required": true
+          },
+          "explicit_empty": {
+            "fieldsets_input": [],
+            "create_consumed_defaults": false,
+            "memberships": [],
+            "preview_token_required": false,
+            "category_default_snapshot_revision_required": false,
+            "preview_token": null,
+            "category_default_snapshot_revision": null
+          }
+        },
         "existing_type_after_category_change": {
           "memberships": [["fs_personal", 1], ["fs_placement", 2]],
           "unchanged": true

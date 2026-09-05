@@ -11,7 +11,10 @@
       "tags": { "type": "multi_select", "required": false, "nullable": false, "max_values": 8, "choice_set": { "active": ["active_x", "active_y"], "deprecated": ["old_tag_a", "old_tag_b"] } },
       "legacy_note": { "type": "text", "required": false, "lifecycle": "deprecated" },
       "required_status": { "type": "single_select", "required": true, "nullable": false, "choice_set": { "active": ["active_z"], "deprecated": ["old_status_z"] } },
-      "owner_note": { "type": "text", "required": false }
+      "owner_note": { "type": "text", "required": false },
+      "f3_location": { "type": "text", "required": false, "nullable": false },
+      "f4_cost": { "type": "decimal", "required": false, "nullable": false, "scale": 2, "integral_digits_max": 18 },
+      "cost": { "type": "decimal", "required": false, "nullable": false, "scale": 2, "integral_digits_max": 18 }
     },
     "projection_reason_codes": ["ACTIVE_VALUE", "INACTIVE_COMPOSITION", "DEPRECATED_FIELD", "DEPRECATED_CHOICE", "INVALID_STORED_VALUE", "UNKNOWN_DEFINITION", "MISSING_REQUIRED"]
   },
@@ -54,11 +57,30 @@
       "invariant": "Historical validity",
       "acceptance": "A05",
       "source_section": "4.4",
-      "initial_state": { "tags": ["active_x", "active_y", "old_tag_b"] },
-      "operation": { "kind": "patch", "set": { "tags": ["active_x", "old_tag_a"] } },
-      "expected_result": { "outcome": "rejected", "error": "INVALID_CHOICE", "path": ["set", "tags"] },
-      "expected_unchanged": { "tags": ["active_x", "active_y", "old_tag_b"] },
-      "rationale": "Once removed, a deprecated member cannot be reintroduced by an ordinary edit."
+      "initial_state": {
+        "before_removal": { "tags": ["active_x", "old_tag_a", "old_tag_b"] },
+        "before_reintroduction": { "tags": ["active_x", "old_tag_b"] }
+      },
+      "operation": {
+        "kind": "patch_sequence",
+        "steps": [
+          { "label": "remove_old_tag_a", "kind": "patch", "set": { "tags": ["active_x", "old_tag_b"] } },
+          { "label": "attempt_reintroduce_old_tag_a", "kind": "patch", "set": { "tags": ["active_x", "old_tag_a"] } }
+        ]
+      },
+      "expected_result": {
+        "outcome": "rejected",
+        "removal_result": { "outcome": "accepted", "stored": { "tags": ["active_x", "old_tag_b"] } },
+        "rejected_step": 1,
+        "error": "INVALID_CHOICE",
+        "path": ["steps", "1", "set", "tags"],
+        "stored_after_rejected_attempt": { "tags": ["active_x", "old_tag_b"] }
+      },
+      "expected_unchanged": {
+        "before_reintroduction": { "tags": ["active_x", "old_tag_b"] },
+        "stored_after_rejected_attempt": { "tags": ["active_x", "old_tag_b"] }
+      },
+      "rationale": "The same object first stores old_tag_a, then removes it successfully; a later ordinary edit cannot reintroduce that deprecated key, and the failed attempt leaves the post-removal state unchanged."
     },
     {
       "id": "T02-HIST-005",
@@ -91,11 +113,20 @@
       "invariant": "Merge preservation",
       "acceptance": "A05",
       "source_section": "4.3",
-      "initial_state": { "owner_note": "not-a-valid-value", "status": "in_service" },
+      "initial_state": { "cost": "not-a-decimal", "owner_note": "existing note", "status": "in_service" },
       "operation": { "kind": "patch", "set": { "owner_note": "ok" } },
-      "expected_result": { "outcome": "accepted", "stored": { "owner_note": "ok", "status": "in_service" } },
-      "expected_unchanged": { "status": "in_service" },
-      "rationale": "An optional unchanged invalid value is retained and flagged (INVALID_STORED_VALUE), never silently reinterpreted or deleted; an unrelated correction is not rejected because of a historical anomaly."
+      "expected_result": {
+        "outcome": "accepted",
+        "stored": { "cost": "not-a-decimal", "owner_note": "ok", "status": "in_service" },
+        "preserved_invalid": {
+          "field": "cost",
+          "value": "not-a-decimal",
+          "state": "invalid",
+          "reason_codes": ["INVALID_STORED_VALUE"]
+        }
+      },
+      "expected_unchanged": { "cost": "not-a-decimal", "status": "in_service" },
+      "rationale": "The declared optional decimal field contains the structurally invalid existing value not-a-decimal. An unrelated owner_note correction retains and flags that value (INVALID_STORED_VALUE), never silently reinterpreting or deleting it, and is not rejected because of the historical anomaly."
     },
     {
       "id": "T02-HIST-008",

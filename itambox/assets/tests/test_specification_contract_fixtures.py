@@ -232,6 +232,114 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
                 f"{case['id']}: after keep local the new baseline must be R, not L",
             )
 
+    def test_duplicate_field_renders_once_with_four_unique_fields_and_all_sources(self):
+        case = self.cases["T02-COMP-003"][1]
+        composition = self.documents["composition.json"]
+        result = case["expected_result"]
+        unchanged = case["expected_unchanged"]
+        duplicate = result["duplicate_field"]
+
+        unique_keys = unchanged["field_keys"]
+        self.assertEqual(unchanged["total_rendered_field_count"], 4)
+        self.assertEqual(unchanged["total_rendered_field_count"], len(unique_keys))
+        self.assertEqual(len(unique_keys), len(set(unique_keys)))
+        self.assertIs(duplicate["rendered_once"], True)
+        self.assertIn(duplicate["key"], unique_keys)
+
+        placement_sources = [
+            fieldset_identity
+            for fieldset_identity, fieldset in composition["context"]["fieldsets"].items()
+            if duplicate["key"] in fieldset["ordinals"]
+        ]
+        self.assertEqual(placement_sources, duplicate["contributing_section_identities"])
+        self.assertEqual(duplicate["first_placement_section_identity"], placement_sources[0])
+        self.assertEqual(len(placement_sources), 2)
+
+    def test_removed_deprecated_choice_cannot_be_reintroduced_after_removal(self):
+        case = self.cases["T02-HIST-004"][1]
+        history = self.documents["history.json"]
+        initial = case["initial_state"]
+        operation = case["operation"]
+        result = case["expected_result"]
+        unchanged = case["expected_unchanged"]
+
+        self.assertIn("old_tag_a", history["context"]["fields"]["tags"]["choice_set"]["deprecated"])
+        self.assertIn("before_removal", initial)
+        self.assertIn("old_tag_a", initial["before_removal"]["tags"])
+        self.assertIn("before_reintroduction", initial)
+        self.assertNotIn("old_tag_a", initial["before_reintroduction"]["tags"])
+
+        self.assertEqual(operation["kind"], "patch_sequence")
+        steps = operation["steps"]
+        self.assertGreaterEqual(len(steps), 2)
+        self.assertNotIn("old_tag_a", steps[0]["set"]["tags"])
+        self.assertIn("old_tag_a", steps[1]["set"]["tags"])
+        self.assertEqual(result["removal_result"]["outcome"], "accepted")
+        self.assertEqual(result["removal_result"]["stored"], initial["before_reintroduction"])
+        self.assertEqual(result["rejected_step"], 1)
+        self.assertEqual(result["error"], "INVALID_CHOICE")
+        self.assertEqual(result["stored_after_rejected_attempt"], initial["before_reintroduction"])
+        self.assertEqual(unchanged["stored_after_rejected_attempt"], initial["before_reintroduction"])
+
+    def test_unchanged_invalid_history_is_invalid_against_declared_decimal(self):
+        case = self.cases["T02-HIST-007"][1]
+        history = self.documents["history.json"]
+        field_key = "cost"
+        definition = history["context"]["fields"].get(field_key)
+        invalid_value = case["initial_state"].get(field_key)
+        result = case["expected_result"]
+        preserved_invalid = result["preserved_invalid"]
+
+        self.assertIsNotNone(definition)
+        self.assertEqual(definition["type"], "decimal")
+        self.assertEqual(definition["scale"], 2)
+        self.assertIsInstance(invalid_value, str)
+        self.assertIsNone(re.fullmatch(r"-?(?:0|[1-9]\\d*)(?:\\.\\d+)?", invalid_value))
+        self.assertNotIn(field_key, case["operation"]["set"])
+        self.assertEqual(preserved_invalid["field"], field_key)
+        self.assertEqual(preserved_invalid["value"], invalid_value)
+        self.assertEqual(preserved_invalid["state"], "invalid")
+        self.assertEqual(preserved_invalid["reason_codes"], ["INVALID_STORED_VALUE"])
+        self.assertEqual(result["stored"][field_key], invalid_value)
+        self.assertEqual(case["expected_unchanged"][field_key], invalid_value)
+
+    def test_category_defaults_distinguish_omitted_from_explicit_empty(self):
+        case = self.cases["T02-COMP-011"][1]
+        operation = case["operation"]
+        result = case["expected_result"]
+        defaults = case["initial_state"]["category_default_memberships"]
+        inputs = operation["creation_inputs"]
+        outcomes = result["creation_outcomes"]
+
+        self.assertEqual(inputs["omitted"]["fieldsets"], "omitted")
+        self.assertEqual(inputs["explicit_empty"]["fieldsets"], [])
+        self.assertEqual(result["outcome"], "accepted")
+        self.assertIs(outcomes["omitted"]["create_consumed_defaults"], True)
+        self.assertEqual(outcomes["omitted"]["memberships"], defaults)
+        self.assertIs(outcomes["omitted"]["preview_token_required"], True)
+        self.assertIs(outcomes["omitted"]["category_default_snapshot_revision_required"], True)
+        self.assertIs(outcomes["explicit_empty"]["create_consumed_defaults"], False)
+        self.assertEqual(outcomes["explicit_empty"]["memberships"], [])
+        self.assertIs(outcomes["explicit_empty"]["preview_token_required"], False)
+        self.assertIs(outcomes["explicit_empty"]["category_default_snapshot_revision_required"], False)
+        self.assertIsNone(outcomes["explicit_empty"]["preview_token"])
+        self.assertIsNone(outcomes["explicit_empty"]["category_default_snapshot_revision"])
+
+    def test_history_cases_define_all_known_field_references(self):
+        history = self.documents["history.json"]
+        fields = history["context"]["fields"]
+        case_fields = {
+            "T02-HIST-007": ("cost", "owner_note", "status"),
+            "T02-HIST-009": ("f3_location", "f4_cost"),
+            "T02-HIST-012": ("f4_cost", "legacy_note"),
+            "T02-HIST-015": ("status", "cost", "owner_note"),
+        }
+        for case_id, field_keys in case_fields.items():
+            for field_key in field_keys:
+                self.assertIn(field_key, fields, f"{case_id}: {field_key} lacks a local definition")
+                self.assertIsInstance(fields[field_key], dict, f"{case_id}: malformed {field_key} definition")
+        self.assertNotIn("ghost_key", fields)
+
     def test_manifest_required_categories_are_covered(self):
         coverage = self.manifest["coverage"]
         for category in self.manifest["required_categories"]:
