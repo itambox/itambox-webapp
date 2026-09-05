@@ -112,7 +112,7 @@ class CustomFieldForm(forms.ModelForm):
             "label",
             "help_text",
             "field_type",
-            "scope",
+            "activation",
             "quantity_kind",
             "canonical_unit",
             "minimum_value",
@@ -134,7 +134,7 @@ class CustomFieldForm(forms.ModelForm):
             "label": forms.TextInput(attrs={"class": "form-control"}),
             "help_text": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "field_type": forms.Select(attrs={"class": "form-select"}),
-            "scope": forms.Select(attrs={"class": "form-select"}),
+            "activation": forms.Select(attrs={"class": "form-select"}),
             "quantity_kind": forms.TextInput(attrs={"class": "form-control"}),
             "canonical_unit": forms.TextInput(attrs={"class": "form-control"}),
             "minimum_value": forms.NumberInput(attrs={"class": "form-control"}),
@@ -170,16 +170,8 @@ class CustomFieldForm(forms.ModelForm):
         )
         self.fields["choice_set"].queryset = CustomFieldChoiceSet.objects.all().order_by("namespace", "slug")
         self.fields["object_types"].help_text = _(
-            "Non-asset fields use the selected model relation. Asset scopes derive their Asset and Asset Type relations."
+            "Select every model this field applies to. Applicability is stored only in this relation."
         )
-        submitted_scope = self.data.get("scope") if self.is_bound else self.initial.get("scope")
-        selected_scope = submitted_scope or getattr(self.instance, "scope", None)
-        if selected_scope in {
-            CustomField.SCOPE_ASSET_TYPE,
-            CustomField.SCOPE_ASSET,
-            CustomField.SCOPE_BOTH,
-        }:
-            self.fields["object_types"].disabled = True
         self._managed_read_only = bool(
             self.instance.pk
             and self.instance.management_kind in {CustomField.MANAGEMENT_CORE, CustomField.MANAGEMENT_LIBRARY}
@@ -203,9 +195,9 @@ class CustomFieldForm(forms.ModelForm):
                 "help_text",
             ),
             Fieldset(
-                _("Scope and validation"),
+                _("Activation and validation"),
                 Row(
-                    Column("scope", css_class="col-md-4"),
+                    Column("activation", css_class="col-md-4"),
                     Column("quantity_kind", css_class="col-md-4"),
                     Column("canonical_unit", css_class="col-md-4"),
                 ),
@@ -243,16 +235,9 @@ class CustomFieldForm(forms.ModelForm):
             _add_immutable_tamper_errors(self, CustomField)
         if self._managed_read_only:
             return cleaned_data
-        if cleaned_data.get("scope"):
-            expected_models = {
-                CustomField.SCOPE_ASSET_TYPE: ["assettype"],
-                CustomField.SCOPE_ASSET: ["asset"],
-                CustomField.SCOPE_BOTH: ["asset", "assettype"],
-            }[cleaned_data["scope"]]
-            cleaned_data["object_types"] = ContentType.objects.filter(app_label="assets", model__in=expected_models)
         errors = custom_field_definition_contract_errors(
             field_type=cleaned_data.get("field_type"),
-            scope=cleaned_data.get("scope"),
+            activation=cleaned_data.get("activation"),
             quantity_kind=cleaned_data.get("quantity_kind"),
             canonical_unit=cleaned_data.get("canonical_unit"),
             minimum_value=cleaned_data.get("minimum_value"),
@@ -267,7 +252,6 @@ class CustomFieldForm(forms.ModelForm):
             object_types=cleaned_data.get("object_types"),
             management_kind=cleaned_data.get("management_kind", self.instance.management_kind or "local"),
             lifecycle=cleaned_data.get("lifecycle", self.instance.lifecycle or "active"),
-            deleted_at=self.instance.deleted_at,
             name=cleaned_data.get("name"),
             namespace=cleaned_data.get("namespace"),
         )
@@ -287,14 +271,6 @@ class CustomFieldForm(forms.ModelForm):
             with transaction.atomic():
                 instance.save()
                 self.save_m2m()
-                if instance.scope == CustomField.SCOPE_ASSET_TYPE:
-                    instance.object_types.set(ContentType.objects.filter(app_label="assets", model="assettype"))
-                elif instance.scope == CustomField.SCOPE_ASSET:
-                    instance.object_types.set(ContentType.objects.filter(app_label="assets", model="asset"))
-                elif instance.scope == CustomField.SCOPE_BOTH:
-                    instance.object_types.set(
-                        ContentType.objects.filter(app_label="assets", model__in=["asset", "assettype"])
-                    )
         return instance
 
 
@@ -327,7 +303,7 @@ class CustomFieldsetForm(forms.ModelForm):
         self.helper.form_method = "post"
         self.helper.form_tag = True
         self.fields["namespace"].initial = self.instance.namespace or "local"
-        self.fields["fields"].queryset = CustomField.objects.filter(deleted_at__isnull=True).order_by("name")
+        self.fields["fields"].queryset = CustomField.objects.order_by("name")
         if self.instance.pk:
             memberships = list(self.instance.field_memberships.select_related("custom_field").order_by("position"))
             self.fields["fields"].initial = [membership.custom_field_id for membership in memberships]

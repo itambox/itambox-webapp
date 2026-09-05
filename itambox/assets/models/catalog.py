@@ -673,7 +673,11 @@ class AssetTypeFieldset(BaseModel):
         ordering = ["position", "fieldset__namespace", "fieldset__slug"]
         constraints = [
             models.UniqueConstraint(fields=["asset_type", "fieldset"], name="unique_assettype_fieldset"),
-            models.UniqueConstraint(fields=["asset_type", "position"], name="unique_assettype_fieldset_position"),
+            models.UniqueConstraint(
+                fields=["asset_type", "position"],
+                name="unique_assettype_fieldset_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
             models.CheckConstraint(
                 condition=models.Q(position__gte=1, position__lte=1000000),
                 name="assettype_fieldset_position_range",
@@ -783,7 +787,11 @@ class CategoryDefaultFieldset(BaseModel):
         ordering = ["position", "fieldset__namespace", "fieldset__slug"]
         constraints = [
             models.UniqueConstraint(fields=["category", "fieldset"], name="unique_category_default_fieldset"),
-            models.UniqueConstraint(fields=["category", "position"], name="unique_category_default_position"),
+            models.UniqueConstraint(
+                fields=["category", "position"],
+                name="unique_category_default_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
             models.CheckConstraint(
                 condition=models.Q(position__gte=1, position__lte=1000000),
                 name="category_default_position_range",

@@ -121,7 +121,6 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         return resolve_effective_custom_fields(
             self._selected_fieldsets(),
             "assettype",
-            {CustomField.SCOPE_ASSET_TYPE, CustomField.SCOPE_BOTH},
             stored,
         )
 

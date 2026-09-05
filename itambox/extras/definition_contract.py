@@ -19,9 +19,9 @@ FIELD_TYPES = frozenset(
 )
 SELECT_FIELD_TYPES = frozenset({"single-select", "multi-select"})
 NUMERIC_FIELD_TYPES = frozenset({"integer", "decimal"})
-ASSET_SCOPES = frozenset({"asset_type", "asset", "both"})
-MANAGEMENT_KINDS = frozenset({"core", "library", "local"})
 LIFECYCLES = frozenset({"active", "deprecated"})
+ACTIVATIONS = frozenset({"composed", "global"})
+MANAGEMENT_KINDS = frozenset({"core", "library", "local"})
 VALIDATION_RULE_TYPES = {
     "rfc1123_hostname": "text",
     "temperature_max_gte_min": "decimal",
@@ -219,12 +219,12 @@ def _add_error(errors, field, message):
     errors.setdefault(field, message)
 
 
-def _basic_definition_errors(field_type, scope, management_kind, lifecycle, minimum_value, maximum_value):
+def _basic_definition_errors(field_type, activation, management_kind, lifecycle, minimum_value, maximum_value):
     errors = {}
     if field_type not in FIELD_TYPES:
         _add_error(errors, "field_type", "Unsupported custom field type.")
-    if scope is not None and scope not in ASSET_SCOPES:
-        _add_error(errors, "scope", "Unsupported custom field scope.")
+    if activation not in ACTIVATIONS:
+        _add_error(errors, "activation", "Unsupported custom field activation.")
     if management_kind not in MANAGEMENT_KINDS:
         _add_error(errors, "management_kind", "Unsupported management kind.")
     if lifecycle not in LIFECYCLES:
@@ -304,11 +304,8 @@ def _choice_definition_errors(field_type, choice_set, max_values):
     if field_type in SELECT_FIELD_TYPES:
         if choice_set is None:
             _add_error(errors, "choice_set", _("Select fields require a Choice Set."))
-        elif (
-            getattr(choice_set, "lifecycle", "active") != "active"
-            or getattr(choice_set, "deleted_at", None) is not None
-        ):
-            _add_error(errors, "choice_set", _("Choice Sets must be active and not deleted."))
+        elif getattr(choice_set, "lifecycle", "active") != "active":
+            _add_error(errors, "choice_set", _("Choice Sets must be active."))
         if field_type == "single-select" and max_values != 1:
             _add_error(errors, "max_values", _("Single-select fields must limit values to exactly one."))
         if field_type == "multi-select" and max_values is None:
@@ -323,23 +320,11 @@ def _choice_definition_errors(field_type, choice_set, max_values):
     return errors
 
 
-def _applicability_errors(scope, object_types):
+def _applicability_errors(object_types):
     if object_types is None:
         return {}
-    if scope is None:
-        if not object_types:
-            return {"object_types": _("Select at least one model for a generic local field.")}
-        return {}
-    if scope not in ASSET_SCOPES:
-        return {}
-    actual = {_object_type_identity(item) for item in object_types}
-    expected = {
-        "asset_type": {("assets", "assettype")},
-        "asset": {("assets", "asset")},
-        "both": {("assets", "asset"), ("assets", "assettype")},
-    }[scope]
-    if actual != expected:
-        return {"object_types": _("Asset scopes and model applicability must describe the same target set.")}
+    if not list(object_types):
+        return {"object_types": _("Select at least one applicable model.")}
     return {}
 
 
@@ -350,7 +335,7 @@ def _object_type_identity(item):
 def custom_field_definition_contract_errors(
     *,
     field_type,
-    scope,
+    activation="global",
     quantity_kind=None,
     canonical_unit=None,
     minimum_value=None,
@@ -365,7 +350,6 @@ def custom_field_definition_contract_errors(
     object_types: Iterable | None = None,
     management_kind="local",
     lifecycle="active",
-    deleted_at=None,
     required=None,
     nullable=None,
     name=None,
@@ -374,13 +358,13 @@ def custom_field_definition_contract_errors(
     """Return field-level errors for one complete custom-field definition."""
     errors = {}
     for group in (
-        _basic_definition_errors(field_type, scope, management_kind, lifecycle, minimum_value, maximum_value),
+        _basic_definition_errors(field_type, activation, management_kind, lifecycle, minimum_value, maximum_value),
         _numeric_metadata_errors(field_type, decimal_scale, text_max_length, minimum_value, maximum_value),
         _regex_definition_errors(field_type, regex),
         _rule_definition_errors(field_type, validation_rule, name, namespace, management_kind),
         _quantity_definition_errors(field_type, quantity_kind, canonical_unit),
         _choice_definition_errors(field_type, choice_set, max_values),
-        _applicability_errors(scope, object_types),
+        _applicability_errors(object_types),
     ):
         for field, message in group.items():
             _add_error(errors, field, message)

@@ -27,6 +27,7 @@ from extras.models import (
 )
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
+from itambox.registry import registry
 
 # Keys in NotificationChannel.config that hold credentials (Slack/Teams incoming-
 # webhook URLs, bearer tokens, etc.). These are redacted on READ so an API reader
@@ -132,7 +133,7 @@ class CustomFieldSerializer(BaseModelSerializer):
     )
     object_types = serializers.SlugRelatedField(
         many=True,
-        queryset=ContentType.objects.filter(app_label="assets", model__in=["asset", "assettype"]),
+        queryset=ContentType.objects.all(),
         slug_field="model",
         required=False,
     )
@@ -147,7 +148,7 @@ class CustomFieldSerializer(BaseModelSerializer):
             "help_text",
             "field_type",
             "field_type_display",
-            "scope",
+            "activation",
             "quantity_kind",
             "canonical_unit",
             "minimum_value",
@@ -172,9 +173,23 @@ class CustomFieldSerializer(BaseModelSerializer):
         object_types = list(data["object_types"] or []) if "object_types" in data else []
         if instance is not None and "object_types" not in data:
             object_types = list(instance.object_types.all())
+        supported_object_types = {
+            (model._meta.app_label, model._meta.model_name)
+            for model, features in registry.model_features.items()
+            if "custom_field_data" in features and not model._meta.abstract
+        }
+        unsupported_object_types = [
+            content_type.model
+            for content_type in object_types
+            if (content_type.app_label, content_type.model) not in supported_object_types
+        ]
+        if unsupported_object_types:
+            raise serializers.ValidationError(
+                {"object_types": [_("Unsupported custom-field owner: %(models)s.") % {"models": ", ".join(unsupported_object_types)}]}
+            )
         errors = custom_field_definition_contract_errors(
             field_type=data.get("field_type", getattr(instance, "field_type", None)),
-            scope=data.get("scope", getattr(instance, "scope", None)),
+            activation=data.get("activation", getattr(instance, "activation", None)),
             quantity_kind=data.get("quantity_kind", getattr(instance, "quantity_kind", None)),
             canonical_unit=data.get("canonical_unit", getattr(instance, "canonical_unit", None)),
             minimum_value=data.get("minimum_value", getattr(instance, "minimum_value", None)),
@@ -189,7 +204,6 @@ class CustomFieldSerializer(BaseModelSerializer):
             object_types=object_types,
             management_kind=data.get("management_kind", getattr(instance, "management_kind", "local")),
             lifecycle=data.get("lifecycle", getattr(instance, "lifecycle", "active")),
-            deleted_at=getattr(instance, "deleted_at", None),
             name=data.get("name", getattr(instance, "name", None)),
             namespace=data.get("namespace", getattr(instance, "namespace", None)),
         )

@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models.deletion import ProtectedError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -141,7 +142,7 @@ class Dashboard(models.Model):
 
 
 class _ManagedDefinitionMixin(models.Model):
-    preserve_tombstones = True
+    """Shared metadata and immutable identity rules for reusable definitions."""
     MANAGEMENT_CORE = "core"
     MANAGEMENT_LIBRARY = "library"
     MANAGEMENT_LOCAL = "local"
@@ -167,7 +168,6 @@ class _ManagedDefinitionMixin(models.Model):
     last_reconciled_at = models.DateTimeField(null=True, blank=True)
 
     immutable_fields = ()
-    soft_delete_preserve_references = True
 
     class Meta:
         abstract = True
@@ -175,7 +175,7 @@ class _ManagedDefinitionMixin(models.Model):
     def _validate_immutable_fields(self):
         if not self.pk:
             return
-        previous = type(self).all_objects.filter(pk=self.pk).values(*self.immutable_fields).first()
+        previous = type(self).objects.filter(pk=self.pk).values(*self.immutable_fields).first()
         if previous is None:
             return
         changed = {
@@ -186,36 +186,21 @@ class _ManagedDefinitionMixin(models.Model):
         if changed:
             raise ValidationError(changed)
 
-    def restore(self):
-        """Restore a definition and normalize the pre-cutover deleted state."""
-        update_fields = ["deleted_at"]
-        self.deleted_at = None
-        if self.lifecycle == "deleted":
-            self.lifecycle = self.LIFECYCLE_DEPRECATED
-            update_fields.append("lifecycle")
-        self._skip_custom_field_applicability = True
-        try:
-            self.save(update_fields=update_fields)
-        finally:
-            del self._skip_custom_field_applicability
-
-    def soft_delete(self):
-        self.deleted_at = timezone.now()
-        self._skip_custom_field_applicability = True
-        try:
-            self.save(update_fields=["deleted_at"])
-        finally:
-            del self._skip_custom_field_applicability
+    def delete(self, *args, **kwargs):
+        """Reusable definition identities are retired, never deleted."""
+        raise ProtectedError(
+            f"{self._meta.verbose_name} identities are permanent; deprecate the row instead.",
+            {self},
+        )
 
     def save(self, *args, **kwargs):
         self._validate_immutable_fields()
         return super().save(*args, **kwargs)
 
 
-class CustomFieldChoiceSet(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class CustomFieldChoiceSet(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
     changelog_global = True
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = models.Manager()
 
     namespace = models.CharField(
         max_length=62,
@@ -240,10 +225,9 @@ class CustomFieldChoiceSet(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseMode
         return f"{self.namespace}/{self.slug}"
 
 
-class CustomFieldChoice(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class CustomFieldChoice(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
     changelog_global = True
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = models.Manager()
 
     choice_set = models.ForeignKey(CustomFieldChoiceSet, on_delete=models.CASCADE, related_name="choices")
     key = models.CharField(
@@ -260,12 +244,13 @@ class CustomFieldChoice(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, 
         ordering = ["position", "key"]
         constraints = [
             models.UniqueConstraint(fields=["choice_set", "key"], name="unique_customfieldchoice_key"),
-            models.UniqueConstraint(fields=["choice_set", "position"], name="unique_customfieldchoice_position"),
+            models.UniqueConstraint(
+                fields=["choice_set", "position"],
+                name="unique_customfieldchoice_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
             models.CheckConstraint(
-                condition=(
-                    models.Q(position__gte=1, position__lte=1000000)
-                    | models.Q(position__gte=1000000001, position__lte=1000000064)
-                ),
+                condition=models.Q(position__gte=1, position__lte=1000000),
                 name="customfieldchoice_position_range",
             ),
         ]
@@ -274,10 +259,9 @@ class CustomFieldChoice(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, 
         return self.label
 
 
-class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
     changelog_global = True  # global config → changelog attributed to tenant=None
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = models.Manager()
     FIELD_TYPE_TEXT = "text"
     FIELD_TYPE_INTEGER = "integer"
     FIELD_TYPE_DECIMAL = "decimal"
@@ -295,13 +279,11 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
         (FIELD_TYPE_MULTI_SELECT, _("Multi select")),
     ]
 
-    SCOPE_ASSET_TYPE = "asset_type"
-    SCOPE_ASSET = "asset"
-    SCOPE_BOTH = "both"
-    SCOPE_CHOICES = [
-        (SCOPE_ASSET_TYPE, _("Asset Type")),
-        (SCOPE_ASSET, _("Asset")),
-        (SCOPE_BOTH, _("Asset Type and Asset")),
+    ACTIVATION_COMPOSED = "composed"
+    ACTIVATION_GLOBAL = "global"
+    ACTIVATION_CHOICES = [
+        (ACTIVATION_COMPOSED, _("Composed")),
+        (ACTIVATION_GLOBAL, _("Global")),
     ]
 
     name = models.CharField(
@@ -320,7 +302,12 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
     field_type = models.CharField(
         max_length=16, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
     )
-    scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, null=True, blank=True)
+    activation = models.CharField(
+        max_length=16,
+        choices=ACTIVATION_CHOICES,
+        db_index=True,
+        verbose_name=_("Activation"),
+    )
     quantity_kind = models.CharField(max_length=32, null=True, blank=True)
     canonical_unit = models.CharField(max_length=16, null=True, blank=True)
     minimum_value = models.DecimalField(max_digits=24, decimal_places=6, null=True, blank=True)
@@ -360,6 +347,10 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
         constraints = [
             models.UniqueConstraint(fields=["name"], name="unique_customfield_name"),
             models.CheckConstraint(
+                condition=models.Q(activation__in=["composed", "global"]),
+                name="customfield_activation_valid",
+            ),
+            models.CheckConstraint(
                 condition=models.Q(minimum_value__isnull=True)
                 | models.Q(maximum_value__isnull=True)
                 | models.Q(minimum_value__lte=models.F("maximum_value")),
@@ -384,7 +375,6 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
         "name",
         "namespace",
         "field_type",
-        "scope",
         "quantity_kind",
         "canonical_unit",
         "minimum_value",
@@ -403,20 +393,15 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
 
     def clean(self):
         super().clean()
-
-        object_types = (
-            None
-            if getattr(self, "_skip_custom_field_applicability", False)
-            else self.object_types.all()
-            if self.pk
-            else None
-        )
+        object_types = self.object_types.all() if self.pk else None
         self.validate_definition_contract(object_types=object_types)
+        if self.activation == self.ACTIVATION_GLOBAL and self.pk and self.fieldset_memberships.exists():
+            raise ValidationError({"activation": _("A field with memberships cannot be global.")})
 
     def validate_definition_contract(self, *, object_types=None):
         validate_custom_field_definition_contract(
             field_type=self.field_type,
-            scope=self.scope,
+            activation=self.activation,
             quantity_kind=self.quantity_kind,
             canonical_unit=self.canonical_unit,
             minimum_value=self.minimum_value,
@@ -431,7 +416,6 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
             object_types=object_types,
             management_kind=self.management_kind,
             lifecycle=self.lifecycle,
-            deleted_at=self.deleted_at,
             required=self.required,
             nullable=self.nullable,
             name=self.name,
@@ -448,10 +432,9 @@ class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDe
         return self.object_types.filter(app_label="assets", model="assettype").exists()
 
 
-class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
     changelog_global = True  # global config → changelog attributed to tenant=None
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = models.Manager()
     fields = models.ManyToManyField(
         CustomField,
         related_name="fieldsets",
@@ -498,12 +481,21 @@ class CustomFieldsetField(BaseModel):
         ordering = ["position", "custom_field__name"]
         constraints = [
             models.UniqueConstraint(fields=["fieldset", "custom_field"], name="unique_customfieldset_field"),
-            models.UniqueConstraint(fields=["fieldset", "position"], name="unique_customfieldset_position"),
+            models.UniqueConstraint(
+                fields=["fieldset", "position"],
+                name="unique_customfieldset_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
             models.CheckConstraint(
                 condition=models.Q(position__gte=1, position__lte=1000000),
                 name="customfieldset_position_range",
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.custom_field_id and self.custom_field.activation == CustomField.ACTIVATION_GLOBAL:
+            raise ValidationError({"custom_field": _("Global fields cannot join a fieldset.")})
 
     def __str__(self):
         return f"{self.fieldset}: {self.custom_field}"

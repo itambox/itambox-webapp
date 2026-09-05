@@ -50,7 +50,6 @@ def validate_required_custom_field_values(definitions, values):
         for item in definitions
         for definition in (_definition(item),)
         if definition.required
-        and definition.deleted_at is None
         and (definition.lifecycle != CustomField.LIFECYCLE_DEPRECATED or definition.name in values)
         and not _required_value_is_present(definition, values.get(definition.name))
     )
@@ -192,7 +191,7 @@ def _active_choice_rows(cf):
     if cf.choice_set_id is None:
         raise ValidationError(_("The choice definition is invalid."), code="INVALID_CHOICE")
     choice_set = cf.choice_set
-    if choice_set.deleted_at is not None or choice_set.lifecycle != CustomField.LIFECYCLE_ACTIVE:
+    if choice_set.lifecycle != CustomField.LIFECYCLE_ACTIVE:
         raise ValidationError(_("The choice set is not active."), code="INVALID_CHOICE")
     cached_choices = getattr(choice_set, "_prefetched_objects_cache", {}).get("choices")
     if cached_choices is not None:
@@ -267,7 +266,7 @@ def validate_custom_field_data_values(definitions, values):
         if item is None:
             continue
         definition = _definition(item)
-        if definition.deleted_at is not None or definition.lifecycle != CustomField.LIFECYCLE_ACTIVE:
+        if definition.lifecycle != CustomField.LIFECYCLE_ACTIVE:
             continue
         if getattr(item, "read_only", False):
             continue
@@ -437,8 +436,6 @@ class CustomFieldModelFormMixin:
 
         for item in self.get_custom_field_definitions():
             cf = _definition(item)
-            if cf.deleted_at is not None:
-                continue
             if cf.lifecycle == CustomField.LIFECYCLE_DEPRECATED and cf.name not in stored:
                 continue
             key = f"cf_{cf.name}"

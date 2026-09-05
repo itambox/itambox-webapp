@@ -1,7 +1,5 @@
 from dataclasses import dataclass, replace
 
-from django.db.models import Q
-
 from extras.customfields import validate_custom_field_data_values
 from extras.models import CustomField, CustomFieldset
 
@@ -17,16 +15,13 @@ def _qualified_identity(fieldset):
     return f"{fieldset.namespace}/{fieldset.slug}"
 
 
-def _definition_applies_to_target(definition, target_model, scopes):
+def _definition_applies_to_target(definition, target_model):
     object_types = getattr(definition, "_prefetched_objects_cache", {}).get("object_types")
     if object_types is None:
         object_types = definition.object_types.all()
-    object_types = list(object_types)
-    if object_types:
-        return any(
-            content_type.app_label == "assets" and content_type.model == target_model for content_type in object_types
-        )
-    return definition.scope in scopes
+    return any(
+        content_type.app_label == "assets" and content_type.model == target_model for content_type in object_types
+    )
 
 
 def _iter_fieldset_memberships(fieldset):
@@ -46,21 +41,16 @@ def _iter_fieldset_memberships(fieldset):
     )
 
 
-def _definition_is_resolvable(definition, target_model, scopes, stored_values):
-    applies = (
-        definition.scope in scopes
-        if target_model is None
-        else _definition_applies_to_target(definition, target_model, scopes)
-    )
+def _definition_is_resolvable(definition, target_model, stored_values):
     return (
-        applies
-        and definition.deleted_at is None
+        definition.activation == CustomField.ACTIVATION_COMPOSED
+        and _definition_applies_to_target(definition, target_model)
         and not (definition.lifecycle == CustomField.LIFECYCLE_DEPRECATED and definition.name not in stored_values)
     )
 
 
-def _merge_resolved_field(resolved, by_key, definition, identity, target_model, scopes, stored_values):
-    if not _definition_is_resolvable(definition, target_model, scopes, stored_values):
+def _merge_resolved_field(resolved, by_key, definition, identity, target_model, stored_values):
+    if not _definition_is_resolvable(definition, target_model, stored_values):
         return
     if definition.name in by_key:
         index = by_key[definition.name]
@@ -77,13 +67,13 @@ def _merge_resolved_field(resolved, by_key, definition, identity, target_model, 
     )
 
 
-def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None, target_model=None):
+def resolve_fieldsets_custom_fields(fieldsets, target_model, stored_values=None):
     """Resolve an already ordered fieldset sequence for a domain form or object."""
     stored_values = dict(stored_values or {})
     resolved = []
     by_key = {}
     for fieldset in fieldsets:
-        if fieldset.deleted_at is not None or fieldset.lifecycle != CustomFieldset.LIFECYCLE_ACTIVE:
+        if fieldset.lifecycle != CustomFieldset.LIFECYCLE_ACTIVE:
             continue
         identity = _qualified_identity(fieldset)
         for membership in _iter_fieldset_memberships(fieldset):
@@ -93,25 +83,21 @@ def resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values=None, targe
                 membership.custom_field,
                 identity,
                 target_model,
-                scopes,
                 stored_values,
             )
     return resolved
 
 
-def resolve_effective_custom_fields(fieldsets, target_model, scopes, stored_values=None):
-    """Resolve composed fields followed by applicable unbound global fields."""
+def resolve_effective_custom_fields(fieldsets, target_model, stored_values=None):
+    """Resolve composed fields followed by explicitly global applicable fields."""
     stored_values = dict(stored_values or {})
-    resolved = resolve_fieldsets_custom_fields(fieldsets, scopes, stored_values, target_model=target_model)
+    resolved = resolve_fieldsets_custom_fields(fieldsets, target_model, stored_values)
     seen = {item.definition.name for item in resolved}
     global_fields = (
         CustomField.objects.filter(
-            fieldset_memberships__isnull=True,
-            deleted_at__isnull=True,
-        )
-        .filter(
-            Q(object_types__app_label="assets", object_types__model=target_model)
-            | Q(object_types__isnull=True, scope__in=scopes)
+            activation=CustomField.ACTIVATION_GLOBAL,
+            object_types__app_label="assets",
+            object_types__model=target_model,
         )
         .prefetch_related("object_types", "choice_set__choices")
         .distinct()
@@ -159,7 +145,6 @@ def resolve_asset_type_custom_fields(asset_type):
     return resolve_effective_custom_fields(
         _composed_fieldsets(asset_type),
         "assettype",
-        {CustomField.SCOPE_ASSET_TYPE, CustomField.SCOPE_BOTH},
         stored_values,
     )
 
@@ -169,7 +154,6 @@ def resolve_asset_type_creation_custom_fields():
     return resolve_effective_custom_fields(
         (),
         "assettype",
-        {CustomField.SCOPE_ASSET_TYPE, CustomField.SCOPE_BOTH},
     )
 
 
@@ -179,7 +163,6 @@ def resolve_asset_custom_fields(asset_type, stored_values=None):
     return resolve_effective_custom_fields(
         fieldsets,
         "asset",
-        {CustomField.SCOPE_ASSET, CustomField.SCOPE_BOTH},
         stored_values,
     )
 
