@@ -5,14 +5,14 @@
       "id": "SEC-479-GITLEAKS-001",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "Synthetic specification-vocabulary fixture literals are not credentials; retain only this exact scanner fingerprint pending fixture redesign.",
+      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox/security",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3114",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
         "rule": "generic-api-key"
       },
-      "review_on": "2026-09-05",
+      "review_on": "2026-09-12",
       "expires_on": "2026-10-05",
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
@@ -22,14 +22,14 @@
       "id": "SEC-479-GITLEAKS-002",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "Synthetic specification-vocabulary fixture literals are not credentials; retain only this exact scanner fingerprint pending fixture redesign.",
+      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox/security",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3135",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
         "rule": "generic-api-key"
       },
-      "review_on": "2026-09-05",
+      "review_on": "2026-09-12",
       "expires_on": "2026-10-05",
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
@@ -39,14 +39,14 @@
       "id": "SEC-479-GITLEAKS-003",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "Synthetic specification-vocabulary fixture literals are not credentials; retain only this exact scanner fingerprint pending fixture redesign.",
+      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox/security",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3142",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
         "rule": "generic-api-key"
       },
-      "review_on": "2026-09-05",
+      "review_on": "2026-09-12",
       "expires_on": "2026-10-05",
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
@@ -56,14 +56,14 @@
       "id": "SEC-479-GITLEAKS-004",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "Synthetic specification-vocabulary fixture literals are not credentials; retain only this exact scanner fingerprint pending fixture redesign.",
+      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox/security",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2473",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
         "rule": "generic-api-key"
       },
-      "review_on": "2026-09-05",
+      "review_on": "2026-09-12",
       "expires_on": "2026-10-05",
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
@@ -73,14 +73,14 @@
       "id": "SEC-479-GITLEAKS-005",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "Synthetic specification-vocabulary fixture literals are not credentials; retain only this exact scanner fingerprint pending fixture redesign.",
+      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox/security",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2494",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
         "rule": "generic-api-key"
       },
-      "review_on": "2026-09-05",
+      "review_on": "2026-09-12",
       "expires_on": "2026-10-05",
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
@@ -90,14 +90,14 @@
       "id": "SEC-479-GITLEAKS-006",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "Synthetic specification-vocabulary fixture literals are not credentials; retain only this exact scanner fingerprint pending fixture redesign.",
+      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox/security",
       "scope": {
         "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2501",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
         "rule": "generic-api-key"
       },
-      "review_on": "2026-09-05",
+      "review_on": "2026-09-12",
       "expires_on": "2026-10-05",
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
