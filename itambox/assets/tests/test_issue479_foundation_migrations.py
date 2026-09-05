@@ -147,13 +147,25 @@ class AdoptionPreflightUnitTests(SimpleTestCase):
 @_isolate_migration_tests
 @pytest.mark.serial_only
 class AssetTypeFoundationMigrationTests(TransactionTestCase):
+    databases = {"default"} if os.environ.get(_ISOLATED_MIGRATION_ENV) == "1" else set()
     migrate_from = [
         ("assets", "0101_seed_canonical_missing_status"),
         ("extras", "0113_upgrade_legacy_webhook_retry_schedules"),
     ]
     migrate_to = [("assets", "0104_asset_type_composition_backfill"), ("extras", "0114_asset_type_definition_schema")]
 
+    @staticmethod
+    def _is_isolated_child():
+        return os.environ.get(_ISOLATED_MIGRATION_ENV) == "1"
+
+    @classmethod
+    def _pre_setup(cls):
+        if cls._is_isolated_child():
+            super()._pre_setup()
+
     def setUp(self):
+        if not self._is_isolated_child():
+            return
         super().setUp()
         self._schema_name = f"issue479_{os.getpid()}_{uuid4().hex[:12]}"
         quoted_schema = connection.ops.quote_name(self._schema_name)
@@ -164,16 +176,19 @@ class AssetTypeFoundationMigrationTests(TransactionTestCase):
             cursor.execute(f"SET search_path TO {quoted_schema}, public")
 
     def tearDown(self):
+        if not self._is_isolated_child():
+            return
         quoted_schema = connection.ops.quote_name(self._schema_name)
         try:
             super().tearDown()
         finally:
-            try:
-                with connection.cursor() as cursor:
-                    cursor.execute("SET search_path TO public")
-                    cursor.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
-            finally:
-                ContentType.objects.clear_cache()
+            with connection.cursor() as cursor:
+                cursor.execute("SET search_path TO public")
+                cursor.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+
+    def _post_teardown(self):
+        if self._is_isolated_child():
+            super()._post_teardown()
 
     def test_core_seed_creates_object_type_contenttypes_on_fresh_upgrade(self):
         executor = MigrationExecutor(connection)
