@@ -7,9 +7,8 @@ foundation snapshot captured by T03.
 """
 
 import json
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 FIXTURE_DIR = Path(__file__).with_name("fixtures") / "specification_vocabulary"
 
