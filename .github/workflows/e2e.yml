@@ -651,6 +651,11 @@ jobs:
             --execution "$GITHUB_WORKSPACE/artifacts/e2e-execution.json"
         timeout-minutes: 30
 
+      - name: Run E2E producer unit tests
+        working-directory: ./itambox/tests/e2e
+        run: node --test run-selected.test.mjs
+        timeout-minutes: 5
+
       - name: Certify Playwright discovery and execution
         if: always()
         working-directory: ./

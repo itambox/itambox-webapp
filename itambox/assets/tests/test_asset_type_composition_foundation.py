@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
@@ -554,3 +555,58 @@ class AssetTypeCompositionFoundationTests(TestCase):
         self.assertLessEqual(asset_type.last_reconciled_at, timezone.now() + timedelta(seconds=10))
         self.assertEqual(asset_type.library_release, "2026.10")
         self.assertEqual(asset_type.source_checksum, "sha256:" + "b" * 64)
+
+    def test_reconciliation_save_failure_restores_instance_and_keeps_unsaved_fields(self):
+        library = AssetTypeLibrary.objects.create(namespace="reconcile-restore", release="2026.09")
+        manufacturer = Manufacturer.objects.create(
+            name="Reconcile Restore Manufacturer", slug="reconcile-restore-manufacturer"
+        )
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Reconcile restore type",
+            slug="reconcile-restore-type",
+            management_kind=AssetType.MANAGEMENT_LIBRARY,
+            library=library,
+            library_definition_key="router-restore",
+            library_release="2026.09",
+            source_checksum="sha256:" + "a" * 64,
+        )
+        # Unrelated unsaved caller state must survive a failed reconciliation.
+        asset_type.description = "unsaved caller field"
+
+        with mock.patch.object(AssetType, "save", side_effect=IntegrityError("trigger refused the write")):
+            with self.assertRaises(IntegrityError):
+                asset_type.apply_library_reconciliation(
+                    library_release="2026.10",
+                    source_checksum="sha256:" + "b" * 64,
+                )
+
+        # The failed target state has been restored on the caller instance...
+        self.assertEqual(asset_type.library_release, "2026.09")
+        self.assertEqual(asset_type.source_checksum, "sha256:" + "a" * 64)
+        self.assertIsNone(asset_type.last_reconciled_at)
+        self.assertEqual(asset_type.description, "unsaved caller field")
+        # ...and the database never saw the write.
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.library_release, "2026.09")
+        self.assertEqual(asset_type.source_checksum, "sha256:" + "a" * 64)
+
+    def test_reconciliation_preflight_rejects_unsaved_instance(self):
+        library = AssetTypeLibrary.objects.create(namespace="reconcile-unsaved", release="2026.09")
+        manufacturer = Manufacturer.objects.create(
+            name="Reconcile Unsaved Manufacturer", slug="reconcile-unsaved-manufacturer"
+        )
+        unsaved = AssetType(
+            manufacturer=manufacturer,
+            model="Reconcile unsaved type",
+            management_kind=AssetType.MANAGEMENT_LIBRARY,
+            library=library,
+            library_definition_key="router-unsaved",
+            library_release="2026.09",
+        )
+
+        with self.assertRaises(ValidationError):
+            unsaved.apply_library_reconciliation(
+                library_release="2026.10",
+                source_checksum="sha256:" + "b" * 64,
+            )

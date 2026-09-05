@@ -13854,7 +13854,11 @@ msgstr "Die Identität des Asset-Typs aus der Bibliothek kann nach der Erstellun
 
 #: itambox/assets/models/catalog.py
 msgid "The library reconciliation state changed after this instance was loaded; refresh it and retry."
-msgstr "Der Reconciliationszustand der Bibliothek hat sich geändert, nachdem diese Instanz geladen wurde; aktualisieren Sie die Instanz und versuchen Sie es erneut."
+msgstr "Der Abgleichstatus der Bibliothek hat sich geändert, nachdem diese Instanz geladen wurde; aktualisieren Sie die Instanz und versuchen Sie es erneut."
+
+#: itambox/assets/models/catalog.py
+msgid "The Asset Type must be saved before it can be reconciled."
+msgstr "Der Asset-Typ muss gespeichert sein, bevor er abgeglichen werden kann."
 
 #: itambox/extras/customfields.py
 msgid "The text is too long."

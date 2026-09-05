@@ -358,7 +358,7 @@ function identityFromAttachments(result) {
   if (typeof attachment.body === 'string') {
     try { return Buffer.from(attachment.body, 'base64').toString('utf8'); } catch { return null; }
   }
-  if (typeof attachment.path === 'string' && existsSync(attachment.path)) return readFileSync(attachment.path, 'utf8');
+  if (typeof attachment.path === 'string' && existsSync(attachment.path)) return readFileSync(attachment.path, 'utf8').trim();
   return null;
 }
 
@@ -457,7 +457,7 @@ function collectExecution(value, output, parentFile = null, parentProject = null
           return {
             retry,
             status: normaliseAttemptStatus(result.status),
-            identity: attemptIdentity(result, test, retry, { spec: specFile, id: resolvedId }),
+            identity: attemptIdentity(result, test, retry, { spec: specFile, id: resolvedId, project }),
           };
         });
         output.tests.push({
@@ -483,7 +483,7 @@ function collectExecution(value, output, parentFile = null, parentProject = null
         return {
           retry,
           status: normaliseAttemptStatus(result.status),
-          identity: attemptIdentity(result, test, retry, { spec: testFile, id: resolvedId }),
+          identity: attemptIdentity(result, test, retry, { spec: testFile, id: resolvedId, project }),
         };
       });
       output.tests.push({

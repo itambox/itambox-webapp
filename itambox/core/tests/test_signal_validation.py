@@ -90,6 +90,34 @@ class CustomFieldValidationSuppressionTests(TestCase):
         validate_custom_validators_on_save(DummyModel, instance, update_fields=None)
         self.assertEqual(calls, [("clean", None)])
 
+    def test_dependency_check_covers_attname_spelling(self):
+        from django.core.exceptions import FieldDoesNotExist
+
+        calls = []
+
+        class DummyModel(ChangeLoggingMixin):
+            custom_field_data_validation_dependencies = frozenset({"asset_type"})
+
+            def clean(self):
+                calls.append(("clean", getattr(self, "_skip_custom_field_data_validation", None)))
+
+        def meta_get_field(name):
+            if name == "asset_type":
+                return SimpleNamespace(attname="asset_type_id")
+            raise FieldDoesNotExist(name)
+
+        DummyModel._meta = SimpleNamespace(get_field=meta_get_field)
+        instance = DummyModel()
+
+        # Django accepts the ``attname`` spelling of a foreign key in
+        # ``update_fields``; the dependency check must not fail open for it.
+        validate_custom_validators_on_save(DummyModel, instance, update_fields={"asset_type_id"})
+        self.assertEqual(calls, [("clean", None)])
+
+        calls.clear()
+        validate_custom_validators_on_save(DummyModel, instance, update_fields={"status"})
+        self.assertEqual(calls, [("clean", True)])
+
     def test_models_without_dependencies_keep_plain_suppression_semantics(self):
         class DummyModel(ChangeLoggingMixin):
             pass

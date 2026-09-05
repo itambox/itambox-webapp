@@ -37,9 +37,11 @@ def _library_reconciliation_opt_in(using):
 
     * it captures the previous value (``None`` when the setting is unset),
     * sets the value to ``on`` locally,
-    * and restores the exact previous value on scope exit, including on
-      exceptions and for nested use — so the opt-in can never leak into an
-      outer transaction and a pre-existing ``on`` state is preserved.
+    * and on scope exit restores the previous value, normalising an unset
+      setting to ``off`` (behaviourally identical for the trigger's
+      ``COALESCE(...,'off')`` check) — including on exceptions and for
+      nested use, so the opt-in can never leak into an outer transaction
+      and a pre-existing ``on`` state is preserved.
 
     The trigger remains a fail-closed integrity guard for uncontrolled
     writes, not a privilege or security boundary: a caller with unrestricted
@@ -67,7 +69,7 @@ def _library_reconciliation_opt_in(using):
                         [_ASSET_TYPE_RECONCILE_SETTING, previous if previous is not None else "off"],
                     )
             except DatabaseError:
-                # broad except: boundary-isolation: the write failed and the
+                # broad except: availability-tradeoff: the write failed and the
                 # transaction is already aborted, so the restore is
                 # best-effort; the enclosing rollback reverts the setting
                 pass
@@ -570,6 +572,8 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         errors = {}
         if self.management_kind != self.MANAGEMENT_LIBRARY:
             errors["management_kind"] = _("Only library-managed Asset Types may be reconciled.")
+        if self.pk is None:
+            errors["pk"] = _("The Asset Type must be saved before it can be reconciled.")
         if self.library_id is None or not self.library_definition_key:
             errors["library_definition_key"] = _(
                 "Library-managed Asset Types require full library identity before reconciliation."
@@ -596,13 +600,15 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         """Apply a controlled library reconciliation update.
 
         ``library_id`` and ``library_definition_key`` are immutable source
-        identity and never change here. ``library_release``,
-        ``source_checksum``, and ``last_reconciled_at`` are controlled
-        reconciliation state: this method is the single supported path that
-        may update them. The model save guard and the PostgreSQL trigger
-        enforce the same boundary for ordinary saves and for direct
-        QuerySet/SQL writes (the trigger opts the write in through the
-        transaction-local ``itambox.assettype_reconcile`` setting).
+        identity and never change here. ``library_release`` and
+        ``source_checksum`` are controlled reconciliation state: this method
+        is the single supported path that may update them, and
+        ``last_reconciled_at`` is stamped as part of the same controlled
+        write. The model save guard and the PostgreSQL trigger enforce the
+        boundary for ``library_release`` and ``source_checksum`` for
+        ordinary saves and for direct QuerySet/SQL writes (the trigger opts
+        the write in through the transaction-local
+        ``itambox.assettype_reconcile`` setting).
 
         The operation is stale-state safe: it locks the target row, compares
         the persisted reconciliation state against the caller's loaded state,
