@@ -6745,7 +6745,7 @@
           "without_reverse": 0
         },
         "RunSQL": {
-          "with_noop_reverse": 0,
+          "with_noop_reverse": 1,
           "with_reverse": 0,
           "without_reverse": 0
         },
@@ -6766,7 +6766,7 @@
         "has_custom_operations": {
           "BtreeGistExtension": false,
           "RunPython": true,
-          "RunSQL": false,
+          "RunSQL": true,
           "SeparateDatabaseAndState": false
         }
       }
@@ -12285,7 +12285,7 @@
         },
         "RunPython": {
           "with_noop_reverse": 0,
-          "with_reverse": 2,
+          "with_reverse": 4,
           "without_reverse": 0
         },
         "RunSQL": {
