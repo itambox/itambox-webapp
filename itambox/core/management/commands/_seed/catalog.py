@@ -278,7 +278,10 @@ def _reconcile_core_fieldsets(field_rows, fieldset_labels, custom_fields):
                     position=position,
                 )
                 for position, row in enumerate(
-                    (row for row in field_rows if row["fieldset_slug"] == slug),
+                    sorted(
+                        (row for row in field_rows if row["fieldset_slug"] == slug),
+                        key=lambda row: (row["position"], row["key"]),
+                    ),
                     start=1,
                 )
             ]

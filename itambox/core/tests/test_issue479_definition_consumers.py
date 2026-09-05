@@ -172,3 +172,25 @@ def test_definition_consumers_do_not_use_retired_schema_fields():
     assert '"activation"' in catalog
     assert "object_types" in catalog
     assert "position=index * 10" not in catalog
+
+
+def test_seed_dense_memberships_preserve_declared_order(monkeypatch):
+    from unittest.mock import Mock
+
+    from core.management.commands._seed import catalog
+
+    fieldset = SimpleNamespace(save=Mock(), field_memberships=Mock())
+    membership = Mock(side_effect=lambda **values: SimpleNamespace(**values))
+    membership._base_manager.filter.return_value.values_list.return_value = []
+    monkeypatch.setattr(catalog, "_get_core_fieldset", lambda slug, label: fieldset)
+    monkeypatch.setattr(catalog, "CustomFieldsetField", membership)
+    fields = {"later": SimpleNamespace(pk=1), "earlier": SimpleNamespace(pk=2)}
+    rows = [
+        {"key": "later", "fieldset_slug": "hardware", "position": 20},
+        {"key": "earlier", "fieldset_slug": "hardware", "position": 10},
+    ]
+
+    catalog._reconcile_core_fieldsets(rows, {"hardware": "Hardware"}, fields)
+
+    created = membership.objects.bulk_create.call_args.args[0]
+    assert [(row.custom_field.pk, row.position) for row in created] == [(2, 1), (1, 2)]
