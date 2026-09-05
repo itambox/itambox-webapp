@@ -529,6 +529,7 @@ def _authorization_evidence(
             "role_id",
             "role__tenant_id",
             "role__permissions",
+            "role__shared_with_managed",
             "role__deleted_at",
             "valid_until",
         )
