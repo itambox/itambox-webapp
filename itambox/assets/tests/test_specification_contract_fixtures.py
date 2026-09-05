@@ -14,6 +14,8 @@ never produced by calling the implementation under test.
 
 import json
 import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -367,13 +369,24 @@ class SpecificationContractFixtureCorpusTest(unittest.TestCase):
             self.assertTrue((FIXTURE_ROOT / name).is_file(), name)
 
     def test_corpus_is_implementation_independent(self):
-        # The test environment must never have loaded application modules.
-        loaded = {module for module in __import__("sys").modules}
-        application_prefixes = ("assets", "itambox", "extras", "organization")
-        self.assertFalse(
-            any(module.split(".", 1)[0] in application_prefixes for module in loaded),
-            f"application modules were loaded: {sorted(loaded & {'assets', 'itambox', 'extras', 'organization'})}",
+        # Django may already be loaded by pytest; test the oracle's own imports
+        # in a fresh interpreter instead of inspecting the runner's ambient state.
+        probe = (
+            "import json, runpy, sys; "
+            "oracle = runpy.run_path(sys.argv[1], run_name='fixture_oracle'); "
+            "oracle['_load'](); "
+            "blocked = {'django', 'assets', 'itambox', 'extras', 'organization'}; "
+            "print(json.dumps(sorted(name for name in sys.modules "
+            "if name.split('.', 1)[0] in blocked)))"
         )
+        result = subprocess.run(
+            [sys.executable, "-I", "-S", "-c", probe, str(Path(__file__).resolve())],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(json.loads(result.stdout), [])
 
 
 if __name__ == "__main__":
