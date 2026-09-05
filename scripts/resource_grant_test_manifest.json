@@ -142,7 +142,8 @@
     "itambox/assets/tests/test_specification_service_namespace.py",
     "itambox/extras/tests/test_specification_codecs.py",
     "scripts/tests/test_specification_vocabulary_contract.py",
-    "itambox/organization/tests/test_specification_access_scope.py"
+    "itambox/organization/tests/test_specification_access_scope.py",
+    "itambox/extras/tests/test_specification_history_projection.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -289,7 +290,8 @@
     "itambox/assets/tests/test_specification_service_namespace.py",
     "itambox/extras/tests/test_specification_codecs.py",
     "scripts/tests/test_specification_vocabulary_contract.py",
-    "itambox/organization/tests/test_specification_access_scope.py"
+    "itambox/organization/tests/test_specification_access_scope.py",
+    "itambox/extras/tests/test_specification_history_projection.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
