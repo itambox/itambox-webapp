@@ -34,6 +34,10 @@ PreviewToken = NewType("PreviewToken", str)
 CategoryDefaultSnapshotRevision = NewType("CategoryDefaultSnapshotRevision", str)
 
 _QUALIFIED_IDENTITY_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9][a-z0-9._-]{0,126}$")
+# Server-created opaque stage reference: 32 lowercase hex characters produced by
+# ``secrets.token_hex(16)`` in the Assets staging authority. The grammar is
+# intentionally narrow and ASCII-safe; the value is never interpreted as a path.
+_STAGED_IMAGE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
 def _freeze_patch_value(value: JSONValue) -> JSONValue:
@@ -112,9 +116,18 @@ def _validate_positive_or_none(value: object, name: str) -> None:
         raise ValueError(f"{name} must be a positive integer or None")
 
 
+def _validate_non_negative_or_none(value: object, name: str) -> None:
+    if value is not None and (type(value) is not int or value < 0):
+        raise ValueError(f"{name} must be a non-negative integer or None")
+
+
 def _validate_optional_bounded_string(value: object, name: str) -> None:
+    # The DTO boundary stays syntactic; model-limit parity (slug grammar,
+    # per-field lengths) is enforced by the shared native planning helper.
     if type(value) is not str or not value:
         raise ValueError(f"{name} must be a non-empty string")
+    if len(value) > 255:
+        raise ValueError(f"{name} must not exceed 255 characters")
 
 
 def _validate_string_fields(instance: "AssetTypeNativeCreateInputDTO") -> None:
@@ -124,9 +137,13 @@ def _validate_string_fields(instance: "AssetTypeNativeCreateInputDTO") -> None:
 
 
 def _validate_tag_ids(tag_ids: tuple[object, ...]) -> None:
+    seen: set[int] = set()
     for tag_id in tag_ids:
         if type(tag_id) is not int or tag_id <= 0:
             raise ValueError("tag_ids must contain positive integers")
+        if tag_id in seen:
+            raise ValueError(f"duplicate tag id: {tag_id}")
+        seen.add(tag_id)
 
 
 @dataclass(frozen=True)
@@ -195,12 +212,13 @@ class AssetTypeNativeCreateInputDTO:
         if self.slug is not None:
             _validate_optional_bounded_string(self.slug, "slug")
         _validate_string_fields(self)
-        _validate_positive_or_none(self.eol_months, "eol_months")
+        _validate_non_negative_or_none(self.eol_months, "eol_months")
         _validate_positive_or_none(self.category_id, "category_id")
         _validate_positive_or_none(self.suggested_asset_role_id, "suggested_asset_role_id")
         _validate_positive_or_none(self.depreciation_id, "depreciation_id")
         if self.staged_image_id is not None:
-            _validate_optional_bounded_string(self.staged_image_id, "staged_image_id")
+            if type(self.staged_image_id) is not str or _STAGED_IMAGE_ID_RE.fullmatch(self.staged_image_id) is None:
+                raise ValueError("staged_image_id must be a bounded server-created opaque stage reference")
         if type(self.tag_ids) is not tuple:
             raise TypeError("tag_ids must be a tuple")
         _validate_tag_ids(self.tag_ids)

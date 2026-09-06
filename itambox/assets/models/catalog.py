@@ -546,3 +546,62 @@ class CategoryDefaultFieldset(BaseModel):
 
     def __str__(self):
         return f"{self.category}: {self.fieldset}"
+
+
+class AssetTypeImageStage(BaseModel):
+    """Internal durable staging authority for a pending Asset Type model image.
+
+    An adapter ingests validated immutable bytes through the staging service
+    before command entry and receives a bounded opaque ``stage_id``. The public
+    create command consumes or discards that reference atomically inside the
+    owner transaction; the stage row and its server-owned storage key are the
+    durable authority (a signed path or cache key cannot record one-time
+    consumption with the owner transaction). Stage metadata is immutable after
+    ingestion so a previewed ID can never later refer to different bytes.
+    """
+
+    class State(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        CONSUMED = "consumed", _("Consumed")
+        DISCARDED = "discarded", _("Discarded")
+
+    stage_id = models.CharField(max_length=64, unique=True, db_index=True, verbose_name=_("Stage ID"))
+    actor_id = models.PositiveBigIntegerField(db_index=True, verbose_name=_("Actor ID"))
+    authentication_revision = models.CharField(max_length=64, verbose_name=_("Authentication Revision"))
+    command_kind = models.CharField(max_length=64, verbose_name=_("Command Kind"))
+    storage_key = models.CharField(max_length=255, unique=True, verbose_name=_("Storage Key"))
+    byte_size = models.PositiveBigIntegerField(verbose_name=_("Byte Size"))
+    content_digest = models.CharField(max_length=64, verbose_name=_("Content Digest"))
+    state = models.CharField(
+        max_length=16,
+        choices=State.choices,
+        default=State.PENDING,
+        db_index=True,
+        verbose_name=_("State"),
+    )
+    expires_at = models.DateTimeField(db_index=True, verbose_name=_("Expires At"))
+    consumed_asset_type = models.ForeignKey(
+        "assets.AssetType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consumed_image_stages",
+        verbose_name=_("Consumed Asset Type"),
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("Asset Type Image Stage")
+        verbose_name_plural = _("Asset Type Image Stages")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(state="consumed") & models.Q(consumed_asset_type__isnull=False))
+                    | (~models.Q(state="consumed") & models.Q(consumed_asset_type__isnull=True))
+                ),
+                name="assettypeimagestage_consumed_link_ck",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.stage_id} ({self.state})"

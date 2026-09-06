@@ -32,6 +32,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0113_assettype_library_identity_immutable",
     "assets.0114_issue479_t06_composition_schema",
     "assets.0115_issue479_t07_provenance_bridge",
+    "assets.0116_assettypeimagestage",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",

@@ -6817,6 +6817,46 @@
     },
     {
       "dependencies": [
+        "assets.0115_issue479_t07_provenance_bridge",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0116_assettypeimagestage",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0116_assettypeimagestage.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -18964,6 +19004,7 @@
     "assets.0113_assettype_library_identity_immutable",
     "assets.0114_issue479_t06_composition_schema",
     "assets.0115_issue479_t07_provenance_bridge",
+    "assets.0116_assettypeimagestage",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -19289,7 +19330,7 @@
         ]
       }
     },
-    "post_transition_migrations": 49,
+    "post_transition_migrations": 50,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

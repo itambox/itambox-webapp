@@ -64,6 +64,7 @@
     "users.0100_issue88_shard_62_users_relations"
   ],
   "current_leaf_ids": [
+    "assets.0116_assettypeimagestage",
     "compliance.0105_custodyhandoffdelivery",
     "extras.0120_issue479_t07_provenance_cutover",
     "inventory.0101_alter_accessoryassignment_options_and_more",
@@ -366,6 +367,7 @@
     "assets.0113_assettype_library_identity_immutable",
     "assets.0114_issue479_t06_composition_schema",
     "assets.0115_issue479_t07_provenance_bridge",
+    "assets.0116_assettypeimagestage",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -402,6 +404,7 @@
     "users.0103_oidcidentity"
   ],
   "post_transition_leaf_ids": [
+    "assets.0116_assettypeimagestage",
     "compliance.0105_custodyhandoffdelivery",
     "extras.0120_issue479_t07_provenance_cutover",
     "inventory.0101_alter_accessoryassignment_options_and_more",
