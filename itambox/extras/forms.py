@@ -80,7 +80,7 @@ def _add_immutable_tamper_errors(form, model):
         return
     for model_field in model.immutable_fields:
         form_field = "choice_set" if model_field == "choice_set_id" else model_field
-        if form_field not in form.data:
+        if form_field not in form.fields or form_field not in form.data:
             continue
         current = getattr(form.instance, model_field)
         submitted = form.data.get(form_field)
@@ -319,7 +319,8 @@ class CustomFieldsetForm(forms.ModelForm):
                 field.disabled = True
         elif self.instance.pk:
             for field_name in CustomFieldset.immutable_fields:
-                self.fields[field_name].disabled = True
+                if field_name in self.fields:
+                    self.fields[field_name].disabled = True
 
         button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = reverse("extras:customfieldset_list")
