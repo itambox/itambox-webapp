@@ -225,7 +225,8 @@ def _assert_row_wait(pid):
             last = cursor.fetchone()
             if last and last[0] == "Lock" and last[2]:
                 cursor.execute(
-                    "SELECT locktype FROM pg_locks WHERE pid = %s AND locktype = 'tuple' AND NOT granted",
+                    "SELECT locktype FROM pg_locks WHERE pid = %s AND NOT granted "
+                    "AND locktype IN ('tuple', 'transactionid')",
                     [pid],
                 )
                 assert cursor.fetchone() is not None
