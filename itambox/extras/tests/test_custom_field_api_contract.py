@@ -34,7 +34,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "name": "api_stage_invalid_regex",
                 "label": "API Stage Invalid Regex",
                 "field_type": "text",
-                "scope": "asset",
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "regex": "[",
                 "object_types": ["asset"],
             }
@@ -49,7 +49,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "name": "api_unknown_validation_rule",
                 "label": "API Unknown Validation Rule",
                 "field_type": "text",
-                "scope": "asset",
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "validation_rule": "unknown-rule",
                 "object_types": ["asset"],
             }
@@ -64,7 +64,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "name": "api_empty_applicability",
                 "label": "API Empty Applicability",
                 "field_type": "text",
-                "scope": None,
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "object_types": [],
             }
         )
@@ -89,7 +89,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "name": "api_stage_select",
                 "label": "API Stage Select",
                 "field_type": "single-select",
-                "scope": "asset",
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "max_values": 1,
             }
         )
@@ -98,19 +98,21 @@ class CustomFieldAPISerializerContractTests(TestCase):
         self.assertIn("choice_set", serializer.errors)
         self.assertIn("object_types", serializer.errors)
 
-    def test_scoped_definition_rejects_mismatched_object_types(self):
+    def test_object_types_are_the_applicability_authority(self):
         serializer = CustomFieldSerializer(
             data={
-                "name": "api_stage_scoped",
-                "label": "API Stage Scoped",
+                "name": "api_stage_asset_type",
+                "label": "API Stage Asset Type",
                 "field_type": "text",
-                "scope": "asset",
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "object_types": ["assettype"],
             }
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("object_types", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        field = serializer.save()
+        self.assertEqual(field.activation, CustomField.ACTIVATION_GLOBAL)
+        self.assertEqual(list(field.object_types.values_list("model", flat=True)), ["assettype"])
 
     def test_valid_select_definition_accepts_matching_contract(self):
         serializer = CustomFieldSerializer(
@@ -118,7 +120,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "name": "api_stage_valid_select",
                 "label": "API Stage Valid Select",
                 "field_type": "single-select",
-                "scope": "asset",
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "max_values": 1,
                 "choice_set": self.choice_set.pk,
                 "object_types": ["asset"],
@@ -135,6 +137,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="api_managed_update",
             label="API Managed Update",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_LOCAL,
         )
         view = ITAMBoxModelViewSet()
@@ -151,7 +154,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         original_guard = view._ensure_unmanaged_definition
 
         def transition_after_initial_check(instance):
-            CustomField.all_objects.filter(pk=instance.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
+            CustomField.objects.filter(pk=instance.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
             return original_guard(instance)
 
         with patch.object(view, "_ensure_unmanaged_definition", side_effect=transition_after_initial_check) as guard:
@@ -166,6 +169,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="api_managed_delete",
             label="API Managed Delete",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_LIBRARY,
         )
         view = ITAMBoxModelViewSet()
@@ -180,12 +184,14 @@ class CustomFieldAPISerializerContractTests(TestCase):
         with self.assertRaises(PermissionDenied):
             view.perform_destroy(field)
 
-        self.assertIsNone(field.deleted_at)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
 
     def test_api_delete_rechecks_locked_managed_definition(self):
         field = CustomField.objects.create(
             name="api_locked_delete",
             label="API Locked Delete",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_LOCAL,
         )
         view = ITAMBoxModelViewSet()
@@ -199,7 +205,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         original_guard = view._ensure_unmanaged_definition
 
         def transition_after_initial_check(instance):
-            CustomField.all_objects.filter(pk=instance.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
+            CustomField.objects.filter(pk=instance.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
             return original_guard(instance)
 
         with patch.object(view, "_ensure_unmanaged_definition", side_effect=transition_after_initial_check) as guard:
@@ -208,14 +214,18 @@ class CustomFieldAPISerializerContractTests(TestCase):
 
         self.assertEqual(guard.call_count, 2)
         field.refresh_from_db()
-        self.assertIsNone(field.deleted_at)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
         self.assertEqual(field.management_kind, CustomField.MANAGEMENT_LIBRARY)
 
     def test_html_edit_rechecks_managed_definition_before_save(self):
         from types import SimpleNamespace
 
-        field = CustomField.objects.create(name="html_edit_lock", label="HTML edit lock")
-        CustomField.all_objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
+        field = CustomField.objects.create(
+            name="html_edit_lock",
+            label="HTML edit lock",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
+        CustomField.objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
         view = ObjectEditView()
         view.model = CustomField
         view.object = field
@@ -233,7 +243,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="html_scalar_edit",
             label="Old label",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(self.asset_ct)
 
@@ -263,8 +273,12 @@ class CustomFieldAPISerializerContractTests(TestCase):
     def test_html_delete_rechecks_managed_definition_before_delete(self):
         from types import SimpleNamespace
 
-        field = CustomField.objects.create(name="html_delete_lock", label="HTML delete lock")
-        CustomField.all_objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
+        field = CustomField.objects.create(
+            name="html_delete_lock",
+            label="HTML delete lock",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
+        CustomField.objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
         view = ObjectDeleteView()
         view.model = CustomField
         view.object = field
@@ -275,14 +289,15 @@ class CustomFieldAPISerializerContractTests(TestCase):
             view.form_valid(SimpleNamespace())
 
         field.refresh_from_db()
-        self.assertIsNone(field.deleted_at)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
 
     def test_asset_type_api_rejects_noncanonical_custom_field_value(self):
         definition = CustomField.objects.create(
             name="api_integer_value",
             label="API Integer Value",
             field_type=CustomField.FIELD_TYPE_INTEGER,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         definition.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="API Manufacturer")
@@ -304,7 +319,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="required_rest_spec",
             label="Required REST specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
             required=True,
         )
         field.object_types.add(self.asset_type_ct)
@@ -325,7 +340,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="required_clear_spec",
             label="Required clear specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
             required=True,
         )
         field.object_types.add(self.asset_type_ct)
@@ -349,6 +364,10 @@ class CustomFieldAPISerializerContractTests(TestCase):
         minimum = CustomField.objects.get(name="operating_temperature_min")
         maximum = CustomField.objects.get(name="operating_temperature_max")
         CustomFieldsetField.objects.filter(custom_field__in=(minimum, maximum)).delete()
+        minimum.refresh_from_db()
+        maximum.refresh_from_db()
+        self.assertEqual(minimum.activation, CustomField.ACTIVATION_COMPOSED)
+        self.assertEqual(maximum.activation, CustomField.ACTIVATION_COMPOSED)
         minimum.object_types.add(self.asset_type_ct)
         maximum.object_types.add(self.asset_type_ct)
         self.assertEqual(maximum.validation_rule, "temperature_max_gte_min")
@@ -380,7 +399,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="roundtrip_spec",
             label="Roundtrip specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="Roundtrip Manufacturer")
@@ -410,7 +429,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="deprecated_spec",
             label="Deprecated specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
             lifecycle=CustomField.LIFECYCLE_DEPRECATED,
         )
         field.object_types.add(self.asset_type_ct)
@@ -437,7 +456,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 name=name,
                 label=name.title(),
                 field_type=CustomField.FIELD_TYPE_TEXT,
-                scope=CustomField.SCOPE_ASSET_TYPE,
+                activation=CustomField.ACTIVATION_GLOBAL,
             )
             field.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="Reserved Name Manufacturer")
@@ -469,13 +488,13 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="visible_spec",
             label="Visible specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         outside = CustomField.objects.create(
             name="outside_spec",
             label="Outside specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         visible.object_types.add(self.asset_type_ct)
         outside.object_types.add(self.asset_type_ct)
@@ -527,7 +546,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="create_spec",
             label="Create specification",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="Create API Maker")
@@ -548,7 +567,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="fieldset_only_create_spec",
             label="Fieldset-only create specification",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         field.object_types.add(self.asset_type_ct)
         fieldset = CustomFieldset.objects.create(namespace="local", slug="create-only-set", label="Create only set")
@@ -570,12 +589,12 @@ class CustomFieldAPISerializerContractTests(TestCase):
         old_field = CustomField.objects.create(
             name="old_asset_spec",
             label="Old asset specification",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         new_field = CustomField.objects.create(
             name="new_asset_spec",
             label="New asset specification",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         old_field.object_types.add(self.asset_ct)
         new_field.object_types.add(self.asset_ct)
@@ -610,7 +629,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="untyped_asset_spec",
             label="Untyped asset specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(self.asset_ct)
         asset = Asset.objects.create(
@@ -635,7 +654,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             name="single_save_spec",
             label="Single save specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="Single Save Manufacturer")
@@ -669,6 +688,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="bulk_delete_contract_field",
             label="Bulk Delete Contract Field",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_CORE,
         )
 
@@ -683,7 +703,8 @@ class CustomFieldAPISerializerContractTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         field.refresh_from_db()
-        self.assertIsNone(field.deleted_at)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
 
     def test_custom_field_bulk_delete_locks_confirmed_selection(self):
         user = get_user_model().objects.create_superuser(
@@ -695,6 +716,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="bulk_lock_contract_field",
             label="Bulk Lock Contract Field",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_LOCAL,
         )
         statements = []
@@ -716,7 +738,8 @@ class CustomFieldAPISerializerContractTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(any("FOR UPDATE" in sql.upper() for sql in statements))
         field.refresh_from_db()
-        self.assertIsNotNone(field.deleted_at)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
 
     def test_custom_field_bulk_edit_rejects_managed_definition_fields(self):
         user = get_user_model().objects.create_superuser(
@@ -728,6 +751,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         field = CustomField.objects.create(
             name="bulk_contract_field",
             label="Bulk Contract Field",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_LOCAL,
         )
 

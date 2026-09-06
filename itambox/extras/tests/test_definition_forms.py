@@ -24,30 +24,29 @@ class CustomDefinitionFormTests(TestCase):
             position=10,
         )
 
-    def _asset_scope_data(self, **overrides):
+    def _asset_applicability_data(self, **overrides):
         data = {
             "name": "form_field",
             "namespace": "local",
             "label": "Form field",
             "help_text": "Help",
             "field_type": CustomField.FIELD_TYPE_TEXT,
-            "scope": CustomField.SCOPE_ASSET,
+            "activation": CustomField.ACTIVATION_GLOBAL,
             "object_types": [str(self.asset_ct.pk)],
             "mappings": "[]",
         }
         data.update(overrides)
         return data
 
-    def test_asset_scope_derives_object_types_before_contract_validation(self):
-        form = CustomFieldForm(data=self._asset_scope_data(object_types=[]))
+    def test_form_requires_explicit_object_types_as_applicability_authority(self):
+        form = CustomFieldForm(data=self._asset_applicability_data(object_types=[]))
 
-        self.assertTrue(form.is_valid(), form.errors)
-        saved = form.save()
-        self.assertEqual(set(saved.object_types.values_list("model", flat=True)), {"asset"})
+        self.assertFalse(form.is_valid())
+        self.assertIn("object_types", form.errors)
 
     def test_temperature_cross_field_rule_is_reserved_to_core_identity(self):
         form = CustomFieldForm(
-            data=self._asset_scope_data(
+            data=self._asset_applicability_data(
                 name="custom_temperature_max",
                 field_type=CustomField.FIELD_TYPE_DECIMAL,
                 decimal_scale="2",
@@ -59,14 +58,14 @@ class CustomDefinitionFormTests(TestCase):
         self.assertIn("validation_rule", form.errors)
 
     def test_definition_form_rejects_invalid_regex(self):
-        form = CustomFieldForm(data=self._asset_scope_data(name="invalid_regex", regex="["))
+        form = CustomFieldForm(data=self._asset_applicability_data(name="invalid_regex", regex="["))
 
         self.assertFalse(form.is_valid())
         self.assertIn("regex", form.errors)
 
     def test_select_requires_choice_set_and_single_select_requires_exactly_one(self):
         missing_choice_set = CustomFieldForm(
-            data=self._asset_scope_data(
+            data=self._asset_applicability_data(
                 name="select_field",
                 field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
                 max_values="1",
@@ -76,7 +75,7 @@ class CustomDefinitionFormTests(TestCase):
         self.assertIn("choice_set", missing_choice_set.errors)
 
         wrong_max_values = CustomFieldForm(
-            data=self._asset_scope_data(
+            data=self._asset_applicability_data(
                 name="select_field",
                 field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
                 choice_set=str(self.choice_set.pk),
@@ -87,7 +86,7 @@ class CustomDefinitionFormTests(TestCase):
         self.assertIn("max_values", wrong_max_values.errors)
 
         valid = CustomFieldForm(
-            data=self._asset_scope_data(
+            data=self._asset_applicability_data(
                 name="select_field",
                 field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
                 choice_set=str(self.choice_set.pk),
@@ -107,7 +106,7 @@ class CustomDefinitionFormTests(TestCase):
             lifecycle=CustomFieldChoiceSet.LIFECYCLE_DEPRECATED,
         )
         form = CustomFieldForm(
-            data=self._asset_scope_data(
+            data=self._asset_applicability_data(
                 name="deprecated_choice_field",
                 field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
                 choice_set=str(deprecated.pk),
@@ -120,13 +119,13 @@ class CustomDefinitionFormTests(TestCase):
 
     def test_decimal_requires_scale_and_non_decimal_rejects_scale(self):
         missing_scale = CustomFieldForm(
-            data=self._asset_scope_data(name="decimal_field", field_type=CustomField.FIELD_TYPE_DECIMAL)
+            data=self._asset_applicability_data(name="decimal_field", field_type=CustomField.FIELD_TYPE_DECIMAL)
         )
         self.assertFalse(missing_scale.is_valid())
         self.assertIn("decimal_scale", missing_scale.errors)
 
         unexpected_scale = CustomFieldForm(
-            data=self._asset_scope_data(
+            data=self._asset_applicability_data(
                 name="text_field",
                 decimal_scale="2",
             )
@@ -140,12 +139,13 @@ class CustomDefinitionFormTests(TestCase):
             namespace="local",
             label="Local immutable field",
             field_type=CustomField.FIELD_TYPE_DECIMAL,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
             quantity_kind="length",
             canonical_unit="m",
             decimal_scale=2,
             nullable=True,
         )
+        field.object_types.add(self.asset_ct)
 
         form = CustomFieldForm(instance=field)
 
@@ -176,8 +176,18 @@ class CustomDefinitionFormTests(TestCase):
         self.assertIn("namespace", tampered.errors)
 
     def test_fieldset_form_persists_post_order_and_explicit_positions(self):
-        first = CustomField.objects.create(name="first_field", label="First", field_type=CustomField.FIELD_TYPE_TEXT)
-        second = CustomField.objects.create(name="second_field", label="Second", field_type=CustomField.FIELD_TYPE_TEXT)
+        first = CustomField.objects.create(
+            name="first_field",
+            label="First",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
+        second = CustomField.objects.create(
+            name="second_field",
+            label="Second",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
         data = QueryDict(mutable=True)
         data.update(
             {
@@ -201,10 +211,16 @@ class CustomDefinitionFormTests(TestCase):
 
     def test_fieldset_form_rejects_effective_position_collisions_before_save(self):
         first = CustomField.objects.create(
-            name="collision_first", label="First", field_type=CustomField.FIELD_TYPE_TEXT
+            name="collision_first",
+            label="First",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         second = CustomField.objects.create(
-            name="collision_second", label="Second", field_type=CustomField.FIELD_TYPE_TEXT
+            name="collision_second",
+            label="Second",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         data = QueryDict(mutable=True)
         data.update(
@@ -226,9 +242,10 @@ class CustomDefinitionFormTests(TestCase):
             namespace="itambox",
             label="Core form field",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_CORE,
         )
+        core_field.object_types.add(self.asset_ct)
         core_field_form = CustomFieldForm(instance=core_field)
         self.assertTrue(all(field.disabled for field in core_field_form.fields.values()))
 

@@ -1,15 +1,11 @@
-from datetime import timedelta
-from io import StringIO
-
 from django.contrib.contenttypes.models import ContentType
-from django.core import management
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.test import TestCase
-from django.utils import timezone
 
 from assets.models import Supplier
-from core.purge_handlers import TombstonePurgeBlocked, purge_object
+from core.purge_handlers import purge_object
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 
@@ -20,6 +16,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         field = CustomField.objects.create(
             name="managed_bulk_field",
             label="Managed Bulk Field",
+            activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_CORE,
         )
 
@@ -80,7 +77,6 @@ class CustomFieldDefinitionFoundationTests(TestCase):
                 name=name,
                 field_type=field_type,
                 required=True,
-                deleted_at=None,
                 lifecycle=CustomField.LIFECYCLE_ACTIVE,
             )
 
@@ -111,7 +107,6 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
             required=True,
             nullable=True,
-            deleted_at=None,
             lifecycle=CustomField.LIFECYCLE_ACTIVE,
         )
         with self.assertRaises(ValidationError):
@@ -124,7 +119,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             name="unknown_validation_rule",
             label="Unknown validation rule",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
             validation_rule="unknown-rule",
         )
 
@@ -133,35 +128,21 @@ class CustomFieldDefinitionFoundationTests(TestCase):
 
         self.assertIn("validation_rule", raised.exception.message_dict)
 
-    def test_managed_definition_lifecycle_uses_deleted_at_for_delete_state(self):
-        self.assertNotIn("deleted", dict(CustomField.LIFECYCLE_CHOICES))
+    def test_reusable_definition_deprecation_retains_identity_and_blocks_delete(self):
+        self.assertEqual(set(dict(CustomField.LIFECYCLE_CHOICES)), {"active", "deprecated"})
+        self.assertFalse(hasattr(CustomField, "restore"))
         field = CustomField.objects.create(
             name="lifecycle_state_field",
             label="Lifecycle state field",
-            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+            activation=CustomField.ACTIVATION_GLOBAL,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
         )
 
-        field.delete()
-        field.refresh_from_db()
-        self.assertIsNotNone(field.deleted_at)
-        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
-
-        field.restore()
-        field.refresh_from_db()
-        self.assertIsNone(field.deleted_at)
-        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
-
-    def test_legacy_deleted_lifecycle_is_normalized_on_restore(self):
-        field = CustomField.objects.create(
-            name="legacy_deleted_lifecycle",
-            label="Legacy deleted lifecycle",
-        )
-        CustomField.all_objects.filter(pk=field.pk).update(lifecycle="deleted", deleted_at=timezone.now())
+        with self.assertRaises(ProtectedError):
+            field.delete()
 
         field.refresh_from_db()
-        field.restore()
-        field.refresh_from_db()
-        self.assertIsNone(field.deleted_at)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
         self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_DEPRECATED)
 
     def test_overlapping_alternation_regex_fails_closed(self):
@@ -241,7 +222,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             namespace="local",
             label="Port speed",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
             choice_set=choice_set,
             max_values=1,
         )
@@ -268,12 +249,13 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         with self.assertRaises(ValidationError):
             fieldset.save()
 
-        tombstone = CustomFieldChoiceSet.objects.create(
+        reserved_identity = CustomFieldChoiceSet.objects.create(
             namespace="local",
             slug="reserved-identity",
             label="Reserved identity",
         )
-        tombstone.delete()
+        with self.assertRaises(ProtectedError):
+            reserved_identity.delete()
         with self.assertRaises(IntegrityError), transaction.atomic():
             CustomFieldChoiceSet.objects.create(namespace="local", slug="reserved-identity", label="Reused identity")
 
@@ -282,6 +264,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             name="required_supplier_field",
             label="Required supplier field",
             field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_GLOBAL,
             required=True,
         )
         field.object_types.add(ContentType.objects.get_for_model(Supplier))
@@ -295,6 +278,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             name="supplier_decimal_value",
             label="Supplier decimal value",
             field_type=CustomField.FIELD_TYPE_DECIMAL,
+            activation=CustomField.ACTIVATION_GLOBAL,
             decimal_scale=2,
         )
         decimal_field.object_types.add(supplier_type)
@@ -316,6 +300,7 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             name="supplier_state_value",
             label="Supplier state value",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=choice_set,
             max_values=1,
         )
@@ -328,23 +313,25 @@ class CustomFieldDefinitionFoundationTests(TestCase):
                 custom_field_data={"supplier_state_value": "removed"},
             )
 
-    def test_deleted_choice_set_rejects_new_choice_values(self):
+    def test_deprecated_choice_set_rejects_new_choice_values(self):
         from extras.customfields import validate_custom_field_value
 
         choice_set = CustomFieldChoiceSet.objects.create(
             namespace="local",
-            slug="deleted-choice-set",
-            label="Deleted choice set",
+            slug="deprecated-choice-set",
+            label="Deprecated choice set",
         )
         choice = CustomFieldChoice.objects.create(choice_set=choice_set, key="one", label="One", position=10)
         field = CustomField.objects.create(
-            name="deleted_choice_field",
-            label="Deleted choice field",
+            name="deprecated_choice_field",
+            label="Deprecated choice field",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=choice_set,
             max_values=1,
         )
-        choice_set.delete()
+        choice_set.lifecycle = CustomFieldChoiceSet.LIFECYCLE_DEPRECATED
+        choice_set.save(update_fields=["lifecycle"])
 
         with self.assertRaises(ValidationError):
             validate_custom_field_value(field, choice.key)
@@ -363,32 +350,29 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             name="ordered_multi",
             label="Ordered multi",
             field_type=CustomField.FIELD_TYPE_MULTI_SELECT,
+            activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=choice_set,
             max_values=2,
         )
 
         self.assertEqual(validate_custom_field_value(field, ["z-last", "a-first"]), ["a-first", "z-last"])
 
-    def test_generic_purge_preserves_schema_definition_tombstones(self):
+    def test_generic_purge_cannot_remove_permanent_schema_definition(self):
         field = CustomField.objects.create(
-            name="permanent_schema_tombstone",
-            label="Permanent schema tombstone",
-            scope=CustomField.SCOPE_ASSET,
+            name="permanent_schema_definition",
+            label="Permanent schema definition",
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(ContentType.objects.get(app_label="assets", model="asset"))
-        field.delete()
-        old_deleted_at = timezone.now() - timedelta(days=31)
-        CustomField.all_objects.filter(pk=field.pk).update(deleted_at=old_deleted_at)
-        output = StringIO()
 
-        management.call_command("purge_deleted", days=30, stdout=output)
+        with self.assertRaises(ProtectedError):
+            purge_object(field)
 
-        self.assertTrue(CustomField.all_objects.filter(pk=field.pk).exists())
-        management.call_command("purge_deleted", days=30, stdout=output, dry_run=True)
+        self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
+        field.refresh_from_db()
+        self.assertEqual(field.lifecycle, CustomField.LIFECYCLE_ACTIVE)
 
-        self.assertIn("Total permanent tombstones deferred: 1", output.getvalue())
-
-    def test_soft_delete_preserves_references_and_restore_keeps_composition(self):
+    def test_deprecated_definitions_retain_references_and_other_soft_delete_stays_intact(self):
         choice_set = CustomFieldChoiceSet.objects.create(
             namespace="local",
             slug="lifecycle-choices",
@@ -405,38 +389,17 @@ class CustomFieldDefinitionFoundationTests(TestCase):
             namespace="local",
             label="Lifecycle state",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
             choice_set=choice_set,
             max_values=1,
         )
+        field.object_types.add(ContentType.objects.get(app_label="assets", model="assettype"))
         fieldset = CustomFieldset.objects.create(
             namespace="local",
             slug="lifecycle",
             label="Lifecycle",
         )
         membership = CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
-
-        fieldset.delete()
-        fieldset.refresh_from_db()
-        self.assertIsNotNone(fieldset.deleted_at)
-        self.assertEqual(CustomFieldsetField.objects.get(pk=membership.pk).fieldset_id, fieldset.pk)
-        fieldset.restore()
-
-        field.delete()
-        field.refresh_from_db()
-        self.assertIsNotNone(field.deleted_at)
-        self.assertEqual(CustomFieldsetField.objects.get(pk=membership.pk).custom_field_id, field.pk)
-        field.restore()
-
-        choice_set.delete()
-        choice_set.refresh_from_db()
-        self.assertIsNotNone(choice_set.deleted_at)
-        self.assertEqual(CustomFieldChoice.all_objects.get(pk=choice.pk).choice_set_id, choice_set.pk)
-        choice_set.restore()
-
-        self.assertIsNone(fieldset.deleted_at)
-        self.assertIsNone(field.deleted_at)
-        self.assertIsNone(choice_set.deleted_at)
 
         from assets.models import AssetType, AssetTypeFieldset, Manufacturer
 
@@ -448,13 +411,26 @@ class CustomFieldDefinitionFoundationTests(TestCase):
         )
         asset_type_membership = AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
 
+        asset_type.delete()
+        asset_type.refresh_from_db()
+        self.assertIsNotNone(asset_type.deleted_at)
+        self.assertTrue(AssetType.all_objects.filter(pk=asset_type.pk).exists())
+
         purge_object(asset_type)
+        self.assertFalse(AssetType.all_objects.filter(pk=asset_type.pk).exists())
         self.assertFalse(AssetTypeFieldset.objects.filter(pk=asset_type_membership.pk).exists())
 
-        fieldset.delete()
-        field.delete()
-        choice_set.delete()
         for definition in (fieldset, field, choice_set):
-            with self.assertRaises(TombstonePurgeBlocked):
-                purge_object(definition)
-            self.assertTrue(definition.__class__.all_objects.filter(pk=definition.pk).exists())
+            definition.lifecycle = definition.LIFECYCLE_DEPRECATED
+            definition.save(update_fields=["lifecycle"])
+
+        self.assertEqual(CustomFieldsetField.objects.get(pk=membership.pk).fieldset_id, fieldset.pk)
+        self.assertEqual(CustomFieldsetField.objects.get(pk=membership.pk).custom_field_id, field.pk)
+        self.assertEqual(CustomFieldChoice.objects.get(pk=choice.pk).choice_set_id, choice_set.pk)
+
+        for definition in (fieldset, field, choice_set):
+            with self.assertRaises(ProtectedError):
+                definition.delete()
+            definition.refresh_from_db()
+            self.assertTrue(definition.__class__.objects.filter(pk=definition.pk).exists())
+            self.assertEqual(definition.lifecycle, definition.LIFECYCLE_DEPRECATED)
