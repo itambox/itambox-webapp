@@ -143,6 +143,7 @@ class Dashboard(models.Model):
 
 class _ManagedDefinitionMixin(models.Model):
     """Shared metadata and immutable identity rules for reusable definitions."""
+
     MANAGEMENT_CORE = "core"
     MANAGEMENT_LIBRARY = "library"
     MANAGEMENT_LOCAL = "local"
