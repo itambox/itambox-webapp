@@ -1701,6 +1701,12 @@ export interface components {
      * @enum {string}
      */
     ActionTypeEnum: "webhook" | "notification";
+    /**
+     * @description * `composed` - Composed
+     * * `global` - Global
+     * @enum {string}
+     */
+    ActivationEnum: "composed" | "global";
     AlertLog: {
       id: number;
       /** Format: uri */
@@ -3044,7 +3050,7 @@ export interface components {
       help_text?: string;
       field_type?: components["schemas"]["FieldTypeEnum"];
       field_type_display: string;
-      scope?: components["schemas"]["ScopeEnum"] | null;
+      activation: components["schemas"]["ActivationEnum"];
       quantity_kind?: string | null;
       canonical_unit?: string | null;
       /** Format: decimal */
@@ -3077,7 +3083,7 @@ export interface components {
       label: string;
       help_text?: string;
       field_type?: components["schemas"]["FieldTypeEnum"];
-      scope?: components["schemas"]["ScopeEnum"] | null;
+      activation: components["schemas"]["ActivationEnum"];
       quantity_kind?: string | null;
       canonical_unit?: string | null;
       /** Format: decimal */
@@ -5415,7 +5421,7 @@ export interface components {
       label?: string;
       help_text?: string;
       field_type?: components["schemas"]["FieldTypeEnum"];
-      scope?: components["schemas"]["ScopeEnum"] | null;
+      activation?: components["schemas"]["ActivationEnum"];
       quantity_kind?: string | null;
       canonical_unit?: string | null;
       /** Format: decimal */
@@ -6188,13 +6194,6 @@ export interface components {
       startIndex: number;
       Resources: components["schemas"]["SCIMUser"][];
     };
-    /**
-     * @description * `asset_type` - Asset Type
-     * * `asset` - Asset
-     * * `both` - Asset Type and Asset
-     * @enum {string}
-     */
-    ScopeEnum: "asset_type" | "asset" | "both";
     /**
      * @description * `info` - Info
      * * `warning` - Warning

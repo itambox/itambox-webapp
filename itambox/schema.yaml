@@ -38464,6 +38464,14 @@ components:
       description: |-
         * `webhook` - Webhook
         * `notification` - Notification
+    ActivationEnum:
+      enum:
+      - composed
+      - global
+      type: string
+      description: |-
+        * `composed` - Composed
+        * `global` - Global
     AlertLog:
       type: object
       properties:
@@ -41573,10 +41581,8 @@ components:
         field_type_display:
           type: string
           readOnly: true
-        scope:
-          allOf:
-          - $ref: '#/components/schemas/ScopeEnum'
-          nullable: true
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
         quantity_kind:
           type: string
           nullable: true
@@ -41640,6 +41646,7 @@ components:
           format: date-time
           readOnly: true
       required:
+      - activation
       - created_at
       - field_type_display
       - id
@@ -41671,10 +41678,8 @@ components:
           maxLength: 4096
         field_type:
           $ref: '#/components/schemas/FieldTypeEnum'
-        scope:
-          allOf:
-          - $ref: '#/components/schemas/ScopeEnum'
-          nullable: true
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
         quantity_kind:
           type: string
           nullable: true
@@ -41731,6 +41736,7 @@ components:
             minLength: 1
             title: Python model class name
       required:
+      - activation
       - label
       - name
     CustomFieldset:
@@ -46375,10 +46381,8 @@ components:
           maxLength: 4096
         field_type:
           $ref: '#/components/schemas/FieldTypeEnum'
-        scope:
-          allOf:
-          - $ref: '#/components/schemas/ScopeEnum'
-          nullable: true
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
         quantity_kind:
           type: string
           nullable: true
@@ -48152,16 +48156,6 @@ components:
       - schemas
       - startIndex
       - totalResults
-    ScopeEnum:
-      enum:
-      - asset_type
-      - asset
-      - both
-      type: string
-      description: |-
-        * `asset_type` - Asset Type
-        * `asset` - Asset
-        * `both` - Asset Type and Asset
     SeverityEnum:
       enum:
       - info
