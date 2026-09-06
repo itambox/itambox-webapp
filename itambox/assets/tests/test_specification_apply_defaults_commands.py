@@ -447,3 +447,105 @@ class SpecificationApplyDefaultsCommandTests(TenantTestMixin, TestCase):
             before_memberships,
         )
         self.assertEqual(self._changes(AssetType, self.type.pk).count(), before_changes)
+
+    def test_apply_preview_and_write_reject_soft_deleted_category(self):
+        self.category.delete()
+        matching = preview_apply_category_defaults(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            expected_resource_revision=self._resource_revision(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(matching, CommandRejectedDTO)
+        self.assertIsNone(matching.safe_owner)
+        self.assertEqual([issue.code for issue in matching.issues], ["OBJECT_UNAVAILABLE"])
+
+        stale = preview_apply_category_defaults(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            expected_resource_revision="sha256:stale",
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(stale, CommandRejectedDTO)
+        self.assertEqual([issue.code for issue in stale.issues], ["OBJECT_UNAVAILABLE"])
+
+        result = apply_category_defaults(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            preview_token="any",
+            expected_resource_revision="sha256:any",
+            expected_definition_revision="sha256:any",
+            expected_category_default_snapshot_revision="sha256:any",
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertIsNone(result.safe_owner)
+        self.assertEqual([issue.code for issue in result.issues], ["OBJECT_UNAVAILABLE"])
+        self.assertEqual(
+            list(AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset_id", "position")),
+            [(self.first.pk, 1)],
+        )
+
+    def test_apply_unauthorized_actor_with_broken_graph_is_object_unavailable(self):
+        outsider = User.objects.create_user(username="apply-outsider")
+        broken = CustomFieldset.objects.create(
+            namespace="local",
+            slug="apply-broken",
+            label="Apply broken",
+            lifecycle=CustomFieldset.LIFECYCLE_DEPRECATED,
+            management_kind=CustomFieldset.MANAGEMENT_LOCAL,
+        )
+        CategoryDefaultFieldset.objects.create(category=self.category, fieldset=broken, position=2)
+        preview = preview_apply_category_defaults(
+            actor=ActorContextDTO(
+                actor_id=outsider.pk,
+                authentication_revision=authentication_revision_for_actor(outsider),
+            ),
+            asset_type_id=self.type.pk,
+            expected_resource_revision=self._resource_revision(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, CommandRejectedDTO)
+        self.assertIsNone(preview.safe_owner)
+        self.assertEqual([issue.code for issue in preview.issues], ["OBJECT_UNAVAILABLE"])
+
+        result = apply_category_defaults(
+            actor=ActorContextDTO(
+                actor_id=outsider.pk,
+                authentication_revision=authentication_revision_for_actor(outsider),
+            ),
+            asset_type_id=self.type.pk,
+            preview_token="any",
+            expected_resource_revision="sha256:any",
+            expected_definition_revision="sha256:any",
+            expected_category_default_snapshot_revision="sha256:any",
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertIsNone(result.safe_owner)
+        self.assertEqual([issue.code for issue in result.issues], ["OBJECT_UNAVAILABLE"])
+
+    def test_apply_invalid_token_with_broken_graph_is_stale_plan_not_structure(self):
+        broken = CustomFieldset.objects.create(
+            namespace="local",
+            slug="apply-broken-token",
+            label="Apply broken token",
+            lifecycle=CustomFieldset.LIFECYCLE_DEPRECATED,
+            management_kind=CustomFieldset.MANAGEMENT_LOCAL,
+        )
+        CategoryDefaultFieldset.objects.create(category=self.category, fieldset=broken, position=2)
+        result = apply_category_defaults(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            preview_token="malformed-token",
+            expected_resource_revision="sha256:any",
+            expected_definition_revision="sha256:any",
+            expected_category_default_snapshot_revision="sha256:any",
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertEqual([issue.code for issue in result.issues], ["STALE_PLAN"])
+        self.assertEqual(
+            list(AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset_id", "position")),
+            [(self.first.pk, 1)],
+        )

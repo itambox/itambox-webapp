@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import shutil
+import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.conf import settings
@@ -11,19 +16,27 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.core.files.storage import FileSystemStorage
+from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from assets.models.asset import Asset
 from assets.models.catalog import (
     AssetRole,
     AssetType,
     AssetTypeFieldset,
+    AssetTypeImageStage,
     Category,
     CategoryDefaultFieldset,
     Depreciation,
     Manufacturer,
 )
 from assets.services.specifications._create_commands import _create_input_digest
+from assets.services.specifications._image_staging import (
+    discard_stage,
+    ingest_staged_image,
+)
 from assets.services.specifications.commands import create_asset_type, preview_asset_type_create
 from assets.services.specifications.contracts import (
     AssetTypeNativeCreateInputDTO,
@@ -43,6 +56,12 @@ from extras.models import CustomField, CustomFieldset, CustomFieldsetField, Tag
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
+
+# 1x1 red PNG (valid real image bytes for the Pillow/libmagic fallback).
+_TINY_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c63f8cfc0f01f00050001ff89993d1d0000000049454e44ae426082"
+)
 
 
 class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
@@ -128,6 +147,9 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         slug=None,
         staged_image_id=None,
         tag_ids=(),
+        role_id=None,
+        depreciation_id=None,
+        eol_months=48,
     ):
         return AssetTypeNativeCreateInputDTO(
             manufacturer_id=manufacturer_id if manufacturer_id is not None else self.manufacturer.pk,
@@ -137,10 +159,10 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             ean="4000000000001",
             region="EU",
             configuration="64GB",
-            eol_months=48,
+            eol_months=eol_months,
             category_id=category_id,
-            suggested_asset_role_id=self.role.pk,
-            depreciation_id=self.depreciation.pk,
+            suggested_asset_role_id=self.role.pk if role_id is None else role_id,
+            depreciation_id=self.depreciation.pk if depreciation_id is None else depreciation_id,
             staged_image_id=staged_image_id,
             description="Create description",
             comments="Create comments",
@@ -152,6 +174,23 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         return ActorContextDTO(
             actor_id=self.user.pk,
             authentication_revision=authentication_revision_for_actor(self.user),
+        )
+
+    @contextmanager
+    def _stage_media(self):
+        """Disposable real storage for staged-image regressions."""
+        storage = FileSystemStorage(location=tempfile.mkdtemp(prefix="itambox-stage-media-"))
+        with patch("assets.services.specifications._image_staging.default_storage", storage):
+            yield storage
+        shutil.rmtree(storage.location, ignore_errors=True)
+
+    def _new_stage(self, *, actor=None, content=None, name="type-image.png", now=None):
+        return ingest_staged_image(
+            actor=actor or self._actor(),
+            command_kind="create_asset_type",
+            content=content or _TINY_PNG,
+            original_name=name,
+            now=now,
         )
 
     def _omitted(self):
@@ -217,7 +256,23 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         with self.assertRaises(ValueError):
             self._native(tag_ids=(0,))
         with self.assertRaises(ValueError):
+            self._native(tag_ids=(self.tag.pk, self.tag.pk))
+        with self.assertRaises(ValueError):
             self._native(staged_image_id="")
+        with self.assertRaises(ValueError):
+            self._native(staged_image_id="staged-1")
+        with self.assertRaises(ValueError):
+            self._native(staged_image_id="A" * 32)
+        with self.assertRaises(ValueError):
+            self._native(staged_image_id="a" * 31)
+        with self.assertRaises(ValueError):
+            self._native(staged_image_id="a" * 64)
+        with self.assertRaises(ValueError):
+            self._native(eol_months=-1)
+        bounded = self._native(staged_image_id="a" * 32)
+        self.assertEqual(bounded.staged_image_id, "a" * 32)
+        zero_eol = self._native(eol_months=0)
+        self.assertEqual(zero_eol.eol_months, 0)
 
     def test_create_with_category_and_omitted_fieldsets_consumes_defaults(self):
         preview = preview_asset_type_create(
@@ -627,7 +682,11 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             fieldsets=self._omitted(),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
         )
-        self.assertIsInstance(preview, AssetTypePreviewDTO)
+        self.assertIsInstance(preview, CommandRejectedDTO)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in preview.issues],
+            [("REFERENCE_CONFLICT", ("slug",))],
+        )
         before_count = AssetType.all_objects.count()
         before_changes = self._changes(AssetType, self.existing.pk).count()
         result = create_asset_type(
@@ -636,11 +695,14 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             fieldsets=self._omitted(),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
             preview_token=None,
-            expected_definition_revision=preview.expected_definition_revision,
+            expected_definition_revision="sha256:any",
             expected_category_default_snapshot_revision=None,
         )
         self.assertIsInstance(result, CommandRejectedDTO)
-        self.assertEqual([issue.code for issue in result.issues], ["REFERENCE_CONFLICT"])
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in result.issues],
+            [("REFERENCE_CONFLICT", ("slug",))],
+        )
         self.assertEqual(AssetType.all_objects.count(), before_count)
         self.assertEqual(self._changes(AssetType, self.existing.pk).count(), before_changes)
 
@@ -726,18 +788,603 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(AssetType.all_objects.count(), before_count)
         self.assertEqual(AssetTypeFieldset.objects.count(), 0)
 
-    def test_staged_image_id_has_no_staging_authority_and_is_rejected(self):
+    def test_native_model_limits_are_enforced_in_preview_and_write(self):
+        cases = (
+            ({"model": "m" * 256}, ("model",)),
+            ({"part_number": "p" * 101}, ("part_number",)),
+            ({"ean": "1" * 15}, ("ean",)),
+            ({"region": "r" * 65}, ("region",)),
+            ({"configuration": "c" * 256}, ("configuration",)),
+        )
+        for overrides, path in cases:
+            with self.subTest(path=path[0]):
+                native = self._native(**overrides)
+                preview = preview_asset_type_create(
+                    actor=self._actor(),
+                    native=native,
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                )
+                self.assertIsInstance(preview, CommandRejectedDTO)
+                self.assertEqual(
+                    [(issue.code, issue.path) for issue in preview.issues],
+                    [("INVALID_RANGE", path)],
+                )
+                result = create_asset_type(
+                    actor=self._actor(),
+                    native=native,
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                    preview_token=None,
+                    expected_definition_revision="sha256:any",
+                    expected_category_default_snapshot_revision=None,
+                )
+                self.assertIsInstance(result, CommandRejectedDTO)
+                self.assertEqual(
+                    [(issue.code, issue.path) for issue in result.issues],
+                    [("INVALID_RANGE", path)],
+                )
+        self.assertEqual(AssetType.all_objects.count(), 1)
+
+    def test_invalid_explicit_slug_syntax_is_rejected_in_preview_and_write(self):
+        native = self._native(category_id=None, slug="bad slug /")
         preview = preview_asset_type_create(
             actor=self._actor(),
-            native=self._native(category_id=self.category.pk, staged_image_id="staged-1"),
-            fieldsets=self._omitted(),
+            native=native,
+            fieldsets=self._explicit_empty(),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
         )
         self.assertIsInstance(preview, CommandRejectedDTO)
         self.assertEqual(
             [(issue.code, issue.path) for issue in preview.issues],
-            [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            [("INVALID_TYPE", ("slug",))],
         )
+        result = create_asset_type(
+            actor=self._actor(),
+            native=native,
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=None,
+            expected_definition_revision="sha256:any",
+            expected_category_default_snapshot_revision=None,
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in result.issues],
+            [("INVALID_TYPE", ("slug",))],
+        )
+
+    def test_zero_eol_months_matches_the_positive_integer_field_semantics(self):
+        preview = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=None, eol_months=0),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, AssetTypePreviewDTO)
+        result = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=None, eol_months=0),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=None,
+            expected_definition_revision=preview.expected_definition_revision,
+            expected_category_default_snapshot_revision=None,
+        )
+        self.assertIsInstance(result, OwnerCreatedDTO)
+        created = AssetType.all_objects.get(pk=result.owner.owner_id)
+        self.assertEqual(created.eol_months, 0)
+
+    def test_unknown_and_soft_deleted_role_depreciation_tags_are_rejected(self):
+        cases = (
+            ({"role_id": 999999}, ("suggested_asset_role_id",)),
+            ({"depreciation_id": 999999}, ("depreciation_id",)),
+            ({"tag_ids": (999999,)}, ("tag_ids",)),
+        )
+        for overrides, path in cases:
+            with self.subTest(overrides=overrides):
+                preview = preview_asset_type_create(
+                    actor=self._actor(),
+                    native=self._native(category_id=None, **overrides),
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                )
+                self.assertIsInstance(preview, CommandRejectedDTO)
+                self.assertEqual(
+                    [(issue.code, issue.path) for issue in preview.issues],
+                    [("REFERENCE_CONFLICT", path)],
+                )
+                result = create_asset_type(
+                    actor=self._actor(),
+                    native=self._native(category_id=None, **overrides),
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                    preview_token=None,
+                    expected_definition_revision="sha256:any",
+                    expected_category_default_snapshot_revision=None,
+                )
+                self.assertIsInstance(result, CommandRejectedDTO)
+                self.assertEqual(
+                    [(issue.code, issue.path) for issue in result.issues],
+                    [("REFERENCE_CONFLICT", path)],
+                )
+
+        self.role.delete()
+        self.depreciation.delete()
+        deleted_tag = Tag.objects.create(name="Doomed tag", slug="doomed-tag")
+        deleted_tag.delete()
+        for overrides, path in (
+            ({"role_id": self.role.pk}, ("suggested_asset_role_id",)),
+            ({"depreciation_id": self.depreciation.pk}, ("depreciation_id",)),
+            ({"tag_ids": (deleted_tag.pk,)}, ("tag_ids",)),
+        ):
+            with self.subTest(overrides=overrides):
+                preview = preview_asset_type_create(
+                    actor=self._actor(),
+                    native=self._native(category_id=None, **overrides),
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                )
+                self.assertIsInstance(preview, CommandRejectedDTO)
+                self.assertEqual(
+                    [(issue.code, issue.path) for issue in preview.issues],
+                    [("REFERENCE_CONFLICT", path)],
+                )
+        self.assertEqual(AssetType.all_objects.count(), 1)
+
+    def test_unauthorized_actor_with_broken_graph_is_object_unavailable(self):
+        outsider = User.objects.create_user(username="create-outsider")
+        preview = preview_asset_type_create(
+            actor=ActorContextDTO(
+                actor_id=outsider.pk,
+                authentication_revision=authentication_revision_for_actor(outsider),
+            ),
+            native=self._native(category_id=None),
+            fieldsets=self._selection(self.deprecated),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, CommandRejectedDTO)
+        self.assertEqual([issue.code for issue in preview.issues], ["OBJECT_UNAVAILABLE"])
+
+        result = create_asset_type(
+            actor=ActorContextDTO(
+                actor_id=outsider.pk,
+                authentication_revision=authentication_revision_for_actor(outsider),
+            ),
+            native=self._native(category_id=None),
+            fieldsets=self._selection(self.deprecated),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token="any",
+            expected_definition_revision="sha256:any",
+            expected_category_default_snapshot_revision=None,
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertIsNone(result.safe_owner)
+        self.assertEqual([issue.code for issue in result.issues], ["OBJECT_UNAVAILABLE"])
+
+    def test_invalid_token_with_broken_graph_is_stale_plan_not_structure(self):
+        result = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=None),
+            fieldsets=self._selection(self.deprecated),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token="malformed-token",
+            expected_definition_revision="sha256:any",
+            expected_category_default_snapshot_revision=None,
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertEqual([issue.code for issue in result.issues], ["STALE_PLAN"])
+
+    def test_stale_definition_beats_deprecated_member_graph_rejection(self):
+        preview = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=None),
+            fieldsets=self._selection(self.first),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, AssetTypePreviewDTO)
+        CustomField.objects.filter(pk=self.first_field.pk).update(lifecycle=CustomField.LIFECYCLE_DEPRECATED)
+        result = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=None),
+            fieldsets=self._selection(self.first),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=None,
+            expected_definition_revision=preview.expected_definition_revision,
+            expected_category_default_snapshot_revision=None,
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in result.issues],
+            [("STALE_DEFINITION", ("expected_definition_revision",))],
+        )
+        self.assertEqual(AssetType.all_objects.count(), 1)
+
+    def test_stage_precedence_never_below_authority_token_or_revision_gates(self):
+        outsider = User.objects.create_user(username="stage-outsider")
+        preview = preview_asset_type_create(
+            actor=ActorContextDTO(
+                actor_id=outsider.pk,
+                authentication_revision=authentication_revision_for_actor(outsider),
+            ),
+            native=self._native(category_id=None, staged_image_id="a" * 32),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, CommandRejectedDTO)
+        self.assertEqual([issue.code for issue in preview.issues], ["OBJECT_UNAVAILABLE"])
+
+        valid = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._omitted(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(valid, AssetTypePreviewDTO)
+        CategoryDefaultFieldset.objects.create(category=self.category, fieldset=self.second, position=2)
+        stale_snapshot = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk, staged_image_id="a" * 32),
+            fieldsets=self._omitted(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=valid.preview_token,
+            expected_definition_revision=valid.expected_definition_revision,
+            expected_category_default_snapshot_revision=valid.expected_category_default_snapshot_revision,
+        )
+        self.assertIsInstance(stale_snapshot, CommandRejectedDTO)
+        self.assertEqual(
+            [issue.code for issue in stale_snapshot.issues],
+            ["STALE_RESOURCE"],
+        )
+
+    def test_staged_image_is_consumed_atomically_with_create_and_reads_back(self):
+        with self._stage_media() as storage:
+            stage_id = self._new_stage()
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, AssetTypePreviewDTO)
+            result = create_asset_type(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=None,
+                expected_definition_revision=preview.expected_definition_revision,
+                expected_category_default_snapshot_revision=None,
+            )
+            self.assertIsInstance(result, OwnerCreatedDTO)
+            created = AssetType.all_objects.get(pk=result.owner.owner_id)
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(created.image.name, stage.storage_key)
+            self.assertTrue(created.image.name.startswith("asset_types/"))
+            self.assertEqual(stage.state, "consumed")
+            self.assertEqual(stage.consumed_asset_type_id, created.pk)
+            self.assertTrue(storage.exists(stage.storage_key))
+            self.assertEqual(storage.open(stage.storage_key).read(), _TINY_PNG)
+
+    def test_repeated_preview_does_not_churn_the_stage(self):
+        with self._stage_media():
+            stage_id = self._new_stage()
+            native = self._native(category_id=None, staged_image_id=stage_id)
+            first = preview_asset_type_create(
+                actor=self._actor(),
+                native=native,
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            second = preview_asset_type_create(
+                actor=self._actor(),
+                native=native,
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(first, AssetTypePreviewDTO)
+            self.assertIsInstance(second, AssetTypePreviewDTO)
+            self.assertEqual(first.expected_definition_revision, second.expected_definition_revision)
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
+            self.assertEqual(stage.content_digest, hashlib.sha256(_TINY_PNG).hexdigest())
+
+    def test_staged_image_replay_is_reference_conflict(self):
+        with self._stage_media():
+            stage_id = self._new_stage()
+            native = self._native(category_id=self.category.pk, staged_image_id=stage_id)
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=native,
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, AssetTypePreviewDTO)
+            result = create_asset_type(
+                actor=self._actor(),
+                native=native,
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=preview.preview_token,
+                expected_definition_revision=preview.expected_definition_revision,
+                expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+            )
+            self.assertIsInstance(result, OwnerCreatedDTO)
+            before_count = AssetType.all_objects.count()
+
+            replay_preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=native,
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(replay_preview, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in replay_preview.issues],
+                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            )
+            replay = create_asset_type(
+                actor=self._actor(),
+                native=native,
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=preview.preview_token,
+                expected_definition_revision=preview.expected_definition_revision,
+                expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+            )
+            self.assertIsInstance(replay, CommandRejectedDTO)
+            self.assertEqual([issue.code for issue in replay.issues], ["REFERENCE_CONFLICT"])
+            self.assertEqual(AssetType.all_objects.count(), before_count)
+
+    def test_staged_image_wrong_actor_and_stale_auth_are_rejected(self):
+        with self._stage_media():
+            stage_id = self._new_stage()
+            other_user = User.objects.create_user(username="stage-other")
+            other_actor = ActorContextDTO(
+                actor_id=other_user.pk,
+                authentication_revision=authentication_revision_for_actor(other_user),
+            )
+            preview = preview_asset_type_create(
+                actor=other_actor,
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in preview.issues],
+                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            )
+
+            stale_revision = authentication_revision_for_actor(self.user)
+            self.user.set_password("rotated-password")
+            self.user.save(update_fields=["password"])
+            stale_actor = ActorContextDTO(actor_id=self.user.pk, authentication_revision=stale_revision)
+            preview = preview_asset_type_create(
+                actor=stale_actor,
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in preview.issues],
+                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            )
+
+    def test_expired_and_discarded_stages_are_rejected(self):
+        with self._stage_media():
+            stage_id = self._new_stage()
+            AssetTypeImageStage.objects.filter(stage_id=stage_id).update(
+                expires_at=timezone.now() - timedelta(minutes=1)
+            )
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in preview.issues],
+                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            )
+
+            second_id = self._new_stage()
+            self.assertTrue(discard_stage(second_id, self._actor(), "create_asset_type"))
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=second_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in preview.issues],
+                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            )
+            stage = AssetTypeImageStage.objects.get(stage_id=second_id)
+            self.assertEqual(stage.state, "discarded")
+
+    def test_staged_image_swapped_input_is_stale_plan(self):
+        with self._stage_media():
+            stage_id = self._new_stage()
+            with_stage = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(with_stage, AssetTypePreviewDTO)
+            swapped = create_asset_type(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=with_stage.preview_token,
+                expected_definition_revision=with_stage.expected_definition_revision,
+                expected_category_default_snapshot_revision=with_stage.expected_category_default_snapshot_revision,
+            )
+            self.assertIsInstance(swapped, CommandRejectedDTO)
+            self.assertEqual([issue.code for issue in swapped.issues], ["STALE_PLAN"])
+
+            without_stage = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(without_stage, AssetTypePreviewDTO)
+            swapped_back = create_asset_type(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=without_stage.preview_token,
+                expected_definition_revision=without_stage.expected_definition_revision,
+                expected_category_default_snapshot_revision=without_stage.expected_category_default_snapshot_revision,
+            )
+            self.assertIsInstance(swapped_back, CommandRejectedDTO)
+            self.assertEqual([issue.code for issue in swapped_back.issues], ["STALE_PLAN"])
+
+    def test_injected_membership_failure_after_owner_save_rolls_back_stage_and_blob(self):
+        with self._stage_media() as storage:
+            stage_id = self._new_stage()
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, AssetTypePreviewDTO)
+            with patch(
+                "assets.services.specifications._create_commands.AssetTypeFieldset.objects.bulk_create",
+                side_effect=IntegrityError("forced membership failure"),
+            ):
+                result = create_asset_type(
+                    actor=self._actor(),
+                    native=self._native(
+                        category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)
+                    ),
+                    fieldsets=self._omitted(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                    preview_token=preview.preview_token,
+                    expected_definition_revision=preview.expected_definition_revision,
+                    expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+                )
+            self.assertIsInstance(result, CommandRejectedDTO)
+            self.assertEqual(AssetTypeFieldset.objects.count(), 0)
+            self.assertEqual(AssetType.tags.through.objects.count(), 0)
+            self.assertEqual(AssetType.all_objects.count(), 1)
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
+            self.assertIsNone(stage.consumed_asset_type_id)
+            self.assertTrue(storage.exists(stage.storage_key))
+
+    def test_injected_tag_link_failure_rolls_back_owner_memberships_and_stage(self):
+        with self._stage_media() as storage:
+            stage_id = self._new_stage()
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, AssetTypePreviewDTO)
+            with patch(
+                "assets.services.specifications._create_commands._link_tags",
+                side_effect=IntegrityError("forced tag failure"),
+            ):
+                result = create_asset_type(
+                    actor=self._actor(),
+                    native=self._native(
+                        category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)
+                    ),
+                    fieldsets=self._omitted(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                    preview_token=preview.preview_token,
+                    expected_definition_revision=preview.expected_definition_revision,
+                    expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+                )
+            self.assertIsInstance(result, CommandRejectedDTO)
+            self.assertEqual(AssetType.all_objects.count(), 1)
+            self.assertEqual(AssetTypeFieldset.objects.count(), 0)
+            self.assertEqual(AssetType.tags.through.objects.count(), 0)
+            self.assertEqual(self._changes(AssetType, 999999).count(), 0)
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
+            self.assertTrue(storage.exists(stage.storage_key))
+
+    def test_injected_consume_failure_rolls_back_everything(self):
+        with self._stage_media() as storage:
+            stage_id = self._new_stage()
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, AssetTypePreviewDTO)
+            with patch(
+                "assets.services.specifications._create_commands.consume_stage",
+                side_effect=IntegrityError("forced consume failure"),
+            ):
+                result = create_asset_type(
+                    actor=self._actor(),
+                    native=self._native(category_id=None, staged_image_id=stage_id),
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                    preview_token=None,
+                    expected_definition_revision=preview.expected_definition_revision,
+                    expected_category_default_snapshot_revision=None,
+                )
+            self.assertIsInstance(result, CommandRejectedDTO)
+            self.assertEqual(AssetType.all_objects.count(), 1)
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
+            self.assertIsNone(stage.consumed_asset_type_id)
+            self.assertTrue(storage.exists(stage.storage_key))
+
+    def test_enclosing_transaction_rollback_leaves_stage_pending_and_reusable(self):
+        with self._stage_media() as storage:
+            stage_id = self._new_stage()
+            preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, AssetTypePreviewDTO)
+            with transaction.atomic():
+                result = create_asset_type(
+                    actor=self._actor(),
+                    native=self._native(category_id=None, staged_image_id=stage_id),
+                    fieldsets=self._explicit_empty(),
+                    patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                    preview_token=None,
+                    expected_definition_revision=preview.expected_definition_revision,
+                    expected_category_default_snapshot_revision=None,
+                )
+                self.assertIsInstance(result, OwnerCreatedDTO)
+                transaction.set_rollback(True)
+            self.assertEqual(AssetType.all_objects.count(), 1)
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
+            self.assertIsNone(stage.consumed_asset_type_id)
+            self.assertTrue(storage.exists(stage.storage_key))
+
+            retry = create_asset_type(
+                actor=self._actor(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=None,
+                expected_definition_revision=preview.expected_definition_revision,
+                expected_category_default_snapshot_revision=None,
+            )
+            self.assertIsInstance(retry, OwnerCreatedDTO)
+            created = AssetType.all_objects.get(pk=retry.owner.owner_id)
+            self.assertEqual(created.image.name, stage.storage_key)
 
     def test_required_fields_are_validated_on_create_and_preview(self):
         preview = preview_asset_type_create(

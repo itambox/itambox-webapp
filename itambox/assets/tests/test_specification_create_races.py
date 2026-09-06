@@ -3,23 +3,37 @@
 from __future__ import annotations
 
 import queue
+import shutil
+import tempfile
 import threading
 import time
+from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.storage import FileSystemStorage
 from django.db import close_old_connections, connection, connections, transaction
+from django.utils import timezone
 
 from assets.models.catalog import (
     AssetType,
     AssetTypeFieldset,
+    AssetTypeImageStage,
     Category,
     CategoryDefaultFieldset,
     Manufacturer,
 )
 from assets.services.specifications._command_support import resource_revision_for_owner
+from assets.services.specifications._image_staging import (
+    CREATE_COMMAND_KIND,
+    cleanup_expired_stages,
+    consume_stage,
+    ingest_staged_image,
+    lock_stage_for_consume,
+)
 from assets.services.specifications.commands import (
     apply_category_defaults,
     create_asset_type,
@@ -28,6 +42,7 @@ from assets.services.specifications.commands import (
 )
 from assets.services.specifications.contracts import (
     AssetTypeNativeCreateInputDTO,
+    AssetTypePreviewDTO,
     CommandRejectedDTO,
     FieldsetSelectionDTO,
     OwnerCreatedDTO,
@@ -39,6 +54,19 @@ from organization.services.access_scope import ActorContextDTO, authentication_r
 
 User = get_user_model()
 pytestmark = [pytest.mark.serial_only, pytest.mark.django_db(transaction=True)]
+
+_TINY_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c63f8cfc0f01f00050001ff89993d1d0000000049454e44ae426082"
+)
+
+
+@pytest.fixture
+def stage_media():
+    storage = FileSystemStorage(location=tempfile.mkdtemp(prefix="itambox-race-stage-"))
+    with patch("assets.services.specifications._image_staging.default_storage", storage):
+        yield storage
+    shutil.rmtree(storage.location, ignore_errors=True)
 
 
 @pytest.fixture
@@ -182,6 +210,31 @@ def _assert_waiting(pid):
     pytest.fail(f"backend {pid} never reached the expected database wait: {last}")
 
 
+def _assert_row_wait(pid):
+    """Require PostgreSQL to identify this backend as blocked on a row lock."""
+    deadline = time.monotonic() + 10
+    last = None
+    while time.monotonic() < deadline:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_stat_clear_snapshot()")
+            cursor.execute(
+                "SELECT wait_event_type, wait_event, pg_backend_pid() = ANY(pg_blocking_pids(pid)) "
+                "FROM pg_stat_activity WHERE pid = %s",
+                [pid],
+            )
+            last = cursor.fetchone()
+            if last and last[0] == "Lock" and last[2]:
+                cursor.execute(
+                    "SELECT locktype FROM pg_locks WHERE pid = %s AND locktype = 'tuple' AND NOT granted",
+                    [pid],
+                )
+                assert cursor.fetchone() is not None
+                print("OBSERVED_DATABASE_WAIT", pid, last, "stage-row")
+                return
+        threading.Event().wait(0.01)
+    pytest.fail(f"backend {pid} never reached the expected database wait: {last}")
+
+
 def _finish(started):
     thread, _, results, errors = started
     thread.join(20)
@@ -274,3 +327,108 @@ def test_concurrent_apply_defaults_and_composition_change_one_winner(create_race
         (first.pk, 1),
         (second.pk, 2),
     ]
+
+
+def _staged_native(manufacturer, category, *, model, staged_image_id):
+    return AssetTypeNativeCreateInputDTO(
+        manufacturer_id=manufacturer.pk,
+        model=model,
+        slug=None,
+        part_number="PN",
+        ean="4000000000002",
+        region="EU",
+        configuration="cfg",
+        eol_months=None,
+        category_id=category.pk,
+        suggested_asset_role_id=None,
+        depreciation_id=None,
+        staged_image_id=staged_image_id,
+        description="description",
+        comments="comments",
+        tag_ids=(),
+        requestable=False,
+    )
+
+
+def test_two_concurrent_creates_serialize_single_stage_consume(create_race_kit, stage_media):
+    manufacturer, category, first, _second, actor = create_race_kit
+    stage_id = ingest_staged_image(
+        actor=actor, command_kind=CREATE_COMMAND_KIND, content=_TINY_PNG, original_name="race.png"
+    )
+    native = _staged_native(manufacturer, category, model="Race staged model", staged_image_id=stage_id)
+    preview = _create_preview(actor, native)
+    assert isinstance(preview, AssetTypePreviewDTO)
+
+    started = None
+    try:
+        with transaction.atomic(), catalogue_transaction_lock(exclusive=True):
+            result_a = _create(actor, native, preview)
+            assert isinstance(result_a, OwnerCreatedDTO)
+            started = _start(lambda: _create(actor, native, preview))
+            _assert_waiting(started[1])
+    finally:
+        if started is not None:
+            result_b = _finish(started)
+
+    assert isinstance(result_b, CommandRejectedDTO)
+    assert [issue.code for issue in result_b.issues] == ["REFERENCE_CONFLICT"]
+    assert AssetType.all_objects.filter(model="Race staged model").count() == 1
+    stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+    assert stage.state == "consumed"
+    assert stage.consumed_asset_type_id == result_a.owner.owner_id
+    assert len(stage_media.listdir("asset_types")[1]) == 1
+
+
+def test_cleanup_vs_consume_serialize_on_stage_row_lock(create_race_kit, stage_media):
+    manufacturer, _category, _first, _second, actor = create_race_kit
+    stage_id = ingest_staged_image(
+        actor=actor, command_kind=CREATE_COMMAND_KIND, content=_TINY_PNG, original_name="race.png"
+    )
+    owner = AssetType.objects.create(
+        manufacturer=manufacturer,
+        model="Race staged-consume type",
+        slug="race-staged-consume-type",
+    )
+
+    started = None
+    try:
+        with transaction.atomic():
+            row = lock_stage_for_consume(stage_id, actor, CREATE_COMMAND_KIND)
+            assert row is not None
+            consume_stage(row, owner.pk)
+            started = _start(
+                lambda: cleanup_expired_stages(now=timezone.now() + timedelta(hours=2))
+            )
+            _assert_row_wait(started[1])
+    finally:
+        if started is not None:
+            discarded = _finish(started)
+
+    assert discarded == 0
+    stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+    assert stage.state == "consumed"
+    assert stage.consumed_asset_type_id == owner.pk
+    assert len(stage_media.listdir("asset_types")[1]) == 1
+
+
+def test_cleanup_discards_expired_stage_before_create_rejects_it(create_race_kit, stage_media):
+    manufacturer, category, _first, _second, actor = create_race_kit
+    stage_id = ingest_staged_image(
+        actor=actor,
+        command_kind=CREATE_COMMAND_KIND,
+        content=_TINY_PNG,
+        original_name="race.png",
+        now=timezone.now() - timedelta(hours=2),
+    )
+    row = AssetTypeImageStage.objects.get(stage_id=stage_id)
+    AssetTypeImageStage.objects.filter(pk=row.pk).update(expires_at=timezone.now() - timedelta(minutes=1))
+    assert cleanup_expired_stages() == 1
+    stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+    assert stage.state == "discarded"
+    assert len(stage_media.listdir("asset_types")[1]) == 0
+
+    native = _staged_native(manufacturer, category, model="Race discarded stage", staged_image_id=stage_id)
+    preview = _create_preview(actor, native)
+    assert isinstance(preview, CommandRejectedDTO)
+    assert [issue.code for issue in preview.issues] == ["REFERENCE_CONFLICT"]
+    assert AssetType.all_objects.filter(model="Race discarded stage").count() == 0
