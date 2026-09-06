@@ -3,13 +3,11 @@ from collections.abc import Mapping
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 
 from assets.api.nested_serializers import (
     NestedAssetRoleSerializer,
@@ -17,6 +15,7 @@ from assets.api.nested_serializers import (
     NestedAssetTypeSerializer,
     NestedManufacturerSerializer,
 )
+from assets.api.serializer_mixins import CanonicalSpecificationSerializerMixin
 from assets.models import (
     Asset,
     AssetAssignment,
@@ -32,6 +31,10 @@ from assets.models import (
     StatusLabel,
     Supplier,
     Warranty,
+)
+from assets.services.specifications.contracts import (
+    DestinationAssetTypeSelectionDTO,
+    SpecificationPatchDTO,
 )
 from core.mixins import suppress_custom_field_data_validation
 from extras.api.serializers import TagSerializer
@@ -50,15 +53,13 @@ from ..services.specifications.commands import (
     update_asset_specifications,
     update_asset_type_specifications,
 )
-from ..services.specifications.contracts import DestinationAssetTypeSelectionDTO
 from ..specification_adapters import (
     actor_context_for_user,
     authorization_for_asset,
-    current_specification_plan,
     create_fieldset_selection,
+    current_specification_plan,
     discard_staged_image,
     native_asset_type_create_input,
-    native_persistence_fields,
     owner_id_from_result,
     patch_from_mapping,
     require_command_success,
@@ -66,54 +67,6 @@ from ..specification_adapters import (
 )
 
 User = get_user_model()
-
-
-class CanonicalSpecificationSerializerMixin(serializers.Serializer):
-    # Keep API parsing separate from the canonical command writer.
-
-    specification_patch = serializers.JSONField(write_only=True, required=False)
-
-    def validate_specification_patch(self, value):
-        if not isinstance(value, Mapping):
-            raise serializers.ValidationError(_("Custom field specification patch must be an object."))
-        unknown_operations = set(value) - {"set", "clear"}
-        if unknown_operations:
-            raise serializers.ValidationError(_("Custom field patch contains an unknown operation."))
-        submitted = value.get("set", {})
-        clear_keys = value.get("clear", [])
-        if not isinstance(submitted, Mapping):
-            raise serializers.ValidationError(_("Custom field patch 'set' must be an object."))
-        if not isinstance(clear_keys, list) or any(not isinstance(key, str) for key in clear_keys):
-            raise serializers.ValidationError(_("Custom field patch 'clear' must be a list of field keys."))
-        return {"set": dict(submitted), "clear": list(clear_keys)}
-
-    def _request_user(self):
-        request = self.context.get("request") if hasattr(self, "context") else None
-        return getattr(request, "user", None)
-
-    @staticmethod
-    def _persist_native_update(current, validated_data):
-        # Commands acquire catalogue/library/owner locks first. Reload their
-        # result before native-only persistence so stale JSON cannot overwrite it.
-        current = type(current)._base_manager.get(pk=current.pk)
-        concrete_names = {field.name for field in current._meta.concrete_fields}
-        native_fields = []
-        for field_name, value in validated_data.items():
-            if field_name in concrete_names:
-                setattr(current, field_name, value)
-                native_fields.append(field_name)
-        if native_fields:
-            current.save(update_fields=native_persistence_fields(current, native_fields))
-        return current
-
-    @staticmethod
-    def _command_error(exc):
-        if isinstance(exc, PermissionDenied):
-            raise DRFPermissionDenied(str(exc)) from exc
-        if isinstance(exc, DjangoValidationError):
-            detail = getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or str(exc)
-            raise serializers.ValidationError(detail) from exc
-        raise exc
 
 
 class AssetRoleSerializer(BaseModelSerializer):
@@ -351,7 +304,12 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         ]
         brief_fields = ["id", "name", "asset_tag", "serial_number", "status"]
 
-    def _apply_specification_command(self, current, target_type_id, patch):
+    def _apply_specification_command(
+        self,
+        current: Asset,
+        target_type_id: int | None,
+        patch: SpecificationPatchDTO,
+    ) -> None:
         authorization = authorization_for_asset(
             user=self._request_user(),
             tenant_id=current.tenant_id,
@@ -370,7 +328,7 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         )
         require_command_success(result)
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, object]) -> Asset:
         if "specification_patch" not in validated_data:
             return super().create(validated_data)
         patch = patch_from_mapping(validated_data.pop("specification_patch", None))
@@ -391,7 +349,7 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             self.instance = Asset._base_manager.get(pk=current.pk)
         return self.instance
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Asset, validated_data: dict[str, object]) -> Asset:
         with transaction.atomic():
             patch_marker = object()
             patch_value = validated_data.pop("specification_patch", patch_marker)
