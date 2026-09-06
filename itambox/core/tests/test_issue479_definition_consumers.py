@@ -194,3 +194,35 @@ def test_seed_dense_memberships_preserve_declared_order(monkeypatch):
 
     created = membership.objects.bulk_create.call_args.args[0]
     assert [(row.custom_field.pk, row.position) for row in created] == [(2, 1), (1, 2)]
+
+
+def test_snipeit_type_composition_writes_dense_single_membership():
+    from unittest.mock import Mock, call
+
+    from core.importers.snipeit.stages.asset_models import AssetModelImporter
+
+    manager = Mock()
+    model = SimpleNamespace(objects=manager)
+    owner, fieldset = object(), object()
+
+    AssetModelImporter._write_composition(model, owner, fieldset)
+
+    assert manager.mock_calls == [
+        call.filter(asset_type=owner),
+        call.filter().delete(),
+        call.create(asset_type=owner, fieldset=fieldset, position=1),
+    ]
+
+
+def test_snipeit_type_composition_explicit_clear_creates_no_membership():
+    from unittest.mock import Mock, call
+
+    from core.importers.snipeit.stages.asset_models import AssetModelImporter
+
+    manager = Mock()
+    model = SimpleNamespace(objects=manager)
+    owner = object()
+
+    AssetModelImporter._write_composition(model, owner, None)
+
+    assert manager.mock_calls == [call.filter(asset_type=owner), call.filter().delete()]

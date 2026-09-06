@@ -147,7 +147,7 @@ class AssetModelImporter:
     def _write_composition(composition_model, asset_type, fieldset):
         composition_model.objects.filter(asset_type=asset_type).delete()
         if fieldset is not None:
-            composition_model.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+            composition_model.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
 
     def run(self) -> StageResult:
         model = apps.get_model("assets", "AssetType")
