@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.utils import timezone
 
@@ -53,8 +54,11 @@ def _make_client(endpoint: str, rows: list[dict], *, base_url="https://snipe.exa
 class TestSnipeITCatalogStages(TenantTestMixin):
     @pytest.fixture(autouse=True)
     def _setup(self, db):
+        from assets.models import Asset
+
         self.setup_tenant_context(name="Stage Tenant", slug="stage-tenant")
         self.admin = User.objects.create_superuser(username="stage-admin", email="stage@example.com", password="pw")
+        self.asset_content_type = ContentType.objects.get_for_model(Asset)
 
     def _context(self, endpoint, rows, *, dry_run=False, update=False, base_url="https://snipe.example", tenant=None):
         target_tenant = self.tenant if tenant is None else tenant
@@ -74,6 +78,24 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         return importer(
             self._context(endpoint, rows, dry_run=dry_run, update=update, base_url=base_url, tenant=tenant)
         ).run()
+
+    def _create_asset_field(self, name, label=None, **kwargs):
+        from extras.models import CustomField
+
+        field = CustomField.objects.create(
+            name=name,
+            label=label or name,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            **kwargs,
+        )
+        field.object_types.set([self.asset_content_type])
+        return field
+
+    @staticmethod
+    def _active_choices(choice_set):
+        from extras.models import CustomFieldChoice
+
+        return choice_set.choices.filter(lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE).order_by("position")
 
     def test_status_labels_create_skip_and_update(self):
         from assets.models import StatusLabel
@@ -209,7 +231,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         obj = CustomField._base_manager.get(name="stage_cpu")
         assert created.counts.created == 1
         assert obj.field_type == "single-select"
-        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["one", "two"]
+        assert obj.activation == CustomField.ACTIVATION_COMPOSED
+        assert set(obj.object_types.values_list("app_label", "model")) == {("assets", "asset")}
+        assert list(self._active_choices(obj.choice_set).values_list("key", flat=True)) == ["one", "two"]
         assert deps.custom_fields["_snipeit_stage_cpu_105"] == obj
 
         skipped = self._run(
@@ -218,7 +242,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             [{**row, "field_values": "changed"}],
         )
         assert skipped.counts.skipped == 1
-        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["one", "two"]
+        assert list(self._active_choices(obj.choice_set).values_list("key", flat=True)) == ["one", "two"]
 
         updated = self._run(
             lambda context: CustomFieldImporter(context, deps),
@@ -230,11 +254,10 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert updated.counts.updated == 1
         assert obj.label == "Updated CPU"
         assert obj.field_type == "single-select"
-        assert list(obj.choice_set.choices.values_list("key", flat=True)) == ["three"]
-        retired_choice = obj.choice_set.choices.model.all_objects.get(key="one")
+        assert list(self._active_choices(obj.choice_set).values_list("key", flat=True)) == ["three"]
+        retired_choice = obj.choice_set.choices.get(key="one")
         assert retired_choice.label == "one"
         assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
-        assert retired_choice.deleted_at is not None
 
     def test_custom_field_import_refuses_same_id_from_another_source(self):
         from extras.models import CustomField
@@ -268,7 +291,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert created.counts.created == 1
         assert result.counts.failed == 1
         assert field.label == "Source A CPU"
-        assert list(field.choice_set.choices.values_list("key", flat=True)) == ["one"]
+        assert list(self._active_choices(field.choice_set).values_list("key", flat=True)) == ["one"]
         assert second_deps.custom_fields == {}
 
     def test_custom_field_import_refuses_same_id_from_another_target_tenant(self):
@@ -344,7 +367,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         first_field.refresh_from_db()
         assert result.counts.failed == 1
-        assert list(first_field.choice_set.choices.values_list("key", flat=True)) == ["one"]
+        assert list(self._active_choices(first_field.choice_set).values_list("key", flat=True)) == ["one"]
         assert not CustomField._base_manager.filter(name="source_b_choice").exists()
         assert second_deps.custom_fields == {}
 
@@ -389,7 +412,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
         field = CustomField.objects.get(name="managed_choice_row")
         choice = field.choice_set.choices.get(key="stable")
-        CustomFieldChoice.all_objects.filter(pk=choice.pk).update(management_kind=CustomFieldChoice.MANAGEMENT_CORE)
+        CustomFieldChoice.objects.filter(pk=choice.pk).update(management_kind=CustomFieldChoice.MANAGEMENT_CORE)
 
         statements = []
 
@@ -429,7 +452,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         result = self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
 
         field = CustomField._base_manager.get(name="collision_choices")
-        keys = list(field.choice_set.choices.values_list("key", flat=True))
+        keys = list(self._active_choices(field.choice_set).values_list("key", flat=True))
         assert result.counts.created == 1
         assert len(keys) == 3
         assert len(set(keys)) == 3
@@ -496,7 +519,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         }
         self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
         field = deps.custom_fields[row["db_column_name"]]
-        original_keys = list(field.choice_set.choices.order_by("position").values_list("key", flat=True))
+        original_keys = list(self._active_choices(field.choice_set).values_list("key", flat=True))
 
         self._run(
             lambda context: CustomFieldImporter(context, deps),
@@ -506,12 +529,11 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         )
 
         field.refresh_from_db()
-        choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
-        retired_choice = field.choice_set.choices.model.all_objects.get(key=original_keys[0])
+        choices = list(self._active_choices(field.choice_set).values_list("key", "label"))
+        retired_choice = field.choice_set.choices.get(key=original_keys[0])
         assert choices == [("uno", "Uno"), (original_keys[1], "Two")]
         assert retired_choice.label == "One"
         assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
-        assert retired_choice.deleted_at is not None
 
     def test_generated_choice_key_collision_never_reuses_different_label(self):
         deps = CustomFieldDependencies({})
@@ -534,13 +556,12 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         )
 
         field.refresh_from_db()
-        active_choices = dict(field.choice_set.choices.values_list("label", "key"))
-        retired_choice = field.choice_set.choices.model.all_objects.get(key=original_key)
+        active_choices = dict(self._active_choices(field.choice_set).values_list("label", "key"))
+        retired_choice = field.choice_set.choices.get(key=original_key)
         assert "A B" in active_choices
         assert active_choices["A B"] != original_key
         assert retired_choice.label == "A-B"
         assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
-        assert retired_choice.deleted_at is not None
 
     def test_custom_field_choice_removal_and_unrelated_addition_never_reuses_old_key(self):
         deps = CustomFieldDependencies({})
@@ -553,7 +574,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         }
         self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
         field = deps.custom_fields[row["db_column_name"]]
-        original_keys = list(field.choice_set.choices.order_by("position").values_list("key", flat=True))
+        original_keys = list(self._active_choices(field.choice_set).values_list("key", flat=True))
 
         self._run(
             lambda context: CustomFieldImporter(context, deps),
@@ -563,12 +584,11 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         )
 
         field.refresh_from_db()
-        active_choices = list(field.choice_set.choices.order_by("position").values_list("key", "label"))
-        retired_choice = field.choice_set.choices.model.all_objects.get(key=original_keys[0])
+        active_choices = list(self._active_choices(field.choice_set).values_list("key", "label"))
+        retired_choice = field.choice_set.choices.get(key=original_keys[0])
         assert active_choices == [(original_keys[1], "Two"), ("three", "Three")]
         assert retired_choice.label == "One"
         assert retired_choice.lifecycle == retired_choice.LIFECYCLE_DEPRECATED
-        assert retired_choice.deleted_at is not None
 
     def test_custom_field_long_names_get_stable_collision_free_keys(self):
         from extras.models import CustomField
@@ -600,11 +620,10 @@ class TestSnipeITCatalogStages(TenantTestMixin):
     def test_custom_field_import_refuses_unprovenanced_local_collision(self):
         from extras.models import CustomField
 
-        field = CustomField.objects.create(
+        field = self._create_asset_field(
             name="collision_field",
             label="Operator-Owned Field",
             namespace="local",
-            scope=CustomField.SCOPE_ASSET,
             lifecycle=CustomField.LIFECYCLE_ACTIVE,
         )
         deps = CustomFieldDependencies({})
@@ -626,12 +645,11 @@ class TestSnipeITCatalogStages(TenantTestMixin):
     def test_custom_field_import_refuses_managed_identity(self):
         from extras.models import CustomField
 
-        field = CustomField.objects.create(
+        field = self._create_asset_field(
             name="managed_stage_field",
             label="Managed Stage Field",
             namespace="local",
             management_kind=CustomField.MANAGEMENT_CORE,
-            scope=CustomField.SCOPE_ASSET,
             lifecycle=CustomField.LIFECYCLE_ACTIVE,
         )
         deps = CustomFieldDependencies({})
@@ -643,27 +661,33 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert result.counts.failed == 1
         assert field.management_kind == CustomField.MANAGEMENT_CORE
 
-    def test_custom_field_import_refuses_deleted_identity(self):
+    def test_custom_field_import_refuses_deprecated_identity(self):
         from extras.models import CustomField
 
-        field = CustomField.objects.create(
-            name="deleted_stage_field",
-            label="Deleted Stage Field",
-            namespace="local",
-            scope=CustomField.SCOPE_ASSET,
-            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
-            deleted_at=timezone.now(),
-        )
-        deps = CustomFieldDependencies({})
-        row = {"id": 121, "db_column_name": "deleted_stage_field", "name": "Deleted Stage Field", "format": "TEXT"}
+        row = {
+            "id": 121,
+            "db_column_name": "deprecated_stage_field",
+            "name": "Deprecated Stage Field",
+            "format": "TEXT",
+        }
+        first_deps = CustomFieldDependencies({})
+        created = self._run(lambda context: CustomFieldImporter(context, first_deps), "/api/v1/fields", [row])
+        field = CustomField._base_manager.get(name="deprecated_stage_field")
+        field.lifecycle = CustomField.LIFECYCLE_DEPRECATED
+        field.save(update_fields=["lifecycle"])
 
-        result = self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row], update=True)
+        second_deps = CustomFieldDependencies({})
+        result = self._run(
+            lambda context: CustomFieldImporter(context, second_deps), "/api/v1/fields", [row], update=True
+        )
 
         field.refresh_from_db()
+        assert created.counts.created == 1
         assert result.counts.failed == 1
-        assert field.deleted_at is not None
+        assert field.lifecycle == CustomField.LIFECYCLE_DEPRECATED
+        assert second_deps.custom_fields == {}
 
-    def test_choice_reconciliation_avoids_tombstone_position_conflicts(self):
+    def test_choice_reconciliation_avoids_deprecated_position_conflicts(self):
         from extras.models import CustomField
 
         deps = CustomFieldDependencies({})
@@ -696,7 +720,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         field = CustomField._base_manager.get(name="choice_position_stability")
         assert result.counts.updated == 1
-        assert list(field.choice_set.choices.values_list("key", flat=True)) == ["three"]
+        assert list(self._active_choices(field.choice_set).values_list("key", flat=True)) == ["three"]
 
     def test_custom_field_import_refuses_managed_choice_set_identity(self):
         from extras.models import CustomField, CustomFieldChoiceSet
@@ -708,11 +732,10 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
             lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
         )
-        CustomField.objects.create(
+        self._create_asset_field(
             name="managed_select_field",
             label="Managed Select Field",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
-            scope=CustomField.SCOPE_ASSET,
             choice_set=choice_set,
             max_values=1,
         )
@@ -753,24 +776,24 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         field = CustomField._base_manager.get(name="omitted_select")
         assert result.counts.updated == 1
-        assert list(field.choice_set.choices.values_list("key", flat=True)) == ["one", "two"]
+        assert list(self._active_choices(field.choice_set).values_list("key", flat=True)) == ["one", "two"]
 
-    def test_custom_field_import_does_not_reuse_deleted_choice_set_identity(self):
+    def test_custom_field_import_does_not_reuse_deprecated_choice_set_identity(self):
         from extras.models import CustomField
 
         deps = CustomFieldDependencies({})
         row = {
             "id": 116,
-            "name": "Deleted choices",
-            "db_column_name": "_snipeit_deleted_choices_116",
+            "name": "Deprecated choices",
+            "db_column_name": "_snipeit_deprecated_choices_116",
             "format": "LIST",
             "field_values": "one",
         }
         self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
-        field = CustomField._base_manager.get(name="deleted_choices")
+        field = CustomField._base_manager.get(name="deprecated_choices")
         choice_set = field.choice_set
-        choice_set.deleted_at = timezone.now()
-        choice_set.save(update_fields=["deleted_at"])
+        choice_set.lifecycle = choice_set.LIFECYCLE_DEPRECATED
+        choice_set.save(update_fields=["lifecycle"])
 
         result = self._run(
             lambda context: CustomFieldImporter(context, deps),
@@ -781,7 +804,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         choice_set.refresh_from_db()
         assert result.counts.failed == 1
-        assert choice_set.deleted_at is not None
+        assert choice_set.lifecycle == choice_set.LIFECYCLE_DEPRECATED
 
     def test_fieldset_import_refuses_managed_identity(self):
         from extras.models import CustomFieldset
@@ -803,9 +826,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert fieldset.management_kind == CustomFieldset.MANAGEMENT_CORE
 
     def test_fieldset_update_with_empty_remote_membership_clears_composition(self):
-        from extras.models import CustomField, CustomFieldset
+        from extras.models import CustomFieldset
 
-        field = CustomField.objects.create(name="stage_empty_serial", label="Serial")
+        field = self._create_asset_field(name="stage_empty_serial", label="Serial")
         deps = FieldsetDependencies({"_snipeit_stage_empty_serial_117": field}, {})
         row = {
             "id": 117,
@@ -825,10 +848,10 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert not fieldset.fields.exists()
 
     def test_fieldset_partial_dependency_resolution_preserves_existing_composition(self):
-        from extras.models import CustomField, CustomFieldset
+        from extras.models import CustomFieldset
 
-        first = CustomField.objects.create(name="stage_partial_first", label="First")
-        second = CustomField.objects.create(name="stage_partial_second", label="Second")
+        first = self._create_asset_field(name="stage_partial_first", label="First")
+        second = self._create_asset_field(name="stage_partial_second", label="Second")
         deps = FieldsetDependencies(
             {
                 "_snipeit_stage_partial_first_118": first,
@@ -866,9 +889,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert second not in fieldset.fields.all()
 
     def test_fieldsets_create_resolves_fields_skip_and_update_does_not_save(self):
-        from extras.models import CustomField, CustomFieldset
+        from extras.models import CustomFieldset
 
-        field = CustomField.objects.create(name="stage_serial", label="Serial")
+        field = self._create_asset_field(name="stage_serial", label="Serial")
         deps = FieldsetDependencies({"_snipeit_stage_serial_106": field}, {})
         row = {
             "id": 106,
@@ -894,7 +917,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         skipped = self._run(lambda context: FieldsetImporter(context, deps), "/api/v1/fieldsets", [row])
         assert skipped.counts.skipped == 1
 
-        other = CustomField.objects.create(name="stage_other", label="Other")
+        other = self._create_asset_field(name="stage_other", label="Other")
         updated = self._run(
             lambda context: FieldsetImporter(context, deps),
             "/api/v1/fieldsets",
@@ -906,15 +929,15 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert list(obj.fields.all()) == [field]
         assert other not in obj.fields.all()
 
-    def test_fieldset_import_does_not_reuse_deleted_identity(self):
+    def test_fieldset_import_does_not_reuse_deprecated_identity(self):
         from extras.models import CustomFieldset
 
         deps = FieldsetDependencies({}, {})
-        row = {"id": 119, "name": "Deleted Stage Specs", "fields": {"rows": []}}
+        row = {"id": 119, "name": "Deprecated Stage Specs", "fields": {"rows": []}}
         self._run(lambda context: FieldsetImporter(context, deps), "/api/v1/fieldsets", [row])
         fieldset = CustomFieldset._base_manager.get(namespace="local", slug="snipeit-119")
-        fieldset.deleted_at = timezone.now()
-        fieldset.save(update_fields=["deleted_at"])
+        fieldset.lifecycle = fieldset.LIFECYCLE_DEPRECATED
+        fieldset.save(update_fields=["lifecycle"])
 
         result = self._run(
             lambda context: FieldsetImporter(context, deps),
@@ -925,7 +948,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         fieldset.refresh_from_db()
         assert result.counts.failed == 1
-        assert fieldset.deleted_at is not None
+        assert fieldset.lifecycle == fieldset.LIFECYCLE_DEPRECATED
 
     def test_asset_model_update_unresolved_fieldset_preserves_composition(self):
         from assets.models import AssetType, AssetTypeFieldset, Category, Manufacturer
@@ -933,7 +956,12 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         manufacturer = Manufacturer.objects.create(name="Unresolved Model Maker")
         category = Category.objects.create(name="Unresolved Model Category", applies_to={"asset": True})
-        fieldset = CustomFieldset.objects.create(namespace="local", slug="snipeit-127", label="Unresolved Specs")
+        fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="snipeit-127",
+            label="Unresolved Specs",
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+        )
         deps = AssetModelDependencies({127: manufacturer}, {127: category}, {127: fieldset}, {})
         row = {
             "id": 127,
@@ -954,7 +982,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         asset_type = AssetType._base_manager.get(model="Unresolved Fieldset Model")
         assert result.counts.failed == 1
         assert list(AssetTypeFieldset.objects.filter(asset_type=asset_type).values_list("fieldset_id", "position")) == [
-            (fieldset.pk, 10)
+            (fieldset.pk, 1)
         ]
 
     def test_asset_model_update_omitted_fieldset_preserves_composition(self):
@@ -963,7 +991,12 @@ class TestSnipeITCatalogStages(TenantTestMixin):
 
         manufacturer = Manufacturer.objects.create(name="Omitted Model Maker")
         category = Category.objects.create(name="Omitted Model Category", applies_to={"asset": True})
-        fieldset = CustomFieldset.objects.create(namespace="local", slug="snipeit-126", label="Omitted Specs")
+        fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="snipeit-126",
+            label="Omitted Specs",
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+        )
         deps = AssetModelDependencies({126: manufacturer}, {126: category}, {126: fieldset}, {})
         row = {
             "id": 126,
@@ -985,7 +1018,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         asset_type = AssetType._base_manager.get(model="Omitted Fieldset Model")
         assert result.counts.updated == 1
         assert list(AssetTypeFieldset.objects.filter(asset_type=asset_type).values_list("fieldset_id", "position")) == [
-            (fieldset.pk, 10)
+            (fieldset.pk, 1)
         ]
 
     def test_asset_models_create_skip_update_and_optional_relations(self):
@@ -1041,6 +1074,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             namespace="local",
             slug="adoption-stage-fields",
             label="Adoption Stage Fields",
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
         )
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
@@ -1052,7 +1086,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             },
             custom_field_data={"operator_value": "keep"},
         )
-        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
         deps = AssetModelDependencies({124: manufacturer}, {}, {}, {})
         row = {
             "id": 124,
@@ -1086,6 +1120,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             namespace="local",
             slug="unprovenanced-stage-fields",
             label="Unprovenanced Stage Fields",
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
         )
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
@@ -1093,7 +1128,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             slug="unprovenanced-stage-model",
             custom_field_data={"operator_value": "keep"},
         )
-        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
         deps = AssetModelDependencies({126: manufacturer}, {}, {}, {})
         row = {
             "id": 126,
@@ -1393,7 +1428,13 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         from extras.models import CustomField, CustomFieldset
 
         manufacturer = Manufacturer(id=-1, name="Dry Maker")
-        custom_field = CustomField(id=-2, name="dry_field", label="Dry Field", field_type="text")
+        custom_field = CustomField(
+            id=-2,
+            name="dry_field",
+            label="Dry Field",
+            field_type="text",
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
         stages = [
             (
                 StatusLabelImporter,
