@@ -8,7 +8,7 @@
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3114",
+        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3114",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
         "rule": "generic-api-key"
       },
@@ -25,7 +25,7 @@
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3135",
+        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3135",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
         "rule": "generic-api-key"
       },
@@ -42,7 +42,7 @@
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3142",
+        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3142",
         "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
         "rule": "generic-api-key"
       },
@@ -59,7 +59,7 @@
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2473",
+        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2473",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
         "rule": "generic-api-key"
       },
@@ -76,7 +76,7 @@
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2494",
+        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2494",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
         "rule": "generic-api-key"
       },
@@ -93,7 +93,7 @@
       "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b02e98798c7ad01bb7109b2c8cf081931967100f:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2501",
+        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2501",
         "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
         "rule": "generic-api-key"
       },
@@ -110,7 +110,7 @@
       "reason": "The historical match is the literal library definition identifier t07-protected-definition in a PostgreSQL hard-delete protection regression fixture, not a credential or authentication token. The exception is restricted to this exact historical commit/path/rule/line fingerprint; no rule or file is globally excluded.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "85f11eca796cb4056b4710e538c27700c7ddfd7e:itambox/extras/tests/test_t07_provenance.py:generic-api-key:236",
+        "fingerprint": "ce854c66e4c0d0ce69742b9309be8d0695868f43:itambox/extras/tests/test_t07_provenance.py:generic-api-key:236",
         "path": "itambox/extras/tests/test_t07_provenance.py",
         "rule": "generic-api-key"
       },
