@@ -16,7 +16,6 @@ from extras.models import (
     CustomFieldsetField,
 )
 
-
 _RACE_TIMEOUT_SECONDS = 5
 
 
@@ -204,7 +203,7 @@ class T06GlobalMembershipConcurrencyTests(TransactionTestCase):
                     activation_ready.set()
                     if not release_activation.wait(_RACE_TIMEOUT_SECONDS):
                         raise AssertionError("activation worker was not released")
-            except BaseException as exc:
+            except Exception as exc:
                 errors["activation"].append(exc)
             finally:
                 activation_finished.set()
@@ -229,7 +228,7 @@ class T06GlobalMembershipConcurrencyTests(TransactionTestCase):
                     membership_statement_finished.set()
                     if not release_membership.wait(_RACE_TIMEOUT_SECONDS):
                         raise AssertionError("membership worker was not released")
-            except BaseException as exc:
+            except Exception as exc:
                 errors["membership"].append(exc)
             finally:
                 membership_finished.set()
@@ -302,7 +301,7 @@ class T06GlobalMembershipConcurrencyTests(TransactionTestCase):
                     membership_ready.set()
                     if not release_membership.wait(_RACE_TIMEOUT_SECONDS):
                         raise AssertionError("membership worker was not released")
-            except BaseException as exc:
+            except Exception as exc:
                 errors["membership"].append(exc)
             finally:
                 membership_finished.set()
@@ -323,7 +322,7 @@ class T06GlobalMembershipConcurrencyTests(TransactionTestCase):
                     activation_statement_finished.set()
                     if not release_activation.wait(_RACE_TIMEOUT_SECONDS):
                         raise AssertionError("activation worker was not released")
-            except BaseException as exc:
+            except Exception as exc:
                 errors["activation"].append(exc)
             finally:
                 activation_finished.set()

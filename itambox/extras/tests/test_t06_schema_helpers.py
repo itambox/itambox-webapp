@@ -3,6 +3,14 @@ from datetime import datetime, timezone
 from importlib import import_module
 from types import SimpleNamespace
 
+from extras.t06_schema import (
+    T06SchemaConflict,
+    classify_activation,
+    dense_ordinals,
+    normalize_lifecycle,
+    validate_activation,
+    validate_object_types,
+)
 
 _t06_migration = import_module("extras.migrations.0118_issue479_t06_definition_schema")
 
@@ -65,10 +73,7 @@ def _historical_preflight_apps(scope, identities, *, owners_with_custom_field_da
     custom_field.object_types = SimpleNamespace(
         through=SimpleNamespace(
             _base_manager=_FakeRows(
-                [
-                    SimpleNamespace(customfield_id=1, contenttype_id=content_type.pk)
-                    for content_type in content_types
-                ]
+                [SimpleNamespace(customfield_id=1, contenttype_id=content_type.pk) for content_type in content_types]
             )
         )
     )
@@ -78,25 +83,13 @@ def _historical_preflight_apps(scope, identities, *, owners_with_custom_field_da
         identity: SimpleNamespace(
             _meta=SimpleNamespace(
                 concrete_fields=(
-                    [SimpleNamespace(name="custom_field_data")]
-                    if identity in owners_with_custom_field_data
-                    else []
+                    [SimpleNamespace(name="custom_field_data")] if identity in owners_with_custom_field_data else []
                 )
             )
         )
         for identity in identities
     }
     return _FakeApps(custom_field, content_type_model, owner_models)
-
-
-from extras.t06_schema import (
-    T06SchemaConflict,
-    classify_activation,
-    dense_ordinals,
-    normalize_lifecycle,
-    validate_activation,
-    validate_object_types,
-)
 
 
 class T06SchemaHelperTests(unittest.TestCase):
@@ -136,6 +129,7 @@ class T06SchemaHelperTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(T06SchemaConflict, "duplicate_member"):
             dense_ordinals(((1, "same"), (2, "same")))
+
     def test_preflight_requires_exact_non_null_scope_target_set(self):
         cases = (
             ("asset", (("assets", "asset"), ("assets", "assettype"))),

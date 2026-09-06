@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.customfields import resolve_effective_custom_fields
 from core.forms import SlugModelForm
 from extras.customfields import CustomFieldModelFormMixin
-from extras.models import CustomField, CustomFieldset, Tag
+from extras.models import CustomFieldset, Tag
 
 from ..models import AssetRole, AssetType, AssetTypeFieldset, Category, Manufacturer
 

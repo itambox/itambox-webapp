@@ -184,9 +184,10 @@ class CustomFieldSerializer(BaseModelSerializer):
             if (content_type.app_label, content_type.model) not in supported_object_types
         ]
         if unsupported_object_types:
-            raise serializers.ValidationError(
-                {"object_types": [_("Unsupported custom-field owner: %(models)s.") % {"models": ", ".join(unsupported_object_types)}]}
-            )
+            message = _("Unsupported custom-field owner: %(models)s.") % {
+                "models": ", ".join(unsupported_object_types),
+            }
+            raise serializers.ValidationError({"object_types": [message]})
         errors = custom_field_definition_contract_errors(
             field_type=data.get("field_type", getattr(instance, "field_type", None)),
             activation=data.get("activation", getattr(instance, "activation", None)),

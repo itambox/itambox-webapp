@@ -328,7 +328,8 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "required-fresh",
-        "Installs PostgreSQL guards for permanent reusable-definition identities and rejects global-field fieldset membership through direct SQL or ORM writes.",
+        "Installs PostgreSQL guards for permanent reusable-definition identities and "
+        "rejects global-field fieldset membership through direct SQL or ORM writes.",
         {
             "extras.0118_issue479_t06_definition_schema",
         },
