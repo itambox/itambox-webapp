@@ -166,7 +166,10 @@
     "itambox/assets/tests/test_specification_command_races.py",
     "itambox/assets/tests/test_specification_value_commands.py",
     "itambox/assets/tests/test_specification_image_staging.py",
-    "itambox/assets/tests/test_specification_native_reference_races.py"
+    "itambox/assets/tests/test_specification_native_reference_races.py",
+    "itambox/assets/api/tests/test_t09c_specification_adapters.py",
+    "itambox/assets/api/tests/test_t09c_specification_http_races.py",
+    "itambox/assets/tests/test_t09c_form_boundaries.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -337,7 +340,10 @@
     "itambox/assets/tests/test_specification_create_commands.py",
     "itambox/assets/tests/test_specification_create_races.py",
     "itambox/assets/tests/test_specification_image_staging.py",
-    "itambox/assets/tests/test_specification_native_reference_races.py"
+    "itambox/assets/tests/test_specification_native_reference_races.py",
+    "itambox/assets/api/tests/test_t09c_specification_adapters.py",
+    "itambox/assets/api/tests/test_t09c_specification_http_races.py",
+    "itambox/assets/tests/test_t09c_form_boundaries.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

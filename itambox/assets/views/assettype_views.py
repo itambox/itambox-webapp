@@ -93,6 +93,11 @@ class AssetTypeEditView(QuickAddMixin, ObjectEditView):
     template_name = "generic/object_edit.html"
     quick_add_target = "id_asset_type"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
     def post(self, request, *args, **kwargs):
         if request.headers.get("HX-Request") and "_reload" in request.POST:
             self.object = self.get_object() if self.kwargs.get("pk") else None
@@ -133,3 +138,8 @@ class AssetTypeCloneView(ObjectCloneView):
     model_form = forms.AssetTypeForm
     template_name = "generic/object_edit.html"
     default_return_url = "assets:assettype_list"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs

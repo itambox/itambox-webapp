@@ -1,10 +1,17 @@
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from assets.forms import AssetForm
-from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer, StatusLabel
+from assets.models import Asset, AssetTagSequence, AssetType, AssetTypeFieldset, Manufacturer, StatusLabel
+from assets.services.specifications._command_support import load_effective_definition
+from assets.specification_adapters import current_specification_plan
+from core.tests.mixins import TenantTestMixin
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
+from organization.models import Role, Tenant
+
+User = get_user_model()
 
 
 def _minimal_asset_form_data(asset, status, asset_type, **custom_values):
@@ -16,7 +23,7 @@ def _minimal_asset_form_data(asset, status, asset_type, **custom_values):
         "asset_role": "",
         "status": status.pk,
         "location": "",
-        "tenant": "",
+        "tenant": asset.tenant_id or "",
         "purchase_date": "",
         "purchase_cost": "",
         "salvage_value": "",
@@ -34,7 +41,19 @@ def _minimal_asset_form_data(asset, status, asset_type, **custom_values):
     return data
 
 
-class AssetFormValuePreservationTests(TestCase):
+class AssetFormValuePreservationTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.setup_tenant_context(
+            name="Value preservation",
+            slug="value-preservation",
+            permissions=["assets.add_asset", "assets.view_asset", "assets.change_asset"],
+        )
+        self.enterContext(self.tenant_context(self.tenant))
+        self.request = RequestFactory().post("/assets/")
+        self.request.user = self.tenant_user
+        self.request.tenant = self.tenant
+
     def test_asset_update_uses_plural_composition_and_preserves_unrendered_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
         fieldset = CustomFieldset.objects.create(
@@ -68,6 +87,7 @@ class AssetFormValuePreservationTests(TestCase):
         AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
         status = StatusLabel.objects.create(name="Available 479", slug="available-479", type="deployable")
         asset = Asset.objects.create(
+            tenant=self.tenant,
             name="Device 1",
             asset_tag="DEVICE-1",
             asset_type=asset_type,
@@ -76,6 +96,7 @@ class AssetFormValuePreservationTests(TestCase):
         )
 
         form = AssetForm(
+            request=self.request,
             data={
                 "name": "Device 1",
                 "asset_tag": "DEVICE-1",
@@ -84,7 +105,7 @@ class AssetFormValuePreservationTests(TestCase):
                 "asset_role": "",
                 "status": status.pk,
                 "location": "",
-                "tenant": "",
+                "tenant": self.tenant.pk,
                 "purchase_date": "",
                 "purchase_cost": "",
                 "salvage_value": "",
@@ -135,6 +156,7 @@ class AssetFormValuePreservationTests(TestCase):
             slug="optional-device",
         )
         asset = Asset.objects.create(
+            tenant=self.tenant,
             name="Optional device",
             asset_tag="OPTIONAL-1",
             asset_type=asset_type,
@@ -142,6 +164,7 @@ class AssetFormValuePreservationTests(TestCase):
             custom_field_data={},
         )
         form = AssetForm(
+            request=self.request,
             data={
                 "name": asset.name,
                 "asset_tag": asset.asset_tag,
@@ -150,7 +173,7 @@ class AssetFormValuePreservationTests(TestCase):
                 "asset_role": "",
                 "status": status.pk,
                 "location": "",
-                "tenant": "",
+                "tenant": self.tenant.pk,
                 "purchase_date": "",
                 "purchase_cost": "",
                 "salvage_value": "",
@@ -185,6 +208,7 @@ class AssetFormValuePreservationTests(TestCase):
         manufacturer = Manufacturer.objects.create(name="Clear Manufacturer", slug="clear-manufacturer")
         asset_type = AssetType.objects.create(manufacturer=manufacturer, model="Clear Device", slug="clear-device")
         asset = Asset.objects.create(
+            tenant=self.tenant,
             name="Clear device",
             asset_tag="CLEAR-1",
             asset_type=asset_type,
@@ -192,6 +216,7 @@ class AssetFormValuePreservationTests(TestCase):
             custom_field_data={"clearable_value": "remove me"},
         )
         form = AssetForm(
+            request=self.request,
             data=_minimal_asset_form_data(
                 asset,
                 status,
@@ -289,3 +314,98 @@ class AssetTypeSwitchValidationTests(TestCase):
         asset.refresh_from_db()
         self.assertEqual(asset.asset_type_id, target_type.pk)
         self.assertEqual(asset.custom_field_data, {"required_spec": "configured"})
+
+
+class AssetFormCommandAdapterTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="asset-form-editor", password="password")
+        self.tenant = Tenant.objects.create(name="Form tenant", slug="form-tenant")
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="Asset form editor",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.user, self.tenant, role)
+        self.manufacturer = Manufacturer.objects.create(name="Form maker", slug="form-maker")
+        self.status = StatusLabel.objects.create(name="Form available", slug="form-available", type="deployable")
+        AssetTagSequence._base_manager.create(
+            tenant=self.tenant,
+            prefix="FORM-ASSET-",
+            next_value=1,
+            zero_padding=6,
+            is_active=True,
+        )
+
+    def _asset_field(self, name, *, required=False):
+        field = CustomField.objects.create(
+            name=name,
+            namespace="local",
+            label=name.replace("_", " ").title(),
+            activation=CustomField.ACTIVATION_COMPOSED,
+            required=required,
+        )
+        field.object_types.add(ContentType.objects.get_for_model(Asset))
+        return field
+
+    def _fieldset(self, slug, field):
+        fieldset = CustomFieldset.objects.create(namespace="local", slug=slug, label=slug.replace("-", " ").title())
+        CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
+        return fieldset
+
+    def test_tenant_authorized_form_switch_uses_destination_definition_revision(self):
+        source_field = self._asset_field("source_revision_spec")
+        target_field = self._asset_field("target_revision_spec", required=True)
+        source_fieldset = self._fieldset("source-revision", source_field)
+        target_fieldset = self._fieldset("target-revision", target_field)
+        source_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Source device",
+            slug="source-device",
+        )
+        target_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Target device",
+            slug="target-device",
+        )
+        AssetTypeFieldset.objects.create(asset_type=source_type, fieldset=source_fieldset, position=10)
+        AssetTypeFieldset.objects.create(asset_type=target_type, fieldset=target_fieldset, position=10)
+        asset = Asset.objects.create(
+            name="Switch through form",
+            asset_tag="FORM-SWITCH-1",
+            tenant=self.tenant,
+            asset_type=source_type,
+            status=self.status,
+            custom_field_data={"source_revision_spec": "legacy source value"},
+        )
+
+        request = RequestFactory().post(f"/assets/{asset.pk}/edit/")
+        request.user = self.user
+        form = AssetForm(
+            data=_minimal_asset_form_data(
+                asset,
+                self.status,
+                target_type,
+                tenant=str(self.tenant.pk),
+                cf_target_revision_spec="target value",
+            ),
+            instance=asset,
+            request=request,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        source_definition, _ = load_effective_definition(source_type.pk, "asset", ("source_revision_spec",))
+        target_definition, _ = load_effective_definition(target_type.pk, "asset", ("source_revision_spec",))
+        self.assertNotEqual(source_definition.revision, target_definition.revision)
+        adapter_plan = current_specification_plan(asset, target_kind="asset", asset_type_id=target_type.pk)
+        self.assertEqual(adapter_plan.definition_revision, target_definition.revision)
+        saved = form.save()
+
+        saved.refresh_from_db()
+        self.assertEqual(saved.asset_type_id, target_type.pk)
+        self.assertEqual(
+            saved.custom_field_data,
+            {
+                "source_revision_spec": "legacy source value",
+                "target_revision_spec": "target value",
+            },
+        )

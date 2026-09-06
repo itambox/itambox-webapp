@@ -198,6 +198,8 @@ PLATFORM_LAYER_PREFIXES = {
 # of the fingerprint; a rule defect belongs in the tables above instead, because
 # an override map that absorbs rule defects rots into a lookup table.
 MODULE_LAYER_OVERRIDES = {
+    # Shared form/REST input translation; domain code must not depend on it.
+    "assets.specification_adapters": "presentation",
     "assets.customfields": "domain-service",
     "assets.depreciation": "domain-service",
     "assets.scanning": "domain-service",

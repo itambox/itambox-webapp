@@ -1,7 +1,8 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
+from crispy_forms.layout import HTML, Div, Fieldset, Layout
 from django import forms
-from django.template.loader import render_to_string
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -10,17 +11,25 @@ from assets.customfields import resolve_asset_custom_fields
 from core.forms import CrispyFormMixin, scope_tenant_field
 from core.mixins import suppress_custom_field_data_validation
 from extras.customfields import (
-    apply_custom_field_patch,
     build_custom_field_clear_form_field,
     build_custom_field_form_field,
     clean_custom_field_form_values,
     custom_field_clear_key,
-    is_omitted_optional_single_select,
 )
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
 from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel, Warranty
+from ..services.specifications.commands import update_asset_specifications
+from ..services.specifications.contracts import DestinationAssetTypeSelectionDTO
+from ..specification_adapters import (
+    actor_context_for_user,
+    authorization_for_asset,
+    current_specification_plan,
+    native_persistence_fields,
+    require_command_success,
+    specification_patch,
+)
 from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
 
@@ -246,6 +255,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         request = kwargs.pop("request", None)
+        self.request = request
         explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
@@ -553,32 +563,115 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         return Layout(*layout_elements)
 
     def save(self, commit=True):
-        instance = super().save(commit=False)
+        # ModelForm.save(commit=False) is intentionally used without the old
+        # custom-field merge.  The command below is the only value/type-switch
+        # writer; native fields are saved separately so a stale form instance
+        # cannot overwrite command-owned state.
+        from django.forms import ModelForm
 
-        submitted = {}
-        clear_keys = set()
-        for key, definition in self.custom_field_definitions.items():
-            if key not in self.cleaned_data or self.fields[key].disabled:
-                continue
-            value = self.cleaned_data[key]
-            clear_key = self.custom_field_clear_keys.get(key)
-            if clear_key and self.cleaned_data.get(clear_key):
-                clear_keys.add(definition.name)
-                continue
-            if is_omitted_optional_single_select(definition, value):
-                continue
-            if value is None and not definition.nullable:
-                continue
-            submitted[definition.name] = value
-        if self.custom_field_definitions:
-            instance.custom_field_data = apply_custom_field_patch(
-                instance.custom_field_data or {},
-                self.custom_field_definitions.values(),
-                submitted,
-                clear_keys=clear_keys,
-            )
+        # is_valid() has already copied the submitted Type onto instance.
+        # Deferred native persistence must retain the stored Type, not that
+        # mutated in-memory value; only save_m2m may execute the switch.
+        previous_type_id = None
+        if not commit and self.instance.pk:
+            previous_type_id = Asset._base_manager.values_list("asset_type_id", flat=True).get(pk=self.instance.pk)
+        instance = ModelForm.save(self, commit=False)
+        self._native_save_m2m = getattr(self, "save_m2m", None)
+        self._pending_target_asset_type_id = instance.asset_type_id
+        self._pending_create = not bool(instance.pk)
+        if not commit:
+            # A caller following Django's commit=False lifecycle must not be
+            # able to persist a type switch through instance.save().  The
+            # pending command runs from save_m2m after the caller has saved
+            # native fields.
+            instance.asset_type_id = previous_type_id
+            self.save_m2m = self._save_pending_m2m
+            return instance
 
-        if commit:
+        actor = actor_context_for_user(getattr(self.request, "user", None))
+        with transaction.atomic():
+            if instance.pk:
+                current = Asset._base_manager.get(pk=instance.pk)
+                self._apply_specification_command(current, actor)
+                current = self._persist_native_update(instance)
+            else:
+                current = self._persist_native_create(instance)
+                self._apply_specification_command(current, actor)
+            self.instance = Asset._base_manager.get(pk=current.pk)
+            if self._native_save_m2m is not None:
+                self._native_save_m2m()
+        return self.instance
+
+    def _specification_patch(self):
+        return specification_patch(
+            definitions=self.custom_field_definitions,
+            cleaned_values=self.cleaned_data,
+            fields=self.fields,
+            clear_keys=self.custom_field_clear_keys,
+        )
+
+    def _native_field_names(self):
+        concrete_names = {field.name for field in Asset._meta.concrete_fields}
+        return tuple(
+            name
+            for name in self.changed_data
+            if name in concrete_names and name not in {"asset_type", "custom_field_data"}
+        )
+
+    def _persist_native_update(self, instance):
+        current = Asset._base_manager.get(pk=instance.pk)
+        field_names = self._native_field_names()
+        for field_name in field_names:
+            field = Asset._meta.get_field(field_name)
+            setattr(current, field.attname, getattr(instance, field.attname))
+        if field_names:
+            current.save(update_fields=native_persistence_fields(current, field_names))
+        return current
+
+    def _persist_native_create(self, instance):
+        # The empty specification object is not a user value.  Suppress only
+        # dynamic custom-field validation for this initial native row; the
+        # canonical command immediately validates and writes the requested
+        # patch/type destination inside the same outer transaction.
+        from core.mixins import suppress_custom_field_data_validation
+
+        instance.custom_field_data = {}
+        with suppress_custom_field_data_validation(instance):
             instance.save()
-            self.save_m2m()
         return instance
+
+    def _apply_specification_command(self, current, actor):
+        target_type_id = self._pending_target_asset_type_id
+        patch = self._specification_patch()
+        if target_type_id == current.asset_type_id and not patch.set_values and not patch.clear_keys:
+            return
+        if target_type_id is None:
+            raise ValidationError("An Asset Type is required for specification changes.")
+        authorization = authorization_for_asset(
+            user=getattr(self.request, "user", None),
+            tenant_id=current.tenant_id,
+        )
+        plan = current_specification_plan(current, target_kind="asset", asset_type_id=target_type_id)
+        result = update_asset_specifications(
+            authorization=authorization,
+            asset_id=current.pk,
+            destination=DestinationAssetTypeSelectionDTO(
+                presence="replace",
+                asset_type_id=int(target_type_id),
+            ),
+            expected_resource_revision=plan.resource_revision,
+            expected_definition_revision=plan.definition_revision,
+            patch=patch,
+        )
+        require_command_success(result)
+
+    def _save_pending_m2m(self):
+        with transaction.atomic():
+            if self._native_save_m2m is not None:
+                self._native_save_m2m()
+            if not self.instance.pk:
+                return
+            current = Asset._base_manager.get(pk=self.instance.pk)
+            actor = actor_context_for_user(getattr(self.request, "user", None))
+            self._apply_specification_command(current, actor)
+            self.instance = Asset._base_manager.get(pk=current.pk)

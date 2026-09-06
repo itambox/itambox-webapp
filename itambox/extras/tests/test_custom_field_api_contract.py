@@ -8,18 +8,28 @@ from django.contrib.messages.storage.cookie import CookieStorage
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from rest_framework import serializers as drf_serializers
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
 from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer
+from core.tests.mixins import TenantTestMixin
 from extras.api.serializers import CustomFieldSerializer, CustomFieldsetSerializer
 from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, SpecificationLibrary
 from itambox.api.viewsets import ITAMBoxModelViewSet
 from itambox.views.generic import ObjectDeleteView, ObjectEditView
 
 
-class CustomFieldAPISerializerContractTests(TestCase):
+class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
     def setUp(self):
+        super().setUp()
+        self.setup_tenant_context(
+            name="API serializer contract tenant",
+            slug="api-serializer-contract",
+            permissions=["assets.change_asset"],
+        )
+        self.enterContext(self.tenant_context(self.tenant))
         self.asset_ct = ContentType.objects.get_for_model(Asset)
         self.asset_type_ct = ContentType.objects.get_for_model(AssetType)
         self.choice_set = CustomFieldChoiceSet.objects.create(
@@ -27,6 +37,10 @@ class CustomFieldAPISerializerContractTests(TestCase):
             slug="api-stage-choices",
             label="API Stage Choices",
         )
+
+    @staticmethod
+    def _serializer_context(user):
+        return {"request": SimpleNamespace(user=user)}
 
     def test_definition_api_rejects_invalid_regex(self):
         serializer = CustomFieldSerializer(
@@ -311,11 +325,15 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "slug": "api-test-type",
                 "manufacturer_id": manufacturer.pk,
                 "specification_patch": {"set": {"api_integer_value": "1.0"}},
-            }
+            },
+            context=self._serializer_context(self.tenant_admin),
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("specification_patch", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            serializer.save()
+        self.assertIn("specifications.invalid_type", str(raised.exception.detail))
+        self.assertFalse(AssetType.all_objects.filter(model="API Test Type").exists())
 
     def test_required_asset_type_field_is_required_on_rest_create(self):
         field = CustomField.objects.create(
@@ -332,11 +350,15 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "model": "Required REST Type",
                 "slug": "required-rest-type",
                 "manufacturer_id": manufacturer.pk,
-            }
+            },
+            context=self._serializer_context(self.tenant_admin),
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("specification_patch", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            serializer.save()
+        self.assertIn("specifications.required_field", str(raised.exception.detail))
+        self.assertFalse(AssetType.all_objects.filter(model="Required REST Type").exists())
 
     def test_required_asset_type_field_cannot_be_cleared(self):
         field = CustomField.objects.create(
@@ -354,14 +376,21 @@ class CustomFieldAPISerializerContractTests(TestCase):
             manufacturer=manufacturer,
             custom_field_data={"required_clear_spec": "keep"},
         )
+        original_updated_at = asset_type.updated_at
         serializer = AssetTypeSerializer(
             instance=asset_type,
             data={"specification_patch": {"clear": ["required_clear_spec"]}},
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("specification_patch", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            serializer.save()
+        self.assertIn("specifications.required_field", str(raised.exception.detail))
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.custom_field_data, {"required_clear_spec": "keep"})
+        self.assertEqual(asset_type.updated_at, original_updated_at)
 
     def test_asset_type_temperature_rule_patch_returns_validation_error(self):
         minimum = CustomField.objects.get(name="operating_temperature_min")
@@ -380,6 +409,14 @@ class CustomFieldAPISerializerContractTests(TestCase):
             slug="temperature-type",
             manufacturer=manufacturer,
         )
+        temperature_fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="temperature-rule",
+            label="Temperature rule",
+        )
+        CustomFieldsetField.objects.create(fieldset=temperature_fieldset, custom_field=minimum, position=10)
+        CustomFieldsetField.objects.create(fieldset=temperature_fieldset, custom_field=maximum, position=20)
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=temperature_fieldset, position=10)
 
         serializer = AssetTypeSerializer(
             instance=asset_type,
@@ -392,10 +429,15 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 }
             },
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("specification_patch", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            serializer.save()
+        self.assertIn("specifications.reference_conflict", str(raised.exception.detail))
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.custom_field_data, {})
 
     def test_get_to_put_roundtrip_preserves_unknown_stored_keys(self):
         field = CustomField.objects.create(
@@ -443,15 +485,23 @@ class CustomFieldAPISerializerContractTests(TestCase):
             manufacturer=manufacturer,
             custom_field_data={"deprecated_spec": "old"},
         )
+        original_updated_at = asset_type.updated_at
 
         serializer = AssetTypeSerializer(
             instance=asset_type,
             data={"specification_patch": {"set": {"deprecated_spec": "new"}}},
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("specification_patch", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            serializer.save()
+        # Deprecated definitions are absent from the writable effective graph.
+        self.assertIn("specifications.unknown_field_key", str(raised.exception.detail))
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.custom_field_data, {"deprecated_spec": "old"})
+        self.assertEqual(asset_type.updated_at, original_updated_at)
 
     def test_set_and_clear_are_valid_custom_field_names_inside_patch(self):
         for name in ("set", "clear"):
@@ -479,6 +529,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 }
             },
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
@@ -518,6 +569,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             instance=asset_type,
             data={"specification_patch": {"set": {"visible_spec": "new"}}},
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
         self.assertTrue(serializer.is_valid(), serializer.errors)
         serializer.save()
@@ -531,6 +583,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             instance=asset_type,
             data={"specification_patch": {"clear": ["visible_spec"]}},
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
         self.assertTrue(clear_serializer.is_valid(), clear_serializer.errors)
         clear_serializer.save()
@@ -541,9 +594,17 @@ class CustomFieldAPISerializerContractTests(TestCase):
             instance=asset_type,
             data={"specification_patch": {"set": {"outside_spec": "must reject"}}},
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
-        self.assertFalse(invalid.is_valid())
-        self.assertIn("specification_patch", invalid.errors)
+        self.assertTrue(invalid.is_valid(), invalid.errors)
+        original_data = dict(asset_type.custom_field_data)
+        original_updated_at = asset_type.updated_at
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            invalid.save()
+        self.assertIn("specifications.unknown_field_key", str(raised.exception.detail))
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.custom_field_data, original_data)
+        self.assertEqual(asset_type.updated_at, original_updated_at)
 
     def test_asset_type_api_create_accepts_applicable_custom_field_data(self):
         field = CustomField.objects.create(
@@ -559,7 +620,8 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "slug": "create-api-model",
                 "manufacturer_id": manufacturer.pk,
                 "specification_patch": {"set": {"create_spec": "created"}},
-            }
+            },
+            context=self._serializer_context(self.tenant_admin),
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
@@ -582,11 +644,15 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "slug": "fieldset-create-api-model",
                 "manufacturer_id": manufacturer.pk,
                 "specification_patch": {"set": {"fieldset_only_create_spec": "must reject"}},
-            }
+            },
+            context=self._serializer_context(self.tenant_admin),
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("specification_patch", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(drf_serializers.ValidationError) as raised:
+            serializer.save()
+        self.assertIn("specifications.unknown_field_key", str(raised.exception.detail))
+        self.assertFalse(AssetType.all_objects.filter(model="Fieldset Create API Model").exists())
 
     def test_asset_api_type_switch_uses_new_composition_for_custom_field_patch(self):
         old_field = CustomField.objects.create(
@@ -610,7 +676,13 @@ class CustomFieldAPISerializerContractTests(TestCase):
         new_type = AssetType.objects.create(manufacturer=manufacturer, model="New type", slug="new-type")
         AssetTypeFieldset.objects.create(asset_type=old_type, fieldset=old_set, position=10)
         AssetTypeFieldset.objects.create(asset_type=new_type, fieldset=new_set, position=10)
-        asset = Asset.objects.create(name="Switchable asset", asset_type=old_type, custom_field_data={})
+        with self.tenant_context(self.tenant):
+            asset = Asset.objects.create(
+                name="Switchable asset",
+                tenant=self.tenant,
+                asset_type=old_type,
+                custom_field_data={},
+            )
 
         serializer = AssetSerializer(
             instance=asset,
@@ -619,6 +691,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
                 "specification_patch": {"set": {"new_asset_spec": "new"}},
             },
             partial=True,
+            context=self._serializer_context(self.tenant_user),
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
@@ -635,16 +708,19 @@ class CustomFieldAPISerializerContractTests(TestCase):
             activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(self.asset_ct)
-        asset = Asset.objects.create(
-            name="Untyped asset",
-            asset_tag="UNTYPED-1",
-            custom_field_data={},
-        )
+        with self.tenant_context(self.tenant):
+            asset = Asset.objects.create(
+                name="Untyped asset",
+                asset_tag="UNTYPED-1",
+                tenant=self.tenant,
+                custom_field_data={},
+            )
 
         serializer = AssetSerializer(
             instance=asset,
             data={"specification_patch": {"set": {"untyped_asset_spec": "value"}}},
             partial=True,
+            context=self._serializer_context(self.tenant_user),
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
@@ -671,13 +747,17 @@ class CustomFieldAPISerializerContractTests(TestCase):
             instance=asset_type,
             data={"specification_patch": {"set": {"single_save_spec": "new"}}},
             partial=True,
+            context=self._serializer_context(self.tenant_admin),
         )
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-        with patch.object(asset_type, "save", wraps=asset_type.save) as save:
+        # The command reloads and locks its owner; spying on the original
+        # Python instance misses the real save. Count the persisted owner write.
+        with CaptureQueriesContext(connection) as captured:
             serializer.save()
 
-        self.assertEqual(save.call_count, 1)
+        writes = [query for query in captured.captured_queries if query["sql"].startswith('UPDATE "assets_assettype" ')]
+        self.assertEqual(len(writes), 1)
         asset_type.refresh_from_db()
         self.assertEqual(asset_type.custom_field_data, {"single_save_spec": "new"})
 

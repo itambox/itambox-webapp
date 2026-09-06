@@ -12,22 +12,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/api/serializers.py",
-      "code": "F401",
-      "message": "'itambox.api.fields.RelatedObjectCountField' imported but unused",
-      "source": "from itambox.api.fields import RelatedObjectCountField",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/api/serializers.py",
-      "code": "F401",
-      "message": "'software.models.Software' imported but unused",
-      "source": "from software.models import Software",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/apps.py",
       "code": "F401",
       "message": "'assets.signals' imported but unused",
@@ -288,38 +272,6 @@
       "code": "F403",
       "message": "'from .import_forms import *' used; unable to detect undefined names",
       "source": "from .import_forms import *",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Column' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Submit' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "code": "F401",
-      "message": "'django.template.loader.render_to_string' imported but unused",
-      "source": "from django.template.loader import render_to_string",
       "context": "Module:body",
       "count": 1
     },

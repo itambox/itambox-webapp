@@ -175,6 +175,12 @@ class ClassificationTests(unittest.TestCase):
 
         self.assertEqual(layer_of(module), MODULE_LAYER_OVERRIDES[module])
 
+    def test_specification_adapter_remains_presentation(self):
+        self.assertEqual(layer_of("assets.specification_adapters"), "presentation")
+        self.assertIsNone(is_allowed("assets.forms.asset_form", "assets.specification_adapters").rule)
+        self.assertIsNone(is_allowed("assets.api.serializers", "assets.specification_adapters").rule)
+        self.assertIsNotNone(is_allowed("assets.models.asset", "assets.specification_adapters").rule)
+
     def test_composition_leaves_win_on_the_last_segment(self):
         for module in (
             "users.api.urls",

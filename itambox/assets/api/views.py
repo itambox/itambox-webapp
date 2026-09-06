@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
@@ -38,6 +38,12 @@ from assets.models import (
     Warranty,
 )
 from assets.services import checkin_asset, checkout_asset
+from assets.services.specifications._command_support import (
+    lock_relevant_libraries,
+    lock_relevant_libraries_for_composition,
+)
+from assets.services.specifications.locking import catalogue_transaction_lock
+from assets.specification_adapters import fieldset_selection
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 
@@ -83,7 +89,43 @@ class AssetStateActionPermissions(TokenPermissions):
         return super().has_object_permission(request, view, obj)
 
 
-class AssetViewSet(ITAMBoxModelViewSet):
+class SpecificationCommandUpdateMixin:
+    """Preserve the legacy ETag lock without taking it before command locks."""
+
+    def perform_update(self, serializer):
+        command_fields = {"specification_patch", "custom_field_data", "custom_fieldsets", "asset_type"}
+        if not command_fields.intersection(serializer.validated_data):
+            return super().perform_update(serializer)
+        # The generic view locks the owner before invoking serializer.save().
+        # Match command lock modes: shared for values, exclusive for composition.
+        # A concurrent owner Type switch changes its ETag; the generic view
+        # rechecks that required precondition under its owner lock before save.
+        # Native-only requests retain the unchanged generic persistence path.
+        exclusive = isinstance(serializer.instance, AssetType) and "custom_fieldsets" in serializer.validated_data
+        with transaction.atomic(), catalogue_transaction_lock(exclusive=exclusive):
+            self._lock_command_libraries(serializer)
+            return super().perform_update(serializer)
+
+    @staticmethod
+    def _lock_command_libraries(serializer):
+        owner = serializer.instance
+        data = serializer.validated_data
+        if isinstance(owner, Asset):
+            current_type_id = Asset._base_manager.filter(pk=owner.pk).values_list("asset_type_id", flat=True).first()
+            target_type_id = getattr(data.get("asset_type"), "pk", None)
+            type_ids = tuple(sorted({value for value in (current_type_id, target_type_id) if value is not None}))
+            lock_relevant_libraries(type_ids, "asset")
+        elif "custom_fieldsets" in data:
+            selection = fieldset_selection(data["custom_fieldsets"], presence="replace")
+            current_ids = tuple(owner.fieldset_memberships.values_list("fieldset_id", flat=True))
+            lock_relevant_libraries_for_composition(
+                current_ids, selection.identities, "asset_type", asset_type_ids=(owner.pk,)
+            )
+        else:
+            lock_relevant_libraries((owner.pk,), "asset_type")
+
+
+class AssetViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
     permission_classes = [AssetStateActionPermissions, StrictTenantPermission]
     queryset = Asset.objects.select_related("asset_role", "asset_type__manufacturer", "location").prefetch_related(
         Prefetch("assignments", queryset=AssetAssignment.objects.filter(is_active=True), to_attr="_active_assignments"),
@@ -170,7 +212,7 @@ class ManufacturerViewSet(ITAMBoxModelViewSet):
     filterset_class = ManufacturerFilterSet
 
 
-class AssetTypeViewSet(ITAMBoxModelViewSet):
+class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
     queryset = AssetType.objects.select_related("manufacturer").prefetch_related(
         "tags",
         Prefetch(
