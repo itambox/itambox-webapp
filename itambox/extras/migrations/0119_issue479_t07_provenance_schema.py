@@ -11,6 +11,7 @@ import core.models
 class Migration(migrations.Migration):
     dependencies = [
         ("extras", "0118_issue479_t06_definition_schema"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [

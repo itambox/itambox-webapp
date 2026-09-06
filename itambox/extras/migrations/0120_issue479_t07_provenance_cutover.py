@@ -179,6 +179,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("assets", "0115_issue479_t07_provenance_bridge"),
         ("extras", "0119_issue479_t07_provenance_schema"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [

@@ -438,6 +438,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("assets", "0114_issue479_t06_composition_schema"),
         ("extras", "0119_issue479_t07_provenance_schema"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [
