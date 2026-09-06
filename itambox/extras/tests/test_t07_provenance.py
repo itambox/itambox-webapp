@@ -17,7 +17,6 @@ from extras.models import (
     release_document_digest,
 )
 
-
 RFC8785_DOCUMENT = {"\U0001f600": "emoji", "\ue000": "bmp"}
 RFC8785_DIGEST = "sha256:3d3586c197a332ed14e1fb20a6623099695a6acdf9e91e512f41bf886c5edbee"
 

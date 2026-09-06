@@ -8,7 +8,6 @@ from django.db.migrations.executor import MigrationExecutor
 
 from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
-
 MIGRATE_FROM = [
     ("assets", "0114_issue479_t06_composition_schema"),
     ("extras", "0118_issue479_t06_definition_schema"),
