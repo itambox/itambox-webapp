@@ -162,7 +162,7 @@ def normalize_release_document(source_document):
         raise ValidationError({"source_document": _("A release document must be a JSON object.")})
     try:
         return canonicalize_release_document(source_document)
-    except (TypeError, ValueError, UnicodeEncodeError) as exc:
+    except (TypeError, ValueError) as exc:
         raise ValidationError({"source_document": _("The release document is not valid normalized JSON.")}) from exc
 
 
