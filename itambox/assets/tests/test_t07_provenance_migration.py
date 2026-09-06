@@ -23,7 +23,7 @@ LEGACY_TYPE_CHECKSUM = "sha256:" + "b" * 64
 FIELD_CHECKSUM = "sha256:" + "c" * 64
 FIELDSET_CHECKSUM = "sha256:" + "d" * 64
 CHOICE_SET_CHECKSUM = "sha256:" + "e" * 64
-CHOICE_CHECKSUM = "sha256:" + "f" * 64
+CHOICE_CHECKSUM = CHOICE_SET_CHECKSUM
 TYPE_CONNECTOR_IDENTITY = "sha256:9e5208a35f4d324cf2bf697b39e4fe34b036b60cc70ffde2b7b9d2236dab2aae"
 
 LOCAL_TYPE_PATHS = {
@@ -104,7 +104,7 @@ class T07ProvenanceMigrationTests(IsolatedMigrationTestCase):
             source_checksum=FIELD_CHECKSUM,
             last_reconciled_at=reconciled_at,
         )
-        asset_type_ct = ContentType.objects.get(app_label="assets", model="assettype")
+        asset_type_ct = ContentType.objects.get_or_create(app_label="assets", model="assettype")[0]
         field.object_types.add(asset_type_ct)
         CustomFieldsetField.objects.create(fieldset_id=fieldset.pk, custom_field_id=field.pk, position=4)
 
@@ -129,7 +129,7 @@ class T07ProvenanceMigrationTests(IsolatedMigrationTestCase):
             management_kind="local",
             version=1,
             lifecycle="active",
-            managed_paths={"choice": {"retain": "metadata"}},
+            managed_paths={"choice_set": {"retain": "metadata"}},
             source_checksum=CHOICE_CHECKSUM,
             last_reconciled_at=reconciled_at,
         )
@@ -243,7 +243,7 @@ class T07ProvenanceMigrationTests(IsolatedMigrationTestCase):
             ("custom_field", field.pk, FIELD_CHECKSUM, {"field": {"retain": "metadata"}}),
             ("custom_fieldset", fieldset.pk, FIELDSET_CHECKSUM, {"fieldset": {"retain": True}}),
             ("choice_set", choice_set.pk, CHOICE_SET_CHECKSUM, {"choice_set": {"retain": "metadata"}}),
-            ("choice", choice.pk, CHOICE_CHECKSUM, {"choice": {"retain": "metadata"}}),
+            ("choice", choice.pk, CHOICE_CHECKSUM, {"choice_set": {"retain": "metadata"}}),
         ):
             with self.subTest(owner_kind=owner_kind):
                 archived = archive(owner_kind, owner_id)
