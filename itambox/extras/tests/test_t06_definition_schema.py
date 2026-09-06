@@ -1,6 +1,10 @@
+import threading
+import time
+
+import pytest
 from django.core.exceptions import FieldDoesNotExist
-from django.db import DatabaseError, IntegrityError, models, transaction
-from django.test import TestCase
+from django.db import DatabaseError, IntegrityError, close_old_connections, connections, models, transaction
+from django.test import TestCase, TransactionTestCase
 from django.test.utils import override_settings
 
 from assets.models.catalog import AssetType, AssetTypeFieldset, CategoryDefaultFieldset
@@ -11,6 +15,9 @@ from extras.models import (
     CustomFieldset,
     CustomFieldsetField,
 )
+
+
+_RACE_TIMEOUT_SECONDS = 5
 
 
 @override_settings(ITAMBOX_ENV="dev")
@@ -122,3 +129,240 @@ class T06DefinitionSchemaTests(TestCase):
         self.assertTrue(CustomFieldChoice.objects.filter(pk=choice.pk).exists())
         with self.assertRaises((IntegrityError, DatabaseError)):
             choice.delete()
+
+
+@pytest.mark.serial_only
+@override_settings(ITAMBOX_ENV="dev")
+class T06GlobalMembershipConcurrencyTests(TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        from django.contrib.contenttypes.models import ContentType
+
+        self.field = CustomField.objects.create(
+            name="concurrent_guard",
+            namespace="local",
+            label="Concurrent guard",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        )
+        self.field.object_types.add(ContentType.objects.get_for_model(AssetType))
+        self.fieldset = CustomFieldset.objects.create(
+            namespace="local",
+            slug="concurrent-guard",
+            label="Concurrent guard",
+        )
+
+    @staticmethod
+    def _backend_pid(db):
+        with db.cursor() as cursor:
+            cursor.execute("SELECT pg_backend_pid()")
+            return cursor.fetchone()[0]
+
+    def _wait_for_row_lock(self, waiting_pid, blocking_pid, statement_finished, worker_finished):
+        deadline = time.monotonic() + _RACE_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            if statement_finished.is_set() or worker_finished.is_set():
+                return False
+            with connections["default"].cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT wait_event_type, pg_blocking_pids(pid)
+                    FROM pg_stat_activity
+                    WHERE pid = %s
+                    """,
+                    [waiting_pid],
+                )
+                state = cursor.fetchone()
+            if state and state[0] == "Lock" and blocking_pid in state[1]:
+                return True
+            time.sleep(0.02)
+        return False
+
+    def test_membership_insert_serializes_after_activation_update(self):
+        activation_ready = threading.Event()
+        membership_started = threading.Event()
+        release_activation = threading.Event()
+        release_membership = threading.Event()
+        membership_statement_finished = threading.Event()
+        activation_finished = threading.Event()
+        membership_finished = threading.Event()
+        pids = {}
+        errors = {"activation": [], "membership": []}
+
+        def activation_worker():
+            close_old_connections()
+            db = connections["default"]
+            try:
+                with transaction.atomic(using="default"):
+                    pids["activation"] = self._backend_pid(db)
+                    with db.cursor() as cursor:
+                        cursor.execute(
+                            "UPDATE extras_customfield SET activation = %s WHERE id = %s",
+                            [CustomField.ACTIVATION_GLOBAL, self.field.pk],
+                        )
+                    activation_ready.set()
+                    if not release_activation.wait(_RACE_TIMEOUT_SECONDS):
+                        raise AssertionError("activation worker was not released")
+            except BaseException as exc:
+                errors["activation"].append(exc)
+            finally:
+                activation_finished.set()
+                close_old_connections()
+
+        def membership_worker():
+            close_old_connections()
+            db = connections["default"]
+            try:
+                with transaction.atomic(using="default"):
+                    pids["membership"] = self._backend_pid(db)
+                    membership_started.set()
+                    with db.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO extras_customfieldsetfield
+                                (fieldset_id, custom_field_id, position, created_at, updated_at)
+                            VALUES (%s, %s, %s, NOW(), NOW())
+                            """,
+                            [self.fieldset.pk, self.field.pk, 1],
+                        )
+                    membership_statement_finished.set()
+                    if not release_membership.wait(_RACE_TIMEOUT_SECONDS):
+                        raise AssertionError("membership worker was not released")
+            except BaseException as exc:
+                errors["membership"].append(exc)
+            finally:
+                membership_finished.set()
+                close_old_connections()
+
+        activation_thread = threading.Thread(target=activation_worker, name="t06-activation-first")
+        membership_thread = threading.Thread(target=membership_worker, name="t06-membership-after-activation")
+        activation_thread.start()
+        membership_thread_started = False
+        try:
+            self.assertTrue(activation_ready.wait(_RACE_TIMEOUT_SECONDS))
+            membership_thread.start()
+            membership_thread_started = True
+            self.assertTrue(membership_started.wait(_RACE_TIMEOUT_SECONDS))
+            self.assertTrue(
+                self._wait_for_row_lock(
+                    pids["membership"],
+                    pids["activation"],
+                    membership_statement_finished,
+                    membership_finished,
+                ),
+                "membership INSERT must wait on the CustomField row lock",
+            )
+            release_activation.set()
+            activation_thread.join(_RACE_TIMEOUT_SECONDS)
+            release_membership.set()
+            membership_thread.join(_RACE_TIMEOUT_SECONDS)
+        finally:
+            release_activation.set()
+            release_membership.set()
+            activation_thread.join(_RACE_TIMEOUT_SECONDS)
+            if membership_thread_started:
+                membership_thread.join(_RACE_TIMEOUT_SECONDS)
+        self.assertFalse(activation_thread.is_alive())
+        self.assertFalse(membership_thread.is_alive())
+        self.assertFalse(errors["activation"])
+        self.assertEqual(len(errors["membership"]), 1)
+        self.assertIsInstance(errors["membership"][0], DatabaseError)
+        self.assertIn("Global Custom Fields cannot join Fieldsets", str(errors["membership"][0]))
+        self.field.refresh_from_db()
+        self.assertEqual(self.field.activation, CustomField.ACTIVATION_GLOBAL)
+        self.assertFalse(CustomFieldsetField.objects.filter(custom_field_id=self.field.pk).exists())
+
+    def test_activation_update_serializes_after_membership_insert(self):
+        membership_ready = threading.Event()
+        activation_started = threading.Event()
+        release_membership = threading.Event()
+        release_activation = threading.Event()
+        activation_statement_finished = threading.Event()
+        membership_finished = threading.Event()
+        activation_finished = threading.Event()
+        pids = {}
+        errors = {"activation": [], "membership": []}
+
+        def membership_worker():
+            close_old_connections()
+            db = connections["default"]
+            try:
+                with transaction.atomic(using="default"):
+                    pids["membership"] = self._backend_pid(db)
+                    with db.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO extras_customfieldsetfield
+                                (fieldset_id, custom_field_id, position, created_at, updated_at)
+                            VALUES (%s, %s, %s, NOW(), NOW())
+                            """,
+                            [self.fieldset.pk, self.field.pk, 1],
+                        )
+                    membership_ready.set()
+                    if not release_membership.wait(_RACE_TIMEOUT_SECONDS):
+                        raise AssertionError("membership worker was not released")
+            except BaseException as exc:
+                errors["membership"].append(exc)
+            finally:
+                membership_finished.set()
+                close_old_connections()
+
+        def activation_worker():
+            close_old_connections()
+            db = connections["default"]
+            try:
+                with transaction.atomic(using="default"):
+                    pids["activation"] = self._backend_pid(db)
+                    activation_started.set()
+                    with db.cursor() as cursor:
+                        cursor.execute(
+                            "UPDATE extras_customfield SET activation = %s WHERE id = %s",
+                            [CustomField.ACTIVATION_GLOBAL, self.field.pk],
+                        )
+                    activation_statement_finished.set()
+                    if not release_activation.wait(_RACE_TIMEOUT_SECONDS):
+                        raise AssertionError("activation worker was not released")
+            except BaseException as exc:
+                errors["activation"].append(exc)
+            finally:
+                activation_finished.set()
+                close_old_connections()
+
+        membership_thread = threading.Thread(target=membership_worker, name="t06-membership-first")
+        activation_thread = threading.Thread(target=activation_worker, name="t06-activation-after-membership")
+        membership_thread.start()
+        activation_thread_started = False
+        try:
+            self.assertTrue(membership_ready.wait(_RACE_TIMEOUT_SECONDS))
+            activation_thread.start()
+            activation_thread_started = True
+            self.assertTrue(activation_started.wait(_RACE_TIMEOUT_SECONDS))
+            self.assertTrue(
+                self._wait_for_row_lock(
+                    pids["activation"],
+                    pids["membership"],
+                    activation_statement_finished,
+                    activation_finished,
+                ),
+                "activation UPDATE must wait on the CustomField row lock",
+            )
+            release_membership.set()
+            membership_thread.join(_RACE_TIMEOUT_SECONDS)
+            release_activation.set()
+            activation_thread.join(_RACE_TIMEOUT_SECONDS)
+        finally:
+            release_membership.set()
+            release_activation.set()
+            membership_thread.join(_RACE_TIMEOUT_SECONDS)
+            if activation_thread_started:
+                activation_thread.join(_RACE_TIMEOUT_SECONDS)
+        self.assertFalse(membership_thread.is_alive())
+        self.assertFalse(activation_thread.is_alive())
+        self.assertFalse(errors["membership"])
+        self.assertEqual(len(errors["activation"]), 1)
+        self.assertIsInstance(errors["activation"][0], DatabaseError)
+        self.assertIn("A Custom Field with memberships cannot become global", str(errors["activation"][0]))
+        self.field.refresh_from_db()
+        self.assertEqual(self.field.activation, CustomField.ACTIVATION_COMPOSED)
+        self.assertTrue(CustomFieldsetField.objects.filter(custom_field_id=self.field.pk).exists())

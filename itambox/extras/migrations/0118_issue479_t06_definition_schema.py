@@ -95,12 +95,14 @@ def _preflight_applicability(apps, db_alias):
                 target_model = None
             if target_model is None:
                 _fail("unresolvable_object_type", f"{field.pk}:{content_type.app_label}.{content_type.model}")
+            if not any(item.name == "custom_field_data" for item in target_model._meta.concrete_fields):
+                _fail("missing_custom_field_data", f"{field.pk}:{content_type.app_label}.{content_type.model}")
         legacy_scope = field.scope
         if legacy_scope not in (None, ""):
             expected = expected_by_scope.get(legacy_scope)
             if expected is None:
                 _fail("invalid_legacy_scope", f"{field.pk}:{legacy_scope}")
-            if not expected.issubset(identities):
+            if identities != expected:
                 _fail("scope_object_types_contradiction", field.pk)
 
 
@@ -314,6 +316,10 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    PERFORM 1
+    FROM extras_customfield
+    WHERE id = NEW.custom_field_id
+    FOR NO KEY UPDATE;
     IF EXISTS (
         SELECT 1 FROM extras_customfield
         WHERE id = NEW.custom_field_id AND activation = 'global'
