@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 46)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 49)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -566,6 +566,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "assets.0112_alter_assettype_library_definition_key_and_more",
                 "assets.0113_assettype_library_identity_immutable",
                 "assets.0114_issue479_t06_composition_schema",
+                "assets.0115_issue479_t07_provenance_bridge",
                 "compliance.0101_alter_custodyreceipt_signed_at",
                 "compliance.0102_clear_unsigned_receipt_timestamps",
                 "compliance.0103_alter_custodyreceipt_options",
@@ -589,6 +590,8 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0116_alter_customfield_lifecycle_and_more",
                 "extras.0117_alter_customfieldchoice_choice_set_and_more",
                 "extras.0118_issue479_t06_definition_schema",
+                "extras.0119_issue479_t07_provenance_schema",
+                "extras.0120_issue479_t07_provenance_cutover",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
