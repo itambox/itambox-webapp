@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 
 from assets.forms import AssetForm, AssetTypeForm
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
@@ -37,6 +38,22 @@ class SpecificationFormBoundaryTests(TenantTestMixin, TestCase):
         self.request = RequestFactory().post("/assets/")
         self.request.user = self.tenant_user
         self.request.tenant = self.tenant
+
+    def test_http_asset_creation_reaches_native_form_with_authenticated_actor(self):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        data = _minimal_asset_form_data(
+            self.asset,
+            self.status,
+            self.source,
+            tenant=self.tenant.pk,
+            name="HTTP form created",
+            asset_tag="HTTP-FORM-CREATED",
+        )
+        response = self.client.post(reverse("assets:asset_create"), data, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 302, response.content[:2000])
+        created = Asset._base_manager.get(asset_tag="HTTP-FORM-CREATED")
+        self.assertEqual(created.tenant_id, self.tenant.pk)
+        self.assertEqual(created.asset_type_id, self.source.pk)
 
     def test_mixed_form_updates_lock_catalogue_before_native_owner_write(self):
         admin_request = RequestFactory().post("/asset-types/")

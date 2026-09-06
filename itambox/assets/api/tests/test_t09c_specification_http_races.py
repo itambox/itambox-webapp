@@ -1,6 +1,7 @@
 """Real PostgreSQL contention through the supported legacy HTTP adapter."""
 
 import pytest
+from django.contrib.contenttypes.models import ContentType
 from django.db import connection, transaction
 from django.urls import reverse
 from rest_framework.test import APITransactionTestCase
@@ -12,7 +13,6 @@ from assets.specification_adapters import actor_context_for_user, current_specif
 from assets.tests.test_specification_composition_races import _assert_waiting, _finish, _start
 from core.tests.mixins import TenantTestMixin
 from extras.models import CustomField
-from django.contrib.contenttypes.models import ContentType
 
 
 @pytest.mark.serial_only
