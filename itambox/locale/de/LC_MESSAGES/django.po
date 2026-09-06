@@ -13721,10 +13721,6 @@ msgid "A field cannot be set and cleared together."
 msgstr "Ein Feld kann nicht gleichzeitig gesetzt und gelöscht werden."
 
 #: itambox/extras/models.py
-msgid "Asset Type and Asset"
-msgstr "Asset-Typ und Asset"
-
-#: itambox/extras/models.py
 msgid "Decimal"
 msgstr "Dezimalzahl"
 
@@ -13892,10 +13888,6 @@ msgstr "Unbekannter Schlüssel für ein benutzerdefiniertes Feld."
 msgid "Applicability"
 msgstr "Anwendbarkeit"
 
-#: itambox/extras/forms.py
-msgid "Asset scopes and model applicability must describe the same target set."
-msgstr "Asset-Bereiche und Modellanwendbarkeit müssen dieselbe Zielmenge beschreiben."
-
 
 #: itambox/extras/forms.py
 msgid "Every field position must be a positive integer."
@@ -13912,10 +13904,6 @@ msgstr "Feldpositionen müssen eindeutig sein."
 #: itambox/extras/forms.py
 msgid "Multi-select fields require a maximum value count."
 msgstr "Mehrfachauswahlfelder benötigen eine maximale Anzahl von Werten."
-
-#: itambox/extras/forms.py
-msgid "Non-asset fields use the selected model relation. Asset scopes derive their Asset and Asset Type relations."
-msgstr "Nicht-Asset-Felder verwenden die ausgewählte Modellbeziehung. Asset-Bereiche leiten ihre Asset- und Asset-Typ-Beziehungen ab."
 
 #: itambox/extras/forms.py
 msgid "Only decimal fields may define a scale."
@@ -13940,10 +13928,6 @@ msgstr "Positionen müssen ein JSON-Objekt sein."
 #: itambox/extras/forms.py
 msgid "Remove value"
 msgstr "Wert entfernen"
-
-#: itambox/extras/forms.py
-msgid "Scope and validation"
-msgstr "Geltungsbereich und Validierung"
 
 
 #: itambox/extras/forms.py
@@ -13978,10 +13962,6 @@ msgstr "Der Custom-Field-Patch enthält eine unbekannte Operation."
 #: itambox/extras/definition_contract.py
 msgid "Decimal fields require a scale from 0 to 6."
 msgstr "Dezimalfelder benötigen eine Skalierung von 0 bis 6."
-
-#: itambox/extras/definition_contract.py
-msgid "Select at least one model for a generic local field."
-msgstr "Wählen Sie für ein allgemeines lokales Feld mindestens ein Modell aus."
 
 #: itambox/extras/api/serializers.py
 msgid "Custom field specification patch must be an object."
@@ -14039,6 +14019,39 @@ msgstr "Das Auswahlset ist nicht aktiv."
 msgid "This field is required."
 msgstr "Dieses Feld ist erforderlich."
 
-#: itambox/extras/definition_contract.py
-msgid "Choice Sets must be active and not deleted."
-msgstr "Auswahlsets müssen aktiv und dürfen nicht gelöscht sein."
+#: itambox/extras/models.py:400
+msgid "A field with memberships cannot be global."
+msgstr "Ein Feld, das einer Feldgruppe zugeordnet ist, kann nicht global sein."
+
+#: itambox/extras/models.py:310
+msgid "Activation"
+msgstr "Aktivierung"
+
+#: itambox/extras/forms.py:198
+msgid "Activation and validation"
+msgstr "Aktivierung und Validierung"
+
+#: itambox/extras/definition_contract.py:308
+msgid "Choice Sets must be active."
+msgstr "Auswahlsets müssen aktiv sein."
+
+#: itambox/extras/models.py:286
+msgid "Composed"
+msgstr "Über Feldgruppen"
+
+#: itambox/extras/models.py:499
+msgid "Global fields cannot join a fieldset."
+msgstr "Globale Felder können keiner Feldgruppe zugeordnet werden."
+
+#: itambox/extras/definition_contract.py:327
+msgid "Select at least one applicable model."
+msgstr "Wählen Sie mindestens ein zutreffendes Modell aus."
+
+#: itambox/extras/forms.py:173
+msgid "Select every model this field applies to. Applicability is stored only in this relation."
+msgstr "Wählen Sie alle Modelle aus, für die dieses Feld gilt. Die Anwendbarkeit wird ausschließlich über diese Zuordnung festgelegt."
+
+#: itambox/extras/api/serializers.py:187
+#, python-format
+msgid "Unsupported custom-field owner: %(models)s."
+msgstr "Nicht unterstütztes Modell für benutzerdefinierte Felder: %(models)s."
