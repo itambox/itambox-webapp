@@ -385,9 +385,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     def save(self, commit=True):
         # Bypass CustomFieldModelFormMixin.save: that mixin is a legacy second
         # authority which merges and writes custom_field_data directly.
-        from django.forms import ModelForm
-
-        instance = ModelForm.save(self, commit=False)
+        instance = forms.ModelForm.save(self, commit=False)
         self._native_save_m2m = getattr(self, "save_m2m", None)
         self._pending_create = not bool(instance.pk)
         if not commit:

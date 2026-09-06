@@ -567,15 +567,13 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # custom-field merge.  The command below is the only value/type-switch
         # writer; native fields are saved separately so a stale form instance
         # cannot overwrite command-owned state.
-        from django.forms import ModelForm
-
         # is_valid() has already copied the submitted Type onto instance.
         # Deferred native persistence must retain the stored Type, not that
         # mutated in-memory value; only save_m2m may execute the switch.
         previous_type_id = None
         if not commit and self.instance.pk:
             previous_type_id = Asset._base_manager.values_list("asset_type_id", flat=True).get(pk=self.instance.pk)
-        instance = ModelForm.save(self, commit=False)
+        instance = forms.ModelForm.save(self, commit=False)
         self._native_save_m2m = getattr(self, "save_m2m", None)
         self._pending_target_asset_type_id = instance.asset_type_id
         self._pending_create = not bool(instance.pk)
@@ -633,8 +631,6 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # dynamic custom-field validation for this initial native row; the
         # canonical command immediately validates and writes the requested
         # patch/type destination inside the same outer transaction.
-        from core.mixins import suppress_custom_field_data_validation
-
         instance.custom_field_data = {}
         with suppress_custom_field_data_validation(instance):
             instance.save()

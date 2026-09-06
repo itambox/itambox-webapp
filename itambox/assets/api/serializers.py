@@ -33,8 +33,8 @@ from assets.models import (
     Supplier,
     Warranty,
 )
+from core.mixins import suppress_custom_field_data_validation
 from extras.api.serializers import TagSerializer
-from extras.models import CustomFieldset
 from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from organization.api.serializers import (
     AssetHolderSerializer,
@@ -47,7 +47,6 @@ from organization.models import Location, Tenant
 from ..services.specifications.commands import (
     create_asset_type,
     preview_asset_type_create,
-    set_asset_type_composition,
     update_asset_specifications,
     update_asset_type_specifications,
 )
@@ -58,7 +57,6 @@ from ..specification_adapters import (
     current_specification_plan,
     create_fieldset_selection,
     discard_staged_image,
-    fieldset_selection,
     native_asset_type_create_input,
     native_persistence_fields,
     owner_id_from_result,
@@ -71,7 +69,7 @@ User = get_user_model()
 
 
 class CanonicalSpecificationSerializerMixin(serializers.Serializer):
-    """Keep API parsing separate from the canonical command writer."""
+    # Keep API parsing separate from the canonical command writer.
 
     specification_patch = serializers.JSONField(write_only=True, required=False)
 
@@ -176,12 +174,6 @@ class DepreciationSerializer(BaseModelSerializer):
 
 class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer):
     custom_field_data = serializers.JSONField(read_only=True)
-    custom_fieldsets = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=CustomFieldset.objects.all(),
-        write_only=True,
-        required=False,
-    )
     manufacturer = NestedManufacturerSerializer(read_only=True)
     manufacturer_id = serializers.PrimaryKeyRelatedField(
         queryset=Manufacturer.objects.all(), source="manufacturer", write_only=True
@@ -212,7 +204,6 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
             "depreciation",
             "depreciation_id",
             "custom_field_data",
-            "custom_fieldsets",
             "specification_patch",
             "image",
             "requestable",
@@ -229,18 +220,13 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
 
     def create(self, validated_data):
         patch = patch_from_mapping(validated_data.pop("specification_patch", None))
-        fieldsets_marker = object()
-        fieldsets = validated_data.pop("custom_fieldsets", fieldsets_marker)
         actor = actor_context_for_user(self._request_user())
         uploaded = validated_data.get("image")
         stage_id = stage_uploaded_image(actor=actor, uploaded=uploaded) if uploaded else None
         succeeded = False
         try:
             native = self._native_input(validated_data, staged_image_id=stage_id)
-            selection = create_fieldset_selection(
-                () if fieldsets is fieldsets_marker else fieldsets,
-                omitted=fieldsets is fieldsets_marker,
-            )
+            selection = create_fieldset_selection((), omitted=True)
             with transaction.atomic():
                 preview = require_command_success(
                     preview_asset_type_create(
@@ -274,32 +260,18 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
         with transaction.atomic():
             patch_marker = object()
             patch_value = validated_data.pop("specification_patch", patch_marker)
-            fieldsets_marker = object()
-            fieldsets = validated_data.pop("custom_fieldsets", fieldsets_marker)
             current = AssetType.all_objects.get(pk=instance.pk)
-
-            if patch_value is not patch_marker or fieldsets is not fieldsets_marker:
+            if patch_value is not patch_marker:
                 try:
                     actor = actor_context_for_user(self._request_user())
                     plan = current_specification_plan(current, target_kind="asset_type")
-                    patch = patch_from_mapping(None if patch_value is patch_marker else patch_value)
-                    if fieldsets is not fieldsets_marker:
-                        result = set_asset_type_composition(
-                            actor=actor,
-                            asset_type_id=current.pk,
-                            fieldsets=fieldset_selection(fieldsets, presence="explicit"),
-                            expected_resource_revision=plan.resource_revision,
-                            expected_definition_revision=plan.definition_revision,
-                            patch=patch,
-                        )
-                    else:
-                        result = update_asset_type_specifications(
-                            actor=actor,
-                            asset_type_id=current.pk,
-                            expected_resource_revision=plan.resource_revision,
-                            expected_definition_revision=plan.definition_revision,
-                            patch=patch,
-                        )
+                    result = update_asset_type_specifications(
+                        actor=actor,
+                        asset_type_id=current.pk,
+                        expected_resource_revision=plan.resource_revision,
+                        expected_definition_revision=plan.definition_revision,
+                        patch=patch_from_mapping(patch_value),
+                    )
                     require_command_success(result)
                 except (PermissionDenied, DjangoValidationError) as exc:
                     self._command_error(exc)
@@ -404,9 +376,9 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         patch = patch_from_mapping(validated_data.pop("specification_patch", None))
         target_type = validated_data.get("asset_type")
         if target_type is None:
-            raise serializers.ValidationError({"asset_type_id": _("An Asset Type is required.")})
-        from core.mixins import suppress_custom_field_data_validation
-
+            raise serializers.ValidationError(
+                {"asset_type_id": self.fields["asset_type_id"].error_messages["required"]}
+            )
         with transaction.atomic():
             instance = Asset(**validated_data, custom_field_data={})
             with suppress_custom_field_data_validation(instance):

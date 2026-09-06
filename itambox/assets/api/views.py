@@ -38,12 +38,8 @@ from assets.models import (
     Warranty,
 )
 from assets.services import checkin_asset, checkout_asset
-from assets.services.specifications._command_support import (
-    lock_relevant_libraries,
-    lock_relevant_libraries_for_composition,
-)
+from assets.services.specifications._command_support import lock_relevant_libraries
 from assets.services.specifications.locking import catalogue_transaction_lock
-from assets.specification_adapters import fieldset_selection
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 
@@ -90,19 +86,18 @@ class AssetStateActionPermissions(TokenPermissions):
 
 
 class SpecificationCommandUpdateMixin:
-    """Preserve the legacy ETag lock without taking it before command locks."""
+    # Preserve the legacy ETag lock without taking it before command locks.
 
     def perform_update(self, serializer):
-        command_fields = {"specification_patch", "custom_field_data", "custom_fieldsets", "asset_type"}
+        command_fields = {"specification_patch", "asset_type"}
         if not command_fields.intersection(serializer.validated_data):
             return super().perform_update(serializer)
         # The generic view locks the owner before invoking serializer.save().
-        # Match command lock modes: shared for values, exclusive for composition.
+        # Supported REST mutations use the value-command shared catalogue lock.
         # A concurrent owner Type switch changes its ETag; the generic view
         # rechecks that required precondition under its owner lock before save.
         # Native-only requests retain the unchanged generic persistence path.
-        exclusive = isinstance(serializer.instance, AssetType) and "custom_fieldsets" in serializer.validated_data
-        with transaction.atomic(), catalogue_transaction_lock(exclusive=exclusive):
+        with transaction.atomic(), catalogue_transaction_lock(exclusive=False):
             self._lock_command_libraries(serializer)
             return super().perform_update(serializer)
 
@@ -115,12 +110,6 @@ class SpecificationCommandUpdateMixin:
             target_type_id = getattr(data.get("asset_type"), "pk", None)
             type_ids = tuple(sorted({value for value in (current_type_id, target_type_id) if value is not None}))
             lock_relevant_libraries(type_ids, "asset")
-        elif "custom_fieldsets" in data:
-            selection = fieldset_selection(data["custom_fieldsets"], presence="replace")
-            current_ids = tuple(owner.fieldset_memberships.values_list("fieldset_id", flat=True))
-            lock_relevant_libraries_for_composition(
-                current_ids, selection.identities, "asset_type", asset_type_ids=(owner.pk,)
-            )
         else:
             lock_relevant_libraries((owner.pk,), "asset_type")
 

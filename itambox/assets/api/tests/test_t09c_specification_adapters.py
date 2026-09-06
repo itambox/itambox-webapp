@@ -31,6 +31,7 @@ def test_public_asset_serializers_collect_specification_patch_field():
 
     assert "specification_patch" in asset_type_fields
     assert "specification_patch" in asset_fields
+    assert "custom_fieldsets" not in list(asset_type_fields)  # Composition REST input belongs to T12.
     assert asset_type_fields["specification_patch"].write_only is True
     assert asset_fields["specification_patch"].write_only is True
 
@@ -50,31 +51,6 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
             slug="t09-c-device",
         )
         self.client_login_to_tenant(self.tenant_user, self.tenant)
-
-    def test_asset_type_update_passes_explicit_fieldset_selection_to_command(self):
-        fieldset = CustomFieldset.objects.create(
-            namespace="local",
-            slug="api-composition",
-            label="API composition",
-            management_kind=CustomFieldset.MANAGEMENT_LOCAL,
-        )
-        self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        detail_url = reverse("api:assets_api:assettype-detail", kwargs={"pk": self.asset_type.pk})
-        current_response = self.client.get(detail_url)
-        assert current_response.status_code == status.HTTP_200_OK, current_response.data
-
-        response = self.client.patch(
-            detail_url,
-            {
-                "custom_fieldsets": [fieldset.pk],
-                "specification_patch": {"set": {}, "clear": []},
-            },
-            format="json",
-            HTTP_IF_MATCH=current_response["ETag"],
-        )
-
-        assert response.status_code == status.HTTP_200_OK, response.data
-        assert list(self.asset_type.fieldset_memberships.values_list("fieldset_id", "position")) == [(fieldset.pk, 1)]
 
     def test_direct_asset_type_update_rolls_back_native_change_on_specification_rejection(self):
         original_model = self.asset_type.model
@@ -350,26 +326,6 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
         )
         self.assertLess(catalogue_lock, owner_lock)
         self.assertIn("pg_advisory_xact_lock_shared", sql[catalogue_lock])
-
-    def test_public_type_composition_uses_canonical_memberships(self):
-        fieldset = CustomFieldset.objects.create(
-            namespace="local", slug="public-composition", label="Public composition"
-        )
-        self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        url = reverse("api:assets_api:assettype-detail", args=[self.asset_type.pk])
-        etag = self.client.get(url)["ETag"]
-        with CaptureQueriesContext(connection) as captured:
-            response = self.client.patch(url, {"custom_fieldsets": [fieldset.pk]}, format="json", HTTP_IF_MATCH=etag)
-        self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(
-            list(self.asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)), [fieldset.pk]
-        )
-        sql = [query["sql"] for query in captured.captured_queries]
-        catalogue_lock = next(index for index, query in enumerate(sql) if "pg_advisory_xact_lock" in query)
-        owner_lock = next(
-            index for index, query in enumerate(sql) if 'FROM "assets_assettype"' in query and "FOR UPDATE" in query
-        )
-        self.assertLess(catalogue_lock, owner_lock)
 
     def test_public_native_only_edit_does_not_acquire_specification_locks(self):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
