@@ -165,7 +165,8 @@
     "scripts/tests/test_typing_policy.py",
     "itambox/assets/tests/test_specification_command_races.py",
     "itambox/assets/tests/test_specification_value_commands.py",
-    "itambox/assets/tests/test_specification_image_staging.py"
+    "itambox/assets/tests/test_specification_image_staging.py",
+    "itambox/assets/tests/test_specification_native_reference_races.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -335,7 +336,8 @@
     "itambox/assets/tests/test_specification_apply_defaults_commands.py",
     "itambox/assets/tests/test_specification_create_commands.py",
     "itambox/assets/tests/test_specification_create_races.py",
-    "itambox/assets/tests/test_specification_image_staging.py"
+    "itambox/assets/tests/test_specification_image_staging.py",
+    "itambox/assets/tests/test_specification_native_reference_races.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
