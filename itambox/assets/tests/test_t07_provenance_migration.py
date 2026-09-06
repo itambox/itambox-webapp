@@ -158,8 +158,9 @@ class T07ProvenanceMigrationTests(IsolatedMigrationTestCase):
         AssetTypeFieldset.objects.create(asset_type_id=local_type.pk, fieldset_id=fieldset.pk, position=7)
         AssetTypeFieldset.objects.create(asset_type_id=library_type.pk, fieldset_id=fieldset.pk, position=9)
 
-        executor.migrate(self.migrate_to)
-        new_apps = executor.loader.project_state(self.migrate_to).apps
+        target_executor = MigrationExecutor(connection)
+        target_executor.migrate(self.migrate_to)
+        new_apps = target_executor.loader.project_state(self.migrate_to).apps
         NewAssetType = new_apps.get_model("assets", "AssetType")
         NewAssetTypeFieldset = new_apps.get_model("assets", "AssetTypeFieldset")
         NewCustomField = new_apps.get_model("extras", "CustomField")
