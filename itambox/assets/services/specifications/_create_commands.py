@@ -626,14 +626,18 @@ def _preview_reference_issues(
     """Read-only reference availability for previews (never consumes locks)."""
     issues: list[DomainIssueDTO] = []
     if native.suggested_asset_role_id is not None:
-        if not AssetRole.all_objects.using(using).filter(
-            pk=native.suggested_asset_role_id, deleted_at__isnull=True
-        ).exists():
+        if (
+            not AssetRole.all_objects.using(using)
+            .filter(pk=native.suggested_asset_role_id, deleted_at__isnull=True)
+            .exists()
+        ):
             issues.append(_reference_issue("suggested_asset_role_id"))
     if native.depreciation_id is not None:
-        if not Depreciation.all_objects.using(using).filter(
-            pk=native.depreciation_id, deleted_at__isnull=True
-        ).exists():
+        if (
+            not Depreciation.all_objects.using(using)
+            .filter(pk=native.depreciation_id, deleted_at__isnull=True)
+            .exists()
+        ):
             issues.append(_reference_issue("depreciation_id"))
     if not _tags_exist(native.tag_ids, using=using):
         issues.append(_reference_issue("tag_ids"))

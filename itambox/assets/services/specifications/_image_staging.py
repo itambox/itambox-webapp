@@ -123,7 +123,9 @@ def _stage_matches_actor(row: AssetTypeImageStage, actor: ActorContextDTO, comma
     return True
 
 
-def preview_stage_or_none(stage_id: str, actor: ActorContextDTO, command_kind: str, *, using: str = _DEFAULT_DB, now=None):
+def preview_stage_or_none(
+    stage_id: str, actor: ActorContextDTO, command_kind: str, *, using: str = _DEFAULT_DB, now=None
+):
     """Read-only validation for previews: never consumes, deletes, or refreshes.
 
     Returns the pending immutable stage row when ownership, authentication
@@ -139,16 +141,12 @@ def preview_stage_or_none(stage_id: str, actor: ActorContextDTO, command_kind: s
 
 def lock_stage(stage_id: str, *, using: str = _DEFAULT_DB):
     """Acquire the stage row lock in the deterministic reference-row order."""
-    return (
-        AssetTypeImageStage.objects.using(using)
-        .select_for_update()
-        .filter(stage_id=stage_id)
-        .order_by("pk")
-        .first()
-    )
+    return AssetTypeImageStage.objects.using(using).select_for_update().filter(stage_id=stage_id).order_by("pk").first()
 
 
-def lock_stage_for_consume(stage_id: str, actor: ActorContextDTO, command_kind: str, *, using: str = _DEFAULT_DB, now=None):
+def lock_stage_for_consume(
+    stage_id: str, actor: ActorContextDTO, command_kind: str, *, using: str = _DEFAULT_DB, now=None
+):
     """Lock and revalidate a pending stage for the write path.
 
     Returns the locked row when still pending/matching, ``None`` otherwise;
@@ -183,12 +181,7 @@ def discard_stage(stage_id: str, actor: ActorContextDTO, command_kind: str, *, u
     if not _stage_matches_actor(row, actor, command_kind, now=timezone.now()):
         return False
     with transaction.atomic(using=using):
-        locked = (
-            AssetTypeImageStage.objects.using(using)
-            .select_for_update()
-            .filter(pk=row.pk)
-            .first()
-        )
+        locked = AssetTypeImageStage.objects.using(using).select_for_update().filter(pk=row.pk).first()
         if locked is None or not _stage_matches_actor(locked, actor, command_kind, now=timezone.now()):
             return False
         locked.state = AssetTypeImageStage.State.DISCARDED

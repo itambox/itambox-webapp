@@ -1263,9 +1263,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             ):
                 result = create_asset_type(
                     actor=self._actor(),
-                    native=self._native(
-                        category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)
-                    ),
+                    native=self._native(category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)),
                     fieldsets=self._omitted(),
                     patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
                     preview_token=preview.preview_token,
@@ -1297,9 +1295,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             ):
                 result = create_asset_type(
                     actor=self._actor(),
-                    native=self._native(
-                        category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)
-                    ),
+                    native=self._native(category_id=self.category.pk, staged_image_id=stage_id, tag_ids=(self.tag.pk,)),
                     fieldsets=self._omitted(),
                     patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
                     preview_token=preview.preview_token,

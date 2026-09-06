@@ -397,9 +397,7 @@ def test_cleanup_vs_consume_serialize_on_stage_row_lock(create_race_kit, stage_m
             row = lock_stage_for_consume(stage_id, actor, CREATE_COMMAND_KIND)
             assert row is not None
             consume_stage(row, owner.pk)
-            started = _start(
-                lambda: cleanup_expired_stages(now=timezone.now() + timedelta(hours=2))
-            )
+            started = _start(lambda: cleanup_expired_stages(now=timezone.now() + timedelta(hours=2)))
             _assert_row_wait(started[1])
     finally:
         if started is not None:

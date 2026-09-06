@@ -41,7 +41,9 @@ _STAGE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 class SpecificationImageStageTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.storage = FileSystemStorage(location=tempfile.mkdtemp(prefix="itambox-stage-svc-"))
-        self.patch_default_storage = patch("assets.services.specifications._image_staging.default_storage", self.storage)
+        self.patch_default_storage = patch(
+            "assets.services.specifications._image_staging.default_storage", self.storage
+        )
         self.patch_default_storage.start()
         self.addCleanup(self.patch_default_storage.stop)
         self.addCleanup(lambda: shutil.rmtree(self.storage.location, ignore_errors=True))
@@ -113,9 +115,7 @@ class SpecificationImageStageTests(TenantTestMixin, TestCase):
         self.assertEqual(foreign.state, "pending")
         self.assertTrue(self.storage.exists(foreign.storage_key))
 
-        owner = AssetType.objects.create(
-            manufacturer=self.manufacturer, model="Consumed type", slug="consumed-type"
-        )
+        owner = AssetType.objects.create(manufacturer=self.manufacturer, model="Consumed type", slug="consumed-type")
         consumed_id = self._stage()
         locked = lock_stage_for_consume(consumed_id, self.actor, CREATE_COMMAND_KIND)
         self.assertIsNotNone(locked)
@@ -135,9 +135,7 @@ class SpecificationImageStageTests(TenantTestMixin, TestCase):
         AssetTypeImageStage.objects.filter(pk=expired_row.pk).update(expires_at=now - timedelta(minutes=1))
 
         unexpired = self._stage(now=now)
-        owner = AssetType.objects.create(
-            manufacturer=self.manufacturer, model="Cleanup type", slug="cleanup-type"
-        )
+        owner = AssetType.objects.create(manufacturer=self.manufacturer, model="Cleanup type", slug="cleanup-type")
         consumed = self._stage(now=now - timedelta(hours=2))
         consumed_row = AssetTypeImageStage.objects.get(stage_id=consumed)
         AssetTypeImageStage.objects.filter(pk=consumed_row.pk).update(expires_at=now - timedelta(minutes=1))
@@ -181,7 +179,5 @@ class SpecificationImageStageTests(TenantTestMixin, TestCase):
         self.assertIsNone(preview_stage_or_none(stage_id, stale_actor, CREATE_COMMAND_KIND))
         self.assertIsNone(lock_stage_for_consume(stage_id, stale_actor, CREATE_COMMAND_KIND))
 
-        AssetTypeImageStage.objects.filter(stage_id=stage_id).update(
-            expires_at=timezone.now() - timedelta(minutes=1)
-        )
+        AssetTypeImageStage.objects.filter(stage_id=stage_id).update(expires_at=timezone.now() - timedelta(minutes=1))
         self.assertIsNone(preview_stage_or_none(stage_id, self.actor, CREATE_COMMAND_KIND))
