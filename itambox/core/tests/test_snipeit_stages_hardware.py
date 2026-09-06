@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 
 from assets.choices import StatusTypeChoices
 from assets.models import Asset, AssetAssignment, AssetType, Category, Manufacturer, StatusLabel, Supplier, Warranty
@@ -60,7 +61,12 @@ class TestHardwareImporter(TenantTestMixin):
             email="jane@example.com",
             tenant=self.tenant,
         )
-        self.custom_field = CustomField.objects.create(name="cpu_model", label="CPU Model")
+        self.custom_field = CustomField.objects.create(
+            name="cpu_model",
+            label="CPU Model",
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
+        self.custom_field.object_types.add(ContentType.objects.get_for_model(Asset))
 
     def _row(self, source_id=42, **overrides):
         row = {

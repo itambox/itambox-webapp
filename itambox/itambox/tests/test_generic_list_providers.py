@@ -74,7 +74,7 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
             name="rack",
             label="Rack",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         rack_field.object_types.add(self.content_type)
         self.saved_filter = SavedFilter.objects.create(

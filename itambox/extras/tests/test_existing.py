@@ -53,12 +53,22 @@ class TagModelTests(TestCase):
 
 class CustomFieldModelTests(TestCase):
     def test_custom_field_creation(self):
-        cf = CustomField.objects.create(name="cost_center", label="Cost Center", field_type=CustomField.FIELD_TYPE_TEXT)
+        cf = CustomField.objects.create(
+            name="cost_center",
+            label="Cost Center",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         self.assertEqual(str(cf), "Cost Center (Text)")
         self.assertFalse(cf.required)
 
     def test_custom_field_absolute_url(self):
-        cf = CustomField.objects.create(name="dept", label="Department", field_type="text")
+        cf = CustomField.objects.create(
+            name="dept",
+            label="Department",
+            field_type="text",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         url = cf.get_absolute_url()
         self.assertIn(str(cf.pk), url)
 
@@ -85,12 +95,19 @@ class CustomFieldModelTests(TestCase):
                 name=f"test_{ft}",
                 label=f"Test {ft_label}",
                 field_type=ft,
+                activation=CustomField.ACTIVATION_GLOBAL,
                 **kwargs,
             )
             self.assertEqual(cf.field_type, ft)
 
     def test_custom_field_required(self):
-        cf = CustomField.objects.create(name="mandatory_field", label="Mandatory", field_type="text", required=True)
+        cf = CustomField.objects.create(
+            name="mandatory_field",
+            label="Mandatory",
+            field_type="text",
+            activation=CustomField.ACTIVATION_GLOBAL,
+            required=True,
+        )
         self.assertTrue(cf.required)
 
     def test_custom_field_choices_for_select(self):
@@ -108,6 +125,7 @@ class CustomFieldModelTests(TestCase):
             name="env",
             label="Environment",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
+            activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=choice_set,
             max_values=1,
         )
@@ -116,14 +134,30 @@ class CustomFieldModelTests(TestCase):
         )
 
     def test_custom_field_name_is_slug(self):
-        cf = CustomField.objects.create(name="my_custom_field", label="My Custom Field", field_type="text")
+        cf = CustomField.objects.create(
+            name="my_custom_field",
+            label="My Custom Field",
+            field_type="text",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         self.assertEqual(cf.name, "my_custom_field")
 
 
 class CustomFieldsetModelTests(TestCase):
     def test_custom_fieldset_creation(self):
-        cf1 = CustomField.objects.create(name="field_a", label="Field A", field_type="text")
-        cf2 = CustomField.objects.create(name="field_b", label="Field B", field_type="decimal", decimal_scale=2)
+        cf1 = CustomField.objects.create(
+            name="field_a",
+            label="Field A",
+            field_type="text",
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
+        cf2 = CustomField.objects.create(
+            name="field_b",
+            label="Field B",
+            field_type="decimal",
+            activation=CustomField.ACTIVATION_COMPOSED,
+            decimal_scale=2,
+        )
         cfs = CustomFieldset.objects.create(
             namespace="local",
             slug="asset-details",
@@ -273,7 +307,10 @@ class CustomFieldViewTests(TestCase):
         )
         self.client.login(username="testadmin", password="testpassword")
         self.cf = CustomField.objects.create(
-            name="dept_code", label="Department Code", field_type=CustomField.FIELD_TYPE_TEXT
+            name="dept_code",
+            label="Department Code",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
 
     def test_list_view(self):
@@ -296,7 +333,7 @@ class CustomFieldViewTests(TestCase):
                 "namespace": "local",
                 "label": "Building Floor",
                 "field_type": CustomField.FIELD_TYPE_INTEGER,
-                "scope": CustomField.SCOPE_ASSET,
+                "activation": CustomField.ACTIVATION_GLOBAL,
                 "object_types": [ContentType.objects.get_for_model(Asset).pk],
                 "required": "on",
             },
@@ -311,7 +348,9 @@ class CustomFieldViewTests(TestCase):
         url = reverse("extras:customfield_delete", kwargs={"pk": self.cf.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(CustomField.objects.filter(pk=self.cf.pk).exists())
+        self.assertTrue(CustomField.objects.filter(pk=self.cf.pk).exists())
+        self.cf.refresh_from_db()
+        self.assertEqual(self.cf.lifecycle, CustomField.LIFECYCLE_ACTIVE)
 
 
 class CustomFieldsetViewTests(TestCase):
@@ -360,7 +399,9 @@ class CustomFieldsetViewTests(TestCase):
         url = reverse("extras:customfieldset_delete", kwargs={"pk": self.cfs.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(CustomFieldset.objects.filter(pk=self.cfs.pk).exists())
+        self.assertTrue(CustomFieldset.objects.filter(pk=self.cfs.pk).exists())
+        self.cfs.refresh_from_db()
+        self.assertEqual(self.cfs.lifecycle, CustomFieldset.LIFECYCLE_ACTIVE)
 
 
 class TagColumnTests(TestCase):

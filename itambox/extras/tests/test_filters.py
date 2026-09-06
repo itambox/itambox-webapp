@@ -34,10 +34,18 @@ class TagFilterTest(TestCase):
 class CustomFieldFilterSetTest(TestCase):
     def setUp(self):
         self.cf1 = CustomField.objects.create(
-            name="cost_center", label="Cost Center", field_type=CustomField.FIELD_TYPE_TEXT, required=True
+            name="cost_center",
+            label="Cost Center",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_GLOBAL,
+            required=True,
         )
         self.cf2 = CustomField.objects.create(
-            name="department", label="Department Info", field_type=CustomField.FIELD_TYPE_TEXT, required=False
+            name="department",
+            label="Department Info",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_GLOBAL,
+            required=False,
         )
 
     def test_filter_empty_search(self):
