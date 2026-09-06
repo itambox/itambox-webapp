@@ -20,12 +20,15 @@
   "itambox/assets/tests/test_issue445_bulk_rbac.py",
   "itambox/assets/tests/test_issue446_missing_status_migration.py",
   "itambox/assets/tests/test_issue479_foundation_migrations.py",
+  "itambox/assets/tests/test_specification_apply_defaults_commands.py",
   "itambox/assets/tests/test_phase0_disposal.py",
   "itambox/assets/tests/test_phase3_state_machine.py",
   "itambox/assets/tests/test_request_notify_recipients.py",
   "itambox/assets/tests/test_specification_composition_commands.py",
   "itambox/assets/tests/test_specification_composition_races.py",
   "itambox/assets/tests/test_specification_contract_fixtures.py",
+  "itambox/assets/tests/test_specification_create_commands.py",
+  "itambox/assets/tests/test_specification_create_races.py",
   "itambox/assets/tests/test_specification_graph_loader.py",
   "itambox/assets/tests/test_specification_graph_loader_orm.py",
   "itambox/assets/tests/test_specification_preview_tokens.py",
@@ -327,7 +330,10 @@
   "scripts/tests/test_specification_vocabulary_contract.py",
   "scripts/tests/test_typing_policy.py",
   "itambox/assets/tests/test_specification_command_races.py",
-  "itambox/assets/tests/test_specification_value_commands.py"
+  "itambox/assets/tests/test_specification_value_commands.py",
+  "itambox/assets/tests/test_specification_apply_defaults_commands.py",
+  "itambox/assets/tests/test_specification_create_commands.py",
+  "itambox/assets/tests/test_specification_create_races.py"
  ],
  "supporting_files": [
   "itambox/inventory/tests/factories.py",
