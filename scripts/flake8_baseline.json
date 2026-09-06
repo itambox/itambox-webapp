@@ -3964,30 +3964,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_import_snipeit.py",
-      "code": "F401",
-      "message": "'assets.models.AssetAssignment' imported but unused",
-      "source": "        from assets.models import Asset, AssetAssignment",
-      "context": "Module:body/ClassDef:TestSnipeITImporter:body/FunctionDef:test_checkout_creates_assignment:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_import_snipeit.py",
-      "code": "F401",
-      "message": "'datetime' imported but unused",
-      "source": "import datetime",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_import_snipeit.py",
-      "code": "F401",
-      "message": "'unittest.mock.patch' imported but unused",
-      "source": "from unittest.mock import MagicMock, patch",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_intune_sync.py",
       "code": "F401",
       "message": "'django.utils.timezone' imported but unused",
