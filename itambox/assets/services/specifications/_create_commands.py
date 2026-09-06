@@ -4,8 +4,18 @@ This module owns the B2 write path for creating Asset Types and for applying
 Category default compositions to existing Asset Types.  It reuses the
 catalogue transaction lock, the prospective loader, the pure codec, and the
 signed preview-token kernel from the sibling modules; it adds only the
-Category-default snapshot recompute and the caller-owned signing-key wiring
-the accepted contract requires.
+Category-default snapshot recompute, the caller-owned signing-key wiring, and
+the bounded staged-image consumption the accepted contract requires.
+
+Error precedence follows the accepted T01 contract: syntactic missing
+preconditions, then authentication/authorization and inaccessible Category or
+Manufacturer (nondisclosing ``OBJECT_UNAVAILABLE``), then token claims
+(``STALE_PLAN``), then Category-default snapshot and owner/definition
+revisions (``STALE_RESOURCE``/``STALE_DEFINITION``), and only then ordinary
+domain validation (native field parity, references, graph structure, codec
+requiredness).  Structural graph failures never precede authority or token
+diagnostics, and a usable graph revision is compared before lifecycle or
+applicability acceptance.
 """
 
 from __future__ import annotations
@@ -13,17 +23,20 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, IntegrityError, transaction
 
 from assets.models.catalog import (
+    AssetRole,
     AssetType,
     AssetTypeFieldset,
     Category,
     CategoryDefaultFieldset,
+    Depreciation,
     Manufacturer,
 )
 from assets.services.specifications.contracts import (
@@ -92,17 +105,41 @@ from ._composition_commands import (
     _reference_rejection,
     _validate_proposed_graph,
 )
+from ._image_staging import (
+    CREATE_COMMAND_KIND,
+    consume_stage,
+    lock_stage_for_consume,
+    preview_stage_or_none,
+)
 
 _DEFAULT_DB = DEFAULT_DB_ALIAS
 _ADD_PERMISSION = "add_assettype"
 _CHANGE_PERMISSION = "change_assettype"
 _TARGET_KIND = "asset_type"
-_CREATE_COMMAND_KIND = "create_asset_type"
+_CREATE_COMMAND_KIND = CREATE_COMMAND_KIND
 _APPLY_COMMAND_KIND = "apply_category_defaults"
 _SNAPSHOT_VERSION = 1
 _REFERENCE_CONFLICT_MESSAGE = "specifications.reference_conflict"
 _STALE_RESOURCE_MESSAGE = "specifications.stale_resource"
 _STALE_DEFINITION_MESSAGE = "specifications.stale_definition"
+_INVALID_RANGE_MESSAGE = "specifications.invalid_range"
+_INVALID_TYPE_MESSAGE = "specifications.invalid_type"
+
+
+@dataclass
+class _CreateDependencyLocks:
+    """Locked reference rows gathered in deterministic model-label/PK order.
+
+    Category and Manufacturer unavailability is already mapped to the
+    nondisclosing ``OBJECT_UNAVAILABLE`` result during locking; the remaining
+    flags feed the row-9 reference validation so an invalid token or stale
+    revision is always reported first.
+    """
+
+    role_exists: bool = True
+    depreciation_exists: bool = True
+    tags_ok: bool = True
+    stage: Any = None
 
 
 def _preview_token_key() -> str:
@@ -269,11 +306,11 @@ def _tags_exist(tag_ids: tuple[int, ...], *, using: str = _DEFAULT_DB) -> bool:
     return Tag.all_objects.using(using).filter(pk__in=tag_ids, deleted_at__isnull=True).count() == len(tag_ids)
 
 
-def _lock_manufacturer(manufacturer_id: int):
+def _lock_asset_type(asset_type_id: int):
     return (
-        Manufacturer.all_objects.using(_DEFAULT_DB)
+        AssetType.all_objects.using(_DEFAULT_DB)
         .select_for_update()
-        .filter(pk=manufacturer_id, deleted_at__isnull=True)
+        .filter(pk=asset_type_id, deleted_at__isnull=True)
         .first()
     )
 
@@ -287,13 +324,108 @@ def _lock_category(category_id: int):
     )
 
 
-def _lock_asset_type(asset_type_id: int):
+def _lock_create_references(
+    native: AssetTypeNativeCreateInputDTO,
+    actor: ActorContextDTO,
+    *,
+    using: str = _DEFAULT_DB,
+) -> _CreateDependencyLocks | CommandRejectedDTO:
+    """Lock every referenced row in deterministic model-label/PK order.
+
+    Order: AssetRole, staged-image row, Category, Depreciation, Manufacturer,
+    then Tag rows by ascending PK.  Category and Manufacturer disappearances
+    are the nondisclosing ``OBJECT_UNAVAILABLE`` availability check; the
+    remaining references are locked here and validated only after the
+    authority/token/revision gates (row 9).
+    """
+    locks = _CreateDependencyLocks()
+    if not isinstance(native, AssetTypeNativeCreateInputDTO):
+        raise TypeError("native must be an AssetTypeNativeCreateInputDTO")
+    if native.suggested_asset_role_id is not None:
+        locks.role_exists = (
+            AssetRole.all_objects.using(using)
+            .select_for_update()
+            .filter(pk=native.suggested_asset_role_id, deleted_at__isnull=True)
+            .exists()
+        )
+    if native.staged_image_id is not None:
+        locks.stage = lock_stage_for_consume(
+            native.staged_image_id,
+            actor,
+            CREATE_COMMAND_KIND,
+            using=using,
+        )
+    if native.category_id is not None:
+        if _lock_category(native.category_id) is None:
+            return unavailable()
+    if native.depreciation_id is not None:
+        locks.depreciation_exists = (
+            Depreciation.all_objects.using(using)
+            .select_for_update()
+            .filter(pk=native.depreciation_id, deleted_at__isnull=True)
+            .exists()
+        )
+    if _lock_manufacturer(native.manufacturer_id) is None:
+        return unavailable()
+    if native.tag_ids:
+        locked_tags = list(
+            Tag.all_objects.using(using)
+            .select_for_update()
+            .filter(pk__in=native.tag_ids, deleted_at__isnull=True)
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        locks.tags_ok = len(locked_tags) == len(native.tag_ids)
+    return locks
+
+
+def _lock_manufacturer(manufacturer_id: int):
     return (
-        AssetType.all_objects.using(_DEFAULT_DB)
+        Manufacturer.all_objects.using(_DEFAULT_DB)
         .select_for_update()
-        .filter(pk=asset_type_id, deleted_at__isnull=True)
+        .filter(pk=manufacturer_id, deleted_at__isnull=True)
         .first()
     )
+
+
+def _category_default_identities_read(category_id: int, *, using: str = _DEFAULT_DB) -> tuple[str, ...]:
+    """Raw structural read of default identities for stable library locks.
+
+    This is lock discovery, not the authoritative snapshot: unresolvable
+    Fieldsets are skipped here and surface as the structure error from the
+    locked recomputation, after the authority and token gates.
+    """
+    rows = list(
+        CategoryDefaultFieldset.objects.using(using)
+        .filter(category_id=category_id)
+        .order_by("position", "fieldset_id", "pk")
+    )
+    fieldset_rows = {
+        row["pk"]: row
+        for row in CustomFieldset.objects.using(using)
+        .filter(pk__in=[row.fieldset_id for row in rows])
+        .values("pk", "namespace", "slug")
+    }
+    identities: list[str] = []
+    for row in rows:
+        fieldset_row = fieldset_rows.get(row.fieldset_id)
+        if fieldset_row is None:
+            continue
+        identities.append(f"{fieldset_row['namespace']}/{fieldset_row['slug']}")
+    return tuple(identities)
+
+
+def _proposed_identities_read(
+    native: AssetTypeNativeCreateInputDTO,
+    fieldsets: FieldsetSelectionDTO,
+    *,
+    using: str = _DEFAULT_DB,
+) -> tuple[str, ...]:
+    if fieldsets.presence == "explicit":
+        return tuple(str(identity) for identity in fieldsets.identities)
+    if native.category_id is None:
+        return ()
+    return _category_default_identities_read(native.category_id, using=using)
 
 
 def _proposed_identities(
@@ -399,7 +531,17 @@ def _prospective_definition_or_rejection(
     *,
     stored_values: dict[str, object],
     owner_ref: OwnerRefDTO | None,
+    expected_definition_revision: str | None = None,
 ):
+    """Load the prospective definition, comparing revisions before graph checks.
+
+    Where a usable graph/revision exists, an expected-definition mismatch is
+    reported as ``STALE_DEFINITION`` before any lifecycle or applicability
+    acceptance, so an explicit selection whose member was deprecated since the
+    preview is stale, not a reference conflict.  Truly unresolvable graphs
+    (missing Fieldsets) are reference conflicts; they never precede the
+    authority or token gates because callers only reach this helper after them.
+    """
     try:
         definition, definitions, graph = load_prospective_definition(
             identities,
@@ -408,6 +550,15 @@ def _prospective_definition_or_rejection(
         )
     except (SpecificationDefinitionError, ValueError, TypeError):
         return _reference_rejection(owner_ref)
+    if expected_definition_revision is not None and definition.revision != expected_definition_revision:
+        return rejected(
+            owner_ref,
+            issue(
+                "STALE_DEFINITION",
+                path=("expected_definition_revision",),
+                message_key=_STALE_DEFINITION_MESSAGE,
+            ),
+        )
     graph_rejection = _validate_proposed_graph(
         graph=graph,
         identities=identities,
@@ -418,18 +569,98 @@ def _prospective_definition_or_rejection(
     return definition, definitions, graph
 
 
-def _create_reference_rejection(native: AssetTypeNativeCreateInputDTO) -> CommandRejectedDTO | None:
-    if native.staged_image_id is not None:
-        return rejected(
-            None,
-            issue("REFERENCE_CONFLICT", path=("staged_image_id",), message_key=_REFERENCE_CONFLICT_MESSAGE),
-        )
-    if not _tags_exist(native.tag_ids):
-        return rejected(
-            None,
-            issue("REFERENCE_CONFLICT", path=("tag_ids",), message_key=_REFERENCE_CONFLICT_MESSAGE),
-        )
+def _native_field_issues(native: AssetTypeNativeCreateInputDTO) -> tuple[DomainIssueDTO, ...]:
+    """Native scalar parity against the real AssetType field limits/validators."""
+    issues: list[DomainIssueDTO] = []
+    for field_name in ("model", "slug", "part_number", "ean", "region", "configuration"):
+        value = getattr(native, field_name)
+        if value is None:
+            continue
+        if len(value) > AssetType._meta.get_field(field_name).max_length:
+            issues.append(issue("INVALID_RANGE", path=(field_name,), message_key=_INVALID_RANGE_MESSAGE))
+    if native.slug is not None:
+        try:
+            for validator in AssetType._meta.get_field("slug").validators:
+                validator(native.slug)
+        except ValidationError:
+            issues.append(issue("INVALID_TYPE", path=("slug",), message_key=_INVALID_TYPE_MESSAGE))
+    if native.eol_months is not None and native.eol_months < 0:
+        issues.append(issue("INVALID_RANGE", path=("eol_months",), message_key=_INVALID_RANGE_MESSAGE))
+    return tuple(issues)
+
+
+def _explicit_slug_conflict_issue(native: AssetTypeNativeCreateInputDTO, *, using: str = _DEFAULT_DB):
+    """Current duplicate explicit-slug conflict in the shared preview/write plan."""
+    if native.slug is None:
+        return None
+    if AssetType.all_objects.using(using).filter(slug=native.slug, deleted_at__isnull=True).exists():
+        return issue("REFERENCE_CONFLICT", path=("slug",), message_key=_REFERENCE_CONFLICT_MESSAGE)
     return None
+
+
+def _reference_issue(path: str) -> DomainIssueDTO:
+    return issue("REFERENCE_CONFLICT", path=(path,), message_key=_REFERENCE_CONFLICT_MESSAGE)
+
+
+def _locked_reference_issues(native: AssetTypeNativeCreateInputDTO, locks: _CreateDependencyLocks):
+    """Row-9 reference availability from the already-locked rows."""
+    issues: list[DomainIssueDTO] = []
+    if native.suggested_asset_role_id is not None and not locks.role_exists:
+        issues.append(_reference_issue("suggested_asset_role_id"))
+    if native.depreciation_id is not None and not locks.depreciation_exists:
+        issues.append(_reference_issue("depreciation_id"))
+    if native.tag_ids and not locks.tags_ok:
+        issues.append(_reference_issue("tag_ids"))
+    if native.staged_image_id is not None and locks.stage is None:
+        issues.append(_reference_issue("staged_image_id"))
+    return tuple(issues)
+
+
+def _preview_reference_issues(
+    native: AssetTypeNativeCreateInputDTO,
+    actor: ActorContextDTO,
+    *,
+    using: str = _DEFAULT_DB,
+    now=None,
+) -> tuple[DomainIssueDTO, ...]:
+    """Read-only reference availability for previews (never consumes locks)."""
+    issues: list[DomainIssueDTO] = []
+    if native.suggested_asset_role_id is not None:
+        if not AssetRole.all_objects.using(using).filter(
+            pk=native.suggested_asset_role_id, deleted_at__isnull=True
+        ).exists():
+            issues.append(_reference_issue("suggested_asset_role_id"))
+    if native.depreciation_id is not None:
+        if not Depreciation.all_objects.using(using).filter(
+            pk=native.depreciation_id, deleted_at__isnull=True
+        ).exists():
+            issues.append(_reference_issue("depreciation_id"))
+    if not _tags_exist(native.tag_ids, using=using):
+        issues.append(_reference_issue("tag_ids"))
+    if native.staged_image_id is not None:
+        if preview_stage_or_none(native.staged_image_id, actor, CREATE_COMMAND_KIND, using=using, now=now) is None:
+            issues.append(_reference_issue("staged_image_id"))
+    return tuple(issues)
+
+
+def _create_domain_issues(
+    native: AssetTypeNativeCreateInputDTO,
+    locks: _CreateDependencyLocks | None,
+    actor: ActorContextDTO,
+    *,
+    using: str = _DEFAULT_DB,
+    now=None,
+) -> tuple[DomainIssueDTO, ...]:
+    """Shared row-9 native/reference validation for the preview and write paths."""
+    issues = list(_native_field_issues(native))
+    slug_issue = _explicit_slug_conflict_issue(native, using=using)
+    if slug_issue is not None:
+        issues.append(slug_issue)
+    if locks is None:
+        issues.extend(_preview_reference_issues(native, actor, using=using, now=now))
+    else:
+        issues.extend(_locked_reference_issues(native, locks))
+    return tuple(issues)
 
 
 def _verify_create_token(
@@ -495,46 +726,34 @@ def _verify_apply_token(
     return None
 
 
-def _lock_create_dependencies(
+def _create_front_state(
+    *,
+    actor: ActorContextDTO,
     native: AssetTypeNativeCreateInputDTO,
-    proposed_identities: Sequence[str],
-) -> CommandRejectedDTO | None:
-    """Lock libraries and the Category/Manufacturer reference rows in order."""
+    fieldsets: FieldsetSelectionDTO,
+):
+    """Locked row-2 preconditions: authorization, then references and libraries.
+
+    Authorization is reloaded before any lock discovery or structural read so
+    a broken/unresolvable graph can never disclose structure to an
+    unauthorized caller.  Library locks (raw identity read) precede the
+    reference-row locks, and the rows themselves are locked in deterministic
+    model-label/PK order.
+    """
+    actor_model = _reloaded_authorized_actor(actor, AssetType, _ADD_PERMISSION)
+    if actor_model is None:
+        return unavailable()
+    proposed_identities = _proposed_identities_read(native, fieldsets)
     lock_relevant_libraries_for_composition(
         (),
         proposed_identities,
         _TARGET_KIND,
         using=_DEFAULT_DB,
     )
-    if native.category_id is not None:
-        if _lock_category(native.category_id) is None:
-            return unavailable()
-    if _lock_manufacturer(native.manufacturer_id) is None:
-        return unavailable()
-    return None
-
-
-def _create_front_state(
-    *,
-    actor: ActorContextDTO,
-    native: AssetTypeNativeCreateInputDTO,
-    fieldsets: FieldsetSelectionDTO,
-    consuming: bool,
-):
-    """Locked preconditions: proposal snapshot, dependencies, actor reload."""
-    snapshot = None
-    if consuming:
-        snapshot = _snapshot_or_rejection(native.category_id, owner_ref=None)
-        if isinstance(snapshot, CommandRejectedDTO):
-            return snapshot
-    proposed_identities = _proposed_identities(native, fieldsets, snapshot)
-    dependency_rejection = _lock_create_dependencies(native, proposed_identities)
-    if dependency_rejection is not None:
-        return dependency_rejection
-    actor_model = _reloaded_authorized_actor(actor, AssetType, _ADD_PERMISSION)
-    if actor_model is None:
-        return unavailable()
-    return actor_model, snapshot, proposed_identities
+    locks = _lock_create_references(native, actor)
+    if isinstance(locks, CommandRejectedDTO):
+        return locks
+    return actor_model, proposed_identities, locks
 
 
 def _create_back_state(
@@ -547,8 +766,8 @@ def _create_back_state(
     expected_definition_revision: str,
     expected_category_default_snapshot_revision: str | None,
     consuming: bool,
-    snapshot: CategoryDefaultSnapshotDTO | None,
     proposed_identities: tuple[str, ...],
+    locks: _CreateDependencyLocks,
 ):
     """Verified write state: token, revision gates, validation, desired rows."""
     token_rejection = _verify_create_token(
@@ -563,7 +782,12 @@ def _create_back_state(
     )
     if token_rejection is not None:
         return token_rejection
+    snapshot = None
+    authoritative_identities = proposed_identities
     if consuming:
+        snapshot = _snapshot_or_rejection(native.category_id, owner_ref=None)
+        if isinstance(snapshot, CommandRejectedDTO):
+            return snapshot
         if snapshot.revision != expected_category_default_snapshot_revision:
             return rejected(
                 None,
@@ -573,26 +797,25 @@ def _create_back_state(
                     message_key=_STALE_RESOURCE_MESSAGE,
                 ),
             )
+        authoritative_identities = _proposed_identities(native, fieldsets, snapshot)
+        lock_relevant_libraries_for_composition(
+            (),
+            authoritative_identities,
+            _TARGET_KIND,
+            using=_DEFAULT_DB,
+        )
     plan = _prospective_definition_or_rejection(
-        proposed_identities,
+        authoritative_identities,
         stored_values={},
         owner_ref=None,
+        expected_definition_revision=expected_definition_revision,
     )
     if isinstance(plan, CommandRejectedDTO):
         return plan
     definition, definitions, _graph = plan
-    if definition.revision != expected_definition_revision:
-        return rejected(
-            None,
-            issue(
-                "STALE_DEFINITION",
-                path=("expected_definition_revision",),
-                message_key=_STALE_DEFINITION_MESSAGE,
-            ),
-        )
-    reference_rejection = _create_reference_rejection(native)
-    if reference_rejection is not None:
-        return reference_rejection
+    domain_issues = _create_domain_issues(native, locks, actor)
+    if domain_issues:
+        return rejected(None, *domain_issues)
     normalized = normalize_patch(
         patch,
         definitions,
@@ -602,7 +825,7 @@ def _create_back_state(
     if isinstance(normalized, tuple):
         return rejected(None, *normalized)
     proposed_values = dict(normalized.stored_values)
-    desired_ids = _desired_fieldset_ids(proposed_identities, owner_ref=None)
+    desired_ids = _desired_fieldset_ids(authoritative_identities, owner_ref=None)
     if isinstance(desired_ids, CommandRejectedDTO):
         return desired_ids
     return definition, proposed_values, desired_ids
@@ -625,6 +848,7 @@ def _preview_create_plan(
     fieldsets: FieldsetSelectionDTO,
     snapshot: CategoryDefaultSnapshotDTO | None,
     patch: SpecificationPatchDTO,
+    actor: ActorContextDTO,
 ):
     proposed_identities = _proposed_identities(native, fieldsets, snapshot)
     lock_relevant_libraries_for_composition(
@@ -641,9 +865,9 @@ def _preview_create_plan(
     if isinstance(plan, CommandRejectedDTO):
         return plan
     definition, definitions, _graph = plan
-    reference_rejection = _create_reference_rejection(native)
-    if reference_rejection is not None:
-        return reference_rejection
+    domain_issues = _create_domain_issues(native, locks=None, actor=actor)
+    if domain_issues:
+        return rejected(None, *domain_issues)
     normalized = normalize_patch(
         patch,
         definitions,
@@ -680,6 +904,7 @@ def _preview_create_locked(
         fieldsets=fieldsets,
         snapshot=snapshot,
         patch=patch,
+        actor=actor,
     )
     if isinstance(plan_result, CommandRejectedDTO):
         return plan_result
@@ -746,31 +971,48 @@ def preview_asset_type_create(
             )
 
 
+def _link_tags(owner: AssetType, tag_ids: tuple[int, ...]) -> None:
+    """Link the active tags; kept as a seam so atomicity tests can inject failure."""
+    owner.tags.set(tag_ids)
+
+
 def _persist_create_owner(
     *,
     native: AssetTypeNativeCreateInputDTO,
     proposed_values: dict[str, object],
     proposed_ids: tuple[int, ...],
     actor_model: object,
+    actor: ActorContextDTO,
+    stage_row: Any = None,
 ):
-    """Persist the Type, dense membership rows, and tags in one savepoint."""
-    new_type = AssetType(
-        manufacturer_id=native.manufacturer_id,
-        model=native.model,
-        slug="" if native.slug is None else native.slug,
-        part_number=native.part_number,
-        ean=native.ean,
-        region=native.region,
-        configuration=native.configuration,
-        eol_months=native.eol_months,
-        category_id=native.category_id,
-        asset_role_id=native.suggested_asset_role_id,
-        depreciation_id=native.depreciation_id,
-        description=native.description,
-        comments=native.comments,
-        requestable=native.requestable,
-        custom_field_data=proposed_values,
-    )
+    """Persist the Type, dense membership rows, tags, and stage consume atomically.
+
+    The stored stage name is assigned to the owner's image field inside the
+    same savepoint as owner, memberships, tags, and audit, so a later failure
+    rolls the consume back and leaves the stage pending and untouched.  The
+    stage is revalidated once more immediately before consumption so an
+    expiry that elapsed while the command held its locks fails cleanly.
+    """
+    kwargs: dict[str, object] = {
+        "manufacturer_id": native.manufacturer_id,
+        "model": native.model,
+        "slug": "" if native.slug is None else native.slug,
+        "part_number": native.part_number,
+        "ean": native.ean,
+        "region": native.region,
+        "configuration": native.configuration,
+        "eol_months": native.eol_months,
+        "category_id": native.category_id,
+        "asset_role_id": native.suggested_asset_role_id,
+        "depreciation_id": native.depreciation_id,
+        "description": native.description,
+        "comments": native.comments,
+        "requestable": native.requestable,
+        "custom_field_data": proposed_values,
+    }
+    if stage_row is not None:
+        kwargs["image"] = stage_row.storage_key
+    new_type = AssetType(**kwargs)
     try:
         with transaction.atomic(using=_DEFAULT_DB):
             with actor_change_context(actor_model):
@@ -787,7 +1029,16 @@ def _persist_create_owner(
                     ]
                 )
             if native.tag_ids:
-                new_type.tags.set(native.tag_ids)
+                _link_tags(new_type, native.tag_ids)
+            if stage_row is not None:
+                final_stage = lock_stage_for_consume(
+                    stage_row.stage_id,
+                    actor,
+                    CREATE_COMMAND_KIND,
+                )
+                if final_stage is None:
+                    raise ValidationError("staged image is no longer consumable")
+                consume_stage(final_stage, new_type.pk)
     except (ValidationError, IntegrityError):
         return rejected(
             None,
@@ -811,11 +1062,10 @@ def _create_locked(
         actor=actor,
         native=native,
         fieldsets=fieldsets,
-        consuming=consuming,
     )
     if isinstance(front, CommandRejectedDTO):
         return front
-    actor_model, snapshot, proposed_identities = front
+    actor_model, proposed_identities, locks = front
     back = _create_back_state(
         actor=actor,
         native=native,
@@ -825,8 +1075,8 @@ def _create_locked(
         expected_definition_revision=expected_definition_revision,
         expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
         consuming=consuming,
-        snapshot=snapshot,
         proposed_identities=proposed_identities,
+        locks=locks,
     )
     if isinstance(back, CommandRejectedDTO):
         return back
@@ -836,6 +1086,8 @@ def _create_locked(
         proposed_values=proposed_values,
         proposed_ids=desired_ids,
         actor_model=actor_model,
+        actor=actor,
+        stage_row=locks.stage,
     )
     if isinstance(persisted, CommandRejectedDTO):
         return persisted
@@ -945,6 +1197,11 @@ def _preview_apply_locked(
     if actor_model is None:
         return unavailable()
 
+    # Row-2 availability: a soft-deleted Category retained on the Type is
+    # inaccessible and must never be previewed against its stale defaults.
+    if _available_category(owner.category_id) is None:
+        return unavailable()
+
     actual_resource_revision = resource_revision_for_owner(owner)
     if expected_resource_revision != actual_resource_revision:
         return rejected(
@@ -1021,47 +1278,36 @@ def _apply_front_state(
     actor: ActorContextDTO,
     asset_type_id: int,
 ):
-    """Locked preconditions: owner, category defaults, library and row locks."""
-    type_row = (
-        AssetType.all_objects.using(_DEFAULT_DB)
-        .filter(pk=asset_type_id, deleted_at__isnull=True)
-        .values("pk", "category_id")
-        .first()
-    )
-    if type_row is None:
+    """Locked row-2 preconditions: authorization, owner, category, libraries.
+
+    Authorization precedes every lock; the owner and Category rows are locked
+    in stable ``(model identity, primary key)`` order after the library locks
+    that use a raw identity read of the Category defaults.
+    """
+    actor_model = _reloaded_authorized_actor(actor, AssetType, _CHANGE_PERMISSION)
+    if actor_model is None:
         return unavailable()
-    category_id = type_row["category_id"]
+    owner = _lock_asset_type(asset_type_id)
+    if owner is None:
+        return unavailable()
+    category_id = owner.category_id
     if category_id is None:
         return unavailable()
+    if _lock_category(category_id) is None:
+        return unavailable()
     owner_ref = OwnerRefDTO("asset_type", asset_type_id)
-
-    snapshot = _snapshot_or_rejection(category_id, owner_ref=owner_ref)
-    if isinstance(snapshot, CommandRejectedDTO):
-        return snapshot
-    proposed_identities = tuple(str(membership.fieldset_identity) for membership in snapshot.memberships)
+    read_identities = _category_default_identities_read(category_id)
     current_ids = tuple(
         row["fieldset_id"] for row in _current_membership_rows(AssetType, asset_type_id, using=_DEFAULT_DB)
     )
     lock_relevant_libraries_for_composition(
         current_ids,
-        proposed_identities,
+        read_identities,
         _TARGET_KIND,
         asset_type_ids=(asset_type_id,),
         using=_DEFAULT_DB,
     )
-
-    # Owner rows in stable (model identity, primary key) order: the Type then
-    # its Category.
-    owner = _lock_asset_type(asset_type_id)
-    if owner is None:
-        return unavailable()
-    if _lock_category(category_id) is None:
-        return unavailable()
-
-    actor_model = _reloaded_authorized_actor(actor, AssetType, _CHANGE_PERMISSION)
-    if actor_model is None:
-        return unavailable()
-    return owner, actor_model, owner_ref, snapshot, proposed_identities
+    return owner, actor_model, owner_ref
 
 
 def _apply_back_state(
@@ -1073,12 +1319,10 @@ def _apply_back_state(
     expected_resource_revision: str,
     expected_definition_revision: str,
     expected_category_default_snapshot_revision: str,
-    snapshot: CategoryDefaultSnapshotDTO,
-    proposed_identities: tuple[str, ...],
     owner_ref: OwnerRefDTO,
     owner: AssetType,
 ):
-    """Verified write state: token, snapshot/resource/definition gates, values."""
+    """Verified write state: token, then snapshot/resource/definition gates."""
     token_rejection = _verify_apply_token(
         actor=actor,
         asset_type_id=asset_type_id,
@@ -1090,6 +1334,9 @@ def _apply_back_state(
     )
     if token_rejection is not None:
         return token_rejection
+    snapshot = _snapshot_or_rejection(owner.category_id, owner_ref=owner_ref)
+    if isinstance(snapshot, CommandRejectedDTO):
+        return snapshot
     if snapshot.revision != expected_category_default_snapshot_revision:
         return rejected(
             owner_ref,
@@ -1105,23 +1352,16 @@ def _apply_back_state(
             owner_ref,
             issue("STALE_RESOURCE", path=("expected_resource_revision",), message_key=_STALE_RESOURCE_MESSAGE),
         )
+    proposed_identities = tuple(str(membership.fieldset_identity) for membership in snapshot.memberships)
     plan = _prospective_definition_or_rejection(
         proposed_identities,
         stored_values=stored_values_for(owner),
         owner_ref=owner_ref,
+        expected_definition_revision=expected_definition_revision,
     )
     if isinstance(plan, CommandRejectedDTO):
         return plan
     proposed_definition, proposed_definitions, _graph = plan
-    if proposed_definition.revision != expected_definition_revision:
-        return rejected(
-            owner_ref,
-            issue(
-                "STALE_DEFINITION",
-                path=("expected_definition_revision",),
-                message_key=_STALE_DEFINITION_MESSAGE,
-            ),
-        )
     normalized = normalize_patch(
         patch,
         proposed_definitions,
@@ -1153,7 +1393,7 @@ def _apply_locked(
     )
     if isinstance(front, CommandRejectedDTO):
         return front
-    owner, actor_model, owner_ref, snapshot, proposed_identities = front
+    owner, actor_model, owner_ref = front
     back = _apply_back_state(
         actor=actor,
         asset_type_id=asset_type_id,
@@ -1162,8 +1402,6 @@ def _apply_locked(
         expected_resource_revision=expected_resource_revision,
         expected_definition_revision=expected_definition_revision,
         expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
-        snapshot=snapshot,
-        proposed_identities=proposed_identities,
         owner_ref=owner_ref,
         owner=owner,
     )
