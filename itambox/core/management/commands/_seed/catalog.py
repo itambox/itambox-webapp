@@ -48,11 +48,8 @@ def _get_core_choice_set(slug, label):
 def _validate_core_choice_row(choice, slug, desired_keys):
     if choice.key not in desired_keys:
         raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
-    if (
-        choice.management_kind != CustomFieldChoice.MANAGEMENT_CORE
-        or choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
-    ):
-        raise ValueError(f"Core Choice identity has incompatible management or lifecycle: itambox/{slug}#{choice.key}")
+    if choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE:
+        raise ValueError(f"Core Choice identity has incompatible lifecycle: itambox/{slug}#{choice.key}")
 
 
 def _reconcile_core_choice_rows(choice_set, slug, choices):
@@ -69,28 +66,21 @@ def _reconcile_core_choice_rows(choice_set, slug, choices):
     for index, (key, choice_label) in enumerate(choices, start=1):
         desired_keys.add(key)
         choice = existing_by_key.get(key)
-        if choice is not None and (
-            choice.management_kind != CustomFieldChoice.MANAGEMENT_CORE
-            or choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
-        ):
-            raise ValueError(f"Core Choice identity has incompatible management or lifecycle: itambox/{slug}#{key}")
         if choice is None:
             CustomFieldChoice.objects.create(
                 choice_set=choice_set,
                 key=key,
                 label=choice_label,
                 position=index,
-                management_kind=CustomFieldChoice.MANAGEMENT_CORE,
                 version=1,
                 lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
             )
             continue
         choice.label = choice_label
         choice.position = index
-        choice.management_kind = CustomFieldChoice.MANAGEMENT_CORE
         choice.version = 1
         choice.lifecycle = CustomFieldChoice.LIFECYCLE_ACTIVE
-        choice.save(update_fields=["label", "position", "management_kind", "version", "lifecycle"])
+        choice.save(update_fields=["label", "position", "version", "lifecycle"])
 
 
 def _reconcile_core_choice_set(slug, label, choices):
@@ -1862,7 +1852,6 @@ class SeedCatalogMixin:
                     "configuration": "",
                     "library": None,
                     "library_definition_key": None,
-                    "library_release": None,
                 },
             )
             obj.custom_field_data = specs
@@ -1871,7 +1860,6 @@ class SeedCatalogMixin:
             obj.configuration = ""
             obj.library = None
             obj.library_definition_key = None
-            obj.library_release = None
             obj.save()
             obj.fieldset_memberships.all().delete()
             AssetTypeFieldset.objects.bulk_create(
