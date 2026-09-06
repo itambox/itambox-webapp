@@ -1,71 +1,59 @@
-from datetime import timedelta
-from unittest import mock
-
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
-from django.utils import timezone
 
-from assets.models import (
-    AssetType,
-    AssetTypeFieldset,
-    AssetTypeLibrary,
-    Category,
-    CategoryDefaultFieldset,
-    Manufacturer,
+from assets.models import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
+from extras.models import (
+    CustomFieldset,
+    SpecificationLibrary,
+    SpecificationLibraryRelease,
+    _specification_library_reconcile_opt_in,
+    release_document_digest,
 )
-from assets.models.catalog import _library_reconciliation_opt_in
-from extras.models import CustomFieldset
 
 
-def _attempt_identity_rewrite_with_reconcile_flag(asset_type_pk, replacement_key):
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT set_config('itambox.assettype_reconcile', 'on', true)")
-    AssetType._base_manager.filter(pk=asset_type_pk).update(library_definition_key=replacement_key)
+def _release_document(library, sequence):
+    """Build the normalized release object used by the current provenance contract."""
+    return {
+        "kind": "itambox.type-library.release",
+        "library": {"namespace": library.namespace, "release": sequence},
+        "schema_version": 1,
+    }
+
+
+def _release(library, sequence):
+    document = _release_document(library, sequence)
+    return SpecificationLibraryRelease.objects.create(
+        library=library,
+        sequence=sequence,
+        semantic_digest=release_document_digest(document),
+        source_document=document,
+    )
 
 
 class AssetTypeCompositionFoundationTests(TestCase):
     def test_management_kind_requires_coherent_library_identity(self):
-        with self.assertRaises(ValidationError):
-            AssetTypeLibrary.objects.create(namespace="Bad Namespace", release="2026.09")
-
-        library = AssetTypeLibrary.objects.create(namespace="identity", release="2026.09")
+        library = SpecificationLibrary.objects.create(namespace="identity")
         manufacturer = Manufacturer.objects.create(name="Identity Manufacturer", slug="identity-manufacturer")
         invalid_variants = (
             {
                 "management_kind": AssetType.MANAGEMENT_LOCAL,
                 "library": library,
                 "library_definition_key": "local-with-library",
-                "library_release": "2026.09",
             },
             {
                 "management_kind": AssetType.MANAGEMENT_LIBRARY,
                 "library_definition_key": None,
-                "library_release": "2026.09",
             },
             {
                 "management_kind": AssetType.MANAGEMENT_LIBRARY,
                 "library": library,
                 "library_definition_key": "",
-                "library_release": "2026.09",
-            },
-            {
-                "management_kind": AssetType.MANAGEMENT_LIBRARY,
-                "library": library,
-                "library_definition_key": "missing-release",
-                "library_release": None,
             },
             {
                 "management_kind": AssetType.MANAGEMENT_LIBRARY,
                 "library": library,
                 "library_definition_key": "invalid key",
-                "library_release": "2026.09",
-            },
-            {
-                "management_kind": AssetType.MANAGEMENT_LIBRARY,
-                "library": library,
-                "library_definition_key": "valid-key",
-                "library_release": "invalid release",
             },
         )
 
@@ -78,8 +66,8 @@ class AssetTypeCompositionFoundationTests(TestCase):
                     **variant,
                 )
 
-    def test_library_identity_db_constraint_rejects_queryset_update(self):
-        library = AssetTypeLibrary.objects.create(namespace="db-identity", release="2026.09")
+    def test_library_identity_db_guard_rejects_direct_coherence_updates(self):
+        library = SpecificationLibrary.objects.create(namespace="db-identity")
         manufacturer = Manufacturer.objects.create(name="DB Identity Manufacturer", slug="db-identity-manufacturer")
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
@@ -88,20 +76,22 @@ class AssetTypeCompositionFoundationTests(TestCase):
         )
 
         with self.assertRaises(IntegrityError), transaction.atomic():
-            AssetType._base_manager.filter(pk=asset_type.pk).update(
-                library_id=library.pk,
-                library_definition_key="invalid-local-state",
-                library_release="2026.09",
-            )
+            AssetType._base_manager.filter(pk=asset_type.pk).update(management_kind=AssetType.MANAGEMENT_LIBRARY)
         with self.assertRaises(IntegrityError), transaction.atomic():
             AssetType._base_manager.filter(pk=asset_type.pk).update(
                 library_id=library.pk,
-                library_definition_key="invalid-local-state",
-                library_release="",
+                library_definition_key="became-library",
             )
 
-    def test_library_identity_db_constraint_rejects_valid_identity_rewrite(self):
-        library = AssetTypeLibrary.objects.create(namespace="immutable-db", release="2026.09")
+        asset_type.refresh_from_db()
+        self.assertEqual(asset_type.management_kind, AssetType.MANAGEMENT_LOCAL)
+        self.assertIsNone(asset_type.library_id)
+        self.assertIsNone(asset_type.library_definition_key)
+
+    def test_library_managed_type_identity_is_immutable_under_direct_updates(self):
+        library = SpecificationLibrary.objects.create(namespace="immutable-db")
+        replacement_library = SpecificationLibrary.objects.create(namespace="immutable-db-other")
+        release = _release(library, 1)
         manufacturer = Manufacturer.objects.create(name="Immutable DB Manufacturer", slug="immutable-db-manufacturer")
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
@@ -110,39 +100,31 @@ class AssetTypeCompositionFoundationTests(TestCase):
             management_kind=AssetType.MANAGEMENT_LIBRARY,
             library=library,
             library_definition_key="original-definition",
-            library_release="2026.09",
+            connector_identity=release.semantic_digest,
         )
-
-        replacement_library = AssetTypeLibrary.objects.create(namespace="immutable-db-other", release="2026.09")
+        replacement_identity = release_document_digest(_release_document(library, 2))
         attempted_updates = (
             {"library_id": replacement_library.pk},
             {"library_definition_key": "replacement-definition"},
-            {"library_release": "2026.10"},
-            {"source_checksum": "sha256:" + "1" * 64},
+            {"connector_identity": replacement_identity},
         )
+
         for update in attempted_updates:
-            with self.assertRaises(IntegrityError), transaction.atomic():
+            with self.subTest(update=update), self.assertRaises(IntegrityError), transaction.atomic():
                 AssetType._base_manager.filter(pk=asset_type.pk).update(**update)
             asset_type.refresh_from_db()
-
-        self.assertEqual(asset_type.library_definition_key, "original-definition")
+            self.assertEqual(asset_type.library_id, library.pk)
+            self.assertEqual(asset_type.library_definition_key, "original-definition")
+            self.assertEqual(asset_type.connector_identity, release.semantic_digest)
 
     def test_library_identity_composition_and_category_defaults_are_relational(self):
-        library = AssetTypeLibrary.objects.create(namespace="acme", release="2026.09")
+        library = SpecificationLibrary.objects.create(namespace="acme")
         manufacturer = Manufacturer.objects.create(name="Example Networks", slug="example-networks")
-        first = CustomFieldset.objects.create(
-            namespace="local",
-            slug="product",
-            label="Product",
-        )
-        second = CustomFieldset.objects.create(
-            namespace="local",
-            slug="networking",
-            label="Networking",
-        )
+        first = CustomFieldset.objects.create(namespace="local", slug="product", label="Product")
+        second = CustomFieldset.objects.create(namespace="local", slug="networking", label="Networking")
         category = Category.objects.create(name="Switch", slug="switch")
-        CategoryDefaultFieldset.objects.create(category=category, fieldset=first, position=10)
-        CategoryDefaultFieldset.objects.create(category=category, fieldset=second, position=20)
+        CategoryDefaultFieldset.objects.create(category=category, fieldset=first, position=1)
+        CategoryDefaultFieldset.objects.create(category=category, fieldset=second, position=2)
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
             model="Switch 48P",
@@ -151,20 +133,19 @@ class AssetTypeCompositionFoundationTests(TestCase):
             management_kind=AssetType.MANAGEMENT_LIBRARY,
             library=library,
             library_definition_key="switch-48p-rev-b",
-            library_release="2026.09",
             region="global",
             configuration="rev-b",
         )
-        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=first, position=10)
-        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=second, position=20)
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=first, position=1)
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=second, position=2)
 
         self.assertEqual(
             list(asset_type.fieldset_memberships.values_list("fieldset__slug", "position")),
-            [("product", 10), ("networking", 20)],
+            [("product", 1), ("networking", 2)],
         )
         self.assertEqual(
             list(category.default_fieldset_memberships.values_list("fieldset__slug", "position")),
-            [("product", 10), ("networking", 20)],
+            [("product", 1), ("networking", 2)],
         )
 
         with self.assertRaises(IntegrityError), transaction.atomic():
@@ -175,438 +156,270 @@ class AssetTypeCompositionFoundationTests(TestCase):
                 management_kind=AssetType.MANAGEMENT_LIBRARY,
                 library=library,
                 library_definition_key="switch-48p-rev-b",
-                library_release="2026.09",
             )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=first, position=3)
 
-        for field_name, replacement in (
-            ("library_definition_key", "renamed-definition"),
-            ("library_release", "2026.10"),
-            ("source_checksum", "sha256:" + "1" * 64),
-        ):
-            setattr(asset_type, field_name, replacement)
-            with self.assertRaises(ValidationError):
-                asset_type.save()
-            asset_type.refresh_from_db()
         asset_type.delete()
         asset_type.refresh_from_db()
         self.assertIsNotNone(asset_type.deleted_at)
         self.assertEqual(
             list(asset_type.fieldset_memberships.values_list("fieldset_id", "position")),
-            [(first.pk, 10), (second.pk, 20)],
+            [(first.pk, 1), (second.pk, 2)],
         )
         asset_type.restore()
         asset_type.refresh_from_db()
         self.assertIsNone(asset_type.deleted_at)
         self.assertEqual(asset_type.fieldset_memberships.count(), 2)
+
+    def test_library_managed_type_hard_delete_is_rejected_and_preserves_memberships(self):
+        library = SpecificationLibrary.objects.create(namespace="protected-type")
+        manufacturer = Manufacturer.objects.create(name="Protected Manufacturer", slug="protected-manufacturer")
+        fieldset = CustomFieldset.objects.create(namespace="local", slug="protected", label="Protected")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Protected model",
+            slug="protected-model",
+            management_kind=AssetType.MANAGEMENT_LIBRARY,
+            library=library,
+            library_definition_key="protected-definition",
+        )
+        membership = AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            asset_type.delete(force_hard_delete=True)
+
+        self.assertTrue(AssetType.all_objects.filter(pk=asset_type.pk).exists())
+        self.assertTrue(AssetTypeFieldset.objects.filter(pk=membership.pk).exists())
+        self.assertTrue(SpecificationLibrary.objects.filter(pk=library.pk).exists())
+
+    def test_local_asset_type_hard_delete_cascades_owned_memberships(self):
+        manufacturer = Manufacturer.objects.create(name="Local Manufacturer", slug="local-manufacturer")
+        fieldset = CustomFieldset.objects.create(namespace="local", slug="local", label="Local")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Local model",
+            slug="local-model",
+        )
+        membership = AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
         asset_type_pk = asset_type.pk
+        membership_pk = membership.pk
+
         asset_type.delete(force_hard_delete=True)
-        self.assertFalse(AssetType._base_manager.filter(pk=asset_type_pk).exists())
-        self.assertFalse(AssetTypeFieldset.objects.filter(asset_type_id=asset_type_pk).exists())
-        replacement = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Switch 48P replacement",
-            slug="example-networks-switch-48p-replacement",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="switch-48p-rev-b",
-            library_release="2026.09",
-        )
-        self.assertEqual(replacement.library_definition_key, "switch-48p-rev-b")
 
-    def test_library_reconciliation_updates_release_and_checksum_through_controlled_path(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-path", release="2026.09")
-        manufacturer = Manufacturer.objects.create(name="Reconcile Manufacturer", slug="reconcile-manufacturer")
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconciled type",
-            slug="reconciled-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-x",
-            library_release="2026.09",
-            source_checksum="sha256:" + "a" * 64,
-        )
-        reconciled_at = timezone.now().replace(microsecond=0)
+        self.assertFalse(AssetType.all_objects.filter(pk=asset_type_pk).exists())
+        self.assertFalse(AssetTypeFieldset.objects.filter(pk=membership_pk).exists())
+        self.assertTrue(CustomFieldset.objects.filter(pk=fieldset.pk).exists())
 
-        asset_type.apply_library_reconciliation(
-            library_release="2026.10",
-            source_checksum="sha256:" + "b" * 64,
-            reconciled_at=reconciled_at,
+    def test_library_accept_release_advances_shared_pointer_with_real_digest(self):
+        library = SpecificationLibrary.objects.create(namespace="acceptance")
+        first = _release(library, 1)
+        second = _release(library, 2)
+
+        library.accept_release(first)
+        library.accept_release(second)
+        library.refresh_from_db()
+
+        self.assertEqual(library.accepted_release_id, second.pk)
+        self.assertEqual(library.accepted_release.sequence, 2)
+        self.assertEqual(
+            library.accepted_release.semantic_digest, release_document_digest(library.accepted_release.source_document)
         )
 
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_release, "2026.10")
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "b" * 64)
-        self.assertEqual(asset_type.last_reconciled_at, reconciled_at)
-        self.assertEqual(asset_type.library_id, library.pk)
-        self.assertEqual(asset_type.library_definition_key, "router-x")
+    def test_library_accept_release_requires_same_library_and_non_older_sequence(self):
+        library = SpecificationLibrary.objects.create(namespace="monotonic")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        other_library = SpecificationLibrary.objects.create(namespace="other")
+        foreign = _release(other_library, 1)
+        library.accept_release(second)
 
-    def test_library_reconciliation_rejects_invalid_provenance_fail_closed(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-invalid", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Invalid Manufacturer", slug="reconcile-invalid-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile invalid type",
-            slug="reconcile-invalid-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-y",
-            library_release="2026.09",
-            source_checksum="sha256:" + "c" * 64,
-        )
-
-        for library_release, source_checksum in (
-            (None, "sha256:" + "d" * 64),
-            ("2026.10", "not-a-checksum"),
-            ("invalid release!", "sha256:" + "d" * 64),
-        ):
-            with self.subTest(release=library_release, checksum=source_checksum):
-                with self.assertRaises(ValidationError):
-                    asset_type.apply_library_reconciliation(
-                        library_release=library_release,
-                        source_checksum=source_checksum,
-                    )
-                # Neither the database nor the caller's instance may carry the
-                # failed target state.
-                self.assertEqual(asset_type.library_release, "2026.09")
-                self.assertEqual(asset_type.source_checksum, "sha256:" + "c" * 64)
-                asset_type.refresh_from_db()
-                self.assertEqual(asset_type.library_release, "2026.09")
-                self.assertEqual(asset_type.source_checksum, "sha256:" + "c" * 64)
-
-    def test_reconciliation_state_change_fails_closed_at_db_boundary_without_session_flag(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-db", release="2026.09")
-        manufacturer = Manufacturer.objects.create(name="Reconcile DB Manufacturer", slug="reconcile-db-manufacturer")
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile db type",
-            slug="reconcile-db-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-z",
-            library_release="2026.09",
-            source_checksum="sha256:" + "e" * 64,
-        )
-
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            AssetType._base_manager.filter(pk=asset_type.pk).update(library_release="2026.11")
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_release, "2026.09")
-
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT set_config('itambox.assettype_reconcile', 'on', true)")
-            AssetType._base_manager.filter(pk=asset_type.pk).update(
-                library_release="2026.11",
-                source_checksum="sha256:" + "f" * 64,
-            )
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_release, "2026.11")
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "f" * 64)
-
-    def test_reconciliation_session_flag_does_not_unlock_immutable_identity(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-identity", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Identity Manufacturer", slug="reconcile-identity-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile identity type",
-            slug="reconcile-identity-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-id",
-            library_release="2026.09",
-        )
-
-        asset_type.apply_library_reconciliation(
-            library_release="2026.10",
-            source_checksum="sha256:" + "a" * 64,
-        )
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_definition_key, "router-id")
-        self.assertEqual(asset_type.library_id, library.pk)
-
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            _attempt_identity_rewrite_with_reconcile_flag(asset_type.pk, "hacked-key")
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_definition_key, "router-id")
-
-    def test_reconciliation_opt_in_does_not_leak_into_outer_transaction(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-leak", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Leak Manufacturer", slug="reconcile-leak-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile leak type",
-            slug="reconcile-leak-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-leak",
-            library_release="2026.09",
-        )
-
-        with transaction.atomic():
-            asset_type.apply_library_reconciliation(
-                library_release="2026.10",
-                source_checksum="sha256:" + "b" * 64,
-            )
-            # A later Library v1 importer will wrap multiple reconciliation
-            # operations in one outer transaction. A direct release/checksum
-            # write in that same transaction must not inherit the previous
-            # method's opt-in.
-            with self.assertRaises(IntegrityError):
-                with transaction.atomic():
-                    AssetType._base_manager.filter(pk=asset_type.pk).update(source_checksum="sha256:" + "c" * 64)
-
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_release, "2026.10")
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "b" * 64)
-
-    def test_reconciliation_opt_in_does_not_leak_after_outer_transaction_commit(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-leak-commit", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Leak Commit Manufacturer", slug="reconcile-leak-commit-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile leak commit type",
-            slug="reconcile-leak-commit-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-leak-commit",
-            library_release="2026.09",
-        )
-
-        with transaction.atomic():
-            asset_type.apply_library_reconciliation(
-                library_release="2026.10",
-                source_checksum="sha256:" + "b" * 64,
-            )
-
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                AssetType._base_manager.filter(pk=asset_type.pk).update(source_checksum="sha256:" + "c" * 64)
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "b" * 64)
-
-    def test_reconciliation_method_rejects_identity_change_on_instance(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-method-identity", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Method Identity Manufacturer", slug="reconcile-method-identity-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile method identity type",
-            slug="reconcile-method-identity-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-method-id",
-            library_release="2026.09",
-        )
-
-        asset_type.library_definition_key = "hacked-key"
         with self.assertRaises(ValidationError):
-            asset_type.apply_library_reconciliation(
-                library_release="2026.10",
-                source_checksum="sha256:" + "b" * 64,
-            )
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_definition_key, "router-method-id")
-        self.assertEqual(asset_type.library_release, "2026.09")
-        self.assertIsNone(asset_type.source_checksum)
-        self.assertIsNone(asset_type.last_reconciled_at)
+            library.accept_release(first)
+        with self.assertRaises(ValidationError):
+            library.accept_release(foreign)
 
-    def test_reconciliation_preserves_preexisting_opt_in_state(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-preserve", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Preserve Manufacturer", slug="reconcile-preserve-manufacturer"
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, second.pk)
+
+    def test_release_rejects_mismatched_real_digest(self):
+        library = SpecificationLibrary.objects.create(namespace="digest-validation")
+        first_document = _release_document(library, 1)
+        second_document = _release_document(library, 2)
+        first_digest = release_document_digest(first_document)
+        second_digest = release_document_digest(second_document)
+
+        self.assertNotEqual(first_digest, second_digest)
+        with self.assertRaises(ValidationError):
+            SpecificationLibraryRelease.objects.create(
+                library=library,
+                sequence=1,
+                semantic_digest=first_digest,
+                source_document=second_document,
+            )
+        self.assertFalse(SpecificationLibraryRelease.objects.filter(library=library, sequence=1).exists())
+
+    def test_release_source_digest_and_sequence_are_immutable(self):
+        library = SpecificationLibrary.objects.create(namespace="release-immutable")
+        release = _release(library, 1)
+        replacement_document = _release_document(library, 2)
+        replacement_digest = release_document_digest(replacement_document)
+
+        release.source_document = replacement_document
+        with self.assertRaises(ValidationError):
+            release.save()
+        release.refresh_from_db()
+        self.assertEqual(release.sequence, 1)
+
+        attempted_updates = (
+            {"sequence": 2},
+            {"semantic_digest": replacement_digest},
+            {"source_document": replacement_document},
         )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile preserve type",
-            slug="reconcile-preserve-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-preserve",
-            library_release="2026.09",
-        )
+        for update in attempted_updates:
+            with self.subTest(update=update), self.assertRaises(IntegrityError), transaction.atomic():
+                SpecificationLibraryRelease._base_manager.filter(pk=release.pk).update(**update)
+            release.refresh_from_db()
+            self.assertEqual(release.sequence, 1)
+            self.assertEqual(release.semantic_digest, release_document_digest(release.source_document))
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            _release(library, 1)
+
+    def test_library_pointer_model_and_database_guards_reject_direct_writes(self):
+        library = SpecificationLibrary.objects.create(namespace="pointer-guards")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        library.accept_release(first)
+
+        library.accepted_release = second
+        with self.assertRaises(ValidationError):
+            library.save(update_fields=["accepted_release", "updated_at"])
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, first.pk)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=second.pk)
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, first.pk)
+
+    def test_reconcile_opt_in_restores_setting_after_success(self):
+        library = SpecificationLibrary.objects.create(namespace="restore-success")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        library.accept_release(first)
 
         with transaction.atomic():
+            with _specification_library_reconcile_opt_in("default"):
+                SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=second.pk)
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT current_setting('itambox.specification_library_reconcile', true)")
+                    self.assertEqual(cursor.fetchone()[0], "on")
             with connection.cursor() as cursor:
-                cursor.execute("SELECT set_config('itambox.assettype_reconcile', 'on', true)")
-            asset_type.apply_library_reconciliation(
-                library_release="2026.10",
-                source_checksum="sha256:" + "b" * 64,
-            )
-            # The helper restored the caller's pre-existing opt-in instead of
-            # forcing it off, so a direct controlled write still succeeds.
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT current_setting('itambox.assettype_reconcile', true)")
-                self.assertEqual(cursor.fetchone()[0], "on")
-            AssetType._base_manager.filter(pk=asset_type.pk).update(library_release="2026.11")
-
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_release, "2026.11")
-
-    def test_reconciliation_write_failure_does_not_leak_opt_in(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-fail-leak", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Fail Leak Manufacturer", slug="reconcile-fail-leak-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile fail leak type",
-            slug="reconcile-fail-leak-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-fail-leak",
-            library_release="2026.09",
-        )
-
-        with transaction.atomic():
-            # The identity rewrite fails in the trigger even while the
-            # reconciliation opt-in is active; the exception must not leave
-            # the surrounding transaction opted in.
-            with self.assertRaises(IntegrityError):
-                with transaction.atomic():
-                    with _library_reconciliation_opt_in("default"):
-                        AssetType._base_manager.filter(pk=asset_type.pk).update(library_definition_key="hacked-key")
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT current_setting('itambox.assettype_reconcile', true)")
+                cursor.execute("SELECT current_setting('itambox.specification_library_reconcile', true)")
                 self.assertIn(cursor.fetchone()[0] or None, (None, "off"))
-            # Functional proof: a release/checksum write is rejected again.
+
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, second.pk)
+
+    def test_reconcile_opt_in_does_not_leak_after_successful_acceptance(self):
+        library = SpecificationLibrary.objects.create(namespace="nonleak-success")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        library.accept_release(first)
+
+        with transaction.atomic():
+            library.accept_release(second)
+            with self.assertRaises(IntegrityError), transaction.atomic():
+                SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=first.pk)
+
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, second.pk)
+
+    def test_reconcile_opt_in_does_not_leak_after_failed_update(self):
+        library = SpecificationLibrary.objects.create(namespace="nonleak-failure")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        other_library = SpecificationLibrary.objects.create(namespace="nonleak-foreign")
+        foreign = _release(other_library, 1)
+        library.accept_release(first)
+
+        with transaction.atomic():
             with self.assertRaises(IntegrityError):
                 with transaction.atomic():
-                    AssetType._base_manager.filter(pk=asset_type.pk).update(library_release="2026.12")
+                    with _specification_library_reconcile_opt_in("default"):
+                        SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=foreign.pk)
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT current_setting('itambox.specification_library_reconcile', true)")
+                self.assertIn(cursor.fetchone()[0] or None, (None, "off"))
+            with self.assertRaises(IntegrityError), transaction.atomic():
+                SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=second.pk)
 
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_definition_key, "router-fail-leak")
-        self.assertEqual(asset_type.library_release, "2026.09")
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, first.pk)
 
-    def test_stale_reconciliation_instance_fails_closed_and_keeps_state_coherent(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-stale", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Stale Manufacturer", slug="reconcile-stale-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile stale type",
-            slug="reconcile-stale-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-stale",
-            library_release="2026.09",
-            source_checksum="sha256:" + "a" * 64,
-        )
+    def test_reconcile_opt_in_does_not_unlock_namespace_identity(self):
+        library = SpecificationLibrary.objects.create(namespace="namespace-immutable")
 
-        first = AssetType.objects.get(pk=asset_type.pk)
-        second = AssetType.objects.get(pk=asset_type.pk)
-
-        first.apply_library_reconciliation(
-            library_release="2026.10",
-            source_checksum="sha256:" + "b" * 64,
-        )
-
-        with self.assertRaises(ValidationError):
-            second.apply_library_reconciliation(
-                library_release="2026.11",
-                source_checksum="sha256:" + "c" * 64,
-            )
-
-        # The stale caller instance was not mutated towards the failed target
-        # state.
-        self.assertEqual(second.library_release, "2026.09")
-        self.assertEqual(second.source_checksum, "sha256:" + "a" * 64)
-        self.assertIsNone(second.last_reconciled_at)
-
-        # The database still holds the first caller's reconciliation result.
-        second.refresh_from_db()
-        self.assertEqual(second.library_release, "2026.10")
-        self.assertEqual(second.source_checksum, "sha256:" + "b" * 64)
-        self.assertIsNotNone(second.last_reconciled_at)
-
-    def test_reconciliation_defaults_last_reconciled_at_to_now(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-stamp", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Stamp Manufacturer", slug="reconcile-stamp-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile stamp type",
-            slug="reconcile-stamp-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-stamp",
-            library_release="2026.09",
-        )
-
-        before = timezone.now()
-        asset_type.apply_library_reconciliation(
-            library_release="2026.10",
-            source_checksum="sha256:" + "b" * 64,
-        )
-        asset_type.refresh_from_db()
-        self.assertIsNotNone(asset_type.last_reconciled_at)
-        self.assertGreaterEqual(asset_type.last_reconciled_at, before - timedelta(seconds=10))
-        self.assertLessEqual(asset_type.last_reconciled_at, timezone.now() + timedelta(seconds=10))
-        self.assertEqual(asset_type.library_release, "2026.10")
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "b" * 64)
-
-    def test_reconciliation_save_failure_restores_instance_and_keeps_unsaved_fields(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-restore", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Restore Manufacturer", slug="reconcile-restore-manufacturer"
-        )
-        asset_type = AssetType.objects.create(
-            manufacturer=manufacturer,
-            model="Reconcile restore type",
-            slug="reconcile-restore-type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-restore",
-            library_release="2026.09",
-            source_checksum="sha256:" + "a" * 64,
-        )
-        # Unrelated unsaved caller state must survive a failed reconciliation.
-        asset_type.description = "unsaved caller field"
-
-        with mock.patch.object(AssetType, "save", side_effect=IntegrityError("trigger refused the write")):
+        with transaction.atomic():
             with self.assertRaises(IntegrityError):
-                asset_type.apply_library_reconciliation(
-                    library_release="2026.10",
-                    source_checksum="sha256:" + "b" * 64,
-                )
+                with transaction.atomic():
+                    with _specification_library_reconcile_opt_in("default"):
+                        SpecificationLibrary._base_manager.filter(pk=library.pk).update(namespace="renamed")
 
-        # The failed target state has been restored on the caller instance...
-        self.assertEqual(asset_type.library_release, "2026.09")
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "a" * 64)
-        self.assertIsNone(asset_type.last_reconciled_at)
-        self.assertEqual(asset_type.description, "unsaved caller field")
-        # ...and the database never saw the write.
-        asset_type.refresh_from_db()
-        self.assertEqual(asset_type.library_release, "2026.09")
-        self.assertEqual(asset_type.source_checksum, "sha256:" + "a" * 64)
+        library.refresh_from_db()
+        self.assertEqual(library.namespace, "namespace-immutable")
 
-    def test_reconciliation_preflight_rejects_unsaved_instance(self):
-        library = AssetTypeLibrary.objects.create(namespace="reconcile-unsaved", release="2026.09")
-        manufacturer = Manufacturer.objects.create(
-            name="Reconcile Unsaved Manufacturer", slug="reconcile-unsaved-manufacturer"
-        )
-        unsaved = AssetType(
-            manufacturer=manufacturer,
-            model="Reconcile unsaved type",
-            management_kind=AssetType.MANAGEMENT_LIBRARY,
-            library=library,
-            library_definition_key="router-unsaved",
-            library_release="2026.09",
-        )
+        library.namespace = "renamed"
+        with self.assertRaises(ValidationError):
+            library.save()
+        library.refresh_from_db()
+        self.assertEqual(library.namespace, "namespace-immutable")
+
+    def test_reconcile_opt_in_preserves_preexisting_setting(self):
+        library = SpecificationLibrary.objects.create(namespace="restore-preexisting")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        library.accept_release(first)
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT set_config('itambox.specification_library_reconcile', 'on', true)")
+            with _specification_library_reconcile_opt_in("default"):
+                SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=second.pk)
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT current_setting('itambox.specification_library_reconcile', true)")
+                self.assertEqual(cursor.fetchone()[0], "on")
+            SpecificationLibrary._base_manager.filter(pk=library.pk).update(accepted_release_id=first.pk)
+
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, first.pk)
+
+    def test_accept_release_rejects_unsaved_library(self):
+        saved_library = SpecificationLibrary.objects.create(namespace="saved-for-unsaved")
+        release = _release(saved_library, 1)
+        unsaved_library = SpecificationLibrary(namespace="unsaved-library")
 
         with self.assertRaises(ValidationError):
-            unsaved.apply_library_reconciliation(
-                library_release="2026.10",
-                source_checksum="sha256:" + "b" * 64,
-            )
+            unsaved_library.accept_release(release)
+
+        self.assertIsNone(unsaved_library.pk)
+
+    def test_failed_pointer_advance_preserves_in_memory_and_database_state(self):
+        library = SpecificationLibrary.objects.create(namespace="failed-pointer")
+        first = _release(library, 1)
+        second = _release(library, 2)
+        other_library = SpecificationLibrary.objects.create(namespace="failed-pointer-other")
+        foreign = _release(other_library, 1)
+        library.accept_release(second)
+
+        with self.assertRaises(ValidationError):
+            library.accept_release(first)
+        self.assertEqual(library.accepted_release_id, second.pk)
+
+        with self.assertRaises(ValidationError):
+            library.accept_release(foreign)
+        self.assertEqual(library.accepted_release_id, second.pk)
+
+        library.refresh_from_db()
+        self.assertEqual(library.accepted_release_id, second.pk)
