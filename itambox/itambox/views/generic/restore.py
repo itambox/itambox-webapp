@@ -7,12 +7,12 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
 from django.views.generic import View
 
 from core import restore_authority
-from core.purge_handlers import purge_object
+from core.purge_handlers import TombstonePurgeBlocked, purge_object
 from itambox.utils import get_model_viewname
 from itambox.views.generic.htmx_responses import is_htmx_request, success_response
 from itambox.views.generic.mixins import (
@@ -22,6 +22,13 @@ from itambox.views.generic.mixins import (
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
+
+
+def _recycle_bin_list_url(model):
+    try:
+        return reverse(get_model_viewname(model, "list")) + "?deleted=true"
+    except NoReverseMatch:
+        return "/"
 
 
 class HtmxActionMixin:
@@ -108,7 +115,13 @@ class ObjectPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredMix
 
     def post(self, request, *args, **kwargs):
         obj_repr = str(self.object)
-        purge_object(self.object)
+        try:
+            purge_object(self.object)
+        except TombstonePurgeBlocked as exc:
+            messages.error(request, str(exc))
+            return HttpResponseRedirect(
+                safe_return_url(request, request.META.get("HTTP_REFERER"), _recycle_bin_list_url(self.model))
+            )
 
         success_msg = _("Permanently purged {model} {object}").format(
             model=self.model._meta.verbose_name,
@@ -241,10 +254,21 @@ class ObjectBulkPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequire
             )
 
         count = 0
+        skipped_tombstones = 0
         with transaction.atomic():
             for obj in rows:
-                purge_object(obj)
-                count += 1
+                try:
+                    purge_object(obj)
+                except TombstonePurgeBlocked:
+                    skipped_tombstones += 1
+                else:
+                    count += 1
+
+        if skipped_tombstones:
+            messages.warning(
+                request,
+                _("Skipped %(count)s permanent schema tombstone(s).") % {"count": skipped_tombstones},
+            )
 
         success_msg = _("Successfully permanently purged {count} {model_plural}.").format(
             count=count,

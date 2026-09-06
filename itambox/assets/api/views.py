@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
@@ -29,6 +29,7 @@ from assets.models import (
     AssetRole,
     AssetTagSequence,
     AssetType,
+    AssetTypeFieldset,
     Category,
     Depreciation,
     Manufacturer,
@@ -37,6 +38,8 @@ from assets.models import (
     Warranty,
 )
 from assets.services import checkin_asset, checkout_asset
+from assets.services.specifications._command_support import lock_relevant_libraries
+from assets.services.specifications.locking import catalogue_transaction_lock
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 
@@ -82,10 +85,46 @@ class AssetStateActionPermissions(TokenPermissions):
         return super().has_object_permission(request, view, obj)
 
 
-class AssetViewSet(ITAMBoxModelViewSet):
+class SpecificationCommandUpdateMixin:
+    # Preserve the legacy ETag lock without taking it before command locks.
+
+    def perform_update(self, serializer):
+        command_fields = {"specification_patch", "asset_type"}
+        if not command_fields.intersection(serializer.validated_data):
+            return super().perform_update(serializer)
+        # The generic view locks the owner before invoking serializer.save().
+        # Supported REST mutations use the value-command shared catalogue lock.
+        # A concurrent owner Type switch changes its ETag; the generic view
+        # rechecks that required precondition under its owner lock before save.
+        # Native-only requests retain the unchanged generic persistence path.
+        with transaction.atomic(), catalogue_transaction_lock(exclusive=False):
+            self._lock_command_libraries(serializer)
+            return super().perform_update(serializer)
+
+    @staticmethod
+    def _lock_command_libraries(serializer):
+        owner = serializer.instance
+        data = serializer.validated_data
+        if isinstance(owner, Asset):
+            current_type_id = Asset._base_manager.filter(pk=owner.pk).values_list("asset_type_id", flat=True).first()
+            target_type_id = getattr(data.get("asset_type"), "pk", None)
+            type_ids = tuple(sorted({value for value in (current_type_id, target_type_id) if value is not None}))
+            lock_relevant_libraries(type_ids, "asset")
+        else:
+            lock_relevant_libraries((owner.pk,), "asset_type")
+
+
+class AssetViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
     permission_classes = [AssetStateActionPermissions, StrictTenantPermission]
     queryset = Asset.objects.select_related("asset_role", "asset_type__manufacturer", "location").prefetch_related(
-        Prefetch("assignments", queryset=AssetAssignment.objects.filter(is_active=True), to_attr="_active_assignments")
+        Prefetch("assignments", queryset=AssetAssignment.objects.filter(is_active=True), to_attr="_active_assignments"),
+        Prefetch(
+            "asset_type__fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types",
+                "fieldset__field_memberships__custom_field__choice_set__choices",
+            ),
+        ),
     )
     serializer_class = AssetSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -162,8 +201,17 @@ class ManufacturerViewSet(ITAMBoxModelViewSet):
     filterset_class = ManufacturerFilterSet
 
 
-class AssetTypeViewSet(ITAMBoxModelViewSet):
-    queryset = AssetType.objects.select_related("manufacturer").prefetch_related("tags").all()
+class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
+    queryset = AssetType.objects.select_related("manufacturer").prefetch_related(
+        "tags",
+        Prefetch(
+            "fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types",
+                "fieldset__field_memberships__custom_field__choice_set__choices",
+            ),
+        ),
+    )
     serializer_class = AssetTypeSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetTypeFilterSet

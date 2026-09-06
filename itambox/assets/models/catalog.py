@@ -3,6 +3,8 @@ Supplier, Category — shared reference data that assets point into.
 """
 
 from django.contrib.contenttypes.fields import GenericRelation
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -10,8 +12,10 @@ from django.utils.translation import gettext_lazy as _
 from assets.choices import StatusTypeChoices
 from core.managers import AllObjectsManager, SoftDeleteManager
 from core.mixins import AutoSlugMixin, CustomFieldDataMixin, SoftDeleteMixin
-from core.models import StandardModel
-from extras.models import CustomFieldset
+from core.models import BaseModel, StandardModel
+from extras.models import CustomFieldset, SpecificationLibrary
+
+_LIBRARY_DEFINITION_KEY_VALIDATOR = RegexValidator(r"^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$")
 
 
 class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -208,10 +212,26 @@ class Depreciation(StandardModel, SoftDeleteMixin):
 
 class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
     changelog_global = True  # global reference data → changelog attributed to tenant=None
+    soft_delete_preserve_references = True
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     slug_source = ("manufacturer__name", "model")
+
+    MANAGEMENT_CORE = "core"
+    MANAGEMENT_LIBRARY = "library"
+    MANAGEMENT_LOCAL = "local"
+    MANAGEMENT_KIND_CHOICES = [
+        (MANAGEMENT_CORE, _("Core")),
+        (MANAGEMENT_LIBRARY, _("Library")),
+        (MANAGEMENT_LOCAL, _("Local")),
+    ]
+    LIFECYCLE_ACTIVE = "active"
+    LIFECYCLE_DEPRECATED = "deprecated"
+    LIFECYCLE_CHOICES = [
+        (LIFECYCLE_ACTIVE, _("Active")),
+        (LIFECYCLE_DEPRECATED, _("Deprecated")),
+    ]
 
     manufacturer = models.ForeignKey(
         "assets.Manufacturer", on_delete=models.PROTECT, related_name="asset_types", verbose_name=_("Manufacturer")
@@ -232,17 +252,35 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         verbose_name=_("EAN"),
         help_text=_("Barcode (EAN / UPC / GTIN) — scanning shows assets of this type."),
     )
+    region = models.CharField(max_length=64, blank=True, default="")
+    configuration = models.CharField(max_length=255, blank=True, default="")
+    management_kind = models.CharField(max_length=16, choices=MANAGEMENT_KIND_CHOICES, default=MANAGEMENT_LOCAL)
+    library = models.ForeignKey(
+        SpecificationLibrary,
+        on_delete=models.PROTECT,
+        related_name="asset_types",
+        null=True,
+        blank=True,
+    )
+    connector_identity = models.CharField(max_length=71, null=True, blank=True, db_index=True)
+    library_definition_key = models.CharField(
+        max_length=127,
+        null=True,
+        blank=True,
+        validators=[_LIBRARY_DEFINITION_KEY_VALIDATOR],
+    )
+    lifecycle = models.CharField(max_length=16, choices=LIFECYCLE_CHOICES, default=LIFECYCLE_ACTIVE)
+    deprecated_at = models.DateTimeField(null=True, blank=True)
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
 
     eol_months = models.PositiveIntegerField(
         null=True, blank=True, verbose_name=_("EOL (Months)"), help_text=_("Lifespan in months before EOL replacement")
     )
-    custom_fieldset = models.ForeignKey(
+    custom_fieldsets = models.ManyToManyField(
         CustomFieldset,
-        on_delete=models.SET_NULL,
-        null=True,
+        related_name="composed_asset_types",
+        through="AssetTypeFieldset",
         blank=True,
-        related_name="asset_types",
-        verbose_name=_("Custom Fieldset"),
     )
     # custom_field_data JSONField comes from CustomFieldDataMixin
     depreciation = models.ForeignKey(
@@ -288,12 +326,34 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["manufacturer", "model"],
-                condition=models.Q(deleted_at__isnull=True),
-                name="unique_manufacturer_model_active",
+                fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_assettype_slug_active"
             ),
             models.UniqueConstraint(
-                fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_assettype_slug_active"
+                fields=["library", "library_definition_key"],
+                name="assettype_library_identity_uq",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(library__isnull=True, library_definition_key__isnull=True)
+                    | models.Q(library__isnull=False, library_definition_key__isnull=False)
+                ),
+                name="assettype_library_identity_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(management_kind="library")
+                        & models.Q(library__isnull=False)
+                        & models.Q(library_definition_key__isnull=False)
+                        & ~models.Q(library_definition_key="")
+                    )
+                    | (
+                        models.Q(management_kind__in=["core", "local"])
+                        & models.Q(library__isnull=True)
+                        & models.Q(library_definition_key__isnull=True)
+                    )
+                ),
+                name="assettype_library_mgmt_ck",
             ),
         ]
         verbose_name = _("Asset Type")
@@ -304,6 +364,74 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     def get_absolute_url(self):
         return reverse("assets:assettype_detail", kwargs={"pk": self.pk})
+
+    def restore(self):
+        """Restore an Asset Type and normalize the pre-cutover deleted state."""
+        update_fields = ["deleted_at"]
+        self.deleted_at = None
+        if self.lifecycle == "deleted":
+            self.lifecycle = self.LIFECYCLE_DEPRECATED
+            update_fields.append("lifecycle")
+        self.save(update_fields=update_fields)
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.library_definition_key:
+            try:
+                _LIBRARY_DEFINITION_KEY_VALIDATOR(self.library_definition_key)
+            except ValidationError as exc:
+                errors["library_definition_key"] = exc.messages
+        if self.management_kind == self.MANAGEMENT_LIBRARY:
+            if self.library_id is None:
+                errors["library"] = _("Library-managed Asset Types require a Library.")
+            if not self.library_definition_key:
+                errors["library_definition_key"] = _("Library-managed Asset Types require a non-empty definition key.")
+        elif self.library_id is not None or self.library_definition_key not in (None, ""):
+            errors["management_kind"] = _("Only library-managed Asset Types may carry Library identity.")
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = (
+                type(self)
+                .all_objects.filter(pk=self.pk)
+                .values("library_id", "library_definition_key", "connector_identity")
+                .first()
+            )
+            if previous and any(
+                previous[field_name] != getattr(self, field_name)
+                for field_name in ("library_id", "library_definition_key", "connector_identity")
+            ):
+                raise ValidationError(
+                    {"library_definition_key": _("The library Asset Type identity is immutable after creation.")}
+                )
+        return super().save(*args, **kwargs)
+
+
+class AssetTypeFieldset(BaseModel):
+    asset_type = models.ForeignKey(AssetType, on_delete=models.CASCADE, related_name="fieldset_memberships")
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="asset_type_memberships")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "fieldset__namespace", "fieldset__slug"]
+        constraints = [
+            models.UniqueConstraint(fields=["asset_type", "fieldset"], name="unique_assettype_fieldset"),
+            models.UniqueConstraint(
+                fields=["asset_type", "position"],
+                name="unique_assettype_fieldset_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="assettype_fieldset_position_range",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.asset_type}: {self.fieldset}"
 
 
 class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -347,6 +475,7 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
+    soft_delete_preserve_references = True
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
     color = models.CharField(
@@ -368,6 +497,12 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ),
     )
     tags = models.ManyToManyField("extras.Tag", related_name="categories", blank=True, verbose_name=_("Tags"))
+    default_custom_fieldsets = models.ManyToManyField(
+        CustomFieldset,
+        related_name="default_for_categories",
+        through="CategoryDefaultFieldset",
+        blank=True,
+    )
 
     class Meta:
         ordering = ["name"]
@@ -387,3 +522,86 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
     def get_absolute_url(self):
         return reverse("assets:category_detail", kwargs={"pk": self.pk})
+
+
+class CategoryDefaultFieldset(BaseModel):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="default_fieldset_memberships")
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.PROTECT, related_name="category_default_memberships")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "fieldset__namespace", "fieldset__slug"]
+        constraints = [
+            models.UniqueConstraint(fields=["category", "fieldset"], name="unique_category_default_fieldset"),
+            models.UniqueConstraint(
+                fields=["category", "position"],
+                name="unique_category_default_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="category_default_position_range",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.category}: {self.fieldset}"
+
+
+class AssetTypeImageStage(BaseModel):
+    """Internal durable staging authority for a pending Asset Type model image.
+
+    An adapter ingests validated immutable bytes through the staging service
+    before command entry and receives a bounded opaque ``stage_id``. The public
+    create command consumes or discards that reference atomically inside the
+    owner transaction; the stage row and its server-owned storage key are the
+    durable authority (a signed path or cache key cannot record one-time
+    consumption with the owner transaction). Stage metadata is immutable after
+    ingestion so a previewed ID can never later refer to different bytes.
+    """
+
+    class State(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        CONSUMED = "consumed", _("Consumed")
+        DISCARDED = "discarded", _("Discarded")
+
+    stage_id = models.CharField(max_length=64, unique=True, db_index=True, verbose_name=_("Stage ID"))
+    actor_id = models.PositiveBigIntegerField(db_index=True, verbose_name=_("Actor ID"))
+    authentication_revision = models.CharField(max_length=64, verbose_name=_("Authentication Revision"))
+    command_kind = models.CharField(max_length=64, verbose_name=_("Command Kind"))
+    storage_key = models.CharField(max_length=255, unique=True, verbose_name=_("Storage Key"))
+    byte_size = models.PositiveBigIntegerField(verbose_name=_("Byte Size"))
+    content_digest = models.CharField(max_length=64, verbose_name=_("Content Digest"))
+    state = models.CharField(
+        max_length=16,
+        choices=State.choices,
+        default=State.PENDING,
+        db_index=True,
+        verbose_name=_("State"),
+    )
+    expires_at = models.DateTimeField(db_index=True, verbose_name=_("Expires At"))
+    consumed_asset_type = models.ForeignKey(
+        "assets.AssetType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consumed_image_stages",
+        verbose_name=_("Consumed Asset Type"),
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("Asset Type Image Stage")
+        verbose_name_plural = _("Asset Type Image Stages")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(state="consumed") & models.Q(consumed_asset_type__isnull=False))
+                    | (~models.Q(state="consumed") & models.Q(consumed_asset_type__isnull=True))
+                ),
+                name="assettypeimagestage_consumed_link_ck",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.stage_id} ({self.state})"

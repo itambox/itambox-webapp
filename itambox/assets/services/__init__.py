@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from organization.models import AssetHolder, Location
 
-    from .models import AssetDisposal
+    from ..models import AssetDisposal
 
 from decimal import Decimal
 
@@ -28,8 +28,8 @@ from compliance.models import CustodyReceipt
 from inventory.services import checkout_inventory_item, validate_checkout_targets
 from licenses.models import LicenseSeatAssignment
 
-from .choices import StatusTypeChoices
-from .models import Asset, AssetAssignment, StatusLabel
+from ..choices import StatusTypeChoices
+from ..models import Asset, AssetAssignment, StatusLabel
 
 logger = logging.getLogger(__name__)
 

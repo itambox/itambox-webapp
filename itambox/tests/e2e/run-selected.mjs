@@ -358,8 +358,49 @@ function identityFromAttachments(result) {
   if (typeof attachment.body === 'string') {
     try { return Buffer.from(attachment.body, 'base64').toString('utf8'); } catch { return null; }
   }
-  if (typeof attachment.path === 'string' && existsSync(attachment.path)) return readFileSync(attachment.path, 'utf8');
+  if (typeof attachment.path === 'string' && existsSync(attachment.path)) return readFileSync(attachment.path, 'utf8').trim();
   return null;
+}
+
+
+function slugify(value) {
+  const result = String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return result || 'test';
+}
+
+function synthesizedAttemptIdentity(resolved, test, retry) {
+  const project = slugify(test.projectName || test.project || resolved.project || 'unknown');
+  const spec = slugify(resolved.spec || test.spec || 'spec');
+  const id = slugify(resolved.id || test.testId || test.id || `${resolved.spec || 'spec'}::${test.title || 'test'}`);
+  return `e2e-${project}-${spec}-${id}-r${retry}`;
+}
+
+/**
+ * Return the canonical attempt identity for one Playwright result.
+ *
+ * Specs that use the shared fixtures carry an attested `e2e-identity`
+ * attachment/annotation; legacy specs do not, so their attempts get a
+ * deterministic identity synthesized from the report fields. The identity
+ * contract is: nonblank, control-free, globally unique, and carrying a
+ * distinct `-r{retry}-` segment. An attested identity is honored only when it
+ * already satisfies that contract for the attempt; otherwise a canonical
+ * identity is synthesized so the evidence file never carries a matching
+ * retry/control-character violation.
+ */
+export function attemptIdentity(result, test, retry, resolved = {}) {
+  const attested = identityFromAttachments(result) || identityFromAnnotations(test);
+  if (
+    attested
+    && !/[\u0000-\u001f\u007f]/.test(attested)
+    && new RegExp(`(?:^|-)r${retry}(?:-|$)`).test(attested)
+  ) {
+    return attested;
+  }
+  return synthesizedAttemptIdentity(resolved, test, retry);
 }
 
 function cleanupStatus(test) {
@@ -410,13 +451,17 @@ function collectExecution(value, output, parentFile = null, parentProject = null
       for (const test of Array.isArray(spec.tests) ? spec.tests : []) {
         if (!specFile) continue;
         const results = Array.isArray(test.results) ? test.results : [];
-        const attempts = results.map((result, index) => ({
-          retry: Number.isInteger(result.retry) ? result.retry : index,
-          status: normaliseAttemptStatus(result.status),
-          identity: identityFromAttachments(result) || identityFromAnnotations(test),
-        }));
+        const resolvedId = String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`);
+        const attempts = results.map((result, index) => {
+          const retry = Number.isInteger(result.retry) ? result.retry : index;
+          return {
+            retry,
+            status: normaliseAttemptStatus(result.status),
+            identity: attemptIdentity(result, test, retry, { spec: specFile, id: resolvedId, project }),
+          };
+        });
         output.tests.push({
-          id: String(test.testId || spec.id || `${specFile}::${spec.title || 'test'}`),
+          id: resolvedId,
           spec: specFile,
           project: String(test.projectName || project),
           status: finalPlaywrightStatus(test, attempts),
@@ -432,13 +477,17 @@ function collectExecution(value, output, parentFile = null, parentProject = null
       const testFile = normaliseReportPath(String(test.location?.file || file || '')) || file;
       if (!testFile) continue;
       const results = Array.isArray(test.results) ? test.results : [];
-      const attempts = results.map((result, index) => ({
-        retry: Number.isInteger(result.retry) ? result.retry : index,
-        status: normaliseAttemptStatus(result.status),
-        identity: identityFromAttachments(result) || identityFromAnnotations(test),
-      }));
+      const resolvedId = String(test.testId || `${testFile}::${test.title || 'test'}`);
+      const attempts = results.map((result, index) => {
+        const retry = Number.isInteger(result.retry) ? result.retry : index;
+        return {
+          retry,
+          status: normaliseAttemptStatus(result.status),
+          identity: attemptIdentity(result, test, retry, { spec: testFile, id: resolvedId, project }),
+        };
+      });
       output.tests.push({
-        id: String(test.testId || `${testFile}::${test.title || 'test'}`),
+        id: resolvedId,
         spec: testFile,
         project: String(test.projectName || project),
         status: finalPlaywrightStatus(test, attempts),

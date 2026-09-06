@@ -1,0 +1,4687 @@
+{
+  "schema_version": 1,
+  "source": {
+    "migration_vocabulary": "itambox/assets/migrations/_core_vocabulary.py",
+    "foundation_migration": "itambox/assets/migrations/0106_asset_type_core_seed.py",
+    "current_demo_seed": "itambox/core/management/commands/_seed/catalog.py",
+    "adoption_migration": "itambox/assets/migrations/0103_asset_type_data_backfill.py",
+    "adoption_to_core_migration": "itambox/assets/migrations/0105_asset_type_core_adoption.py"
+  },
+  "observed_counts": {
+    "migration_fields": 48,
+    "seed_fields": 48,
+    "choice_sets": 13,
+    "sections": 12,
+    "seed_categories": 29,
+    "categories_with_defaults": 9,
+    "demo_asset_types": 23,
+    "custom_field_data_owners": 13
+  },
+  "fields": [
+    {
+      "identity": "itambox/form_factor",
+      "namespace": "itambox",
+      "key": "form_factor",
+      "label": "Form factor",
+      "help_text": "Form factor",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/form-factor",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/rack_units",
+      "namespace": "itambox",
+      "key": "rack_units",
+      "label": "Rack units",
+      "help_text": "Rack units",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "length",
+      "canonical_unit": "U",
+      "validation": {
+        "minimum": "0",
+        "maximum": "100",
+        "scale": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/weight",
+      "namespace": "itambox",
+      "key": "weight",
+      "label": "Weight",
+      "help_text": "Weight",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "mass",
+      "canonical_unit": "kg",
+      "validation": {
+        "minimum": "0",
+        "maximum": "100000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ip_rating",
+      "namespace": "itambox",
+      "key": "ip_rating",
+      "label": "IP rating",
+      "help_text": "IP rating",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "regex": "^IP[0-6X][0-9X]K?$",
+        "max_length": 8
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/processor_model",
+      "namespace": "itambox",
+      "key": "processor_model",
+      "label": "Processor model",
+      "help_text": "Processor model",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 255
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/core_count",
+      "namespace": "itambox",
+      "key": "core_count",
+      "label": "Core count",
+      "help_text": "Core count",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "1048576"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/memory_capacity",
+      "namespace": "itambox",
+      "key": "memory_capacity",
+      "label": "Memory capacity",
+      "help_text": "Memory capacity",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "decimal",
+      "quantity_kind": "digital_information",
+      "canonical_unit": "GiB",
+      "validation": {
+        "minimum": "0",
+        "maximum": "1048576",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/memory_type",
+      "namespace": "itambox",
+      "key": "memory_type",
+      "label": "Memory type",
+      "help_text": "Memory type",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/memory-type",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage_capacity",
+      "namespace": "itambox",
+      "key": "storage_capacity",
+      "label": "Storage capacity",
+      "help_text": "Storage capacity",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "decimal",
+      "quantity_kind": "digital_information",
+      "canonical_unit": "GiB",
+      "validation": {
+        "minimum": "0",
+        "maximum": "1073741824",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage_medium",
+      "namespace": "itambox",
+      "key": "storage_medium",
+      "label": "Storage medium",
+      "help_text": "Storage medium",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/storage-medium",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/drive_bay_count",
+      "namespace": "itambox",
+      "key": "drive_bay_count",
+      "label": "Drive bay count",
+      "help_text": "Drive bay count",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/hot_swap_supported",
+      "namespace": "itambox",
+      "key": "hot_swap_supported",
+      "label": "Hot-swap storage",
+      "help_text": "Hot-swap storage",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ethernet_port_count",
+      "namespace": "itambox",
+      "key": "ethernet_port_count",
+      "label": "Ethernet port count",
+      "help_text": "Ethernet port count",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ethernet_speeds",
+      "namespace": "itambox",
+      "key": "ethernet_speeds",
+      "label": "Ethernet speeds",
+      "help_text": "Ethernet speeds",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/ethernet-speeds",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/wifi_standards",
+      "namespace": "itambox",
+      "key": "wifi_standards",
+      "label": "Wi-Fi standards",
+      "help_text": "Wi-Fi standards",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 8
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/wifi-standards",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/usb_port_count",
+      "namespace": "itambox",
+      "key": "usb_port_count",
+      "label": "USB port count",
+      "help_text": "USB port count",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "1024"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/network_functions",
+      "namespace": "itambox",
+      "key": "network_functions",
+      "label": "Network functions",
+      "help_text": "Network functions",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 10
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/network-functions",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/switching_capacity",
+      "namespace": "itambox",
+      "key": "switching_capacity",
+      "label": "Switching capacity",
+      "help_text": "Switching capacity",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "data_rate",
+      "canonical_unit": "Gbit/s",
+      "validation": {
+        "minimum": "0",
+        "maximum": "1000000000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/poe_port_count",
+      "namespace": "itambox",
+      "key": "poe_port_count",
+      "label": "PoE port count",
+      "help_text": "PoE port count",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/poe_budget",
+      "namespace": "itambox",
+      "key": "poe_budget",
+      "label": "PoE budget",
+      "help_text": "PoE budget",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "power",
+      "canonical_unit": "W",
+      "validation": {
+        "minimum": "0",
+        "maximum": "10000000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/input_voltage",
+      "namespace": "itambox",
+      "key": "input_voltage",
+      "label": "Input voltage",
+      "help_text": "Input voltage",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "voltage",
+      "canonical_unit": "V",
+      "validation": {
+        "minimum": "0",
+        "maximum": "1000000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/power_consumption_max",
+      "namespace": "itambox",
+      "key": "power_consumption_max",
+      "label": "Maximum power consumption",
+      "help_text": "Maximum power consumption",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "power",
+      "canonical_unit": "W",
+      "validation": {
+        "minimum": "0",
+        "maximum": "100000000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/battery_capacity",
+      "namespace": "itambox",
+      "key": "battery_capacity",
+      "label": "Battery capacity",
+      "help_text": "Battery capacity",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "decimal",
+      "quantity_kind": "energy",
+      "canonical_unit": "Wh",
+      "validation": {
+        "minimum": "0",
+        "maximum": "10000000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/battery_runtime",
+      "namespace": "itambox",
+      "key": "battery_runtime",
+      "label": "Battery runtime",
+      "help_text": "Battery runtime",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "integer",
+      "quantity_kind": "duration",
+      "canonical_unit": "min",
+      "validation": {
+        "minimum": "0",
+        "maximum": "5256000"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/display_size",
+      "namespace": "itambox",
+      "key": "display_size",
+      "label": "Display size",
+      "help_text": "Display size",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "length",
+      "canonical_unit": "in",
+      "validation": {
+        "minimum": "0",
+        "maximum": "1000",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/display_resolution",
+      "namespace": "itambox",
+      "key": "display_resolution",
+      "label": "Display resolution",
+      "help_text": "Display resolution",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "regex": "^[1-9][0-9]{1,4}x[1-9][0-9]{1,4}$",
+        "max_length": 11
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/touch_supported",
+      "namespace": "itambox",
+      "key": "touch_supported",
+      "label": "Touch supported",
+      "help_text": "Touch supported",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/camera_resolution",
+      "namespace": "itambox",
+      "key": "camera_resolution",
+      "label": "Camera resolution",
+      "help_text": "Camera resolution",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "resolution",
+      "canonical_unit": "MP",
+      "validation": {
+        "minimum": "0",
+        "maximum": "10000",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print_technology",
+      "namespace": "itambox",
+      "key": "print_technology",
+      "label": "Print technology",
+      "help_text": "Print technology",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/print-technology",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/color_supported",
+      "namespace": "itambox",
+      "key": "color_supported",
+      "label": "Color printing",
+      "help_text": "Color printing",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/duplex_supported",
+      "namespace": "itambox",
+      "key": "duplex_supported",
+      "label": "Duplex printing",
+      "help_text": "Duplex printing",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print_speed",
+      "namespace": "itambox",
+      "key": "print_speed",
+      "label": "Print speed",
+      "help_text": "Print speed",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "rate",
+      "canonical_unit": "pages_per_minute",
+      "validation": {
+        "minimum": "0",
+        "maximum": "100000",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating_system_family",
+      "namespace": "itambox",
+      "key": "operating_system_family",
+      "label": "Operating system family",
+      "help_text": "Operating system family",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "current_scope": "both",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/operating-system-family",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/management_protocols",
+      "namespace": "itambox",
+      "key": "management_protocols",
+      "label": "Management protocols",
+      "help_text": "Management protocols",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/management-protocols",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/hostname",
+      "namespace": "itambox",
+      "key": "hostname",
+      "label": "Hostname",
+      "help_text": "Hostname",
+      "targets": [
+        "asset"
+      ],
+      "current_scope": "asset",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 253,
+        "rule": "rfc1123_hostname"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/firmware_version",
+      "namespace": "itambox",
+      "key": "firmware_version",
+      "label": "Firmware version",
+      "help_text": "Firmware version",
+      "targets": [
+        "asset"
+      ],
+      "current_scope": "asset",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 255
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating_temperature_min",
+      "namespace": "itambox",
+      "key": "operating_temperature_min",
+      "label": "Minimum operating temperature",
+      "help_text": "Minimum operating temperature",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "temperature",
+      "canonical_unit": "°C",
+      "validation": {
+        "minimum": "-273.15",
+        "maximum": "1000",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating_temperature_max",
+      "namespace": "itambox",
+      "key": "operating_temperature_max",
+      "label": "Maximum operating temperature",
+      "help_text": "Maximum operating temperature",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "temperature",
+      "canonical_unit": "°C",
+      "validation": {
+        "minimum": "-273.15",
+        "maximum": "1000",
+        "scale": 2,
+        "rule": "temperature_max_gte_min"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/outdoor_rated",
+      "namespace": "itambox",
+      "key": "outdoor_rated",
+      "label": "Outdoor rated",
+      "help_text": "Outdoor rated",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/acoustic_level",
+      "namespace": "itambox",
+      "key": "acoustic_level",
+      "label": "Acoustic level",
+      "help_text": "Acoustic level",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "decimal",
+      "quantity_kind": "sound_pressure",
+      "canonical_unit": "dBA",
+      "validation": {
+        "minimum": "0",
+        "maximum": "250",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/sensor_types",
+      "namespace": "itambox",
+      "key": "sensor_types",
+      "label": "Sensor types",
+      "help_text": "Sensor types",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 32
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/sensor-types",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/analog_input_count",
+      "namespace": "itambox",
+      "key": "analog_input_count",
+      "label": "Analog input count",
+      "help_text": "Analog input count",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/digital_input_count",
+      "namespace": "itambox",
+      "key": "digital_input_count",
+      "label": "Digital input count",
+      "help_text": "Digital input count",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/industrial_protocols",
+      "namespace": "itambox",
+      "key": "industrial_protocols",
+      "label": "Industrial protocols",
+      "help_text": "Industrial protocols",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/industrial-protocols",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/regulatory_certifications",
+      "namespace": "itambox",
+      "key": "regulatory_certifications",
+      "label": "Regulatory certifications",
+      "help_text": "Regulatory certifications",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/regulatory-certifications",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/rohs_compliant",
+      "namespace": "itambox",
+      "key": "rohs_compliant",
+      "label": "RoHS compliant",
+      "help_text": "RoHS compliant",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/energy_certifications",
+      "namespace": "itambox",
+      "key": "energy_certifications",
+      "label": "Energy certifications",
+      "help_text": "Energy certifications",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/energy-certifications",
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/country_of_origin",
+      "namespace": "itambox",
+      "key": "country_of_origin",
+      "label": "Country of origin",
+      "help_text": "Country of origin",
+      "targets": [
+        "asset_type"
+      ],
+      "current_scope": "asset_type",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "regex": "^[A-Z]{2}$",
+        "max_length": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "activation_declared": false,
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    }
+  ],
+  "choice_sets": [
+    {
+      "identity": "itambox/form-factor",
+      "namespace": "itambox",
+      "slug": "form-factor",
+      "label": "Form factor",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "desktop",
+          "label": "Desktop",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "notebook",
+          "label": "Notebook",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "tablet",
+          "label": "Tablet",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "phone",
+          "label": "Phone",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "rack",
+          "label": "Rack",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "tower",
+          "label": "Tower",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "blade",
+          "label": "Blade",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "appliance",
+          "label": "Appliance",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "peripheral",
+          "label": "Peripheral",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "module",
+          "label": "Module",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        }
+      ]
+    },
+    {
+      "identity": "itambox/memory-type",
+      "namespace": "itambox",
+      "slug": "memory-type",
+      "label": "Memory type",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "ddr3",
+          "label": "DDR3",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "ddr4",
+          "label": "DDR4",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "ddr5",
+          "label": "DDR5",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "lpddr4x",
+          "label": "LPDDR4X",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "lpddr5",
+          "label": "LPDDR5",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "lpddr5x",
+          "label": "LPDDR5X",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "hbm2",
+          "label": "HBM2",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "hbm3",
+          "label": "HBM3",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage-medium",
+      "namespace": "itambox",
+      "slug": "storage-medium",
+      "label": "Storage medium",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "hdd",
+          "label": "Hard disk drive",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "ssd",
+          "label": "Solid-state drive",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "nvme_ssd",
+          "label": "NVMe solid-state drive",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "flash",
+          "label": "Flash",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "optical",
+          "label": "Optical",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "tape",
+          "label": "Tape",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "hybrid",
+          "label": "Hybrid",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ethernet-speeds",
+      "namespace": "itambox",
+      "slug": "ethernet-speeds",
+      "label": "Ethernet speeds",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "10m",
+          "label": "10 Mbit/s",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "100m",
+          "label": "100 Mbit/s",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "1g",
+          "label": "1 Gbit/s",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "2_5g",
+          "label": "2.5 Gbit/s",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "5g",
+          "label": "5 Gbit/s",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "10g",
+          "label": "10 Gbit/s",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "25g",
+          "label": "25 Gbit/s",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "40g",
+          "label": "40 Gbit/s",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "50g",
+          "label": "50 Gbit/s",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "100g",
+          "label": "100 Gbit/s",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "200g",
+          "label": "200 Gbit/s",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        },
+        {
+          "key": "400g",
+          "label": "400 Gbit/s",
+          "lifecycle": "active",
+          "order": 12,
+          "position": 120
+        }
+      ]
+    },
+    {
+      "identity": "itambox/wifi-standards",
+      "namespace": "itambox",
+      "slug": "wifi-standards",
+      "label": "Wi-Fi standards",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "802_11a",
+          "label": "802.11a",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "802_11b",
+          "label": "802.11b",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "802_11g",
+          "label": "802.11g",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "802_11n",
+          "label": "802.11n",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "802_11ac",
+          "label": "802.11ac",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "802_11ax",
+          "label": "802.11ax",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "802_11be",
+          "label": "802.11be",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "itambox/network-functions",
+      "namespace": "itambox",
+      "slug": "network-functions",
+      "label": "Network functions",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "switch",
+          "label": "Switch",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "router",
+          "label": "Router",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "firewall",
+          "label": "Firewall",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "wlan_ap",
+          "label": "WLAN access point",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "wlan_controller",
+          "label": "WLAN controller",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "load_balancer",
+          "label": "Load balancer",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "vpn_gateway",
+          "label": "VPN gateway",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "modem",
+          "label": "Modem",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "gateway",
+          "label": "Gateway",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "bridge",
+          "label": "Bridge",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print-technology",
+      "namespace": "itambox",
+      "slug": "print-technology",
+      "label": "Print technology",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "laser",
+          "label": "Laser",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "inkjet",
+          "label": "Inkjet",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "thermal",
+          "label": "Thermal",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "dot_matrix",
+          "label": "Dot matrix",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "dye_sublimation",
+          "label": "Dye sublimation",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "solid_ink",
+          "label": "Solid ink",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating-system-family",
+      "namespace": "itambox",
+      "slug": "operating-system-family",
+      "label": "Operating system family",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "windows",
+          "label": "Windows",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "windows_server",
+          "label": "Windows Server",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "macos",
+          "label": "macOS",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "linux",
+          "label": "Linux",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "chromeos",
+          "label": "ChromeOS",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "ios",
+          "label": "iOS",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "ipados",
+          "label": "iPadOS",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "android",
+          "label": "Android",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "bsd",
+          "label": "BSD",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "network_os",
+          "label": "Network OS",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "embedded",
+          "label": "Embedded",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 12,
+          "position": 120
+        }
+      ]
+    },
+    {
+      "identity": "itambox/management-protocols",
+      "namespace": "itambox",
+      "slug": "management-protocols",
+      "label": "Management protocols",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "https",
+          "label": "HTTPS",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "ssh",
+          "label": "SSH",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "snmpv1",
+          "label": "SNMPv1",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "snmpv2c",
+          "label": "SNMPv2c",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "snmpv3",
+          "label": "SNMPv3",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "redfish",
+          "label": "Redfish",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "ipmi",
+          "label": "IPMI",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "wsman",
+          "label": "WS-Man",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "rest",
+          "label": "REST",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "graphql",
+          "label": "GraphQL",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        }
+      ]
+    },
+    {
+      "identity": "itambox/sensor-types",
+      "namespace": "itambox",
+      "slug": "sensor-types",
+      "label": "Sensor types",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "temperature",
+          "label": "Temperature",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "humidity",
+          "label": "Humidity",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "pressure",
+          "label": "Pressure",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "light",
+          "label": "Light",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "motion",
+          "label": "Motion",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "vibration",
+          "label": "Vibration",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "current",
+          "label": "Current",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "voltage",
+          "label": "Voltage",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "power",
+          "label": "Power",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "energy",
+          "label": "Energy",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "flow",
+          "label": "Flow",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        },
+        {
+          "key": "level",
+          "label": "Level",
+          "lifecycle": "active",
+          "order": 12,
+          "position": 120
+        },
+        {
+          "key": "gas",
+          "label": "Gas",
+          "lifecycle": "active",
+          "order": 13,
+          "position": 130
+        },
+        {
+          "key": "smoke",
+          "label": "Smoke",
+          "lifecycle": "active",
+          "order": 14,
+          "position": 140
+        },
+        {
+          "key": "position",
+          "label": "Position",
+          "lifecycle": "active",
+          "order": 15,
+          "position": 150
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 16,
+          "position": 160
+        }
+      ]
+    },
+    {
+      "identity": "itambox/industrial-protocols",
+      "namespace": "itambox",
+      "slug": "industrial-protocols",
+      "label": "Industrial protocols",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "modbus_rtu",
+          "label": "Modbus RTU",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "modbus_tcp",
+          "label": "Modbus TCP",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "profinet",
+          "label": "PROFINET",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "profibus",
+          "label": "PROFIBUS",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "ethernet_ip",
+          "label": "EtherNet/IP",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "ethercat",
+          "label": "EtherCAT",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "bacnet_ip",
+          "label": "BACnet/IP",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "opc_ua",
+          "label": "OPC UA",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "canopen",
+          "label": "CANopen",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        }
+      ]
+    },
+    {
+      "identity": "itambox/regulatory-certifications",
+      "namespace": "itambox",
+      "slug": "regulatory-certifications",
+      "label": "Regulatory certifications",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "ce",
+          "label": "CE",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "fcc",
+          "label": "FCC",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "ul",
+          "label": "UL",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "csa",
+          "label": "CSA",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "ukca",
+          "label": "UKCA",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "vcci",
+          "label": "VCCI",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "rcm",
+          "label": "RCM",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "eac",
+          "label": "EAC",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        }
+      ]
+    },
+    {
+      "identity": "itambox/energy-certifications",
+      "namespace": "itambox",
+      "slug": "energy-certifications",
+      "label": "Energy certifications",
+      "description": null,
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "energy_star",
+          "label": "ENERGY STAR",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "epeat_bronze",
+          "label": "EPEAT Bronze",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "epeat_silver",
+          "label": "EPEAT Silver",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "epeat_gold",
+          "label": "EPEAT Gold",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "80plus",
+          "label": "80 PLUS",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "80plus_bronze",
+          "label": "80 PLUS Bronze",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "80plus_silver",
+          "label": "80 PLUS Silver",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "80plus_gold",
+          "label": "80 PLUS Gold",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "80plus_platinum",
+          "label": "80 PLUS Platinum",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "80plus_titanium",
+          "label": "80 PLUS Titanium",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "identity": "itambox/product-physical",
+      "namespace": "itambox",
+      "slug": "product-physical",
+      "label": "Product and Physical",
+      "description": "Normative product and physical specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/form_factor",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/rack_units",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/weight",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/ip_rating",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/compute-memory",
+      "namespace": "itambox",
+      "slug": "compute-memory",
+      "label": "Compute and Memory",
+      "description": "Normative compute and memory specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/processor_model",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/core_count",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/memory_capacity",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/memory_type",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage",
+      "namespace": "itambox",
+      "slug": "storage",
+      "label": "Storage",
+      "description": "Normative storage specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/storage_capacity",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/storage_medium",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/drive_bay_count",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/hot_swap_supported",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/connectivity-io",
+      "namespace": "itambox",
+      "slug": "connectivity-io",
+      "label": "Connectivity and I/O",
+      "description": "Normative connectivity and i/o specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/ethernet_port_count",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/ethernet_speeds",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/wifi_standards",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/usb_port_count",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/network-function",
+      "namespace": "itambox",
+      "slug": "network-function",
+      "label": "Network Function",
+      "description": "Normative network function specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/network_functions",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/switching_capacity",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/poe_port_count",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/poe_budget",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/power-battery",
+      "namespace": "itambox",
+      "slug": "power-battery",
+      "label": "Power and Battery",
+      "description": "Normative power and battery specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/input_voltage",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/power_consumption_max",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/battery_capacity",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/battery_runtime",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/display-av-imaging",
+      "namespace": "itambox",
+      "slug": "display-av-imaging",
+      "label": "Display, AV and Imaging",
+      "description": "Normative display, av and imaging specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/display_size",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/display_resolution",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/touch_supported",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/camera_resolution",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print-scan",
+      "namespace": "itambox",
+      "slug": "print-scan",
+      "label": "Print and Scan",
+      "description": "Normative print and scan specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/print_technology",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/color_supported",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/duplex_supported",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/print_speed",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/management-security",
+      "namespace": "itambox",
+      "slug": "management-security",
+      "label": "Management and Security",
+      "description": "Normative management and security specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/operating_system_family",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/management_protocols",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/hostname",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/firmware_version",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/environmental-ruggedization",
+      "namespace": "itambox",
+      "slug": "environmental-ruggedization",
+      "label": "Environmental and Ruggedization",
+      "description": "Normative environmental and ruggedization specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/operating_temperature_min",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/operating_temperature_max",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/outdoor_rated",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/acoustic_level",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/sensors-control",
+      "namespace": "itambox",
+      "slug": "sensors-control",
+      "label": "Sensors and Control",
+      "description": "Normative sensors and control specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/sensor_types",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/analog_input_count",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/digital_input_count",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/industrial_protocols",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/compliance-sustainability",
+      "namespace": "itambox",
+      "slug": "compliance-sustainability",
+      "label": "Compliance and Sustainability",
+      "description": "Normative compliance and sustainability specification section.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/regulatory_certifications",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/rohs_compliant",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/energy_certifications",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/country_of_origin",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "identity": "catalog/laptops",
+      "namespace": "catalog",
+      "slug": "laptops",
+      "native_identity": "laptops",
+      "label": "Laptops",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "4263eb",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 7,
+          "position": 70
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/desktops",
+      "namespace": "catalog",
+      "slug": "desktops",
+      "native_identity": "desktops",
+      "label": "Desktops",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "1864ab",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 6,
+          "position": 60
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/servers",
+      "namespace": "catalog",
+      "slug": "servers",
+      "native_identity": "servers",
+      "label": "Servers",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "5f3dc4",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/network-function",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 8,
+          "position": 80
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/monitors",
+      "namespace": "catalog",
+      "slug": "monitors",
+      "native_identity": "monitors",
+      "label": "Monitors",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "0c8599",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 5,
+          "position": 50
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/mobile-phones",
+      "namespace": "catalog",
+      "slug": "mobile-phones",
+      "native_identity": "mobile-phones",
+      "label": "Mobile Phones",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "2b8a3e",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 8,
+          "position": 80
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/tablets",
+      "namespace": "catalog",
+      "slug": "tablets",
+      "native_identity": "tablets",
+      "label": "Tablets",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "37b24d",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 8,
+          "position": 80
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/network-devices",
+      "namespace": "catalog",
+      "slug": "network-devices",
+      "native_identity": "network-devices",
+      "label": "Network Devices",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "e8590c",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/environmental-ruggedization",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 7,
+          "position": 70
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/storage-devices",
+      "namespace": "catalog",
+      "slug": "storage-devices",
+      "native_identity": "storage-devices",
+      "label": "Storage Devices",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "9c36b5",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 7,
+          "position": 70
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/conference-systems",
+      "namespace": "catalog",
+      "slug": "conference-systems",
+      "native_identity": "conference-systems",
+      "label": "Conference Systems",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "1098ad",
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/compliance-sustainability",
+          "order": 6,
+          "position": 60
+        }
+      ],
+      "defaults_seeded": true
+    },
+    {
+      "identity": "catalog/charger",
+      "namespace": "catalog",
+      "slug": "charger",
+      "native_identity": "charger",
+      "label": "Charger",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "f59f00",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/adaptor",
+      "namespace": "catalog",
+      "slug": "adaptor",
+      "native_identity": "adaptor",
+      "label": "Adaptor",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "f08c00",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/mouse",
+      "namespace": "catalog",
+      "slug": "mouse",
+      "native_identity": "mouse",
+      "label": "Mouse",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "868e96",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/keyboard",
+      "namespace": "catalog",
+      "slug": "keyboard",
+      "native_identity": "keyboard",
+      "label": "Keyboard",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "495057",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/webcam",
+      "namespace": "catalog",
+      "slug": "webcam",
+      "native_identity": "webcam",
+      "label": "Webcam",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "0ca678",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/headset",
+      "namespace": "catalog",
+      "slug": "headset",
+      "native_identity": "headset",
+      "label": "Headset",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "7048e8",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/cable",
+      "namespace": "catalog",
+      "slug": "cable",
+      "native_identity": "cable",
+      "label": "Cable",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "adb5bd",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/display",
+      "namespace": "catalog",
+      "slug": "display",
+      "native_identity": "display",
+      "label": "Display",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "15aabf",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/dock",
+      "namespace": "catalog",
+      "slug": "dock",
+      "native_identity": "dock",
+      "label": "Dock",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "3b5bdb",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/toner",
+      "namespace": "catalog",
+      "slug": "toner",
+      "native_identity": "toner",
+      "label": "Toner",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "343a40",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/ink",
+      "namespace": "catalog",
+      "slug": "ink",
+      "native_identity": "ink",
+      "label": "Ink",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "1c7ed6",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/batteries",
+      "namespace": "catalog",
+      "slug": "batteries",
+      "native_identity": "batteries",
+      "label": "Batteries",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "66a80f",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/thermal-paste",
+      "namespace": "catalog",
+      "slug": "thermal-paste",
+      "native_identity": "thermal-paste",
+      "label": "Thermal Paste",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "c2255c",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/other",
+      "namespace": "catalog",
+      "slug": "other",
+      "native_identity": "other",
+      "label": "Other",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "6c757d",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/ram-memory",
+      "namespace": "catalog",
+      "slug": "ram-memory",
+      "native_identity": "ram-memory",
+      "label": "Ram Memory",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "e64980",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/ssd-nvme",
+      "namespace": "catalog",
+      "slug": "ssd-nvme",
+      "native_identity": "ssd-nvme",
+      "label": "Ssd Nvme",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "be4bdb",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/hdd",
+      "namespace": "catalog",
+      "slug": "hdd",
+      "native_identity": "hdd",
+      "label": "Hdd",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "7950f2",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/nic",
+      "namespace": "catalog",
+      "slug": "nic",
+      "native_identity": "nic",
+      "label": "Nic",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "f76707",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/gpu",
+      "namespace": "catalog",
+      "slug": "gpu",
+      "native_identity": "gpu",
+      "label": "Gpu",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "e03131",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    },
+    {
+      "identity": "catalog/cpu",
+      "namespace": "catalog",
+      "slug": "cpu",
+      "native_identity": "cpu",
+      "label": "Cpu",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset",
+        "accessory",
+        "consumable",
+        "component"
+      ],
+      "color": "d6336c",
+      "default_fieldsets": [],
+      "defaults_seeded": false
+    }
+  ],
+  "demo_value_inventory": {
+    "records": [
+      {
+        "asset_type_slug": "dell-latitude-5550",
+        "category": "laptops",
+        "raw_specs": {
+          "cpu": "Intel Core i7-1365U",
+          "ram_gb": 16,
+          "storage_gb": 512,
+          "storage_type": "NVMe",
+          "cpu_architecture": "x86_64"
+        },
+        "written_specs": {
+          "processor_model": "Intel Core i7-1365U",
+          "memory_capacity": "16.000",
+          "storage_capacity": "512.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "notebook",
+          "operating_system_family": "windows",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "hp-elitebook-860-g11",
+        "category": "laptops",
+        "raw_specs": {
+          "cpu": "Intel Core i7-1370P",
+          "ram_gb": 32,
+          "storage_gb": 1024,
+          "storage_type": "NVMe",
+          "cpu_architecture": "x86_64"
+        },
+        "written_specs": {
+          "processor_model": "Intel Core i7-1370P",
+          "memory_capacity": "32.000",
+          "storage_capacity": "1024.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "notebook",
+          "operating_system_family": "windows",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "thinkpad-x1-carbon-g12",
+        "category": "laptops",
+        "raw_specs": {
+          "cpu": "Intel Core i7-1365U",
+          "ram_gb": 32,
+          "storage_gb": 1024,
+          "storage_type": "NVMe",
+          "cpu_architecture": "x86_64"
+        },
+        "written_specs": {
+          "processor_model": "Intel Core i7-1365U",
+          "memory_capacity": "32.000",
+          "storage_capacity": "1024.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "notebook",
+          "operating_system_family": "windows",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "macbook-pro-16-2024",
+        "category": "laptops",
+        "raw_specs": {
+          "cpu": "Apple M4 Pro",
+          "ram_gb": 36,
+          "storage_gb": 1024,
+          "storage_type": "NVMe",
+          "cpu_architecture": "ARM64"
+        },
+        "written_specs": {
+          "processor_model": "Apple M4 Pro",
+          "memory_capacity": "36.000",
+          "storage_capacity": "1024.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "notebook",
+          "operating_system_family": "macos",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "macbook-air-15-2024",
+        "category": "laptops",
+        "raw_specs": {
+          "cpu": "Apple M3",
+          "ram_gb": 16,
+          "storage_gb": 512,
+          "storage_type": "NVMe",
+          "cpu_architecture": "ARM64"
+        },
+        "written_specs": {
+          "processor_model": "Apple M3",
+          "memory_capacity": "16.000",
+          "storage_capacity": "512.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "notebook",
+          "operating_system_family": "macos",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "dell-precision-5680",
+        "category": "laptops",
+        "raw_specs": {
+          "cpu": "Intel Core i9-13900H",
+          "ram_gb": 64,
+          "storage_gb": 2048,
+          "storage_type": "NVMe",
+          "gpu": "NVIDIA RTX 3000 Ada",
+          "cpu_architecture": "x86_64"
+        },
+        "written_specs": {
+          "processor_model": "Intel Core i9-13900H",
+          "memory_capacity": "64.000",
+          "storage_capacity": "2048.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "notebook",
+          "operating_system_family": "windows",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "dell-optiplex-7010",
+        "category": "desktops",
+        "raw_specs": {
+          "cpu": "Intel Core i5-13500",
+          "ram_gb": 16,
+          "storage_gb": 512,
+          "storage_type": "NVMe",
+          "cpu_architecture": "x86_64"
+        },
+        "written_specs": {
+          "processor_model": "Intel Core i5-13500",
+          "memory_capacity": "16.000",
+          "storage_capacity": "512.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "desktop",
+          "operating_system_family": "windows",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "mac-studio-2024",
+        "category": "desktops",
+        "raw_specs": {
+          "cpu": "Apple M2 Ultra",
+          "ram_gb": 64,
+          "storage_gb": 1024,
+          "storage_type": "NVMe",
+          "cpu_architecture": "ARM64"
+        },
+        "written_specs": {
+          "processor_model": "Apple M2 Ultra",
+          "memory_capacity": "64.000",
+          "storage_capacity": "1024.000",
+          "storage_medium": "nvme_ssd",
+          "form_factor": "desktop",
+          "operating_system_family": "macos",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "dell-precision-7960-tower",
+        "category": "desktops",
+        "raw_specs": {
+          "cpu": "Intel Xeon w7-3465X",
+          "ram_gb": 128,
+          "storage_gb": 4096,
+          "storage_type": "SSD RAID",
+          "gpu": "NVIDIA RTX 6000 Ada",
+          "cpu_architecture": "x86_64"
+        },
+        "written_specs": {
+          "processor_model": "Intel Xeon w7-3465X",
+          "memory_capacity": "128.000",
+          "storage_capacity": "4096.000",
+          "storage_medium": "ssd",
+          "form_factor": "desktop",
+          "operating_system_family": "windows",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "dell-poweredge-r760",
+        "category": "servers",
+        "raw_specs": {
+          "cpu": "2x Intel Xeon Gold 6430",
+          "ram_gb": 256,
+          "storage_gb": 8000,
+          "storage_type": "SSD RAID"
+        },
+        "written_specs": {
+          "processor_model": "2x Intel Xeon Gold 6430",
+          "memory_capacity": "256.000",
+          "storage_capacity": "8000.000",
+          "storage_medium": "ssd",
+          "form_factor": "rack",
+          "operating_system_family": "linux",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "hpe-proliant-dl380-g11",
+        "category": "servers",
+        "raw_specs": {
+          "cpu": "2x Intel Xeon Silver 4416+",
+          "ram_gb": 128,
+          "storage_gb": 4000,
+          "storage_type": "SSD RAID"
+        },
+        "written_specs": {
+          "processor_model": "2x Intel Xeon Silver 4416+",
+          "memory_capacity": "128.000",
+          "storage_capacity": "4000.000",
+          "storage_medium": "ssd",
+          "form_factor": "rack",
+          "operating_system_family": "linux",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "synology-ds1823xs",
+        "category": "storage-devices",
+        "raw_specs": {
+          "cpu": "AMD Ryzen V1780B",
+          "ram_gb": 32,
+          "storage_gb": 64000,
+          "storage_type": "HDD"
+        },
+        "written_specs": {
+          "processor_model": "AMD Ryzen V1780B",
+          "memory_capacity": "32.000",
+          "storage_capacity": "64000.000",
+          "storage_medium": "hdd",
+          "form_factor": "appliance",
+          "operating_system_family": "embedded",
+          "memory_type": "ddr5",
+          "ethernet_port_count": 1,
+          "ethernet_speeds": [
+            "1g"
+          ],
+          "usb_port_count": 4,
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "iphone-15-pro",
+        "category": "mobile-phones",
+        "raw_specs": {
+          "cpu": "Apple A17 Pro",
+          "ram_gb": 8,
+          "storage_gb": 256,
+          "screen_size": 6.1
+        },
+        "written_specs": {
+          "processor_model": "Apple A17 Pro",
+          "memory_capacity": "8.000",
+          "storage_capacity": "256.000",
+          "display_size": "6.10",
+          "form_factor": "phone",
+          "operating_system_family": "ios",
+          "memory_type": "lpddr5",
+          "ethernet_port_count": 0,
+          "ethernet_speeds": [],
+          "usb_port_count": 1,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "galaxy-s24-ultra",
+        "category": "mobile-phones",
+        "raw_specs": {
+          "cpu": "Snapdragon 8 Gen 3",
+          "ram_gb": 12,
+          "storage_gb": 256,
+          "screen_size": 6.8
+        },
+        "written_specs": {
+          "processor_model": "Snapdragon 8 Gen 3",
+          "memory_capacity": "12.000",
+          "storage_capacity": "256.000",
+          "display_size": "6.80",
+          "form_factor": "phone",
+          "operating_system_family": "android",
+          "memory_type": "lpddr5",
+          "ethernet_port_count": 0,
+          "ethernet_speeds": [],
+          "usb_port_count": 1,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "ipad-pro-129-2024",
+        "category": "tablets",
+        "raw_specs": {
+          "cpu": "Apple M4",
+          "ram_gb": 8,
+          "storage_gb": 256,
+          "screen_size": 12.9
+        },
+        "written_specs": {
+          "processor_model": "Apple M4",
+          "memory_capacity": "8.000",
+          "storage_capacity": "256.000",
+          "display_size": "12.90",
+          "form_factor": "tablet",
+          "operating_system_family": "ipados",
+          "memory_type": "lpddr5",
+          "ethernet_port_count": 0,
+          "ethernet_speeds": [],
+          "usb_port_count": 1,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "surface-pro-10",
+        "category": "tablets",
+        "raw_specs": {
+          "cpu": "Intel Core i7-1365U",
+          "ram_gb": 16,
+          "storage_gb": 512,
+          "screen_size": 13.0
+        },
+        "written_specs": {
+          "processor_model": "Intel Core i7-1365U",
+          "memory_capacity": "16.000",
+          "storage_capacity": "512.000",
+          "display_size": "13.00",
+          "form_factor": "tablet",
+          "operating_system_family": "windows",
+          "memory_type": "lpddr5",
+          "ethernet_port_count": 0,
+          "ethernet_speeds": [],
+          "usb_port_count": 1,
+          "wifi_standards": [
+            "802_11ac",
+            "802_11ax"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "cisco-catalyst-9300",
+        "category": "network-devices",
+        "raw_specs": {
+          "port_count": 48,
+          "poe_budget_w": 740
+        },
+        "written_specs": {
+          "ethernet_port_count": 48,
+          "poe_port_count": 48,
+          "poe_budget": "740.000",
+          "form_factor": "appliance",
+          "operating_system_family": "network_os",
+          "ethernet_speeds": [
+            "10g",
+            "1g"
+          ],
+          "usb_port_count": 1,
+          "network_functions": [
+            "gateway"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "unifi-switch-pro-48",
+        "category": "network-devices",
+        "raw_specs": {
+          "port_count": 48,
+          "poe_budget_w": 600
+        },
+        "written_specs": {
+          "ethernet_port_count": 48,
+          "poe_port_count": 48,
+          "poe_budget": "600.000",
+          "form_factor": "appliance",
+          "operating_system_family": "network_os",
+          "ethernet_speeds": [
+            "10g",
+            "1g"
+          ],
+          "usb_port_count": 1,
+          "network_functions": [
+            "switch"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "meraki-mr46",
+        "category": "network-devices",
+        "raw_specs": {},
+        "written_specs": {
+          "form_factor": "appliance",
+          "operating_system_family": "network_os",
+          "ethernet_speeds": [
+            "10g",
+            "1g"
+          ],
+          "usb_port_count": 1,
+          "network_functions": [
+            "wlan_ap"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "unifi-dream-machine-pro",
+        "category": "network-devices",
+        "raw_specs": {
+          "port_count": 8,
+          "poe_budget_w": 0
+        },
+        "written_specs": {
+          "ethernet_port_count": 8,
+          "poe_port_count": 8,
+          "poe_budget": "0.000",
+          "form_factor": "appliance",
+          "operating_system_family": "network_os",
+          "ethernet_speeds": [
+            "10g",
+            "1g"
+          ],
+          "usb_port_count": 1,
+          "network_functions": [
+            "firewall",
+            "router"
+          ],
+          "management_protocols": [
+            "https",
+            "ssh"
+          ]
+        }
+      },
+      {
+        "asset_type_slug": "dell-p2723de-monitor",
+        "category": "monitors",
+        "raw_specs": {},
+        "written_specs": {
+          "form_factor": "peripheral"
+        }
+      },
+      {
+        "asset_type_slug": "dell-p2422he-monitor",
+        "category": "monitors",
+        "raw_specs": {},
+        "written_specs": {
+          "form_factor": "peripheral"
+        }
+      },
+      {
+        "asset_type_slug": "logitech-rally-bar",
+        "category": "conference-systems",
+        "raw_specs": {
+          "screen_size": 0
+        },
+        "written_specs": {
+          "display_size": "0.00",
+          "form_factor": "appliance",
+          "operating_system_family": "windows"
+        }
+      }
+    ],
+    "raw_key_counts": {
+      "cpu": 16,
+      "ram_gb": 16,
+      "storage_gb": 16,
+      "storage_type": 12,
+      "cpu_architecture": 9,
+      "gpu": 2,
+      "screen_size": 5,
+      "port_count": 3,
+      "poe_budget_w": 3
+    },
+    "raw_value_counts": {
+      "cpu": {
+        "Intel Core i7-1365U": 3,
+        "Intel Core i7-1370P": 1,
+        "Apple M4 Pro": 1,
+        "Apple M3": 1,
+        "Intel Core i9-13900H": 1,
+        "Intel Core i5-13500": 1,
+        "Apple M2 Ultra": 1,
+        "Intel Xeon w7-3465X": 1,
+        "2x Intel Xeon Gold 6430": 1,
+        "2x Intel Xeon Silver 4416+": 1,
+        "AMD Ryzen V1780B": 1,
+        "Apple A17 Pro": 1,
+        "Snapdragon 8 Gen 3": 1,
+        "Apple M4": 1
+      },
+      "cpu_architecture": {
+        "x86_64": 6,
+        "ARM64": 3
+      },
+      "gpu": {
+        "NVIDIA RTX 3000 Ada": 1,
+        "NVIDIA RTX 6000 Ada": 1
+      },
+      "poe_budget_w": {
+        "740": 1,
+        "600": 1,
+        "0": 1
+      },
+      "port_count": {
+        "48": 2,
+        "8": 1
+      },
+      "ram_gb": {
+        "16": 4,
+        "32": 3,
+        "36": 1,
+        "64": 2,
+        "128": 2,
+        "256": 1,
+        "8": 2,
+        "12": 1
+      },
+      "screen_size": {
+        "6.1": 1,
+        "6.8": 1,
+        "12.9": 1,
+        "13.0": 1,
+        "0": 1
+      },
+      "storage_gb": {
+        "512": 4,
+        "1024": 4,
+        "2048": 1,
+        "4096": 1,
+        "8000": 1,
+        "4000": 1,
+        "64000": 1,
+        "256": 3
+      },
+      "storage_type": {
+        "NVMe": 8,
+        "SSD RAID": 3,
+        "HDD": 1
+      }
+    },
+    "written_key_counts": {
+      "processor_model": 16,
+      "memory_capacity": 16,
+      "storage_capacity": 16,
+      "storage_medium": 12,
+      "form_factor": 23,
+      "operating_system_family": 21,
+      "memory_type": 16,
+      "ethernet_port_count": 19,
+      "ethernet_speeds": 20,
+      "usb_port_count": 20,
+      "wifi_standards": 13,
+      "management_protocols": 16,
+      "display_size": 5,
+      "poe_port_count": 3,
+      "poe_budget": 3,
+      "network_functions": 4
+    },
+    "written_value_counts": {
+      "display_size": {
+        "\"6.10\"": 1,
+        "\"6.80\"": 1,
+        "\"12.90\"": 1,
+        "\"13.00\"": 1,
+        "\"0.00\"": 1
+      },
+      "ethernet_port_count": {
+        "1": 12,
+        "0": 4,
+        "48": 2,
+        "8": 1
+      },
+      "ethernet_speeds": {
+        "[\"1g\"]": 12,
+        "[]": 4,
+        "[\"10g\", \"1g\"]": 4
+      },
+      "form_factor": {
+        "\"notebook\"": 6,
+        "\"desktop\"": 3,
+        "\"rack\"": 2,
+        "\"appliance\"": 6,
+        "\"phone\"": 2,
+        "\"tablet\"": 2,
+        "\"peripheral\"": 2
+      },
+      "management_protocols": {
+        "[\"https\", \"ssh\"]": 16
+      },
+      "memory_capacity": {
+        "\"16.000\"": 4,
+        "\"32.000\"": 3,
+        "\"36.000\"": 1,
+        "\"64.000\"": 2,
+        "\"128.000\"": 2,
+        "\"256.000\"": 1,
+        "\"8.000\"": 2,
+        "\"12.000\"": 1
+      },
+      "memory_type": {
+        "\"ddr5\"": 12,
+        "\"lpddr5\"": 4
+      },
+      "network_functions": {
+        "[\"gateway\"]": 1,
+        "[\"switch\"]": 1,
+        "[\"wlan_ap\"]": 1,
+        "[\"firewall\", \"router\"]": 1
+      },
+      "operating_system_family": {
+        "\"windows\"": 8,
+        "\"macos\"": 3,
+        "\"linux\"": 2,
+        "\"embedded\"": 1,
+        "\"ios\"": 1,
+        "\"android\"": 1,
+        "\"ipados\"": 1,
+        "\"network_os\"": 4
+      },
+      "poe_budget": {
+        "\"740.000\"": 1,
+        "\"600.000\"": 1,
+        "\"0.000\"": 1
+      },
+      "poe_port_count": {
+        "48": 2,
+        "8": 1
+      },
+      "processor_model": {
+        "\"Intel Core i7-1365U\"": 3,
+        "\"Intel Core i7-1370P\"": 1,
+        "\"Apple M4 Pro\"": 1,
+        "\"Apple M3\"": 1,
+        "\"Intel Core i9-13900H\"": 1,
+        "\"Intel Core i5-13500\"": 1,
+        "\"Apple M2 Ultra\"": 1,
+        "\"Intel Xeon w7-3465X\"": 1,
+        "\"2x Intel Xeon Gold 6430\"": 1,
+        "\"2x Intel Xeon Silver 4416+\"": 1,
+        "\"AMD Ryzen V1780B\"": 1,
+        "\"Apple A17 Pro\"": 1,
+        "\"Snapdragon 8 Gen 3\"": 1,
+        "\"Apple M4\"": 1
+      },
+      "storage_capacity": {
+        "\"512.000\"": 4,
+        "\"1024.000\"": 4,
+        "\"2048.000\"": 1,
+        "\"4096.000\"": 1,
+        "\"8000.000\"": 1,
+        "\"4000.000\"": 1,
+        "\"64000.000\"": 1,
+        "\"256.000\"": 3
+      },
+      "storage_medium": {
+        "\"nvme_ssd\"": 8,
+        "\"ssd\"": 3,
+        "\"hdd\"": 1
+      },
+      "usb_port_count": {
+        "4": 12,
+        "1": 8
+      },
+      "wifi_standards": {
+        "[\"802_11ac\", \"802_11ax\"]": 13
+      }
+    },
+    "special_observations": [
+      {
+        "source_key": "storage_type",
+        "source_value": "NVMe",
+        "records": 8,
+        "current_written_key": "storage_medium",
+        "current_written_value": "nvme_ssd",
+        "status": "existing_seed_mapping_is_out_of_final_contract",
+        "value_action": "do_not_rewrite_or_convert_persisted_values"
+      },
+      {
+        "source_key": "input_voltage",
+        "records_in_current_demo_seed": 0,
+        "status": "definition_only_in_current_foundation",
+        "value_action": "do_not_split_or_infer_input_voltage_min_max"
+      },
+      {
+        "source_key": "port_count",
+        "records": 3,
+        "current_written_keys": [
+          "ethernet_port_count",
+          "poe_port_count"
+        ],
+        "status": "existing_seed_derivation_requires_review",
+        "value_action": "do_not_infer_poe_from_generic_port_count"
+      },
+      {
+        "source_key": "storage_type",
+        "source_value": "SSD RAID",
+        "records": 3,
+        "current_written_key": "storage_medium",
+        "current_written_value": "ssd",
+        "status": "existing_seed_loses_raid_detail_and_writes_no_interface",
+        "value_action": "retain_history; no_unproven_conversion"
+      }
+    ]
+  },
+  "custom_field_data_owners": [
+    {
+      "content_type": "assets.asset",
+      "model": "Asset",
+      "source": "itambox/assets/models/asset.py",
+      "target_names": [
+        "asset"
+      ],
+      "custom_field_data": "direct"
+    },
+    {
+      "content_type": "assets.assettype",
+      "model": "AssetType",
+      "source": "itambox/assets/models/catalog.py",
+      "target_names": [
+        "asset_type"
+      ],
+      "custom_field_data": "direct"
+    },
+    {
+      "content_type": "assets.supplier",
+      "model": "Supplier",
+      "source": "itambox/assets/models/catalog.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "inventory.accessory",
+      "model": "Accessory",
+      "source": "itambox/inventory/models.py",
+      "target_names": [],
+      "custom_field_data": "inherited:AbstractInventoryItem"
+    },
+    {
+      "content_type": "inventory.component",
+      "model": "Component",
+      "source": "itambox/inventory/models.py",
+      "target_names": [],
+      "custom_field_data": "inherited:AbstractInventoryItem"
+    },
+    {
+      "content_type": "inventory.consumable",
+      "model": "Consumable",
+      "source": "itambox/inventory/models.py",
+      "target_names": [],
+      "custom_field_data": "inherited:AbstractInventoryItem"
+    },
+    {
+      "content_type": "licenses.license",
+      "model": "License",
+      "source": "itambox/licenses/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "organization.assetholder",
+      "model": "AssetHolder",
+      "source": "itambox/organization/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "organization.contact",
+      "model": "Contact",
+      "source": "itambox/organization/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "organization.costcenter",
+      "model": "CostCenter",
+      "source": "itambox/organization/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "organization.location",
+      "model": "Location",
+      "source": "itambox/organization/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "software.software",
+      "model": "Software",
+      "source": "itambox/software/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    },
+    {
+      "content_type": "subscriptions.subscription",
+      "model": "Subscription",
+      "source": "itambox/subscriptions/models.py",
+      "target_names": [],
+      "custom_field_data": "direct_non_asset"
+    }
+  ],
+  "collision_probes": [
+    {
+      "resource": "field",
+      "identity": "form_factor",
+      "namespace": "local",
+      "current_behavior": "rejected_by_global_CustomField.name_identity",
+      "evidence": "itambox/assets/tests/test_issue479_foundation_migrations.py::test_core_seed_refuses_local_field_identity",
+      "target_rule": "Field key is globally unique; do not overwrite or alias"
+    },
+    {
+      "resource": "fieldset",
+      "identity": "itambox/compute-memory",
+      "namespace": "local",
+      "current_behavior": "local namespace identity can coexist; same itambox identity with incompatible management/lifecycle is rejected",
+      "evidence": "foundation migration tests for local fieldset and fieldset identity",
+      "target_rule": "(namespace, slug) identity; preserve local collision and fail for occupied core identity"
+    },
+    {
+      "resource": "choice_set",
+      "identity": "itambox/form-factor",
+      "namespace": "local",
+      "current_behavior": "local namespace identity can coexist; same itambox identity with incompatible management/lifecycle is rejected",
+      "evidence": "foundation migration tests for local Choice Set and Choice Set identity",
+      "target_rule": "(namespace, slug) identity; preserve local collision and fail for occupied core identity"
+    },
+    {
+      "resource": "category",
+      "identity": "catalog/laptops",
+      "namespace": "catalog",
+      "current_behavior": "native Category.slug is globally unique; no namespace-qualified local category identity",
+      "evidence": "itambox/assets/models/catalog.py Category model and current seed",
+      "target_rule": "preserve native global slug; library spelling is catalog/<slug>; no fuzzy mapping"
+    }
+  ]
+}

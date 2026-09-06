@@ -932,6 +932,15 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
             flag_missing_assets(flag_warm_session, user=self.user)
         flag_warm = len(queries)
 
+        # Exact measured query counts for the ten cold/warm operation probes,
+        # in the order (expected_cold, expected_warm, classify_cold,
+        # classify_warm, close_cold, close_warm, rehome_cold, rehome_warm,
+        # flag_cold, flag_warm). Each cold/warm pair exercises the same
+        # operation against the same fixture size with a different actor;
+        # equal pairs prove the cost is constant and independent of the acting
+        # user. The rehome/flag values (19/16/19/16) reflect the Foundation
+        # prefetch graph measured in the CI follow-up; they are exact counts,
+        # not ceilings, so a regression in the audit query plan fails here.
         self.assertEqual(
             (
                 expected_cold,

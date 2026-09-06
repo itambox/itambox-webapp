@@ -72,7 +72,7 @@ class VisibleFormHelpTextTests(SimpleTestCase):
     def test_target_type_choices_are_translated(self):
         expected = {
             AssetCheckOutForm: ["Asset-Inhaber", "Lagerort", "Asset"],
-            AssetRequestForm: ["Ich selbst", "Asset-Inhaber", "Lagerort", "Asset"],
+            AssetRequestForm: ["Mich selbst", "Asset-Inhaber", "Lagerort", "Asset"],
             SubscriptionCheckoutForm: ["Mitarbeiter / Asset-Inhaber", "Hardware-Asset", "Lagerort"],
         }
         with override("de"):

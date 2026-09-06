@@ -68,6 +68,29 @@ normal plugin removal.
    core smoke/test subset. A plugin that fails again is disabled again; it does
    not abort the application startup.
 
+## Migrate API imports in extensions
+
+The `itambox.api` package no longer re-exports API classes or helpers. Plugins
+using imports such as `from itambox.api import BaseModelSerializer` must import
+from the concrete module instead:
+
+```python
+from itambox.api.base import BaseModelSerializer, ValidatedModelSerializer
+from itambox.api.fields import ChoiceField, ContentTypeField, RelatedObjectCountField, SerializedPKRelatedField
+from itambox.api.gfk_fields import GFKSerializerField
+from itambox.api.mixins import BulkDestroyModelMixin, BulkUpdateModelMixin, ETagMixin, ObjectValidationMixin
+from itambox.api.pagination import ITAMBoxPagination
+from itambox.api.routers import ITAMBoxRouter
+from itambox.api.utils import get_serializer_for_model, get_view_name
+from itambox.api.viewsets import BaseViewSet, ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+```
+
+Import only the names the extension uses. Update any dotted configuration paths
+to these concrete modules as well. Test the updated plugin in staging before
+re-enabling it; the package-level imports are not a compatibility fallback.
+This migration does not expand the [documented plugin API](../plugins/api_reference.md);
+API infrastructure outside that inventory remains private/unstable.
+
 ## Security boundary
 
 A plugin has the same process privileges, database access, filesystem access,

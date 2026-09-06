@@ -11845,15 +11845,19 @@ paths:
           enum:
           - boolean
           - date
-          - number
-          - select
+          - decimal
+          - integer
+          - multi-select
+          - single-select
           - text
         description: |-
           * `text` - Text
-          * `number` - Number
+          * `integer` - Integer
+          * `decimal` - Decimal
           * `date` - Date
           * `boolean` - Boolean
-          * `select` - Select / Dropdown
+          * `single-select` - Single select
+          * `multi-select` - Multi select
       - in: query
         name: label
         schema:
@@ -12408,6 +12412,10 @@ paths:
     get:
       operationId: extras_custom_fieldsets_list
       parameters:
+      - in: query
+        name: label
+        schema:
+          type: string
       - name: limit
         required: false
         in: query
@@ -12415,7 +12423,7 @@ paths:
         schema:
           type: integer
       - in: query
-        name: name
+        name: namespace
         schema:
           type: string
       - name: offset
@@ -12429,6 +12437,10 @@ paths:
         schema:
           type: string
         description: Search
+      - in: query
+        name: slug
+        schema:
+          type: string
       - name: start
         required: false
         in: query
@@ -38452,6 +38464,14 @@ components:
       description: |-
         * `webhook` - Webhook
         * `notification` - Notification
+    ActivationEnum:
+      enum:
+      - composed
+      - global
+      type: string
+      description: |-
+        * `composed` - Composed
+        * `global` - Global
     AlertLog:
       type: object
       properties:
@@ -39588,7 +39608,8 @@ components:
         last_audited_by:
           type: string
           readOnly: true
-        custom_field_data: {}
+        custom_field_data:
+          readOnly: true
         requestable:
           type: boolean
           nullable: true
@@ -39619,6 +39640,7 @@ components:
       - assigned_to
       - cost_center
       - created_at
+      - custom_field_data
       - id
       - last_audited_by
       - location
@@ -39705,7 +39727,8 @@ components:
           type: string
           format: date-time
           nullable: true
-        custom_field_data: {}
+        specification_patch:
+          writeOnly: true
         requestable:
           type: boolean
           nullable: true
@@ -39883,10 +39906,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/Depreciation'
           readOnly: true
-        custom_fieldset:
-          type: integer
-          nullable: true
-        custom_field_data: {}
+        custom_field_data:
+          readOnly: true
         image:
           type: string
           format: uri
@@ -39915,6 +39936,7 @@ components:
       required:
       - asset_role
       - created_at
+      - custom_field_data
       - depreciation
       - id
       - manufacturer
@@ -39959,10 +39981,8 @@ components:
           type: integer
           writeOnly: true
           nullable: true
-        custom_fieldset:
-          type: integer
-          nullable: true
-        custom_field_data: {}
+        specification_patch:
+          writeOnly: true
         image:
           type: string
           format: binary
@@ -41542,29 +41562,81 @@ components:
         name:
           type: string
           title: Field Name
-          description: Slug-like name (e.g. sim_card_number)
-          maxLength: 50
-          pattern: ^[-a-zA-Z0-9_]+$
+          description: Stable JSON key (e.g. sim_card_number)
+          pattern: ^[a-z][a-z0-9_]{0,63}$
+          maxLength: 64
+        namespace:
+          type: string
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
+          maxLength: 62
         label:
           type: string
           title: Display Label
-          maxLength: 100
+          maxLength: 200
+        help_text:
+          type: string
+          maxLength: 4096
         field_type:
           $ref: '#/components/schemas/FieldTypeEnum'
         field_type_display:
           type: string
           readOnly: true
-        choices:
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
+        quantity_kind:
           type: string
-          description: New-line separated list of choices (only for 'select' type)
+          nullable: true
+          maxLength: 32
+        canonical_unit:
+          type: string
+          nullable: true
+          maxLength: 16
+        minimum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,6})?$
+          nullable: true
+        maximum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,6})?$
+          nullable: true
+        regex:
+          type: string
+          nullable: true
+          maxLength: 256
+        decimal_scale:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        max_values:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        text_max_length:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        validation_rule:
+          type: string
+          nullable: true
+          maxLength: 32
         required:
           type: boolean
+        nullable:
+          type: boolean
+        mappings: {}
+        choice_set:
+          type: integer
+          nullable: true
         object_types:
           type: array
           items:
             type: string
             title: Python model class name
-          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -41574,12 +41646,12 @@ components:
           format: date-time
           readOnly: true
       required:
+      - activation
       - created_at
       - field_type_display
       - id
       - label
       - name
-      - object_types
       - updated_at
     CustomFieldRequest:
       type: object
@@ -41588,22 +41660,83 @@ components:
           type: string
           minLength: 1
           title: Field Name
-          description: Slug-like name (e.g. sim_card_number)
-          maxLength: 50
-          pattern: ^[-a-zA-Z0-9_]+$
+          description: Stable JSON key (e.g. sim_card_number)
+          pattern: ^[a-z][a-z0-9_]{0,63}$
+          maxLength: 64
+        namespace:
+          type: string
+          minLength: 1
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
+          maxLength: 62
         label:
           type: string
           minLength: 1
           title: Display Label
-          maxLength: 100
+          maxLength: 200
+        help_text:
+          type: string
+          maxLength: 4096
         field_type:
           $ref: '#/components/schemas/FieldTypeEnum'
-        choices:
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
+        quantity_kind:
           type: string
-          description: New-line separated list of choices (only for 'select' type)
+          nullable: true
+          maxLength: 32
+        canonical_unit:
+          type: string
+          nullable: true
+          maxLength: 16
+        minimum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,6})?$
+          nullable: true
+        maximum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,6})?$
+          nullable: true
+        regex:
+          type: string
+          nullable: true
+          maxLength: 256
+        decimal_scale:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        max_values:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        text_max_length:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        validation_rule:
+          type: string
+          nullable: true
+          maxLength: 32
         required:
           type: boolean
+        nullable:
+          type: boolean
+        mappings: {}
+        choice_set:
+          type: integer
+          nullable: true
+        object_types:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            title: Python model class name
       required:
+      - activation
       - label
       - name
     CustomFieldset:
@@ -41612,10 +41745,21 @@ components:
         id:
           type: integer
           readOnly: true
-        name:
+        namespace:
           type: string
-          title: Fieldset Name
-          maxLength: 100
+          default: local
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
+          maxLength: 62
+        slug:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9._-]{0,126}$
+          maxLength: 127
+        label:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4096
         fields:
           type: array
           items:
@@ -41633,18 +41777,30 @@ components:
       - created_at
       - fields
       - id
-      - name
+      - slug
       - updated_at
     CustomFieldsetRequest:
       type: object
       properties:
-        name:
+        namespace:
           type: string
           minLength: 1
-          title: Fieldset Name
-          maxLength: 100
+          default: local
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
+          maxLength: 62
+        slug:
+          type: string
+          minLength: 1
+          pattern: ^[a-z0-9][a-z0-9._-]{0,126}$
+          maxLength: 127
+        label:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4096
       required:
-      - name
+      - slug
     Dashboard:
       type: object
       properties:
@@ -41895,17 +42051,21 @@ components:
     FieldTypeEnum:
       enum:
       - text
-      - number
+      - integer
+      - decimal
       - date
       - boolean
-      - select
+      - single-select
+      - multi-select
       type: string
       description: |-
         * `text` - Text
-        * `number` - Number
+        * `integer` - Integer
+        * `decimal` - Decimal
         * `date` - Date
         * `boolean` - Boolean
-        * `select` - Select / Dropdown
+        * `single-select` - Single select
+        * `multi-select` - Multi select
     GenericObject:
       type: object
       properties:
@@ -45628,7 +45788,8 @@ components:
           type: string
           format: date-time
           nullable: true
-        custom_field_data: {}
+        specification_patch:
+          writeOnly: true
         requestable:
           type: boolean
           nullable: true
@@ -45718,10 +45879,8 @@ components:
           type: integer
           writeOnly: true
           nullable: true
-        custom_fieldset:
-          type: integer
-          nullable: true
-        custom_field_data: {}
+        specification_patch:
+          writeOnly: true
         image:
           type: string
           format: binary
@@ -46204,29 +46363,101 @@ components:
           type: string
           minLength: 1
           title: Field Name
-          description: Slug-like name (e.g. sim_card_number)
-          maxLength: 50
-          pattern: ^[-a-zA-Z0-9_]+$
+          description: Stable JSON key (e.g. sim_card_number)
+          pattern: ^[a-z][a-z0-9_]{0,63}$
+          maxLength: 64
+        namespace:
+          type: string
+          minLength: 1
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
+          maxLength: 62
         label:
           type: string
           minLength: 1
           title: Display Label
-          maxLength: 100
+          maxLength: 200
+        help_text:
+          type: string
+          maxLength: 4096
         field_type:
           $ref: '#/components/schemas/FieldTypeEnum'
-        choices:
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
+        quantity_kind:
           type: string
-          description: New-line separated list of choices (only for 'select' type)
+          nullable: true
+          maxLength: 32
+        canonical_unit:
+          type: string
+          nullable: true
+          maxLength: 16
+        minimum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,6})?$
+          nullable: true
+        maximum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,6})?$
+          nullable: true
+        regex:
+          type: string
+          nullable: true
+          maxLength: 256
+        decimal_scale:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        max_values:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        text_max_length:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+        validation_rule:
+          type: string
+          nullable: true
+          maxLength: 32
         required:
           type: boolean
+        nullable:
+          type: boolean
+        mappings: {}
+        choice_set:
+          type: integer
+          nullable: true
+        object_types:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            title: Python model class name
     PatchedCustomFieldsetRequest:
       type: object
       properties:
-        name:
+        namespace:
           type: string
           minLength: 1
-          title: Fieldset Name
-          maxLength: 100
+          default: local
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
+          maxLength: 62
+        slug:
+          type: string
+          minLength: 1
+          pattern: ^[a-z0-9][a-z0-9._-]{0,126}$
+          maxLength: 127
+        label:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4096
     PatchedDashboardRequest:
       type: object
       properties:

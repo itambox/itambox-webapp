@@ -7,11 +7,10 @@ SnipeITClient._get, which backs every paginated get_all() call.
 
 from __future__ import annotations
 
-import datetime
 import logging
 from io import StringIO
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -276,7 +275,7 @@ class TestSnipeITImporter(TenantTestMixin):
     # ------------------------------------------------------------------
 
     def test_basic_import_creates_records(self):
-        from assets.models import Asset, Category, Manufacturer, StatusLabel
+        from assets.models import Asset, AssetType, Category, Manufacturer, StatusLabel
         from extras.models import CustomField, CustomFieldset
         from organization.models import AssetHolder, Location
 
@@ -289,8 +288,15 @@ class TestSnipeITImporter(TenantTestMixin):
         assert Location._base_manager.filter(name="HQ").exists()
         assert Location._base_manager.filter(name="Floor 1").exists()
         assert AssetHolder._base_manager.filter(upn="jdoe").exists()
-        assert CustomField._base_manager.filter(name="cpu_model").exists()
-        assert CustomFieldset._base_manager.filter(name="Laptop Specs").exists()
+        field = CustomField._base_manager.get(name="cpu_model")
+        fieldset = CustomFieldset._base_manager.get(namespace="local", slug="snipeit-2", label="Laptop Specs")
+        asset_type = AssetType._base_manager.get(model="ThinkPad X1")
+        assert field.activation == CustomField.ACTIVATION_COMPOSED
+        assert field.lifecycle == CustomField.LIFECYCLE_ACTIVE
+        assert set(field.object_types.values_list("app_label", "model")) == {("assets", "asset")}
+        assert fieldset.lifecycle == CustomFieldset.LIFECYCLE_ACTIVE
+        assert list(fieldset.field_memberships.values_list("custom_field_id", "position")) == [(field.pk, 1)]
+        assert list(asset_type.fieldset_memberships.values_list("fieldset_id", "position")) == [(fieldset.pk, 1)]
         assert Asset._base_manager.filter(asset_tag="NW-0001").exists()
 
         assert counts["assets"]["created"] == 1
@@ -307,6 +313,58 @@ class TestSnipeITImporter(TenantTestMixin):
     # ------------------------------------------------------------------
     # Parent-child location hierarchy
     # ------------------------------------------------------------------
+
+    def test_custom_field_values_are_canonicalized_before_storage(self):
+        from assets.models import Asset
+
+        fields = {
+            "total": 3,
+            "rows": [
+                *SNIPE_FIELDS["rows"],
+                {
+                    "id": 4,
+                    "name": "Stage Core Count",
+                    "db_column_name": "_snipeit_stage_core_count_4",
+                    "format": "NUMERIC",
+                    "field_values": None,
+                    "type": "numeric",
+                },
+                {
+                    "id": 5,
+                    "name": "Stage Environment",
+                    "db_column_name": "_snipeit_stage_environment_5",
+                    "format": "LIST",
+                    "field_values": "Production\nStaging",
+                    "type": "list",
+                },
+            ],
+        }
+        hardware = {
+            "total": 1,
+            "rows": [
+                {
+                    **SNIPE_HARDWARE["rows"][0],
+                    "custom_fields": {
+                        "Core Count": {
+                            "field": "_snipeit_stage_core_count_4",
+                            "value": "16",
+                            "field_format": "NUMERIC",
+                        },
+                        "Environment": {
+                            "field": "_snipeit_stage_environment_5",
+                            "value": "Production",
+                            "field_format": "LIST",
+                        },
+                    },
+                }
+            ],
+        }
+
+        self._run(pages={"/api/v1/fields": fields, "/api/v1/hardware": hardware})
+
+        asset = Asset._base_manager.get(asset_tag="NW-0001")
+        assert asset.custom_field_data["stage_core_count"] == "16.00"
+        assert asset.custom_field_data["stage_environment"] == "production"
 
     def test_location_parent_wired_up(self):
         from organization.models import Location
@@ -356,7 +414,7 @@ class TestSnipeITImporter(TenantTestMixin):
     # ------------------------------------------------------------------
 
     def test_checkout_creates_assignment(self):
-        from assets.models import Asset, AssetAssignment
+        from assets.models import Asset
 
         self._run(pages={"/api/v1/hardware": SNIPE_HARDWARE_CHECKED_OUT})
 

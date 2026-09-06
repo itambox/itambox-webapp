@@ -1701,6 +1701,12 @@ export interface components {
      * @enum {string}
      */
     ActionTypeEnum: "webhook" | "notification";
+    /**
+     * @description * `composed` - Composed
+     * * `global` - Global
+     * @enum {string}
+     */
+    ActivationEnum: "composed" | "global";
     AlertLog: {
       id: number;
       /** Format: uri */
@@ -2221,7 +2227,7 @@ export interface components {
       /** Format: date-time */
       last_audited?: string | null;
       last_audited_by: string;
-      custom_field_data?: unknown;
+      custom_field_data: unknown;
       /** @description Allow users to request this asset */
       requestable?: boolean | null;
       notes?: string;
@@ -2269,7 +2275,7 @@ export interface components {
       cost_center_id?: number | null;
       /** Format: date-time */
       last_audited?: string | null;
-      custom_field_data?: unknown;
+      specification_patch?: unknown;
       /** @description Allow users to request this asset */
       requestable?: boolean | null;
       notes?: string;
@@ -2336,8 +2342,7 @@ export interface components {
       category?: number | null;
       asset_role: components["schemas"]["NestedAssetRole"];
       depreciation: components["schemas"]["Depreciation"];
-      custom_fieldset?: number | null;
-      custom_field_data?: unknown;
+      custom_field_data: unknown;
       /**
        * Model Image
        * Format: uri
@@ -2367,8 +2372,7 @@ export interface components {
       category?: number | null;
       assetrole_id?: number | null;
       depreciation_id?: number | null;
-      custom_fieldset?: number | null;
-      custom_field_data?: unknown;
+      specification_patch?: unknown;
       /**
        * Model Image
        * Format: binary
@@ -3037,17 +3041,32 @@ export interface components {
       id: number;
       /**
        * Field Name
-       * @description Slug-like name (e.g. sim_card_number)
+       * @description Stable JSON key (e.g. sim_card_number)
        */
       name: string;
+      namespace?: string;
       /** Display Label */
       label: string;
+      help_text?: string;
       field_type?: components["schemas"]["FieldTypeEnum"];
       field_type_display: string;
-      /** @description New-line separated list of choices (only for 'select' type) */
-      choices?: string;
+      activation: components["schemas"]["ActivationEnum"];
+      quantity_kind?: string | null;
+      canonical_unit?: string | null;
+      /** Format: decimal */
+      minimum_value?: string | null;
+      /** Format: decimal */
+      maximum_value?: string | null;
+      regex?: string | null;
+      decimal_scale?: number | null;
+      max_values?: number | null;
+      text_max_length?: number | null;
+      validation_rule?: string | null;
       required?: boolean;
-      object_types: readonly string[];
+      nullable?: boolean;
+      mappings?: unknown;
+      choice_set?: number | null;
+      object_types?: string[];
       /** Format: date-time */
       created_at: string;
       /** Format: date-time */
@@ -3056,20 +3075,39 @@ export interface components {
     CustomFieldRequest: {
       /**
        * Field Name
-       * @description Slug-like name (e.g. sim_card_number)
+       * @description Stable JSON key (e.g. sim_card_number)
        */
       name: string;
+      namespace?: string;
       /** Display Label */
       label: string;
+      help_text?: string;
       field_type?: components["schemas"]["FieldTypeEnum"];
-      /** @description New-line separated list of choices (only for 'select' type) */
-      choices?: string;
+      activation: components["schemas"]["ActivationEnum"];
+      quantity_kind?: string | null;
+      canonical_unit?: string | null;
+      /** Format: decimal */
+      minimum_value?: string | null;
+      /** Format: decimal */
+      maximum_value?: string | null;
+      regex?: string | null;
+      decimal_scale?: number | null;
+      max_values?: number | null;
+      text_max_length?: number | null;
+      validation_rule?: string | null;
       required?: boolean;
+      nullable?: boolean;
+      mappings?: unknown;
+      choice_set?: number | null;
+      object_types?: string[];
     };
     CustomFieldset: {
       id: number;
-      /** Fieldset Name */
-      name: string;
+      /** @default local */
+      namespace?: string;
+      slug: string;
+      label?: string;
+      description?: string;
       fields: readonly components["schemas"]["CustomField"][];
       /** Format: date-time */
       created_at: string;
@@ -3077,8 +3115,11 @@ export interface components {
       updated_at: string;
     };
     CustomFieldsetRequest: {
-      /** Fieldset Name */
-      name: string;
+      /** @default local */
+      namespace?: string;
+      slug: string;
+      label?: string;
+      description?: string;
     };
     Dashboard: {
       id: number;
@@ -3214,13 +3255,15 @@ export interface components {
     };
     /**
      * @description * `text` - Text
-     * * `number` - Number
+     * * `integer` - Integer
+     * * `decimal` - Decimal
      * * `date` - Date
      * * `boolean` - Boolean
-     * * `select` - Select / Dropdown
+     * * `single-select` - Single select
+     * * `multi-select` - Multi select
      * @enum {string}
      */
-    FieldTypeEnum: "text" | "number" | "date" | "boolean" | "select";
+    FieldTypeEnum: "text" | "integer" | "decimal" | "date" | "boolean" | "single-select" | "multi-select";
     GenericObject: {
       object_type: string;
       object_id: number;
@@ -5092,7 +5135,7 @@ export interface components {
       cost_center_id?: number | null;
       /** Format: date-time */
       last_audited?: string | null;
-      custom_field_data?: unknown;
+      specification_patch?: unknown;
       /** @description Allow users to request this asset */
       requestable?: boolean | null;
       notes?: string;
@@ -5129,8 +5172,7 @@ export interface components {
       category?: number | null;
       assetrole_id?: number | null;
       depreciation_id?: number | null;
-      custom_fieldset?: number | null;
-      custom_field_data?: unknown;
+      specification_patch?: unknown;
       /**
        * Model Image
        * Format: binary
@@ -5371,19 +5413,38 @@ export interface components {
     PatchedCustomFieldRequest: {
       /**
        * Field Name
-       * @description Slug-like name (e.g. sim_card_number)
+       * @description Stable JSON key (e.g. sim_card_number)
        */
       name?: string;
+      namespace?: string;
       /** Display Label */
       label?: string;
+      help_text?: string;
       field_type?: components["schemas"]["FieldTypeEnum"];
-      /** @description New-line separated list of choices (only for 'select' type) */
-      choices?: string;
+      activation?: components["schemas"]["ActivationEnum"];
+      quantity_kind?: string | null;
+      canonical_unit?: string | null;
+      /** Format: decimal */
+      minimum_value?: string | null;
+      /** Format: decimal */
+      maximum_value?: string | null;
+      regex?: string | null;
+      decimal_scale?: number | null;
+      max_values?: number | null;
+      text_max_length?: number | null;
+      validation_rule?: string | null;
       required?: boolean;
+      nullable?: boolean;
+      mappings?: unknown;
+      choice_set?: number | null;
+      object_types?: string[];
     };
     PatchedCustomFieldsetRequest: {
-      /** Fieldset Name */
-      name?: string;
+      /** @default local */
+      namespace?: string;
+      slug?: string;
+      label?: string;
+      description?: string;
     };
     PatchedDashboardRequest: {
       /** @description Ordered list of widget config dicts */
@@ -16432,12 +16493,14 @@ export interface operations {
       query?: {
         /**
          * @description * `text` - Text
-         * * `number` - Number
+         * * `integer` - Integer
+         * * `decimal` - Decimal
          * * `date` - Date
          * * `boolean` - Boolean
-         * * `select` - Select / Dropdown
+         * * `single-select` - Single select
+         * * `multi-select` - Multi select
          */
-        field_type?: "boolean" | "date" | "number" | "select" | "text";
+        field_type?: "boolean" | "date" | "decimal" | "integer" | "multi-select" | "single-select" | "text";
         label?: string;
         /** @description Number of results to return per page. */
         limit?: number;
@@ -16891,13 +16954,15 @@ export interface operations {
   extras_custom_fieldsets_list: {
     parameters: {
       query?: {
+        label?: string;
         /** @description Number of results to return per page. */
         limit?: number;
-        name?: string;
+        namespace?: string;
         /** @description The initial index from which to return the results. */
         offset?: number;
         /** @description Search */
         q?: string;
+        slug?: string;
         /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
         start?: number;
       };

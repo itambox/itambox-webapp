@@ -1,11 +1,15 @@
+import hashlib
 import json
+from contextlib import contextmanager
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import models
+from django.core.validators import RegexValidator
+from django.db import DatabaseError, connections, models, router, transaction
+from django.db.models.deletion import ProtectedError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -24,6 +28,9 @@ from core.mixins import BookmarkableMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
 from core.report_keys import unknown_column_keys
 from core.validators import validate_external_url, validate_file_attachment, validate_image_attachment
+
+from .canonicalization import canonicalize_release_document
+from .definition_contract import validate_custom_field_definition_contract
 
 
 def has_authored_conditions(conditions):
@@ -137,36 +144,508 @@ class Dashboard(models.Model):
             self.save(update_fields=["layout"])
 
 
-class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
-    changelog_global = True  # global config → changelog attributed to tenant=None
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
-    FIELD_TYPE_TEXT = "text"
-    FIELD_TYPE_NUMBER = "number"
-    FIELD_TYPE_DATE = "date"
-    FIELD_TYPE_BOOLEAN = "boolean"
-    FIELD_TYPE_SELECT = "select"
-    FIELD_TYPE_CHOICES = [
-        (FIELD_TYPE_TEXT, _("Text")),
-        (FIELD_TYPE_NUMBER, _("Number")),
-        (FIELD_TYPE_DATE, _("Date")),
-        (FIELD_TYPE_BOOLEAN, _("Boolean")),
-        (FIELD_TYPE_SELECT, _("Select / Dropdown")),
+SPECIFICATION_LIBRARY_NAMESPACE_RE = r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+_SPECIFICATION_LIBRARY_DIGEST_RE = r"^sha256:[0-9a-f]{64}$"
+_SPECIFICATION_LIBRARY_RECONCILE_SETTING = "itambox.specification_library_reconcile"
+
+_SPECIFICATION_LIBRARY_NAMESPACE_VALIDATOR = RegexValidator(SPECIFICATION_LIBRARY_NAMESPACE_RE)
+_SPECIFICATION_LIBRARY_DIGEST_VALIDATOR = RegexValidator(_SPECIFICATION_LIBRARY_DIGEST_RE)
+
+
+def normalize_release_document(source_document):
+    """Return RFC 8785 JCS bytes for an already domain-normalized document.
+
+    This function performs byte canonicalization only: JCS preserves array
+    order and does not sort or otherwise normalize source-domain collections.
+    """
+    if not isinstance(source_document, dict):
+        raise ValidationError({"source_document": _("A release document must be a JSON object.")})
+    try:
+        return canonicalize_release_document(source_document)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError({"source_document": _("The release document is not valid normalized JSON.")}) from exc
+
+
+def release_document_digest(source_document):
+    """Return the semantic SHA-256 digest for a normalized release document."""
+    return "sha256:" + hashlib.sha256(normalize_release_document(source_document)).hexdigest()
+
+
+@contextmanager
+def _specification_library_reconcile_opt_in(using):
+    """Permit one accepted-release pointer update in the current transaction."""
+    database = connections[using]
+    with database.cursor() as cursor:
+        cursor.execute("SELECT current_setting(%s, true)", [_SPECIFICATION_LIBRARY_RECONCILE_SETTING])
+        previous = cursor.fetchone()[0] or None
+        cursor.execute("SELECT set_config(%s, 'on', true)", [_SPECIFICATION_LIBRARY_RECONCILE_SETTING])
+    try:
+        yield
+    finally:
+        if not database.needs_rollback:
+            try:
+                with database.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT set_config(%s, %s, true)",
+                        [_SPECIFICATION_LIBRARY_RECONCILE_SETTING, previous if previous is not None else "off"],
+                    )
+            except DatabaseError:
+                # broad except: cleanup-reraise: the enclosing transaction already failed
+                pass
+
+
+class SpecificationLibrary(ChangeLoggingMixin, BaseModel):
+    """Immutable publisher identity and pointer to its accepted release."""
+
+    changelog_global = True
+    objects = models.Manager()
+
+    namespace = models.CharField(
+        max_length=62,
+        unique=True,
+        validators=[_SPECIFICATION_LIBRARY_NAMESPACE_VALIDATOR],
+    )
+    label = models.CharField(max_length=200, blank=True, default="")
+    installed_at = models.DateTimeField(default=timezone.now)
+    accepted_release = models.ForeignKey(
+        "extras.SpecificationLibraryRelease",
+        on_delete=models.PROTECT,
+        related_name="accepted_by_libraries",
+        null=True,
+        blank=True,
+    )
+
+    immutable_fields = ("namespace",)
+
+    class Meta:
+        ordering = ["namespace"]
+        constraints = [
+            models.UniqueConstraint(fields=["namespace"], name="unique_specificationlibrary_namespace"),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        try:
+            _SPECIFICATION_LIBRARY_NAMESPACE_VALIDATOR(self.namespace)
+        except ValidationError as exc:
+            errors["namespace"] = exc.messages
+        if self.accepted_release_id and self.accepted_release is not None:
+            if self.accepted_release.library_id != self.pk:
+                errors["accepted_release"] = _("The accepted Release must belong to this Library.")
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = (
+                type(self)
+                .objects.using(self._state.db)
+                .filter(pk=self.pk)
+                .values("namespace", "accepted_release_id")
+                .first()
+            )
+            if previous:
+                if previous["namespace"] != self.namespace:
+                    raise ValidationError({"namespace": _("A Library namespace is immutable after creation.")})
+                if previous["accepted_release_id"] != self.accepted_release_id and not getattr(
+                    self, "_accepted_release_write", False
+                ):
+                    raise ValidationError(
+                        {"accepted_release": _("The accepted Release may only change through the library command.")}
+                    )
+        elif self.accepted_release_id and not getattr(self, "_accepted_release_write", False):
+            raise ValidationError({"accepted_release": _("Create a Library before accepting a Release.")})
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ProtectedError(_("Specification Library identities are permanent."), {self})
+
+    def accept_release(self, release, *, using=None):
+        """Advance the accepted pointer to a same-library, non-older Release."""
+        if self.pk is None:
+            raise ValidationError({"pk": _("The Library must be saved before accepting a Release.")})
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        release_id = getattr(release, "pk", release)
+        with transaction.atomic(using=using):
+            locked = type(self).objects.using(using).select_for_update().get(pk=self.pk)
+            release_model = locked._meta.get_field("accepted_release").remote_field.model
+            candidate = release_model._base_manager.using(using).get(pk=release_id)
+            if candidate.library_id != locked.pk:
+                raise ValidationError({"accepted_release": _("The Release belongs to another Library.")})
+            current = locked.accepted_release_id
+            if current:
+                current_release = release_model._base_manager.using(using).get(pk=current)
+                if candidate.sequence < current_release.sequence:
+                    raise ValidationError({"accepted_release": _("An older Release cannot become accepted.")})
+            locked.accepted_release_id = candidate.pk
+            locked._accepted_release_write = True
+            try:
+                with _specification_library_reconcile_opt_in(using):
+                    locked.save(using=using, update_fields=["accepted_release", "updated_at"])
+            finally:
+                locked._accepted_release_write = False
+            self.accepted_release_id = candidate.pk
+            self.updated_at = locked.updated_at
+        return self
+
+    def __str__(self):
+        return self.namespace
+
+
+class SpecificationLibraryRelease(ChangeLoggingMixin, BaseModel):
+    """Immutable normalized source snapshot retained for one library sequence."""
+
+    changelog_global = True
+    objects = models.Manager()
+
+    library = models.ForeignKey(
+        SpecificationLibrary,
+        on_delete=models.PROTECT,
+        related_name="releases",
+    )
+    sequence = models.PositiveBigIntegerField()
+    semantic_digest = models.CharField(
+        max_length=71,
+        validators=[_SPECIFICATION_LIBRARY_DIGEST_VALIDATOR],
+    )
+    source_document = models.JSONField()
+    accepted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["library", "-sequence"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["library", "sequence"],
+                name="unique_specificationlibraryrelease_library_sequence",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(sequence__gte=1),
+                name="specificationlibraryrelease_sequence_positive",
+            ),
+        ]
+        indexes = [models.Index(fields=["library", "-sequence"], name="spec_library_release_lookup")]
+
+    def _validate_release_values(self):
+        errors = {}
+        if not isinstance(self.sequence, int) or isinstance(self.sequence, bool) or self.sequence < 1:
+            errors["sequence"] = _("Release sequence must be a positive integer.")
+        try:
+            _SPECIFICATION_LIBRARY_DIGEST_VALIDATOR(self.semantic_digest)
+        except ValidationError as exc:
+            errors["semantic_digest"] = exc.messages
+        try:
+            expected_digest = release_document_digest(self.source_document)
+        except ValidationError as exc:
+            errors.update(exc.message_dict)
+        else:
+            if self.semantic_digest != expected_digest:
+                errors["semantic_digest"] = _("The digest does not match the normalized release document.")
+        if errors:
+            raise ValidationError(errors)
+
+    def clean(self):
+        super().clean()
+        self._validate_release_values()
+        if self.library_id and self.library is not None and self.library_id != self.library.pk:
+            raise ValidationError({"library": _("The Release library identity is inconsistent.")})
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError({"__all__": _("Release rows are immutable after insertion.")})
+        self._validate_release_values()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ProtectedError(_("Release rows are immutable and retained."), {self})
+
+
+class SpecificationLibraryLegacyProvenance(BaseModel):
+    """Immutable transition evidence; never an active reconciliation source."""
+
+    OWNER_LIBRARY = "library"
+    OWNER_ASSET_TYPE = "asset_type"
+    OWNER_CUSTOM_FIELD = "custom_field"
+    OWNER_CUSTOM_FIELDSET = "custom_fieldset"
+    OWNER_CHOICE_SET = "choice_set"
+    OWNER_CHOICE = "choice"
+    OWNER_KIND_CHOICES = [
+        (OWNER_LIBRARY, _("Library")),
+        (OWNER_ASSET_TYPE, _("Asset Type")),
+        (OWNER_CUSTOM_FIELD, _("Custom Field")),
+        (OWNER_CUSTOM_FIELDSET, _("Custom Fieldset")),
+        (OWNER_CHOICE_SET, _("Choice Set")),
+        (OWNER_CHOICE, _("Choice")),
+    ]
+    DISPOSITION_UNINITIALIZED = "uninitialized"
+    DISPOSITION_UNRECONCILED = "unreconciled"
+    DISPOSITION_CHOICES = [
+        (DISPOSITION_UNINITIALIZED, _("Uninitialized")),
+        (DISPOSITION_UNRECONCILED, _("Unreconciled")),
     ]
 
-    name = models.SlugField(
-        max_length=50, verbose_name=_("Field Name"), help_text=_("Slug-like name (e.g. sim_card_number)")
-    )
-    label = models.CharField(max_length=100, db_index=True, verbose_name=_("Display Label"))
-    field_type = models.CharField(
-        max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
-    )
-    choices = models.TextField(
+    objects = models.Manager()
+    library = models.ForeignKey(
+        SpecificationLibrary,
+        on_delete=models.PROTECT,
+        related_name="legacy_provenance",
+        null=True,
         blank=True,
-        verbose_name=_("Choices"),
-        help_text=_("New-line separated list of choices (only for 'select' type)"),
     )
+    owner_kind = models.CharField(max_length=16, choices=OWNER_KIND_CHOICES)
+    owner_id = models.PositiveBigIntegerField()
+    owner_namespace = models.CharField(max_length=62)
+    legacy_release = models.CharField(max_length=64, null=True, blank=True)
+    legacy_source_checksum = models.CharField(max_length=71, null=True, blank=True)
+    legacy_managed_paths = models.JSONField(default=dict)
+    legacy_last_reconciled_at = models.DateTimeField(null=True, blank=True)
+    disposition = models.CharField(max_length=16, choices=DISPOSITION_CHOICES)
+    captured_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner_kind", "owner_id"],
+                name="unique_specificationlibrarylegacyprovenance_owner",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["library", "owner_kind"], name="spec_legacy_library_kind"),
+            models.Index(fields=["owner_kind", "owner_id"], name="spec_legacy_owner_lookup"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError({"__all__": _("Legacy provenance rows are immutable after insertion.")})
+        if not isinstance(self.legacy_managed_paths, dict):
+            raise ValidationError({"legacy_managed_paths": _("Legacy managed paths must be a JSON object.")})
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ProtectedError(_("Legacy provenance is immutable transition evidence."), {self})
+
+
+class _DefinitionIdentityMixin(models.Model):
+    """Lifecycle, immutable identity and permanent-row behavior for definitions."""
+
+    LIFECYCLE_ACTIVE = "active"
+    LIFECYCLE_DEPRECATED = "deprecated"
+    LIFECYCLE_CHOICES = [
+        (LIFECYCLE_ACTIVE, _("Active")),
+        (LIFECYCLE_DEPRECATED, _("Deprecated")),
+    ]
+
+    version = models.PositiveIntegerField(default=1)
+    lifecycle = models.CharField(max_length=16, choices=LIFECYCLE_CHOICES, default=LIFECYCLE_ACTIVE)
+    deprecated_at = models.DateTimeField(null=True, blank=True)
+
+    immutable_fields = ()
+
+    class Meta:
+        abstract = True
+
+    def _validate_immutable_fields(self):
+        if not self.pk:
+            return
+        previous = type(self).objects.filter(pk=self.pk).values(*self.immutable_fields).first()
+        if previous is None:
+            return
+        changed = {
+            field: _("This value is immutable after creation.")
+            for field in self.immutable_fields
+            if previous[field] != getattr(self, field)
+        }
+        if changed:
+            raise ValidationError(changed)
+
+    def delete(self, *args, **kwargs):
+        """Reusable definition identities are retired, never deleted."""
+        raise ProtectedError(
+            f"{self._meta.verbose_name} identities are permanent; deprecate the row instead.",
+            {self},
+        )
+
+    def save(self, *args, **kwargs):
+        self._validate_immutable_fields()
+        return super().save(*args, **kwargs)
+
+
+class _ManagedDefinitionMixin(_DefinitionIdentityMixin):
+    MANAGEMENT_CORE = "core"
+    MANAGEMENT_LIBRARY = "library"
+    MANAGEMENT_LOCAL = "local"
+    MANAGEMENT_KIND_CHOICES = [
+        (MANAGEMENT_CORE, _("Core")),
+        (MANAGEMENT_LIBRARY, _("Library")),
+        (MANAGEMENT_LOCAL, _("Local")),
+    ]
+
+    management_kind = models.CharField(max_length=16, choices=MANAGEMENT_KIND_CHOICES, default=MANAGEMENT_LOCAL)
+
+    class Meta:
+        abstract = True
+
+    def clean(self):
+        super().clean()
+        if self.management_kind == self.MANAGEMENT_LIBRARY and self.library_id is None:
+            raise ValidationError({"library": _("Library-managed definitions require a Library.")})
+        if self.management_kind in {self.MANAGEMENT_CORE, self.MANAGEMENT_LOCAL} and self.library_id is not None:
+            raise ValidationError({"library": _("Core and local definitions cannot carry a Library link.")})
+
+
+class CustomFieldChoiceSet(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
+    changelog_global = True
+    objects = models.Manager()
+
+    namespace = models.CharField(
+        max_length=62,
+        validators=[_SPECIFICATION_LIBRARY_NAMESPACE_VALIDATOR],
+    )
+    slug = models.CharField(
+        max_length=127,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9._-]{0,126}$")],
+    )
+    label = models.CharField(max_length=200)
+    library = models.ForeignKey(
+        SpecificationLibrary,
+        on_delete=models.PROTECT,
+        related_name="choice_sets",
+        null=True,
+        blank=True,
+    )
+    connector_identity = models.CharField(max_length=71, null=True, blank=True, db_index=True)
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
+
+    immutable_fields = ("namespace", "slug", "library_id", "connector_identity")
+
+    class Meta:
+        ordering = ["namespace", "slug"]
+        constraints = [
+            models.UniqueConstraint(fields=["namespace", "slug"], name="unique_customfieldchoiceset_identity"),
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(management_kind="library") & models.Q(library__isnull=False))
+                    | (models.Q(management_kind__in=["core", "local"]) & models.Q(library__isnull=True))
+                ),
+                name="customfieldchoiceset_library_management_coherence",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.namespace}/{self.slug}"
+
+
+class CustomFieldChoice(_DefinitionIdentityMixin, ChangeLoggingMixin, BaseModel):
+    changelog_global = True
+    objects = models.Manager()
+
+    choice_set = models.ForeignKey(CustomFieldChoiceSet, on_delete=models.CASCADE, related_name="choices")
+    key = models.CharField(
+        max_length=63,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9_]{0,62}$")],
+    )
+    label = models.CharField(max_length=200)
+    position = models.PositiveIntegerField()
+    replaced_by = models.CharField(max_length=254, null=True, blank=True)
+
+    immutable_fields = ("choice_set_id", "key")
+
+    class Meta:
+        ordering = ["position", "key"]
+        constraints = [
+            models.UniqueConstraint(fields=["choice_set", "key"], name="unique_customfieldchoice_key"),
+            models.UniqueConstraint(
+                fields=["choice_set", "position"],
+                name="unique_customfieldchoice_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="customfieldchoice_position_range",
+            ),
+        ]
+
+    def __str__(self):
+        return self.label
+
+
+class CustomField(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
+    changelog_global = True  # global config → changelog attributed to tenant=None
+    objects = models.Manager()
+    FIELD_TYPE_TEXT = "text"
+    FIELD_TYPE_INTEGER = "integer"
+    FIELD_TYPE_DECIMAL = "decimal"
+    FIELD_TYPE_DATE = "date"
+    FIELD_TYPE_BOOLEAN = "boolean"
+    FIELD_TYPE_SINGLE_SELECT = "single-select"
+    FIELD_TYPE_MULTI_SELECT = "multi-select"
+    FIELD_TYPE_CHOICES = [
+        (FIELD_TYPE_TEXT, _("Text")),
+        (FIELD_TYPE_INTEGER, _("Integer")),
+        (FIELD_TYPE_DECIMAL, _("Decimal")),
+        (FIELD_TYPE_DATE, _("Date")),
+        (FIELD_TYPE_BOOLEAN, _("Boolean")),
+        (FIELD_TYPE_SINGLE_SELECT, _("Single select")),
+        (FIELD_TYPE_MULTI_SELECT, _("Multi select")),
+    ]
+
+    ACTIVATION_COMPOSED = "composed"
+    ACTIVATION_GLOBAL = "global"
+    ACTIVATION_CHOICES = [
+        (ACTIVATION_COMPOSED, _("Composed")),
+        (ACTIVATION_GLOBAL, _("Global")),
+    ]
+
+    name = models.CharField(
+        max_length=64,
+        validators=[RegexValidator(r"^[a-z][a-z0-9_]{0,63}$")],
+        verbose_name=_("Field Name"),
+        help_text=_("Stable JSON key (e.g. sim_card_number)"),
+    )
+    namespace = models.CharField(
+        max_length=62,
+        default="local",
+        validators=[_SPECIFICATION_LIBRARY_NAMESPACE_VALIDATOR],
+    )
+    library = models.ForeignKey(
+        SpecificationLibrary,
+        on_delete=models.PROTECT,
+        related_name="fields",
+        null=True,
+        blank=True,
+    )
+    connector_identity = models.CharField(max_length=71, null=True, blank=True, db_index=True)
+    label = models.CharField(max_length=200, db_index=True, verbose_name=_("Display Label"))
+    help_text = models.TextField(max_length=4096, blank=True, default="")
+    field_type = models.CharField(
+        max_length=16, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
+    )
+    activation = models.CharField(
+        max_length=16,
+        choices=ACTIVATION_CHOICES,
+        db_index=True,
+        verbose_name=_("Activation"),
+    )
+    quantity_kind = models.CharField(max_length=32, null=True, blank=True)
+    canonical_unit = models.CharField(max_length=16, null=True, blank=True)
+    minimum_value = models.DecimalField(max_digits=24, decimal_places=6, null=True, blank=True)
+    maximum_value = models.DecimalField(max_digits=24, decimal_places=6, null=True, blank=True)
+    regex = models.CharField(max_length=256, null=True, blank=True)
+    decimal_scale = models.PositiveSmallIntegerField(null=True, blank=True)
+    max_values = models.PositiveSmallIntegerField(null=True, blank=True)
+    text_max_length = models.PositiveSmallIntegerField(null=True, blank=True)
+    validation_rule = models.CharField(max_length=32, null=True, blank=True)
     required = models.BooleanField(default=False, db_index=True, verbose_name=_("Required"))
+    nullable = models.BooleanField(default=False)
+    mappings = models.JSONField(default=list, blank=True)
+    choice_set = models.ForeignKey(
+        CustomFieldChoiceSet,
+        on_delete=models.PROTECT,
+        related_name="fields",
+        null=True,
+        blank=True,
+    )
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
     object_types = models.ManyToManyField(
         "contenttypes.ContentType",
         related_name="custom_fields",
@@ -184,13 +663,91 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         verbose_name = _("Custom Field")
         verbose_name_plural = _("Custom Fields")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfield_name_active"
+            models.UniqueConstraint(fields=["name"], name="unique_customfield_name"),
+            models.CheckConstraint(
+                condition=models.Q(activation__in=["composed", "global"]),
+                name="customfield_activation_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(management_kind="library") & models.Q(library__isnull=False))
+                    | (models.Q(management_kind__in=["core", "local"]) & models.Q(library__isnull=True))
+                ),
+                name="customfield_library_management_coherence",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(minimum_value__isnull=True)
+                | models.Q(maximum_value__isnull=True)
+                | models.Q(minimum_value__lte=models.F("maximum_value")),
+                name="customfield_minimum_lte_maximum",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(decimal_scale__isnull=True) | models.Q(decimal_scale__lte=6),
+                name="customfield_decimal_scale_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(max_values__isnull=True) | models.Q(max_values__gte=1, max_values__lte=64),
+                name="customfield_max_values_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(text_max_length__isnull=True)
+                | models.Q(text_max_length__gte=1, text_max_length__lte=4096),
+                name="customfield_text_length_range",
             ),
         ]
 
+    immutable_fields = (
+        "name",
+        "namespace",
+        "field_type",
+        "quantity_kind",
+        "canonical_unit",
+        "minimum_value",
+        "maximum_value",
+        "regex",
+        "decimal_scale",
+        "max_values",
+        "text_max_length",
+        "validation_rule",
+        "nullable",
+        "choice_set_id",
+        "library_id",
+        "connector_identity",
+    )
+
     def __str__(self):
         return f"{self.label} ({self.get_field_type_display()})"
+
+    def clean(self):
+        super().clean()
+        object_types = self.object_types.all() if self.pk else None
+        self.validate_definition_contract(object_types=object_types)
+        if self.activation == self.ACTIVATION_GLOBAL and self.pk and self.fieldset_memberships.exists():
+            raise ValidationError({"activation": _("A field with memberships cannot be global.")})
+
+    def validate_definition_contract(self, *, object_types=None):
+        validate_custom_field_definition_contract(
+            field_type=self.field_type,
+            activation=self.activation,
+            quantity_kind=self.quantity_kind,
+            canonical_unit=self.canonical_unit,
+            minimum_value=self.minimum_value,
+            maximum_value=self.maximum_value,
+            regex=self.regex,
+            decimal_scale=self.decimal_scale,
+            max_values=self.max_values,
+            text_max_length=self.text_max_length,
+            validation_rule=self.validation_rule,
+            mappings=self.mappings,
+            choice_set=self.choice_set,
+            object_types=object_types,
+            management_kind=self.management_kind,
+            lifecycle=self.lifecycle,
+            required=self.required,
+            nullable=self.nullable,
+            name=self.name,
+            namespace=self.namespace,
+        )
 
     def get_absolute_url(self):
         return reverse("extras:customfield_detail", kwargs={"pk": self.pk})
@@ -202,28 +759,88 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return self.object_types.filter(app_label="assets", model="assettype").exists()
 
 
-class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class CustomFieldset(_ManagedDefinitionMixin, ChangeLoggingMixin, BaseModel):
     changelog_global = True  # global config → changelog attributed to tenant=None
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, verbose_name=_("Fieldset Name"))
-    fields = models.ManyToManyField(CustomField, related_name="fieldsets", blank=True, verbose_name=_("Custom Fields"))
+    objects = models.Manager()
+    fields = models.ManyToManyField(
+        CustomField,
+        related_name="fieldsets",
+        through="CustomFieldsetField",
+        blank=True,
+        verbose_name=_("Custom Fields"),
+    )
+    namespace = models.CharField(
+        max_length=62,
+        default="local",
+        validators=[_SPECIFICATION_LIBRARY_NAMESPACE_VALIDATOR],
+    )
+    library = models.ForeignKey(
+        SpecificationLibrary,
+        on_delete=models.PROTECT,
+        related_name="fieldsets",
+        null=True,
+        blank=True,
+    )
+    connector_identity = models.CharField(max_length=71, null=True, blank=True, db_index=True)
+    slug = models.CharField(
+        max_length=127,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9._-]{0,126}$")],
+    )
+    label = models.CharField(max_length=200, blank=True, default="")
+    description = models.TextField(max_length=4096, blank=True, default="")
+    replaced_by = models.CharField(max_length=190, null=True, blank=True)
+
+    immutable_fields = ("namespace", "slug", "library_id", "connector_identity")
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["namespace", "slug"]
         verbose_name = _("Custom Fieldset")
         verbose_name_plural = _("Custom Fieldsets")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfieldset_name_active"
+            models.UniqueConstraint(fields=["namespace", "slug"], name="unique_customfieldset_identity"),
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(management_kind="library") & models.Q(library__isnull=False))
+                    | (models.Q(management_kind__in=["core", "local"]) & models.Q(library__isnull=True))
+                ),
+                name="customfieldset_library_management_coherence",
             ),
         ]
 
     def __str__(self):
-        return self.name
+        return self.label
 
     def get_absolute_url(self):
         return reverse("extras:customfieldset_detail", kwargs={"pk": self.pk})
+
+
+class CustomFieldsetField(BaseModel):
+    fieldset = models.ForeignKey(CustomFieldset, on_delete=models.CASCADE, related_name="field_memberships")
+    custom_field = models.ForeignKey(CustomField, on_delete=models.PROTECT, related_name="fieldset_memberships")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "custom_field__name"]
+        constraints = [
+            models.UniqueConstraint(fields=["fieldset", "custom_field"], name="unique_customfieldset_field"),
+            models.UniqueConstraint(
+                fields=["fieldset", "position"],
+                name="unique_customfieldset_position",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(position__gte=1, position__lte=1000000),
+                name="customfieldset_position_range",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.custom_field_id and self.custom_field.activation == CustomField.ACTIVATION_GLOBAL:
+            raise ValidationError({"custom_field": _("Global fields cannot join a fieldset.")})
+
+    def __str__(self):
+        return f"{self.fieldset}: {self.custom_field}"
 
 
 # Machine-generated event-bus row. Intentionally NOT change-logged: it is

@@ -548,11 +548,26 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 28)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 50)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
                 "assets.0101_seed_canonical_missing_status",
+                "assets.0102_asset_type_composition_schema",
+                "assets.0103_asset_type_data_backfill",
+                "assets.0104_asset_type_composition_backfill",
+                "assets.0105_asset_type_core_adoption",
+                "assets.0106_asset_type_core_seed",
+                "assets.0107_asset_type_library_contract",
+                "assets.0108_asset_type_singular_cutover",
+                "assets.0109_alter_assettype_lifecycle",
+                "assets.0110_alter_assettypefieldset_asset_type",
+                "assets.0111_alter_categorydefaultfieldset_category",
+                "assets.0112_alter_assettype_library_definition_key_and_more",
+                "assets.0113_assettype_library_identity_immutable",
+                "assets.0114_issue479_t06_composition_schema",
+                "assets.0115_issue479_t07_provenance_bridge",
+                "assets.0116_assettypeimagestage",
                 "compliance.0101_alter_custodyreceipt_signed_at",
                 "compliance.0102_clear_unsigned_receipt_timestamps",
                 "compliance.0103_alter_custodyreceipt_options",
@@ -571,6 +586,13 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0111_webhookdelivery_target_claim",
                 "extras.0112_backfill_webhookdelivery_targets",
                 "extras.0113_upgrade_legacy_webhook_retry_schedules",
+                "extras.0114_asset_type_definition_schema",
+                "extras.0115_asset_type_fieldset_cutover",
+                "extras.0116_alter_customfield_lifecycle_and_more",
+                "extras.0117_alter_customfieldchoice_choice_set_and_more",
+                "extras.0118_issue479_t06_definition_schema",
+                "extras.0119_issue479_t07_provenance_schema",
+                "extras.0120_issue479_t07_provenance_cutover",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
@@ -632,7 +654,10 @@ class MigrationAuditTests(unittest.TestCase):
                 "assets.0100_issue88_shard_42_assets_relations",
                 "assets.0100_issue88_shard_43_assets_seed",
                 "assets.0101_seed_canonical_missing_status",
+                "assets.0106_asset_type_core_seed",
+                "assets.0113_assettype_library_identity_immutable",
                 "extras.0108_alertlog_delivery_outcome",
+                "extras.0118_issue479_t06_definition_schema",
             ],
         )
         replacement_extension = next(

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.core.exceptions import FieldDoesNotExist
 from django.db import IntegrityError, transaction
+from django.utils.translation import override
 
 from assets.models import Manufacturer
 from core.forms.import_forms import BulkImportForm, ImportResult
@@ -194,7 +195,7 @@ class TestImportTaskAbortContract(TenantTestMixin):
         form.import_data.side_effect = RuntimeError(SECRET)
         get_import_form_class.return_value = MagicMock(return_value=form)
 
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.ERROR), override("en"):
             import_csv_task(
                 job_id=job.pk,
                 rows_data=[{"email": "customer@example.test"}],

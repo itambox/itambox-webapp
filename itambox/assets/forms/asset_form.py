@@ -1,18 +1,35 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
+from crispy_forms.layout import HTML, Div, Fieldset, Layout
 from django import forms
-from django.contrib.contenttypes.models import ContentType
-from django.template.loader import render_to_string
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from assets.customfields import resolve_asset_custom_fields
 from core.forms import CrispyFormMixin, scope_tenant_field
-from extras.models import CustomField, Tag
+from core.mixins import suppress_custom_field_data_validation
+from extras.customfields import (
+    build_custom_field_clear_form_field,
+    build_custom_field_form_field,
+    clean_custom_field_form_values,
+    custom_field_clear_key,
+)
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
 from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel, Warranty
+from ..services.specifications.commands import update_asset_specifications
+from ..services.specifications.contracts import DestinationAssetTypeSelectionDTO
+from ..specification_adapters import (
+    actor_context_for_user,
+    authorization_for_asset,
+    current_specification_plan,
+    native_persistence_fields,
+    require_command_success,
+    specification_patch,
+)
 from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
 
@@ -159,6 +176,10 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             ),
         }
 
+    def _post_clean(self):
+        with suppress_custom_field_data_validation(self.instance):
+            super()._post_clean()
+
     def clean_status(self):
         status = self.cleaned_data.get("status")
         if isinstance(status, str):
@@ -206,7 +227,12 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     "warranty_end_date",
                     _("End date cannot be before the start date."),
                 )
-        return cleaned_data
+        return clean_custom_field_form_values(
+            self,
+            cleaned_data,
+            self.custom_field_definitions,
+            self.custom_field_clear_keys,
+        )
 
     def create_inline_warranty(self, asset):
         cd = self.cleaned_data
@@ -229,6 +255,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         request = kwargs.pop("request", None)
+        self.request = request
         explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
@@ -415,58 +442,6 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         if not current_role and selected_asset_type.asset_role:
             self.fields["asset_role"].initial = selected_asset_type.asset_role
 
-    def _custom_field_queryset(self, selected_asset_type):
-        """Per-device custom fields: globally-applicable Asset fields (not bound
-        to any fieldset) plus the selected asset type's fieldset fields that
-        target Asset."""
-        asset_ct = ContentType.objects.get_for_model(Asset)
-        custom_fields = CustomField.objects.filter(object_types=asset_ct, fieldsets__isnull=True)
-        if selected_asset_type and selected_asset_type.custom_fieldset:
-            custom_fields = custom_fields | selected_asset_type.custom_fieldset.fields.filter(object_types=asset_ct)
-        return custom_fields.distinct()
-
-    def _build_custom_form_field(self, field, initial_value):
-        """Build the form field for one CustomField, or None for unknown types."""
-        if field.field_type == CustomField.FIELD_TYPE_TEXT:
-            return forms.CharField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value,
-                widget=forms.TextInput(attrs={"class": "form-control"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_NUMBER:
-            return forms.DecimalField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value,
-                widget=forms.NumberInput(attrs={"class": "form-control"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_DATE:
-            return forms.DateField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value,
-                widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_BOOLEAN:
-            return forms.BooleanField(
-                label=field.label,
-                required=field.required,
-                initial=initial_value or False,
-                widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            )
-        if field.field_type == CustomField.FIELD_TYPE_SELECT:
-            choice_lines = [line.strip() for line in (field.choices or "").split("\n") if line.strip()]
-            choices = [("", "---------")] + [(choice, choice) for choice in choice_lines]
-            return forms.ChoiceField(
-                label=field.label,
-                required=field.required,
-                choices=choices,
-                initial=initial_value,
-                widget=forms.Select(attrs={"class": "form-select"}),
-            )
-        return None
-
     def _configure_custom_fields(self, selected_asset_type):
         """Attach the dynamic ``cf_*`` fields and record their layout order."""
         stored_values = {}
@@ -474,13 +449,25 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             stored_values = self.instance.custom_field_data
 
         self.custom_field_keys = []
-        for field in self._custom_field_queryset(selected_asset_type):
+        self.custom_field_definitions = {}
+        self.custom_field_clear_keys = {}
+        resolved_fields = resolve_asset_custom_fields(selected_asset_type, stored_values)
+        for resolved in resolved_fields:
+            field = resolved.definition
             field_key = f"cf_{field.name}"
             self.custom_field_keys.append(field_key)
-
-            form_field = self._build_custom_form_field(field, stored_values.get(field.name))
+            self.custom_field_definitions[field_key] = field
+            form_field = build_custom_field_form_field(
+                field,
+                stored_values.get(field.name),
+                read_only=resolved.read_only,
+            )
             if form_field:
                 self.fields[field_key] = form_field
+                if not form_field.disabled:
+                    clear_key = custom_field_clear_key(field.name)
+                    self.fields[clear_key] = build_custom_field_clear_form_field()
+                    self.custom_field_clear_keys[field_key] = clear_key
 
     def _build_layout(self, cancel_url):
         # Grouped, standardized section order: Identity -> Classification ->
@@ -530,7 +517,13 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             cf_divs = []
             for i in range(0, len(self.custom_field_keys), 2):
                 chunk = self.custom_field_keys[i : i + 2]
-                row_cols = [Div(key, css_class="col-md-6") for key in chunk]
+                row_cols = []
+                for key in chunk:
+                    clear_key = self.custom_field_clear_keys.get(key)
+                    fields = [key]
+                    if clear_key:
+                        fields.append(clear_key)
+                    row_cols.append(Div(*fields, css_class="col-md-6"))
                 cf_divs.append(Div(*row_cols, css_class="row"))
             layout_elements.append(Fieldset(_("Custom Specifications"), *cf_divs, css_class="mb-4 border p-3 rounded"))
 
@@ -570,25 +563,111 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         return Layout(*layout_elements)
 
     def save(self, commit=True):
-        instance = super().save(commit=False)
+        # ModelForm.save(commit=False) is intentionally used without the old
+        # custom-field merge.  The command below is the only value/type-switch
+        # writer; native fields are saved separately so a stale form instance
+        # cannot overwrite command-owned state.
+        # is_valid() has already copied the submitted Type onto instance.
+        # Deferred native persistence must retain the stored Type, not that
+        # mutated in-memory value; only save_m2m may execute the switch.
+        previous_type_id = None
+        if not commit and self.instance.pk:
+            previous_type_id = Asset._base_manager.values_list("asset_type_id", flat=True).get(pk=self.instance.pk)
+        instance = forms.ModelForm.save(self, commit=False)
+        self._native_save_m2m = getattr(self, "save_m2m", None)
+        self._pending_target_asset_type_id = instance.asset_type_id
+        self._pending_create = not bool(instance.pk)
+        if not commit:
+            # A caller following Django's commit=False lifecycle must not be
+            # able to persist a type switch through instance.save().  The
+            # pending command runs from save_m2m after the caller has saved
+            # native fields.
+            instance.asset_type_id = previous_type_id
+            self.save_m2m = self._save_pending_m2m
+            return instance
 
-        custom_field_data = {}
-        for key, value in self.cleaned_data.items():
-            if key.startswith("cf_"):
-                field_name = key[3:]
-                if value is not None:
-                    if isinstance(value, (int, float, bool)):
-                        custom_field_data[field_name] = value
-                    elif hasattr(value, "isoformat"):
-                        custom_field_data[field_name] = value.isoformat()
-                    else:
-                        custom_field_data[field_name] = str(value)
-                else:
-                    custom_field_data[field_name] = None
+        actor = actor_context_for_user(getattr(self.request, "user", None))
+        with transaction.atomic():
+            if instance.pk:
+                current = Asset._base_manager.get(pk=instance.pk)
+                self._apply_specification_command(current, actor)
+                current = self._persist_native_update(instance)
+            else:
+                current = self._persist_native_create(instance)
+                self._apply_specification_command(current, actor)
+            self.instance = Asset._base_manager.get(pk=current.pk)
+            if self._native_save_m2m is not None:
+                self._native_save_m2m()
+        return self.instance
 
-        instance.custom_field_data = custom_field_data
+    def _specification_patch(self):
+        return specification_patch(
+            definitions=self.custom_field_definitions,
+            cleaned_values=self.cleaned_data,
+            fields=self.fields,
+            clear_keys=self.custom_field_clear_keys,
+        )
 
-        if commit:
+    def _native_field_names(self):
+        concrete_names = {field.name for field in Asset._meta.concrete_fields}
+        return tuple(
+            name
+            for name in self.changed_data
+            if name in concrete_names and name not in {"asset_type", "custom_field_data"}
+        )
+
+    def _persist_native_update(self, instance):
+        current = Asset._base_manager.get(pk=instance.pk)
+        field_names = self._native_field_names()
+        for field_name in field_names:
+            field = Asset._meta.get_field(field_name)
+            setattr(current, field.attname, getattr(instance, field.attname))
+        if field_names:
+            current.save(update_fields=native_persistence_fields(current, field_names))
+        return current
+
+    def _persist_native_create(self, instance):
+        # The empty specification object is not a user value.  Suppress only
+        # dynamic custom-field validation for this initial native row; the
+        # canonical command immediately validates and writes the requested
+        # patch/type destination inside the same outer transaction.
+        instance.custom_field_data = {}
+        with suppress_custom_field_data_validation(instance):
             instance.save()
-            self.save_m2m()
         return instance
+
+    def _apply_specification_command(self, current, actor):
+        target_type_id = self._pending_target_asset_type_id
+        patch = self._specification_patch()
+        if target_type_id == current.asset_type_id and not patch.set_values and not patch.clear_keys:
+            return
+        if target_type_id is None:
+            raise ValidationError("An Asset Type is required for specification changes.")
+        authorization = authorization_for_asset(
+            user=getattr(self.request, "user", None),
+            tenant_id=current.tenant_id,
+        )
+        plan = current_specification_plan(current, target_kind="asset", asset_type_id=target_type_id)
+        result = update_asset_specifications(
+            authorization=authorization,
+            asset_id=current.pk,
+            destination=DestinationAssetTypeSelectionDTO(
+                presence="replace",
+                asset_type_id=int(target_type_id),
+            ),
+            expected_resource_revision=plan.resource_revision,
+            expected_definition_revision=plan.definition_revision,
+            patch=patch,
+        )
+        require_command_success(result)
+
+    def _save_pending_m2m(self):
+        with transaction.atomic():
+            if self._native_save_m2m is not None:
+                self._native_save_m2m()
+            if not self.instance.pk:
+                return
+            current = Asset._base_manager.get(pk=self.instance.pk)
+            actor = actor_context_for_user(getattr(self.request, "user", None))
+            self._apply_specification_command(current, actor)
+            self.instance = Asset._base_manager.get(pk=current.pk)

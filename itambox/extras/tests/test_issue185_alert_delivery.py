@@ -13,7 +13,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection, transaction
 from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.recorder import MigrationRecorder
 from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -22,6 +21,7 @@ from rest_framework.test import APITestCase
 
 from core.events import DeliveryDisposition, DeliveryResult
 from core.models import Notification
+from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 from core.tests.mixins import TenantTestMixin
 from extras.filters import AlertLogFilterSet
 from extras.models import AlertLog, AlertRule, NotificationChannel
@@ -610,8 +610,9 @@ class AlertDeliveryTableRenderTests(TestCase):
         self.assertIn("badge bg-secondary", table.render_delivery(no_channels))
 
 
+@isolate_migration_tests
 @pytest.mark.serial_only
-class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
+class AlertDeliveryOutcomeMigrationTests(IsolatedMigrationTestCase):
     """Migration 0108 derives filterable outcomes from legacy payloads (N11/U4)."""
 
     reset_sequences = True
@@ -621,7 +622,6 @@ class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):
@@ -644,7 +644,7 @@ class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
 
         tenant = Tenant.objects.create(name="WP-13 Migration Tenant", slug="wp-13-migration-tenant")
         rule = AlertRule.objects.create(
-            tenant=tenant,
+            tenant_id=tenant.pk,
             name="WP-13 Migration Rule",
             alert_type="low_stock",
             threshold_value=1,
@@ -665,7 +665,7 @@ class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
         expected = {}
         for index, (payload, outcome) in enumerate(cases):
             log = AlertLog.objects.create(
-                rule=rule,
+                rule_id=rule.pk,
                 subject=f"case-{index}",
                 message="m",
                 content_type_id=rule_ct.pk,

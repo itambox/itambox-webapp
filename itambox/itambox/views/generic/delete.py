@@ -3,7 +3,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import ProtectedError
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
@@ -15,6 +15,8 @@ from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
+    is_managed_definition,
+    lock_unmanaged_definition,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import resolve_view_model, safe_return_url
@@ -32,6 +34,12 @@ class ObjectDeleteView(
     def has_permission(self):
         if not user_can_mutate_model(self.request.user, resolve_view_model(self)):
             return False
+        if self.kwargs.get("pk") or self.kwargs.get("slug"):
+            try:
+                if is_managed_definition(self.get_object()):
+                    return False
+            except Http404:
+                raise
         perms = self.get_permission_required()
         return self.request.user.has_perms(perms, obj=PermissionResolver.object_under_check(self))
 
@@ -60,7 +68,9 @@ class ObjectDeleteView(
         obj_repr = self.get_object_display()
         model = self.object.__class__
         try:
-            self.object.delete()
+            with lock_unmanaged_definition(self.object) as locked_object:
+                self.object = locked_object
+                self.object.delete()
             messages.success(
                 self.request,
                 _("Deleted %(model)s %(object)s.") % {"model": model._meta.verbose_name, "object": obj_repr},

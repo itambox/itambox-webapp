@@ -198,7 +198,18 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 28)
+        self.assertEqual(len(manifest["post_transition_ids"]), 50)
+        self.assertTrue(
+            {
+                "assets.0114_issue479_t06_composition_schema",
+                "assets.0115_issue479_t07_provenance_bridge",
+                "extras.0118_issue479_t06_definition_schema",
+                "extras.0119_issue479_t07_provenance_schema",
+                "extras.0120_issue479_t07_provenance_cutover",
+            }.issubset(manifest["post_transition_ids"])
+        )
+        self.assertIn("extras.0120_issue479_t07_provenance_cutover", manifest["post_transition_leaf_ids"])
+        self.assertIn("assets.0116_assettypeimagestage", manifest["post_transition_leaf_ids"])
         self.assertEqual(len(manifest["post_transition_leaf_ids"]), 8)
         self.assertEqual(manifest["baseline_ids"], manifest["replacement_ids"])
 

@@ -142,6 +142,7 @@ class Registry:
 
     def __init__(self):
         self._model_features = defaultdict(set)
+        self._custom_field_data_validators = {}
         self._search_indexes = defaultdict(list)
         self._filter_sets = {}
         self._table_classes = {}
@@ -205,6 +206,15 @@ class Registry:
 
     def get_models_with_feature(self, feature_name):
         return [m for m, features in self._model_features.items() if feature_name in features]
+
+    def register_custom_field_data_validator(self, model, validator):
+        existing = self._custom_field_data_validators.get(model)
+        if existing is not None and existing is not validator:
+            raise RuntimeError(f"A custom-field data validator is already registered for {model}.")
+        self._custom_field_data_validators[model] = validator
+
+    def get_custom_field_data_validator(self, model):
+        return self._custom_field_data_validators.get(model)
 
     def register_search_index(self, model, index_instance):
         self._search_indexes[model].append(index_instance)

@@ -16,7 +16,6 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import close_old_connections, connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.operations.special import RunPython
-from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 from django.utils import timezone
 from django_q.models import Schedule
@@ -24,6 +23,7 @@ from django_q.models import Schedule
 from assets.models import Manufacturer
 from core.events import DeliveryDisposition, DeliveryResult
 from core.managers import set_current_membership, set_current_tenant
+from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 from core.tests.mixins import TenantTestMixin, grant
 from extras.models import Event, EventRule, WebhookDelivery, WebhookEndpoint
 from extras.services.events import process_event_rules
@@ -1012,17 +1012,9 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertIn(delivery.status, str(delivery))
 
 
-def _prepare_historical_extras_migration_state():
-    recorder = MigrationRecorder(connection)
-    if recorder.migration_qs.filter(
-        app="extras",
-        name="0113_upgrade_legacy_webhook_retry_schedules",
-    ).exists():
-        recorder.record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
-
-
+@isolate_migration_tests
 @pytest.mark.serial_only
-class WebhookDeliveryMigrationTests(TransactionTestCase):
+class WebhookDeliveryMigrationTests(IsolatedMigrationTestCase):
     """Migration 0109 creates only the durable table and reverses cleanly."""
 
     migrate_from = ("extras", "0108_alertlog_delivery_outcome")
@@ -1030,7 +1022,6 @@ class WebhookDeliveryMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        _prepare_historical_extras_migration_state()
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):
@@ -1064,8 +1055,9 @@ class WebhookDeliveryMigrationTests(TransactionTestCase):
         self.assertIn(table_name, connection.introspection.table_names())
 
 
+@isolate_migration_tests
 @pytest.mark.serial_only
-class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
+class WebhookDeliveryTargetMigrationTests(IsolatedMigrationTestCase):
     """Endpoint-backed history gains snapshots; ambiguous legacy rows stay inert."""
 
     migrate_from = ("extras", "0110_issue445_task_paths")
@@ -1073,7 +1065,6 @@ class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        _prepare_historical_extras_migration_state()
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):
@@ -1137,8 +1128,9 @@ class WebhookDeliveryTargetMigrationTests(TransactionTestCase):
         self.assertEqual(ReappliedDelivery.objects.get(pk=endpointless.pk).target_url, "")
 
 
+@isolate_migration_tests
 @pytest.mark.serial_only
-class WebhookRetryScheduleMigrationTests(TransactionTestCase):
+class WebhookRetryScheduleMigrationTests(IsolatedMigrationTestCase):
     """Legacy delayed retries become assertion-only schedules with no target secrets."""
 
     migrate_from = ("extras", "0112_backfill_webhookdelivery_targets")
@@ -1146,7 +1138,6 @@ class WebhookRetryScheduleMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        _prepare_historical_extras_migration_state()
 
     def _migrate(self, target):
         executor = MigrationExecutor(connection)

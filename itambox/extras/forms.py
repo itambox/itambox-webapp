@@ -5,6 +5,7 @@ from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row,
 from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.templatetags.static import static
 from django.urls import reverse
@@ -15,8 +16,17 @@ from core.features import report_designer_probe
 from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
 
+from .definition_contract import custom_field_definition_contract_errors
 from .filters import TagFilter
-from .models import CustomField, CustomFieldset, ReportTemplate, SavedFilter, Tag
+from .models import (
+    CustomField,
+    CustomFieldChoiceSet,
+    CustomFieldset,
+    CustomFieldsetField,
+    ReportTemplate,
+    SavedFilter,
+    Tag,
+)
 from .signals import _SIGNAL_SKIP_MODELS
 
 
@@ -65,16 +75,77 @@ class TagFilterForm(FilterForm):
     filterset_class = TagFilter
 
 
+def _add_immutable_tamper_errors(form, model):
+    if not form.instance.pk:
+        return
+    for model_field in model.immutable_fields:
+        form_field = "choice_set" if model_field == "choice_set_id" else model_field
+        if form_field not in form.fields or form_field not in form.data:
+            continue
+        current = getattr(form.instance, model_field)
+        submitted = form.data.get(form_field)
+        if form_field == "choice_set":
+            try:
+                submitted = None if submitted in (None, "") else int(submitted)
+            except (TypeError, ValueError):
+                continue
+            current = form.instance.choice_set_id
+        if submitted != current:
+            form.add_error(form_field, _("This value is immutable after creation."))
+
+
 class CustomFieldForm(forms.ModelForm):
+    choice_set = forms.ModelChoiceField(
+        queryset=CustomFieldChoiceSet.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+    )
+    mappings = forms.JSONField(
+        required=False, initial=list, widget=forms.Textarea(attrs={"class": "form-control", "rows": 3})
+    )
+
     class Meta:
         model = CustomField
-        fields = ["name", "label", "field_type", "choices", "required", "object_types"]
+        fields = [
+            "name",
+            "namespace",
+            "label",
+            "help_text",
+            "field_type",
+            "activation",
+            "quantity_kind",
+            "canonical_unit",
+            "minimum_value",
+            "maximum_value",
+            "regex",
+            "decimal_scale",
+            "max_values",
+            "text_max_length",
+            "validation_rule",
+            "required",
+            "nullable",
+            "mappings",
+            "choice_set",
+            "object_types",
+        ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
+            "namespace": forms.TextInput(attrs={"class": "form-control"}),
             "label": forms.TextInput(attrs={"class": "form-control"}),
+            "help_text": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "field_type": forms.Select(attrs={"class": "form-select"}),
-            "choices": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Value 1\nValue 2"}),
+            "activation": forms.Select(attrs={"class": "form-select"}),
+            "quantity_kind": forms.TextInput(attrs={"class": "form-control"}),
+            "canonical_unit": forms.TextInput(attrs={"class": "form-control"}),
+            "minimum_value": forms.NumberInput(attrs={"class": "form-control"}),
+            "maximum_value": forms.NumberInput(attrs={"class": "form-control"}),
+            "regex": forms.TextInput(attrs={"class": "form-control"}),
+            "decimal_scale": forms.NumberInput(attrs={"class": "form-control", "min": 0, "max": 6}),
+            "max_values": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 64}),
+            "text_max_length": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 4096}),
+            "validation_rule": forms.TextInput(attrs={"class": "form-control"}),
             "required": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "nullable": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "object_types": forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
         }
 
@@ -84,10 +155,9 @@ class CustomFieldForm(forms.ModelForm):
         self.helper.form_method = "post"
         self.helper.form_tag = True
         self.fields["name"].widget.attrs["slugify"] = "label"
+        self.fields["namespace"].initial = self.instance.namespace or "local"
 
         # Only models that actually store custom field data are selectable.
-        from django.contrib.contenttypes.models import ContentType
-
         from itambox.registry import registry
 
         supported = [
@@ -98,35 +168,133 @@ class CustomFieldForm(forms.ModelForm):
         self.fields["object_types"].queryset = ContentType.objects.filter(pk__in=supported).order_by(
             "app_label", "model"
         )
+        self.fields["choice_set"].queryset = CustomFieldChoiceSet.objects.all().order_by("namespace", "slug")
         self.fields["object_types"].help_text = _(
-            "Models this field applies to. Fields applying to Asset Type act as "
-            "hardware specifications; fields applying to Asset are per-device details."
+            "Select every model this field applies to. Applicability is stored only in this relation."
         )
+        self._managed_read_only = bool(
+            self.instance.pk
+            and self.instance.management_kind in {CustomField.MANAGEMENT_CORE, CustomField.MANAGEMENT_LIBRARY}
+        )
+        if self._managed_read_only:
+            for field in self.fields.values():
+                field.disabled = True
+        elif self.instance.pk:
+            for field_name in CustomField.immutable_fields:
+                form_name = "choice_set" if field_name == "choice_set_id" else field_name
+                if form_name in self.fields:
+                    self.fields[form_name].disabled = True
 
         button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = reverse("extras:customfield_list")
-
         self.helper.layout = Layout(
-            "label",
-            "name",
-            "field_type",
-            "choices",
-            Div("required", css_class="mb-3 form-check"),
-            "object_types",
+            Fieldset(
+                _("Identity"),
+                Row(Column("name", css_class="col-md-6"), Column("namespace", css_class="col-md-6")),
+                Row(Column("label", css_class="col-md-6"), Column("field_type", css_class="col-md-6")),
+                "help_text",
+            ),
+            Fieldset(
+                _("Activation and validation"),
+                Row(
+                    Column("activation", css_class="col-md-4"),
+                    Column("quantity_kind", css_class="col-md-4"),
+                    Column("canonical_unit", css_class="col-md-4"),
+                ),
+                Row(
+                    Column("minimum_value", css_class="col-md-3"),
+                    Column("maximum_value", css_class="col-md-3"),
+                    Column("decimal_scale", css_class="col-md-3"),
+                    Column("text_max_length", css_class="col-md-3"),
+                ),
+                Row(
+                    Column("max_values", css_class="col-md-4"),
+                    Column("validation_rule", css_class="col-md-4"),
+                    Column("regex", css_class="col-md-4"),
+                ),
+                "choice_set",
+                "mappings",
+            ),
+            Fieldset(
+                _("Applicability"),
+                Div("required", css_class="mb-3 form-check"),
+                Div("nullable", css_class="mb-3 form-check"),
+                "object_types",
+            ),
             HTML('<div class="mt-3">'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
+            HTML(format_html('<a href="{}" class="btn btn-outline-secondary ms-2">{}</a>', cancel_url, _("Cancel"))),
             HTML("</div>"),
         )
 
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("mappings") is None:
+            cleaned_data["mappings"] = []
+        if not self._managed_read_only:
+            _add_immutable_tamper_errors(self, CustomField)
+        if self._managed_read_only:
+            return cleaned_data
+        errors = custom_field_definition_contract_errors(
+            field_type=cleaned_data.get("field_type"),
+            activation=cleaned_data.get("activation"),
+            quantity_kind=cleaned_data.get("quantity_kind"),
+            canonical_unit=cleaned_data.get("canonical_unit"),
+            minimum_value=cleaned_data.get("minimum_value"),
+            maximum_value=cleaned_data.get("maximum_value"),
+            regex=cleaned_data.get("regex"),
+            decimal_scale=cleaned_data.get("decimal_scale"),
+            max_values=cleaned_data.get("max_values"),
+            text_max_length=cleaned_data.get("text_max_length"),
+            validation_rule=cleaned_data.get("validation_rule"),
+            mappings=cleaned_data.get("mappings"),
+            choice_set=cleaned_data.get("choice_set"),
+            object_types=cleaned_data.get("object_types"),
+            management_kind=cleaned_data.get("management_kind", self.instance.management_kind or "local"),
+            lifecycle=cleaned_data.get("lifecycle", self.instance.lifecycle or "active"),
+            name=cleaned_data.get("name"),
+            namespace=cleaned_data.get("namespace"),
+        )
+        for field_name, message in errors.items():
+            form_name = "choice_set" if field_name == "choice_set_id" else field_name
+            if form_name in self.fields:
+                self.add_error(form_name, message)
+            else:
+                self.add_error(None, message)
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self._managed_read_only:
+            return instance
+        if commit:
+            with transaction.atomic():
+                instance.save()
+                self.save_m2m()
+        return instance
+
 
 class CustomFieldsetForm(forms.ModelForm):
+    fields = forms.ModelMultipleChoiceField(
+        queryset=CustomField.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 12}),
+    )
+    field_positions = forms.JSONField(
+        required=False,
+        initial=dict,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": '{"field_key": 10}'}),
+        help_text=_("Optional JSON object mapping field keys to positive positions. Omitted keys use selection order."),
+    )
+
     class Meta:
         model = CustomFieldset
-        fields = ["name", "fields"]
+        fields = ["namespace", "slug", "label", "description"]
         widgets = {
-            "name": forms.TextInput(attrs={"class": "form-control"}),
-            "fields": forms.SelectMultiple(attrs={"class": "form-select", "size": 10}),
+            "namespace": forms.TextInput(attrs={"class": "form-control"}),
+            "slug": forms.TextInput(attrs={"class": "form-control"}),
+            "label": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -134,18 +302,101 @@ class CustomFieldsetForm(forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
+        self.fields["namespace"].initial = self.instance.namespace or "local"
+        self.fields["fields"].queryset = CustomField.objects.order_by("name")
+        if self.instance.pk:
+            memberships = list(self.instance.field_memberships.select_related("custom_field").order_by("position"))
+            self.fields["fields"].initial = [membership.custom_field_id for membership in memberships]
+            self.fields["field_positions"].initial = {
+                membership.custom_field.name: membership.position for membership in memberships
+            }
+        self._managed_read_only = bool(
+            self.instance.pk
+            and self.instance.management_kind in {CustomFieldset.MANAGEMENT_CORE, CustomFieldset.MANAGEMENT_LIBRARY}
+        )
+        if self._managed_read_only:
+            for field in self.fields.values():
+                field.disabled = True
+        elif self.instance.pk:
+            for field_name in CustomFieldset.immutable_fields:
+                if field_name in self.fields:
+                    self.fields[field_name].disabled = True
 
         button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = reverse("extras:customfieldset_list")
-
         self.helper.layout = Layout(
-            "name",
-            "fields",
+            Fieldset(
+                _("Identity"),
+                Row(Column("namespace", css_class="col-md-6"), Column("slug", css_class="col-md-6")),
+                "label",
+                "description",
+            ),
+            Fieldset(_("Ordered fields"), "fields", "field_positions"),
             HTML('<div class="mt-3">'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
+            HTML(format_html('<a href="{}" class="btn btn-outline-secondary ms-2">{}</a>', cancel_url, _("Cancel"))),
             HTML("</div>"),
         )
+
+    def clean_field_positions(self):
+        positions = self.cleaned_data.get("field_positions") or {}
+        if not isinstance(positions, dict):
+            raise forms.ValidationError(_("Positions must be a JSON object."))
+        normalized = {}
+        for key, value in positions.items():
+            if not str(key).strip() or type(value) is not int or not 1 <= value <= 1000000:
+                raise forms.ValidationError(_("Every field position must be a positive integer."))
+            normalized[str(key)] = value
+        if len(normalized) != len(set(normalized.values())):
+            raise forms.ValidationError(_("Field positions must be unique."))
+        return normalized
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self._managed_read_only:
+            _add_immutable_tamper_errors(self, CustomFieldset)
+        if self._managed_read_only:
+            return cleaned_data
+        positions = cleaned_data.get("field_positions") or {}
+        selected = {field.pk: field for field in cleaned_data.get("fields") or ()}
+        raw_ids = self.data.getlist("fields") if hasattr(self.data, "getlist") else []
+        ordered_ids = [int(value) for value in raw_ids if str(value).isdigit() and int(value) in selected]
+        effective_positions = {
+            field_id: positions.get(selected[field_id].name, positions.get(str(field_id), index * 10))
+            for index, field_id in enumerate(ordered_ids, start=1)
+        }
+        if len(effective_positions) != len(set(effective_positions.values())):
+            raise forms.ValidationError(_("Field positions must be unique."))
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self._managed_read_only:
+            return instance
+        if not commit:
+            return instance
+
+        raw_ids = self.data.getlist("fields") if hasattr(self.data, "getlist") else []
+        ordered_ids = [int(value) for value in raw_ids if str(value).isdigit()]
+        selected = {field.pk: field for field in self.cleaned_data["fields"]}
+        ordered_ids = [field_id for field_id in ordered_ids if field_id in selected]
+        positions = self.cleaned_data.get("field_positions") or {}
+        position_by_id = {}
+        for index, field_id in enumerate(ordered_ids, start=1):
+            field = selected[field_id]
+            position_by_id[field_id] = positions.get(field.name, positions.get(str(field_id), index * 10))
+        if len(position_by_id) != len(set(position_by_id.values())):
+            raise forms.ValidationError(_("Field positions must be unique."))
+        with transaction.atomic():
+            instance.save()
+            instance.field_memberships.all().delete()
+            CustomFieldsetField.objects.bulk_create(
+                [
+                    CustomFieldsetField(fieldset=instance, custom_field_id=field_id, position=position)
+                    for field_id, position in sorted(position_by_id.items(), key=lambda item: item[1])
+                ]
+            )
+        return instance
 
 
 class CustomFieldFilterForm(FilterForm):

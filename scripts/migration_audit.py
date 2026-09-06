@@ -18,6 +18,21 @@ OPERATION_TYPES = (
 )
 POST_TRANSITION_MIGRATIONS = {
     "assets.0101_seed_canonical_missing_status",
+    "assets.0102_asset_type_composition_schema",
+    "assets.0103_asset_type_data_backfill",
+    "assets.0104_asset_type_composition_backfill",
+    "assets.0105_asset_type_core_adoption",
+    "assets.0106_asset_type_core_seed",
+    "assets.0107_asset_type_library_contract",
+    "assets.0108_asset_type_singular_cutover",
+    "assets.0109_alter_assettype_lifecycle",
+    "assets.0110_alter_assettypefieldset_asset_type",
+    "assets.0111_alter_categorydefaultfieldset_category",
+    "assets.0112_alter_assettype_library_definition_key_and_more",
+    "assets.0113_assettype_library_identity_immutable",
+    "assets.0114_issue479_t06_composition_schema",
+    "assets.0115_issue479_t07_provenance_bridge",
+    "assets.0116_assettypeimagestage",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -36,6 +51,13 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
+    "extras.0114_asset_type_definition_schema",
+    "extras.0115_asset_type_fieldset_cutover",
+    "extras.0116_alter_customfield_lifecycle_and_more",
+    "extras.0117_alter_customfieldchoice_choice_set_and_more",
+    "extras.0118_issue479_t06_definition_schema",
+    "extras.0119_issue479_t07_provenance_schema",
+    "extras.0120_issue479_t07_provenance_cutover",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -70,6 +92,22 @@ def _dispositions(disposition, rationale, migration_ids):
 # This is a checked, human-reviewed policy. It is intentionally independent of
 # migration/function names, reversibility syntax, and operation implementation.
 SEMANTIC_DISPOSITIONS = {
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Converts legacy custom-field identities, types, relational choices, memberships, and stored JSON values "
+            "into the Issue #479 additive definition schema while preserving unknown keys and aborting on ambiguity."
+        ),
+        {"assets.0103_asset_type_data_backfill"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Copies the legacy singular Asset Type fieldset relation into the ordered plural composition before the "
+            "later clean-cut removal of the migration-input column."
+        ),
+        {"assets.0104_asset_type_composition_backfill"},
+    ),
     **_dispositions(
         "upgrade-only",
         (
@@ -122,6 +160,22 @@ SEMANTIC_DISPOSITIONS = {
             "endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue secrets."
         ),
         {"extras.0113_upgrade_legacy_webhook_retry_schedules"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Adopts exactly the five preflight-authenticated legacy core candidates, validates their converted values, "
+            "and switches their final core ownership and Asset/AssetType scopes before the final seed."
+        ),
+        {"assets.0105_asset_type_core_adoption"},
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Creates and reconciles the normative 48-field core vocabulary, thirteen choice sets, twelve ordered "
+            "fieldsets, and field memberships without creating concrete Asset Types."
+        ),
+        {"assets.0106_asset_type_core_seed"},
     ),
     **_dispositions(
         "required-fresh",
@@ -246,6 +300,66 @@ SEMANTIC_DISPOSITIONS = {
             "mutating delivery_status; fully reversible."
         ),
         {"extras.0108_alertlog_delivery_outcome"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Performs the irreversible clean cutover from the singular/legacy fieldset columns to the final relational "
+            "contract; reverse migration is refused before any destructive rollback operation."
+        ),
+        {
+            "assets.0108_asset_type_singular_cutover",
+            "extras.0115_asset_type_fieldset_cutover",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Normalizes historical lifecycle='deleted' rows to the final active/deprecated contract and records "
+            "missing deletion timestamps; the reverse is explicitly refused because the original state is not recoverable."
+        ),
+        {
+            "assets.0109_alter_assettype_lifecycle",
+            "extras.0116_alter_customfield_lifecycle_and_more",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        "Installs the PostgreSQL trigger that keeps Asset Type library identity immutable and restricts "
+        "library release/checksum reconciliation-state changes to the controlled reconciliation path, "
+        "including for QuerySet and direct SQL updates.",
+        {"assets.0113_assettype_library_identity_immutable"},
+    ),
+    **_dispositions(
+        "required-fresh",
+        "Installs PostgreSQL guards for permanent reusable-definition identities and "
+        "rejects global-field fieldset membership through direct SQL or ORM writes.",
+        {
+            "extras.0118_issue479_t06_definition_schema",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        "Normalizes predecessor composition positions to dense one-based ordinals and installs deferred owner/position uniqueness.",
+        {
+            "assets.0114_issue479_t06_composition_schema",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Bridges legacy Asset Type and definition provenance into the new Specification Library schema, captures "
+            "transition evidence, and performs the irreversible Asset Type cutover with guarded identity semantics."
+        ),
+        {"assets.0115_issue479_t07_provenance_bridge"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Completes the irreversible provenance cutover by removing legacy source fields and installing database "
+            "guards that preserve library, release, and legacy evidence identities."
+        ),
+        {"extras.0120_issue479_t07_provenance_cutover"},
     ),
 }
 

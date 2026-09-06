@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "language_neutral": true,
+  "domain": "deterministic composition and type switching",
+  "source_sections": ["3.1", "3.2", "3.3", "16"],
+  "context": {
+    "definition_revision": "defn-rev-composition-fixture",
+    "target_kind": "asset",
+    "fields": {
+      "f1_name": { "type": "text", "targets": ["asset"], "activation": "composed" },
+      "f2_owner": { "type": "text", "targets": ["asset"], "activation": "composed" },
+      "f3_location": { "type": "text", "targets": ["asset"], "activation": "composed" },
+      "f4_cost": { "type": "decimal", "targets": ["asset"], "activation": "composed" },
+      "g1_global_note": { "type": "text", "targets": ["asset"], "activation": "global" },
+      "g2_global_tag": { "type": "single_select", "targets": ["asset"], "activation": "global" },
+      "legacy_label": { "type": "text", "targets": ["asset"], "activation": "composed", "lifecycle": "deprecated" }
+    },
+    "fieldsets": {
+      "fs_personal": { "ordinals": { "f1_name": 1, "f2_owner": 2, "f3_location": 3 } },
+      "fs_placement": { "ordinals": { "f3_location": 1, "f4_cost": 2 } },
+      "fs_deprecated": { "ordinals": { "legacy_label": 1 }, "lifecycle": "deprecated" },
+      "fs_unused": { "ordinals": { "f4_cost": 1 } }
+    },
+    "ordered_membership_candidates": {
+      "A": [["fs_personal", 1], ["fs_placement", 2]],
+      "A_reordered": [["fs_placement", 1], ["fs_personal", 2]],
+      "B": [["fs_placement", 1], ["fs_personal", 2]],
+      "duplicate_ordinals": [["fs_personal", 1], ["fs_placement", 1]],
+      "with_deprecated": [["fs_deprecated", 1], ["fs_personal", 2], ["fs_placement", 3]]
+    }
+  },
+  "cases": [
+    {
+      "id": "T02-COMP-001",
+      "invariant": "Single definition truth",
+      "acceptance": "A01",
+      "source_section": "3.1",
+      "initial_state": {
+        "definition_revision": "defn-rev-composition-fixture",
+        "memberships": "A"
+      },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "rendered_sections": [
+          { "section": "fs_personal", "first_placed_fields": ["f1_name", "f2_owner", "f3_location"] },
+          { "section": "fs_placement", "first_placed_fields": ["f4_cost"] },
+          { "section": "derived_additional", "fields": ["g1_global_note", "g2_global_tag"] }
+        ],
+        "f3_location_provenance": ["fs_personal", "fs_placement"],
+        "global_order": ["g1_global_note", "g2_global_tag"]
+      },
+      "expected_unchanged": {
+        "persisted_memberships": [["fs_personal", 1], ["fs_placement", 2]],
+        "field_keys": ["f1_name", "f2_owner", "f3_location", "f4_cost", "g1_global_note", "g2_global_tag"]
+      },
+      "rationale": "One canonical graph produces one definition: same ordered keys, targets, units, choices and required policy across all adapters; no independent stored override exists. f3_location renders once at first placement (fs_personal); fs_placement contributes provenance only."
+    },
+    {
+      "id": "T02-COMP-002",
+      "invariant": "Deterministic composition",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": {
+        "definition_revision": "defn-rev-composition-fixture",
+        "memberships": "A_reordered"
+      },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "rendered_sections": [
+          { "section": "fs_placement", "first_placed_fields": ["f3_location", "f4_cost"] },
+          { "section": "fs_personal", "first_placed_fields": ["f1_name", "f2_owner"] },
+          { "section": "derived_additional", "fields": ["g1_global_note", "g2_global_tag"] }
+        ],
+        "f3_location_provenance": ["fs_placement", "fs_personal"]
+      },
+      "expected_unchanged": {
+        "persisted_memberships": [["fs_placement", 1], ["fs_personal", 2]],
+        "field_keys": ["f1_name", "f2_owner", "f3_location", "f4_cost"]
+      },
+      "rationale": "Reordering sections changes first placement deterministically: f3_location's first placement moves to fs_placement, but the field key and its stored value do not change."
+    },
+    {
+      "id": "T02-COMP-003",
+      "invariant": "Deterministic composition",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": {
+        "definition_revision": "defn-rev-composition-fixture",
+        "memberships": "A"
+      },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "duplicate_field": {
+          "key": "f3_location",
+          "rendered_once": true,
+          "first_placement_section_identity": "fs_personal",
+          "contributing_section_identities": ["fs_personal", "fs_placement"]
+        }
+      },
+      "expected_unchanged": {
+        "total_rendered_field_count": 4,
+        "field_keys": ["f1_name", "f2_owner", "f3_location", "f4_cost"]
+      },
+      "rationale": "A duplicate Field used in two sections renders once with both contributing section identities; the same input is never rendered twice, and all occurrences refer to the same Field row."
+    },
+    {
+      "id": "T02-COMP-004",
+      "invariant": "Deterministic composition",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": {},
+      "operation": { "kind": "write_memberships", "memberships": "duplicate_ordinals" },
+      "expected_result": { "outcome": "rejected", "error": "DUPLICATE_FIELD", "path": [] },
+      "expected_unchanged": {
+        "persisted_memberships": null,
+        "note": "Write rejected before persistence; no half-saved membership list exists."
+      },
+      "rationale": "Duplicate section ordinals are rejected at write time; tie-breakers by immutable identity are only defensive reads of a broken graph, never permission to accept duplicate ordinals."
+    },
+    {
+      "id": "T02-COMP-005",
+      "invariant": "Explicit globals",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": { "memberships": "A" },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "derived_additional_fields": ["g1_global_note", "g2_global_tag"],
+        "unused_composed_field": { "key": "f4_cost", "member_of": ["fs_placement"], "global": false }
+      },
+      "expected_unchanged": { "other_type_definitions": "unaffected" },
+      "rationale": "An unused composed Field is not global: f4_cost appears only where its membership places it. Adding or removing a Field's last membership never alters another Type's definition."
+    },
+    {
+      "id": "T02-COMP-006",
+      "invariant": "Explicit globals",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": { "global_field_membership": { "field": "g1_global_note", "in_fieldset": "fs_personal" } },
+      "operation": { "kind": "write_memberships", "memberships": "A" },
+      "expected_result": { "outcome": "rejected", "error": "IMMUTABLE_DEFINITION", "path": [] },
+      "expected_unchanged": { "persisted_memberships": null },
+      "rationale": "A global Field in a Fieldset is a configuration error, not a precedence rule; activation=global Fields cannot be members of a Fieldset."
+    },
+    {
+      "id": "T02-COMP-007",
+      "invariant": "Explicit globals",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": { "memberships": "A" },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "additional_section": {
+          "section_kind": "derived_additional",
+          "identity": null,
+          "persisted_ordinal": null,
+          "not_persistable": true,
+          "not_assignable": true
+        }
+      },
+      "expected_unchanged": { "persisted_memberships": [["fs_personal", 1], ["fs_placement", 2]] },
+      "rationale": "The derived Additional specifications section is a display section, not a persisted Fieldset; it has no assignable identity and is never persisted."
+    },
+    {
+      "id": "T02-COMP-008",
+      "invariant": "Deterministic composition",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": { "memberships": "with_deprecated" },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "rendered_sections": [
+          { "section": "fs_personal", "first_placed_fields": ["f1_name", "f2_owner", "f3_location"] },
+          { "section": "fs_placement", "first_placed_fields": ["f4_cost"] }
+        ],
+        "skipped_sections": ["fs_deprecated"]
+      },
+      "expected_unchanged": {
+        "persisted_memberships": [["fs_deprecated", 1], ["fs_personal", 2], ["fs_placement", 3]],
+        "historical_provenance_kept": true
+      },
+      "rationale": "Deprecated sections are skipped in the active read definition but their identities are retained in historical provenance where known; the persisted membership list preserves the full ordered list for configuration and round trip."
+    },
+    {
+      "id": "T02-COMP-009",
+      "invariant": "Type switch/back",
+      "acceptance": "A05",
+      "source_section": "3.3",
+      "initial_state": {
+        "asset_on_type_A": true,
+        "stored": {
+          "f1_name": "Laptop-1",
+          "f2_owner": "Rene",
+          "f3_location": "Office",
+          "g1_global_note": "global"
+        },
+        "type_A_fields": ["f1_name", "f2_owner", "f3_location", "g1_global_note", "g2_global_tag"],
+        "type_B_fields": ["f3_location", "f4_cost", "g1_global_note", "g2_global_tag"]
+      },
+      "operation": {
+        "kind": "switch_type",
+        "sequence": ["A", "B", "A"],
+        "destination": "B",
+        "patch": {}
+      },
+      "expected_result": {
+        "outcome": "accepted",
+        "after_switch_to_B": {
+          "stored": { "f3_location": "Office", "g1_global_note": "global" },
+          "preserved_as_history": ["f1_name", "f2_owner"]
+        },
+        "after_switch_back_to_A": {
+          "stored": { "f1_name": "Laptop-1", "f2_owner": "Rene", "f3_location": "Office", "g1_global_note": "global" },
+          "reused_from_storage": ["f1_name", "f2_owner"]
+        }
+      },
+      "expected_unchanged": {
+        "field_keys": ["f1_name", "f2_owner", "f3_location", "f4_cost"],
+        "no_name_based_remapping": true,
+        "no_automatic_copy_from_destination": true,
+        "value_of_f3_location": "Office"
+      },
+      "rationale": "On switch, the proposed destination type is resolved for target=asset, the patch is merged into the locked Asset's existing values and the final state validated. Fields that no longer apply are preserved as history. A key applicable again after switching back is reused from storage; no name-based remapping or automatic copy from the destination Type occurs."
+    },
+    {
+      "id": "T02-COMP-010",
+      "invariant": "Required evolution",
+      "acceptance": "A05",
+      "source_section": "3.3",
+      "initial_state": {
+        "asset_on_type_B": true,
+        "stored": { "f3_location": "Office", "g1_global_note": "global" }
+      },
+      "operation": {
+        "kind": "switch_type",
+        "sequence": ["B", "A"],
+        "destination": "A",
+        "patch": {}
+      },
+      "expected_result": {
+        "outcome": "rejected",
+        "error": "REQUIRED_FIELD",
+        "path": ["required", "f2_owner"],
+        "note": "Type A declares f2_owner required; the destination final state is not satisfied."
+      },
+      "expected_unchanged": {
+        "asset_remains_on": "B",
+        "stored": { "f3_location": "Office", "g1_global_note": "global" }
+      },
+      "rationale": "New target required fields must be satisfied before the switch commits; the switch is rejected and the Asset remains on the source type."
+    },
+    {
+      "id": "T02-COMP-011",
+      "invariant": "Category defaults",
+      "acceptance": "A04",
+      "source_section": "16",
+      "initial_state": {
+        "category_default_memberships": [["fs_personal", 1], ["fs_placement", 2]],
+        "existing_type_memberships": [["fs_personal", 1], ["fs_placement", 2]]
+      },
+      "operation": {
+        "kind": "create_with_category",
+        "creation_inputs": {
+          "omitted": { "fieldsets": "omitted" },
+          "explicit_empty": { "fieldsets": [] }
+        },
+        "later_category_default_change": { "new_default_memberships": [["fs_placement", 1]] }
+      },
+      "expected_result": {
+        "outcome": "accepted",
+        "creation_outcomes": {
+          "omitted": {
+            "fieldsets_input": "omitted",
+            "create_consumed_defaults": true,
+            "memberships": [["fs_personal", 1], ["fs_placement", 2]],
+            "preview_token_required": true,
+            "category_default_snapshot_revision_required": true
+          },
+          "explicit_empty": {
+            "fieldsets_input": [],
+            "create_consumed_defaults": false,
+            "memberships": [],
+            "preview_token_required": false,
+            "category_default_snapshot_revision_required": false,
+            "preview_token": null,
+            "category_default_snapshot_revision": null
+          }
+        },
+        "existing_type_after_category_change": {
+          "memberships": [["fs_personal", 1], ["fs_placement", 2]],
+          "unchanged": true
+        }
+      },
+      "expected_unchanged": {
+        "existing_type_memberships": [["fs_personal", 1], ["fs_placement", 2]],
+        "stored_values_of_existing_type": "retained"
+      },
+      "rationale": "Omitted versus explicit empty differs only on create: omitted consumes Category defaults (with preview token and snapshot revision), explicit empty [] consumes none. Later Category-default changes never mutate an existing Type's composition."
+    },
+    {
+      "id": "T02-COMP-012",
+      "invariant": "Single definition truth",
+      "acceptance": "A01",
+      "source_section": "3.1",
+      "initial_state": {
+        "asset_1": { "type": "A", "stored": { "f1_name": "Laptop-1" } },
+        "asset_2": { "type": "A", "stored": { "f1_name": "Laptop-2", "f2_owner": "Rene" } }
+      },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "definition_revision_asset_1": "defn-rev-composition-fixture",
+        "definition_revision_asset_2": "defn-rev-composition-fixture",
+        "same_definition_revision": true
+      },
+      "expected_unchanged": {
+        "stored_values": { "asset_1": { "f1_name": "Laptop-1" }, "asset_2": { "f1_name": "Laptop-2", "f2_owner": "Rene" } }
+      },
+      "rationale": "Two Assets of the same type have the same definition revision even if only one has historical values; definition revision is value-independent and value changes do not alter it."
+    },
+    {
+      "id": "T02-COMP-013",
+      "invariant": "Deterministic composition",
+      "acceptance": "A02",
+      "source_section": "3.2",
+      "initial_state": { "memberships": "A" },
+      "operation": { "kind": "resolve", "requested_target_kind": "asset" },
+      "expected_result": {
+        "outcome": "accepted",
+        "additional_section": {
+          "section_kind": "derived_additional",
+          "fields": ["g1_global_note", "g2_global_tag"],
+          "ordered_by": "immutable field key"
+        }
+      },
+      "expected_unchanged": { "rendered_count_of_global_fields": 2 },
+      "rationale": "The derived Additional specifications section contains applicable active activation=global Fields ordered by immutable key."
+    }
+  ]
+}

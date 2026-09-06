@@ -17,9 +17,9 @@ import pytest
 from django.apps import apps as django_apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.recorder import MigrationRecorder
 from django.db.models.signals import post_migrate
-from django.test import TransactionTestCase
+
+from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
 TASK_PATH_MAP = {
     "core.tasks.evaluate_alert_rules_task": "extras.tasks.alerts.evaluate_alert_rules_task",
@@ -59,20 +59,15 @@ NON_FUNC_FIELDS = (
 )
 
 
+@isolate_migration_tests
 @pytest.mark.serial_only
-class Issue445TaskPathMigrationTests(TransactionTestCase):
+class Issue445TaskPathMigrationTests(IsolatedMigrationTestCase):
     """Full forward/reverse/forward lifecycle of the persisted-path cutover."""
 
     reset_sequences = True
 
     def setUp(self):
         super().setUp()
-        # This class rehearses 0110 in isolation, as it existed before the
-        # upgrade-only 0113 release. The current test database starts at the
-        # graph leaf, so remove only 0113's data-migration record before asking
-        # MigrationExecutor to construct that historical state. Production
-        # reverse remains refused and is tested separately.
-        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
 
     def _migrate(self, target):
         executor = MigrationExecutor(connection)

@@ -1,11 +1,15 @@
 from collections.abc import Mapping
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 
 from assets.api.nested_serializers import (
     NestedAssetRoleSerializer,
@@ -29,9 +33,9 @@ from assets.models import (
     Supplier,
     Warranty,
 )
+from core.mixins import suppress_custom_field_data_validation
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
-from itambox.api.fields import RelatedObjectCountField
 from organization.api.serializers import (
     AssetHolderSerializer,
     ContactAssignmentSerializer,
@@ -39,9 +43,77 @@ from organization.api.serializers import (
     NestedTenantSerializer,
 )
 from organization.models import Location, Tenant
-from software.models import Software
+
+from ..services.specifications.commands import (
+    create_asset_type,
+    preview_asset_type_create,
+    update_asset_specifications,
+    update_asset_type_specifications,
+)
+from ..services.specifications.contracts import DestinationAssetTypeSelectionDTO
+from ..specification_adapters import (
+    actor_context_for_user,
+    authorization_for_asset,
+    current_specification_plan,
+    create_fieldset_selection,
+    discard_staged_image,
+    native_asset_type_create_input,
+    native_persistence_fields,
+    owner_id_from_result,
+    patch_from_mapping,
+    require_command_success,
+    stage_uploaded_image,
+)
 
 User = get_user_model()
+
+
+class CanonicalSpecificationSerializerMixin(serializers.Serializer):
+    # Keep API parsing separate from the canonical command writer.
+
+    specification_patch = serializers.JSONField(write_only=True, required=False)
+
+    def validate_specification_patch(self, value):
+        if not isinstance(value, Mapping):
+            raise serializers.ValidationError(_("Custom field specification patch must be an object."))
+        unknown_operations = set(value) - {"set", "clear"}
+        if unknown_operations:
+            raise serializers.ValidationError(_("Custom field patch contains an unknown operation."))
+        submitted = value.get("set", {})
+        clear_keys = value.get("clear", [])
+        if not isinstance(submitted, Mapping):
+            raise serializers.ValidationError(_("Custom field patch 'set' must be an object."))
+        if not isinstance(clear_keys, list) or any(not isinstance(key, str) for key in clear_keys):
+            raise serializers.ValidationError(_("Custom field patch 'clear' must be a list of field keys."))
+        return {"set": dict(submitted), "clear": list(clear_keys)}
+
+    def _request_user(self):
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return getattr(request, "user", None)
+
+    @staticmethod
+    def _persist_native_update(current, validated_data):
+        # Commands acquire catalogue/library/owner locks first. Reload their
+        # result before native-only persistence so stale JSON cannot overwrite it.
+        current = type(current)._base_manager.get(pk=current.pk)
+        concrete_names = {field.name for field in current._meta.concrete_fields}
+        native_fields = []
+        for field_name, value in validated_data.items():
+            if field_name in concrete_names:
+                setattr(current, field_name, value)
+                native_fields.append(field_name)
+        if native_fields:
+            current.save(update_fields=native_persistence_fields(current, native_fields))
+        return current
+
+    @staticmethod
+    def _command_error(exc):
+        if isinstance(exc, PermissionDenied):
+            raise DRFPermissionDenied(str(exc)) from exc
+        if isinstance(exc, DjangoValidationError):
+            detail = getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or str(exc)
+            raise serializers.ValidationError(detail) from exc
+        raise exc
 
 
 class AssetRoleSerializer(BaseModelSerializer):
@@ -100,7 +172,8 @@ class DepreciationSerializer(BaseModelSerializer):
         brief_fields = ["id", "name", "months"]
 
 
-class AssetTypeSerializer(BaseModelSerializer):
+class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer):
+    custom_field_data = serializers.JSONField(read_only=True)
     manufacturer = NestedManufacturerSerializer(read_only=True)
     manufacturer_id = serializers.PrimaryKeyRelatedField(
         queryset=Manufacturer.objects.all(), source="manufacturer", write_only=True
@@ -130,8 +203,8 @@ class AssetTypeSerializer(BaseModelSerializer):
             "assetrole_id",
             "depreciation",
             "depreciation_id",
-            "custom_fieldset",
             "custom_field_data",
+            "specification_patch",
             "image",
             "requestable",
             "description",
@@ -142,9 +215,74 @@ class AssetTypeSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "model", "slug", "manufacturer"]
 
+    def _native_input(self, validated_data, *, staged_image_id=None):
+        return native_asset_type_create_input(validated_data, staged_image_id=staged_image_id)
+
+    def create(self, validated_data):
+        patch = patch_from_mapping(validated_data.pop("specification_patch", None))
+        actor = actor_context_for_user(self._request_user())
+        uploaded = validated_data.get("image")
+        stage_id = stage_uploaded_image(actor=actor, uploaded=uploaded) if uploaded else None
+        succeeded = False
+        try:
+            native = self._native_input(validated_data, staged_image_id=stage_id)
+            selection = create_fieldset_selection((), omitted=True)
+            with transaction.atomic():
+                preview = require_command_success(
+                    preview_asset_type_create(
+                        actor=actor,
+                        native=native,
+                        fieldsets=selection,
+                        patch=patch,
+                    )
+                )
+                if getattr(preview, "issues", ()):
+                    raise DjangoValidationError("; ".join(issue.message_key for issue in preview.issues))
+                result = create_asset_type(
+                    actor=actor,
+                    native=native,
+                    fieldsets=selection,
+                    patch=patch,
+                    preview_token=preview.preview_token,
+                    expected_definition_revision=preview.expected_definition_revision,
+                    expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+                )
+                owner_id = owner_id_from_result(result)
+            succeeded = True
+            return AssetType.all_objects.get(pk=owner_id)
+        except (PermissionDenied, DjangoValidationError) as exc:
+            self._command_error(exc)
+        finally:
+            if stage_id is not None and not succeeded:
+                discard_staged_image(stage_id=stage_id, actor=actor)
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            patch_marker = object()
+            patch_value = validated_data.pop("specification_patch", patch_marker)
+            current = AssetType.all_objects.get(pk=instance.pk)
+            if patch_value is not patch_marker:
+                try:
+                    actor = actor_context_for_user(self._request_user())
+                    plan = current_specification_plan(current, target_kind="asset_type")
+                    result = update_asset_type_specifications(
+                        actor=actor,
+                        asset_type_id=current.pk,
+                        expected_resource_revision=plan.resource_revision,
+                        expected_definition_revision=plan.definition_revision,
+                        patch=patch_from_mapping(patch_value),
+                    )
+                    require_command_success(result)
+                except (PermissionDenied, DjangoValidationError) as exc:
+                    self._command_error(exc)
+            current = self._persist_native_update(current, validated_data)
+        self.instance = current
+        return self.instance
+
 
 @extend_schema_serializer(component_name="AssetResource")
-class AssetSerializer(BaseModelSerializer):
+class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer):
+    custom_field_data = serializers.JSONField(read_only=True)
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetType.objects.all(), source="asset_type", write_only=True
@@ -203,6 +341,7 @@ class AssetSerializer(BaseModelSerializer):
             "last_audited",
             "last_audited_by",
             "custom_field_data",
+            "specification_patch",
             "requestable",
             "notes",
             "tags",
@@ -211,6 +350,67 @@ class AssetSerializer(BaseModelSerializer):
             "updated_at",
         ]
         brief_fields = ["id", "name", "asset_tag", "serial_number", "status"]
+
+    def _apply_specification_command(self, current, target_type_id, patch):
+        authorization = authorization_for_asset(
+            user=self._request_user(),
+            tenant_id=current.tenant_id,
+        )
+        plan = current_specification_plan(current, target_kind="asset", asset_type_id=target_type_id)
+        result = update_asset_specifications(
+            authorization=authorization,
+            asset_id=current.pk,
+            destination=DestinationAssetTypeSelectionDTO(
+                presence="replace" if target_type_id is not None else "keep_current",
+                asset_type_id=target_type_id,
+            ),
+            expected_resource_revision=plan.resource_revision,
+            expected_definition_revision=plan.definition_revision,
+            patch=patch,
+        )
+        require_command_success(result)
+
+    def create(self, validated_data):
+        if "specification_patch" not in validated_data:
+            return super().create(validated_data)
+        patch = patch_from_mapping(validated_data.pop("specification_patch", None))
+        target_type = validated_data.get("asset_type")
+        if target_type is None:
+            raise serializers.ValidationError(
+                {"asset_type_id": self.fields["asset_type_id"].error_messages["required"]}
+            )
+        with transaction.atomic():
+            instance = Asset(**validated_data, custom_field_data={})
+            with suppress_custom_field_data_validation(instance):
+                instance.save()
+            current = Asset._base_manager.get(pk=instance.pk)
+            try:
+                self._apply_specification_command(current, target_type.pk, patch)
+            except (PermissionDenied, DjangoValidationError) as exc:
+                self._command_error(exc)
+            self.instance = Asset._base_manager.get(pk=current.pk)
+        return self.instance
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            patch_marker = object()
+            patch_value = validated_data.pop("specification_patch", patch_marker)
+            target_marker = object()
+            target_type = validated_data.pop("asset_type", target_marker)
+            current = Asset._base_manager.get(pk=instance.pk)
+
+            if patch_value is not patch_marker or target_type is not target_marker:
+                try:
+                    self._apply_specification_command(
+                        current,
+                        current.asset_type_id if target_type is target_marker else target_type.pk,
+                        patch_from_mapping(None if patch_value is patch_marker else patch_value),
+                    )
+                except (PermissionDenied, DjangoValidationError) as exc:
+                    self._command_error(exc)
+            current = self._persist_native_update(current, validated_data)
+        self.instance = current
+        return self.instance
 
     def get_fields(self) -> dict[str, serializers.Field[object, object, object, object]]:
         fields = super().get_fields()
