@@ -1087,8 +1087,8 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
 
             stale_definition_preview = preview_asset_type_create(
                 actor=self._actor(),
-                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
-                fieldsets=self._omitted(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._selection(self.first),
                 patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
             )
             self.assertIsInstance(stale_definition_preview, AssetTypePreviewDTO)
@@ -1098,14 +1098,12 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             )
             stale_definition = create_asset_type(
                 actor=self._actor(),
-                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
-                fieldsets=self._omitted(),
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._selection(self.first),
                 patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
-                preview_token=stale_definition_preview.preview_token,
+                preview_token=None,
                 expected_definition_revision=stale_definition_preview.expected_definition_revision,
-                expected_category_default_snapshot_revision=(
-                    stale_definition_preview.expected_category_default_snapshot_revision
-                ),
+                expected_category_default_snapshot_revision=None,
             )
             self.assertIsInstance(stale_definition, CommandRejectedDTO)
             self.assertIsNone(stale_definition.safe_owner)
