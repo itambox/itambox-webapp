@@ -1,13 +1,15 @@
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 from django.utils import timezone
 
+from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
+
+@isolate_migration_tests
 @pytest.mark.serial_only
-class SCIMIdentityMigrationTests(TransactionTestCase):
+class SCIMIdentityMigrationTests(IsolatedMigrationTestCase):
     migrate_from = [
         ("organization", "0100_issue88_shard_61_organization_relations"),
         ("users", "0100_issue88_shard_62_users_relations"),
@@ -19,11 +21,6 @@ class SCIMIdentityMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        # This test reconstructs a pre-issue-445 global migration state to
-        # rehearse the older SCIM migration. Remove only the upgrade-only 0113
-        # recorder row in this isolated database; production reverse remains
-        # refused and has its own lifecycle test.
-        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
         self.addCleanup(self._restore_graph_leaves)
 
     def _restore_graph_leaves(self):

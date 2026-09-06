@@ -3,12 +3,13 @@
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.recorder import MigrationRecorder
-from django.test import TransactionTestCase
+
+from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
 
+@isolate_migration_tests
 @pytest.mark.serial_only
-class AlertTenantReconciliationMigrationTests(TransactionTestCase):
+class AlertTenantReconciliationMigrationTests(IsolatedMigrationTestCase):
     reset_sequences = True
 
     migrate_from = ("extras", "0103_remove_reporttemplate_advanced_mode_and_more")
@@ -16,7 +17,6 @@ class AlertTenantReconciliationMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
         self.executor = MigrationExecutor(connection)
 
     def _migrate(self, target):
