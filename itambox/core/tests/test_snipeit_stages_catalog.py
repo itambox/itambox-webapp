@@ -1072,9 +1072,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             manufacturer=manufacturer,
             model="Adoption Stage Model",
             slug="adoption-stage-model",
-            connector_identity=_connector_identity(
-                {"source_url": "https://snipe.example", "source_id": "124"}
-            ),
+            connector_identity=_connector_identity({"source_url": "https://snipe.example", "source_id": "124"}),
             custom_field_data={"operator_value": "keep"},
         )
         AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
@@ -1217,9 +1215,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             model="Core Managed Stage Model",
             slug="core-managed-stage-model",
             management_kind=AssetType.MANAGEMENT_CORE,
-            connector_identity=_connector_identity(
-                {"source_url": "https://snipe.example", "source_id": "119"}
-            ),
+            connector_identity=_connector_identity({"source_url": "https://snipe.example", "source_id": "119"}),
         )
         deps = AssetModelDependencies({119: manufacturer}, {}, {}, {})
         row = {

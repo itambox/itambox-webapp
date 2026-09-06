@@ -179,7 +179,9 @@ class T07ProvenanceMigrationTests(IsolatedMigrationTestCase):
         )
         self.assertEqual(migrated_local.connector_identity, TYPE_CONNECTOR_IDENTITY)
         self.assertEqual(
-            list(NewAssetTypeFieldset.objects.filter(asset_type_id=local_type.pk).values_list("fieldset_id", "position")),
+            list(
+                NewAssetTypeFieldset.objects.filter(asset_type_id=local_type.pk).values_list("fieldset_id", "position")
+            ),
             [(fieldset.pk, 7)],
         )
 
@@ -192,7 +194,11 @@ class T07ProvenanceMigrationTests(IsolatedMigrationTestCase):
             {"memory_capacity": "32.000", "operator_note": "retain"},
         )
         self.assertEqual(
-            list(NewAssetTypeFieldset.objects.filter(asset_type_id=library_type.pk).values_list("fieldset_id", "position")),
+            list(
+                NewAssetTypeFieldset.objects.filter(asset_type_id=library_type.pk).values_list(
+                    "fieldset_id", "position"
+                )
+            ),
             [(fieldset.pk, 9)],
         )
 

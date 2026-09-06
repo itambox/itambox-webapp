@@ -41567,7 +41567,7 @@ components:
           maxLength: 64
         namespace:
           type: string
-          pattern: ^[a-z][a-z0-9-]{0,61}$
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
           maxLength: 62
         label:
           type: string
@@ -41666,7 +41666,7 @@ components:
         namespace:
           type: string
           minLength: 1
-          pattern: ^[a-z][a-z0-9-]{0,61}$
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
           maxLength: 62
         label:
           type: string
@@ -41748,7 +41748,7 @@ components:
         namespace:
           type: string
           default: local
-          pattern: ^[a-z][a-z0-9-]{0,61}$
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
           maxLength: 62
         slug:
           type: string
@@ -41786,7 +41786,7 @@ components:
           type: string
           minLength: 1
           default: local
-          pattern: ^[a-z][a-z0-9-]{0,61}$
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
           maxLength: 62
         slug:
           type: string
@@ -46369,7 +46369,7 @@ components:
         namespace:
           type: string
           minLength: 1
-          pattern: ^[a-z][a-z0-9-]{0,61}$
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
           maxLength: 62
         label:
           type: string
@@ -46445,7 +46445,7 @@ components:
           type: string
           minLength: 1
           default: local
-          pattern: ^[a-z][a-z0-9-]{0,61}$
+          pattern: ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$
           maxLength: 62
         slug:
           type: string

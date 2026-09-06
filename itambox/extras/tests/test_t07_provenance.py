@@ -186,7 +186,11 @@ class T07ProvenanceModelTests(TestCase):
             (AssetType, asset_type.pk, {"connector_identity": "sha256:" + "6" * 64}),
         )
         for model, pk, values in attempted_updates:
-            with self.subTest(model=model.__name__, values=values), self.assertRaises(IntegrityError), transaction.atomic():
+            with (
+                self.subTest(model=model.__name__, values=values),
+                self.assertRaises(IntegrityError),
+                transaction.atomic(),
+            ):
                 model._base_manager.filter(pk=pk).update(**values)
 
     def test_model_and_database_hard_delete_guards_retain_identities(self):

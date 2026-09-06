@@ -102,6 +102,23 @@
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/479"
       ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-007",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "The historical match is the literal library definition identifier t07-protected-definition in a PostgreSQL hard-delete protection regression fixture, not a credential or authentication token. The exception is restricted to this exact historical commit/path/rule/line fingerprint; no rule or file is globally excluded.",
+      "owner": "@itambox",
+      "scope": {
+        "fingerprint": "85f11eca796cb4056b4710e538c27700c7ddfd7e:itambox/extras/tests/test_t07_provenance.py:generic-api-key:236",
+        "path": "itambox/extras/tests/test_t07_provenance.py",
+        "rule": "generic-api-key"
+      },
+      "review_on": "2026-09-12",
+      "expires_on": "2026-10-05",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479"
+      ]
     }
   ]
 }
