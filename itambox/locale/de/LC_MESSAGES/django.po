@@ -14124,3 +14124,51 @@ msgstr "Nicht initialisiert"
 #: itambox/extras/models.py:384
 msgid "Unreconciled"
 msgstr "Nicht abgeglichen"
+
+#: itambox/assets/models/catalog.py
+msgid "Actor ID"
+msgstr "Actor-ID"
+
+#: itambox/assets/models/catalog.py
+msgid "Asset Type Image Stage"
+msgstr "Bild-Stage für Asset-Typen"
+
+#: itambox/assets/models/catalog.py
+msgid "Asset Type Image Stages"
+msgstr "Bild-Stages für Asset-Typen"
+
+#: itambox/assets/models/catalog.py
+msgid "Authentication Revision"
+msgstr "Authentifizierungsrevision"
+
+#: itambox/assets/models/catalog.py
+msgid "Byte Size"
+msgstr "Bytegröße"
+
+#: itambox/assets/models/catalog.py
+msgid "Command Kind"
+msgstr "Befehlsart"
+
+#: itambox/assets/models/catalog.py
+msgid "Consumed Asset Type"
+msgstr "Verbrauchter Asset-Typ"
+
+#: itambox/assets/models/catalog.py
+msgid "Content Digest"
+msgstr "Inhaltsprüfsumme"
+
+#: itambox/assets/models/catalog.py
+msgid "Discarded"
+msgstr "Verworfen"
+
+#: itambox/assets/models/catalog.py
+msgid "Expires At"
+msgstr "Ablaufzeitpunkt"
+
+#: itambox/assets/models/catalog.py
+msgid "Stage ID"
+msgstr "Stage-ID"
+
+#: itambox/assets/models/catalog.py
+msgid "Storage Key"
+msgstr "Speicherschlüssel"
