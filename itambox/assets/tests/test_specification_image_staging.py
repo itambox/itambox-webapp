@@ -175,9 +175,11 @@ class SpecificationImageStageTests(TenantTestMixin, TestCase):
         stale_revision = self.actor.authentication_revision
         self.user.set_password("rotated-password")
         self.user.save(update_fields=["password"])
-        stale_actor = ActorContextDTO(actor_id=self.user.pk, authentication_revision=stale_revision)
-        self.assertIsNone(preview_stage_or_none(stage_id, stale_actor, CREATE_COMMAND_KIND))
-        self.assertIsNone(lock_stage_for_consume(stage_id, stale_actor, CREATE_COMMAND_KIND))
+        current_revision = authentication_revision_for_actor(self.user)
+        self.assertNotEqual(current_revision, stale_revision)
+        rotated_actor = ActorContextDTO(actor_id=self.user.pk, authentication_revision=current_revision)
+        self.assertIsNone(preview_stage_or_none(stage_id, rotated_actor, CREATE_COMMAND_KIND))
+        self.assertIsNone(lock_stage_for_consume(stage_id, rotated_actor, CREATE_COMMAND_KIND))
 
         AssetTypeImageStage.objects.filter(stage_id=stage_id).update(expires_at=timezone.now() - timedelta(minutes=1))
         self.assertIsNone(preview_stage_or_none(stage_id, self.actor, CREATE_COMMAND_KIND))

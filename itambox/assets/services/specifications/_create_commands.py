@@ -980,6 +980,20 @@ def _link_tags(owner: AssetType, tag_ids: tuple[int, ...]) -> None:
     owner.tags.set(tag_ids)
 
 
+def _link_memberships(owner: AssetType, proposed_ids: tuple[int, ...]) -> None:
+    """Insert the dense membership rows; kept as a seam so atomicity tests can inject failure."""
+    AssetTypeFieldset.objects.using(_DEFAULT_DB).bulk_create(
+        [
+            AssetTypeFieldset(
+                asset_type_id=owner.pk,
+                fieldset_id=fieldset_id,
+                position=position,
+            )
+            for position, fieldset_id in enumerate(proposed_ids, start=1)
+        ]
+    )
+
+
 def _persist_create_owner(
     *,
     native: AssetTypeNativeCreateInputDTO,
@@ -1022,16 +1036,7 @@ def _persist_create_owner(
             with actor_change_context(actor_model):
                 new_type.save(using=_DEFAULT_DB)
             if proposed_ids:
-                AssetTypeFieldset.objects.using(_DEFAULT_DB).bulk_create(
-                    [
-                        AssetTypeFieldset(
-                            asset_type_id=new_type.pk,
-                            fieldset_id=fieldset_id,
-                            position=position,
-                        )
-                        for position, fieldset_id in enumerate(proposed_ids, start=1)
-                    ]
-                )
+                _link_memberships(new_type, proposed_ids)
             if native.tag_ids:
                 _link_tags(new_type, native.tag_ids)
             if stage_row is not None:

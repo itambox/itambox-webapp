@@ -150,15 +150,19 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         role_id=None,
         depreciation_id=None,
         eol_months=48,
+        part_number="PN-1",
+        ean="4000000000001",
+        region="EU",
+        configuration="64GB",
     ):
         return AssetTypeNativeCreateInputDTO(
             manufacturer_id=manufacturer_id if manufacturer_id is not None else self.manufacturer.pk,
             model=model or "Create model",
             slug=slug,
-            part_number="PN-1",
-            ean="4000000000001",
-            region="EU",
-            configuration="64GB",
+            part_number=part_number,
+            ean=ean,
+            region=region,
+            configuration=configuration,
             eol_months=eol_months,
             category_id=category_id,
             suggested_asset_role_id=self.role.pk if role_id is None else role_id,
@@ -676,10 +680,17 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(list(created.tags.values_list("pk", flat=True)), [self.tag.pk])
 
     def test_duplicate_explicit_slug_is_reference_conflict_and_auto_slug_stays_unique(self):
+        plan = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=None, slug=None),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(plan, AssetTypePreviewDTO)
         preview = preview_asset_type_create(
             actor=self._actor(),
             native=self._native(category_id=None, slug="create-maker-existing-model"),
-            fieldsets=self._omitted(),
+            fieldsets=self._explicit_empty(),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
         )
         self.assertIsInstance(preview, CommandRejectedDTO)
@@ -692,10 +703,10 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         result = create_asset_type(
             actor=self._actor(),
             native=self._native(category_id=None, slug="create-maker-existing-model"),
-            fieldsets=self._omitted(),
+            fieldsets=self._explicit_empty(),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
             preview_token=None,
-            expected_definition_revision="sha256:any",
+            expected_definition_revision=plan.expected_definition_revision,
             expected_category_default_snapshot_revision=None,
         )
         self.assertIsInstance(result, CommandRejectedDTO)
@@ -789,6 +800,13 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(AssetTypeFieldset.objects.count(), 0)
 
     def test_native_model_limits_are_enforced_in_preview_and_write(self):
+        plan = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=None),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(plan, AssetTypePreviewDTO)
         cases = (
             ({"model": "m" * 256}, ("model",)),
             ({"part_number": "p" * 101}, ("part_number",)),
@@ -798,7 +816,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         )
         for overrides, path in cases:
             with self.subTest(path=path[0]):
-                native = self._native(**overrides)
+                native = self._native(category_id=None, **overrides)
                 preview = preview_asset_type_create(
                     actor=self._actor(),
                     native=native,
@@ -816,7 +834,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
                     fieldsets=self._explicit_empty(),
                     patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
                     preview_token=None,
-                    expected_definition_revision="sha256:any",
+                    expected_definition_revision=plan.expected_definition_revision,
                     expected_category_default_snapshot_revision=None,
                 )
                 self.assertIsInstance(result, CommandRejectedDTO)
@@ -827,6 +845,13 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(AssetType.all_objects.count(), 1)
 
     def test_invalid_explicit_slug_syntax_is_rejected_in_preview_and_write(self):
+        plan = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=None),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(plan, AssetTypePreviewDTO)
         native = self._native(category_id=None, slug="bad slug /")
         preview = preview_asset_type_create(
             actor=self._actor(),
@@ -845,7 +870,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             fieldsets=self._explicit_empty(),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
             preview_token=None,
-            expected_definition_revision="sha256:any",
+            expected_definition_revision=plan.expected_definition_revision,
             expected_category_default_snapshot_revision=None,
         )
         self.assertIsInstance(result, CommandRejectedDTO)
@@ -876,6 +901,13 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(created.eol_months, 0)
 
     def test_unknown_and_soft_deleted_role_depreciation_tags_are_rejected(self):
+        plan = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=None),
+            fieldsets=self._explicit_empty(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(plan, AssetTypePreviewDTO)
         cases = (
             ({"role_id": 999999}, ("suggested_asset_role_id",)),
             ({"depreciation_id": 999999}, ("depreciation_id",)),
@@ -900,7 +932,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
                     fieldsets=self._explicit_empty(),
                     patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
                     preview_token=None,
-                    expected_definition_revision="sha256:any",
+                    expected_definition_revision=plan.expected_definition_revision,
                     expected_category_default_snapshot_revision=None,
                 )
                 self.assertIsInstance(result, CommandRejectedDTO)
@@ -913,10 +945,21 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.depreciation.delete()
         deleted_tag = Tag.objects.create(name="Doomed tag", slug="doomed-tag")
         deleted_tag.delete()
+        active_role = AssetRole.objects.create(name="Active role", slug="active-role")
+        active_depreciation = Depreciation.objects.create(name="Active depreciation", months=12)
         for overrides, path in (
-            ({"role_id": self.role.pk}, ("suggested_asset_role_id",)),
-            ({"depreciation_id": self.depreciation.pk}, ("depreciation_id",)),
-            ({"tag_ids": (deleted_tag.pk,)}, ("tag_ids",)),
+            (
+                {"role_id": self.role.pk, "depreciation_id": active_depreciation.pk},
+                ("suggested_asset_role_id",),
+            ),
+            (
+                {"role_id": active_role.pk, "depreciation_id": self.depreciation.pk},
+                ("depreciation_id",),
+            ),
+            (
+                {"role_id": active_role.pk, "depreciation_id": active_depreciation.pk, "tag_ids": (deleted_tag.pk,)},
+                ("tag_ids",),
+            ),
         ):
             with self.subTest(overrides=overrides):
                 preview = preview_asset_type_create(
@@ -1014,28 +1057,63 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertIsInstance(preview, CommandRejectedDTO)
         self.assertEqual([issue.code for issue in preview.issues], ["OBJECT_UNAVAILABLE"])
 
-        valid = preview_asset_type_create(
-            actor=self._actor(),
-            native=self._native(category_id=self.category.pk),
-            fieldsets=self._omitted(),
-            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
-        )
-        self.assertIsInstance(valid, AssetTypePreviewDTO)
-        CategoryDefaultFieldset.objects.create(category=self.category, fieldset=self.second, position=2)
-        stale_snapshot = create_asset_type(
-            actor=self._actor(),
-            native=self._native(category_id=self.category.pk, staged_image_id="a" * 32),
-            fieldsets=self._omitted(),
-            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
-            preview_token=valid.preview_token,
-            expected_definition_revision=valid.expected_definition_revision,
-            expected_category_default_snapshot_revision=valid.expected_category_default_snapshot_revision,
-        )
-        self.assertIsInstance(stale_snapshot, CommandRejectedDTO)
-        self.assertEqual(
-            [issue.code for issue in stale_snapshot.issues],
-            ["STALE_RESOURCE"],
-        )
+        with self._stage_media():
+            stage_id = self._new_stage()
+            valid = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(valid, AssetTypePreviewDTO)
+            CategoryDefaultFieldset.objects.create(category=self.category, fieldset=self.second, position=2)
+            stale_snapshot = create_asset_type(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=valid.preview_token,
+                expected_definition_revision=valid.expected_definition_revision,
+                expected_category_default_snapshot_revision=valid.expected_category_default_snapshot_revision,
+            )
+            self.assertIsInstance(stale_snapshot, CommandRejectedDTO)
+            self.assertIsNone(stale_snapshot.safe_owner)
+            self.assertEqual(
+                [issue.code for issue in stale_snapshot.issues],
+                ["STALE_RESOURCE"],
+            )
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
+
+            stale_definition_preview = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(stale_definition_preview, AssetTypePreviewDTO)
+            CustomField.objects.filter(pk=self.first_field.pk).update(lifecycle=CustomField.LIFECYCLE_DEPRECATED)
+            AssetTypeImageStage.objects.filter(stage_id=stage_id).update(
+                expires_at=timezone.now() - timedelta(minutes=1)
+            )
+            stale_definition = create_asset_type(
+                actor=self._actor(),
+                native=self._native(category_id=self.category.pk, staged_image_id=stage_id),
+                fieldsets=self._omitted(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=stale_definition_preview.preview_token,
+                expected_definition_revision=stale_definition_preview.expected_definition_revision,
+                expected_category_default_snapshot_revision=(
+                    stale_definition_preview.expected_category_default_snapshot_revision
+                ),
+            )
+            self.assertIsInstance(stale_definition, CommandRejectedDTO)
+            self.assertIsNone(stale_definition.safe_owner)
+            self.assertEqual(
+                [issue.code for issue in stale_definition.issues],
+                ["STALE_DEFINITION"],
+            )
+            self.assertEqual(AssetType.all_objects.count(), 1)
 
     def test_staged_image_is_consumed_atomically_with_create_and_reads_back(self):
         with self._stage_media() as storage:
@@ -1153,8 +1231,53 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             self.assertIsInstance(preview, CommandRejectedDTO)
             self.assertEqual(
                 [(issue.code, issue.path) for issue in preview.issues],
+                [("OBJECT_UNAVAILABLE", ())],
+            )
+
+            other_user.user_permissions.add(
+                Permission.objects.get(
+                    content_type=ContentType.objects.get_for_model(AssetType),
+                    codename="add_assettype",
+                )
+            )
+            other_actor = ActorContextDTO(
+                actor_id=other_user.pk,
+                authentication_revision=authentication_revision_for_actor(other_user),
+            )
+            plan = preview_asset_type_create(
+                actor=self._actor(),
+                native=self._native(category_id=None),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(plan, AssetTypePreviewDTO)
+            preview = preview_asset_type_create(
+                actor=other_actor,
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            )
+            self.assertIsInstance(preview, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in preview.issues],
                 [("REFERENCE_CONFLICT", ("staged_image_id",))],
             )
+            result = create_asset_type(
+                actor=other_actor,
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=None,
+                expected_definition_revision=plan.expected_definition_revision,
+                expected_category_default_snapshot_revision=None,
+            )
+            self.assertIsInstance(result, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in result.issues],
+                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+            )
+            stage = AssetTypeImageStage.objects.get(stage_id=stage_id)
+            self.assertEqual(stage.state, "pending")
 
             stale_revision = authentication_revision_for_actor(self.user)
             self.user.set_password("rotated-password")
@@ -1169,7 +1292,21 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             self.assertIsInstance(preview, CommandRejectedDTO)
             self.assertEqual(
                 [(issue.code, issue.path) for issue in preview.issues],
-                [("REFERENCE_CONFLICT", ("staged_image_id",))],
+                [("OBJECT_UNAVAILABLE", ())],
+            )
+            result = create_asset_type(
+                actor=stale_actor,
+                native=self._native(category_id=None, staged_image_id=stage_id),
+                fieldsets=self._explicit_empty(),
+                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+                preview_token=None,
+                expected_definition_revision=plan.expected_definition_revision,
+                expected_category_default_snapshot_revision=None,
+            )
+            self.assertIsInstance(result, CommandRejectedDTO)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in result.issues],
+                [("OBJECT_UNAVAILABLE", ())],
             )
 
     def test_expired_and_discarded_stages_are_rejected(self):
@@ -1258,7 +1395,7 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             )
             self.assertIsInstance(preview, AssetTypePreviewDTO)
             with patch(
-                "assets.services.specifications._create_commands.AssetTypeFieldset.objects.bulk_create",
+                "assets.services.specifications._create_commands._link_memberships",
                 side_effect=IntegrityError("forced membership failure"),
             ):
                 result = create_asset_type(
