@@ -156,7 +156,9 @@
   "scripts/tests/test_product_language_gate.py",
   "scripts/tests/test_select_e2e_scopes.py",
   "scripts/tests/test_specification_vocabulary_contract.py",
-  "scripts/tests/test_typing_policy.py"
+  "scripts/tests/test_typing_policy.py",
+  "itambox/assets/tests/test_specification_command_races.py",
+  "itambox/assets/tests/test_specification_value_commands.py"
  ],
  "baseline_tests": [
   "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -317,7 +319,9 @@
   "scripts/tests/test_product_language_gate.py",
   "scripts/tests/test_select_e2e_scopes.py",
   "scripts/tests/test_specification_vocabulary_contract.py",
-  "scripts/tests/test_typing_policy.py"
+  "scripts/tests/test_typing_policy.py",
+  "itambox/assets/tests/test_specification_command_races.py",
+  "itambox/assets/tests/test_specification_value_commands.py"
  ],
  "supporting_files": [
   "itambox/inventory/tests/factories.py",
