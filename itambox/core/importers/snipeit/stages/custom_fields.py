@@ -25,7 +25,7 @@ class FieldsetDependencies:
     fieldsets: MutableMapping[int, object]
 
 
-def _source_checksum(context, definition_kind, source_id):
+def _definition_digest(context, definition_kind, source_id):
     source_url = str(getattr(context.client, "base_url", "")).rstrip("/")
     if not source_url:
         raise ValueError("Cannot establish Snipe-IT source identity")
@@ -46,8 +46,8 @@ class CustomFieldImporter:
         self.context = context
         self.dependencies = dependencies
 
-    def _source_checksum(self, definition_kind, source_id):
-        return _source_checksum(self.context, definition_kind, source_id)
+    def _connector_identity(self, definition_kind, source_id):
+        return _definition_digest(self.context, definition_kind, source_id)
 
     @staticmethod
     def _choice_labels(raw_choices):
@@ -55,11 +55,11 @@ class CustomFieldImporter:
 
     def _get_choice_set(self, choice_set_model, source_id, label):
         slug = f"snipeit-{source_id}"
-        source_checksum = self._source_checksum("choice-set", source_id)
+        connector_identity = self._connector_identity("choice-set", source_id)
         choice_set = choice_set_model.objects.select_for_update().filter(namespace="local", slug=slug).first()
         if choice_set is not None and choice_set.management_kind != "local":
             raise ValueError("Cannot update a managed Choice Set from Snipe-IT")
-        if choice_set is not None and choice_set.source_checksum != source_checksum:
+        if choice_set is not None and choice_set.connector_identity != connector_identity:
             raise ValueError("Cannot claim an unprovenanced Choice Set from Snipe-IT")
         if choice_set is not None and choice_set.lifecycle != "active":
             raise ValueError("Cannot reactivate a deprecated Choice Set from Snipe-IT")
@@ -71,7 +71,7 @@ class CustomFieldImporter:
                 management_kind="local",
                 version=1,
                 lifecycle="active",
-                source_checksum=source_checksum,
+                connector_identity=connector_identity,
             )
         return choice_set
 
@@ -137,11 +137,11 @@ class CustomFieldImporter:
         return existing_by_key, desired_choices
 
     def _reconcile_choice_rows(self, choice_model, choice_set, choices):
+        if choice_set.management_kind != "local":
+            raise ValueError("Cannot update managed Choices from Snipe-IT")
         existing_choices = list(
             choice_model.objects.select_for_update().filter(choice_set_id=choice_set.pk).order_by("position", "key")
         )
-        if any(choice.management_kind != "local" for choice in existing_choices):
-            raise ValueError("Cannot update managed Choices from Snipe-IT")
         existing_by_key, desired_choices = self._desired_choice_keys(existing_choices, choices)
         desired_keys = {key for key, _ in desired_choices}
         full_order = self._full_choice_order(existing_choices, desired_choices)
@@ -160,7 +160,6 @@ class CustomFieldImporter:
                     key=key,
                     label=choice_label,
                     position=positions[key],
-                    management_kind="local",
                     version=1,
                     lifecycle="active",
                 )
@@ -168,7 +167,6 @@ class CustomFieldImporter:
             choice_model.objects.filter(pk=choice.pk).update(
                 label=choice_label,
                 position=positions[key],
-                management_kind="local",
                 version=1,
                 lifecycle="active",
             )
@@ -228,7 +226,7 @@ class CustomFieldImporter:
                 management_kind="local",
                 version=1,
                 lifecycle="active",
-                source_checksum=self._source_checksum("choice-set", source_id),
+                connector_identity=self._connector_identity("choice-set", source_id),
             )
         else:
             defaults["choice_set"] = self._choice_set(
@@ -258,14 +256,14 @@ class CustomFieldImporter:
             "required": False,
             "nullable": False,
             "mappings": [],
-            "source_checksum": self._source_checksum("custom-field", source_id),
+            "connector_identity": self._connector_identity("custom-field", source_id),
             "decimal_scale": 2 if field_type == "decimal" else None,
             "choice_set": None,
         }
         obj = model.objects.select_for_update().filter(name=raw_name).first()
         if obj and obj.management_kind != "local":
             raise ValueError("Cannot update a managed Custom Field from Snipe-IT")
-        if obj and obj.source_checksum != defaults["source_checksum"]:
+        if obj and obj.connector_identity != defaults["connector_identity"]:
             raise ValueError("Cannot claim an unprovenanced Custom Field from Snipe-IT")
         if obj and obj.lifecycle != "active":
             raise ValueError("Cannot reactivate a deprecated Custom Field from Snipe-IT")
@@ -330,8 +328,8 @@ class FieldsetImporter:
         self.context = context
         self.dependencies = dependencies
 
-    def _source_checksum(self, source_id):
-        return _source_checksum(self.context, "fieldset", source_id)
+    def _connector_identity(self, source_id):
+        return _definition_digest(self.context, "fieldset", source_id)
 
     def _reconcile_memberships(self, membership_model, fieldset, row):
         field_payload = row.get("fields")
@@ -366,13 +364,13 @@ class FieldsetImporter:
             "management_kind": "local",
             "version": 1,
             "lifecycle": "active",
-            "source_checksum": self._source_checksum(source_id),
+            "connector_identity": self._connector_identity(source_id),
         }
         obj = model.objects.select_for_update().filter(namespace="local", slug=slug).first()
         created = False
         if obj and obj.management_kind != "local":
             raise ValueError("Cannot update a managed Fieldset from Snipe-IT")
-        if obj and obj.source_checksum != defaults["source_checksum"]:
+        if obj and obj.connector_identity != defaults["connector_identity"]:
             raise ValueError("Cannot claim an unprovenanced Fieldset from Snipe-IT")
         if obj and obj.lifecycle != "active":
             raise ValueError("Cannot reactivate a deprecated Fieldset from Snipe-IT")

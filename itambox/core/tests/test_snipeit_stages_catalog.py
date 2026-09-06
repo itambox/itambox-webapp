@@ -7,12 +7,11 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db import connection
 from django.utils import timezone
 
 from core.importers.snipeit.client import SnipeITClient
 from core.importers.snipeit.contracts import ImportContext, StageReporter
-from core.importers.snipeit.stages.asset_models import AssetModelDependencies, AssetModelImporter
+from core.importers.snipeit.stages.asset_models import AssetModelDependencies, AssetModelImporter, _connector_identity
 from core.importers.snipeit.stages.catalog import (
     CategoryDependencies,
     CategoryImporter,
@@ -398,8 +397,8 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert fieldset.label == "Source A Specs"
         assert second_deps.fieldsets == {}
 
-    def test_custom_field_import_refuses_managed_choice_row_and_locks_row(self):
-        from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet
+    def test_custom_field_import_refuses_managed_choice_set_owner(self):
+        from extras.models import CustomField, CustomFieldChoiceSet
 
         deps = CustomFieldDependencies({})
         row = {
@@ -411,31 +410,22 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         }
         self._run(lambda context: CustomFieldImporter(context, deps), "/api/v1/fields", [row])
         field = CustomField.objects.get(name="managed_choice_row")
-        choice = field.choice_set.choices.get(key="stable")
-        CustomFieldChoice.objects.filter(pk=choice.pk).update(management_kind=CustomFieldChoice.MANAGEMENT_CORE)
+        choice_set = field.choice_set
+        CustomFieldChoiceSet.objects.filter(pk=choice_set.pk).update(
+            management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE
+        )
 
-        statements = []
+        result = self._run(
+            lambda context: CustomFieldImporter(context, deps),
+            "/api/v1/fields",
+            [row],
+            update=True,
+        )
 
-        def capture(execute, sql, params, many, context):
-            statements.append(sql)
-            return execute(sql, params, many, context)
-
-        with connection.execute_wrapper(capture):
-            result = self._run(
-                lambda context: CustomFieldImporter(context, deps),
-                "/api/v1/fields",
-                [row],
-                update=True,
-            )
-
-        choice.refresh_from_db()
+        choice_set.refresh_from_db()
         assert result.counts.failed == 1
-        assert choice.management_kind == CustomFieldChoice.MANAGEMENT_CORE
-        choice_lock_statements = [
-            sql for sql in statements if '"EXTRAS_CUSTOMFIELDCHOICE"' in sql.upper() and "FOR UPDATE" in sql.upper()
-        ]
-        assert choice_lock_statements
-        assert CustomFieldChoiceSet.objects.filter(pk=field.choice_set_id).exists()
+        assert choice_set.management_kind == CustomFieldChoiceSet.MANAGEMENT_CORE
+        assert field.choice_set_id == choice_set.pk
 
     def test_custom_field_choice_keys_remain_distinct_for_normalized_label_collisions(self):
         from extras.models import CustomField
@@ -639,7 +629,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         field.refresh_from_db()
         assert result.counts.failed == 1
         assert field.label == "Operator-Owned Field"
-        assert field.source_checksum is None
+        assert field.connector_identity is None
         assert deps.custom_fields == {}
 
     def test_custom_field_import_refuses_managed_identity(self):
@@ -1045,7 +1035,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert obj.eol_months == 36
         assert len(obj.part_number) == 100
         assert obj.custom_field_data == {}
-        assert obj.managed_paths == {"snipeit": {"source_url": "https://snipe.example", "source_id": "107"}}
+        assert obj.connector_identity == _connector_identity(
+            {"source_url": "https://snipe.example", "source_id": "107"}
+        )
         assert deps.asset_models[107] == obj
 
         skipped = self._run(lambda context: AssetModelImporter(context, deps), "/api/v1/models", [row])
@@ -1080,10 +1072,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             manufacturer=manufacturer,
             model="Adoption Stage Model",
             slug="adoption-stage-model",
-            managed_paths={
-                "operator": "keep",
-                "snipeit": {"source_url": "https://snipe.example", "source_id": "124"},
-            },
+            connector_identity=_connector_identity(
+                {"source_url": "https://snipe.example", "source_id": "124"}
+            ),
             custom_field_data={"operator_value": "keep"},
         )
         AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
@@ -1105,10 +1096,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         asset_type.refresh_from_db()
         assert result.counts.updated == 1
         assert asset_type.custom_field_data == {"operator_value": "keep"}
-        assert asset_type.managed_paths == {
-            "operator": "keep",
-            "snipeit": {"source_url": "https://snipe.example", "source_id": "124"},
-        }
+        assert asset_type.connector_identity == _connector_identity(
+            {"source_url": "https://snipe.example", "source_id": "124"}
+        )
         assert list(asset_type.fieldset_memberships.values_list("fieldset_id", flat=True)) == [fieldset.pk]
 
     def test_asset_model_attribute_match_refuses_unprovenanced_local_asset_type(self):
@@ -1227,7 +1217,9 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             model="Core Managed Stage Model",
             slug="core-managed-stage-model",
             management_kind=AssetType.MANAGEMENT_CORE,
-            managed_paths={"snipeit": {"source_url": "https://snipe.example", "source_id": "119"}},
+            connector_identity=_connector_identity(
+                {"source_url": "https://snipe.example", "source_id": "119"}
+            ),
         )
         deps = AssetModelDependencies({119: manufacturer}, {}, {}, {})
         row = {

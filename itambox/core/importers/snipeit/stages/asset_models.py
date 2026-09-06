@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 
@@ -29,6 +31,19 @@ def _snipeit_identity(context, source_id):
     return {"source_url": source_url, "source_id": str(source_id)}
 
 
+def _connector_identity(source_identity):
+    material = json.dumps(
+        {
+            "source_url": source_identity["source_url"],
+            "source_id": source_identity["source_id"],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 class AssetModelImporter:
     key = "models"
 
@@ -37,14 +52,9 @@ class AssetModelImporter:
         self.dependencies = dependencies
 
     @staticmethod
-    def _find_existing(model, source_identity, model_name, manufacturer):
+    def _find_existing(model, connector_identity, model_name, manufacturer):
         locked = model.all_objects.select_for_update()
-        source_matches = list(
-            locked.filter(
-                managed_paths__snipeit__source_url=source_identity["source_url"],
-                managed_paths__snipeit__source_id=source_identity["source_id"],
-            )[:2]
-        )
+        source_matches = list(locked.filter(connector_identity=connector_identity)[:2])
         if len(source_matches) > 1:
             raise ValueError("Ambiguous Snipe-IT source ID")
         if source_matches:
@@ -60,11 +70,8 @@ class AssetModelImporter:
         existing_data = existing.custom_field_data or {}
         if not isinstance(existing_data, Mapping):
             raise ValueError("Existing Asset Type specifications are not a JSON object")
-        existing_paths = existing.managed_paths or {}
-        if not isinstance(existing_paths, Mapping):
-            raise ValueError("Existing Asset Type managed metadata is not a JSON object")
-        existing_source = existing_paths.get("snipeit")
-        if existing_source is not None and existing_source != source_identity:
+        existing_identity = existing.connector_identity
+        if existing_identity not in (None, "") and existing_identity != connector_identity:
             raise ValueError("Asset Type attributes belong to another Snipe-IT identity")
         if existing_data.get("snipeit_id") not in (None, ""):
             raise ValueError("Asset Type has legacy unprovenanced Snipe-IT identity")
@@ -80,16 +87,10 @@ class AssetModelImporter:
         previous_data = getattr(obj, "custom_field_data", None)
         if previous_data is not None and not isinstance(previous_data, Mapping):
             raise ValueError("Existing Asset Type specifications are not a JSON object")
-        previous_paths = getattr(obj, "managed_paths", None)
-        if previous_paths is not None and not isinstance(previous_paths, Mapping):
-            raise ValueError("Existing Asset Type managed metadata is not a JSON object")
         merged_data = dict(previous_data or {})
         merged_data.pop("snipeit_id", None)
         merged_data.update(defaults["custom_field_data"])
-        merged_paths = dict(previous_paths or {})
-        merged_paths.update(defaults["managed_paths"])
         defaults["custom_field_data"] = merged_data
-        defaults["managed_paths"] = merged_paths
         if not self.context.dry_run:
             for field, value in defaults.items():
                 setattr(obj, field, value)
@@ -104,12 +105,18 @@ class AssetModelImporter:
             if fieldset is not _OMITTED_FIELDSET:
                 self._write_composition(composition_model, obj, fieldset)
         else:
-            obj = model(id=-source_id, model=model_name, manufacturer=manufacturer)
+            obj = model(
+                id=-source_id,
+                model=model_name,
+                manufacturer=manufacturer,
+                connector_identity=defaults["connector_identity"],
+            )
         return obj, "created"
 
     def _upsert(self, model, composition_model, row) -> tuple[object, Outcome]:
         source_id = row["id"]
         source_identity = _snipeit_identity(self.context, source_id)
+        connector_identity = _connector_identity(source_identity)
         model_name = (row.get("name") or "").strip() or f"Model {source_id}"
         manufacturer = self.dependencies.manufacturers.get(_nested_id(row.get("manufacturer")))
         category = self.dependencies.categories.get(_nested_id(row.get("category")))
@@ -136,9 +143,9 @@ class AssetModelImporter:
             "eol_months": eol_months,
             "part_number": part_number,
             "custom_field_data": {},
-            "managed_paths": {"snipeit": source_identity},
+            "connector_identity": connector_identity,
         }
-        obj = self._find_existing(model, source_identity, model_name, manufacturer)
+        obj = self._find_existing(model, connector_identity, model_name, manufacturer)
         if obj is not None:
             return self._update_existing(obj, defaults, composition_model, fieldset)
         return self._create(model, source_id, defaults, composition_model, fieldset, model_name, manufacturer)
