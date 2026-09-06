@@ -56,6 +56,23 @@ class PreviewTokenKernelTests(unittest.TestCase):
     def _issue(self, expectation: PreviewTokenExpectation | None = None, *, now: int = TEST_NOW) -> str:
         return issue_preview_token(expectation or self._expectation(), key=TEST_KEY, now=now)
 
+    def _payload(self) -> dict[str, object]:
+        payload = signing.Signer(key=TEST_KEY, salt=PREVIEW_TOKEN_SALT, fallback_keys=()).unsign_object(self._issue())
+        if not isinstance(payload, dict):
+            raise AssertionError("issued token payload is not a mapping")
+        return payload
+
+    def _payload_with_claims(self, **changes: object) -> dict[str, object]:
+        payload = self._payload()
+        claims = payload["claims"]
+        if not isinstance(claims, dict):
+            raise AssertionError("issued token claims are not a mapping")
+        payload["claims"] = {**claims, **changes}
+        return payload
+
+    def _sign_payload(self, payload: object) -> str:
+        return signing.Signer(key=TEST_KEY, salt=PREVIEW_TOKEN_SALT, fallback_keys=()).sign_object(payload)
+
     def _assert_stale(self, token: str, expected: PreviewTokenExpectation | None = None, *, now: int = TEST_NOW):
         with self.assertRaises(PreviewTokenError) as raised:
             verify_preview_token(
@@ -112,6 +129,11 @@ class PreviewTokenKernelTests(unittest.TestCase):
     def test_malformed_and_oversized_tokens_are_rejected(self):
         for token in ("", "not-a-signed-token", "x" * (MAX_PREVIEW_TOKEN_LENGTH + 1)):
             with self.subTest(token_length=len(token)):
+                self._assert_stale(token)
+
+    def test_invalid_token_text_types_and_characters_are_rejected(self):
+        for token in (None, b"not-a-text-token", "é"):
+            with self.subTest(token_type=type(token).__name__):
                 self._assert_stale(token)
 
     def test_compressed_tokens_are_outside_the_emitted_format(self):
@@ -199,6 +221,51 @@ class PreviewTokenKernelTests(unittest.TestCase):
         self.assertEqual(changed_snapshot.expected_definition_revision, expected.expected_definition_revision)
         self._assert_stale(self._issue(expected), changed_snapshot)
 
+    def test_public_expectations_reject_invalid_owner_and_claim_values(self):
+        with self.assertRaises(ValueError):
+            OwnerRef(owner_kind="unsupported", owner_id=1)
+        with self.assertRaises(ValueError):
+            OwnerRef(owner_kind="asset", owner_id=0)
+        with self.assertRaises(TypeError):
+            replace(self._expectation(), target={"owner_kind": "asset", "owner_id": 1})
+        with self.assertRaises(TypeError):
+            replace(self._expectation(), authentication_revision=41)
+        with self.assertRaises(ValueError):
+            replace(self._expectation(), command_kind="")
+        with self.assertRaises(ValueError):
+            replace(self._expectation(), command_kind="préview")
+
+    def test_preview_claims_reject_invalid_epoch_and_lifetime_values(self):
+        claims = self._expectation().with_times(TEST_NOW)
+
+        with self.assertRaises(ValueError):
+            self._expectation().with_times(-1)
+        with self.assertRaises(ValueError):
+            replace(claims, expires_at_epoch_seconds=TEST_NOW + 1799)
+        with self.assertRaises(ValueError):
+            replace(claims, issued_at_epoch_seconds=-1)
+        with self.assertRaises(ValueError):
+            replace(claims, expires_at_epoch_seconds=-1)
+
+    def test_optional_claims_and_target_can_be_absent(self):
+        expected = replace(
+            self._expectation(),
+            access_scope_fingerprint=None,
+            expected_resource_revision=None,
+            expected_category_default_snapshot_revision=None,
+            historical_state_digest=None,
+            target=None,
+        )
+
+        actual = verify_preview_token(self._issue(expected), expected=expected, key=TEST_KEY, now=TEST_NOW)
+
+        self.assertEqual(actual.binding(), expected)
+        self.assertIsNone(actual.target)
+        self.assertIsNone(actual.access_scope_fingerprint)
+        self.assertIsNone(actual.expected_resource_revision)
+        self.assertIsNone(actual.expected_category_default_snapshot_revision)
+        self.assertIsNone(actual.historical_state_digest)
+
     def test_signed_payload_schema_rejects_missing_claims(self):
         token = self._issue()
         payload = signing.Signer(key=TEST_KEY, salt=PREVIEW_TOKEN_SALT, fallback_keys=()).unsign_object(token)
@@ -211,10 +278,95 @@ class PreviewTokenKernelTests(unittest.TestCase):
 
         self._assert_stale(malformed_schema_token)
 
+    def test_signed_envelope_and_claim_keysets_are_exact(self):
+        missing_envelope_key = self._payload()
+        del missing_envelope_key["purpose"]
+
+        extra_envelope_key = self._payload()
+        extra_envelope_key["unexpected"] = "not-supported"
+
+        boolean_version = self._payload()
+        boolean_version["version"] = True
+
+        non_mapping_claims = self._payload()
+        non_mapping_claims["claims"] = []
+
+        extra_claim_key = self._payload_with_claims(nonce="not-part-of-the-preview-contract")
+
+        malformed_payloads = {
+            "missing envelope key": missing_envelope_key,
+            "extra envelope key": extra_envelope_key,
+            "boolean version": boolean_version,
+            "non-mapping claims": non_mapping_claims,
+            "extra nonce claim": extra_claim_key,
+        }
+        for name, payload in malformed_payloads.items():
+            with self.subTest(schema=name):
+                self._assert_stale(self._sign_payload(payload))
+
+    def test_signed_target_and_claim_values_fail_closed(self):
+        malformed_payloads = {
+            "target keyset": self._payload_with_claims(target={"owner_kind": "asset"}),
+            "boolean actor": self._payload_with_claims(actor_id=True),
+            "non-string claim": self._payload_with_claims(authentication_revision=None),
+            "non-ascii claim": self._payload_with_claims(authentication_revision="é"),
+            "boolean issued time": self._payload_with_claims(issued_at_epoch_seconds=True),
+            "wrong lifetime": self._payload_with_claims(expires_at_epoch_seconds=TEST_NOW + 1799),
+        }
+        for name, payload in malformed_payloads.items():
+            with self.subTest(claim=name):
+                self._assert_stale(self._sign_payload(payload))
+
     def test_normalized_input_and_tokens_are_bounded(self):
         with self.assertRaises(ValueError):
             normalized_input_digest({"too_long": "x" * 5000})
         self._assert_stale("x" * (MAX_PREVIEW_TOKEN_LENGTH + 1))
+
+    def test_normalized_input_rejects_structural_and_scalar_limits(self):
+        deeply_nested: object = "leaf"
+        for _ in range(17):
+            deeply_nested = [deeply_nested]
+
+        node_limit = [[[0] * 512 for _ in range(128)]]
+        malformed_inputs = {
+            "unsupported scalar": {"value": 1.5},
+            "depth limit": deeply_nested,
+            "node limit": node_limit,
+            "large integer": {"value": 1 << 256},
+            "mapping item limit": {str(index): None for index in range(513)},
+            "non-string mapping key": {1: None},
+            "mapping key length": {"k" * 4097: None},
+            "sequence item limit": [None] * 513,
+            "invalid unicode": {"value": "\ud800"},
+        }
+        for name, value in malformed_inputs.items():
+            with self.subTest(input_shape=name):
+                with self.assertRaises(ValueError):
+                    normalized_input_digest(value)
+
+    def test_normalized_input_rejects_canonical_json_above_byte_limit(self):
+        leaf = "x" * 4096
+        oversized_input = [[leaf] * 512 for _ in range(5)]
+
+        with self.assertRaisesRegex(ValueError, "size limit"):
+            normalized_input_digest(oversized_input)
+
+    def test_issue_preview_token_rejects_a_signed_payload_above_token_limit(self):
+        long_claim = "a" * 512
+        oversized_expectation = replace(
+            self._expectation(),
+            actor_id=10**3500,
+            authentication_revision=long_claim,
+            access_scope_fingerprint=long_claim,
+            command_kind=long_claim,
+            expected_resource_revision=long_claim,
+            expected_definition_revision=long_claim,
+            expected_category_default_snapshot_revision=long_claim,
+            historical_state_digest=long_claim,
+        )
+
+        with self.assertRaisesRegex(ValueError, "exceeds the size limit"):
+            issue_preview_token(oversized_expectation, key=TEST_KEY, now=TEST_NOW)
 
     def test_digest_accepts_full_effective_field_text_envelope(self):
         normalized = {
@@ -242,6 +394,27 @@ class PreviewTokenKernelTests(unittest.TestCase):
             issue_preview_token(self._expectation(), now=TEST_NOW)  # type: ignore[call-arg]
         with self.assertRaises(ValueError):
             issue_preview_token(self._expectation(), key="", now=TEST_NOW)
+
+    def test_explicit_server_key_accepts_bytes_and_rejects_invalid_key_types(self):
+        key = TEST_KEY.encode("ascii")
+        token = issue_preview_token(self._expectation(), key=key, now=TEST_NOW)
+
+        self.assertEqual(
+            verify_preview_token(token, expected=self._expectation(), key=key, now=TEST_NOW).binding(),
+            self._expectation(),
+        )
+        for invalid_key in (None, object()):
+            with self.subTest(key_type=type(invalid_key).__name__):
+                with self.assertRaises(ValueError):
+                    issue_preview_token(self._expectation(), key=invalid_key, now=TEST_NOW)
+                with self.assertRaises(ValueError):
+                    verify_preview_token(token, expected=self._expectation(), key=invalid_key, now=TEST_NOW)
+
+    def test_invalid_expected_values_are_rejected_before_token_processing(self):
+        with self.assertRaises(TypeError):
+            issue_preview_token(object(), key=TEST_KEY, now=TEST_NOW)
+        with self.assertRaises(TypeError):
+            verify_preview_token(self._issue(), expected=object(), key=TEST_KEY, now=TEST_NOW)
 
     def test_invalid_token_failure_does_not_log_or_echo_credentials(self):
         token = self._issue()
