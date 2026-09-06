@@ -55,8 +55,10 @@ from assets.services.specifications.loader import (
 from assets.services.specifications.locking import catalogue_transaction_lock
 from assets.services.specifications.preview_tokens import (
     OwnerRef as PreviewOwnerRef,
-    PreviewTokenExpectation,
+)
+from assets.services.specifications.preview_tokens import (
     PreviewTokenError,
+    PreviewTokenExpectation,
     issue_preview_token,
     normalized_input_digest,
     verify_preview_token,
@@ -78,8 +80,8 @@ from ._command_support import (
     positive_id,
     rejected,
     reload_actor,
-    revision_string,
     resource_revision_for_owner,
+    revision_string,
     stale_plan_issue,
     stored_values_for,
     unavailable,
@@ -162,9 +164,7 @@ def _missing_create_preconditions(
     if preview_token is None:
         missing.append(issue("MISSING_PRECONDITION", path=("preview_token",)))
     if expected_category_default_snapshot_revision is None:
-        missing.append(
-            issue("MISSING_PRECONDITION", path=("expected_category_default_snapshot_revision",))
-        )
+        missing.append(issue("MISSING_PRECONDITION", path=("expected_category_default_snapshot_revision",)))
     return tuple(missing)
 
 
@@ -183,9 +183,7 @@ def _missing_apply_preconditions(
     if expected_definition_revision is None:
         missing.append(issue("MISSING_PRECONDITION", path=("expected_definition_revision",)))
     if expected_category_default_snapshot_revision is None:
-        missing.append(
-            issue("MISSING_PRECONDITION", path=("expected_category_default_snapshot_revision",))
-        )
+        missing.append(issue("MISSING_PRECONDITION", path=("expected_category_default_snapshot_revision",)))
     return tuple(missing)
 
 
@@ -258,27 +256,17 @@ def _reloaded_authorized_actor(
 
 
 def _available_manufacturer(manufacturer_id: int):
-    return (
-        Manufacturer.all_objects.using(_DEFAULT_DB)
-        .filter(pk=manufacturer_id, deleted_at__isnull=True)
-        .first()
-    )
+    return Manufacturer.all_objects.using(_DEFAULT_DB).filter(pk=manufacturer_id, deleted_at__isnull=True).first()
 
 
 def _available_category(category_id: int):
-    return (
-        Category.all_objects.using(_DEFAULT_DB)
-        .filter(pk=category_id, deleted_at__isnull=True)
-        .first()
-    )
+    return Category.all_objects.using(_DEFAULT_DB).filter(pk=category_id, deleted_at__isnull=True).first()
 
 
 def _tags_exist(tag_ids: tuple[int, ...], *, using: str = _DEFAULT_DB) -> bool:
     if not tag_ids:
         return True
-    return (
-        Tag.all_objects.using(using).filter(pk__in=tag_ids, deleted_at__isnull=True).count() == len(tag_ids)
-    )
+    return Tag.all_objects.using(using).filter(pk__in=tag_ids, deleted_at__isnull=True).count() == len(tag_ids)
 
 
 def _lock_manufacturer(manufacturer_id: int):
@@ -389,9 +377,7 @@ def _recompute_category_default_snapshot(
     )
     return CategoryDefaultSnapshotDTO(
         category_id=category_id,
-        revision=CategoryDefaultSnapshotRevision(
-            "sha256:" + hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-        ),
+        revision=CategoryDefaultSnapshotRevision("sha256:" + hashlib.sha256(serialized.encode("utf-8")).hexdigest()),
         memberships=tuple(membership_dtos),
     )
 
@@ -948,11 +934,7 @@ def _preview_apply_locked(
     expected_resource_revision: str,
     patch: SpecificationPatchDTO,
 ) -> AssetTypePreviewResult:
-    owner = (
-        AssetType.all_objects.using(_DEFAULT_DB)
-        .filter(pk=asset_type_id, deleted_at__isnull=True)
-        .first()
-    )
+    owner = AssetType.all_objects.using(_DEFAULT_DB).filter(pk=asset_type_id, deleted_at__isnull=True).first()
     owner_ref = OwnerRefDTO("asset_type", asset_type_id)
     if owner is None:
         return unavailable()

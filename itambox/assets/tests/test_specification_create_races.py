@@ -197,7 +197,9 @@ def test_two_concurrent_creates_consume_category_defaults_serially(create_race_k
     native_b = _native(manufacturer, category, model="Race model B")
     preview_a = _create_preview(actor, native_a)
     preview_b = _create_preview(actor, native_b)
-    assert preview_a.expected_category_default_snapshot_revision == preview_b.expected_category_default_snapshot_revision
+    assert (
+        preview_a.expected_category_default_snapshot_revision == preview_b.expected_category_default_snapshot_revision
+    )
 
     started = None
     try:

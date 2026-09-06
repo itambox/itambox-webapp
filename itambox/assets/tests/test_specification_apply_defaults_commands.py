@@ -326,7 +326,9 @@ class SpecificationApplyDefaultsCommandTests(TenantTestMixin, TestCase):
     def test_apply_defaults_recomputed_snapshot_binds_definition_unchanged_case(self):
         preview = self._preview()
         position = CategoryDefaultFieldset.objects.get(category=self.category, fieldset=self.first).position
-        CategoryDefaultFieldset.objects.filter(category=self.category, fieldset=self.first).update(position=position + 7)
+        CategoryDefaultFieldset.objects.filter(category=self.category, fieldset=self.first).update(
+            position=position + 7
+        )
         definition, _definitions, _graph = load_prospective_definition(
             ("local/first",),
             "asset_type",
