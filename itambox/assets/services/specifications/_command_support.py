@@ -19,25 +19,33 @@ from types import MappingProxyType
 from typing import Iterator
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
 
 from assets.models.asset import Asset
-from assets.models.catalog import AssetType, AssetTypeFieldset
+from assets.models.catalog import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset
 from assets.services.specifications.contracts import (
     CommandRejectedDTO,
     DefinitionRevision,
     DomainIssueDTO,
+    OrderedFieldsetMembershipDTO,
     OwnerRefDTO,
+    QualifiedIdentity,
     ResourceRevision,
     SpecificationGraphLoadRequest,
     SpecificationPatchDTO,
     SpecificationResolutionRequest,
 )
-from assets.services.specifications.loader import load_specification_graph
+from assets.services.specifications.loader import (
+    composition_library_ids,
+    load_prospective_specification_graph,
+    load_specification_graph,
+    relevant_library_ids,
+)
 from core.context import _current_user, _request_id
-from extras.models import CustomField, CustomFieldset, CustomFieldsetField, SpecificationLibrary
+from extras.models import SpecificationLibrary
 from extras.services.specifications.codecs import (
     NormalizedSpecificationPatch,
     SpecificationCodecError,
@@ -47,6 +55,7 @@ from extras.services.specifications.composition import resolve_specification_def
 from extras.services.specifications.contracts import (
     FieldDefinitionDTO,
     FieldKey,
+    LoadedSpecificationGraphDTO,
     ResolvedFieldDTO,
     SpecificationDefinitionDTO,
     TargetKind,
@@ -74,6 +83,25 @@ def revision_string(value: object, name: str) -> str:
     if type(value) is not str or not value:
         raise ValueError(f"{name} must be a non-empty string")
     return value
+
+
+def has_global_model_permission(actor: object, model: type[object], codename: str) -> bool:
+    """Require an active user's real global model permission, not staff/tenant flags."""
+    if getattr(actor, "is_superuser", False):
+        return True
+    content_type = ContentType.objects.get_for_model(model)
+    permission = Permission.objects.filter(content_type=content_type, codename=codename).first()
+    if permission is None:
+        return False
+    user_permissions = getattr(actor, "user_permissions", None)
+    groups = getattr(actor, "groups", None)
+    return bool(
+        user_permissions is not None
+        and (
+            user_permissions.filter(pk=permission.pk).exists()
+            or (groups is not None and groups.filter(permissions__pk=permission.pk).exists())
+        )
+    )
 
 
 def issue(
@@ -136,7 +164,7 @@ def _canonical_value(value: object) -> object:
     return str(value)
 
 
-def _owner_resource_payload(owner: Asset | AssetType) -> dict[str, object]:
+def _owner_resource_payload(owner: Asset | AssetType | Category) -> dict[str, object]:
     payload: dict[str, object] = {
         "version": 1,
         "model": owner._meta.label_lower,
@@ -156,14 +184,26 @@ def _owner_resource_payload(owner: Asset | AssetType) -> dict[str, object]:
                 "fieldset_id": row["fieldset_id"],
                 "position": row["position"],
             }
-            for row in AssetTypeFieldset.objects.filter(asset_type_id=owner.pk)
+            for row in AssetTypeFieldset.objects.using(owner._state.db or DEFAULT_DB_ALIAS)
+            .filter(asset_type_id=owner.pk)
+            .order_by("position", "fieldset_id")
+            .values("fieldset_id", "position")
+        ]
+    elif isinstance(owner, Category):
+        payload["composition"] = [
+            {
+                "fieldset_id": row["fieldset_id"],
+                "position": row["position"],
+            }
+            for row in CategoryDefaultFieldset.objects.using(owner._state.db or DEFAULT_DB_ALIAS)
+            .filter(category_id=owner.pk)
             .order_by("position", "fieldset_id")
             .values("fieldset_id", "position")
         ]
     return payload
 
 
-def resource_revision_for_owner(owner: Asset | AssetType) -> ResourceRevision:
+def resource_revision_for_owner(owner: Asset | AssetType | Category) -> ResourceRevision:
     serialized = json.dumps(
         _owner_resource_payload(owner),
         ensure_ascii=False,
@@ -212,59 +252,6 @@ def stored_values_for(owner: Asset | AssetType) -> dict[str, object]:
     return dict(values)
 
 
-def _add_library_id(library_ids: set[int], value: object) -> None:
-    if value is not None:
-        library_ids.add(positive_id(value, "library id"))
-
-
-def relevant_library_ids(
-    asset_type_ids: Sequence[int],
-    target_kind: TargetKind,
-    *,
-    using: str = DEFAULT_DB_ALIAS,
-) -> tuple[int, ...]:
-    """Find libraries reachable from the destination graph before owner locking."""
-    library_ids: set[int] = set()
-    type_ids = tuple(sorted(set(asset_type_ids)))
-    type_rows = AssetType.all_objects.using(using).filter(pk__in=type_ids).values("pk", "library_id")
-    for row in type_rows:
-        _add_library_id(library_ids, row["library_id"])
-
-    fieldset_ids = set(
-        AssetTypeFieldset.objects.using(using).filter(asset_type_id__in=type_ids).values_list("fieldset_id", flat=True)
-    )
-    if fieldset_ids:
-        for library_id in (
-            CustomField.objects.using(using)
-            .filter(fieldset_memberships__fieldset_id__in=fieldset_ids)
-            .values_list("library_id", flat=True)
-        ):
-            _add_library_id(library_ids, library_id)
-        for library_id in (
-            CustomFieldset.objects.using(using).filter(pk__in=fieldset_ids).values_list("library_id", flat=True)
-        ):
-            _add_library_id(library_ids, library_id)
-        for library_id in (
-            CustomFieldsetField.objects.using(using)
-            .filter(fieldset_id__in=fieldset_ids)
-            .values_list("custom_field__choice_set__library_id", flat=True)
-        ):
-            _add_library_id(library_ids, library_id)
-
-    target_model = AssetType if target_kind == "asset_type" else Asset
-    content_type = ContentType.objects.db_manager(using).get_for_model(target_model)
-    global_fields = CustomField.objects.using(using).filter(
-        activation=CustomField.ACTIVATION_GLOBAL,
-        object_types=content_type,
-    )
-    for library_id in global_fields.values_list("library_id", flat=True):
-        _add_library_id(library_ids, library_id)
-    for library_id in global_fields.values_list("choice_set__library_id", flat=True):
-        _add_library_id(library_ids, library_id)
-
-    return tuple(sorted(library_ids))
-
-
 def lock_relevant_libraries(
     asset_type_ids: Sequence[int],
     target_kind: TargetKind,
@@ -276,6 +263,28 @@ def lock_relevant_libraries(
     if library_ids:
         list(SpecificationLibrary.objects.using(using).select_for_update().filter(pk__in=library_ids).order_by("pk"))
     return library_ids
+
+
+def lock_relevant_libraries_for_composition(
+    current_fieldset_ids: Sequence[int],
+    proposed_fieldset_identities: Sequence[str],
+    target_kind: TargetKind,
+    *,
+    asset_type_ids: Sequence[int] = (),
+    using: str = DEFAULT_DB_ALIAS,
+) -> tuple[int, ...]:
+    """Lock libraries reachable from both the current and proposed graph."""
+    library_ids = composition_library_ids(
+        current_fieldset_ids,
+        proposed_fieldset_identities,
+        target_kind,
+        asset_type_ids=asset_type_ids,
+        using=using,
+    )
+
+    if library_ids:
+        list(SpecificationLibrary.objects.using(using).select_for_update().filter(pk__in=library_ids).order_by("pk"))
+    return tuple(sorted(library_ids))
 
 
 def _field_definition_for_edit(field: ResolvedFieldDTO) -> FieldDefinitionDTO:
@@ -334,6 +343,31 @@ def load_effective_definition(
     return definition, _editable_definitions(definition)
 
 
+def load_prospective_definition(
+    fieldset_identities: Sequence[str],
+    target_kind: TargetKind,
+    stored_keys: Sequence[str],
+) -> tuple[SpecificationDefinitionDTO, Mapping[str, FieldDefinitionDTO], LoadedSpecificationGraphDTO]:
+    identities = tuple(QualifiedIdentity(identity) for identity in fieldset_identities)
+    graph = load_prospective_specification_graph(
+        fieldset_identities=identities,
+        requested_target_kinds=frozenset({target_kind}),
+        requested_field_keys=frozenset(FieldKey(key) for key in stored_keys),
+    )
+    ordered_memberships = tuple(
+        OrderedFieldsetMembershipDTO(fieldset_identity=identity, ordinal=ordinal)
+        for ordinal, identity in enumerate(identities, start=1)
+    )
+    definition = resolve_specification_definition(
+        SpecificationResolutionRequest(
+            ordered_memberships=ordered_memberships,
+            loaded_graph=graph,
+            target_kind=target_kind,
+        )
+    )
+    return definition, _editable_definitions(definition), graph
+
+
 def normalize_patch(
     patch: SpecificationPatchDTO,
     definitions: Mapping[str, FieldDefinitionDTO],
@@ -369,7 +403,7 @@ def actor_change_context(actor: object) -> Iterator[None]:
 
 
 def save_owner_in_savepoint(
-    owner: Asset | AssetType,
+    owner: Asset | AssetType | Category,
     actor: object,
     *,
     update_fields: Sequence[str],
@@ -427,9 +461,12 @@ def stale_plan_issue() -> DomainIssueDTO:
 
 __all__ = [
     "actor_change_context",
+    "has_global_model_permission",
     "json_values_equal",
     "load_effective_definition",
+    "load_prospective_definition",
     "lock_relevant_libraries",
+    "lock_relevant_libraries_for_composition",
     "map_reference_error",
     "map_structure_error",
     "normalize_patch",

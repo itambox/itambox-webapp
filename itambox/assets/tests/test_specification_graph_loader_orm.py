@@ -16,6 +16,21 @@ from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, 
 pytestmark = pytest.mark.django_db
 
 
+def _assert_no_owner_reads(sql):
+    assert not re.search(
+        r'\b(?:FROM|JOIN)\s+"?(?:assets_asset|assets_assettype|assets_category|organization_tenant)"?(?=\s|$)',
+        sql,
+        re.IGNORECASE,
+    )
+    assert "custom_field_data" not in sql.lower()
+
+
+@pytest.mark.parametrize("table", ["assets_asset", "assets_assettype", "organization_tenant"])
+def test_owner_sql_guard_rejects_real_owner_selects(table):
+    with pytest.raises(AssertionError):
+        _assert_no_owner_reads('SELECT * FROM "' + table + '"')
+
+
 def _field(name, *, activation, model=AssetType, lifecycle="active"):
     field = CustomField.objects.create(
         namespace="local",
@@ -130,3 +145,39 @@ def test_real_multiple_fieldsets_share_choices_without_per_field_queries():
     assert later.fieldsets_by_identity["local/choice-group-0"].resource_revision != before
     assert later.fields_by_key[field_names[0]].choice_set.choices[0].label == "Changed option"
     print("REAL_FIELDSET_QUERY_COUNTS", counts)
+
+
+def test_real_prospective_fieldset_loader_is_flat_and_does_not_read_owners_or_values():
+    identities = []
+    field_names = []
+    for index in range(loader._BATCH_SIZE + 1):
+        group = CustomFieldset.objects.create(namespace="local", slug=f"prospective-{index}", label="Prospective")
+        field = _field(f"prospective_field_{index}", activation=CustomField.ACTIVATION_COMPOSED)
+        CustomFieldsetField.objects.create(fieldset=group, custom_field=field, position=1)
+        identities.append(f"local/{group.slug}")
+        field_names.append(field.name)
+
+    counts = []
+    for selected in (identities[:1], identities[:30], identities[:50], identities[:100], identities):
+        with CaptureQueriesContext(connection) as queries:
+            graph = loader.load_prospective_specification_graph(
+                fieldset_identities=tuple(selected),
+                requested_target_kinds=frozenset({"asset_type", "asset"}),
+                requested_field_keys=frozenset(),
+            )
+        assert not graph.type_memberships
+        assert set(graph.fieldsets_by_identity) == set(selected)
+        assert len(graph.fields_by_key) == len(set(selected))
+        for query in queries:
+            _assert_no_owner_reads(query["sql"])
+        counts.append(len(queries))
+    assert counts[0] == counts[1] == counts[2] == counts[3]
+    assert counts[0] < counts[4] <= counts[0] + 4
+    with pytest.raises(TypeError):
+        graph.fieldsets_by_identity["injected"] = graph.fieldsets_by_identity[identities[0]]
+    with pytest.raises(AttributeError):
+        graph.fields_by_key[field_names[0]].label = "mutated"
+    with pytest.raises(AttributeError):
+        graph.fieldsets_by_identity[identities[0]].field_memberships[0].ordinal = 99
+    assert graph.fields_by_key[field_names[0]].label == field_names[0]
+    print("REAL_PROSPECTIVE_BATCH_QUERY_COUNTS", counts)

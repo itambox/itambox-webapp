@@ -15,11 +15,14 @@ from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Any
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Prefetch
+from django.db import DEFAULT_DB_ALIAS
+from django.db.models import Prefetch, Q
 
-from assets.models.catalog import AssetTypeFieldset
-from extras.models import CustomField, CustomFieldChoice, CustomFieldsetField
+from assets.models.asset import Asset
+from assets.models.catalog import AssetType, AssetTypeFieldset
+from extras.models import CustomField, CustomFieldChoice, CustomFieldset, CustomFieldsetField
 from extras.services.specifications.contracts import (
     ChoiceDTO,
     ChoiceSetDTO,
@@ -112,6 +115,24 @@ def _validate_field_keys(raw_field_keys: Any) -> tuple[str, ...]:
             raise ValueError("requested_field_keys must contain non-empty strings")
         field_keys.add(value)
     return tuple(sorted(field_keys))
+
+
+def _validate_fieldset_identities(raw_identities: Any) -> tuple[str, ...]:
+    if type(raw_identities) is not tuple:
+        raise TypeError("fieldset_identities must be a tuple")
+    identities: list[str] = []
+    seen: set[str] = set()
+    for value in raw_identities:
+        if type(value) is not str or value.count("/") != 1:
+            raise ValueError("fieldset_identities must contain qualified identities")
+        namespace, slug = value.split("/")
+        if not namespace or not slug:
+            raise ValueError("fieldset_identities must contain non-empty qualified identities")
+        if value in seen:
+            raise ValueError(f"duplicate Fieldset identity: {value}")
+        identities.append(value)
+        seen.add(value)
+    return tuple(identities)
 
 
 def _validate_request(
@@ -681,12 +702,13 @@ def _assemble_type_memberships(
     }
 
 
-def _assemble_graph(
+def _assemble_graph_from_fieldsets(
     type_ids: Sequence[int],
     target_kinds: Sequence[str],
     requested_field_keys: Sequence[str],
+    rows_by_type: Mapping[int, Sequence[Any]],
+    fieldsets_by_id: Mapping[Any, Any],
 ) -> LoadedSpecificationGraphDTO:
-    rows_by_type, fieldsets_by_id = _load_type_memberships(type_ids)
     fieldset_ids = tuple(sorted(fieldsets_by_id, key=lambda value: str(value)))
     fieldset_rows = _load_fieldset_memberships(fieldset_ids)
     choice_set_cache: dict[str, ChoiceSetDTO] = {}
@@ -721,6 +743,164 @@ def _assemble_graph(
     )
 
 
+def _assemble_graph(
+    type_ids: Sequence[int],
+    target_kinds: Sequence[str],
+    requested_field_keys: Sequence[str],
+) -> LoadedSpecificationGraphDTO:
+    rows_by_type, fieldsets_by_id = _load_type_memberships(type_ids)
+    return _assemble_graph_from_fieldsets(
+        type_ids,
+        target_kinds,
+        requested_field_keys,
+        rows_by_type,
+        fieldsets_by_id,
+    )
+
+
+def _load_prospective_fieldsets(identities: Sequence[str]) -> dict[Any, Any]:
+    fieldsets_by_id: dict[Any, Any] = {}
+    for chunk in _chunks(tuple(identities)):
+        predicate = Q()
+        for identity in chunk:
+            namespace, slug = identity.split("/", 1)
+            predicate |= Q(namespace=namespace, slug=slug)
+        rows = (
+            CustomFieldset.objects.filter(predicate)
+            .select_related("library", "library__accepted_release")
+            .order_by("namespace", "slug", "pk")
+        )
+        for fieldset in rows:
+            identity = f"{_safe_attr(fieldset, 'namespace')}/{_safe_attr(fieldset, 'slug')}"
+            if identity in chunk:
+                fieldsets_by_id[_safe_attr(fieldset, "pk")] = fieldset
+    expected = set(identities)
+    found = {
+        f"{_safe_attr(fieldset, 'namespace')}/{_safe_attr(fieldset, 'slug')}" for fieldset in fieldsets_by_id.values()
+    }
+    missing = sorted(expected - found)
+    if missing:
+        raise ValueError(f"unresolved prospective Fieldset identity: {missing[0]}")
+    return fieldsets_by_id
+
+
+def _add_library_id(library_ids: set[int], value: object) -> None:
+    if value is not None:
+        if type(value) is not int or value <= 0:
+            raise ValueError("library id must be a positive integer")
+        library_ids.add(value)
+
+
+def relevant_library_ids(
+    asset_type_ids: Sequence[int],
+    target_kind: TargetKind,
+    *,
+    using: str = DEFAULT_DB_ALIAS,
+) -> tuple[int, ...]:
+    """Find libraries reachable from the destination graph before owner locking."""
+    library_ids: set[int] = set()
+    type_ids = tuple(sorted(set(asset_type_ids)))
+    type_rows = AssetType.all_objects.using(using).filter(pk__in=type_ids).values("pk", "library_id")
+    for row in type_rows:
+        _add_library_id(library_ids, row["library_id"])
+
+    fieldset_ids = set(
+        AssetTypeFieldset.objects.using(using).filter(asset_type_id__in=type_ids).values_list("fieldset_id", flat=True)
+    )
+    if fieldset_ids:
+        for library_id in (
+            CustomField.objects.using(using)
+            .filter(fieldset_memberships__fieldset_id__in=fieldset_ids)
+            .values_list("library_id", flat=True)
+        ):
+            _add_library_id(library_ids, library_id)
+        for library_id in (
+            CustomFieldset.objects.using(using).filter(pk__in=fieldset_ids).values_list("library_id", flat=True)
+        ):
+            _add_library_id(library_ids, library_id)
+        for library_id in (
+            CustomFieldsetField.objects.using(using)
+            .filter(fieldset_id__in=fieldset_ids)
+            .values_list("custom_field__choice_set__library_id", flat=True)
+        ):
+            _add_library_id(library_ids, library_id)
+
+    target_model = AssetType if target_kind == "asset_type" else Asset
+    content_type = ContentType.objects.db_manager(using).get_for_model(target_model)
+    global_fields = CustomField.objects.using(using).filter(
+        activation=CustomField.ACTIVATION_GLOBAL,
+        object_types=content_type,
+    )
+    for library_id in global_fields.values_list("library_id", flat=True):
+        _add_library_id(library_ids, library_id)
+    for library_id in global_fields.values_list("choice_set__library_id", flat=True):
+        _add_library_id(library_ids, library_id)
+
+    return tuple(sorted(library_ids))
+
+
+def composition_library_ids(
+    current_fieldset_ids: Sequence[int],
+    proposed_fieldset_identities: Sequence[str],
+    target_kind: TargetKind,
+    *,
+    asset_type_ids: Sequence[int] = (),
+    using: str = DEFAULT_DB_ALIAS,
+) -> tuple[int, ...]:
+    """Discover lock dependencies only; commands lock before loading definitions."""
+    library_ids = set(relevant_library_ids(asset_type_ids, target_kind, using=using))
+    if any(type(value) is not int or value <= 0 for value in current_fieldset_ids):
+        raise ValueError("Fieldset ID must be a positive integer")
+    fieldset_ids = set(current_fieldset_ids)
+
+    identity_predicate = Q()
+    for identity in proposed_fieldset_identities:
+        namespace, slug = identity.split("/", 1)
+        identity_predicate |= Q(namespace=namespace, slug=slug)
+    if proposed_fieldset_identities:
+        fieldset_ids.update(CustomFieldset.objects.using(using).filter(identity_predicate).values_list("pk", flat=True))
+
+    if fieldset_ids:
+        for library_id in (
+            CustomFieldset.objects.using(using).filter(pk__in=fieldset_ids).values_list("library_id", flat=True)
+        ):
+            _add_library_id(library_ids, library_id)
+        field_rows = CustomField.objects.using(using).filter(
+            fieldset_memberships__fieldset_id__in=fieldset_ids,
+        )
+        for library_id, choice_library_id in field_rows.values_list("library_id", "choice_set__library_id"):
+            _add_library_id(library_ids, library_id)
+            _add_library_id(library_ids, choice_library_id)
+
+    return tuple(sorted(library_ids))
+
+
+def fieldset_ids_for_identities(identities: Sequence[str], *, using: str) -> tuple[int | None, ...]:
+    if not identities:
+        return ()
+    predicate = Q()
+    for identity in identities:
+        namespace, slug = identity.split("/", 1)
+        predicate |= Q(namespace=namespace, slug=slug)
+    rows = CustomFieldset.objects.using(using).filter(predicate).values("pk", "namespace", "slug")
+    by_identity = {f"{row['namespace']}/{row['slug']}": row["pk"] for row in rows}
+    return tuple(by_identity.get(identity) for identity in identities)
+
+
+def load_prospective_specification_graph(
+    *,
+    fieldset_identities: tuple[QualifiedIdentity, ...],
+    requested_target_kinds: frozenset[TargetKind],
+    requested_field_keys: frozenset[FieldKey],
+) -> LoadedSpecificationGraphDTO:
+    """Load a graph for an explicit Fieldset list without reading an owner row."""
+    identities = _validate_fieldset_identities(fieldset_identities)
+    target_kinds = _validate_target_kinds(requested_target_kinds)
+    field_keys = _validate_field_keys(requested_field_keys)
+    fieldsets_by_id = _load_prospective_fieldsets(identities)
+    return _assemble_graph_from_fieldsets((), target_kinds, field_keys, {}, fieldsets_by_id)
+
+
 def load_specification_graph(request: SpecificationGraphLoadRequest) -> LoadedSpecificationGraphDTO:
     """Load one immutable, batched graph for the requested Asset Types.
 
@@ -732,4 +912,4 @@ def load_specification_graph(request: SpecificationGraphLoadRequest) -> LoadedSp
     return _assemble_graph(type_ids, target_kinds, requested_field_keys)
 
 
-__all__ = ["load_specification_graph"]
+__all__ = ["load_prospective_specification_graph", "load_specification_graph"]

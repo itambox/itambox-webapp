@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -14,6 +15,7 @@ from extras.services.specifications.contracts import (
     JSONValue,
     LoadedSpecificationGraphDTO,
     OrderedFieldsetMembershipDTO,
+    QualifiedIdentity,
     ResourceRevision,
     SpecificationDefinitionDTO,
     StoredSpecificationEntryDTO,
@@ -27,6 +29,8 @@ ManufacturerId = NewType("ManufacturerId", int)
 AssetRoleId = NewType("AssetRoleId", int)
 DepreciationId = NewType("DepreciationId", int)
 TagId = NewType("TagId", int)
+
+_QUALIFIED_IDENTITY_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9][a-z0-9._-]{0,126}$")
 
 
 def _freeze_patch_value(value: JSONValue) -> JSONValue:
@@ -62,6 +66,24 @@ class SpecificationPatchDTO:
             if type(key) is not str or not key:
                 raise ValueError("clear_keys must contain non-empty strings")
         object.__setattr__(self, "set_values", _freeze_patch_value(self.set_values))
+
+
+@dataclass(frozen=True)
+class ExplicitFieldsetSelectionDTO:
+    """An explicit, ordered Fieldset replacement; omission is not representable."""
+
+    identities: tuple[QualifiedIdentity, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.identities) is not tuple:
+            raise TypeError("identities must be a tuple")
+        seen: set[str] = set()
+        for identity in self.identities:
+            if type(identity) is not str or _QUALIFIED_IDENTITY_RE.fullmatch(identity) is None:
+                raise ValueError("identities must contain well-formed qualified Fieldset identities")
+            if identity in seen:
+                raise ValueError(f"duplicate Fieldset identity: {identity}")
+            seen.add(identity)
 
 
 @dataclass(frozen=True)

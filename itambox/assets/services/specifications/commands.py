@@ -56,6 +56,7 @@ from ._command_support import (
     stored_values_for,
     unavailable,
 )
+from ._composition_commands import set_asset_type_composition, set_category_defaults
 
 _DEFAULT_DB = DEFAULT_DB_ALIAS
 _ASSET_CHANGE_PERMISSION = "assets.change_asset"
@@ -451,4 +452,9 @@ def update_asset_specifications(
             )
 
 
-__all__ = ["update_asset_specifications", "update_asset_type_specifications"]
+__all__ = [
+    "set_asset_type_composition",
+    "set_category_defaults",
+    "update_asset_specifications",
+    "update_asset_type_specifications",
+]
