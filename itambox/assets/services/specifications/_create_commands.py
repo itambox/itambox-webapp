@@ -45,6 +45,7 @@ from assets.services.specifications.contracts import (
     OwnerNoOpDTO,
     OwnerRefDTO,
     PreviewToken,
+    ResourceRevision,
     SpecificationPatchDTO,
 )
 from assets.services.specifications.loader import (
@@ -77,8 +78,8 @@ from ._command_support import (
     positive_id,
     rejected,
     reload_actor,
-    resource_revision_for_owner,
     revision_string,
+    resource_revision_for_owner,
     stale_plan_issue,
     stored_values_for,
     unavailable,
@@ -244,10 +245,30 @@ def _validate_apply_shared_inputs(
     positive_id(asset_type_id, "Asset Type ID")
 
 
+def _reloaded_authorized_actor(
+    actor: ActorContextDTO,
+    model: type[object],
+    codename: str,
+):
+    """Reload the active actor and require the real global model permission."""
+    actor_model = reload_actor(actor)
+    if actor_model is None or not has_global_model_permission(actor_model, model, codename):
+        return None
+    return actor_model
+
+
 def _available_manufacturer(manufacturer_id: int):
     return (
         Manufacturer.all_objects.using(_DEFAULT_DB)
         .filter(pk=manufacturer_id, deleted_at__isnull=True)
+        .first()
+    )
+
+
+def _available_category(category_id: int):
+    return (
+        Category.all_objects.using(_DEFAULT_DB)
+        .filter(pk=category_id, deleted_at__isnull=True)
         .first()
     )
 
@@ -257,14 +278,6 @@ def _tags_exist(tag_ids: tuple[int, ...], *, using: str = _DEFAULT_DB) -> bool:
         return True
     return (
         Tag.all_objects.using(using).filter(pk__in=tag_ids, deleted_at__isnull=True).count() == len(tag_ids)
-    )
-
-
-def _available_category(category_id: int):
-    return (
-        Category.all_objects.using(_DEFAULT_DB)
-        .filter(pk=category_id, deleted_at__isnull=True)
-        .first()
     )
 
 
@@ -345,7 +358,7 @@ def _recompute_category_default_snapshot(
     )
     memberships: list[dict[str, object]] = []
     membership_dtos: list[OrderedFieldsetMembershipDTO] = []
-    for row, identity in zip(rows, identities):
+    for row, identity in zip(rows, identities, strict=True):
         fieldset_dto = graph.fieldsets_by_identity.get(QualifiedIdentity(identity))
         if fieldset_dto is None:
             raise ValueError(f"unresolved default Fieldset graph: {identity}")
@@ -419,6 +432,242 @@ def _prospective_definition_or_rejection(
     return definition, definitions, graph
 
 
+def _create_reference_rejection(native: AssetTypeNativeCreateInputDTO) -> CommandRejectedDTO | None:
+    if native.staged_image_id is not None:
+        return rejected(
+            None,
+            issue("REFERENCE_CONFLICT", path=("staged_image_id",), message_key=_REFERENCE_CONFLICT_MESSAGE),
+        )
+    if not _tags_exist(native.tag_ids):
+        return rejected(
+            None,
+            issue("REFERENCE_CONFLICT", path=("tag_ids",), message_key=_REFERENCE_CONFLICT_MESSAGE),
+        )
+    return None
+
+
+def _verify_create_token(
+    *,
+    actor: ActorContextDTO,
+    native: AssetTypeNativeCreateInputDTO,
+    fieldsets: FieldsetSelectionDTO,
+    patch: SpecificationPatchDTO,
+    preview_token: str | None,
+    expected_definition_revision: str,
+    expected_category_default_snapshot_revision: str | None,
+    consuming: bool,
+) -> CommandRejectedDTO | None:
+    if preview_token is None:
+        return None
+    expectation = PreviewTokenExpectation(
+        actor_id=actor.actor_id,
+        authentication_revision=actor.authentication_revision,
+        access_scope_fingerprint=None,
+        command_kind=_CREATE_COMMAND_KIND,
+        target=None,
+        normalized_input_digest=_create_input_digest(native, fieldsets, patch),
+        expected_resource_revision=None,
+        expected_definition_revision=expected_definition_revision,
+        expected_category_default_snapshot_revision=(
+            expected_category_default_snapshot_revision if consuming else None
+        ),
+        historical_state_digest=None,
+    )
+    try:
+        verify_preview_token(preview_token, expected=expectation, key=_preview_token_key())
+    except PreviewTokenError:
+        return rejected(None, stale_plan_issue())
+    return None
+
+
+def _verify_apply_token(
+    *,
+    actor: ActorContextDTO,
+    asset_type_id: int,
+    patch: SpecificationPatchDTO,
+    preview_token: str,
+    expected_resource_revision: str,
+    expected_definition_revision: str,
+    expected_category_default_snapshot_revision: str,
+) -> CommandRejectedDTO | None:
+    expectation = PreviewTokenExpectation(
+        actor_id=actor.actor_id,
+        authentication_revision=actor.authentication_revision,
+        access_scope_fingerprint=None,
+        command_kind=_APPLY_COMMAND_KIND,
+        target=PreviewOwnerRef("asset_type", asset_type_id),
+        normalized_input_digest=_apply_input_digest(patch),
+        expected_resource_revision=expected_resource_revision,
+        expected_definition_revision=expected_definition_revision,
+        expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
+        historical_state_digest=None,
+    )
+    try:
+        verify_preview_token(preview_token, expected=expectation, key=_preview_token_key())
+    except PreviewTokenError:
+        return rejected(OwnerRefDTO("asset_type", asset_type_id), stale_plan_issue())
+    return None
+
+
+def _lock_create_dependencies(
+    native: AssetTypeNativeCreateInputDTO,
+    proposed_identities: Sequence[str],
+) -> CommandRejectedDTO | None:
+    """Lock libraries and the Category/Manufacturer reference rows in order."""
+    lock_relevant_libraries_for_composition(
+        (),
+        proposed_identities,
+        _TARGET_KIND,
+        using=_DEFAULT_DB,
+    )
+    if native.category_id is not None:
+        if _lock_category(native.category_id) is None:
+            return unavailable()
+    if _lock_manufacturer(native.manufacturer_id) is None:
+        return unavailable()
+    return None
+
+
+def _create_front_state(
+    *,
+    actor: ActorContextDTO,
+    native: AssetTypeNativeCreateInputDTO,
+    fieldsets: FieldsetSelectionDTO,
+    consuming: bool,
+):
+    """Locked preconditions: proposal snapshot, dependencies, actor reload."""
+    snapshot = None
+    if consuming:
+        snapshot = _snapshot_or_rejection(native.category_id, owner_ref=None)
+        if isinstance(snapshot, CommandRejectedDTO):
+            return snapshot
+    proposed_identities = _proposed_identities(native, fieldsets, snapshot)
+    dependency_rejection = _lock_create_dependencies(native, proposed_identities)
+    if dependency_rejection is not None:
+        return dependency_rejection
+    actor_model = _reloaded_authorized_actor(actor, AssetType, _ADD_PERMISSION)
+    if actor_model is None:
+        return unavailable()
+    return actor_model, snapshot, proposed_identities
+
+
+def _create_back_state(
+    *,
+    actor: ActorContextDTO,
+    native: AssetTypeNativeCreateInputDTO,
+    fieldsets: FieldsetSelectionDTO,
+    patch: SpecificationPatchDTO,
+    preview_token: str | None,
+    expected_definition_revision: str,
+    expected_category_default_snapshot_revision: str | None,
+    consuming: bool,
+    snapshot: CategoryDefaultSnapshotDTO | None,
+    proposed_identities: tuple[str, ...],
+):
+    """Verified write state: token, revision gates, validation, desired rows."""
+    token_rejection = _verify_create_token(
+        actor=actor,
+        native=native,
+        fieldsets=fieldsets,
+        patch=patch,
+        preview_token=preview_token,
+        expected_definition_revision=expected_definition_revision,
+        expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
+        consuming=consuming,
+    )
+    if token_rejection is not None:
+        return token_rejection
+    if consuming:
+        if snapshot.revision != expected_category_default_snapshot_revision:
+            return rejected(
+                None,
+                issue(
+                    "STALE_RESOURCE",
+                    path=("expected_category_default_snapshot_revision",),
+                    message_key=_STALE_RESOURCE_MESSAGE,
+                ),
+            )
+    plan = _prospective_definition_or_rejection(
+        proposed_identities,
+        stored_values={},
+        owner_ref=None,
+    )
+    if isinstance(plan, CommandRejectedDTO):
+        return plan
+    definition, definitions, _graph = plan
+    if definition.revision != expected_definition_revision:
+        return rejected(
+            None,
+            issue(
+                "STALE_DEFINITION",
+                path=("expected_definition_revision",),
+                message_key=_STALE_DEFINITION_MESSAGE,
+            ),
+        )
+    reference_rejection = _create_reference_rejection(native)
+    if reference_rejection is not None:
+        return reference_rejection
+    normalized = normalize_patch(
+        patch,
+        definitions,
+        {},
+        operation="create",
+    )
+    if isinstance(normalized, tuple):
+        return rejected(None, *normalized)
+    proposed_values = dict(normalized.stored_values)
+    desired_ids = _desired_fieldset_ids(proposed_identities, owner_ref=None)
+    if isinstance(desired_ids, CommandRejectedDTO):
+        return desired_ids
+    return definition, proposed_values, desired_ids
+
+
+def _desired_fieldset_ids(
+    proposed_identities: Sequence[str],
+    *,
+    owner_ref: OwnerRefDTO | None,
+):
+    proposed_ids = fieldset_ids_for_identities(proposed_identities, using=_DEFAULT_DB)
+    if any(fieldset_id is None for fieldset_id in proposed_ids):
+        return _reference_rejection(owner_ref)
+    return tuple(fieldset_id for fieldset_id in proposed_ids if fieldset_id is not None)
+
+
+def _preview_create_plan(
+    *,
+    native: AssetTypeNativeCreateInputDTO,
+    fieldsets: FieldsetSelectionDTO,
+    snapshot: CategoryDefaultSnapshotDTO | None,
+    patch: SpecificationPatchDTO,
+):
+    proposed_identities = _proposed_identities(native, fieldsets, snapshot)
+    lock_relevant_libraries_for_composition(
+        (),
+        proposed_identities,
+        _TARGET_KIND,
+        using=_DEFAULT_DB,
+    )
+    plan = _prospective_definition_or_rejection(
+        proposed_identities,
+        stored_values={},
+        owner_ref=None,
+    )
+    if isinstance(plan, CommandRejectedDTO):
+        return plan
+    definition, definitions, _graph = plan
+    reference_rejection = _create_reference_rejection(native)
+    if reference_rejection is not None:
+        return reference_rejection
+    normalized = normalize_patch(
+        patch,
+        definitions,
+        {},
+        operation="create",
+    )
+    issues = () if not isinstance(normalized, tuple) else normalized
+    return definition, issues
+
+
 def _preview_create_locked(
     *,
     actor: ActorContextDTO,
@@ -426,8 +675,8 @@ def _preview_create_locked(
     fieldsets: FieldsetSelectionDTO,
     patch: SpecificationPatchDTO,
 ) -> AssetTypePreviewResult:
-    actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, AssetType, _ADD_PERMISSION):
+    actor_model = _reloaded_authorized_actor(actor, AssetType, _ADD_PERMISSION)
+    if actor_model is None:
         return unavailable()
     if _available_manufacturer(native.manufacturer_id) is None:
         return unavailable()
@@ -440,41 +689,15 @@ def _preview_create_locked(
         snapshot = _snapshot_or_rejection(native.category_id, owner_ref=None)
         if isinstance(snapshot, CommandRejectedDTO):
             return snapshot
-    proposed_identities = _proposed_identities(native, fieldsets, snapshot)
-    lock_relevant_libraries_for_composition(
-        (),
-        proposed_identities,
-        _TARGET_KIND,
-        using=_DEFAULT_DB,
+    plan_result = _preview_create_plan(
+        native=native,
+        fieldsets=fieldsets,
+        snapshot=snapshot,
+        patch=patch,
     )
-
-    plan = _prospective_definition_or_rejection(
-        proposed_identities,
-        stored_values={},
-        owner_ref=None,
-    )
-    if isinstance(plan, CommandRejectedDTO):
-        return plan
-    definition, definitions, _graph = plan
-
-    if native.staged_image_id is not None:
-        return rejected(
-            None,
-            issue("REFERENCE_CONFLICT", path=("staged_image_id",), message_key=_REFERENCE_CONFLICT_MESSAGE),
-        )
-    if not _tags_exist(native.tag_ids):
-        return rejected(
-            None,
-            issue("REFERENCE_CONFLICT", path=("tag_ids",), message_key=_REFERENCE_CONFLICT_MESSAGE),
-        )
-
-    normalized = normalize_patch(
-        patch,
-        definitions,
-        {},
-        operation="create",
-    )
-    issues = () if not isinstance(normalized, tuple) else normalized
+    if isinstance(plan_result, CommandRejectedDTO):
+        return plan_result
+    definition, issues = plan_result
     expected_definition_revision = DefinitionRevision(definition.revision)
 
     if consuming:
@@ -598,110 +821,30 @@ def _create_locked(
     expected_category_default_snapshot_revision: str | None,
 ) -> AssetTypeCreateResult:
     consuming = _consumes_category_defaults(native, fieldsets)
-    snapshot_for_proposal = None
-    if consuming:
-        snapshot_for_proposal = _snapshot_or_rejection(native.category_id, owner_ref=None)
-        if isinstance(snapshot_for_proposal, CommandRejectedDTO):
-            return snapshot_for_proposal
-    proposed_identities = _proposed_identities(native, fieldsets, snapshot_for_proposal)
-    lock_relevant_libraries_for_composition(
-        (),
-        proposed_identities,
-        _TARGET_KIND,
-        using=_DEFAULT_DB,
+    front = _create_front_state(
+        actor=actor,
+        native=native,
+        fieldsets=fieldsets,
+        consuming=consuming,
     )
-
-    # Reference rows before the actor reload: Category then Manufacturer in
-    # stable (model identity, primary key) order.
-    if native.category_id is not None:
-        if _lock_category(native.category_id) is None:
-            return unavailable()
-    if _lock_manufacturer(native.manufacturer_id) is None:
-        return unavailable()
-
-    actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, AssetType, _ADD_PERMISSION):
-        return unavailable()
-
-    if preview_token is not None:
-        expectation = PreviewTokenExpectation(
-            actor_id=actor.actor_id,
-            authentication_revision=actor.authentication_revision,
-            access_scope_fingerprint=None,
-            command_kind=_CREATE_COMMAND_KIND,
-            target=None,
-            normalized_input_digest=_create_input_digest(native, fieldsets, patch),
-            expected_resource_revision=None,
-            expected_definition_revision=expected_definition_revision,
-            expected_category_default_snapshot_revision=(
-                expected_category_default_snapshot_revision if consuming else None
-            ),
-            historical_state_digest=None,
-        )
-        try:
-            verify_preview_token(preview_token, expected=expectation, key=_preview_token_key())
-        except PreviewTokenError:
-            return rejected(None, stale_plan_issue())
-
-    snapshot = None
-    if consuming:
-        snapshot = _snapshot_or_rejection(native.category_id, owner_ref=None)
-        if isinstance(snapshot, CommandRejectedDTO):
-            return snapshot
-        if snapshot.revision != expected_category_default_snapshot_revision:
-            return rejected(
-                None,
-                issue(
-                    "STALE_RESOURCE",
-                    path=("expected_category_default_snapshot_revision",),
-                    message_key=_STALE_RESOURCE_MESSAGE,
-                ),
-            )
-
-    plan = _prospective_definition_or_rejection(
-        proposed_identities,
-        stored_values={},
-        owner_ref=None,
+    if isinstance(front, CommandRejectedDTO):
+        return front
+    actor_model, snapshot, proposed_identities = front
+    back = _create_back_state(
+        actor=actor,
+        native=native,
+        fieldsets=fieldsets,
+        patch=patch,
+        preview_token=preview_token,
+        expected_definition_revision=expected_definition_revision,
+        expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
+        consuming=consuming,
+        snapshot=snapshot,
+        proposed_identities=proposed_identities,
     )
-    if isinstance(plan, CommandRejectedDTO):
-        return plan
-    definition, definitions, _graph = plan
-    if definition.revision != expected_definition_revision:
-        return rejected(
-            None,
-            issue(
-                "STALE_DEFINITION",
-                path=("expected_definition_revision",),
-                message_key=_STALE_DEFINITION_MESSAGE,
-            ),
-        )
-
-    if native.staged_image_id is not None:
-        return rejected(
-            None,
-            issue("REFERENCE_CONFLICT", path=("staged_image_id",), message_key=_REFERENCE_CONFLICT_MESSAGE),
-        )
-    if not _tags_exist(native.tag_ids):
-        return rejected(
-            None,
-            issue("REFERENCE_CONFLICT", path=("tag_ids",), message_key=_REFERENCE_CONFLICT_MESSAGE),
-        )
-
-    normalized = normalize_patch(
-        patch,
-        definitions,
-        {},
-        operation="create",
-    )
-    if isinstance(normalized, tuple):
-        return rejected(None, *normalized)
-    proposed_values = dict(normalized.stored_values)
-
-    proposed_ids = fieldset_ids_for_identities(proposed_identities, using=_DEFAULT_DB)
-    if any(fieldset_id is None for fieldset_id in proposed_ids):
-        return _reference_rejection(None)
-    desired_ids = tuple(fieldset_id for fieldset_id in proposed_ids if fieldset_id is not None)
-
+    if isinstance(back, CommandRejectedDTO):
+        return back
+    definition, proposed_values, desired_ids = back
     persisted = _persist_create_owner(
         native=native,
         proposed_values=proposed_values,
@@ -760,6 +903,44 @@ def create_asset_type(
             )
 
 
+def _apply_preview_plan(
+    *,
+    asset_type_id: int,
+    owner: AssetType,
+    snapshot: CategoryDefaultSnapshotDTO,
+    patch: SpecificationPatchDTO,
+    owner_ref: OwnerRefDTO,
+):
+    proposed_identities = tuple(str(membership.fieldset_identity) for membership in snapshot.memberships)
+    current_ids = tuple(
+        row["fieldset_id"] for row in _current_membership_rows(AssetType, asset_type_id, using=_DEFAULT_DB)
+    )
+    lock_relevant_libraries_for_composition(
+        current_ids,
+        proposed_identities,
+        _TARGET_KIND,
+        asset_type_ids=(asset_type_id,),
+        using=_DEFAULT_DB,
+    )
+    stored_values = stored_values_for(owner)
+    plan = _prospective_definition_or_rejection(
+        proposed_identities,
+        stored_values=stored_values,
+        owner_ref=owner_ref,
+    )
+    if isinstance(plan, CommandRejectedDTO):
+        return plan
+    definition, definitions, _graph = plan
+    normalized = normalize_patch(
+        patch,
+        definitions,
+        stored_values,
+        operation="composition_edit",
+    )
+    issues = () if not isinstance(normalized, tuple) else normalized
+    return definition, issues
+
+
 def _preview_apply_locked(
     *,
     actor: ActorContextDTO,
@@ -778,8 +959,8 @@ def _preview_apply_locked(
     if owner.category_id is None:
         return unavailable()
 
-    actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, AssetType, _CHANGE_PERMISSION):
+    actor_model = _reloaded_authorized_actor(actor, AssetType, _CHANGE_PERMISSION)
+    if actor_model is None:
         return unavailable()
 
     actual_resource_revision = resource_revision_for_owner(owner)
@@ -792,35 +973,17 @@ def _preview_apply_locked(
     snapshot = _snapshot_or_rejection(owner.category_id, owner_ref=owner_ref)
     if isinstance(snapshot, CommandRejectedDTO):
         return snapshot
-    proposed_identities = tuple(str(membership.fieldset_identity) for membership in snapshot.memberships)
-    current_ids = tuple(
-        row["fieldset_id"] for row in _current_membership_rows(AssetType, asset_type_id, using=_DEFAULT_DB)
-    )
-    lock_relevant_libraries_for_composition(
-        current_ids,
-        proposed_identities,
-        _TARGET_KIND,
-        asset_type_ids=(asset_type_id,),
-        using=_DEFAULT_DB,
-    )
-
-    plan = _prospective_definition_or_rejection(
-        proposed_identities,
-        stored_values=stored_values_for(owner),
+    plan = _apply_preview_plan(
+        asset_type_id=asset_type_id,
+        owner=owner,
+        snapshot=snapshot,
+        patch=patch,
         owner_ref=owner_ref,
     )
     if isinstance(plan, CommandRejectedDTO):
         return plan
-    definition, definitions, _graph = plan
+    definition, issues = plan
     expected_definition_revision = DefinitionRevision(definition.revision)
-
-    normalized = normalize_patch(
-        patch,
-        definitions,
-        stored_values_for(owner),
-        operation="composition_edit",
-    )
-    issues = () if not isinstance(normalized, tuple) else normalized
     token = issue_preview_token(
         PreviewTokenExpectation(
             actor_id=actor.actor_id,
@@ -871,16 +1034,12 @@ def preview_apply_category_defaults(
             )
 
 
-def _apply_locked(
+def _apply_front_state(
     *,
     actor: ActorContextDTO,
-    asset_type_id: AssetTypeId,
-    preview_token: str,
-    expected_resource_revision: str,
-    expected_definition_revision: str,
-    expected_category_default_snapshot_revision: str,
-    patch: SpecificationPatchDTO,
-) -> OwnerMutationResult:
+    asset_type_id: int,
+):
+    """Locked preconditions: owner, category defaults, library and row locks."""
     type_row = (
         AssetType.all_objects.using(_DEFAULT_DB)
         .filter(pk=asset_type_id, deleted_at__isnull=True)
@@ -917,27 +1076,38 @@ def _apply_locked(
     if _lock_category(category_id) is None:
         return unavailable()
 
-    actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, AssetType, _CHANGE_PERMISSION):
+    actor_model = _reloaded_authorized_actor(actor, AssetType, _CHANGE_PERMISSION)
+    if actor_model is None:
         return unavailable()
+    return owner, actor_model, owner_ref, snapshot, proposed_identities
 
-    expectation = PreviewTokenExpectation(
-        actor_id=actor.actor_id,
-        authentication_revision=actor.authentication_revision,
-        access_scope_fingerprint=None,
-        command_kind=_APPLY_COMMAND_KIND,
-        target=PreviewOwnerRef("asset_type", asset_type_id),
-        normalized_input_digest=_apply_input_digest(patch),
+
+def _apply_back_state(
+    *,
+    actor: ActorContextDTO,
+    asset_type_id: int,
+    patch: SpecificationPatchDTO,
+    preview_token: str,
+    expected_resource_revision: str,
+    expected_definition_revision: str,
+    expected_category_default_snapshot_revision: str,
+    snapshot: CategoryDefaultSnapshotDTO,
+    proposed_identities: tuple[str, ...],
+    owner_ref: OwnerRefDTO,
+    owner: AssetType,
+):
+    """Verified write state: token, snapshot/resource/definition gates, values."""
+    token_rejection = _verify_apply_token(
+        actor=actor,
+        asset_type_id=asset_type_id,
+        patch=patch,
+        preview_token=preview_token,
         expected_resource_revision=expected_resource_revision,
         expected_definition_revision=expected_definition_revision,
         expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
-        historical_state_digest=None,
     )
-    try:
-        verify_preview_token(preview_token, expected=expectation, key=_preview_token_key())
-    except PreviewTokenError:
-        return rejected(owner_ref, stale_plan_issue())
-
+    if token_rejection is not None:
+        return token_rejection
     if snapshot.revision != expected_category_default_snapshot_revision:
         return rejected(
             owner_ref,
@@ -947,14 +1117,12 @@ def _apply_locked(
                 message_key=_STALE_RESOURCE_MESSAGE,
             ),
         )
-
     actual_resource_revision = resource_revision_for_owner(owner)
     if expected_resource_revision != actual_resource_revision:
         return rejected(
             owner_ref,
             issue("STALE_RESOURCE", path=("expected_resource_revision",), message_key=_STALE_RESOURCE_MESSAGE),
         )
-
     plan = _prospective_definition_or_rejection(
         proposed_identities,
         stored_values=stored_values_for(owner),
@@ -972,7 +1140,6 @@ def _apply_locked(
                 message_key=_STALE_DEFINITION_MESSAGE,
             ),
         )
-
     normalized = normalize_patch(
         patch,
         proposed_definitions,
@@ -982,11 +1149,46 @@ def _apply_locked(
     if isinstance(normalized, tuple):
         return rejected(owner_ref, *normalized)
     proposed_values = dict(normalized.stored_values)
+    desired_ids = _desired_fieldset_ids(proposed_identities, owner_ref=owner_ref)
+    if isinstance(desired_ids, CommandRejectedDTO):
+        return desired_ids
+    return proposed_definition, proposed_values, desired_ids, actual_resource_revision
 
-    proposed_ids = fieldset_ids_for_identities(proposed_identities, using=_DEFAULT_DB)
-    if any(fieldset_id is None for fieldset_id in proposed_ids):
-        return _reference_rejection(owner_ref)
-    desired_ids = tuple(fieldset_id for fieldset_id in proposed_ids if fieldset_id is not None)
+
+def _apply_locked(
+    *,
+    actor: ActorContextDTO,
+    asset_type_id: AssetTypeId,
+    preview_token: str,
+    expected_resource_revision: str,
+    expected_definition_revision: str,
+    expected_category_default_snapshot_revision: str,
+    patch: SpecificationPatchDTO,
+) -> OwnerMutationResult:
+    front = _apply_front_state(
+        actor=actor,
+        asset_type_id=asset_type_id,
+    )
+    if isinstance(front, CommandRejectedDTO):
+        return front
+    owner, actor_model, owner_ref, snapshot, proposed_identities = front
+    back = _apply_back_state(
+        actor=actor,
+        asset_type_id=asset_type_id,
+        patch=patch,
+        preview_token=preview_token,
+        expected_resource_revision=expected_resource_revision,
+        expected_definition_revision=expected_definition_revision,
+        expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
+        snapshot=snapshot,
+        proposed_identities=proposed_identities,
+        owner_ref=owner_ref,
+        owner=owner,
+    )
+    if isinstance(back, CommandRejectedDTO):
+        return back
+    proposed_definition, proposed_values, desired_ids, actual_resource_revision = back
+
     current_rows = _current_membership_rows(AssetType, asset_type_id, using=_DEFAULT_DB)
     desired_rows = tuple((fieldset_id, position) for position, fieldset_id in enumerate(desired_ids, start=1))
     current_pairs = tuple((row["fieldset_id"], row["position"]) for row in current_rows)

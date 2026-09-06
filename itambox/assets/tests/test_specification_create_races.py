@@ -30,7 +30,6 @@ from assets.services.specifications.contracts import (
     AssetTypeNativeCreateInputDTO,
     CommandRejectedDTO,
     FieldsetSelectionDTO,
-    OwnerChangedDTO,
     OwnerCreatedDTO,
     SpecificationPatchDTO,
 )

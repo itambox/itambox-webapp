@@ -117,6 +117,18 @@ def _validate_optional_bounded_string(value: object, name: str) -> None:
         raise ValueError(f"{name} must be a non-empty string")
 
 
+def _validate_string_fields(instance: "AssetTypeNativeCreateInputDTO") -> None:
+    for name in ("part_number", "ean", "region", "configuration", "description", "comments"):
+        if type(getattr(instance, name)) is not str:
+            raise TypeError(f"{name} must be a string")
+
+
+def _validate_tag_ids(tag_ids: tuple[object, ...]) -> None:
+    for tag_id in tag_ids:
+        if type(tag_id) is not int or tag_id <= 0:
+            raise ValueError("tag_ids must contain positive integers")
+
+
 @dataclass(frozen=True)
 class FieldsetSelectionDTO:
     """Presence-sensitive Fieldset selection for Type creation.
@@ -180,11 +192,9 @@ class AssetTypeNativeCreateInputDTO:
             raise ValueError("manufacturer_id must be a positive integer")
         if type(self.model) is not str or not self.model:
             raise ValueError("model must be a non-empty string")
-        if self.slug is not None and type(self.slug) is not str:
-            raise TypeError("slug must be a string or None")
-        for name in ("part_number", "ean", "region", "configuration", "description", "comments"):
-            if type(getattr(self, name)) is not str:
-                raise TypeError(f"{name} must be a string")
+        if self.slug is not None:
+            _validate_optional_bounded_string(self.slug, "slug")
+        _validate_string_fields(self)
         _validate_positive_or_none(self.eol_months, "eol_months")
         _validate_positive_or_none(self.category_id, "category_id")
         _validate_positive_or_none(self.suggested_asset_role_id, "suggested_asset_role_id")
@@ -193,9 +203,7 @@ class AssetTypeNativeCreateInputDTO:
             _validate_optional_bounded_string(self.staged_image_id, "staged_image_id")
         if type(self.tag_ids) is not tuple:
             raise TypeError("tag_ids must be a tuple")
-        for tag_id in self.tag_ids:
-            if type(tag_id) is not int or tag_id <= 0:
-                raise ValueError("tag_ids must contain positive integers")
+        _validate_tag_ids(self.tag_ids)
         if type(self.requestable) is not bool:
             raise TypeError("requestable must be a bool")
 
