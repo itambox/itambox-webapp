@@ -13,7 +13,7 @@ from django.urls import reverse
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
 from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer
 from extras.api.serializers import CustomFieldSerializer, CustomFieldsetSerializer
-from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
+from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, SpecificationLibrary
 from itambox.api.viewsets import ITAMBoxModelViewSet
 from itambox.views.generic import ObjectDeleteView, ObjectEditView
 
@@ -166,9 +166,12 @@ class CustomFieldAPISerializerContractTests(TestCase):
         self.assertEqual(field.management_kind, CustomField.MANAGEMENT_CORE)
 
     def test_api_delete_rejects_library_definition(self):
+        library = SpecificationLibrary.objects.create(namespace="api-contract", label="API contract")
         field = CustomField.objects.create(
             name="api_managed_delete",
             label="API Managed Delete",
+            namespace=library.namespace,
+            library=library,
             activation=CustomField.ACTIVATION_GLOBAL,
             management_kind=CustomField.MANAGEMENT_LIBRARY,
         )
@@ -205,7 +208,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         original_guard = view._ensure_unmanaged_definition
 
         def transition_after_initial_check(instance):
-            CustomField.objects.filter(pk=instance.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
+            CustomField.objects.filter(pk=instance.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
             return original_guard(instance)
 
         with patch.object(view, "_ensure_unmanaged_definition", side_effect=transition_after_initial_check) as guard:
@@ -215,7 +218,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
         self.assertEqual(guard.call_count, 2)
         field.refresh_from_db()
         self.assertTrue(CustomField.objects.filter(pk=field.pk).exists())
-        self.assertEqual(field.management_kind, CustomField.MANAGEMENT_LIBRARY)
+        self.assertEqual(field.management_kind, CustomField.MANAGEMENT_CORE)
 
     def test_html_edit_rechecks_managed_definition_before_save(self):
         from types import SimpleNamespace
@@ -278,7 +281,7 @@ class CustomFieldAPISerializerContractTests(TestCase):
             label="HTML delete lock",
             activation=CustomField.ACTIVATION_GLOBAL,
         )
-        CustomField.objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_LIBRARY)
+        CustomField.objects.filter(pk=field.pk).update(management_kind=CustomField.MANAGEMENT_CORE)
         view = ObjectDeleteView()
         view.model = CustomField
         view.object = field

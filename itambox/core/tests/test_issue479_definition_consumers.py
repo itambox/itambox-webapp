@@ -144,7 +144,7 @@ def test_choice_reconciliation_applies_dense_positions_for_every_identity(
     choice_model = _FakeChoiceModel(existing)
     importer = object.__new__(CustomFieldImporter)
 
-    importer._reconcile_choice_rows(choice_model, SimpleNamespace(pk=17), remote_labels)
+    importer._reconcile_choice_rows(choice_model, SimpleNamespace(pk=17, management_kind="local"), remote_labels)
 
     rows = sorted(choice_model.objects, key=lambda row: row.position)
     assert [row.key for row in rows] == expected_order
