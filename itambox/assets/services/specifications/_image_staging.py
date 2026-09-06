@@ -104,6 +104,7 @@ def ingest_staged_image(
                 expires_at=((now or timezone.now()) + timedelta(seconds=STAGE_LIFETIME_SECONDS)),
             )
     except Exception:
+        # broad except: cleanup-reraise: remove the stored blob when stage registration fails, then re-raise
         default_storage.delete(stored_name)
         raise
     return stage_id
