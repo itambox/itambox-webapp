@@ -57,6 +57,12 @@ from ._command_support import (
     unavailable,
 )
 from ._composition_commands import set_asset_type_composition, set_category_defaults
+from ._create_commands import (
+    apply_category_defaults,
+    create_asset_type,
+    preview_apply_category_defaults,
+    preview_asset_type_create,
+)
 
 _DEFAULT_DB = DEFAULT_DB_ALIAS
 _ASSET_CHANGE_PERMISSION = "assets.change_asset"
@@ -453,6 +459,10 @@ def update_asset_specifications(
 
 
 __all__ = [
+    "apply_category_defaults",
+    "create_asset_type",
+    "preview_apply_category_defaults",
+    "preview_asset_type_create",
     "set_asset_type_composition",
     "set_category_defaults",
     "update_asset_specifications",

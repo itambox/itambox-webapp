@@ -29,6 +29,9 @@ ManufacturerId = NewType("ManufacturerId", int)
 AssetRoleId = NewType("AssetRoleId", int)
 DepreciationId = NewType("DepreciationId", int)
 TagId = NewType("TagId", int)
+StagedImageId = NewType("StagedImageId", str)
+PreviewToken = NewType("PreviewToken", str)
+CategoryDefaultSnapshotRevision = NewType("CategoryDefaultSnapshotRevision", str)
 
 _QUALIFIED_IDENTITY_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9][a-z0-9._-]{0,126}$")
 
@@ -104,6 +107,99 @@ class DestinationAssetTypeSelectionDTO:
             raise ValueError("replace destination requires a positive Asset Type ID")
 
 
+def _validate_positive_or_none(value: object, name: str) -> None:
+    if value is not None and (type(value) is not int or value <= 0):
+        raise ValueError(f"{name} must be a positive integer or None")
+
+
+def _validate_optional_bounded_string(value: object, name: str) -> None:
+    if type(value) is not str or not value:
+        raise ValueError(f"{name} must be a non-empty string")
+
+
+@dataclass(frozen=True)
+class FieldsetSelectionDTO:
+    """Presence-sensitive Fieldset selection for Type creation.
+
+    ``presence="omitted"`` is the only omitted value and must carry no
+    identities; ``presence="explicit"`` permits an empty or ordered nonempty
+    tuple of well-formed qualified Fieldset identities without duplicates.
+    Any list/null input is rejected before construction.
+    """
+
+    presence: Literal["omitted", "explicit"]
+    identities: tuple[QualifiedIdentity, ...]
+
+    def __post_init__(self) -> None:
+        if self.presence not in {"omitted", "explicit"}:
+            raise ValueError(f"unsupported selection presence: {self.presence!r}")
+        if type(self.identities) is not tuple:
+            raise TypeError("identities must be a tuple")
+        if self.presence == "omitted":
+            if self.identities:
+                raise ValueError("omitted selection cannot carry identities")
+            return
+        seen: set[str] = set()
+        for identity in self.identities:
+            if type(identity) is not str or _QUALIFIED_IDENTITY_RE.fullmatch(identity) is None:
+                raise ValueError("identities must contain well-formed qualified Fieldset identities")
+            if identity in seen:
+                raise ValueError(f"duplicate Fieldset identity: {identity}")
+            seen.add(identity)
+
+
+@dataclass(frozen=True)
+class AssetTypeNativeCreateInputDTO:
+    """Native, server-validated Asset Type create input.
+
+    Adapters construct this DTO at the transport boundary; they never pass a
+    dictionary, model instance, request, or uploaded-file object into the
+    command. ``staged_image_id`` is a bounded server-created staging reference
+    only; the command consumes or discards it atomically.
+    """
+
+    manufacturer_id: ManufacturerId
+    model: str
+    slug: str | None
+    part_number: str
+    ean: str
+    region: str
+    configuration: str
+    eol_months: int | None
+    category_id: CategoryId | None
+    suggested_asset_role_id: AssetRoleId | None
+    depreciation_id: DepreciationId | None
+    staged_image_id: StagedImageId | None
+    description: str
+    comments: str
+    tag_ids: tuple[TagId, ...]
+    requestable: bool
+
+    def __post_init__(self) -> None:
+        if type(self.manufacturer_id) is not int or self.manufacturer_id <= 0:
+            raise ValueError("manufacturer_id must be a positive integer")
+        if type(self.model) is not str or not self.model:
+            raise ValueError("model must be a non-empty string")
+        if self.slug is not None and type(self.slug) is not str:
+            raise TypeError("slug must be a string or None")
+        for name in ("part_number", "ean", "region", "configuration", "description", "comments"):
+            if type(getattr(self, name)) is not str:
+                raise TypeError(f"{name} must be a string")
+        _validate_positive_or_none(self.eol_months, "eol_months")
+        _validate_positive_or_none(self.category_id, "category_id")
+        _validate_positive_or_none(self.suggested_asset_role_id, "suggested_asset_role_id")
+        _validate_positive_or_none(self.depreciation_id, "depreciation_id")
+        if self.staged_image_id is not None:
+            _validate_optional_bounded_string(self.staged_image_id, "staged_image_id")
+        if type(self.tag_ids) is not tuple:
+            raise TypeError("tag_ids must be a tuple")
+        for tag_id in self.tag_ids:
+            if type(tag_id) is not int or tag_id <= 0:
+                raise ValueError("tag_ids must contain positive integers")
+        if type(self.requestable) is not bool:
+            raise TypeError("requestable must be a bool")
+
+
 DomainIssueCode: TypeAlias = Literal[
     "INVALID_TYPE",
     "INVALID_DECIMAL",
@@ -166,6 +262,34 @@ class OwnerNoOpDTO:
 
 
 @dataclass(frozen=True)
+class OwnerCreatedDTO:
+    outcome: Literal["created"]
+    owner: OwnerRefDTO
+    resource_revision: ResourceRevision
+    definition_revision: DefinitionRevision
+
+
+@dataclass(frozen=True)
+class CategoryDefaultSnapshotDTO:
+    """Distinct Category-default snapshot source state recomputed under the lock."""
+
+    category_id: CategoryId
+    revision: CategoryDefaultSnapshotRevision
+    memberships: tuple[OrderedFieldsetMembershipDTO, ...]
+
+
+@dataclass(frozen=True)
+class AssetTypePreviewDTO:
+    preview_token: PreviewToken | None
+    definition: SpecificationDefinitionDTO
+    expected_definition_revision: DefinitionRevision
+    expected_resource_revision: ResourceRevision | None
+    expected_category_default_snapshot_revision: CategoryDefaultSnapshotRevision | None
+    consumes_category_defaults: bool
+    issues: tuple[DomainIssueDTO, ...]
+
+
+@dataclass(frozen=True)
 class CommandRejectedDTO:
     outcome: Literal["rejected"]
     safe_owner: OwnerRefDTO | None
@@ -173,6 +297,8 @@ class CommandRejectedDTO:
 
 
 OwnerMutationResult: TypeAlias = OwnerChangedDTO | OwnerNoOpDTO | CommandRejectedDTO
+AssetTypeCreateResult: TypeAlias = OwnerCreatedDTO | CommandRejectedDTO
+AssetTypePreviewResult: TypeAlias = AssetTypePreviewDTO | CommandRejectedDTO
 
 
 @dataclass(frozen=True)
