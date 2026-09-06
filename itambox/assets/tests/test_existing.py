@@ -987,14 +987,14 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
             name="sim_number",
             label="SIM Number",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
             required=True,
         )
         screen_field = CustomField.objects.create(
             name="screen_size",
             label="Screen Size",
             field_type=CustomField.FIELD_TYPE_DECIMAL,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
             decimal_scale=1,
             required=False,
         )

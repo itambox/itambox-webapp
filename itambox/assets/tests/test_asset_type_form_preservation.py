@@ -22,7 +22,7 @@ class AssetTypeFormPreservationTests(TestCase):
             name="generic_asset_type_spec",
             namespace="local",
             label="Generic Asset Type specification",
-            scope=None,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         field.object_types.add(ContentType.objects.get_for_model(AssetType))
 
@@ -145,9 +145,10 @@ class AssetTypeFormPreservationTests(TestCase):
             namespace="local",
             label="Required after composition",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
             required=True,
         )
+        required.object_types.add(ContentType.objects.get_for_model(AssetType))
         CustomFieldsetField.objects.create(fieldset=new_fieldset, custom_field=required, position=10)
         asset_type = AssetType.objects.create(
             manufacturer=manufacturer,
@@ -190,8 +191,9 @@ class AssetTypeFormPreservationTests(TestCase):
                 name=f"query_bound_{index}",
                 namespace="local",
                 label=f"Query bound {index}",
-                scope=CustomField.SCOPE_ASSET_TYPE,
+                activation=CustomField.ACTIVATION_COMPOSED,
             )
+            field.object_types.add(ContentType.objects.get_for_model(AssetType))
             CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
             fieldsets.append(fieldset)
         asset_type = AssetType.objects.create(
@@ -227,8 +229,9 @@ class AssetTypeFormPreservationTests(TestCase):
                 name=f"query_bound_{index}",
                 namespace="local",
                 label=f"Query bound {index}",
-                scope=CustomField.SCOPE_ASSET_TYPE,
+                activation=CustomField.ACTIVATION_COMPOSED,
             )
+            field.object_types.add(ContentType.objects.get_for_model(AssetType))
             CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
             AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=(index + 1) * 10)
 
@@ -255,15 +258,17 @@ class AssetTypeFormPreservationTests(TestCase):
                     name=f"cf_text_{size}_{fieldset_index}",
                     namespace="local",
                     label=f"Text {fieldset_index}",
-                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    activation=CustomField.ACTIVATION_COMPOSED,
                 )
+                text_field.object_types.add(ContentType.objects.get_for_model(AssetType))
                 integer_field = CustomField.objects.create(
                     name=f"cf_int_{size}_{fieldset_index}",
                     namespace="local",
                     label=f"Integer {fieldset_index}",
-                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    activation=CustomField.ACTIVATION_COMPOSED,
                     field_type=CustomField.FIELD_TYPE_INTEGER,
                 )
+                integer_field.object_types.add(ContentType.objects.get_for_model(AssetType))
                 single_set = CustomFieldChoiceSet.objects.create(
                     namespace="local",
                     slug=f"single-{size}-{fieldset_index}",
@@ -280,11 +285,12 @@ class AssetTypeFormPreservationTests(TestCase):
                     name=f"cf_single_{size}_{fieldset_index}",
                     namespace="local",
                     label=f"Single {fieldset_index}",
-                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    activation=CustomField.ACTIVATION_COMPOSED,
                     field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
                     choice_set=single_set,
                     max_values=1,
                 )
+                single_field.object_types.add(ContentType.objects.get_for_model(AssetType))
                 multi_set = CustomFieldChoiceSet.objects.create(
                     namespace="local",
                     slug=f"multi-{size}-{fieldset_index}",
@@ -301,11 +307,12 @@ class AssetTypeFormPreservationTests(TestCase):
                     name=f"cf_multi_{size}_{fieldset_index}",
                     namespace="local",
                     label=f"Multi {fieldset_index}",
-                    scope=CustomField.SCOPE_ASSET_TYPE,
+                    activation=CustomField.ACTIVATION_COMPOSED,
                     field_type=CustomField.FIELD_TYPE_MULTI_SELECT,
                     choice_set=multi_set,
                     max_values=2,
                 )
+                multi_field.object_types.add(ContentType.objects.get_for_model(AssetType))
                 CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=text_field, position=10)
                 CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=integer_field, position=20)
                 CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=single_field, position=30)
@@ -345,14 +352,16 @@ class AssetTypeFormPreservationTests(TestCase):
             name="visible_spec",
             namespace="local",
             label="Visible specification",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
+        visible.object_types.add(ContentType.objects.get_for_model(AssetType))
         hidden = CustomField.objects.create(
             name="hidden_spec",
             namespace="local",
             label="Hidden specification",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
+        hidden.object_types.add(ContentType.objects.get_for_model(AssetType))
         fieldset = CustomFieldset.objects.create(
             namespace="local",
             slug="specifications",

@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
@@ -41,18 +42,21 @@ class AssetFormValuePreservationTests(TestCase):
             slug="device-details",
             label="Device details",
         )
+        asset_ct = ContentType.objects.get_for_model(Asset)
         visible = CustomField.objects.create(
             name="test_hostname",
             namespace="local",
             label="Hostname",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
+        visible.object_types.add(asset_ct)
         hidden = CustomField.objects.create(
             name="hidden_device_value",
             namespace="local",
             label="Hidden device value",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
+        hidden.object_types.add(asset_ct)
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=visible, position=10)
         hidden_fieldset = CustomFieldset.objects.create(
             namespace="local",
@@ -112,16 +116,17 @@ class AssetFormValuePreservationTests(TestCase):
             namespace="local", slug="optional-choice", label="Optional choice"
         )
         CustomFieldChoice.objects.create(choice_set=choice_set, key="one", label="One", position=10)
-        CustomField.objects.create(
+        optional = CustomField.objects.create(
             name="optional_choice",
             namespace="local",
             label="Optional choice",
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=choice_set,
             max_values=1,
             required=False,
         )
+        optional.object_types.add(ContentType.objects.get_for_model(Asset))
         status = StatusLabel.objects.create(name="Available optional", slug="available-optional", type="deployable")
         manufacturer = Manufacturer.objects.create(name="Optional Manufacturer", slug="optional-manufacturer")
         asset_type = AssetType.objects.create(
@@ -168,13 +173,14 @@ class AssetFormValuePreservationTests(TestCase):
         self.assertEqual(saved.custom_field_data, {})
 
     def test_explicit_clear_checkbox_removes_existing_value(self):
-        CustomField.objects.create(
+        clearable = CustomField.objects.create(
             name="clearable_value",
             namespace="local",
             label="Clearable value",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
+        clearable.object_types.add(ContentType.objects.get_for_model(Asset))
         status = StatusLabel.objects.create(name="Available clear", slug="available-clear", type="deployable")
         manufacturer = Manufacturer.objects.create(name="Clear Manufacturer", slug="clear-manufacturer")
         asset_type = AssetType.objects.create(manufacturer=manufacturer, model="Clear Device", slug="clear-device")
@@ -208,9 +214,10 @@ def _asset_switch_pair():
         name="required_spec",
         namespace="local",
         label="Required specification",
-        scope=CustomField.SCOPE_ASSET,
+        activation=CustomField.ACTIVATION_COMPOSED,
         required=True,
     )
+    required.object_types.add(ContentType.objects.get_for_model(Asset))
     fieldset = CustomFieldset.objects.create(namespace="local", slug="switch-required", label="Switch required")
     CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=required, position=10)
     target_type = AssetType.objects.create(manufacturer=manufacturer, model="Target Device", slug="target-device")

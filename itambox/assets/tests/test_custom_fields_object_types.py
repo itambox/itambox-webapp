@@ -36,14 +36,14 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             name="cpu",
             label="CPU Model",
             field_type="text",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         self.cf_cpu.object_types.add(self.assettype_ct)
         self.cf_ram = CustomField.objects.create(
             name="ram_gb",
             label="RAM (GB)",
             field_type="decimal",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
             decimal_scale=0,
         )
         self.cf_ram.object_types.add(self.assettype_ct)
@@ -53,14 +53,14 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             name="test_hostname",
             label="Hostname",
             field_type="text",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         self.cf_test_hostname.object_types.add(self.asset_ct)
         self.cf_encrypted = CustomField.objects.create(
             name="encrypted",
             label="Disk Encrypted",
             field_type="boolean",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         self.cf_encrypted.object_types.add(self.asset_ct)
 
@@ -113,7 +113,7 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             name="wrong_target_spec",
             label="Wrong target specification",
             field_type="text",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
         wrong_target.object_types.add(self.asset_ct)
         CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=wrong_target, position=50)
@@ -128,7 +128,7 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             name="cost_center",
             label="Cost Center",
             field_type="text",
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
         cf_global.object_types.add(self.asset_ct)
         asset = Asset.objects.create(
@@ -141,15 +141,16 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         # Fieldset-bound fields don't leak onto assets of other/no types.
         self.assertNotIn("cf_test_hostname", form.fields)
 
-    def test_resolver_excludes_soft_deleted_definition_from_active_composition(self):
+    def test_resolver_excludes_deprecated_definition_without_stored_value_from_active_composition(self):
         deleted = CustomField.objects.create(
             name="deleted_spec",
             label="Deleted specification",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
-            lifecycle=CustomField.LIFECYCLE_ACTIVE,
-            deleted_at=timezone.now(),
+            activation=CustomField.ACTIVATION_COMPOSED,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+            deprecated_at=timezone.now(),
         )
+        deleted.object_types.add(self.assettype_ct)
         CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=deleted, position=50)
 
         resolved = resolve_asset_type_custom_fields(self.asset_type)
@@ -161,7 +162,7 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             name="exact_capacity",
             label="Exact capacity",
             field_type=CustomField.FIELD_TYPE_DECIMAL,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
             decimal_scale=3,
         )
         decimal.object_types.add(self.assettype_ct)
@@ -176,7 +177,7 @@ class CustomFieldsObjectTypesTestCase(TestCase):
             name="protocols",
             label="Protocols",
             field_type=CustomField.FIELD_TYPE_MULTI_SELECT,
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
             max_values=2,
             choice_set=choice_set,
         )
@@ -209,7 +210,12 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
 
     def test_supplier_form_roundtrip(self):
         supplier_ct = ContentType.objects.get_for_model(Supplier)
-        cf = CustomField.objects.create(name="account_no", label="Account Number", field_type="text")
+        cf = CustomField.objects.create(
+            name="account_no",
+            label="Account Number",
+            field_type="text",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         cf.object_types.add(supplier_ct)
 
         form = SupplierForm(data={"name": "Bechtle AG", "slug": "bechtle-ag", "cf_account_no": "ACC-42"})
@@ -223,17 +229,23 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
 
     def test_supplier_form_applies_definition_lifecycle_to_stored_values(self):
         supplier_ct = ContentType.objects.get_for_model(Supplier)
-        active = CustomField.objects.create(name="active_note", label="Active note")
+        active = CustomField.objects.create(
+            name="active_note",
+            label="Active note",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         deprecated = CustomField.objects.create(
             name="old_note",
             label="Old note",
+            activation=CustomField.ACTIVATION_GLOBAL,
             lifecycle=CustomField.LIFECYCLE_DEPRECATED,
         )
         deleted = CustomField.objects.create(
             name="deleted_note",
             label="Deleted note",
+            activation=CustomField.ACTIVATION_GLOBAL,
             lifecycle=CustomField.LIFECYCLE_DEPRECATED,
-            deleted_at=timezone.now(),
+            deprecated_at=timezone.now(),
         )
         for definition in (active, deprecated, deleted):
             definition.object_types.add(supplier_ct)
@@ -247,7 +259,8 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
         self.assertIn("cf_active_note", edit_form.fields)
         self.assertIn("cf_old_note", edit_form.fields)
         self.assertTrue(edit_form.fields["cf_old_note"].disabled)
-        self.assertNotIn("cf_deleted_note", edit_form.fields)
+        self.assertIn("cf_deleted_note", edit_form.fields)
+        self.assertTrue(edit_form.fields["cf_deleted_note"].disabled)
 
         bound_form = SupplierForm(
             data={
@@ -275,17 +288,23 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
 
     def test_supplier_filters_resolve_only_active_definitions(self):
         supplier_ct = ContentType.objects.get_for_model(Supplier)
-        active = CustomField.objects.create(name="region", label="Region")
+        active = CustomField.objects.create(
+            name="region",
+            label="Region",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         deprecated = CustomField.objects.create(
             name="old_region",
             label="Old region",
+            activation=CustomField.ACTIVATION_GLOBAL,
             lifecycle=CustomField.LIFECYCLE_DEPRECATED,
         )
         deleted = CustomField.objects.create(
             name="deleted_region",
             label="Deleted region",
+            activation=CustomField.ACTIVATION_GLOBAL,
             lifecycle=CustomField.LIFECYCLE_DEPRECATED,
-            deleted_at=timezone.now(),
+            deprecated_at=timezone.now(),
         )
         for definition in (active, deprecated, deleted):
             definition.object_types.add(supplier_ct)

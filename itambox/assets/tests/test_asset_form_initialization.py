@@ -355,12 +355,13 @@ class AssetFormLayoutTests(TestCase):
         self.assertEqual(fieldset_legends(form), self.BASE_LEGENDS)
 
     def test_custom_specifications_section_is_inserted_before_the_warranty_section(self):
-        CustomField.objects.create(
+        field = CustomField.objects.create(
             name="test_hostname",
             label="Hostname",
             field_type=CustomField.FIELD_TYPE_TEXT,
-            scope=CustomField.SCOPE_ASSET,
+            activation=CustomField.ACTIVATION_GLOBAL,
         )
+        field.object_types.add(ContentType.objects.get_for_model(Asset))
 
         form, _ = build_form_without_sequence()
 
@@ -382,9 +383,10 @@ class AssetFormCustomFieldTests(TestCase):
     def setUpTestData(cls):
         cls.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
 
-    def _asset_custom_field(self, **kwargs):
-        kwargs.setdefault("scope", CustomField.SCOPE_ASSET)
-        return CustomField.objects.create(**kwargs)
+    def _asset_custom_field(self, *, activation=CustomField.ACTIVATION_GLOBAL, **kwargs):
+        field = CustomField.objects.create(activation=activation, **kwargs)
+        field.object_types.add(ContentType.objects.get_for_model(Asset))
+        return field
 
     def test_global_custom_field_keys_follow_stable_key_ordering(self):
         self._asset_custom_field(name="zeta", label="Zeta", field_type="text")
@@ -396,7 +398,11 @@ class AssetFormCustomFieldTests(TestCase):
         self.assertEqual(form.custom_field_keys, ["cf_alpha", "cf_mid", "cf_zeta"])
 
     def test_generic_asset_field_uses_object_types_for_global_resolution(self):
-        field = self._asset_custom_field(name="generic_asset_detail", label="Generic asset detail", scope=None)
+        field = self._asset_custom_field(
+            name="generic_asset_detail",
+            label="Generic asset detail",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         field.object_types.add(ContentType.objects.get_for_model(Asset))
 
         form, _ = build_form_without_sequence()
@@ -472,13 +478,19 @@ class AssetFormCustomFieldTests(TestCase):
 
     def test_fieldset_fields_of_the_selected_asset_type_are_added_once(self):
         self._asset_custom_field(name="test_hostname", label="Hostname", field_type="text")
-        scoped_field = self._asset_custom_field(name="rack", label="Rack", field_type="text")
+        scoped_field = self._asset_custom_field(
+            name="rack",
+            label="Rack",
+            field_type="text",
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
         spec_field = CustomField.objects.create(
             name="cpu",
             label="CPU",
             field_type="text",
-            scope=CustomField.SCOPE_ASSET_TYPE,
+            activation=CustomField.ACTIVATION_COMPOSED,
         )
+        spec_field.object_types.add(ContentType.objects.get_for_model(AssetType))
         fieldset = CustomFieldset.objects.create(
             namespace="local",
             slug="server-specs",
