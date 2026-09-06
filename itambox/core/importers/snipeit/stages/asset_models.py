@@ -88,7 +88,6 @@ class AssetModelImporter:
         if previous_data is not None and not isinstance(previous_data, Mapping):
             raise ValueError("Existing Asset Type specifications are not a JSON object")
         merged_data = dict(previous_data or {})
-        merged_data.pop("snipeit_id", None)
         merged_data.update(defaults["custom_field_data"])
         defaults["custom_field_data"] = merged_data
         if not self.context.dry_run:

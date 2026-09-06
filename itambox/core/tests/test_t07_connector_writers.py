@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from core.importers.snipeit.stages.asset_models import (
+    _OMITTED_FIELDSET,
     AssetModelDependencies,
     AssetModelImporter,
     _connector_identity,
@@ -27,7 +28,11 @@ class _QuerySet:
     def filter(self, **criteria):
         self.calls.append(("filter", criteria))
         return type(self)(
-            [record for record in self.records if all(getattr(record, key, object()) == value for key, value in criteria.items())],
+            [
+                record
+                for record in self.records
+                if all(getattr(record, key, object()) == value for key, value in criteria.items())
+            ],
             self.calls,
         )
 
@@ -113,13 +118,16 @@ def test_type_connector_identity_uses_exact_json_vector_and_normalized_source_id
 
 
 def test_type_connector_identity_uses_sorted_ascii_json_and_ignores_extra_keys():
-    assert _connector_identity(
-        {
-            "source_url": "https://snipe.example/ä",
-            "source_id": "β",
-            "operator": "archive-only",
-        }
-    ) == "sha256:c1cbfdc911a6b519507e7be3e13c2cce652ff3e7aa111858bf823c19bd66a917"
+    assert (
+        _connector_identity(
+            {
+                "source_url": "https://snipe.example/ä",
+                "source_id": "β",
+                "operator": "archive-only",
+            }
+        )
+        == "sha256:c1cbfdc911a6b519507e7be3e13c2cce652ff3e7aa111858bf823c19bd66a917"
+    )
 
 
 def test_definition_digest_keeps_existing_material_and_tenant_precedence():
@@ -202,9 +210,7 @@ def test_asset_dry_run_writer_stores_connector_identity_without_archive_metadata
     )
 
     assert outcome == "created"
-    assert obj.connector_identity == _connector_identity(
-        {"source_url": "https://snipe.example", "source_id": "9"}
-    )
+    assert obj.connector_identity == _connector_identity({"source_url": "https://snipe.example", "source_id": "9"})
     assert "managed_paths" not in obj.__dict__
 
 
@@ -230,3 +236,26 @@ def test_choice_reconciliation_refuses_managed_owner_choice_set():
 
     with pytest.raises(ValueError, match="managed Choices"):
         importer._reconcile_choice_rows(choice_model, choice_set, [])
+
+
+def test_type_update_preserves_unrequested_historical_keys():
+    values = {"snipeit_id": "historical-value", "known": False, "unknown": 0}
+    obj = SimpleNamespace(
+        deleted_at=None,
+        management_kind="local",
+        custom_field_data=values,
+        save=lambda: None,
+    )
+    importer = AssetModelImporter(
+        SimpleNamespace(update=True, dry_run=False),
+        AssetModelDependencies({}, {}, {}, {}),
+    )
+    result, outcome = importer._update_existing(
+        obj,
+        {"custom_field_data": {}},
+        None,
+        _OMITTED_FIELDSET,
+    )
+    assert result is obj
+    assert outcome == "updated"
+    assert obj.custom_field_data == values
