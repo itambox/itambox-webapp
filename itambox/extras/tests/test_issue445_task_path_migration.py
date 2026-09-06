@@ -18,7 +18,6 @@ from django.apps import apps as django_apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.models.signals import post_migrate
-from django.test import TransactionTestCase
 
 from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
