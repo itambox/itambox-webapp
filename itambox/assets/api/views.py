@@ -89,8 +89,13 @@ class SpecificationCommandUpdateMixin:
     # Preserve the legacy ETag lock without taking it before command locks.
 
     def perform_update(self, serializer):
-        command_fields = {"specification_patch", "asset_type"}
-        if not command_fields.intersection(serializer.validated_data):
+        data = serializer.validated_data
+        type_changed = (
+            isinstance(serializer.instance, Asset)
+            and "asset_type" in data
+            and data["asset_type"].pk != serializer.instance.asset_type_id
+        )
+        if "specification_patch" not in data and not type_changed:
             return super().perform_update(serializer)
         # The generic view locks the owner before invoking serializer.save().
         # Supported REST mutations use the value-command shared catalogue lock.

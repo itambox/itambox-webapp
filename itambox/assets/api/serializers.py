@@ -399,7 +399,8 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             target_type = validated_data.pop("asset_type", target_marker)
             current = Asset._base_manager.get(pk=instance.pk)
 
-            if patch_value is not patch_marker or target_type is not target_marker:
+            type_changed = target_type is not target_marker and target_type.pk != current.asset_type_id
+            if patch_value is not patch_marker or type_changed:
                 try:
                     self._apply_specification_command(
                         current,

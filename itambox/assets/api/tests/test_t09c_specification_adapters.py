@@ -138,6 +138,8 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
                     )
 
     def test_native_only_edit_does_not_enforce_later_specification_requirement(self):
+        self.tenant_role.permissions = ["assets.add_asset", "assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save(update_fields=["permissions"])
         with self.tenant_context(self.tenant):
             asset = Asset.objects.create(
                 name="Before native edit",
@@ -150,18 +152,38 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
             field.required = True
             field.save(update_fields=["required"])
             AssetTypeFieldset.objects.create(asset_type=self.asset_type, fieldset=fieldset, position=1)
-            serializer = AssetSerializer(
-                instance=asset,
-                data={"name": "After native edit"},
-                partial=True,
-                context={"request": SimpleNamespace(user=self.tenant_user)},
-            )
-            self.assertTrue(serializer.is_valid(), serializer.errors)
+            for payload in (
+                {"name": "After native edit"},
+                {"name": "After repeated Type", "asset_type_id": self.asset_type.pk},
+            ):
+                with self.subTest(payload=payload):
+                    serializer = AssetSerializer(
+                        instance=asset,
+                        data=payload,
+                        partial=True,
+                        context={"request": SimpleNamespace(user=self.tenant_user)},
+                    )
+                    self.assertTrue(serializer.is_valid(), serializer.errors)
+                    with CaptureQueriesContext(connection) as queries:
+                        serializer.save()
+                    self.assertFalse(any("pg_advisory_xact_lock" in entry["sql"] for entry in queries.captured_queries))
+                    asset.refresh_from_db()
+                    self.assertEqual(asset.name, payload["name"])
+                    self.assertEqual(asset.custom_field_data, {})
+            self.client_login_to_tenant(self.tenant_user, self.tenant)
+            detail_url = reverse("api:assets_api:asset-detail", args=[asset.pk])
+            etag = self.client.get(detail_url)["ETag"]
             with CaptureQueriesContext(connection) as queries:
-                serializer.save()
+                response = self.client.patch(
+                    detail_url,
+                    {"name": "HTTP repeated Type", "asset_type_id": self.asset_type.pk},
+                    format="json",
+                    HTTP_IF_MATCH=etag,
+                )
+            self.assertEqual(response.status_code, 200, response.data)
             self.assertFalse(any("pg_advisory_xact_lock" in entry["sql"] for entry in queries.captured_queries))
             asset.refresh_from_db()
-            self.assertEqual(asset.name, "After native edit")
+            self.assertEqual(asset.name, "HTTP repeated Type")
             self.assertEqual(asset.custom_field_data, {})
 
     def test_public_asset_type_create_uses_canonical_create(self):
