@@ -226,7 +226,14 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        wanted = {"fieldsets", "specifications", "specification_state", "resource_revision", "definition_revision", "library"}
+        wanted = {
+            "fieldsets",
+            "specifications",
+            "specification_state",
+            "resource_revision",
+            "definition_revision",
+            "library",
+        }
         view = self.context.get("view") if hasattr(self, "context") else None
         if getattr(view, "action", None) != "list" and wanted.intersection(self.fields):
             payload = self._specification_payload(instance)
@@ -304,7 +311,9 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
                 try:
                     actor = actor_context_for_user(self._request_user())
                     plan = current_specification_plan(current, target_kind="asset_type")
-                    expected_resource_revision = if_match_revision(self.context.get("request")) or plan.resource_revision
+                    expected_resource_revision = (
+                        if_match_revision(self.context.get("request")) or plan.resource_revision
+                    )
                     expected_definition_revision = expected_definition_revision or plan.definition_revision
                     result = update_asset_type_specifications(
                         actor=actor,

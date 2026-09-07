@@ -30,6 +30,7 @@ from assets.services.specifications.contracts import (
     DomainIssueDTO,
     ExplicitFieldsetSelectionDTO,
     FieldKey,
+    FieldsetSelectionDTO,
     HistoryCleanupPreviewDTO,
     OwnerChangedDTO,
     OwnerCreatedDTO,
@@ -678,7 +679,6 @@ def create_fieldset_selection_from_values(
     omitted: bool,
 ) -> object:
     """Construct the presence-sensitive create DTO from parsed transport data."""
-    from assets.services.specifications.contracts import FieldsetSelectionDTO
 
     if omitted:
         return FieldsetSelectionDTO(presence="omitted", identities=())
