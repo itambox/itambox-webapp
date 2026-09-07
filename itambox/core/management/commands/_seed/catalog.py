@@ -19,7 +19,6 @@ and ``self._providers``. It reads ``self._status_label_defs()`` from Command.
 from decimal import Decimal
 
 from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
-from extras.definition_contract import validate_custom_field_definition_contract
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
 
 
@@ -187,26 +186,6 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct, vers
     for row in field_rows:
         options = _core_field_options(row, choice_sets, version)
         target_content_types = _core_field_target_types(row, content_types)
-        validate_custom_field_definition_contract(
-            field_type=options["field_type"],
-            activation=options["activation"],
-            quantity_kind=options["quantity_kind"],
-            canonical_unit=options["canonical_unit"],
-            minimum_value=options["minimum_value"],
-            maximum_value=options["maximum_value"],
-            regex=options["regex"],
-            decimal_scale=options["decimal_scale"],
-            max_values=options["max_values"],
-            text_max_length=options["text_max_length"],
-            validation_rule=options["validation_rule"],
-            mappings=options["mappings"],
-            choice_set=options["choice_set"],
-            object_types=target_content_types,
-            management_kind=options["management_kind"],
-            lifecycle=options["lifecycle"],
-            name=row["key"],
-            namespace=options["namespace"],
-        )
         matches = list(CustomField.objects.filter(name=row["key"]))
         _validate_core_field_identity(matches, row["key"])
         field = matches[0] if matches else CustomField(name=row["key"], **options)
