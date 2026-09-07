@@ -8,6 +8,7 @@ from extras.services.specifications.contracts import (
     FieldDefinitionDTO,
     LoadedSpecificationGraphDTO,
     PersistedFieldsetDTO,
+    ProjectionIssueDTO,
     ResolvedFieldDTO,
     SpecificationProjectionEntryDTO,
 )
@@ -125,12 +126,12 @@ def issues_for_entries(entries: tuple[SpecificationProjectionEntryDTO, ...]) -> 
     return tuple(issues)
 
 
-def issues_for_missing_required(issues: tuple[object, ...]) -> tuple[UserErrorView, ...]:
+def issues_for_missing_required(issues: tuple[ProjectionIssueDTO, ...]) -> tuple[UserErrorView, ...]:
     return tuple(
         UserErrorView(
             code="MISSING_REQUIRED",
-            path=("specifications", str(getattr(issue, "field_key"))),
-            field_key=str(getattr(issue, "field_key")),
+            path=("specifications", str(issue.field_key)),
+            field_key=str(issue.field_key),
             message="specifications.missing_required",
         )
         for issue in issues
@@ -138,7 +139,9 @@ def issues_for_missing_required(issues: tuple[object, ...]) -> tuple[UserErrorVi
 
 
 def field_view_sources(field: FieldDefinitionDTO | ResolvedFieldDTO) -> tuple[str, ...]:
-    return tuple(str(identity) for identity in getattr(field, "contributing_section_identities", ()))
+    if not isinstance(field, ResolvedFieldDTO):
+        return ()
+    return tuple(str(identity) for identity in field.contributing_section_identities)
 
 
 __all__ = [

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory
@@ -22,7 +20,6 @@ from assets.services.specifications.contracts import (
     CommandRejectedDTO,
     DefinitionRevision,
     DomainIssueDTO,
-    ExplicitFieldsetSelectionDTO,
     FieldKey,
     OwnerChangedDTO,
     OwnerRefDTO,
@@ -34,7 +31,6 @@ from extras.services.specifications.contracts import (
     ChoiceSetDTO,
     FieldDefinitionDTO,
     OrderedFieldsetMembershipDTO,
-    PersistedFieldsetDTO,
     ResolvedFieldDTO,
     ResolvedSectionDTO,
     SpecificationProjectionDTO,

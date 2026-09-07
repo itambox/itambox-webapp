@@ -40,7 +40,9 @@ from assets.models import (
     Warranty,
 )
 from assets.services.specifications.contracts import (
+    DefinitionRevision,
     DestinationAssetTypeSelectionDTO,
+    ResourceRevision,
     SpecificationPatchDTO,
 )
 from core.mixins import suppress_custom_field_data_validation
@@ -63,13 +65,11 @@ from ..services.specifications.commands import (
 from ..specification_adapters import (
     actor_context_for_user,
     authorization_for_asset,
-    create_fieldset_selection,
     current_specification_plan,
     discard_staged_image,
     native_asset_type_create_input,
     owner_id_from_result,
     patch_from_mapping,
-    require_command_success,
     stage_uploaded_image,
 )
 
@@ -203,7 +203,7 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
     def _native_input(self, validated_data, *, staged_image_id=None):
         return native_asset_type_create_input(validated_data, staged_image_id=staged_image_id)
 
-    def validate(self, data):
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
         if self.nested:
             return data
         initial = getattr(self, "initial_data", None)
@@ -411,7 +411,7 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         ]
         brief_fields = ["id", "name", "asset_tag", "serial_number", "status"]
 
-    def validate(self, data):
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
         if self.nested:
             return data
         initial = getattr(self, "initial_data", None)
@@ -419,7 +419,7 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             reject_transport_writes(initial, self.fields)
         return data
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: Asset) -> dict[str, object]:
         data = super().to_representation(instance)
         wanted = {"fieldsets", "specifications", "specification_state", "resource_revision", "definition_revision"}
         view = self.context.get("view") if hasattr(self, "context") else None
@@ -436,8 +436,8 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         target_type_id: int | None,
         patch: SpecificationPatchDTO,
         *,
-        expected_resource_revision=None,
-        expected_definition_revision=None,
+        expected_resource_revision: ResourceRevision | None = None,
+        expected_definition_revision: DefinitionRevision | None = None,
     ) -> None:
         authorization = authorization_for_asset(
             user=self._request_user(),

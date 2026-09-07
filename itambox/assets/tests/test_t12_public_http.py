@@ -175,7 +175,7 @@ class T12PublicSpecificationHTTPTests(TenantTestMixin, APITestCase):
                 "specification_patch": {"set": {}, "clear": []},
             },
             format="json",
-            HTTP_IF_MATCH=f'"{preview.data["expected_resource_revision"]}"',
+            HTTP_IF_MATCH='"{}"'.format(preview.data["expected_resource_revision"]),
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["outcome"], "changed")

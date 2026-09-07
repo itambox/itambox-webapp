@@ -455,7 +455,7 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
                 "specification_patch": {"set": {}, "clear": []},
             },
             format="json",
-            HTTP_IF_MATCH=f'"{preview.data["expected_resource_revision"]}"',
+            HTTP_IF_MATCH='"{}"'.format(preview.data["expected_resource_revision"]),
         )
         self.assertEqual(write.status_code, status.HTTP_200_OK, write.data)
         self.assertEqual(

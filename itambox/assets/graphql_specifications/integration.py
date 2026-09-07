@@ -8,11 +8,9 @@ one ORM lookup per Field, Choice, or value.
 from __future__ import annotations
 
 import base64
-import binascii
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
 
 from django.core.exceptions import PermissionDenied
 from django.db import router
@@ -21,7 +19,6 @@ from graphql import GraphQLError
 
 from assets.models import Asset, AssetType
 from assets.services.specifications._command_support import resource_revision_for_owner
-from assets.services.specifications.contracts import DomainIssueDTO
 from assets.services.specifications.loader import (
     _assemble_current_fields,
     _assemble_fieldsets,
@@ -32,8 +29,8 @@ from extras.services._definition_command_support import resource_revision_for_de
 from extras.services.specifications.contracts import (
     ChoiceDTO,
     ChoiceSetDTO,
-    FieldKey,
-    LoadedSpecificationGraphDTO,
+    FieldDefinitionDTO,
+    ResolvedFieldDTO,
     ResourceRevision,
     TargetKind,
 )
@@ -49,9 +46,9 @@ from organization.services.access_scope import (
     resolve_access_scope,
 )
 
-from .loaders import RequestScopedSpecificationLoader, request_loader_for_info
+from .loaders import RequestScopedSpecificationLoader
 from .readers import fields_for_fieldset, issues_for_entries, issues_for_missing_required
-from .types import FieldsetView, LibraryOriginView, PageInfoType, UserErrorType
+from .types import FieldsetView, LibraryOriginView, UserErrorType
 
 
 @dataclass(frozen=True)
@@ -115,12 +112,12 @@ def authenticated_user(info: object) -> object:
 
 def has_global_permission(info: object, permission: str) -> bool:
     user = authenticated_user(info)
-    return bool(getattr(user, "has_perm")(permission))
+    return bool(user.has_perm(permission))
 
 
 def require_global_permission(info: object, permission: str) -> object:
     user = authenticated_user(info)
-    if not getattr(user, "has_perm")(permission):
+    if not user.has_perm(permission):
         raise PermissionDenied("Permission denied.")
     return user
 
@@ -355,22 +352,22 @@ def asset_type_connection(
 
 
 def specification_field_connection(
-    fields: Sequence[object],
+    fields: Sequence[FieldDefinitionDTO | ResolvedFieldDTO],
     *,
     first: int | None,
     after: str | None,
 ) -> SpecificationFieldConnectionView:
     page_size_value = page_size(first)
-    ordered = sorted(fields, key=lambda item: str(getattr(item, "identity")))
+    ordered = sorted(fields, key=lambda item: str(item.identity))
     if after:
         after_identity, _unused = decode_cursor(after, prefix="field")
-        ordered = [item for item in ordered if str(getattr(item, "identity")) > after_identity]
+        ordered = [item for item in ordered if str(item.identity) > after_identity]
     page = ordered[: page_size_value + 1]
     has_next = len(page) > page_size_value
     page = page[:page_size_value]
     edges = tuple(
         SpecificationFieldEdgeView(
-            cursor=encode_cursor("field", str(getattr(item, "identity")), 0),
+            cursor=encode_cursor("field", str(item.identity), 0),
             node=item,
         )
         for item in page
@@ -396,7 +393,7 @@ def decode_cursor(cursor: str, *, prefix: str) -> tuple[str, int]:
         padding = "=" * (-len(cursor) % 4)
         decoded = base64.urlsafe_b64decode((cursor + padding).encode("ascii"))
         payload = json.loads(decoded.decode("utf-8"))
-    except (ValueError, UnicodeError, binascii.Error, json.JSONDecodeError) as exc:
+    except ValueError as exc:
         raise GraphQLError("Invalid cursor.", extensions={"code": "INVALID_CURSOR"}) from exc
     if (
         type(payload) is not list

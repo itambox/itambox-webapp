@@ -24,7 +24,6 @@ from extras.services.specifications.contracts import (
     SpecificationProjectionDTO,
     SpecificationProjectionEntryDTO,
     SpecificationValidationDTO,
-    StoredSpecificationEntryDTO,
 )
 
 

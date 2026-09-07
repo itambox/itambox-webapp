@@ -92,6 +92,7 @@ from .specification_api import (
     definition_for_owner,
     error_response,
     etag_for_owner,
+    etag_for_revision,
     explicit_fieldset_selection,
     history_keys,
     if_match_revision,
@@ -385,7 +386,7 @@ class AssetViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
             )
         response = command_result_response(result)
         if hasattr(result, "resource_revision"):
-            response["ETag"] = f'"{result.resource_revision}"'
+            response["ETag"] = etag_for_revision(result.resource_revision)
         return response
 
 
@@ -505,7 +506,7 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
                 expected_definition_revision=DefinitionRevision(expected_definition_revision),
                 patch=patch_from_validated(serializer.validated_data.get("specification_patch")),
             )
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             return error_response(
                 (
                     issue(
@@ -517,7 +518,7 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
             )
         response = command_result_response(result)
         if hasattr(result, "resource_revision"):
-            response["ETag"] = f'"{result.resource_revision}"'
+            response["ETag"] = etag_for_revision(result.resource_revision)
         return response
 
     @action(
@@ -554,7 +555,7 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
         )
         response = command_result_response(result)
         if hasattr(result, "resource_revision"):
-            response["ETag"] = f'"{result.resource_revision}"'
+            response["ETag"] = etag_for_revision(result.resource_revision)
         return response
 
     @action(
@@ -621,7 +622,7 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
             )
         response = command_result_response(result)
         if hasattr(result, "resource_revision"):
-            response["ETag"] = f'"{result.resource_revision}"'
+            response["ETag"] = etag_for_revision(result.resource_revision)
         return response
 
 
@@ -684,7 +685,7 @@ class CategoryViewSet(SpecificationContractMixin, ITAMBoxModelViewSet):
             )
         response = command_result_response(result)
         if hasattr(result, "resource_revision"):
-            response["ETag"] = f'"{result.resource_revision}"'
+            response["ETag"] = etag_for_revision(result.resource_revision)
         return response
 
 

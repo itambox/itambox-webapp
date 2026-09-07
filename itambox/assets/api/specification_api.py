@@ -17,7 +17,6 @@ from rest_framework.response import Response
 from assets.models import Asset, AssetType, Category, CategoryDefaultFieldset
 from assets.services.specifications._command_support import (
     issue,
-    load_effective_definition,
     load_prospective_definition,
     normalize_patch,
     resource_revision_for_owner,
@@ -32,9 +31,6 @@ from assets.services.specifications.contracts import (
     FieldKey,
     FieldsetSelectionDTO,
     HistoryCleanupPreviewDTO,
-    OwnerChangedDTO,
-    OwnerCreatedDTO,
-    OwnerNoOpDTO,
     OwnerRefDTO,
     SpecificationGraphLoadRequest,
     SpecificationProjectionRequest,
@@ -332,8 +328,12 @@ def if_match_revision(request: object) -> str | None:
     return values[0]
 
 
+def etag_for_revision(revision: object) -> str:
+    return '"{}"'.format(revision)
+
+
 def etag_for_owner(owner: object) -> str:
-    return f'"{resource_revision_for_owner(owner)}"'
+    return etag_for_revision(resource_revision_for_owner(owner))
 
 
 def _validation_payload(validation: object) -> dict[str, object]:

@@ -3408,6 +3408,7 @@ paths:
   /api/assets/asset-types/:
     get:
       operationId: assets_asset_types_list
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: query
         name: category
@@ -3491,6 +3492,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     post:
       operationId: assets_asset_types_create
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -3554,6 +3556,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: assets_asset_types_update_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -3617,6 +3620,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: assets_asset_types_partial_update_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -3679,6 +3683,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: assets_asset_types_destroy_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       security:
@@ -3721,6 +3726,7 @@ paths:
   /api/assets/asset-types/{id}/:
     get:
       operationId: assets_asset_types_retrieve
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -3767,6 +3773,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: assets_asset_types_update
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -3843,6 +3850,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: assets_asset_types_partial_update
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -3918,6 +3926,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: assets_asset_types_destroy
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -3970,9 +3979,447 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/apply-category-defaults/:
+    post:
+      operationId: assets_asset_types_apply_category_defaults_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyCategoryDefaultsInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApplyCategoryDefaultsInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApplyCategoryDefaultsInputRequest'
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplyCategoryDefaultsInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/composition/:
+    put:
+      operationId: assets_asset_types_composition_update
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompositionInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompositionInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompositionInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompositionInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/composition-preview/:
+    post:
+      operationId: assets_asset_types_composition_preview_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompositionInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompositionInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompositionInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompositionInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/specification-definition/:
+    get:
+      operationId: assets_asset_types_specification_definition_retrieve
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetType'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/specification-history/cleanup/:
+    post:
+      operationId: assets_asset_types_specification_history_cleanup_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupWriteInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupWriteInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupWriteInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryCleanupWriteInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/specification-history/cleanup-preview/:
+    post:
+      operationId: assets_asset_types_specification_history_cleanup_preview_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryCleanupInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/assets/assets/:
     get:
       operationId: assets_assets_list
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: query
         name: asset_role
@@ -4118,6 +4565,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     post:
       operationId: assets_assets_create
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -4181,6 +4629,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: assets_assets_update_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -4244,6 +4693,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: assets_assets_partial_update_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -4306,6 +4756,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: assets_assets_destroy_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       security:
@@ -4348,6 +4799,7 @@ paths:
   /api/assets/assets/{id}/:
     get:
       operationId: assets_assets_retrieve
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -4394,6 +4846,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: assets_assets_update
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -4470,6 +4923,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: assets_assets_partial_update
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -4545,6 +4999,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: assets_assets_destroy
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -4737,9 +5192,166 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/assets/assets/{id}/specification-history/cleanup/:
+    post:
+      operationId: assets_assets_specification_history_cleanup_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupWriteInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupWriteInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupWriteInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryCleanupWriteInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/assets/{id}/specification-history/cleanup-preview/:
+    post:
+      operationId: assets_assets_specification_history_cleanup_preview_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HistoryCleanupInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryCleanupInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/assets/categories/:
     get:
       operationId: assets_categories_list
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - name: limit
         required: false
@@ -4804,6 +5416,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     post:
       operationId: assets_categories_create
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -4867,6 +5480,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: assets_categories_update_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -4930,6 +5544,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: assets_categories_partial_update_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       requestBody:
@@ -4992,6 +5607,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: assets_categories_destroy_bulk
+      description: Use the canonical resource digest for specification-aware objects.
       tags:
       - assets
       security:
@@ -5034,6 +5650,7 @@ paths:
   /api/assets/categories/{id}/:
     get:
       operationId: assets_categories_retrieve
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -5080,6 +5697,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: assets_categories_update
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -5156,6 +5774,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: assets_categories_partial_update
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -5231,6 +5850,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: assets_categories_destroy
+      description: Use the canonical resource digest for specification-aware objects.
       parameters:
       - in: path
         name: id
@@ -5266,6 +5886,131 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIError'
         '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/categories/{id}/default-fieldsets/:
+    get:
+      operationId: assets_categories_default_fieldsets_retrieve
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Category.
+        required: true
+      tags:
+      - assets
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryDefaultFieldsetsInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    put:
+      operationId: assets_categories_default_fieldsets_update
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Category.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryDefaultFieldsetsInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryDefaultFieldsetsInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryDefaultFieldsetsInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryDefaultFieldsetsInput'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
           description: The request could not be completed.
           content:
             application/json:
@@ -38777,6 +39522,35 @@ components:
         * `renewal_due` - Renewal Due Alert
         * `warranty_expiry` - Warranty Expiry Alert
         * `audit_overdue` - Audit Overdue
+    ApplyCategoryDefaultsInput:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        preview_token:
+          type: string
+        expected_definition_revision:
+          type: string
+        expected_category_default_snapshot_revision:
+          type: string
+        specification_patch:
+          $ref: '#/components/schemas/SpecificationPatchInput'
+    ApplyCategoryDefaultsInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        preview_token:
+          type: string
+          minLength: 1
+        expected_definition_revision:
+          type: string
+          minLength: 1
+        expected_category_default_snapshot_revision:
+          type: string
+          minLength: 1
+        specification_patch:
+          $ref: '#/components/schemas/SpecificationPatchInputRequest'
     AssetAssignment:
       type: object
       properties:
@@ -39608,7 +40382,19 @@ components:
         last_audited_by:
           type: string
           readOnly: true
-        custom_field_data:
+        fieldsets:
+          type: array
+          items: {}
+          readOnly: true
+        specifications:
+          readOnly: true
+        specification_state:
+          readOnly: true
+        resource_revision:
+          type: string
+          readOnly: true
+        definition_revision:
+          type: string
           readOnly: true
         requestable:
           type: boolean
@@ -39640,11 +40426,15 @@ components:
       - assigned_to
       - cost_center
       - created_at
-      - custom_field_data
+      - definition_revision
+      - fieldsets
       - id
       - last_audited_by
       - location
       - name
+      - resource_revision
+      - specification_state
+      - specifications
       - status
       - supplier
       - tags
@@ -39729,6 +40519,10 @@ components:
           nullable: true
         specification_patch:
           writeOnly: true
+        expected_definition_revision:
+          type: string
+          writeOnly: true
+          minLength: 1
         requestable:
           type: boolean
           nullable: true
@@ -39906,7 +40700,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/Depreciation'
           readOnly: true
-        custom_field_data:
+        specifications:
+          readOnly: true
+        specification_state:
+          readOnly: true
+        resource_revision:
+          type: string
+          readOnly: true
+        definition_revision:
+          type: string
+          readOnly: true
+        library:
           readOnly: true
         image:
           type: string
@@ -39936,12 +40740,16 @@ components:
       required:
       - asset_role
       - created_at
-      - custom_field_data
+      - definition_revision
       - depreciation
       - id
+      - library
       - manufacturer
       - model
+      - resource_revision
       - slug
+      - specification_state
+      - specifications
       - tags
       - updated_at
     AssetTypeRequest:
@@ -39981,8 +40789,26 @@ components:
           type: integer
           writeOnly: true
           nullable: true
+        fieldsets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          writeOnly: true
         specification_patch:
           writeOnly: true
+        expected_definition_revision:
+          type: string
+          writeOnly: true
+          minLength: 1
+        preview_token:
+          type: string
+          writeOnly: true
+          minLength: 1
+        expected_category_default_snapshot_revision:
+          type: string
+          writeOnly: true
+          minLength: 1
         image:
           type: string
           format: binary
@@ -40132,6 +40958,29 @@ components:
       - slug
       - tags
       - updated_at
+    CategoryDefaultFieldsetsInput:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        fieldsets:
+          type: array
+          items:
+            type: string
+      required:
+      - fieldsets
+    CategoryDefaultFieldsetsInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        fieldsets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+      required:
+      - fieldsets
     CategoryEnum:
       enum:
       - operating_system
@@ -40473,6 +41322,38 @@ components:
       required:
       - component_id
       - location_id
+    CompositionInput:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        fieldsets:
+          type: array
+          items:
+            type: string
+        expected_definition_revision:
+          type: string
+        specification_patch:
+          $ref: '#/components/schemas/SpecificationPatchInput'
+      required:
+      - fieldsets
+    CompositionInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        fieldsets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        expected_definition_revision:
+          type: string
+          minLength: 1
+        specification_patch:
+          $ref: '#/components/schemas/SpecificationPatchInputRequest'
+      required:
+      - fieldsets
     Consumable:
       type: object
       properties:
@@ -42111,6 +42992,67 @@ components:
       - name
       - url
       - user_count
+    HistoryCleanupInput:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+        expected_definition_revision:
+          type: string
+      required:
+      - keys
+    HistoryCleanupInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        expected_definition_revision:
+          type: string
+          minLength: 1
+      required:
+      - keys
+    HistoryCleanupWriteInput:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+        expected_definition_revision:
+          type: string
+        preview_token:
+          type: string
+      required:
+      - keys
+    HistoryCleanupWriteInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        expected_definition_revision:
+          type: string
+          minLength: 1
+        preview_token:
+          type: string
+          minLength: 1
+      required:
+      - keys
     HttpMethodEnum:
       enum:
       - GET
@@ -45790,6 +46732,10 @@ components:
           nullable: true
         specification_patch:
           writeOnly: true
+        expected_definition_revision:
+          type: string
+          writeOnly: true
+          minLength: 1
         requestable:
           type: boolean
           nullable: true
@@ -45879,8 +46825,26 @@ components:
           type: integer
           writeOnly: true
           nullable: true
+        fieldsets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          writeOnly: true
         specification_patch:
           writeOnly: true
+        expected_definition_revision:
+          type: string
+          writeOnly: true
+          minLength: 1
+        preview_token:
+          type: string
+          writeOnly: true
+          minLength: 1
+        expected_category_default_snapshot_revision:
+          type: string
+          writeOnly: true
+          minLength: 1
         image:
           type: string
           format: binary
@@ -48476,6 +49440,25 @@ components:
       required:
       - manufacturer_id
       - name
+    SpecificationPatchInput:
+      type: object
+      description: Structural parsing only; command codecs own all specification semantics.
+      properties:
+        set: {}
+        clear:
+          type: array
+          items:
+            type: string
+    SpecificationPatchInputRequest:
+      type: object
+      description: Structural parsing only; command codecs own all specification semantics.
+      properties:
+        set: {}
+        clear:
+          type: array
+          items:
+            type: string
+            minLength: 1
     StatusLabel:
       type: object
       properties:

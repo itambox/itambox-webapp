@@ -11,9 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Literal
 
-import graphene
 from graphql import GraphQLError
 
 from assets.services.specifications.contracts import (
@@ -25,9 +23,8 @@ from assets.services.specifications.contracts import (
 from assets.services.specifications.loader import load_specification_graph
 from extras.services.specifications.composition import resolve_specification_definition
 from extras.services.specifications.contracts import (
-    FieldDefinitionDTO,
+    ChoiceSetDTO,
     LoadedSpecificationGraphDTO,
-    ProjectionIssueDTO,
     SpecificationDefinitionDTO,
     SpecificationProjectionDTO,
     StoredSpecificationEntryDTO,
@@ -268,26 +265,37 @@ def request_loader_for_info(info: object) -> RequestScopedSpecificationLoader:
             "A request context is required for specification reads.",
             extensions={"code": "OBJECT_UNAVAILABLE"},
         )
-
-    key = "_itambox_specification_loader"
     if isinstance(context, Mapping):
-        loader = context.get(key)
-        if loader is None:
-            loader = RequestScopedSpecificationLoader()
-            try:
-                context[key] = loader  # type: ignore[index]
-            except (AttributeError, TypeError) as exc:
-                raise GraphQLError(
-                    "The request context cannot hold request-local state.",
-                    extensions={"code": "OBJECT_UNAVAILABLE"},
-                ) from exc
-        if not isinstance(loader, RequestScopedSpecificationLoader):
-            raise GraphQLError(
-                "The request context contains an invalid specification loader.",
-                extensions={"code": "OBJECT_UNAVAILABLE"},
-            )
-        return loader
+        return _loader_for_mapping_context(context)
+    return _loader_for_object_context(context)
 
+
+def _validated_loader(loader: object) -> RequestScopedSpecificationLoader:
+    if not isinstance(loader, RequestScopedSpecificationLoader):
+        raise GraphQLError(
+            "The request context contains an invalid specification loader.",
+            extensions={"code": "OBJECT_UNAVAILABLE"},
+        )
+    return loader
+
+
+def _loader_for_mapping_context(context: Mapping[str, object]) -> RequestScopedSpecificationLoader:
+    key = "_itambox_specification_loader"
+    loader = context.get(key)
+    if loader is None:
+        loader = RequestScopedSpecificationLoader()
+        try:
+            context[key] = loader  # type: ignore[index]
+        except (AttributeError, TypeError) as exc:
+            raise GraphQLError(
+                "The request context cannot hold request-local state.",
+                extensions={"code": "OBJECT_UNAVAILABLE"},
+            ) from exc
+    return _validated_loader(loader)
+
+
+def _loader_for_object_context(context: object) -> RequestScopedSpecificationLoader:
+    key = "_itambox_specification_loader"
     loader = getattr(context, key, None)
     if loader is None:
         loader = RequestScopedSpecificationLoader()
@@ -298,12 +306,7 @@ def request_loader_for_info(info: object) -> RequestScopedSpecificationLoader:
                 "The request context cannot hold request-local state.",
                 extensions={"code": "OBJECT_UNAVAILABLE"},
             ) from exc
-    if not isinstance(loader, RequestScopedSpecificationLoader):
-        raise GraphQLError(
-            "The request context contains an invalid specification loader.",
-            extensions={"code": "OBJECT_UNAVAILABLE"},
-        )
-    return loader
+    return _validated_loader(loader)
 
 
 def _default_graph_loader(request: SpecificationGraphLoadRequest) -> LoadedSpecificationGraphDTO:
