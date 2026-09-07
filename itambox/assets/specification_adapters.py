@@ -36,10 +36,10 @@ from assets.services.specifications.contracts import (
 from extras.customfields import is_omitted_optional_single_select
 from extras.models import CustomFieldset
 from organization.services.access_scope import (
+    AccessScopeDeniedDTO,
     AccessScopeResolutionRequestDTO,
     AccessScopeResolvedDTO,
     ActorContextDTO,
-    AccessScopeDeniedDTO,
     RequestedScopeSelectorDTO,
     ResolvedAccessAuthorizationDTO,
     TenantId,

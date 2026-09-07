@@ -20,6 +20,7 @@ from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
 from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel, Warranty
+from ..models.choices import WarrantyTypeChoices
 from ..services.specifications.commands import update_asset_specifications
 from ..services.specifications.contracts import DestinationAssetTypeSelectionDTO
 from ..specification_adapters import (
@@ -30,7 +31,6 @@ from ..specification_adapters import (
     require_command_success,
     specification_patch,
 )
-from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
 
 HTML5_DATE_FORMAT = "%Y-%m-%d"
