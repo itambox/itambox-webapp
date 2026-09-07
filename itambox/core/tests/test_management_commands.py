@@ -275,7 +275,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
             key="unexpected-core",
             label="Unexpected local",
             position=999,
-            management_kind=CustomFieldChoice.MANAGEMENT_CORE,
             version=1,
             lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
         )
