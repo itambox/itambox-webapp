@@ -19,9 +19,9 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
 from django_tables2 import RequestConfig
 
-from assets.tables import AssetTable  # Import AssetTable
 from assets.services.specification_consumers.contracts import FieldReference, parse_filter_document
 from assets.services.specification_consumers.exporting import machine_csv_bytes
+from assets.tables import AssetTable  # Import AssetTable
 from core.managers import get_current_tenant
 from core.reports.rendering import render_report_csv, render_report_html
 from extras.tasks.reports import generate_scheduled_report_task

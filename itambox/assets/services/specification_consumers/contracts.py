@@ -226,9 +226,7 @@ def _saved_filter_impact(
     path: tuple[str, ...],
     known_references: Mapping[FieldReference, str],
 ) -> SavedReferenceImpact | None:
-    looks_like_filter = "operator" in value and bool(
-        {"source", "field_key", "field", "label"}.intersection(value)
-    )
+    looks_like_filter = "operator" in value and bool({"source", "field_key", "field", "label"}.intersection(value))
     if not looks_like_filter:
         return None
     try:
