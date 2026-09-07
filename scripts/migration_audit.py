@@ -33,6 +33,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0114_issue479_t06_composition_schema",
     "assets.0115_issue479_t07_provenance_bridge",
     "assets.0116_assettypeimagestage",
+    "assets.0117_issue479_final_core_vocabulary",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -352,6 +353,15 @@ SEMANTIC_DISPOSITIONS = {
             "transition evidence, and performs the irreversible Asset Type cutover with guarded identity semantics."
         ),
         {"assets.0115_issue479_t07_provenance_bridge"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Reconciles existing core vocabulary definitions, memberships, and category defaults to the reviewed "
+            "Issue #479 matrix, retaining legacy values and refusing ambiguous ownership or identity conflicts; "
+            "reverse is refused because the existing-data reconciliation is not safely reversible."
+        ),
+        {"assets.0117_issue479_final_core_vocabulary"},
     ),
     **_dispositions(
         "upgrade-only",

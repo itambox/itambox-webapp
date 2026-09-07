@@ -198,19 +198,30 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 50)
+        self.assertEqual(len(manifest["post_transition_ids"]), 51)
         self.assertTrue(
             {
                 "assets.0114_issue479_t06_composition_schema",
                 "assets.0115_issue479_t07_provenance_bridge",
+                "assets.0117_issue479_final_core_vocabulary",
                 "extras.0118_issue479_t06_definition_schema",
                 "extras.0119_issue479_t07_provenance_schema",
                 "extras.0120_issue479_t07_provenance_cutover",
             }.issubset(manifest["post_transition_ids"])
         )
-        self.assertIn("extras.0120_issue479_t07_provenance_cutover", manifest["post_transition_leaf_ids"])
-        self.assertIn("assets.0116_assettypeimagestage", manifest["post_transition_leaf_ids"])
-        self.assertEqual(len(manifest["post_transition_leaf_ids"]), 8)
+        self.assertEqual(
+            manifest["post_transition_leaf_ids"],
+            [
+                "assets.0117_issue479_final_core_vocabulary",
+                "compliance.0105_custodyhandoffdelivery",
+                "inventory.0101_alter_accessoryassignment_options_and_more",
+                "organization.0103_tenant_resource_grant_expiry",
+                "procurement.0101_alter_purchaseorder_options",
+                "subscriptions.0101_remove_subscription_auto_renewal_and_more",
+                "users.0103_oidcidentity",
+            ],
+        )
+        self.assertEqual(manifest["current_leaf_ids"], manifest["post_transition_leaf_ids"])
         self.assertEqual(manifest["baseline_ids"], manifest["replacement_ids"])
 
     def test_checked_manifest_rejects_malformed_shape(self):
