@@ -168,6 +168,17 @@ function restoreSelectValue(select: HTMLSelectElement, value: string): void {
   }
 }
 
+function markSpecificationValue(form: HTMLFormElement, target: EventTarget | null): void {
+  if (!(target instanceof HTMLElement) || !target.matches('[data-specification-input]')) return;
+  const input = target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+  const key = input.dataset.specificationKey;
+  if (!key) return;
+  const marker = namedElement(form, `cf_${key}__presence`);
+  if (marker) marker.value = 'value';
+  const clear = namedElement(form, `cf_${key}__clear`);
+  if (clear instanceof HTMLInputElement) clear.checked = false;
+}
+
 function bindEditor(form: HTMLFormElement): void {
   if (form.dataset.specificationEditorBound === 'true') return;
   form.dataset.specificationEditorBound = 'true';
@@ -182,6 +193,10 @@ function bindEditor(form: HTMLFormElement): void {
     if (target instanceof HTMLSelectElement && target.matches('[data-specification-category]')) {
       target.dataset.previousSpecificationValue = target.value;
     }
+  });
+
+  form.addEventListener('input', (event) => {
+    markSpecificationValue(form, event.target);
   });
 
   form.addEventListener('change', (event) => {
@@ -216,15 +231,7 @@ function bindEditor(form: HTMLFormElement): void {
       return;
     }
 
-    if (target.matches('[data-specification-input]')) {
-      const input = target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-      const key = input.dataset.specificationKey;
-      if (!key) return;
-      const marker = namedElement(form, `cf_${key}__presence`);
-      if (marker) marker.value = 'value';
-      const clear = namedElement(form, `cf_${key}__clear`);
-      if (clear instanceof HTMLInputElement) clear.checked = false;
-    }
+    markSpecificationValue(form, target);
   });
 
   form.addEventListener('click', (event) => {
