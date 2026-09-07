@@ -19,6 +19,7 @@ and ``self._providers``. It reads ``self._status_label_defs()`` from Command.
 from decimal import Decimal
 
 from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
+from extras.definition_contract import validate_custom_field_definition_contract
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
 
 
@@ -186,6 +187,26 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct, vers
     for row in field_rows:
         options = _core_field_options(row, choice_sets, version)
         target_content_types = _core_field_target_types(row, content_types)
+        validate_custom_field_definition_contract(
+            field_type=options["field_type"],
+            activation=options["activation"],
+            quantity_kind=options["quantity_kind"],
+            canonical_unit=options["canonical_unit"],
+            minimum_value=options["minimum_value"],
+            maximum_value=options["maximum_value"],
+            regex=options["regex"],
+            decimal_scale=options["decimal_scale"],
+            max_values=options["max_values"],
+            text_max_length=options["text_max_length"],
+            validation_rule=options["validation_rule"],
+            mappings=options["mappings"],
+            choice_set=options["choice_set"],
+            object_types=target_content_types,
+            management_kind=options["management_kind"],
+            lifecycle=options["lifecycle"],
+            name=row["key"],
+            namespace=options["namespace"],
+        )
         matches = list(CustomField.objects.filter(name=row["key"]))
         _validate_core_field_identity(matches, row["key"])
         field = matches[0] if matches else CustomField(name=row["key"], **options)
@@ -245,6 +266,12 @@ def _reconcile_core_fieldsets(section_rows, custom_fields, version):
         fieldset.version = version
         fieldset.lifecycle = section["lifecycle"]
         fieldset.save()
+        existing_memberships = list(fieldset.field_memberships.select_related("custom_field"))
+        if any(
+            membership.custom_field.management_kind != CustomField.MANAGEMENT_CORE
+            for membership in existing_memberships
+        ):
+            raise ValueError(f"Core fieldset membership ownership collision: {namespace}/{slug}")
         fieldset.field_memberships.all().delete()
         CustomFieldsetField.objects.bulk_create(
             [
@@ -263,6 +290,11 @@ def _reconcile_core_fieldsets(section_rows, custom_fields, version):
 def _seed_core_category_defaults(category_rows, categories, fieldsets):
     for category_row in category_rows:
         category = categories[category_row["slug"]]
+        existing_memberships = list(category.default_fieldset_memberships.select_related("fieldset"))
+        if any(
+            membership.fieldset.management_kind != CustomFieldset.MANAGEMENT_CORE for membership in existing_memberships
+        ):
+            raise ValueError(f"Core category default ownership collision: {category_row['slug']}")
         category.default_fieldset_memberships.all().delete()
         CategoryDefaultFieldset.objects.bulk_create(
             [
@@ -314,7 +346,8 @@ def _translate_legacy_demo_specs(raw_specs):
         specs["display_size"] = f"{float(raw_specs['screen_size']):.2f}"
     if "port_count" in raw_specs:
         specs["ethernet_port_count"] = int(raw_specs["port_count"])
-        specs["poe_port_count"] = int(raw_specs["port_count"])
+    if "poe_port_count" in raw_specs:
+        specs["poe_port_count"] = int(raw_specs["poe_port_count"])
     if "poe_budget_w" in raw_specs:
         specs["poe_budget"] = f"{float(raw_specs['poe_budget_w']):.3f}"
     return specs
@@ -564,11 +597,10 @@ class SeedCatalogMixin:
 
         # Normative core vocabulary is the runtime consumer of the current release.
         # inline import: app-registry: load the assets-owned release after Django setup.
-        from assets.services.specifications.core_vocabulary import get_core_vocabulary
-        from django.contrib.contenttypes.models import ContentType
-
         from assets.models import Asset as AssetModel
         from assets.models import AssetType as AssetTypeModel
+        from assets.services.specifications.core_vocabulary import get_core_vocabulary
+        from django.contrib.contenttypes.models import ContentType
 
         vocabulary = get_core_vocabulary()
         library_release = vocabulary["library"]["release"]
