@@ -155,16 +155,27 @@ class T12PublicSpecificationHTTPTests(TenantTestMixin, APITestCase):
     def test_composition_write_and_native_type_update_use_public_paths(self):
         detail = self.client.get(self._type_detail_url())
         self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        preview_url = reverse("api:assets_api:assettype-composition-preview", args=[self.type.pk])
+        preview = self.client.post(
+            preview_url,
+            {
+                "fieldsets": ["local/t12-second", "local/t12-first"],
+                "specification_patch": {"set": {}, "clear": []},
+            },
+            format="json",
+        )
+        self.assertEqual(preview.status_code, status.HTTP_200_OK, preview.data)
+
         composition_url = reverse("api:assets_api:assettype-composition", args=[self.type.pk])
         response = self.client.put(
             composition_url,
             {
-                "fieldsets": ["local/t12-second", "local/t12-first"],
-                "expected_definition_revision": detail.data["definition_revision"],
+                "fieldsets": preview.data["fieldsets"],
+                "expected_definition_revision": preview.data["expected_definition_revision"],
                 "specification_patch": {"set": {}, "clear": []},
             },
             format="json",
-            HTTP_IF_MATCH=detail["ETag"],
+            HTTP_IF_MATCH=f'"{preview.data["expected_resource_revision"]}"',
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["outcome"], "changed")

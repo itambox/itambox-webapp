@@ -31,10 +31,10 @@ from assets.services.specifications.contracts import (
     ExplicitFieldsetSelectionDTO,
     FieldKey,
     HistoryCleanupPreviewDTO,
+    OwnerChangedDTO,
     OwnerCreatedDTO,
     OwnerNoOpDTO,
     OwnerRefDTO,
-    OwnerChangedDTO,
     SpecificationGraphLoadRequest,
     SpecificationProjectionRequest,
     SpecificationResolutionRequest,
@@ -64,7 +64,6 @@ from organization.services.access_scope import (
     authentication_revision_for_actor,
     resolve_access_scope,
 )
-
 
 _MISSING_PRECONDITION_STATUS = status.HTTP_428_PRECONDITION_REQUIRED
 _STALE_STATUS = status.HTTP_412_PRECONDITION_FAILED
@@ -217,7 +216,9 @@ def _status_for_issues(issues: Sequence[DomainIssueDTO]) -> int:
         return _STALE_STATUS
     if "MISSING_PRECONDITION" in codes:
         return _MISSING_PRECONDITION_STATUS
-    if codes.intersection({"REFERENCE_CONFLICT", "OWNERSHIP_CONFLICT", "DEPENDENCY_RETIREMENT", "UNSUPPORTED_STRUCTURE"}):
+    if codes.intersection(
+        {"REFERENCE_CONFLICT", "OWNERSHIP_CONFLICT", "DEPENDENCY_RETIREMENT", "UNSUPPORTED_STRUCTURE"}
+    ):
         return status.HTTP_409_CONFLICT
     return status.HTTP_400_BAD_REQUEST
 
@@ -238,9 +239,7 @@ def error_response(
 ) -> Response:
     normalized = tuple(issues)
     if not normalized:
-        normalized = (
-            issue("UNSUPPORTED_STRUCTURE", message_key="specifications.unsupported_structure"),
-        )
+        normalized = (issue("UNSUPPORTED_STRUCTURE", message_key="specifications.unsupported_structure"),)
     return Response(
         {
             "error": {
@@ -484,9 +483,7 @@ def projection_payload(projection: SpecificationProjectionDTO) -> dict[str, obje
                 "message": _message("specifications.required_field"),
             }
         )
-    complete = not any(
-        item["code"] in {"MISSING_REQUIRED", "INVALID_STORED_VALUE"} for item in state_issues
-    )
+    complete = not any(item["code"] in {"MISSING_REQUIRED", "INVALID_STORED_VALUE"} for item in state_issues)
     return {
         "specifications": values,
         "specification_state": {

@@ -31,13 +31,13 @@ from assets.services.specifications.contracts import (
 )
 from extras.services.specifications.contracts import (
     ChoiceDTO,
-    SpecificationProjectionDTO,
     ChoiceSetDTO,
     FieldDefinitionDTO,
     OrderedFieldsetMembershipDTO,
     PersistedFieldsetDTO,
     ResolvedFieldDTO,
     ResolvedSectionDTO,
+    SpecificationProjectionDTO,
     SpecificationValidationDTO,
 )
 
@@ -205,7 +205,10 @@ class SpecificationPayloadTests(SimpleTestCase):
 
     def test_projection_payload_has_one_value_map_and_history_status(self):
         payload = projection_payload(self.projection)
-        self.assertEqual(payload, {"specifications": {}, "specification_state": {"complete": True, "issues": [], "historical_keys": []}})
+        self.assertEqual(
+            payload,
+            {"specifications": {}, "specification_state": {"complete": True, "issues": [], "historical_keys": []}},
+        )
 
 
 class SpecificationMutationPayloadTests(SimpleTestCase):

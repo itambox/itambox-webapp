@@ -55,6 +55,7 @@ from assets.services.specifications.contracts import (
     ResourceRevision,
 )
 from assets.services.specifications.locking import catalogue_transaction_lock
+from assets.specification_adapters import actor_context_for_user
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 
@@ -89,16 +90,15 @@ from .specification_api import (
     composition_preview_payload,
     create_missing_precondition_paths,
     definition_for_owner,
-    etag_for_owner,
     error_response,
+    etag_for_owner,
     explicit_fieldset_selection,
     history_keys,
     if_match_revision,
     missing_precondition_response,
-    preview_result_response,
     patch_from_validated,
+    preview_result_response,
 )
-from assets.specification_adapters import actor_context_for_user
 
 
 class SpecificationContractMixin:
@@ -363,7 +363,7 @@ class AssetViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
         if resource_revision is None:
             missing.insert(0, "If-Match")
         if missing:
-            return missing_precondition_response(*( (name,) for name in missing ))
+            return missing_precondition_response(*((name,) for name in missing))
         asset = self.get_object()
         authorization = asset_history_authorization_for_user(user=request.user, tenant_id=asset.tenant_id)
         if authorization is None:
@@ -375,7 +375,9 @@ class AssetViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
                 keys=history_keys(serializer.validated_data["keys"]),
                 preview_token=serializer.validated_data["preview_token"],
                 expected_resource_revision=ResourceRevision(resource_revision),
-                expected_definition_revision=DefinitionRevision(serializer.validated_data["expected_definition_revision"]),
+                expected_definition_revision=DefinitionRevision(
+                    serializer.validated_data["expected_definition_revision"]
+                ),
             )
         except (TypeError, ValueError):
             return error_response(
@@ -537,7 +539,7 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
         if resource_revision is None:
             missing.insert(0, "If-Match")
         if missing:
-            return missing_precondition_response(*( (name,) for name in missing ))
+            return missing_precondition_response(*((name,) for name in missing))
         owner = self.get_object()
         result = apply_category_defaults(
             actor=actor_context_for_user(request.user),
@@ -600,7 +602,7 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
         if resource_revision is None:
             missing.insert(0, "If-Match")
         if missing:
-            return missing_precondition_response(*( (name,) for name in missing ))
+            return missing_precondition_response(*((name,) for name in missing))
         owner = self.get_object()
         try:
             result = cleanup_asset_type_history(
@@ -609,7 +611,9 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
                 keys=history_keys(serializer.validated_data["keys"]),
                 preview_token=serializer.validated_data["preview_token"],
                 expected_resource_revision=ResourceRevision(resource_revision),
-                expected_definition_revision=DefinitionRevision(serializer.validated_data["expected_definition_revision"]),
+                expected_definition_revision=DefinitionRevision(
+                    serializer.validated_data["expected_definition_revision"]
+                ),
             )
         except (TypeError, ValueError):
             return error_response(
