@@ -1,11 +1,45 @@
 import graphene
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 
 from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
 from organization.models import Location, Tenant
 
+from .graphql_specifications.integration import (
+    asset_queryset_for_scope,
+    asset_type_connection,
+    authenticated_user,
+    bind_scope,
+    choice_set_for_identity,
+    decode_cursor,
+    fieldsets_for_type,
+    has_global_permission,
+    library_origin_for,
+    owner_resource_revision,
+    owner_user_errors,
+    page_size,
+    prepare_asset_graph,
+    prepare_type_graph,
+    require_global_permission,
+    resolve_read_scope,
+    specification_field_connection,
+)
+from .graphql_specifications.loaders import request_loader_for_info
+from .graphql_specifications.scalars import CursorScalar
+from .graphql_specifications.types import (
+    ChoiceSetType,
+    LibraryOriginType,
+    PageInfoType,
+    SpecificationDefinitionType,
+    SpecificationEntryType,
+    SpecificationFieldConnectionType,
+    SpecificationFieldsetType,
+    SpecificationTargetEnum,
+    ScopeModeEnum,
+    UserErrorType,
+)
 from .models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
 
 
@@ -46,8 +80,20 @@ class DepreciationNode(DjangoObjectType):
 
 
 class AssetTypeNode(DjangoObjectType):
+    resource_revision = graphene.String(required=True)
+    fieldsets = graphene.List(graphene.NonNull(SpecificationFieldsetType), required=True)
+    specification_definition = graphene.Field(
+        SpecificationDefinitionType,
+        target=SpecificationTargetEnum(required=True),
+        required=True,
+    )
+    specification_entries = graphene.List(graphene.NonNull(SpecificationEntryType), required=True)
+    specification_issues = graphene.List(graphene.NonNull(UserErrorType), required=True)
+    library = graphene.Field(LibraryOriginType)
+
     class Meta:
         model = AssetType
+        name = "AssetType"
         fields = (
             "id",
             "slug",
@@ -64,6 +110,37 @@ class AssetTypeNode(DjangoObjectType):
             "updated_at",
         )
 
+    @staticmethod
+    def resolve_resource_revision(root, info):
+        del info
+        return owner_resource_revision(root)
+
+    @staticmethod
+    def resolve_fieldsets(root, info):
+        loader = request_loader_for_info(info)
+        return fieldsets_for_type(loader, int(root.pk))
+
+    @staticmethod
+    def resolve_specification_definition(root, info, target):
+        loader = request_loader_for_info(info)
+        target_kind = getattr(target, "value", target)
+        return loader.definition_for_type(int(root.pk), target_kind=target_kind)
+
+    @staticmethod
+    def resolve_specification_entries(root, info):
+        loader = request_loader_for_info(info)
+        return loader.read_owner(root, target_kind="asset_type").projection.entries
+
+    @staticmethod
+    def resolve_specification_issues(root, info):
+        loader = request_loader_for_info(info)
+        return owner_user_errors(loader, root, "asset_type")
+
+    @staticmethod
+    def resolve_library(root, info):
+        del info
+        return library_origin_for(root)
+
 
 class SupplierNode(DjangoObjectType):
     class Meta:
@@ -78,8 +155,14 @@ class CategoryNode(DjangoObjectType):
 
 
 class AssetNode(DjangoObjectType):
+    resource_revision = graphene.String(required=True)
+    specification_definition = graphene.Field(SpecificationDefinitionType, required=True)
+    specification_entries = graphene.List(graphene.NonNull(SpecificationEntryType), required=True)
+    specification_issues = graphene.List(graphene.NonNull(UserErrorType), required=True)
+
     class Meta:
         model = Asset
+        name = "Asset"
         fields = (
             "id",
             "name",
@@ -98,6 +181,32 @@ class AssetNode(DjangoObjectType):
             "updated_at",
         )
 
+    @staticmethod
+    def resolve_asset_type(root, info):
+        if not has_global_permission(info, "assets.view_assettype"):
+            return None
+        return root.asset_type
+
+    @staticmethod
+    def resolve_resource_revision(root, info):
+        del info
+        return owner_resource_revision(root)
+
+    @staticmethod
+    def resolve_specification_definition(root, info):
+        loader = request_loader_for_info(info)
+        return loader.read_owner(root, target_kind="asset").definition
+
+    @staticmethod
+    def resolve_specification_entries(root, info):
+        loader = request_loader_for_info(info)
+        return loader.read_owner(root, target_kind="asset").projection.entries
+
+    @staticmethod
+    def resolve_specification_issues(root, info):
+        loader = request_loader_for_info(info)
+        return owner_user_errors(loader, root, "asset")
+
 
 ASSET_SORTABLE_FIELDS = {
     "name",
@@ -115,9 +224,35 @@ ASSET_SORTABLE_FIELDS = {
 }
 
 
+class RequestedScopeSelectorInput(graphene.InputObjectType):
+    class Meta:
+        name = "RequestedScopeSelector"
+
+    mode = ScopeModeEnum(required=True)
+    tenant_id = graphene.ID()
+    tenant_group_id = graphene.ID()
+
+
+class AssetTypeEdgeType(graphene.ObjectType):
+    class Meta:
+        name = "AssetTypeEdge"
+
+    cursor = graphene.Field(CursorScalar, required=True)
+    node = graphene.Field(lambda: AssetTypeNode, required=True)
+
+
+class AssetTypeConnectionType(graphene.ObjectType):
+    class Meta:
+        name = "AssetTypeConnection"
+
+    edges = graphene.List(graphene.NonNull(AssetTypeEdgeType), required=True)
+    page_info = graphene.Field(PageInfoType, required=True)
+
+
 class Query(graphene.ObjectType):
     assets = graphene.List(
         AssetNode,
+        requested_scope=RequestedScopeSelectorInput(required=True),
         limit=graphene.Int(),
         offset=graphene.Int(),
         sort_by=graphene.String(),
@@ -127,59 +262,90 @@ class Query(graphene.ObjectType):
         status_id=graphene.ID(),
         location_id=graphene.ID(),
     )
-    asset = graphene.Field(AssetNode, id=graphene.ID(required=True))
+    asset = graphene.Field(
+        AssetNode,
+        id=graphene.ID(required=True),
+        requested_scope=RequestedScopeSelectorInput(required=True),
+    )
+    asset_type = graphene.Field(AssetTypeNode, id=graphene.ID(required=True))
+    asset_types = graphene.Field(
+        AssetTypeConnectionType,
+        first=graphene.Int(required=True, default_value=50),
+        after=CursorScalar(),
+        required=True,
+    )
+    specification_fields = graphene.Field(
+        SpecificationFieldConnectionType,
+        first=graphene.Int(required=True, default_value=50),
+        after=CursorScalar(),
+        required=True,
+    )
+    choice_set = graphene.Field(ChoiceSetType, identity=graphene.String(required=True))
 
-    def resolve_assets(self, info, limit=None, offset=None, sort_by=None, **kwargs):
-        check_permission(info, "assets.view_asset")
-        active_tenant = getattr(info.context, "active_tenant", None)
-        qs = (
-            Asset.objects.select_related(
-                "asset_type",
-                "asset_type__manufacturer",
-                "asset_type__category",
-                "asset_type__depreciation",
-                "asset_type__asset_role",
-                "asset_role",
-                "status",
-                "location",
-                "location__site",
-                "tenant",
-                "supplier",
-            )
-            .prefetch_related("asset_type__manufacturer__software_products")
-            .filter(tenant=active_tenant)
-        )
+    def resolve_assets(self, info, requested_scope, limit=None, offset=None, sort_by=None, **kwargs):
+        authenticated_user(info)
+        scope = resolve_read_scope(info, requested_scope)
+        if scope is None:
+            return []
+        loader = request_loader_for_info(info)
+        bind_scope(loader, scope)
+        qs = asset_queryset_for_scope(scope)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in ASSET_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        return paginate_queryset(qs, limit, offset)
+        items = list(paginate_queryset(qs, limit, offset))
+        prepare_asset_graph(loader, items)
+        return items
 
-    def resolve_asset(self, info, id):
-        check_permission(info, "assets.view_asset")
-        active_tenant = getattr(info.context, "active_tenant", None)
+    def resolve_asset(self, info, id, requested_scope):
+        authenticated_user(info)
+        scope = resolve_read_scope(info, requested_scope)
+        if scope is None:
+            return None
+        loader = request_loader_for_info(info)
+        bind_scope(loader, scope)
         try:
-            return (
-                Asset.objects.select_related(
-                    "asset_type",
-                    "asset_type__manufacturer",
-                    "asset_type__category",
-                    "asset_type__depreciation",
-                    "asset_type__asset_role",
-                    "asset_role",
-                    "status",
-                    "location",
-                    "location__site",
-                    "tenant",
-                    "supplier",
-                )
-                .prefetch_related("asset_type__manufacturer__software_products")
-                .filter(tenant=active_tenant)
-                .get(pk=id)
-            )
+            asset = asset_queryset_for_scope(scope).get(pk=id)
+            prepare_asset_graph(loader, (asset,))
+            return asset
         except Asset.DoesNotExist:
             return None
+
+    def resolve_asset_type(self, info, id):
+        require_global_permission(info, "assets.view_assettype")
+        try:
+            asset_type = AssetType.objects.select_related("library", "library__accepted_release").get(pk=id)
+        except AssetType.DoesNotExist:
+            return None
+        prepare_type_graph(request_loader_for_info(info), (asset_type,))
+        return asset_type
+
+    def resolve_asset_types(self, info, first=50, after=None):
+        require_global_permission(info, "assets.view_assettype")
+        size = page_size(first)
+        asset_types_qs = AssetType.objects.select_related("library", "library__accepted_release").order_by("slug", "pk")
+        if after:
+            after_slug, after_id = decode_cursor(after, prefix="asset-type")
+            asset_types_qs = asset_types_qs.filter(
+                Q(slug__gt=after_slug) | Q(slug=after_slug, pk__gt=after_id)
+            )
+        asset_types = tuple(asset_types_qs[: size + 1])
+        loader = request_loader_for_info(info)
+        prepare_type_graph(loader, asset_types)
+        return asset_type_connection(asset_types, first=size, after=None)
+
+    def resolve_specification_fields(self, info, first=50, after=None):
+        require_global_permission(info, "extras.view_customfield")
+        loader = request_loader_for_info(info)
+        graph = loader.global_graph(("asset_type", "asset"))
+        fields = tuple(graph.fields_by_key.values())
+        return specification_field_connection(fields, first=first, after=after)
+
+    def resolve_choice_set(self, info, identity):
+        require_global_permission(info, "extras.view_customfieldchoiceset")
+        return choice_set_for_identity(identity, loader=request_loader_for_info(info))
 
 
 class CreateAsset(graphene.Mutation):
