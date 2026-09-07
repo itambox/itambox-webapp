@@ -298,7 +298,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # Custom fields must exist before the layout pairs them into rows.
         self._configure_custom_fields(selected_asset_type)
 
-        self.helper.layout = self._build_layout(reverse("assets:asset_list"))
+        # _configure_custom_fields builds the T15-aware layout after dynamic fields are known.
 
     def _resolve_asset_type_id(self, request, explicit_initial):
         """Return the raw asset-type ID the form should work from, or None.
@@ -499,7 +499,11 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         self._inject_t15_drafts(drafts)
         self._configure_t15_draft_transport()
-        self._build_t15_presentation(selected_asset_type, resolved_fields)
+        self.helper.layout = self._build_t15_presentation(
+            selected_asset_type,
+            resolved_fields,
+            reverse("assets:asset_list"),
+        )
 
     def _stored_custom_values(self):
         if not self.instance or not self.instance.pk:
@@ -655,7 +659,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             return getattr(library, "namespace", None) or str(library)
         return str(getattr(fieldset, "management_kind", "local")).capitalize()
 
-    def _build_t15_presentation(self, selected_asset_type, resolved_fields):
+    def _build_t15_presentation(self, selected_asset_type, resolved_fields, cancel_url):
         stored_values = self._stored_custom_values()
         self.specification_sections = self._asset_fieldset_context(selected_asset_type, resolved_fields)
         self.specification_history = _history_entries(stored_values, self.custom_field_definitions)
@@ -672,29 +676,28 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 self.specification_definition_revision = ""
 
         self.model_specification_fields = []
-        if selected_asset_type is None:
-            return
-        model_values = dict(selected_asset_type.custom_field_data or {})
-        for resolved in resolve_asset_type_custom_fields(selected_asset_type):
-            definition = resolved.definition
-            if definition.name not in model_values:
-                value = None
-                has_value = False
-            else:
-                value = model_values[definition.name]
-                has_value = True
-            self.model_specification_fields.append(
-                {
-                    "key": definition.name,
-                    "label": definition.label,
-                    "definition": definition,
-                    "value": value,
-                    "display_value": _display_t15_value(definition, value) if has_value else _("Not set"),
-                    "model_value_json": json.dumps(value, ensure_ascii=False),
-                    "model_value_script_id": f"asset-model-value-{definition.name}",
-                    "can_copy": definition.name in self.custom_field_definitions,
-                }
-            )
+        if selected_asset_type is not None:
+            model_values = dict(selected_asset_type.custom_field_data or {})
+            for resolved in resolve_asset_type_custom_fields(selected_asset_type):
+                definition = resolved.definition
+                if definition.name not in model_values:
+                    value = None
+                    has_value = False
+                else:
+                    value = model_values[definition.name]
+                    has_value = True
+                self.model_specification_fields.append(
+                    {
+                        "key": definition.name,
+                        "label": definition.label,
+                        "definition": definition,
+                        "value": value,
+                        "display_value": _display_t15_value(definition, value) if has_value else _("Not set"),
+                        "model_value_json": json.dumps(value, ensure_ascii=False),
+                        "model_value_script_id": f"asset-model-value-{definition.name}",
+                        "can_copy": definition.name in self.custom_field_definitions,
+                    }
+                )
 
         # Grouped, standardized section order: Identity -> Classification ->
         # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.
