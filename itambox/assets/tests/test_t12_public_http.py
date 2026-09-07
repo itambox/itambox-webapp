@@ -216,6 +216,21 @@ class T12PublicSpecificationHTTPTests(TenantTestMixin, APITestCase):
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.asset_type_id, destination.pk)
 
+    def test_native_asset_update_without_specification_gate_remains_available(self):
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        asset_url = self._asset_detail_url()
+        current = self.client.get(asset_url)
+        self.assertEqual(current.status_code, status.HTTP_200_OK, current.data)
+        response = self.client.patch(
+            asset_url,
+            {"name": "T12 native asset edit", "asset_type_id": self.type.pk},
+            format="json",
+            HTTP_IF_MATCH=current["ETag"],
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.name, "T12 native asset edit")
+
     def test_category_defaults_read_and_replace_are_atomic_public_operations(self):
         defaults_url = reverse("api:assets_api:category-default-fieldsets", args=[self.category.pk])
         current = self.client.get(defaults_url)

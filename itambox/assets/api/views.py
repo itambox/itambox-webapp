@@ -198,7 +198,16 @@ class SpecificationCommandUpdateMixin(SpecificationContractMixin):
     def update(self, request, *args, **kwargs):
         data = request.data
         if isinstance(data, dict):
-            needs_definition = "specification_patch" in data or "asset_type_id" in data
+            needs_definition = "specification_patch" in data
+            if "asset_type_id" in data and not needs_definition:
+                submitted_type_id = data.get("asset_type_id")
+                if isinstance(submitted_type_id, bool):
+                    submitted_type_id = None
+                elif isinstance(submitted_type_id, str) and submitted_type_id.isdecimal():
+                    submitted_type_id = int(submitted_type_id)
+                if isinstance(submitted_type_id, int) and submitted_type_id > 0:
+                    current = self.get_object()
+                    needs_definition = submitted_type_id != current.asset_type_id
             if needs_definition and not data.get("expected_definition_revision"):
                 return missing_precondition_response(("expected_definition_revision",))
         return super().update(request, *args, **kwargs)
