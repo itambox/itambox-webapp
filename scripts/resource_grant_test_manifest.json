@@ -2,6 +2,7 @@
   "base_commit": "27f82ca4398d933b9017c2a2abdbd9d43ebf7284",
   "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
+    "itambox/assets/tests/test_assignments.py",
     "itambox/assets/tests/test_t09c_e2e_authorization.py",
     "itambox/assets/tests/test_asset_clone_form_context.py",
     "itambox/assets/tests/test_asset_form_initialization.py",
@@ -177,6 +178,7 @@
     "itambox/inventory/tests/test_stock_action_permissions.py"
   ],
   "mandatory_tests": [
+    "itambox/assets/tests/test_assignments.py",
     "itambox/assets/tests/test_t09c_e2e_authorization.py",
     "itambox/assets/tests/test_asset_clone_form_context.py",
     "itambox/assets/tests/test_asset_form_initialization.py",
