@@ -227,6 +227,31 @@ def _expect_int(
     return value
 
 
+def _expect_enum_array(
+    value: Any,
+    path: tuple[PathPart, ...],
+    *,
+    allowed: frozenset[str],
+    minimum: int,
+    maximum: int,
+    label: str,
+) -> list[str]:
+    items = _expect_array(value, path)
+    if not minimum <= len(items) <= maximum:
+        _fail("INVALID_RANGE", path, f"{label} must contain between {minimum} and {maximum} entries")
+    seen: set[str] = set()
+    for index, item in enumerate(items):
+        item_path = path + (index,)
+        if type(item) is not str:
+            _fail("SCHEMA_TYPE", item_path, f"{label} entries must be strings")
+        if item not in allowed:
+            _fail("INVALID_VALIDATION", item_path, f"Unknown {label} entry")
+        if item in seen:
+            _fail("DUPLICATE_IDENTITY", item_path, f"{label} entries must be unique")
+        seen.add(item)
+    return items
+
+
 def _check_properties(
     value: Any,
     path: tuple[PathPart, ...],
@@ -359,11 +384,14 @@ def _validate_field_surface(field: dict[str, Any], path: tuple[PathPart, ...]) -
     _expect_string(field["help_text"], path + ("help_text",))
     if len(field["help_text"]) > 4096:
         _fail("INVALID_RANGE", path + ("help_text",), "Help text may not exceed 4096 characters")
-    targets = _expect_array(field["targets"], path + ("targets",))
-    if not 1 <= len(targets) <= 2 or len(set(targets)) != len(targets) or any(item not in _TARGETS for item in targets):
-        _fail(
-            "INVALID_VALIDATION", path + ("targets",), "Targets must be a unique non-empty subset of the public targets"
-        )
+    _expect_enum_array(
+        field["targets"],
+        path + ("targets",),
+        allowed=_TARGETS,
+        minimum=1,
+        maximum=2,
+        label="Targets",
+    )
     activation = _expect_string(field["activation"], path + ("activation",))
     if activation not in _ACTIVATIONS:
         _fail("INVALID_VALIDATION", path + ("activation",), "Unknown Field activation")
@@ -609,20 +637,24 @@ def _validate_category(value: Any, path: tuple[PathPart, ...]) -> dict[str, Any]
     lifecycle = _expect_string(category["lifecycle"], path + ("lifecycle",))
     if lifecycle not in _LIFECYCLES:
         _fail("INVALID_VALIDATION", path + ("lifecycle",), "Unknown Category lifecycle")
-    applies_to = _expect_array(category["applies_to"], path + ("applies_to",))
-    if (
-        not 1 <= len(applies_to) <= 3
-        or len(set(applies_to)) != len(applies_to)
-        or any(item not in _APPLIES_TO for item in applies_to)
-    ):
-        _fail("INVALID_VALIDATION", path + ("applies_to",), "applies_to must be a unique non-empty set")
+    _expect_enum_array(
+        category["applies_to"],
+        path + ("applies_to",),
+        allowed=_APPLIES_TO,
+        minimum=1,
+        maximum=3,
+        label="applies_to",
+    )
     defaults = _expect_array(category["default_fieldsets"], path + ("default_fieldsets",))
     if len(defaults) > 32:
         _fail("RESOURCE_LIMIT", path + ("default_fieldsets",), "Category has too many default Fieldsets")
-    if len(set(defaults)) != len(defaults):
-        _fail("DUPLICATE_IDENTITY", path + ("default_fieldsets",), "Category default Fieldsets must be unique")
-    for index, fieldset_ref in enumerate(defaults):
+    normalized_defaults = [
         _qualified_identity(fieldset_ref, path + ("default_fieldsets", index))
+        for index, fieldset_ref in enumerate(defaults)
+    ]
+    if len(set(normalized_defaults)) != len(normalized_defaults):
+        _fail("DUPLICATE_IDENTITY", path + ("default_fieldsets",), "Category default Fieldsets must be unique")
+    category["default_fieldsets"] = normalized_defaults
     category["id"] = identity
     return category
 
@@ -715,10 +747,12 @@ def _validate_asset_type(  # noqa: C901 - one bounded structural pass keeps all 
     fieldsets = _expect_array(asset_type["fieldsets"], path + ("fieldsets",))
     if len(fieldsets) > ctx.limits.max_sections_per_type:
         _fail("RESOURCE_LIMIT", path + ("fieldsets",), "Asset Type has too many Fieldsets")
-    if len(set(fieldsets)) != len(fieldsets):
+    normalized_fieldsets = [
+        _qualified_identity(fieldset_ref, path + ("fieldsets", index)) for index, fieldset_ref in enumerate(fieldsets)
+    ]
+    if len(set(normalized_fieldsets)) != len(normalized_fieldsets):
         _fail("DUPLICATE_IDENTITY", path + ("fieldsets",), "Asset Type Fieldsets must be unique")
-    for index, fieldset_ref in enumerate(fieldsets):
-        _qualified_identity(fieldset_ref, path + ("fieldsets", index))
+    asset_type["fieldsets"] = normalized_fieldsets
     _validate_specification_map(asset_type["specifications"], path + ("specifications",), ctx.limits)
     _validate_historical_map(asset_type["historical_specifications"], path + ("historical_specifications",), ctx.limits)
     if "replaced_by" in asset_type:
