@@ -736,8 +736,10 @@ def _validate_asset_type(  # noqa: C901 - one bounded structural pass keeps all 
         if len(asset_type[name]) > maximum:
             _fail("INVALID_RANGE", path + (name,), f"{name} exceeds its length bound")
     gtin = asset_type["gtin"]
-    if gtin is not None and (_expect_string(gtin, path + ("gtin",)) and _GTIN_RE.fullmatch(gtin) is None):
-        _fail("INVALID_VALIDATION", path + ("gtin",), "GTIN must contain 8, 12, 13, or 14 digits")
+    if gtin is not None:
+        gtin = _expect_string(gtin, path + ("gtin",))
+        if _GTIN_RE.fullmatch(gtin) is None:
+            _fail("INVALID_VALIDATION", path + ("gtin",), "GTIN must contain 8, 12, 13, or 14 digits")
     category = asset_type["category"]
     if category is not None:
         _catalog_identity(category, path + ("category",))

@@ -265,5 +265,15 @@ def test_publisher_namespace_length_is_bounded_before_graph_validation():
     assert caught.value.code == "INVALID_IDENTITY"
 
 
+def test_empty_gtin_is_rejected_instead_of_short_circuiting_pattern_validation():
+    document = _release_document()
+    document["definitions"]["asset_types"][0]["gtin"] = ""  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(json.dumps(document))
+
+    assert caught.value.code == "INVALID_VALIDATION"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
