@@ -52,6 +52,7 @@ class AssetFormPresenceTests(SimpleTestCase):
         form.data = QueryDict("specification_draft__cf_instance_note=%22edited%20draft%22")
         form.instance = SimpleNamespace(pk=None, custom_field_data={})
         form.fields = {}
+        form.helper = SimpleNamespace(layout=None)
         form._build_t15_presentation = lambda *args: None
 
         with patch("assets.forms.asset_form.resolve_asset_custom_fields", return_value=[resolved]):
