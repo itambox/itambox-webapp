@@ -59,7 +59,10 @@ function hasDraftInput(form: HTMLFormElement): boolean {
       const initial = (element as unknown as { _initialChecked?: boolean })._initialChecked;
       return initial !== undefined ? element.checked !== initial : element.checked !== element.defaultChecked;
     }
-    const initial = (element as unknown as { _initialValue?: string })._initialValue ?? element.defaultValue;
+    const defaultValue = element instanceof HTMLSelectElement
+      ? (Array.from(element.options).find((option) => option.defaultSelected)?.value ?? element.options[0]?.value ?? '')
+      : element.defaultValue;
+    const initial = (element as unknown as { _initialValue?: string })._initialValue ?? defaultValue;
     return element.value !== initial;
   });
 }
