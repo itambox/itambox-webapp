@@ -183,29 +183,34 @@ def _process_error(prefix, result):
     return prefix
 
 
-def _terminate_process_tree(child):
-    if os.name == "nt":
-        try:
-            result = subprocess.run(
-                ["taskkill", "/PID", str(child.pid), "/T", "/F"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False,
-                timeout=_TERMINATION_TIMEOUT,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return f"process-tree termination failed: {type(exc).__name__}: {exc}"
-        if result.returncode:
-            return _process_error(f"process-tree termination exited {result.returncode}", result)
-        try:
-            child.wait(timeout=_TERMINATION_TIMEOUT)
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return f"process-tree did not stop: {type(exc).__name__}: {exc}"
-        return None
+def _wait_for_child(child, *, error_prefix):
+    try:
+        child.wait(timeout=_TERMINATION_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"{error_prefix}: {type(exc).__name__}: {exc}"
+    return None
 
+
+def _terminate_windows_process_tree(child):
+    try:
+        result = subprocess.run(
+            ["taskkill", "/PID", str(child.pid), "/T", "/F"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=_TERMINATION_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"process-tree termination failed: {type(exc).__name__}: {exc}"
+    if result.returncode:
+        return _process_error(f"process-tree termination exited {result.returncode}", result)
+    return _wait_for_child(child, error_prefix="process-tree did not stop")
+
+
+def _terminate_posix_process_tree(child):
     try:
         os.killpg(child.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -222,13 +227,16 @@ def _terminate_process_tree(child):
             return None
         except OSError as exc:
             return f"process-group SIGKILL failed: {type(exc).__name__}: {exc}"
-        try:
-            child.wait(timeout=_TERMINATION_TIMEOUT)
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return f"process-group did not stop: {type(exc).__name__}: {exc}"
+        return _wait_for_child(child, error_prefix="process-group did not stop")
     except OSError as exc:
         return f"process-group wait failed: {type(exc).__name__}: {exc}"
     return None
+
+
+def _terminate_process_tree(child):
+    if os.name == "nt":
+        return _terminate_windows_process_tree(child)
+    return _terminate_posix_process_tree(child)
 
 
 def _terminate_child_safely(child):
@@ -300,26 +308,26 @@ def _add_failure_note(error, note):
         add_note(note)
 
 
-def _run_isolated_test(method, self, *args, **kwargs):
-    nodeid = os.environ.get(_NODE_ENV) or _migration_test_nodeid(self, method)
-    if _is_isolated_child():
-        _emit_phase(nodeid, "test-start", database=os.environ.get("TEST_DATABASE_NAME", "<unset>"))
-        return method(self, *args, **kwargs)
-
-    child_env = _child_environment(nodeid)
-    database_name = child_env["TEST_DATABASE_NAME"]
-    timeout = float(os.environ.get("ITAMBOX_ISSUE479_MIGRATION_TIMEOUT", "900"))
-    _emit_phase(nodeid, "database-create-start", database=database_name)
+def _safe_create_child_database(database_name, child_env):
     try:
-        database_error = _create_child_database(database_name, child_env)
+        return _create_child_database(database_name, child_env)
     except Exception as exc:  # pragma: no cover - defensive creation boundary
-        database_error = f"database creation raised: {type(exc).__name__}: {exc}"
+        return f"database creation raised: {type(exc).__name__}: {exc}"
+
+
+def _safe_cleanup_child_database(database_name, child_env):
+    try:
+        return _cleanup_child_database(database_name, child_env)
+    except Exception as exc:  # pragma: no cover - defensive cleanup boundary
+        return f"database cleanup raised: {type(exc).__name__}: {exc}"
+
+
+def _prepare_isolated_database(test_case, nodeid, database_name, child_env):
+    _emit_phase(nodeid, "database-create-start", database=database_name)
+    database_error = _safe_create_child_database(database_name, child_env)
     if database_error:
         _emit_phase(nodeid, "database-create-failed", database=database_name, error=database_error)
-        try:
-            cleanup_error = _cleanup_child_database(database_name, child_env)
-        except Exception as exc:  # pragma: no cover - defensive cleanup boundary
-            cleanup_error = f"database cleanup raised: {type(exc).__name__}: {exc}"
+        cleanup_error = _safe_cleanup_child_database(database_name, child_env)
         _emit_phase(
             nodeid,
             "parent-complete",
@@ -332,9 +340,39 @@ def _run_isolated_test(method, self, *args, **kwargs):
         if cleanup_error:
             details.append(cleanup_error)
         creation_detail_text = "\n".join(details)
-        self.fail(f"isolated migration database creation failed: {nodeid}\n{creation_detail_text}")
+        test_case.fail(f"isolated migration database creation failed: {nodeid}\n{creation_detail_text}")
     _emit_phase(nodeid, "database-create-complete", database=database_name)
-    _emit_phase(nodeid, "spawn", database=database_name, timeout=timeout)
+
+
+def _collect_after_termination(child, output, *, error_prefix):
+    try:
+        final_output, _ = child.communicate(timeout=_TERMINATION_TIMEOUT)
+    except Exception as collect_error:  # pragma: no cover - defensive process cleanup
+        return output, f"{error_prefix}: {type(collect_error).__name__}: {collect_error}"
+    return _output_text(output, final_output), None
+
+
+def _communicate_with_child(child, timeout):
+    try:
+        output, _ = child.communicate(timeout=timeout)
+        return output, False, None, None
+    except subprocess.TimeoutExpired as exc:
+        output = _output_text(getattr(exc, "output", None))
+        termination_error = _terminate_child_safely(child)
+        output, run_error = _collect_after_termination(
+            child, output, error_prefix="timed-out child output collection failed"
+        )
+        return output, True, run_error, termination_error
+    except Exception as exc:  # pragma: no cover - defensive process cleanup
+        run_error = f"child execution failed: {type(exc).__name__}: {exc}"
+        termination_error = _terminate_child_safely(child)
+        output, collection_error = _collect_after_termination(child, "", error_prefix="child output collection failed")
+        if collection_error:
+            run_error = f"{run_error}; {collection_error}"
+        return output, False, run_error, termination_error
+
+
+def _run_child_process(nodeid, database_name, child_env, timeout):
     popen_kwargs = {
         "cwd": os.getcwd(),
         "env": child_env,
@@ -357,50 +395,58 @@ def _run_isolated_test(method, self, *args, **kwargs):
     try:
         child = subprocess.Popen(_child_pytest_args(nodeid), **popen_kwargs)
         _emit_phase(nodeid, "child-start", pid=child.pid, database=database_name)
-        try:
-            output, _ = child.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired as exc:
-            timed_out = True
-            output = _output_text(getattr(exc, "output", None))
-            termination_error = _terminate_child_safely(child)
-            try:
-                final_output, _ = child.communicate(timeout=_TERMINATION_TIMEOUT)
-                output = _output_text(output, final_output)
-            except Exception as collect_error:  # pragma: no cover - defensive process cleanup
-                run_error = f"timed-out child output collection failed: {type(collect_error).__name__}: {collect_error}"
-        except Exception as exc:  # pragma: no cover - defensive process cleanup
-            run_error = f"child execution failed: {type(exc).__name__}: {exc}"
-            termination_error = _terminate_child_safely(child)
-            try:
-                final_output, _ = child.communicate(timeout=_TERMINATION_TIMEOUT)
-                output = _output_text(output, final_output)
-            except Exception as collect_error:  # pragma: no cover - defensive process cleanup
-                run_error = (
-                    f"{run_error}; child output collection failed: {type(collect_error).__name__}: {collect_error}"
-                )
+        output, timed_out, run_error, termination_error = _communicate_with_child(child, timeout)
     except OSError as exc:
         run_error = f"child process could not start: {type(exc).__name__}: {exc}"
+    return child, output, timed_out, run_error, termination_error
+
+
+def _isolated_status(timed_out, run_error, returncode, cleanup_error):
+    if timed_out:
+        return "timeout"
+    if run_error:
+        return "runner-error"
+    if returncode:
+        return "failed"
+    if cleanup_error:
+        return "cleanup-error"
+    return "passed"
+
+
+def _raise_isolated_failure(test_case, nodeid, timeout, timed_out, run_error, returncode, cleanup_error, details):
+    detail_text = "\n".join(details)
+    if timed_out:
+        test_case.fail(f"isolated migration test timed out after {timeout:g}s: {nodeid}\n{detail_text}")
+    if run_error:
+        test_case.fail(f"isolated migration test runner failed: {nodeid}\n{detail_text}")
+    if returncode:
+        test_case.fail(f"isolated migration test exited {returncode}: {nodeid}\n{detail_text}")
+    if cleanup_error:
+        test_case.fail(f"isolated migration test passed but cleanup failed: {nodeid}\n{detail_text}")
+
+
+def _run_isolated_test(method, self, *args, **kwargs):
+    nodeid = os.environ.get(_NODE_ENV) or _migration_test_nodeid(self, method)
+    if _is_isolated_child():
+        _emit_phase(nodeid, "test-start", database=os.environ.get("TEST_DATABASE_NAME", "<unset>"))
+        return method(self, *args, **kwargs)
+
+    child_env = _child_environment(nodeid)
+    database_name = child_env["TEST_DATABASE_NAME"]
+    timeout = float(os.environ.get("ITAMBOX_ISSUE479_MIGRATION_TIMEOUT", "900"))
+    _prepare_isolated_database(self, nodeid, database_name, child_env)
+    _emit_phase(nodeid, "spawn", database=database_name, timeout=timeout)
+    child, output, timed_out, run_error, termination_error = _run_child_process(
+        nodeid, database_name, child_env, timeout
+    )
 
     if output:
         _forward_phase_output(output)
 
-    cleanup_error = None
-    try:
-        cleanup_error = _cleanup_child_database(database_name, child_env)
-    except Exception as exc:  # pragma: no cover - defensive cleanup boundary
-        cleanup_error = f"database cleanup raised: {type(exc).__name__}: {exc}"
+    cleanup_error = _safe_cleanup_child_database(database_name, child_env)
 
     returncode = getattr(child, "returncode", None)
-    if timed_out:
-        status = "timeout"
-    elif run_error:
-        status = "runner-error"
-    elif returncode:
-        status = "failed"
-    elif cleanup_error:
-        status = "cleanup-error"
-    else:
-        status = "passed"
+    status = _isolated_status(timed_out, run_error, returncode, cleanup_error)
     _emit_phase(
         nodeid,
         "parent-complete",
@@ -419,15 +465,7 @@ def _run_isolated_test(method, self, *args, **kwargs):
         details.append(run_error)
     if cleanup_error:
         details.append(cleanup_error)
-    detail_text = "\n".join(details)
-    if timed_out:
-        self.fail(f"isolated migration test timed out after {timeout:g}s: {nodeid}\n{detail_text}")
-    if run_error:
-        self.fail(f"isolated migration test runner failed: {nodeid}\n{detail_text}")
-    if returncode:
-        self.fail(f"isolated migration test exited {returncode}: {nodeid}\n{detail_text}")
-    if cleanup_error:
-        self.fail(f"isolated migration test passed but cleanup failed: {nodeid}\n{detail_text}")
+    _raise_isolated_failure(self, nodeid, timeout, timed_out, run_error, returncode, cleanup_error, details)
 
 
 def _configure_child_database():
@@ -551,17 +589,16 @@ class IsolatedMigrationTestCase(TransactionTestCase):
             return
         nodeid = os.environ.get(_NODE_ENV, "<unknown>")
         _emit_phase(nodeid, "test-teardown-start", schema=getattr(self, "_migration_schema_name", "<unset>"))
-        primary_error = None
         try:
             super().tearDown()
         except BaseException as exc:
-            primary_error = exc
+            cleanup_error = self._cleanup_schema()
+            _emit_phase(nodeid, "schema-cleanup-complete", error=cleanup_error or "none")
+            if cleanup_error:
+                _add_failure_note(exc, f"migration schema cleanup after test failure: {cleanup_error}")
+            raise
         cleanup_error = self._cleanup_schema()
         _emit_phase(nodeid, "schema-cleanup-complete", error=cleanup_error or "none")
-        if primary_error is not None:
-            if cleanup_error:
-                _add_failure_note(primary_error, f"migration schema cleanup after test failure: {cleanup_error}")
-            raise primary_error
         if cleanup_error:
             raise AssertionError(f"migration schema cleanup failed: {cleanup_error}")
 
