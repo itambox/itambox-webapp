@@ -20,6 +20,49 @@ from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
 from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.reports.registry import register_report_provider
 
+from .services.specification_consumers.contracts import FieldReference
+from .services.specification_consumers.exporting import MachineExportResult, build_machine_export_rows
+from .services.specification_consumers.semantics import field_value_from_mapping
+
+# -- source-qualified specification report/export helpers ------------------
+
+
+def build_asset_specification_export(
+    records,
+    references,
+    *,
+    definitions=None,
+    statuses_by_asset=None,
+):
+    """Build lossless specification columns for already-authorized Asset rows.
+
+    Asset and Asset Type values are read from their explicit source maps.  The
+    helper intentionally receives records rather than fetching them, so the
+    report provider's tenant-scoped queryset remains the authorization boundary.
+    """
+
+    references = tuple(references)
+    definitions = definitions or {}
+    statuses_by_asset = statuses_by_asset or {}
+    rows = []
+    for asset in records:
+        asset_type = getattr(asset, "asset_type", None)
+        asset_values = getattr(asset, "custom_field_data", None) or {}
+        asset_type_values = getattr(asset_type, "custom_field_data", None) or {}
+        status_map = statuses_by_asset.get(getattr(asset, "pk", None), {})
+        row = {}
+        for reference in references:
+            values = asset_values if reference.source == "asset" else asset_type_values
+            projected = field_value_from_mapping(
+                reference,
+                values,
+                status=status_map.get(reference, "current"),
+            )
+            row[reference] = projected
+        rows.append(row)
+    return build_machine_export_rows(references, rows, definitions=definitions)
+
+
 # -- asset summary --------------------------------------------------------
 
 
@@ -126,6 +169,23 @@ class AssetSummaryReportProvider(ReportDefinition):
             "assignments__assigned_user",
             "assignments__assigned_location",
             "assignments__assigned_asset",
+        )
+
+    def build_specification_export(
+        self,
+        records,
+        references,
+        *,
+        definitions=None,
+        statuses_by_asset=None,
+    ):
+        """Expose source-qualified machine export for the shared report shell."""
+
+        return build_asset_specification_export(
+            records,
+            references,
+            definitions=definitions,
+            statuses_by_asset=statuses_by_asset,
         )
 
     def build_rows(self, records, request: ReportRequest):

@@ -36,8 +36,40 @@ from .models.choices import (
 
 User = get_user_model()
 
+from .services.specification_consumers.contracts import (
+    FieldReference,
+    identify_saved_references,
+    parse_filter_document,
+)
+from .services.specification_consumers.query import apply_specification_filters
 
-class AssetFilterSet(BaseFilterSet):
+
+def saved_specification_reference_impacts(parameters, *, known_references=None):
+    """Inventory canonical and legacy references before a saved filter is used."""
+
+    return identify_saved_references(parameters, known_references=known_references)
+
+
+class SpecificationFilterMixin:
+    """Shared explicit JSON filter entry point for Asset and AssetType lists."""
+
+    def filter_specification(self, queryset, name, value):
+        if not value:
+            return queryset
+        try:
+            filters = parse_filter_document(value)
+        except (TypeError, ValueError):
+            return queryset.none()
+        definitions = getattr(self, "specification_definitions", None)
+        return apply_specification_filters(queryset, filters, definitions=definitions).distinct()
+
+
+class AssetFilterSet(SpecificationFilterMixin, BaseFilterSet):
+    specification = django_filters.CharFilter(
+        method="filter_specification",
+        label=_("Specification filters"),
+        widget=forms.HiddenInput(),
+    )
     q = django_filters.CharFilter(
         method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Tag, Serial..."})
     )
@@ -219,7 +251,12 @@ class ManufacturerFilterSet(BaseFilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
 
 
-class AssetTypeFilterSet(BaseFilterSet):
+class AssetTypeFilterSet(SpecificationFilterMixin, BaseFilterSet):
+    specification = django_filters.CharFilter(
+        method="filter_specification",
+        label=_("Specification filters"),
+        widget=forms.HiddenInput(),
+    )
     q = django_filters.CharFilter(
         method="search",
         label=_("Search"),

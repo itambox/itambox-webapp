@@ -2,6 +2,31 @@
 from core.search import SearchIndex, register_search
 
 from .models import Asset, AssetMaintenance, AssetRequest, AssetRole, Category, Manufacturer, Supplier
+from .services.specification_consumers.query import apply_specification_filters
+
+
+def search_assets_by_specification(
+    filters,
+    *,
+    queryset=None,
+    tenant_ids=None,
+    definitions=None,
+):
+    """Search Assets with explicit source-qualified specification filters.
+
+    The ordinary global-search term remains separate from specification search;
+    callers must provide ``FieldFilter`` objects (or an empty iterable) and may
+    pass resolved FieldDefinition DTOs for current/history applicability.
+    """
+
+    if queryset is None:
+        queryset = Asset.objects.all()
+    return apply_specification_filters(
+        queryset,
+        tuple(filters),
+        tenant_ids=tenant_ids,
+        definitions=definitions,
+    )
 
 
 @register_search()
@@ -14,6 +39,16 @@ class AssetIndex(SearchIndex):
         "notes",
     )
     order_by = ("name",)
+
+    def search_specifications(self, filters, queryset=None, *, tenant_ids=None, definitions=None):
+        """Use the same source-qualified query path as list filters and reports."""
+
+        return search_assets_by_specification(
+            filters,
+            queryset=queryset,
+            tenant_ids=tenant_ids,
+            definitions=definitions,
+        )
 
 
 @register_search()
