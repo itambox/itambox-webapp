@@ -284,7 +284,7 @@ class AssetEditView(ObjectEditView):
     queryset = Asset.objects.all()
     model = Asset
     model_form = forms.AssetForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/asset_specification_form.html"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -295,14 +295,21 @@ class AssetEditView(ObjectEditView):
         if request.headers.get("HX-Request") and "_reload" in request.POST:
             self.object = self.get_object()
             form = self.get_form()
-            return render(request, "htmx/crispy_form.html", {"form": form})
+            context = self.get_context_data(form=form)
+            return render(request, "assets/_asset_specification_form.html", context)
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        try:
+            response = super().form_valid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            form.specification_revision_conflict = True
+            return self.form_invalid(form)
         if getattr(self, "object", None) is not None:
             form.create_inline_warranty(self.object)
         return response
+
 
 
 class AssetDeleteView(ObjectDeleteView):
@@ -315,7 +322,7 @@ class AssetDeleteView(ObjectDeleteView):
 class AssetCloneView(ObjectCloneView):
     model = Asset
     model_form = forms.AssetForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/asset_specification_form.html"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

@@ -1,16 +1,26 @@
+import json
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.customfields import resolve_effective_custom_fields
 from core.forms import SlugModelForm
-from extras.customfields import CustomFieldModelFormMixin
-from extras.models import CustomFieldset, Tag
+from extras.customfields import (
+    CustomFieldModelFormMixin,
+    build_custom_field_clear_form_field,
+    build_custom_field_form_field,
+    clean_custom_field_form_values,
+    custom_field_clear_key,
+    validate_custom_field_value,
+)
+from extras.models import CustomField, CustomFieldset, Tag
 
 from ..models import AssetRole, AssetType, Category, Manufacturer
 from ..services.specifications.commands import (
@@ -36,6 +46,174 @@ from ..specification_adapters import (
 )
 
 
+_T15_UNSET = object()
+_DRAFT_PREFIX = "specification_draft__cf_"
+
+
+def _choice_rows(definition):
+    choice_set = getattr(definition, "choice_set", None)
+    if choice_set is None:
+        return ()
+    relation = getattr(choice_set, "choices", ())
+    rows = relation.all() if callable(getattr(relation, "all", None)) else relation
+    return tuple(sorted(rows, key=lambda row: (getattr(row, "position", 0), getattr(row, "key", ""))))
+
+
+def _choice_options(definition, initial_value):
+    stored = set(initial_value if isinstance(initial_value, (list, tuple)) else [initial_value])
+    options = []
+    for choice in _choice_rows(definition):
+        if choice.lifecycle == CustomField.LIFECYCLE_ACTIVE or choice.key in stored:
+            label = str(choice.label)
+            if choice.lifecycle == CustomField.LIFECYCLE_DEPRECATED:
+                label = f"{label} ({str(_('No longer offered'))})"
+            options.append((choice.key, label))
+    return options
+
+
+def _coerce_t15_boolean(value):
+    if value == "":
+        return _T15_UNSET
+    if value == "__null__":
+        return None
+    return str(value).casefold() == "true"
+
+
+def _build_t15_custom_field(definition, initial_value=None, *, has_stored_value=False, read_only=False):
+    if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+        if definition.required:
+            choices = (("true", _("Yes")), ("false", _("No")))
+        else:
+            choices = (("", _("Unset")), ("true", _("Yes")), ("false", _("No")))
+        if definition.nullable:
+            choices = (*choices, ("__null__", _("Explicit null")))
+        if has_stored_value:
+            if initial_value is None:
+                initial = "__null__" if definition.nullable else ""
+            else:
+                initial = "true" if initial_value is True else "false"
+        else:
+            initial = ""
+        return forms.TypedChoiceField(
+            choices=choices,
+            coerce=_coerce_t15_boolean,
+            label=definition.label,
+            help_text=definition.help_text,
+            required=definition.required,
+            initial=initial,
+            disabled=read_only,
+            widget=forms.Select(attrs={"class": "form-select", "data-specification-input": "1"}),
+        )
+
+    if definition.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT:
+        return forms.ChoiceField(
+            choices=[("", "---------"), *_choice_options(definition, initial_value)],
+            label=definition.label,
+            help_text=definition.help_text,
+            required=definition.required,
+            initial=initial_value,
+            disabled=read_only,
+            widget=forms.Select(attrs={"class": "form-select", "data-specification-input": "1"}),
+        )
+
+    if definition.field_type == CustomField.FIELD_TYPE_MULTI_SELECT:
+        return forms.MultipleChoiceField(
+            choices=_choice_options(definition, initial_value),
+            label=definition.label,
+            help_text=definition.help_text,
+            required=definition.required,
+            initial=initial_value,
+            disabled=read_only,
+            widget=forms.SelectMultiple(attrs={"class": "form-select", "data-specification-input": "1"}),
+        )
+
+    field = build_custom_field_form_field(definition, initial_value, read_only=read_only)
+    if field is not None:
+        field.widget.attrs.update({"data-specification-input": "1"})
+    return field
+
+
+def _build_t15_presence_field(definition):
+    choices = [("", _("Leave unchanged")), ("value", _("Set value"))]
+    if definition.field_type in {CustomField.FIELD_TYPE_TEXT, CustomField.FIELD_TYPE_MULTI_SELECT}:
+        choices.append(
+            (
+                "empty",
+                _("Set explicit empty text")
+                if definition.field_type == CustomField.FIELD_TYPE_TEXT
+                else _("Set empty selection"),
+            )
+        )
+    if definition.nullable:
+        choices.append(("null", _("Set explicit null")))
+    return forms.ChoiceField(
+        choices=choices,
+        required=False,
+        label=_("Presence"),
+        help_text=_("Choose whether this draft value is omitted, explicit, empty, or null."),
+        widget=forms.Select(attrs={"class": "form-select form-select-sm", "data-specification-presence": "1"}),
+        initial="",
+    )
+
+
+def _display_t15_value(definition, value):
+    if value is None:
+        return "null"
+    if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+        return str(_("Yes")) if value is True else str(_("No"))
+    options = {choice.key: str(choice.label) for choice in _choice_rows(definition)}
+    if isinstance(value, (list, tuple)):
+        return ", ".join(options.get(item, str(item)) for item in value)
+    return options.get(value, str(value))
+
+
+def _history_entries(stored_values, current_definitions):
+    if not stored_values:
+        return []
+    historical = CustomField.objects.filter(name__in=stored_values).prefetch_related("choice_set__choices")
+    historical_by_name = {field.name: field for field in historical}
+    entries = []
+    for name, value in stored_values.items():
+        definition = current_definitions.get(f"cf_{name}") or historical_by_name.get(name)
+        if definition is None:
+            entries.append(
+                {
+                    "key": name,
+                    "label": name,
+                    "display_value": str(value),
+                    "state": "unknown",
+                    "reasons": (_("Unknown definition"),),
+                }
+            )
+            continue
+        current = f"cf_{name}" in current_definitions
+        reasons = []
+        if not current:
+            reasons.append(_("Inactive composition"))
+        if definition.lifecycle == CustomField.LIFECYCLE_DEPRECATED:
+            reasons.append(_("Deprecated field"))
+        choice_keys = {choice.key for choice in _choice_rows(definition) if choice.lifecycle == CustomField.LIFECYCLE_DEPRECATED}
+        values = value if isinstance(value, (list, tuple)) else (value,)
+        if any(item in choice_keys for item in values):
+            reasons.append(_("Deprecated choice"))
+        state = "historical" if reasons else "current"
+        try:
+            validate_custom_field_value(definition, value)
+        except ValidationError:
+            state = "invalid"
+            reasons.append(_("Invalid stored value"))
+        entries.append(
+            {
+                "key": name,
+                "label": definition.label,
+                "display_value": _display_t15_value(definition, value),
+                "state": state,
+                "reasons": tuple(reasons),
+            }
+        )
+    return entries
+
+
 class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(), widget=forms.Select(attrs={"class": "form-select"})
@@ -49,8 +227,12 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     custom_fieldsets = forms.ModelMultipleChoiceField(
         queryset=CustomFieldset.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
+        widget=forms.MultipleHiddenInput(attrs={"data-specification-fieldsets": "1"}),
         label=_("Specification fieldsets"),
+    )
+    specification_fieldsets_presence = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-specification-fieldsets-presence": "1"}),
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -95,8 +277,32 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             "ean": _("Barcode (EAN, UPC, or GTIN). Scan this barcode to view assets of this type."),
         }
 
+    @staticmethod
+    def _category_default_fieldset_ids(category_id):
+        if not category_id:
+            return []
+        return list(
+            Category.objects.filter(pk=category_id, default_fieldset_memberships__isnull=False)
+            .values_list("default_fieldset_memberships__fieldset_id", flat=True)
+            .order_by("default_fieldset_memberships__position")
+        )
+
+    def _normalize_omitted_fieldset_data(self, kwargs):
+        data = kwargs.get("data")
+        if data is None or data.get("specification_fieldsets_presence") != "omitted":
+            return
+        normalized = data.copy()
+        category_id = normalized.get("category")
+        normalized.setlist(
+            "custom_fieldsets",
+            [str(fieldset_id) for fieldset_id in self._category_default_fieldset_ids(category_id)],
+        )
+        kwargs["data"] = normalized
+
     def _raw_selected_fieldset_ids(self):
         if self.is_bound:
+            if self.data.get("specification_fieldsets_presence") == "omitted" and "custom_fieldsets" not in self.data:
+                return self._category_default_fieldset_ids(self.data.get("category"))
             if hasattr(self.data, "getlist"):
                 values = self.data.getlist("custom_fieldsets")
             else:
@@ -108,12 +314,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             return list(self.instance.fieldset_memberships.order_by("position").values_list("fieldset_id", flat=True))
         if not self._custom_fieldsets_explicit:
             category_id = getattr(self._draft_category, "pk", self._draft_category)
-            if category_id:
-                return list(
-                    Category.objects.filter(pk=category_id, default_fieldset_memberships__isnull=False)
-                    .values_list("default_fieldset_memberships__fieldset_id", flat=True)
-                    .order_by("default_fieldset_memberships__position")
-                )
+            return self._category_default_fieldset_ids(category_id)
         initial = self.initial.get("custom_fieldsets", [])
         if hasattr(initial, "values_list"):
             return list(initial.values_list("pk", flat=True))
@@ -151,12 +352,35 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         supplied_initial = kwargs.get("initial") or {}
         self._custom_fieldsets_explicit = "custom_fieldsets" in supplied_initial
         self._draft_category = supplied_initial.get("category")
+        self._normalize_omitted_fieldset_data(kwargs)
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
         self.fields["slug"].widget.attrs["slugify"] = "model"
+        self.fields["category"].widget.attrs.update(
+            {
+                "data-specification-category": "1",
+                "hx-post": "",
+                "hx-trigger": "change",
+                "hx-target": "closest form",
+                "hx-swap": "outerHTML",
+                "hx-include": "closest form",
+                "hx-vals": '{"_reload": "1"}',
+            }
+        )
         self.fields["custom_fieldsets"].initial = self._raw_selected_fieldset_ids()
+        if self.is_bound:
+            self.fields["specification_fieldsets_presence"].initial = self.data.get(
+                "specification_fieldsets_presence", "omitted"
+            )
+        else:
+            self.fields["specification_fieldsets_presence"].initial = (
+                "explicit" if self._custom_fieldsets_explicit or self.instance.pk else "omitted"
+            )
+        self._configure_t15_custom_fields()
+        self._configure_t15_draft_transport()
+        self._build_t15_presentation()
 
         button_text = _("Update") if self.instance.pk else _("Create")
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse("assets:assettype_list")
@@ -218,6 +442,213 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         )
         self.helper.layout = Layout(*layout_elements)
 
+    def _stored_custom_values(self):
+        if not self.instance or not self.instance.pk:
+            return {}
+        return dict(self.instance.custom_field_data or {})
+
+    def _read_t15_draft_transport(self):
+        if not self.is_bound:
+            return {}
+        drafts = {}
+        for key in self.data.keys():
+            if not key.startswith(_DRAFT_PREFIX):
+                continue
+            name = key[len(_DRAFT_PREFIX) :]
+            try:
+                drafts[name] = json.loads(self.data.get(key))
+            except (TypeError, ValueError):
+                continue
+        return drafts
+
+    def _posted_t15_drafts(self):
+        drafts = self._read_t15_draft_transport()
+        if not self.is_bound:
+            return drafts
+        for key in self.data.keys():
+            if not key.startswith("cf_") or key.endswith(("__clear", "__presence")):
+                continue
+            values = self.data.getlist(key) if hasattr(self.data, "getlist") else [self.data.get(key)]
+            drafts[key[3:]] = values if len(values) != 1 else values[0]
+        return drafts
+
+    def _inject_t15_drafts(self, drafts):
+        if not self.is_bound or not drafts:
+            return
+        data = self.data.copy()
+        for name, value in drafts.items():
+            key = f"cf_{name}"
+            if key in data or key not in self.custom_field_definitions:
+                continue
+            if isinstance(value, list):
+                data.setlist(key, ["" if item is None else str(item) for item in value])
+            elif value is None:
+                data[key] = ""
+            else:
+                data[key] = str(value).lower() if isinstance(value, bool) else str(value)
+        self.data = data
+
+    def _configure_t15_custom_fields(self):
+        stored = self._stored_custom_values()
+        drafts = self._read_t15_draft_transport()
+        self.custom_field_presence_keys = {}
+        for key, definition in self.custom_field_definitions.items():
+            if key not in self.fields:
+                continue
+            name = getattr(definition, "name", key.removeprefix("cf_"))
+            value = drafts.get(name, stored.get(name))
+            field = _build_t15_custom_field(
+                definition,
+                value,
+                has_stored_value=name in stored or name in drafts,
+                read_only=self.fields[key].disabled,
+            )
+            self.fields[key] = field
+            field.widget.attrs.update({"data-specification-key": key[3:]})
+            if not field.disabled and not definition.required and definition.field_type != CustomField.FIELD_TYPE_BOOLEAN:
+                presence_key = f"{key}__presence"
+                self.fields[presence_key] = _build_t15_presence_field(definition)
+                self.fields[presence_key].widget.attrs["data-specification-presence-for"] = key[3:]
+                self.custom_field_presence_keys[key] = presence_key
+            clear_key = self.custom_field_clear_keys.get(key)
+            if clear_key and clear_key in self.fields:
+                self.fields[clear_key].widget.attrs["data-specification-clear-for"] = key[3:]
+        self._inject_t15_drafts(drafts)
+
+    def _configure_t15_draft_transport(self):
+        drafts = self._posted_t15_drafts()
+        if not drafts:
+            return
+        data = self.data.copy() if self.is_bound else None
+        for name, value in drafts.items():
+            transport_key = f"{_DRAFT_PREFIX}{name}"
+            if transport_key not in self.fields:
+                self.fields[transport_key] = forms.CharField(
+                    required=False,
+                    widget=forms.HiddenInput(attrs={"data-specification-draft": name}),
+                )
+            encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+            self.fields[transport_key].initial = encoded
+            if data is not None:
+                data[transport_key] = encoded
+        if data is not None:
+            self.data = data
+
+    def _apply_t15_presence(self, cleaned_data):
+        for key, presence_key in self.custom_field_presence_keys.items():
+            mode = cleaned_data.get(presence_key, "")
+            clear_key = self.custom_field_clear_keys.get(key)
+            if clear_key and cleaned_data.get(clear_key) and mode in {"empty", "null", "value"}:
+                self.add_error(presence_key, _("Choose either removal or an explicit value, not both."))
+            if mode in {"", None}:
+                cleaned_data.pop(key, None)
+            elif mode == "empty":
+                cleaned_data[key] = [] if self.custom_field_definitions[key].field_type == CustomField.FIELD_TYPE_MULTI_SELECT else ""
+            elif mode == "null":
+                cleaned_data[key] = None
+
+    def clean(self):
+        cleaned_data = forms.ModelForm.clean(self)
+        for key in self.custom_field_keys:
+            if cleaned_data.get(key) is _T15_UNSET:
+                cleaned_data.pop(key, None)
+        self._apply_t15_presence(cleaned_data)
+        return clean_custom_field_form_values(
+            self,
+            cleaned_data,
+            self.custom_field_definitions,
+            self.custom_field_clear_keys,
+        )
+
+    def _fieldset_source(self, fieldset):
+        library = getattr(fieldset, "library", None)
+        if library is not None:
+            return getattr(library, "namespace", None) or str(library)
+        return str(getattr(fieldset, "management_kind", "local")).capitalize()
+
+    def _build_t15_presentation(self):
+        selected = self._selected_fieldsets()
+        current = set(self.custom_field_definitions)
+        used = set()
+        sections = []
+        for fieldset in selected:
+            fields = []
+            memberships = fieldset.field_memberships.select_related("custom_field").all()
+            for membership in memberships:
+                key = f"cf_{membership.custom_field.name}"
+                if key not in current or key in used:
+                    continue
+                used.add(key)
+                fields.append(self._t15_field_context(key))
+            if fields:
+                sections.append(
+                    {
+                        "id": fieldset.pk,
+                        "identity": f"{fieldset.namespace}/{fieldset.slug}",
+                        "label": fieldset.label or fieldset.slug,
+                        "description": fieldset.description,
+                        "source": self._fieldset_source(fieldset),
+                        "fields": fields,
+                    }
+                )
+        remaining = [self._t15_field_context(key) for key in self.custom_field_keys if key not in used]
+        if remaining:
+            sections.append(
+                {
+                    "id": "additional",
+                    "identity": "additional",
+                    "label": _("Additional specifications"),
+                    "description": _("Global specifications and values retained from an earlier composition."),
+                    "source": _("Global"),
+                    "fields": remaining,
+                }
+            )
+        self.specification_sections = sections
+        self.specification_history = _history_entries(self._stored_custom_values(), self.custom_field_definitions)
+        self.specification_fieldset_options = self._fieldset_options(selected)
+        self.specification_definition_revision = ""
+        if self.instance and self.instance.pk:
+            try:
+                self.specification_definition_revision = current_specification_plan(
+                    self.instance, target_kind="asset_type"
+                ).definition_revision
+            except (ValidationError, AttributeError):
+                self.specification_definition_revision = ""
+
+    def _t15_field_context(self, key):
+        return {
+            "key": key[3:],
+            "bound": self[key],
+            "presence": self[self.custom_field_presence_keys[key]] if key in self.custom_field_presence_keys else None,
+            "clear": self[self.custom_field_clear_keys[key]] if key in self.custom_field_clear_keys else None,
+            "definition": self.custom_field_definitions[key],
+        }
+
+    def _fieldset_options(self, selected):
+        selected_ids = [fieldset.pk for fieldset in selected]
+        fieldsets = (
+            CustomFieldset.objects.filter(Q(lifecycle=CustomFieldset.LIFECYCLE_ACTIVE) | Q(pk__in=selected_ids))
+            .prefetch_related("field_memberships__custom_field")
+            .order_by("namespace", "slug")
+        )
+        stored = self._stored_custom_values()
+        options = []
+        for fieldset in fieldsets:
+            field_names = {membership.custom_field.name for membership in fieldset.field_memberships.all()}
+            options.append(
+                {
+                    "id": fieldset.pk,
+                    "identity": f"{fieldset.namespace}/{fieldset.slug}",
+                    "label": fieldset.label or fieldset.slug,
+                    "description": fieldset.description,
+                    "source": self._fieldset_source(fieldset),
+                    "selected": fieldset.pk in selected_ids,
+                    "deprecated": fieldset.lifecycle == CustomFieldset.LIFECYCLE_DEPRECATED,
+                    "has_stored_values": bool(field_names & stored.keys()),
+                }
+            )
+        return sorted(options, key=lambda option: (not option["selected"], option["identity"]))
+
     def _actor(self):
         user = getattr(self.request, "user", None)
         return actor_context_for_user(user)
@@ -234,9 +665,11 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         )
 
     def _create_selection(self):
-        # A missing key is the form-level representation of omission.  An
-        # explicitly empty multi-select is a deliberate empty composition.
-        omitted = self.is_bound and "custom_fieldsets" not in self.data
+        # The hidden presence marker keeps category defaults as an omission
+        # while still letting the browser render and submit those fields.
+        omitted = self.is_bound and self.data.get("specification_fieldsets_presence") == "omitted"
+        if not self.is_bound:
+            omitted = not self._custom_fieldsets_explicit and not self.instance.pk
         return create_fieldset_selection(self._ordered_selected_fieldsets(), omitted=omitted)
 
     def _patch(self):

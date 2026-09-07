@@ -1,13 +1,16 @@
+import json
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Fieldset, Layout
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from assets.customfields import resolve_asset_custom_fields
+from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from core.forms import CrispyFormMixin, scope_tenant_field
 from core.mixins import suppress_custom_field_data_validation
 from extras.customfields import (
@@ -15,7 +18,9 @@ from extras.customfields import (
     build_custom_field_form_field,
     clean_custom_field_form_values,
     custom_field_clear_key,
+    validate_custom_field_value,
 )
+from extras.models import CustomField, CustomFieldset
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
@@ -30,6 +35,14 @@ from ..specification_adapters import (
     native_persistence_fields,
     require_command_success,
     specification_patch,
+)
+from .assettype_form import (
+    _DRAFT_PREFIX,
+    _T15_UNSET,
+    _build_t15_custom_field,
+    _build_t15_presence_field,
+    _display_t15_value,
+    _history_entries,
 )
 from .fields import StatusModelChoiceField
 
@@ -201,6 +214,10 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        for key in self.custom_field_keys:
+            if cleaned_data.get(key) is _T15_UNSET:
+                cleaned_data.pop(key, None)
+        self._apply_t15_presence(cleaned_data)
         warranty_fields = (
             "warranty_provider",
             "warranty_type",
@@ -443,33 +460,239 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             self.fields["asset_role"].initial = selected_asset_type.asset_role
 
     def _configure_custom_fields(self, selected_asset_type):
-        """Attach the dynamic ``cf_*`` fields and record their layout order."""
+        """Attach target fields and retain one model/type presentation separately."""
         stored_values = {}
         if self.instance and self.instance.pk and self.instance.custom_field_data:
-            stored_values = self.instance.custom_field_data
+            stored_values = dict(self.instance.custom_field_data)
 
         self.custom_field_keys = []
         self.custom_field_definitions = {}
         self.custom_field_clear_keys = {}
+        self.custom_field_presence_keys = {}
         resolved_fields = resolve_asset_custom_fields(selected_asset_type, stored_values)
+        drafts = self._read_t15_draft_transport()
         for resolved in resolved_fields:
             field = resolved.definition
             field_key = f"cf_{field.name}"
             self.custom_field_keys.append(field_key)
             self.custom_field_definitions[field_key] = field
-            form_field = build_custom_field_form_field(
+            initial_value = drafts.get(field.name, stored_values.get(field.name))
+            form_field = _build_t15_custom_field(
                 field,
-                stored_values.get(field.name),
+                initial_value,
+                has_stored_value=field.name in stored_values or field.name in drafts,
                 read_only=resolved.read_only,
             )
-            if form_field:
-                self.fields[field_key] = form_field
-                if not form_field.disabled:
-                    clear_key = custom_field_clear_key(field.name)
-                    self.fields[clear_key] = build_custom_field_clear_form_field()
-                    self.custom_field_clear_keys[field_key] = clear_key
+            if form_field is None:
+                continue
+            self.fields[field_key] = form_field
+            form_field.widget.attrs.update({"data-specification-key": field.name})
+            if not form_field.disabled:
+                clear_key = custom_field_clear_key(field.name)
+                self.fields[clear_key] = build_custom_field_clear_form_field()
+                self.custom_field_clear_keys[field_key] = clear_key
+                if not field.required and field.field_type != CustomField.FIELD_TYPE_BOOLEAN:
+                    presence_key = f"{field_key}__presence"
+                    self.fields[presence_key] = _build_t15_presence_field(field)
+                    self.fields[presence_key].widget.attrs["data-specification-presence-for"] = field.name
+                    self.custom_field_presence_keys[field_key] = presence_key
 
-    def _build_layout(self, cancel_url):
+        self._inject_t15_drafts(drafts)
+        self._configure_t15_draft_transport()
+        self._build_t15_presentation(selected_asset_type, resolved_fields)
+
+    def _stored_custom_values(self):
+        if not self.instance or not self.instance.pk:
+            return {}
+        return dict(self.instance.custom_field_data or {})
+
+    def _read_t15_draft_transport(self):
+        if not self.is_bound:
+            return {}
+        drafts = {}
+        for key in self.data.keys():
+            if not key.startswith(_DRAFT_PREFIX):
+                continue
+            name = key[len(_DRAFT_PREFIX) :]
+            try:
+                drafts[name] = json.loads(self.data.get(key))
+            except (TypeError, ValueError):
+                continue
+        return drafts
+
+    def _posted_t15_drafts(self):
+        drafts = self._read_t15_draft_transport()
+        if not self.is_bound:
+            return drafts
+        for key in self.data.keys():
+            if not key.startswith("cf_") or key.endswith(("__clear", "__presence")):
+                continue
+            values = self.data.getlist(key) if hasattr(self.data, "getlist") else [self.data.get(key)]
+            drafts[key[3:]] = values if len(values) != 1 else values[0]
+        return drafts
+
+    def _inject_t15_drafts(self, drafts):
+        if not self.is_bound or not drafts:
+            return
+        data = self.data.copy()
+        for name, value in drafts.items():
+            key = f"cf_{name}"
+            if key in data or key not in self.custom_field_definitions:
+                continue
+            if isinstance(value, list):
+                data.setlist(key, ["" if item is None else str(item) for item in value])
+            elif value is None:
+                data[key] = ""
+            else:
+                data[key] = str(value).lower() if isinstance(value, bool) else str(value)
+        self.data = data
+
+    def _configure_t15_draft_transport(self):
+        drafts = self._posted_t15_drafts()
+        if not drafts:
+            return
+        data = self.data.copy() if self.is_bound else None
+        for name, value in drafts.items():
+            transport_key = f"{_DRAFT_PREFIX}{name}"
+            if transport_key not in self.fields:
+                self.fields[transport_key] = forms.CharField(
+                    required=False,
+                    widget=forms.HiddenInput(attrs={"data-specification-draft": name}),
+                )
+            encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+            self.fields[transport_key].initial = encoded
+            if data is not None:
+                data[transport_key] = encoded
+        if data is not None:
+            self.data = data
+
+    def _apply_t15_presence(self, cleaned_data):
+        """Translate presence selectors into explicit patch values for Assets."""
+        for key, presence_key in self.custom_field_presence_keys.items():
+            mode = cleaned_data.get(presence_key, "")
+            clear_key = self.custom_field_clear_keys.get(key)
+            if clear_key and cleaned_data.get(clear_key) and mode in {"empty", "null", "value"}:
+                self.add_error(presence_key, _("Choose either removal or an explicit value, not both."))
+            if mode in {"", None}:
+                cleaned_data.pop(key, None)
+            elif mode == "empty":
+                definition = self.custom_field_definitions[key]
+                cleaned_data[key] = [] if definition.field_type == CustomField.FIELD_TYPE_MULTI_SELECT else ""
+            elif mode == "null":
+                cleaned_data[key] = None
+
+    def _asset_fieldset_context(self, selected_asset_type, resolved_fields):
+        memberships = getattr(selected_asset_type, "_prefetched_objects_cache", {}).get("fieldset_memberships", ())
+        by_identity = {}
+        for membership in memberships:
+            fieldset = membership.fieldset
+            identity = f"{fieldset.namespace}/{fieldset.slug}"
+            by_identity[identity] = fieldset
+
+        sections = []
+        section_by_identity = {}
+        used = set()
+        for resolved in resolved_fields:
+            key = f"cf_{resolved.definition.name}"
+            if key not in self.fields or not resolved.provenance:
+                continue
+            identity = resolved.provenance[0]
+            if identity not in section_by_identity:
+                fieldset = by_identity.get(identity)
+                label = getattr(fieldset, "label", None) or identity.rsplit("/", 1)[-1]
+                description = getattr(fieldset, "description", "")
+                source = self._fieldset_source(fieldset) if fieldset is not None else identity.split("/", 1)[0]
+                section_by_identity[identity] = {
+                    "id": getattr(fieldset, "pk", identity),
+                    "identity": identity,
+                    "label": label,
+                    "description": description,
+                    "source": source,
+                    "fields": [],
+                }
+                sections.append(section_by_identity[identity])
+            if key in used:
+                continue
+            used.add(key)
+            section_by_identity[identity]["fields"].append(self._t15_asset_field_context(key, resolved))
+
+        additional = [
+            self._t15_asset_field_context(f"cf_{resolved.definition.name}", resolved)
+            for resolved in resolved_fields
+            if f"cf_{resolved.definition.name}" in self.fields and f"cf_{resolved.definition.name}" not in used
+        ]
+        if additional:
+            sections.append(
+                {
+                    "id": "additional",
+                    "identity": "additional",
+                    "label": _("Additional specifications"),
+                    "description": _("Global specifications and values retained from an earlier composition."),
+                    "source": _("Global"),
+                    "fields": additional,
+                }
+            )
+        return sections
+
+    def _t15_asset_field_context(self, key, resolved):
+        return {
+            "key": key[3:],
+            "bound": self[key],
+            "presence": self[self.custom_field_presence_keys[key]] if key in self.custom_field_presence_keys else None,
+            "clear": self[self.custom_field_clear_keys[key]] if key in self.custom_field_clear_keys else None,
+            "definition": resolved.definition,
+            "provenance": resolved.provenance,
+        }
+
+    def _fieldset_source(self, fieldset):
+        if fieldset is None:
+            return "Local"
+        library = getattr(fieldset, "library", None)
+        if library is not None:
+            return getattr(library, "namespace", None) or str(library)
+        return str(getattr(fieldset, "management_kind", "local")).capitalize()
+
+    def _build_t15_presentation(self, selected_asset_type, resolved_fields):
+        stored_values = self._stored_custom_values()
+        self.specification_sections = self._asset_fieldset_context(selected_asset_type, resolved_fields)
+        self.specification_history = _history_entries(stored_values, self.custom_field_definitions)
+        self.specification_definition_revision = ""
+        if selected_asset_type is not None:
+            try:
+                owner = self.instance if self.instance and self.instance.pk else Asset(asset_type=selected_asset_type)
+                self.specification_definition_revision = current_specification_plan(
+                    owner,
+                    target_kind="asset",
+                    asset_type_id=selected_asset_type.pk,
+                ).definition_revision
+            except (ValidationError, AttributeError):
+                self.specification_definition_revision = ""
+
+        self.model_specification_fields = []
+        if selected_asset_type is None:
+            return
+        model_values = dict(selected_asset_type.custom_field_data or {})
+        for resolved in resolve_asset_type_custom_fields(selected_asset_type):
+            definition = resolved.definition
+            if definition.name not in model_values:
+                value = None
+                has_value = False
+            else:
+                value = model_values[definition.name]
+                has_value = True
+            self.model_specification_fields.append(
+                {
+                    "key": definition.name,
+                    "label": definition.label,
+                    "definition": definition,
+                    "value": value,
+                    "display_value": _display_t15_value(definition, value) if has_value else _("Not set"),
+                    "model_value_json": json.dumps(value, ensure_ascii=False),
+                    "model_value_script_id": f"asset-model-value-{definition.name}",
+                    "can_copy": definition.name in self.custom_field_definitions,
+                }
+            )
+
         # Grouped, standardized section order: Identity -> Classification ->
         # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.
         layout_elements = [
