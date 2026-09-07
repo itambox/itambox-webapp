@@ -311,7 +311,6 @@ class AssetEditView(ObjectEditView):
         return response
 
 
-
 class AssetDeleteView(ObjectDeleteView):
     queryset = Asset.objects.all()
     model = Asset

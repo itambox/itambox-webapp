@@ -36,7 +36,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     await selectTomOption(createForm, 'asset_role', String(assetRoles[0].id));
     await selectTomOption(createForm, 'status', String(deployable.id));
     await selectTomOption(createForm, 'tenant', tenant.id);
-    await createForm.getByLabel('Notes').fill(`Owned asset catalog lifecycle ${runId}`);
+    await createForm.locator('textarea[name="notes"]').fill(`Owned asset catalog lifecycle ${runId}`);
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === createPath,
@@ -75,7 +75,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     expect(updatePage?.status(), `GET ${updatePath}`).toBe(200);
     const updateForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await updateForm.locator('input[name="name"]').fill(renamedName);
-    await updateForm.getByLabel('Notes').fill(`Updated owned asset lifecycle ${runId}`);
+    await updateForm.locator('textarea[name="notes"]').fill(`Updated owned asset lifecycle ${runId}`);
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );

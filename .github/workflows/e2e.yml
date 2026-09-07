@@ -343,8 +343,11 @@ jobs:
           from datetime import timedelta
 
           from django.contrib.auth import get_user_model
+          from django.contrib.contenttypes.models import ContentType
           from django.db.models import Q
           from django.utils import timezone
+          from assets.models import Asset, AssetType, AssetTypeFieldset, StatusLabel
+          from extras.models import CustomField, CustomFieldset, CustomFieldsetField
           from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
           from users.models import Token, UserGroup
 
@@ -496,6 +499,60 @@ jobs:
           )
           print("E2E operator/viewer role boundary provisioned with tenant-local grants.")
 
+          asset_content_type = ContentType.objects.get_for_model(Asset)
+          required_field, _ = CustomField.objects.update_or_create(
+              name="e2e_required_boolean",
+              defaults={
+                  "namespace": "e2e",
+                  "label": "E2E required boolean",
+                  "help_text": "",
+                  "field_type": CustomField.FIELD_TYPE_BOOLEAN,
+                  "activation": CustomField.ACTIVATION_COMPOSED,
+                  "management_kind": CustomField.MANAGEMENT_LOCAL,
+                  "lifecycle": CustomField.LIFECYCLE_ACTIVE,
+                  "required": True,
+                  "nullable": False,
+              },
+          )
+          required_field.object_types.set([asset_content_type])
+          required_fieldset, _ = CustomFieldset.objects.update_or_create(
+              namespace="e2e",
+              slug="required-asset-fields",
+              defaults={
+                  "label": "E2E required asset fields",
+                  "description": "Disposable required-field coverage for browser qualification.",
+                  "management_kind": CustomFieldset.MANAGEMENT_LOCAL,
+                  "lifecycle": CustomFieldset.LIFECYCLE_ACTIVE,
+              },
+          )
+          CustomFieldsetField.objects.update_or_create(
+              fieldset=required_fieldset,
+              custom_field=required_field,
+              defaults={"position": 1},
+          )
+          type_a = AssetType._base_manager.get(slug="dell-latitude-5550")
+          AssetTypeFieldset.objects.update_or_create(
+              asset_type=type_a,
+              fieldset=required_fieldset,
+              defaults={"position": 1000},
+          )
+          status = StatusLabel._base_manager.order_by("pk").first()
+          type_b = AssetType._base_manager.get(slug="cisco-catalyst-9300")
+          if status is None:
+              raise RuntimeError("E2E fixture requires at least one asset status")
+          foreign_asset, _ = Asset._base_manager.get_or_create(
+              asset_tag="E2E-ISOLATION-ASSET",
+              defaults={
+                  "name": "E2E isolation foreign asset",
+                  "asset_type": type_b,
+                  "status": status,
+                  "tenant": isolation_tenant,
+              },
+          )
+          if foreign_asset.tenant_id != isolation_tenant.pk:
+              raise RuntimeError("E2E isolation asset must belong to the isolation tenant")
+          print("E2E required Boolean composition and foreign-tenant asset fixtures provisioned.")
+
           UserGroup._base_manager.get_or_create(
               tenant=tenant,
               name=os.environ["E2E_TENANT_GROUP_NAME"],
@@ -524,6 +581,7 @@ jobs:
               env_file.write(f"E2E_API_TOKEN_SECONDARY={secondary_plaintext}\n")
               env_file.write(f"E2E_TENANT_ID={tenant.pk}\n")
               env_file.write(f"E2E_ISOLATION_TENANT_ID={isolation_tenant.pk}\n")
+              env_file.write(f"E2E_ISOLATION_ASSET_ID={foreign_asset.pk}\n")
           PY
 
       - name: Start Django dev server
