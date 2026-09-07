@@ -8,6 +8,7 @@ or Choice resolver.
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 import graphene
 
 from extras.services.specifications.contracts import (
@@ -19,7 +20,18 @@ from extras.services.specifications.contracts import (
     SpecificationProjectionEntryDTO,
 )
 
-from .readers import specification_value_for_entry
+from .readers import (
+    BooleanSpecificationValue,
+    ChoiceSpecificationValue,
+    DateSpecificationValue,
+    DecimalSpecificationValue,
+    IntegerSpecificationValue,
+    MultiChoiceSpecificationValue,
+    NullSpecificationValue,
+    TextSpecificationValue,
+    UninterpretedSpecificationValue,
+    specification_value_for_entry,
+)
 from .scalars import CursorScalar, DateScalar, DecimalScalar, JSONScalar, SafeInteger
 
 
@@ -235,51 +247,6 @@ class SpecificationDefinitionType(graphene.ObjectType):
         return definition.rendered_sections
 
 
-@dataclass(frozen=True)
-class TextSpecificationValue:
-    text: str
-
-
-@dataclass(frozen=True)
-class IntegerSpecificationValue:
-    integer: int
-
-
-@dataclass(frozen=True)
-class DecimalSpecificationValue:
-    decimal: str
-
-
-@dataclass(frozen=True)
-class BooleanSpecificationValue:
-    boolean: bool
-
-
-@dataclass(frozen=True)
-class DateSpecificationValue:
-    date: str
-
-
-@dataclass(frozen=True)
-class ChoiceSpecificationValue:
-    choice: str
-
-
-@dataclass(frozen=True)
-class MultiChoiceSpecificationValue:
-    choices: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class NullSpecificationValue:
-    is_null: bool = True
-
-
-@dataclass(frozen=True)
-class UninterpretedSpecificationValue:
-    json: object
-
-
 class TextSpecificationValueType(graphene.ObjectType):
     class Meta:
         name = "TextSpecificationValue"
@@ -474,7 +441,6 @@ class SpecificationFieldConnectionType(graphene.ObjectType):
 
 
 __all__ = [
-
     "BooleanSpecificationValue",
     "ChoiceSetType",
     "ChoiceSpecificationValue",

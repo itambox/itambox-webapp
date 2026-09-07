@@ -23,6 +23,7 @@ from assets.services.specifications.contracts import (
     SpecificationResolutionRequest,
 )
 from assets.services.specifications.loader import load_specification_graph
+from extras.services.specifications.composition import resolve_specification_definition
 from extras.services.specifications.contracts import (
     FieldDefinitionDTO,
     LoadedSpecificationGraphDTO,
@@ -32,7 +33,6 @@ from extras.services.specifications.contracts import (
     StoredSpecificationEntryDTO,
     TargetKind,
 )
-from extras.services.specifications.composition import resolve_specification_definition
 from extras.services.specifications.projection import project_specification_values
 
 GraphLoader = Callable[[SpecificationGraphLoadRequest], LoadedSpecificationGraphDTO]
@@ -71,7 +71,9 @@ class RequestScopedSpecificationLoader:
         self._definition_resolver = definition_resolver
         self._projection_resolver = projection_resolver
         self._scope_fingerprint = scope_fingerprint
-        self._graph_batches: dict[tuple[tuple[int, ...], tuple[str, ...], tuple[str, ...]], LoadedSpecificationGraphDTO] = {}
+        self._graph_batches: dict[
+            tuple[tuple[int, ...], tuple[str, ...], tuple[str, ...]], LoadedSpecificationGraphDTO
+        ] = {}
         self._definitions: dict[tuple[int, str, tuple[str, ...]], SpecificationDefinitionDTO] = {}
         self._owner_reads: dict[tuple[str, str, int], OwnerSpecificationRead] = {}
         self._global_graphs: dict[tuple[str, ...], LoadedSpecificationGraphDTO] = {}

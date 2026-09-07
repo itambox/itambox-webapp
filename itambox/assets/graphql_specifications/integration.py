@@ -39,8 +39,8 @@ from extras.services.specifications.contracts import (
 )
 from organization.services.access_scope import (
     AccessScopeDeniedDTO,
-    AccessScopeResolvedDTO,
     AccessScopeResolutionRequestDTO,
+    AccessScopeResolvedDTO,
     ActorContextDTO,
     RequestedScopeSelectorDTO,
     TenantGroupId,

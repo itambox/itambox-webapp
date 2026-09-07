@@ -32,12 +32,12 @@ from .graphql_specifications.types import (
     ChoiceSetType,
     LibraryOriginType,
     PageInfoType,
+    ScopeModeEnum,
     SpecificationDefinitionType,
     SpecificationEntryType,
     SpecificationFieldConnectionType,
     SpecificationFieldsetType,
     SpecificationTargetEnum,
-    ScopeModeEnum,
     UserErrorType,
 )
 from .models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
@@ -328,9 +328,7 @@ class Query(graphene.ObjectType):
         asset_types_qs = AssetType.objects.select_related("library", "library__accepted_release").order_by("slug", "pk")
         if after:
             after_slug, after_id = decode_cursor(after, prefix="asset-type")
-            asset_types_qs = asset_types_qs.filter(
-                Q(slug__gt=after_slug) | Q(slug=after_slug, pk__gt=after_id)
-            )
+            asset_types_qs = asset_types_qs.filter(Q(slug__gt=after_slug) | Q(slug=after_slug, pk__gt=after_id))
         asset_types = tuple(asset_types_qs[: size + 1])
         loader = request_loader_for_info(info)
         prepare_type_graph(loader, asset_types)

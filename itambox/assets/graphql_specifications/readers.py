@@ -21,6 +21,51 @@ class UserErrorView:
     message: str
 
 
+@dataclass(frozen=True)
+class TextSpecificationValue:
+    text: str
+
+
+@dataclass(frozen=True)
+class IntegerSpecificationValue:
+    integer: int
+
+
+@dataclass(frozen=True)
+class DecimalSpecificationValue:
+    decimal: str
+
+
+@dataclass(frozen=True)
+class BooleanSpecificationValue:
+    boolean: bool
+
+
+@dataclass(frozen=True)
+class DateSpecificationValue:
+    date: str
+
+
+@dataclass(frozen=True)
+class ChoiceSpecificationValue:
+    choice: str
+
+
+@dataclass(frozen=True)
+class MultiChoiceSpecificationValue:
+    choices: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NullSpecificationValue:
+    is_null: bool = True
+
+
+@dataclass(frozen=True)
+class UninterpretedSpecificationValue:
+    json: object
+
+
 def fields_for_fieldset(
     fieldset: PersistedFieldsetDTO,
     graph: LoadedSpecificationGraphDTO,
@@ -38,19 +83,6 @@ def fields_for_fieldset(
 
 def specification_value_for_entry(entry: SpecificationProjectionEntryDTO) -> object:
     """Return the typed union arm, preserving unknown/invalid history as JSON."""
-    # inline import: cycle: readers is imported by types, while union arms live in types
-    from .types import (
-        BooleanSpecificationValue,
-        ChoiceSpecificationValue,
-        DateSpecificationValue,
-        DecimalSpecificationValue,
-        IntegerSpecificationValue,
-        MultiChoiceSpecificationValue,
-        NullSpecificationValue,
-        TextSpecificationValue,
-        UninterpretedSpecificationValue,
-    )
-
     value = entry.value
     if value is None:
         return NullSpecificationValue()
