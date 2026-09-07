@@ -56,6 +56,13 @@ _MISSING: Final = object()
 MISSING: Final = _MISSING
 
 
+def canonical_field_type(field_type: object) -> str | None:
+    """Accept DTO/model spellings while keeping one query semantic spelling."""
+    if not isinstance(field_type, str):
+        return None
+    return field_type.replace("-", "_")
+
+
 def _validate_json_filter_value(value: object) -> None:
     if value is MISSING:
         return

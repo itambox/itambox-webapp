@@ -94,7 +94,9 @@ def build_machine_export_rows(
     """Build a machine export for multiple records without changing identities."""
 
     first = build_machine_export(references, rows[0] if rows else {}, definitions=definitions)
-    materialized = [first.rows[0]] if rows else []
+    if not rows:
+        return MachineExportResult(first.columns, (), first.metadata)
+    materialized = [first.rows[0]]
     for row in rows[1:]:
         materialized.append(build_machine_export(references, row, definitions=definitions).rows[0])
     return MachineExportResult(first.columns, tuple(materialized), first.metadata)

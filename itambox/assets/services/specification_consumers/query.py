@@ -13,7 +13,7 @@ from django.db.models import Case, CharField, DateField, DecimalField, F, Func, 
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast
 
-from .contracts import FieldFilter, FieldReference
+from .contracts import FieldFilter, FieldReference, canonical_field_type
 
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
@@ -114,10 +114,11 @@ def _annotate_value(queryset: QuerySet, reference: FieldReference, json_path: st
 
 
 def _type_q(text_alias: str, type_alias: str, field_type: str | None):
+    field_type = canonical_field_type(field_type)
     if field_type == "integer":
-        return Q(**{type_alias: "number", f"{text_alias}__regex": _INTEGER_RE})
+        return Q(**{f"{type_alias}__in": ("number", "string"), f"{text_alias}__regex": _INTEGER_RE})
     if field_type == "decimal":
-        return Q(**{type_alias: "string", f"{text_alias}__regex": _DECIMAL_RE})
+        return Q(**{f"{type_alias}__in": ("number", "string"), f"{text_alias}__regex": _DECIMAL_RE})
     if field_type == "date":
         return Q(**{type_alias: "string", f"{text_alias}__regex": _DATE_RE})
     if field_type == "boolean":
@@ -131,7 +132,7 @@ def _type_q(text_alias: str, type_alias: str, field_type: str | None):
 
 def _field_type(definition: object | None, filter_spec: FieldFilter) -> str | None:
     if definition is not None:
-        return getattr(definition, "field_type", None)
+        return canonical_field_type(getattr(definition, "field_type", None))
     if filter_spec.operator in {"gt", "gte", "lt", "lte"}:
         if type(filter_spec.value) is int:
             return "integer"
@@ -342,15 +343,14 @@ def apply_specification_filters(
 ) -> QuerySet:
     """Apply filters in order, preserving the caller's explicit source map."""
 
-    result = queryset
-    first = True
+    result = scope_queryset(queryset, tenant_ids, tenant_field=tenant_field) if tenant_ids is not None else queryset
     for filter_spec in filters:
         result = apply_specification_filter(
             result,
             filter_spec,
-            tenant_ids=tenant_ids if first else None,
+            tenant_ids=None,
             tenant_field=tenant_field,
             field_definition=(definitions or {}).get(filter_spec.reference),
         )
-        first = False
+
     return result

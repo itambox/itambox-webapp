@@ -21,7 +21,8 @@ from core.reports.formatting import _format_per_currency, _money, _record_curren
 from core.reports.registry import register_report_provider
 
 from .services.specification_consumers.contracts import FieldReference
-from .services.specification_consumers.exporting import MachineExportResult, build_machine_export_rows
+from .services.specification_consumers.exporting import build_machine_export_rows
+from .services.specification_consumers.query import apply_specification_filters
 from .services.specification_consumers.semantics import field_value_from_mapping
 
 # -- source-qualified specification report/export helpers ------------------
@@ -162,7 +163,16 @@ class AssetSummaryReportProvider(ReportDefinition):
     }
 
     def get_queryset(self, request: ReportRequest):
+        # Tenant authorization is deliberately established before any
+        # specification expression is introduced.  The filtered queryset is
+        # therefore also the export authorization boundary.
         queryset = self.scope_to_tenants(Asset.objects.filter(deleted_at__isnull=True), request)
+        if request.specification_filters:
+            queryset = apply_specification_filters(
+                queryset,
+                request.specification_filters,
+                definitions=dict(request.specification_definitions),
+            )
         return queryset.select_related("asset_type", "asset_type__manufacturer", "status").prefetch_related(
             "warranties",
             "assignments",

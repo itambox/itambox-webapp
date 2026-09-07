@@ -41,6 +41,11 @@ class ReportRequest:
     columns: tuple[str, ...]
     user: object | None
     as_of: datetime
+    # Specification consumers are domain-owned.  The shared report contract
+    # carries opaque DTOs so core never imports the assets application.
+    specification_filters: tuple[object, ...] = ()
+    specification_definitions: Mapping[object, object] = field(default_factory=dict)
+    specification_export_references: tuple[object, ...] = ()
 
 
 ReportRow = Mapping[str, object]
@@ -58,6 +63,8 @@ class ReportResult:
     chart_svg: str = ""
     #: True when the scope held no data and the report shows its sample instead.
     is_sample: bool = False
+    #: Optional domain-owned machine export built from the authorized record set.
+    specification_export: object | None = None
 
     def __post_init__(self) -> None:
         self.rows = list(self.rows)
@@ -194,6 +201,15 @@ class ReportDefinition:
     def build_sample_chart(self, request: ReportRequest) -> str:
         return ""
 
+    def build_specification_export(self, records: Sequence[object], references, *, definitions=None):
+        """Build an optional domain-owned export from authorized records.
+
+        Providers that support specifications may override this hook.  The
+        shared shell deliberately treats the result as opaque and never
+        imports a domain exporter.
+        """
+        return None
+
     # -- orchestration -----------------------------------------------------
 
     def build(self, request: ReportRequest) -> ReportResult:
@@ -205,12 +221,22 @@ class ReportDefinition:
         queryset = self.get_queryset(request)
         records = list(queryset[: self.row_limit])
         rows = list(self.build_rows(records, request))
+        specification_export = None
+        if request.specification_export_references:
+            specification_export = self.build_specification_export(
+                records,
+                request.specification_export_references,
+                definitions=request.specification_definitions,
+            )
         if not rows:
-            return self.build_sample(request)
+            result = self.build_sample(request)
+            result.specification_export = specification_export
+            return result
         return ReportResult(
             rows=rows,
             summary_cards=list(self.build_summary(queryset, request)),
             chart_svg=self.build_chart(queryset, records, request),
+            specification_export=specification_export,
         )
 
     def build_sample(self, request: ReportRequest) -> ReportResult:

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from assets.services.specification_consumers import query
 from assets.services.specification_consumers.contracts import (
     FieldFilter,
     FieldReference,
@@ -18,6 +19,21 @@ from assets.services.specification_consumers.semantics import (
     field_value_from_mapping,
     matches_filter,
 )
+
+
+@pytest.mark.parametrize("tenant_ids", [(), (7,)])
+def test_empty_filters_still_apply_explicit_tenant_scope(monkeypatch, tenant_ids):
+
+    source, scoped = object(), object()
+    calls = []
+
+    def apply_scope(queryset, ids, *, tenant_field):
+        calls.append((queryset, ids, tenant_field))
+        return scoped
+
+    monkeypatch.setattr(query, "scope_queryset", apply_scope)
+    assert query.apply_specification_filters(source, [], tenant_ids=tenant_ids) is scoped
+    assert calls == [(source, tenant_ids, "tenant_id")]
 
 
 def test_field_reference_is_source_qualified_and_label_free():

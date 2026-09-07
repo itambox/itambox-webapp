@@ -10,7 +10,7 @@ from typing import Literal
 
 from extras.services.specifications.contracts import SpecificationProjectionDTO
 
-from .contracts import MISSING, FieldFilter, FieldReference, ValueStatus
+from .contracts import MISSING, FieldFilter, FieldReference, ValueStatus, canonical_field_type
 
 Presence = Literal["missing", "null", "empty", "value"]
 
@@ -78,6 +78,7 @@ def _date(value: object) -> date | None:
 
 
 def _same_value(left: object, right: object, field_type: str | None) -> bool:
+    field_type = canonical_field_type(field_type)
     if field_type == "decimal":
         left_decimal = _decimal(left)
         right_decimal = _decimal(right)
@@ -94,6 +95,7 @@ def _same_value(left: object, right: object, field_type: str | None) -> bool:
 
 
 def _ordered_value(value: object, field_type: str | None) -> Decimal | date | str | int | None:
+    field_type = canonical_field_type(field_type)
     if field_type in {"integer", "decimal"}:
         return _decimal(value)
     if field_type == "date":

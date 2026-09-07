@@ -1183,6 +1183,42 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
         )
 
 
+def _specification_inputs(request, *, source):
+    """Parse explicit report specification DTOs at the public view boundary."""
+    raw_filters = source.get("specification_filters")
+    if raw_filters:
+        from assets.services.specification_consumers.contracts import parse_filter_document
+
+        try:
+            specification_filters = parse_filter_document(raw_filters)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError({"specification_filters": str(exc)}) from exc
+    else:
+        specification_filters = ()
+
+    raw_references = source.get("specification_export_references")
+    if not raw_references:
+        return specification_filters, ()
+
+    from assets.services.specification_consumers.contracts import FieldReference
+
+    try:
+        document = json.loads(raw_references)
+        if isinstance(document, dict):
+            if set(document) != {"references"}:
+                raise ValueError("specification export references have unknown properties")
+            document = document["references"]
+        if not isinstance(document, list):
+            raise ValueError("specification export references require a JSON list")
+        references = tuple(
+            FieldReference.from_column_id(item) if isinstance(item, str) else FieldReference.from_mapping(item)
+            for item in document
+        )
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValidationError({"specification_export_references": str(exc)}) from exc
+    return specification_filters, references
+
+
 @method_decorator(login_required, name="dispatch")
 class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin, View):
     capability_key = REPORT_DESIGNER_CAPABILITY
@@ -1247,9 +1283,14 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
         from core.reports import build_report_context
 
         try:
+            specification_filters, specification_export_references = _specification_inputs(request, source=request.POST)
             template_instance.full_clean(validate_constraints=False)
             _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
-                template_instance, active_tenant=active_tenant, filter_tenants=filter_tenants
+                template_instance,
+                active_tenant=active_tenant,
+                filter_tenants=filter_tenants,
+                specification_filters=specification_filters,
+                specification_export_references=specification_export_references,
             )
 
             context_data["request"] = request
@@ -1301,8 +1342,13 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         from core.reports import build_report_context
 
         try:
+            specification_filters, specification_export_references = _specification_inputs(request, source=request.GET)
             headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
-                template, active_tenant=active_tenant, filter_tenants=filter_tenants
+                template,
+                active_tenant=active_tenant,
+                filter_tenants=filter_tenants,
+                specification_filters=specification_filters,
+                specification_export_references=specification_export_references,
             )
 
             format_type = request.GET.get("format", "html").lower()
@@ -1310,6 +1356,14 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
 
             safe_name = safe_csv_filename(template.name).lower().replace(" ", "_")
             stamp = f"{timezone.now():%Y%m%d}"
+
+            machine_export = context_data.get("specification_export")
+            if machine_export is not None and format_type in {"csv", "machine_csv"}:
+                from assets.services.specification_consumers.exporting import machine_csv_bytes
+
+                response = HttpResponse(machine_csv_bytes(machine_export), content_type="text/csv")
+                response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
+                return response
 
             if format_type == "csv":
                 response = HttpResponse(
@@ -1321,8 +1375,10 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             if format_type == "xlsx":
                 from core.reports.exporters import XLSX_MIME, report_xlsx_bytes
 
+                export_headers = machine_export.columns if machine_export is not None else headers
+                export_rows = machine_export.rows if machine_export is not None else rows
                 response = HttpResponse(
-                    report_xlsx_bytes(headers, rows, sheet_title=template.name), content_type=XLSX_MIME
+                    report_xlsx_bytes(export_headers, export_rows, sheet_title=template.name), content_type=XLSX_MIME
                 )
                 response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.xlsx"'
                 return response
