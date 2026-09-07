@@ -6,7 +6,6 @@ intentionally separate from historical migration assets.
 
 from copy import deepcopy
 
-
 # Generated from canonical-target.json; do not import historical migration data.
 _CORE_VOCABULARY: dict[str, object] = {'schema_version': 1,
  'kind': 'itambox.type-library.release',  # noqa: E128

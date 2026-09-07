@@ -575,11 +575,12 @@ class SeedCatalogMixin:
                 self._demo_depreciation_afa = obj  # first entry = tenant default showcase
 
         # Normative core vocabulary is the runtime consumer of the current release.
-        # inline import: app-registry: load the assets-owned release after Django setup.
+        from django.contrib.contenttypes.models import ContentType
+
         from assets.models import Asset as AssetModel
         from assets.models import AssetType as AssetTypeModel
+        # inline import: app-registry: load the assets-owned release after Django setup.
         from assets.services.specifications.core_vocabulary import get_core_vocabulary
-        from django.contrib.contenttypes.models import ContentType
 
         vocabulary = get_core_vocabulary()
         library_release = vocabulary["library"]["release"]
