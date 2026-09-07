@@ -10,12 +10,7 @@ class CoreVocabularyAssetTests(unittest.TestCase):
     def _oracle():
         repository_root = Path(__file__).resolve().parents[3]
         oracle_path = (
-            repository_root
-            / "scripts"
-            / "tests"
-            / "fixtures"
-            / "specification_vocabulary"
-            / "canonical-target.json"
+            repository_root / "scripts" / "tests" / "fixtures" / "specification_vocabulary" / "canonical-target.json"
         )
         return json.loads(oracle_path.read_text(encoding="utf-8"))
 

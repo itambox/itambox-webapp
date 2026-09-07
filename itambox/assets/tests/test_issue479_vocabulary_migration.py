@@ -128,12 +128,7 @@ class CoreVocabularyMigrationTests(TransactionTestCase):
     def _oracle():
         repository_root = Path(__file__).resolve().parents[3]
         oracle_path = (
-            repository_root
-            / "scripts"
-            / "tests"
-            / "fixtures"
-            / "specification_vocabulary"
-            / "canonical-target.json"
+            repository_root / "scripts" / "tests" / "fixtures" / "specification_vocabulary" / "canonical-target.json"
         )
         return json.loads(oracle_path.read_text(encoding="utf-8"))
 
@@ -299,7 +294,9 @@ class CoreVocabularyMigrationTests(TransactionTestCase):
             management_kind="local",
             lifecycle="active",
         )
-        CustomFieldsetField._base_manager.create(fieldset_id=local_fieldset.pk, custom_field_id=local_field.pk, position=10)
+        CustomFieldsetField._base_manager.create(
+            fieldset_id=local_fieldset.pk, custom_field_id=local_field.pk, position=10
+        )
         local_choice_set = ChoiceSet._base_manager.create(
             namespace="local",
             slug="local-keep",
@@ -372,7 +369,9 @@ class CoreVocabularyMigrationTests(TransactionTestCase):
             apps.get_model("extras", "CustomField")._base_manager.filter(pk=local_field.pk, namespace="local").exists()
         )
         self.assertTrue(
-            apps.get_model("extras", "CustomFieldset")._base_manager.filter(pk=local_fieldset.pk, namespace="local").exists()
+            apps.get_model("extras", "CustomFieldset")
+            ._base_manager.filter(pk=local_fieldset.pk, namespace="local")
+            .exists()
         )
         self.assertTrue(
             apps.get_model("extras", "CustomFieldChoiceSet")
