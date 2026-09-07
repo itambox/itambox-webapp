@@ -1,13 +1,12 @@
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
-import unittest
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
 from assets.forms.asset_form import AssetForm
 from extras.models import CustomField
-
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 
@@ -62,7 +61,6 @@ class AssetFormPresenceTests(SimpleTestCase):
         self.assertEqual(form.data.get("cf_instance_note"), "edited draft")
 
 
-
 class T15SpecificationUiContractTests(unittest.TestCase):
     def test_asset_type_form_declares_presence_aware_composition_metadata(self):
         source = (APP_ROOT / "assets" / "forms" / "assettype_form.py").read_text(encoding="utf-8")
@@ -77,18 +75,18 @@ class T15SpecificationUiContractTests(unittest.TestCase):
         self.assertIn("custom_field_presence_keys", source)
 
     def test_specification_templates_expose_real_editor_hooks(self):
-        asset_type_template = (
-            APP_ROOT / "templates" / "assets" / "_assettype_specification_form.html"
-        ).read_text(encoding="utf-8")
-        asset_template = (
-            APP_ROOT / "templates" / "assets" / "_asset_specification_form.html"
-        ).read_text(encoding="utf-8")
+        asset_type_template = (APP_ROOT / "templates" / "assets" / "_assettype_specification_form.html").read_text(
+            encoding="utf-8"
+        )
+        asset_template = (APP_ROOT / "templates" / "assets" / "_asset_specification_form.html").read_text(
+            encoding="utf-8"
+        )
         for template in (asset_type_template, asset_template):
-            self.assertIn('data-specification-editor', template)
-            self.assertIn('data-specification-history', template)
-            self.assertIn('Previous specification values', template)
-        self.assertIn('data-specification-fieldset', asset_type_template)
-        self.assertIn('data-specification-copy-model-key', asset_template)
+            self.assertIn("data-specification-editor", template)
+            self.assertIn("data-specification-history", template)
+            self.assertIn("Previous specification values", template)
+        self.assertIn("data-specification-fieldset", asset_type_template)
+        self.assertIn("data-specification-copy-model-key", asset_template)
 
 
 if __name__ == "__main__":

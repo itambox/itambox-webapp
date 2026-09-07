@@ -45,7 +45,6 @@ from ..specification_adapters import (
     stage_uploaded_image,
 )
 
-
 _T15_UNSET = object()
 _DRAFT_PREFIX = "specification_draft__cf_"
 
@@ -192,7 +191,9 @@ def _history_entries(stored_values, current_definitions):
             reasons.append(_("Inactive composition"))
         if definition.lifecycle == CustomField.LIFECYCLE_DEPRECATED:
             reasons.append(_("Deprecated field"))
-        choice_keys = {choice.key for choice in _choice_rows(definition) if choice.lifecycle == CustomField.LIFECYCLE_DEPRECATED}
+        choice_keys = {
+            choice.key for choice in _choice_rows(definition) if choice.lifecycle == CustomField.LIFECYCLE_DEPRECATED
+        }
         values = value if isinstance(value, (list, tuple)) else (value,)
         if any(item in choice_keys for item in values):
             reasons.append(_("Deprecated choice"))
@@ -505,7 +506,11 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             )
             self.fields[key] = field
             field.widget.attrs.update({"data-specification-key": key[3:]})
-            if not field.disabled and not definition.required and definition.field_type != CustomField.FIELD_TYPE_BOOLEAN:
+            if (
+                not field.disabled
+                and not definition.required
+                and definition.field_type != CustomField.FIELD_TYPE_BOOLEAN
+            ):
                 presence_key = f"{key}__presence"
                 self.fields[presence_key] = _build_t15_presence_field(definition)
                 self.fields[presence_key].widget.attrs["data-specification-presence-for"] = key[3:]
@@ -543,7 +548,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             if mode in {"", None}:
                 cleaned_data.pop(key, None)
             elif mode == "empty":
-                cleaned_data[key] = [] if self.custom_field_definitions[key].field_type == CustomField.FIELD_TYPE_MULTI_SELECT else ""
+                cleaned_data[key] = (
+                    [] if self.custom_field_definitions[key].field_type == CustomField.FIELD_TYPE_MULTI_SELECT else ""
+                )
             elif mode == "null":
                 cleaned_data[key] = None
 

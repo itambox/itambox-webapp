@@ -11,9 +11,10 @@
       {% translate "This specification changed while you were editing. Your draft is retained; refresh the specification and review it before saving again." %}
     </div>
   {% endif %}
-
   <section class="card mb-4" aria-labelledby="asset-identity-heading">
-    <div class="card-header"><h3 id="asset-identity-heading" class="h5 mb-0">{% translate "Identity" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-identity-heading" class="h5 mb-0">{% translate "Identity" %}</h3>
+    </div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">{{ form.name|as_crispy_field }}</div>
@@ -23,52 +24,72 @@
       </div>
     </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-classification-heading">
-    <div class="card-header"><h3 id="asset-classification-heading" class="h5 mb-0">{% translate "Classification" %}</h3></div>
-    <div class="card-body"><div class="row g-3">
-      <div class="col-md-6">{{ form.asset_type|as_crispy_field }}</div>
-      <div class="col-md-6">{{ form.asset_role|as_crispy_field }}</div>
-    </div></div>
+    <div class="card-header">
+      <h3 id="asset-classification-heading" class="h5 mb-0">{% translate "Classification" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.asset_type|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.asset_role|as_crispy_field }}</div>
+      </div>
+    </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-assignment-heading">
-    <div class="card-header"><h3 id="asset-assignment-heading" class="h5 mb-0">{% translate "Assignment" %}</h3></div>
-    <div class="card-body"><div class="row g-3">
-      <div class="col-md-6">{{ form.location|as_crispy_field }}</div>
-      <div class="col-md-6">{{ form.tenant|as_crispy_field }}</div>
-    </div></div>
+    <div class="card-header">
+      <h3 id="asset-assignment-heading" class="h5 mb-0">{% translate "Assignment" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.location|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.tenant|as_crispy_field }}</div>
+      </div>
+    </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-procurement-heading">
-    <div class="card-header"><h3 id="asset-procurement-heading" class="h5 mb-0">{% translate "Procurement and financial" %}</h3></div>
-    <div class="card-body"><div class="row g-3">
-      <div class="col-md-4">{{ form.purchase_date|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.order_number|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.supplier|as_crispy_field }}</div>
-      <div class="col-md-6">{{ form.purchase_order_line|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.purchase_cost|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.currency|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.salvage_value|as_crispy_field }}</div>
-      <div class="col-md-6">{{ form.cost_center|as_crispy_field }}</div>
-    </div></div>
+    <div class="card-header">
+      <h3 id="asset-procurement-heading" class="h5 mb-0">{% translate "Procurement and financial" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">{{ form.purchase_date|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.order_number|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.supplier|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.purchase_order_line|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.purchase_cost|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.currency|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.salvage_value|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.cost_center|as_crispy_field }}</div>
+      </div>
+    </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-lifecycle-heading">
-    <div class="card-header"><h3 id="asset-lifecycle-heading" class="h5 mb-0">{% translate "Lifecycle" %}</h3></div>
-    <div class="card-body"><div class="row g-3">
-      <div class="col-md-6">{{ form.in_service_date|as_crispy_field }}</div>
-      <div class="col-md-6">{{ form.depreciation_override|as_crispy_field }}</div>
-    </div></div>
+    <div class="card-header">
+      <h3 id="asset-lifecycle-heading" class="h5 mb-0">{% translate "Lifecycle" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.in_service_date|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.depreciation_override|as_crispy_field }}</div>
+      </div>
+    </div>
   </section>
-
-  <section class="card mb-4" aria-labelledby="asset-model-specifications-heading">
-    <div class="card-header"><h3 id="asset-model-specifications-heading" class="h5 mb-0">{% translate "Model specifications" %}</h3></div>
+  <section class="card mb-4"
+           aria-labelledby="asset-model-specifications-heading">
+    <div class="card-header">
+      <h3 id="asset-model-specifications-heading" class="h5 mb-0">{% translate "Model specifications" %}</h3>
+    </div>
     <div class="card-body">
       {% if form.model_specification_fields %}
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
-            <thead><tr><th>{% translate "Field" %}</th><th>{% translate "Model default" %}</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>{% translate "Field" %}</th>
+                <th>{% translate "Model default" %}</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody>
               {% for item in form.model_specification_fields %}
                 <tr>
@@ -76,7 +97,10 @@
                   <td>{{ item.display_value }}{{ item.value|json_script:item.model_value_script_id }}</td>
                   <td class="text-end">
                     {% if item.can_copy %}
-                      <button type="button" class="btn btn-sm btn-outline-primary" data-specification-copy-model-key="{{ item.key }}" data-specification-model-value-script="{{ item.model_value_script_id }}">{% translate "Copy to asset draft" %}</button>
+                      <button type="button"
+                              class="btn btn-sm btn-outline-primary"
+                              data-specification-copy-model-key="{{ item.key }}"
+                              data-specification-model-value-script="{{ item.model_value_script_id }}">{% translate "Copy to asset draft" %}</button>
                     {% endif %}
                   </td>
                 </tr>
@@ -90,12 +114,14 @@
       <div class="small text-muted mt-2" data-specification-copy-feedback hidden></div>
     </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-values-heading">
-    <div class="card-header"><h3 id="asset-values-heading" class="h5 mb-0">{% translate "Asset specification values" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-values-heading" class="h5 mb-0">{% translate "Asset specification values" %}</h3>
+    </div>
     <div class="card-body">
       {% for section in form.specification_sections %}
-        <fieldset class="border rounded p-3 mb-3" data-specification-section="{{ section.identity }}">
+        <fieldset class="border rounded p-3 mb-3"
+                  data-specification-section="{{ section.identity }}">
           <legend class="float-none w-auto px-2 h6 mb-0">{{ section.label }}</legend>
           {% if section.description %}<p class="small text-muted">{{ section.description }}</p>{% endif %}
           <div class="row g-3">
@@ -113,14 +139,19 @@
       {% endfor %}
     </div>
   </section>
-
   <details class="card mb-4" data-specification-history>
     <summary class="card-header h6">{% translate "Previous specification values" %}</summary>
     <div class="card-body">
       {% if form.specification_history %}
         <div class="table-responsive">
           <table class="table table-sm mb-0">
-            <thead><tr><th>{% translate "Field" %}</th><th>{% translate "Stored value" %}</th><th>{% translate "State" %}</th></tr></thead>
+            <thead>
+              <tr>
+                <th>{% translate "Field" %}</th>
+                <th>{% translate "Stored value" %}</th>
+                <th>{% translate "State" %}</th>
+              </tr>
+            </thead>
             <tbody>
               {% for entry in form.specification_history %}
                 <tr data-specification-history-key="{{ entry.key }}">
@@ -137,33 +168,63 @@
       {% endif %}
     </div>
   </details>
-
   <section class="card mb-4" aria-labelledby="asset-warranty-heading">
-    <div class="card-header"><h3 id="asset-warranty-heading" class="h5 mb-0">{% translate "Optional warranty" %}</h3></div>
-    <div class="card-body"><div class="row g-3">
-      <div class="col-md-6">{{ form.warranty_provider|as_crispy_field }}</div>
-      <div class="col-md-6">{{ form.warranty_type|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.warranty_start_date|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.warranty_end_date|as_crispy_field }}</div>
-      <div class="col-md-4">{{ form.warranty_cost|as_crispy_field }}</div>
-    </div></div>
-  </section>
-
-  <section class="card mb-4" aria-labelledby="asset-notes-heading">
-    <div class="card-header"><h3 id="asset-notes-heading" class="h5 mb-0">{% translate "Notes and tags" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-warranty-heading" class="h5 mb-0">{% translate "Optional warranty" %}</h3>
+    </div>
     <div class="card-body">
-      <div class="row g-3"><div class="col-md-6">{{ form.tags|as_crispy_field }}</div><div class="col-md-6">{{ form.requestable|as_crispy_field }}</div></div>
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.warranty_provider|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.warranty_type|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.warranty_start_date|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.warranty_end_date|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.warranty_cost|as_crispy_field }}</div>
+      </div>
+    </div>
+  </section>
+  <section class="card mb-4" aria-labelledby="asset-notes-heading">
+    <div class="card-header">
+      <h3 id="asset-notes-heading" class="h5 mb-0">{% translate "Notes and tags" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.tags|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.requestable|as_crispy_field }}</div>
+      </div>
       {{ form.notes|as_crispy_field }}
     </div>
   </section>
-
   {% if form.specification_revision_conflict %}
-    <button type="button" class="btn btn-outline-primary mt-2" data-specification-reload hx-post="{{ request.path }}" hx-trigger="click" hx-target="closest form" hx-swap="outerHTML" hx-include="closest form" hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
+    <button type="button"
+            class="btn btn-outline-primary mt-2"
+            data-specification-reload
+            hx-post="{{ request.path }}"
+            hx-trigger="click"
+            hx-target="closest form"
+            hx-swap="outerHTML"
+            hx-include="closest form"
+            hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
   {% else %}
-    <button type="button" class="d-none" data-specification-reload hx-post="{{ request.path }}" hx-trigger="click" hx-target="closest form" hx-swap="outerHTML" hx-include="closest form" hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
+    <button type="button"
+            class="d-none"
+            data-specification-reload
+            hx-post="{{ request.path }}"
+            hx-trigger="click"
+            hx-target="closest form"
+            hx-swap="outerHTML"
+            hx-include="closest form"
+            hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
   {% endif %}
   <div class="mt-4">
-    <button type="submit" class="btn btn-primary">{% if form.instance.pk %}{% translate "Update" %}{% else %}{% translate "Create" %}{% endif %}</button>
-    <a href="{% if form.instance.pk %}{{ form.instance.get_absolute_url }}{% else %}{% url 'assets:asset_list' %}{% endif %}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">{% translate "Cancel" %}</a>
+    <button type="submit" class="btn btn-primary">
+      {% if form.instance.pk %}
+        {% translate "Update" %}
+      {% else %}
+        {% translate "Create" %}
+      {% endif %}
+    </button>
+    <a href="{% if form.instance.pk %}{{ form.instance.get_absolute_url }}{% else %}{% url 'assets:asset_list' %}{% endif %}"
+       class="btn btn-outline-secondary ms-2"
+       data-no-dirty-track="true">{% translate "Cancel" %}</a>
   </div>
 </form>

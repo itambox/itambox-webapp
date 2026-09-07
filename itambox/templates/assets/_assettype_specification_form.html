@@ -12,9 +12,10 @@
       {% translate "This specification changed while you were editing. Your draft is retained; refresh the specification and review it before saving again." %}
     </div>
   {% endif %}
-
   <section class="card mb-4" aria-labelledby="asset-type-general-heading">
-    <div class="card-header"><h3 id="asset-type-general-heading" class="h5 mb-0">{% translate "General information" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-type-general-heading" class="h5 mb-0">{% translate "General information" %}</h3>
+    </div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">{{ form.manufacturer|as_crispy_field }}</div>
@@ -28,9 +29,10 @@
       </div>
     </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-type-classification-heading">
-    <div class="card-header"><h3 id="asset-type-classification-heading" class="h5 mb-0">{% translate "Classification and financial" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-type-classification-heading" class="h5 mb-0">{% translate "Classification and financial" %}</h3>
+    </div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-4">{{ form.category|as_crispy_field }}</div>
@@ -40,8 +42,9 @@
       </div>
     </div>
   </section>
-
-  <section class="card mb-4" aria-labelledby="asset-type-fieldsets-heading" data-specification-composition>
+  <section class="card mb-4"
+           aria-labelledby="asset-type-fieldsets-heading"
+           data-specification-composition>
     <div class="card-header">
       <h3 id="asset-type-fieldsets-heading" class="h5 mb-0">{% translate "Specification sections" %}</h3>
       <p class="text-muted small mb-0">{% translate "Choose the ordered sections that define specifications for this model." %}</p>
@@ -54,17 +57,36 @@
           <div class="vstack gap-2" data-specification-selected-list>
             {% for option in form.specification_fieldset_options %}
               {% if option.selected %}
-                <article class="border rounded p-3" data-specification-fieldset data-fieldset-id="{{ option.id }}" data-fieldset-label="{{ option.label }}" data-selected="true" data-has-stored-values="{{ option.has_stored_values|yesno:'true,false' }}" aria-posinset="{{ forloop.counter }}" aria-setsize="{{ form.specification_fieldset_options|length }}">
+                <article class="border rounded p-3"
+                         data-specification-fieldset
+                         data-fieldset-id="{{ option.id }}"
+                         data-fieldset-label="{{ option.label }}"
+                         data-selected="true"
+                         data-has-stored-values="{{ option.has_stored_values|yesno:'true,false' }}"
+                         aria-posinset="{{ forloop.counter }}"
+                         aria-setsize="{{ form.specification_fieldset_options|length }}">
                   <div class="d-flex align-items-start gap-2">
-                    <input type="checkbox" class="form-check-input mt-1" data-specification-fieldset-toggle checked aria-label="{% blocktranslate with label=option.label %}Keep {{ label }} selected{% endblocktranslate %}">
+                    <input type="checkbox"
+                           class="form-check-input mt-1"
+                           data-specification-fieldset-toggle
+                           checked
+                           aria-label="{% blocktranslate with label=option.label %}Keep {{ label }} selected{% endblocktranslate %}">
                     <div class="flex-grow-1">
                       <div class="fw-semibold">{{ option.label }}</div>
                       <div class="small text-muted">{{ option.identity }} · {{ option.source }}</div>
                       {% if option.description %}<div class="small mt-1">{{ option.description }}</div>{% endif %}
                     </div>
-                    <div class="btn-group btn-group-sm" role="group" aria-label="{% blocktranslate with label=option.label %}Reorder {{ label }}{% endblocktranslate %}">
-                      <button type="button" class="btn btn-outline-secondary" data-specification-move="up" aria-label="{% translate 'Move section up' %}">↑</button>
-                      <button type="button" class="btn btn-outline-secondary" data-specification-move="down" aria-label="{% translate 'Move section down' %}">↓</button>
+                    <div class="btn-group btn-group-sm"
+                         role="group"
+                         aria-label="{% blocktranslate with label=option.label %}Reorder {{ label }}{% endblocktranslate %}">
+                      <button type="button"
+                              class="btn btn-outline-secondary"
+                              data-specification-move="up"
+                              aria-label="{% translate 'Move section up' %}">↑</button>
+                      <button type="button"
+                              class="btn btn-outline-secondary"
+                              data-specification-move="down"
+                              aria-label="{% translate 'Move section down' %}">↓</button>
                     </div>
                   </div>
                 </article>
@@ -79,14 +101,25 @@
           <div class="vstack gap-2" data-specification-available-list>
             {% for option in form.specification_fieldset_options %}
               {% if not option.selected %}
-                <article class="border rounded p-3" data-specification-fieldset data-fieldset-id="{{ option.id }}" data-fieldset-label="{{ option.label }}" data-selected="false" data-has-stored-values="{{ option.has_stored_values|yesno:'true,false' }}">
+                <article class="border rounded p-3"
+                         data-specification-fieldset
+                         data-fieldset-id="{{ option.id }}"
+                         data-fieldset-label="{{ option.label }}"
+                         data-selected="false"
+                         data-has-stored-values="{{ option.has_stored_values|yesno:'true,false' }}">
                   <div class="d-flex align-items-start gap-2">
-                    <input type="checkbox" class="form-check-input mt-1" data-specification-fieldset-toggle{% if option.deprecated %} disabled{% endif %} aria-label="{% blocktranslate with label=option.label %}Add {{ label }}{% endblocktranslate %}">
+                    <input type="checkbox"
+                           class="form-check-input mt-1"
+                           data-specification-fieldset-toggle{% if option.deprecated %}
+                           disabled{% endif %}
+                           aria-label="{% blocktranslate with label=option.label %}Add {{ label }}{% endblocktranslate %}">
                     <div class="flex-grow-1">
                       <div class="fw-semibold">{{ option.label }}</div>
                       <div class="small text-muted">{{ option.identity }} · {{ option.source }}</div>
                       {% if option.description %}<div class="small mt-1">{{ option.description }}</div>{% endif %}
-                      {% if option.has_stored_values %}<div class="small text-warning" data-specification-retained-notice>{% translate "Stored values are retained until explicitly cleared." %}</div>{% endif %}
+                      {% if option.has_stored_values %}
+                        <div class="small text-warning" data-specification-retained-notice>{% translate "Stored values are retained until explicitly cleared." %}</div>
+                      {% endif %}
                     </div>
                   </div>
                 </article>
@@ -99,12 +132,14 @@
       </div>
     </div>
   </section>
-
   <section class="card mb-4" aria-labelledby="asset-type-values-heading">
-    <div class="card-header"><h3 id="asset-type-values-heading" class="h5 mb-0">{% translate "Model specification values" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-type-values-heading" class="h5 mb-0">{% translate "Model specification values" %}</h3>
+    </div>
     <div class="card-body">
       {% for section in form.specification_sections %}
-        <fieldset class="border rounded p-3 mb-3" data-specification-section="{{ section.identity }}">
+        <fieldset class="border rounded p-3 mb-3"
+                  data-specification-section="{{ section.identity }}">
           <legend class="float-none w-auto px-2 h6 mb-0">{{ section.label }}</legend>
           {% if section.description %}<p class="small text-muted">{{ section.description }}</p>{% endif %}
           <div class="row g-3">
@@ -122,14 +157,19 @@
       {% endfor %}
     </div>
   </section>
-
   <details class="card mb-4" data-specification-history>
     <summary class="card-header h6">{% translate "Previous specification values" %}</summary>
     <div class="card-body">
       {% if form.specification_history %}
         <div class="table-responsive">
           <table class="table table-sm mb-0">
-            <thead><tr><th>{% translate "Field" %}</th><th>{% translate "Stored value" %}</th><th>{% translate "State" %}</th></tr></thead>
+            <thead>
+              <tr>
+                <th>{% translate "Field" %}</th>
+                <th>{% translate "Stored value" %}</th>
+                <th>{% translate "State" %}</th>
+              </tr>
+            </thead>
             <tbody>
               {% for entry in form.specification_history %}
                 <tr data-specification-history-key="{{ entry.key }}">
@@ -146,22 +186,46 @@
       {% endif %}
     </div>
   </details>
-
   <section class="card mb-4" aria-labelledby="asset-type-additional-heading">
-    <div class="card-header"><h3 id="asset-type-additional-heading" class="h5 mb-0">{% translate "Additional information" %}</h3></div>
+    <div class="card-header">
+      <h3 id="asset-type-additional-heading" class="h5 mb-0">{% translate "Additional information" %}</h3>
+    </div>
     <div class="card-body">
       {{ form.comments|as_crispy_field }}
       {{ form.tags|as_crispy_field }}
     </div>
   </section>
-
   {% if form.specification_revision_conflict %}
-    <button type="button" class="btn btn-outline-primary mt-2" data-specification-reload hx-post="{{ request.path }}" hx-trigger="click" hx-target="closest form" hx-swap="outerHTML" hx-include="closest form" hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
+    <button type="button"
+            class="btn btn-outline-primary mt-2"
+            data-specification-reload
+            hx-post="{{ request.path }}"
+            hx-trigger="click"
+            hx-target="closest form"
+            hx-swap="outerHTML"
+            hx-include="closest form"
+            hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
   {% else %}
-    <button type="button" class="d-none" data-specification-reload hx-post="{{ request.path }}" hx-trigger="click" hx-target="closest form" hx-swap="outerHTML" hx-include="closest form" hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
+    <button type="button"
+            class="d-none"
+            data-specification-reload
+            hx-post="{{ request.path }}"
+            hx-trigger="click"
+            hx-target="closest form"
+            hx-swap="outerHTML"
+            hx-include="closest form"
+            hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
   {% endif %}
   <div class="mt-4">
-    <button type="submit" class="btn btn-primary">{% if form.instance.pk %}{% translate "Update" %}{% else %}{% translate "Create" %}{% endif %}</button>
-    <a href="{% if form.instance.pk %}{{ form.instance.get_absolute_url }}{% else %}{% url 'assets:assettype_list' %}{% endif %}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">{% translate "Cancel" %}</a>
+    <button type="submit" class="btn btn-primary">
+      {% if form.instance.pk %}
+        {% translate "Update" %}
+      {% else %}
+        {% translate "Create" %}
+      {% endif %}
+    </button>
+    <a href="{% if form.instance.pk %}{{ form.instance.get_absolute_url }}{% else %}{% url 'assets:assettype_list' %}{% endif %}"
+       class="btn btn-outline-secondary ms-2"
+       data-no-dirty-track="true">{% translate "Cancel" %}</a>
   </div>
 </form>
