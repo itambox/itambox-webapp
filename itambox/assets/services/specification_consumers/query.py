@@ -9,6 +9,10 @@ from decimal import Decimal, InvalidOperation
 from hashlib import sha1
 from typing import TYPE_CHECKING
 
+from django.db.models import Case, CharField, DateField, DecimalField, F, Func, IntegerField, Q, Value, When
+from django.db.models.fields.json import KeyTextTransform, KeyTransform
+from django.db.models.functions import Cast
+
 from .contracts import FieldFilter, FieldReference
 
 if TYPE_CHECKING:
@@ -66,8 +70,6 @@ def _type_path(queryset: QuerySet) -> str:
 def _current_applicability(queryset: QuerySet, reference: FieldReference, definition: object | None):
     """Return a Q expression for the current composed definition, if knowable."""
 
-    from django.db.models import Q
-
     if definition is None:
         return None
     targets = getattr(definition, "targets", frozenset())
@@ -94,9 +96,6 @@ def _aliases(reference: FieldReference, json_path: str) -> tuple[str, str]:
 
 
 def _annotate_value(queryset: QuerySet, reference: FieldReference, json_path: str) -> tuple[QuerySet, str, str]:
-    from django.db.models import CharField, F, Func
-    from django.db.models.fields.json import KeyTextTransform, KeyTransform
-
     text_alias, type_alias = _aliases(reference, json_path)
     return (
         queryset.annotate(
@@ -115,8 +114,6 @@ def _annotate_value(queryset: QuerySet, reference: FieldReference, json_path: st
 
 
 def _type_q(text_alias: str, type_alias: str, field_type: str | None):
-    from django.db.models import Q
-
     if field_type == "integer":
         return Q(**{type_alias: "number", f"{text_alias}__regex": _INTEGER_RE})
     if field_type == "decimal":
@@ -146,9 +143,6 @@ def _field_type(definition: object | None, filter_spec: FieldFilter) -> str | No
 
 
 def _numeric_annotation(queryset: QuerySet, text_alias: str, *, integer: bool) -> tuple[QuerySet, str]:
-    from django.db.models import Case, DecimalField, F, Value, When
-    from django.db.models.functions import Cast
-
     alias = f"{text_alias}_number"
     regex = _INTEGER_RE if integer else _DECIMAL_RE
     expression = Case(
@@ -168,9 +162,6 @@ def _date_annotation(queryset: QuerySet, text_alias: str) -> tuple[QuerySet, str
     comparing its round-trip rendering rejects overflow dates such as
     2024-02-31 without raising on malformed stored JSON.
     """
-
-    from django.db.models import Case, CharField, DateField, F, Func, Value, When
-    from django.db.models.functions import Cast
 
     raw_alias = f"{text_alias}_date"
     rendered_alias = f"{text_alias}_date_text"
@@ -214,8 +205,6 @@ def _value_condition(
     type_alias: str,
     definition: object | None,
 ):
-    from django.db.models import F, Q
-
     field_type = _field_type(definition, filter_spec)
     operator = filter_spec.operator
     key_lookup = f"{json_path}__has_key"
@@ -226,9 +215,6 @@ def _value_condition(
         return queryset.filter(presence, **{type_alias: "null"})
     if operator == "is_empty":
         array_alias = f"{text_alias}_array_length"
-        from django.db.models import Case, Func, IntegerField, Value, When
-        from django.db.models.fields.json import KeyTransform
-
         array_length = Case(
             When(
                 **{type_alias: "array"},
@@ -331,8 +317,6 @@ def apply_specification_filter(
             return scoped.none()
     elif filter_spec.status == "invalid" and field_definition is None:
         return scoped.none()
-
-    from django.db.models import Q
 
     has_key = Q(**{f"{json_path}__has_key": filter_spec.reference.key})
     if filter_spec.status == "unknown":

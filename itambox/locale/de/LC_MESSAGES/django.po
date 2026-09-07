@@ -81,6 +81,10 @@ msgstr "Abgebrochen"
 msgid "Search"
 msgstr "Suchen"
 
+#: assets/filters.py:70 assets/filters.py:257
+msgid "Specification filters"
+msgstr "Spezifikationsfilter"
+
 msgid "Status"
 msgstr "Status"
 
