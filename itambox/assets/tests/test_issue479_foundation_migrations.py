@@ -1,87 +1,16 @@
 import hashlib
 import importlib
-import inspect
-import os
-import signal
-import subprocess
-import sys
-from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import uuid4
 
 import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.recorder import MigrationRecorder
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
 from django.utils import timezone
 
-_ISOLATED_MIGRATION_ENV = "ITAMBOX_ISSUE479_MIGRATION_CHILD"
-
-
-def _migration_test_nodeid(test_case, method):
-    test_file = Path(inspect.getfile(type(test_case))).resolve()
-    cwd = Path.cwd().resolve()
-    try:
-        relative_file = test_file.relative_to(cwd)
-    except ValueError:
-        relative_file = Path(os.path.relpath(test_file, cwd))
-    return f"{relative_file.as_posix()}::{type(test_case).__name__}::{method.__name__}"
-
-
-def _isolate_migration_test(method):
-    @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        if os.environ.get(_ISOLATED_MIGRATION_ENV) == "1":
-            return method(self, *args, **kwargs)
-
-        nodeid = _migration_test_nodeid(self, method)
-        child_env = os.environ.copy()
-        child_env[_ISOLATED_MIGRATION_ENV] = "1"
-        timeout = float(os.environ.get("ITAMBOX_ISSUE479_MIGRATION_TIMEOUT", "900"))
-        popen_kwargs = {
-            "cwd": os.getcwd(),
-            "env": child_env,
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.STDOUT,
-            "text": True,
-            "encoding": "utf-8",
-            "errors": "replace",
-        }
-        if os.name == "nt":
-            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-        else:
-            popen_kwargs["start_new_session"] = True
-        child = subprocess.Popen([sys.executable, "-m", "pytest", nodeid], **popen_kwargs)
-        try:
-            output, _ = child.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            if os.name == "nt":
-                child.kill()
-            else:
-                os.killpg(child.pid, signal.SIGTERM)
-            try:
-                output, _ = child.communicate(timeout=20)
-            except subprocess.TimeoutExpired:
-                if os.name == "nt":
-                    child.kill()
-                else:
-                    os.killpg(child.pid, signal.SIGKILL)
-                output, _ = child.communicate()
-            self.fail(f"isolated migration test timed out after {timeout:g}s: {nodeid}\n{output}")
-        if child.returncode:
-            self.fail(f"isolated migration test exited {child.returncode}: {nodeid}\n{output}")
-
-    return wrapper
-
-
-def _isolate_migration_tests(test_class):
-    for name, method in tuple(vars(test_class).items()):
-        if name.startswith("test_"):
-            setattr(test_class, name, _isolate_migration_test(method))
-    return test_class
+from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
 
 class AdoptionPreflightUnitTests(SimpleTestCase):
@@ -144,51 +73,14 @@ class AdoptionPreflightUnitTests(SimpleTestCase):
         self.assertEqual([(field.name, field.label, field.field_type) for field in fields], before)
 
 
-@_isolate_migration_tests
+@isolate_migration_tests
 @pytest.mark.serial_only
-class AssetTypeFoundationMigrationTests(TransactionTestCase):
-    databases = {"default"} if os.environ.get(_ISOLATED_MIGRATION_ENV) == "1" else set()
+class AssetTypeFoundationMigrationTests(IsolatedMigrationTestCase):
     migrate_from = [
         ("assets", "0101_seed_canonical_missing_status"),
         ("extras", "0113_upgrade_legacy_webhook_retry_schedules"),
     ]
     migrate_to = [("assets", "0104_asset_type_composition_backfill"), ("extras", "0114_asset_type_definition_schema")]
-
-    @staticmethod
-    def _is_isolated_child():
-        return os.environ.get(_ISOLATED_MIGRATION_ENV) == "1"
-
-    @classmethod
-    def _pre_setup(cls):
-        if cls._is_isolated_child():
-            super()._pre_setup()
-
-    def setUp(self):
-        if not self._is_isolated_child():
-            return
-        super().setUp()
-        self._schema_name = f"issue479_{os.getpid()}_{uuid4().hex[:12]}"
-        quoted_schema = connection.ops.quote_name(self._schema_name)
-        with connection.cursor() as cursor:
-            cursor.execute(f"CREATE SCHEMA {quoted_schema}")
-            cursor.execute(f"SET search_path TO {quoted_schema}")
-            MigrationRecorder(connection).ensure_schema()
-            cursor.execute(f"SET search_path TO {quoted_schema}, public")
-
-    def tearDown(self):
-        if not self._is_isolated_child():
-            return
-        quoted_schema = connection.ops.quote_name(self._schema_name)
-        try:
-            super().tearDown()
-        finally:
-            with connection.cursor() as cursor:
-                cursor.execute("SET search_path TO public")
-                cursor.execute(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
-
-    def _post_teardown(self):
-        if self._is_isolated_child():
-            super()._post_teardown()
 
     def test_core_seed_creates_object_type_contenttypes_on_fresh_upgrade(self):
         executor = MigrationExecutor(connection)
