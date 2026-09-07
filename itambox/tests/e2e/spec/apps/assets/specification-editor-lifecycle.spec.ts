@@ -28,9 +28,14 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const assetTypes = await getJsonRows(api, '/api/assets/asset-types/?limit=100', 'specification asset types');
+    const [assetTypes, statuses] = await Promise.all([
+      getJsonRows(api, '/api/assets/asset-types/?limit=100', 'specification asset types'),
+      getJsonRows(api, '/api/assets/status-labels/?limit=100', 'specification asset statuses'),
+    ]);
     const typeA = seededAssetType(assetTypes, 'dell-latitude-5550');
     const typeB = seededAssetType(assetTypes, 'cisco-catalyst-9300');
+    const deployableStatus = statuses.find((row) => row.type === 'deployable');
+    if (!deployableStatus) throw new Error('The E2E seed must expose a deployable asset status.');
     const assetTag = `E2E-SPEC-${runId}`.toUpperCase().replace(/[^A-Z0-9-]/g, '-').slice(0, 50);
     const assetName = `E2E specification journey ${runId}`;
 
@@ -40,6 +45,7 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
           name: assetName,
           asset_tag: assetTag,
           asset_type_id: typeA.id,
+          status_id: deployableStatus.id,
           tenant_id: tenant.id,
         },
       }),
