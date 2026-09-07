@@ -579,6 +579,7 @@ class SeedCatalogMixin:
 
         from assets.models import Asset as AssetModel
         from assets.models import AssetType as AssetTypeModel
+
         # inline import: app-registry: load the assets-owned release after Django setup.
         from assets.services.specifications.core_vocabulary import get_core_vocabulary
 
