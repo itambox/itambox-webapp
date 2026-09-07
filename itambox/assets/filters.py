@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import timedelta
 
 import django_filters
@@ -33,9 +34,6 @@ from .models.choices import (
     ReservationStatusChoices,
     WarrantyTypeChoices,
 )
-
-User = get_user_model()
-
 from .services.specification_consumers.contracts import (
     FieldReference,
     identify_saved_references,
@@ -43,8 +41,14 @@ from .services.specification_consumers.contracts import (
 )
 from .services.specification_consumers.query import apply_specification_filters
 
+User = get_user_model()
 
-def saved_specification_reference_impacts(parameters, *, known_references=None):
+
+def saved_specification_reference_impacts(
+    parameters,
+    *,
+    known_references: Mapping[FieldReference, str] | None = None,
+):
     """Inventory canonical and legacy references before a saved filter is used."""
 
     return identify_saved_references(parameters, known_references=known_references)

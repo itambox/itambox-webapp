@@ -20,6 +20,8 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, U
 from django_tables2 import RequestConfig
 
 from assets.tables import AssetTable  # Import AssetTable
+from assets.services.specification_consumers.contracts import FieldReference, parse_filter_document
+from assets.services.specification_consumers.exporting import machine_csv_bytes
 from core.managers import get_current_tenant
 from core.reports.rendering import render_report_csv, render_report_html
 from extras.tasks.reports import generate_scheduled_report_task
@@ -1187,8 +1189,6 @@ def _specification_inputs(request, *, source):
     """Parse explicit report specification DTOs at the public view boundary."""
     raw_filters = source.get("specification_filters")
     if raw_filters:
-        from assets.services.specification_consumers.contracts import parse_filter_document
-
         try:
             specification_filters = parse_filter_document(raw_filters)
         except (TypeError, ValueError) as exc:
@@ -1199,8 +1199,6 @@ def _specification_inputs(request, *, source):
     raw_references = source.get("specification_export_references")
     if not raw_references:
         return specification_filters, ()
-
-    from assets.services.specification_consumers.contracts import FieldReference
 
     try:
         document = json.loads(raw_references)
@@ -1359,8 +1357,6 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
 
             machine_export = context_data.get("specification_export")
             if machine_export is not None and format_type in {"csv", "machine_csv"}:
-                from assets.services.specification_consumers.exporting import machine_csv_bytes
-
                 response = HttpResponse(machine_csv_bytes(machine_export), content_type="text/csv")
                 response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
                 return response

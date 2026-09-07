@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from hashlib import sha1
@@ -197,6 +196,131 @@ def _expected_decimal(value: object) -> Decimal:
         raise SpecificationQueryError("numeric comparisons require a decimal value") from exc
 
 
+def _presence_condition(
+    queryset: QuerySet,
+    reference: FieldReference,
+    filter_spec: FieldFilter,
+    json_path: str,
+    text_alias: str,
+    type_alias: str,
+) -> QuerySet | None:
+    presence = Q(**{f"{json_path}__has_key": reference.key})
+    if filter_spec.operator == "is_missing":
+        return queryset.filter(~presence)
+    if filter_spec.operator == "is_null":
+        return queryset.filter(presence, **{type_alias: "null"})
+    if filter_spec.operator != "is_empty":
+        return None
+
+    array_alias = f"{text_alias}_array_length"
+    array_length = Case(
+        When(
+            **{type_alias: "array"},
+            then=Func(
+                KeyTransform(reference.key, F(json_path)),
+                function="jsonb_array_length",
+                output_field=IntegerField(),
+            ),
+        ),
+        default=Value(None),
+        output_field=IntegerField(),
+    )
+    queryset = queryset.annotate(**{array_alias: array_length})
+    return queryset.filter(presence).filter(Q(**{text_alias: ""}) | Q(**{array_alias: 0}))
+
+
+def _multi_select_condition(
+    queryset: QuerySet,
+    filter_spec: FieldFilter,
+    field_type: str | None,
+    type_guard: Q,
+    presence: Q,
+    json_path: str,
+) -> QuerySet | None:
+    if filter_spec.operator not in {"contains_any", "contains_all"}:
+        return None
+    if not isinstance(filter_spec.value, (list, tuple)) or not filter_spec.value:
+        raise SpecificationQueryError(f"{filter_spec.operator} requires a non-empty sequence")
+    if field_type != "multi_select":
+        raise SpecificationQueryError(f"{filter_spec.operator} requires a multi-select definition")
+    values = list(filter_spec.value)
+    return queryset.filter(type_guard, presence, **{f"{json_path}__{filter_spec.reference.key}__contains": values})
+
+
+def _contains_condition(
+    queryset: QuerySet,
+    filter_spec: FieldFilter,
+    type_guard: Q,
+    presence: Q,
+    text_alias: str,
+) -> QuerySet | None:
+    if filter_spec.operator != "contains":
+        return None
+    if type(filter_spec.value) is not str:
+        raise SpecificationQueryError("text contains requires a string")
+    return queryset.filter(type_guard, presence, **{f"{text_alias}__icontains": filter_spec.value})
+
+
+def _ordered_condition(
+    queryset: QuerySet,
+    filter_spec: FieldFilter,
+    field_type: str | None,
+    type_guard: Q,
+    presence: Q,
+    text_alias: str,
+) -> QuerySet | None:
+    if field_type in {"integer", "decimal"}:
+        queryset, number_alias = _numeric_annotation(queryset, text_alias, integer=field_type == "integer")
+        expected = _expected_decimal(filter_spec.value)
+        return queryset.filter(type_guard, presence, **{f"{number_alias}__{filter_spec.operator}": expected})
+
+    if field_type != "date":
+        return None
+    queryset, date_alias, rendered_alias = _date_annotation(queryset, text_alias)
+    expected = _expected_date(filter_spec.value)
+    return queryset.filter(
+        type_guard, presence, **{rendered_alias: F(text_alias), f"{date_alias}__{filter_spec.operator}": expected}
+    )
+
+
+def _boolean_condition(
+    queryset: QuerySet,
+    filter_spec: FieldFilter,
+    field_type: str | None,
+    type_guard: Q,
+    presence: Q,
+    text_alias: str,
+) -> QuerySet | None:
+    if field_type != "boolean":
+        return None
+    if type(filter_spec.value) is not bool or filter_spec.operator not in {"eq", "neq"}:
+        raise SpecificationQueryError("boolean specifications support strict equality only")
+    condition = Q(**{text_alias: "true" if filter_spec.value else "false"})
+    if filter_spec.operator == "neq":
+        condition = ~condition
+    return queryset.filter(type_guard, presence & condition)
+
+
+def _text_condition(
+    queryset: QuerySet,
+    filter_spec: FieldFilter,
+    type_guard: Q,
+    presence: Q,
+    text_alias: str,
+) -> QuerySet:
+    if filter_spec.operator not in {"eq", "neq", "gt", "gte", "lt", "lte"}:
+        raise SpecificationQueryError(f"operator {filter_spec.operator!r} is not valid for this field type")
+    if filter_spec.operator in {"gt", "gte", "lt", "lte"}:
+        raise SpecificationQueryError("ordered comparisons require integer, decimal, or date definitions")
+    expected = filter_spec.value
+    if type(expected) is not str:
+        raise SpecificationQueryError("text and Choice equality require a string")
+    condition = Q(**{text_alias: expected})
+    if filter_spec.operator == "neq":
+        condition = ~condition
+    return queryset.filter(type_guard, presence & condition)
+
+
 def _value_condition(
     queryset: QuerySet,
     reference: FieldReference,
@@ -207,75 +331,67 @@ def _value_condition(
     definition: object | None,
 ):
     field_type = _field_type(definition, filter_spec)
-    operator = filter_spec.operator
-    key_lookup = f"{json_path}__has_key"
-    presence = Q(**{key_lookup: reference.key})
-    if operator == "is_missing":
-        return queryset.filter(~presence)
-    if operator == "is_null":
-        return queryset.filter(presence, **{type_alias: "null"})
-    if operator == "is_empty":
-        array_alias = f"{text_alias}_array_length"
-        array_length = Case(
-            When(
-                **{type_alias: "array"},
-                then=Func(
-                    KeyTransform(reference.key, F(json_path)),
-                    function="jsonb_array_length",
-                    output_field=IntegerField(),
-                ),
-            ),
-            default=Value(None),
-            output_field=IntegerField(),
-        )
-        queryset = queryset.annotate(**{array_alias: array_length})
-        return queryset.filter(presence).filter(Q(**{text_alias: ""}) | Q(**{array_alias: 0}))
-
+    presence = Q(**{f"{json_path}__has_key": reference.key})
+    presence_result = _presence_condition(queryset, reference, filter_spec, json_path, text_alias, type_alias)
+    if presence_result is not None:
+        return presence_result
     type_guard = _type_q(text_alias, type_alias, field_type)
-    if operator in {"contains_any", "contains_all"}:
-        if not isinstance(filter_spec.value, (list, tuple)) or not filter_spec.value:
-            raise SpecificationQueryError(f"{operator} requires a non-empty sequence")
-        if field_type != "multi_select":
-            raise SpecificationQueryError(f"{operator} requires a multi-select definition")
-        values = list(filter_spec.value)
-        return queryset.filter(type_guard, presence, **{f"{json_path}__{reference.key}__contains": values})
+    condition = _multi_select_condition(queryset, filter_spec, field_type, type_guard, presence, json_path)
+    if condition is not None:
+        return condition
+    condition = _contains_condition(queryset, filter_spec, type_guard, presence, text_alias)
+    if condition is not None:
+        return condition
+    condition = _ordered_condition(queryset, filter_spec, field_type, type_guard, presence, text_alias)
+    if condition is not None:
+        return condition
+    condition = _boolean_condition(queryset, filter_spec, field_type, type_guard, presence, text_alias)
+    if condition is not None:
+        return condition
+    return _text_condition(queryset, filter_spec, type_guard, presence, text_alias)
 
-    if operator == "contains":
-        if type(filter_spec.value) is not str:
-            raise SpecificationQueryError("text contains requires a string")
-        return queryset.filter(type_guard, presence, **{f"{text_alias}__icontains": filter_spec.value})
 
-    if field_type in {"integer", "decimal"}:
-        queryset, number_alias = _numeric_annotation(queryset, text_alias, integer=field_type == "integer")
-        expected = _expected_decimal(filter_spec.value)
-        return queryset.filter(type_guard, presence, **{f"{number_alias}__{operator}": expected})
+def _definition_allows_reference(reference: FieldReference, definition: object | None) -> bool:
+    if definition is None:
+        return True
+    definition_key = str(getattr(definition, "key", ""))
+    if definition_key != reference.key:
+        raise SpecificationQueryError("field definition key does not match the source-qualified reference")
+    return reference.source in getattr(definition, "targets", frozenset())
 
-    if field_type == "date":
-        queryset, date_alias, rendered_alias = _date_annotation(queryset, text_alias)
-        expected = _expected_date(filter_spec.value)
-        return queryset.filter(
-            type_guard, presence, **{rendered_alias: F(text_alias), f"{date_alias}__{operator}": expected}
-        )
 
-    if field_type == "boolean":
-        if type(filter_spec.value) is not bool or operator not in {"eq", "neq"}:
-            raise SpecificationQueryError("boolean specifications support strict equality only")
-        condition = Q(**{text_alias: "true" if filter_spec.value else "false"})
-        if operator == "neq":
-            condition = ~condition
-        return queryset.filter(type_guard, presence & condition)
+def _apply_status_policy(
+    queryset: QuerySet,
+    reference: FieldReference,
+    filter_spec: FieldFilter,
+    definition: object | None,
+) -> QuerySet:
+    if filter_spec.status == "unknown" and definition is not None:
+        return queryset.none()
+    if filter_spec.status == "invalid" and definition is None:
+        return queryset.none()
 
-    if operator not in {"eq", "neq", "gt", "gte", "lt", "lte"}:
-        raise SpecificationQueryError(f"operator {operator!r} is not valid for this field type")
-    if operator in {"gt", "gte", "lt", "lte"}:
-        raise SpecificationQueryError("ordered comparisons require integer, decimal, or date definitions")
-    expected = filter_spec.value
-    if type(expected) is not str:
-        raise SpecificationQueryError("text and Choice equality require a string")
-    condition = Q(**{text_alias: expected})
-    if operator == "neq":
-        condition = ~condition
-    return queryset.filter(type_guard, presence & condition)
+    applicability = _current_applicability(queryset, reference, definition)
+    if filter_spec.status == "history":
+        if applicability is None or not applicability.children:
+            return queryset.none()
+        return queryset.filter(~applicability)
+    if filter_spec.status == "current" and applicability is not None:
+        return queryset.filter(applicability)
+    return queryset
+
+
+def _invalid_value_queryset(
+    queryset: QuerySet,
+    has_key: Q,
+    text_alias: str,
+    type_alias: str,
+    filter_spec: FieldFilter,
+    definition: object | None,
+) -> QuerySet:
+    field_type = _field_type(definition, filter_spec)
+    valid = _type_q(text_alias, type_alias, field_type)
+    return queryset.filter(has_key).filter(~valid)
 
 
 def apply_specification_filter(
@@ -297,27 +413,9 @@ def apply_specification_filter(
         raise TypeError("filter_spec must be a FieldFilter")
     scoped = queryset if tenant_ids is None else scope_queryset(queryset, tenant_ids, tenant_field=tenant_field)
     json_path = _json_path(scoped, filter_spec.reference)
-    if field_definition is not None:
-        definition_key = str(getattr(field_definition, "key", ""))
-        if definition_key != filter_spec.reference.key:
-            raise SpecificationQueryError("field definition key does not match the source-qualified reference")
-        targets = getattr(field_definition, "targets", frozenset())
-        if filter_spec.reference.source not in targets:
-            return scoped.none()
-
-    applicability = _current_applicability(scoped, filter_spec.reference, field_definition)
-    if filter_spec.status == "history":
-        if applicability is None or not applicability.children:
-            return scoped.none()
-        scoped = scoped.filter(~applicability)
-    elif filter_spec.status == "current":
-        if applicability is not None:
-            scoped = scoped.filter(applicability)
-    elif filter_spec.status == "unknown":
-        if field_definition is not None:
-            return scoped.none()
-    elif filter_spec.status == "invalid" and field_definition is None:
+    if not _definition_allows_reference(filter_spec.reference, field_definition):
         return scoped.none()
+    scoped = _apply_status_policy(scoped, filter_spec.reference, filter_spec, field_definition)
 
     has_key = Q(**{f"{json_path}__has_key": filter_spec.reference.key})
     if filter_spec.status == "unknown":
@@ -325,9 +423,7 @@ def apply_specification_filter(
 
     scoped, text_alias, type_alias = _annotate_value(scoped, filter_spec.reference, json_path)
     if filter_spec.status == "invalid":
-        field_type = _field_type(field_definition, filter_spec)
-        valid = _type_q(text_alias, type_alias, field_type)
-        return scoped.filter(has_key).filter(~valid)
+        return _invalid_value_queryset(scoped, has_key, text_alias, type_alias, filter_spec, field_definition)
     return _value_condition(
         scoped, filter_spec.reference, filter_spec, json_path, text_alias, type_alias, field_definition
     )

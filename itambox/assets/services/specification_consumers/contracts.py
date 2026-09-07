@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final, Literal, TypeAlias
+from typing import Final, Literal, TypeAlias
 
 TargetKind: TypeAlias = Literal["asset", "asset_type"]
 ValueStatus: TypeAlias = Literal["current", "historical", "invalid", "unknown"]
@@ -169,16 +169,9 @@ class SavedReferenceImpact:
     reason: str
 
 
-def parse_filter_document(
+def _filter_entries(
     document: Mapping[str, object] | Sequence[Mapping[str, object]] | str,
-) -> tuple[FieldFilter, ...]:
-    """Parse the persisted source-qualified filter document.
-
-    A document is either ``{"filters": [...]}`` or the list itself.  The
-    parser intentionally rejects label/raw-path forms instead of trying to
-    repair or retarget them.
-    """
-
+) -> Sequence[object]:
     if isinstance(document, str):
         try:
             document = json.loads(document)
@@ -192,29 +185,84 @@ def parse_filter_document(
         raw_filters = document
     if not isinstance(raw_filters, (list, tuple)):
         raise ValueError("specification filter document requires a filters sequence")
+    return raw_filters
 
-    parsed: list[FieldFilter] = []
-    for index, raw_filter in enumerate(raw_filters):
-        if not isinstance(raw_filter, Mapping):
-            raise ValueError(f"filter at index {index} must be an object")
-        if set(raw_filter) - {"source", "field_key", "operator", "value", "status"}:
-            raise ValueError(f"filter at index {index} has unknown properties")
-        reference = FieldReference.from_mapping(raw_filter)
-        try:
-            operator = raw_filter["operator"]
-        except KeyError as exc:
-            raise ValueError(f"filter at index {index} requires an operator") from exc
-        status = raw_filter.get("status", "current")
-        value = raw_filter["value"] if "value" in raw_filter else MISSING
-        parsed.append(
-            FieldFilter(
-                reference=reference,
-                operator=operator,  # type: ignore[arg-type]
-                value=value,
-                status=status,  # type: ignore[arg-type]
-            )
-        )
-    return tuple(parsed)
+
+def _parse_filter_entry(raw_filter: object, index: int) -> FieldFilter:
+    if not isinstance(raw_filter, Mapping):
+        raise ValueError(f"filter at index {index} must be an object")
+    if set(raw_filter) - {"source", "field_key", "operator", "value", "status"}:
+        raise ValueError(f"filter at index {index} has unknown properties")
+    reference = FieldReference.from_mapping(raw_filter)
+    try:
+        operator = raw_filter["operator"]
+    except KeyError as exc:
+        raise ValueError(f"filter at index {index} requires an operator") from exc
+    status = raw_filter.get("status", "current")
+    value = raw_filter["value"] if "value" in raw_filter else MISSING
+    return FieldFilter(
+        reference=reference,
+        operator=operator,  # type: ignore[arg-type]
+        value=value,
+        status=status,  # type: ignore[arg-type]
+    )
+
+
+def parse_filter_document(
+    document: Mapping[str, object] | Sequence[Mapping[str, object]] | str,
+) -> tuple[FieldFilter, ...]:
+    """Parse the persisted source-qualified filter document.
+
+    A document is either ``{"filters": [...]}`` or the list itself.  The
+    parser intentionally rejects label/raw-path forms instead of trying to
+    repair or retarget them.
+    """
+
+    return tuple(_parse_filter_entry(raw_filter, index) for index, raw_filter in enumerate(_filter_entries(document)))
+
+
+def _saved_filter_impact(
+    value: Mapping[str, object],
+    path: tuple[str, ...],
+    known_references: Mapping[FieldReference, str],
+) -> SavedReferenceImpact | None:
+    looks_like_filter = "operator" in value and bool(
+        {"source", "field_key", "field", "label"}.intersection(value)
+    )
+    if not looks_like_filter:
+        return None
+    try:
+        reference = FieldReference.from_mapping(value)
+    except (TypeError, ValueError) as exc:
+        return SavedReferenceImpact(path, None, "legacy", str(exc))
+
+    saved_status = known_references.get(reference)
+    if saved_status == "historical":
+        status = "historical"
+    elif saved_status == "current":
+        status = "valid"
+    elif saved_status is None:
+        status = "unresolved"
+    else:
+        status = "legacy"
+    return SavedReferenceImpact(path, reference, status, "canonical reference")
+
+
+def _collect_saved_reference_impacts(
+    value: object,
+    path: tuple[str, ...],
+    known_references: Mapping[FieldReference, str],
+    impacts: list[SavedReferenceImpact],
+) -> None:
+    if isinstance(value, Mapping):
+        impact = _saved_filter_impact(value, path, known_references)
+        if impact is not None:
+            impacts.append(impact)
+        for key, nested in value.items():
+            _collect_saved_reference_impacts(nested, (*path, str(key)), known_references, impacts)
+    elif isinstance(value, (list, tuple)):
+        for index, nested in enumerate(value):
+            _collect_saved_reference_impacts(nested, (*path, str(index)), known_references, impacts)
 
 
 def identify_saved_references(
@@ -229,35 +277,6 @@ def identify_saved_references(
     path are reported as ``legacy`` and are never guessed into a new identity.
     """
 
-    known = known_references or {}
     impacts: list[SavedReferenceImpact] = []
-
-    def walk(value: object, path: tuple[str, ...]) -> None:
-        if isinstance(value, Mapping):
-            looks_like_filter = "operator" in value and (
-                "source" in value or "field_key" in value or "field" in value or "label" in value
-            )
-            if looks_like_filter:
-                try:
-                    reference = FieldReference.from_mapping(value)
-                except (TypeError, ValueError) as exc:
-                    impacts.append(SavedReferenceImpact(path, None, "legacy", str(exc)))
-                else:
-                    saved_status = known.get(reference)
-                    if saved_status == "historical":
-                        status = "historical"
-                    elif saved_status == "current":
-                        status = "valid"
-                    elif saved_status is None:
-                        status = "unresolved"
-                    else:
-                        status = "legacy"
-                    impacts.append(SavedReferenceImpact(path, reference, status, "canonical reference"))
-            for key, nested in value.items():
-                walk(nested, (*path, str(key)))
-        elif isinstance(value, (list, tuple)):
-            for index, nested in enumerate(value):
-                walk(nested, (*path, str(index)))
-
-    walk(document, ())
+    _collect_saved_reference_impacts(document, (), known_references or {}, impacts)
     return tuple(impacts)

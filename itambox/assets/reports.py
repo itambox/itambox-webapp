@@ -20,7 +20,6 @@ from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
 from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.reports.registry import register_report_provider
 
-from .services.specification_consumers.contracts import FieldReference
 from .services.specification_consumers.exporting import build_machine_export_rows
 from .services.specification_consumers.query import apply_specification_filters
 from .services.specification_consumers.semantics import field_value_from_mapping

@@ -110,41 +110,30 @@ def _status_matches(value: ProjectedFieldValue, requested_status: str) -> bool:
     return value.status == expected
 
 
-def matches_filter(
-    field: ProjectedFieldValue,
-    filter_spec: FieldFilter,
-    *,
-    field_type: str | None = None,
-) -> bool:
-    """Evaluate one projected value with strict status and presence semantics."""
-
-    if field.reference != filter_spec.reference or not _status_matches(field, filter_spec.status):
-        return False
-    operator = filter_spec.operator
+def _presence_matches(field: ProjectedFieldValue, operator: str) -> bool | None:
     if operator == "is_missing":
         return field.presence == "missing"
     if operator == "is_null":
         return field.presence == "null"
     if operator == "is_empty":
         return field.presence == "empty"
-    if field.presence == "missing" or field.presence == "null":
+    if field.presence in {"missing", "null"}:
         return False
+    return None
 
-    expected = filter_spec.value
-    if operator == "eq":
-        return _same_value(field.value, expected, field_type)
-    if operator == "neq":
-        return not _same_value(field.value, expected, field_type)
-    if operator == "contains":
-        return type(field.value) is str and type(expected) is str and expected.casefold() in field.value.casefold()
-    if operator in {"contains_any", "contains_all"}:
-        if not isinstance(field.value, (list, tuple)) or not isinstance(expected, (list, tuple, set, frozenset)):
-            return False
-        actual = set(field.value)
-        wanted = set(expected)
-        return bool(actual.intersection(wanted)) if operator == "contains_any" else wanted.issubset(actual)
 
-    actual_ordered = _ordered_value(field.value, field_type)
+def _collection_matches(actual: object, expected: object, operator: str) -> bool:
+    if not isinstance(actual, (list, tuple)) or not isinstance(expected, (list, tuple, set, frozenset)):
+        return False
+    actual_values = set(actual)
+    expected_values = set(expected)
+    if operator == "contains_any":
+        return bool(actual_values.intersection(expected_values))
+    return expected_values.issubset(actual_values)
+
+
+def _ordered_matches(actual: object, expected: object, operator: str, field_type: str | None) -> bool:
+    actual_ordered = _ordered_value(actual, field_type)
     expected_ordered = _ordered_value(expected, field_type)
     if actual_ordered is None or expected_ordered is None:
         return False
@@ -157,6 +146,36 @@ def matches_filter(
     if operator == "lte":
         return actual_ordered <= expected_ordered
     return False
+
+
+def _value_matches(field: ProjectedFieldValue, filter_spec: FieldFilter, field_type: str | None) -> bool:
+    operator = filter_spec.operator
+    expected = filter_spec.value
+    if operator == "eq":
+        return _same_value(field.value, expected, field_type)
+    if operator == "neq":
+        return not _same_value(field.value, expected, field_type)
+    if operator == "contains":
+        return type(field.value) is str and type(expected) is str and expected.casefold() in field.value.casefold()
+    if operator in {"contains_any", "contains_all"}:
+        return _collection_matches(field.value, expected, operator)
+    return _ordered_matches(field.value, expected, operator, field_type)
+
+
+def matches_filter(
+    field: ProjectedFieldValue,
+    filter_spec: FieldFilter,
+    *,
+    field_type: str | None = None,
+) -> bool:
+    """Evaluate one projected value with strict status and presence semantics."""
+
+    if field.reference != filter_spec.reference or not _status_matches(field, filter_spec.status):
+        return False
+    presence_result = _presence_matches(field, filter_spec.operator)
+    if presence_result is not None:
+        return presence_result
+    return _value_matches(field, filter_spec, field_type)
 
 
 def project_source_values(

@@ -7,11 +7,10 @@ import io
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
 
 from core.csv_utils import csv_safe
 
-from .contracts import MISSING, FieldReference, ValueStatus
+from .contracts import MISSING, FieldReference
 from .semantics import ProjectedFieldValue, field_value_from_mapping
 
 
