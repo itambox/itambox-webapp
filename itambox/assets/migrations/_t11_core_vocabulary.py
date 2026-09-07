@@ -1,16 +1,12 @@
-"""Current normalized core vocabulary asset for runtime consumers.
+"""Frozen normalized #479 vocabulary consumed only by migration 0117.
 
-This data is generated from the frozen normalized canonical-target matrix. It is
-intentionally separate from historical migration assets.
+This historical asset is generated from the reviewed canonical target matrix.
+It must remain separate from the live runtime vocabulary service.
 """
 
-from copy import deepcopy
-
-
-# Generated from canonical-target.json; do not import historical migration data.
-_CORE_VOCABULARY: dict[str, object] = {'schema_version': 1,
- 'kind': 'itambox.type-library.release',  # noqa: E128
- 'library': {'namespace': 'itambox', 'release': 1, 'label': 'ITAMbox core vocabulary v1 (proposed)'},  # noqa: E128
+CORE_VOCABULARY: dict[str, object] = {'schema_version': 1,
+ 'kind': 'itambox.type-library.release',
+ 'library': {'namespace': 'itambox', 'release': 1, 'label': 'ITAMbox core vocabulary v1 (proposed)'},
  'expected_counts': {'active_fields': 54,
                      'reserved_retired_fields': 1,
                      'sections': 13,
@@ -1682,9 +1678,3 @@ _CORE_VOCABULARY: dict[str, object] = {'schema_version': 1,
                                        {'fieldset': 'itambox/power-battery', 'order': 5, 'position': 50},
                                        {'fieldset': 'itambox/display-av-imaging', 'order': 6, 'position': 60},
                                        {'fieldset': 'itambox/management-security', 'order': 7, 'position': 70}]}]}
-
-
-def get_core_vocabulary() -> dict[str, object]:
-    """Return an independent copy of the normalized core vocabulary matrix."""
-
-    return deepcopy(_CORE_VOCABULARY)
