@@ -982,6 +982,19 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         self.role = AssetRole.objects.create(name="Mobile Phone", slug="mobile-phone")
 
     def test_dynamic_custom_fieldsets_and_form_saving(self):
+        tenant = Tenant.objects.create(name="Enterprise form tenant", slug="enterprise-form-tenant")
+        editor = User.objects.create_user(username="enterprise-asset-editor", password="testpassword")
+        role = Role.objects.create(
+            tenant=tenant,
+            name="Enterprise asset editor",
+            permissions=["assets.add_asset", "assets.change_asset", "assets.view_asset"],
+        )
+        grant(editor, tenant, role)
+        self.client.force_login(editor)
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
         # 1. Create custom fields
         sim_field = CustomField.objects.create(
             name="sim_number",
@@ -1028,6 +1041,7 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
             "asset_type": asset_type.pk,
             "asset_role": self.role.pk,
             "status": self.available_status.pk,
+            "tenant": tenant.pk,
             "cf_sim_number": "8904903200001234567",
             "cf_screen_size": "6.1",
             "notes": "Dynamic specs test",

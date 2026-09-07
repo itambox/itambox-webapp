@@ -1,3 +1,5 @@
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.cookie import CookieStorage
 from django.db import connection
@@ -15,8 +17,25 @@ from extras.models import (
 )
 from itambox.views.generic import ObjectEditView
 
+User = get_user_model()
+
 
 class AssetTypeFormPreservationTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_user(username="asset-type-form-editor")
+        self.user.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(AssetType),
+                codename="change_assettype",
+            )
+        )
+
+    def _authorized_request(self, data=None):
+        request = RequestFactory().post("/asset-types/", data=data or {})
+        request.user = self.user
+        return request
+
     def test_unbound_generic_asset_type_field_is_rendered(self):
         field = CustomField.objects.create(
             name="generic_asset_type_spec",
@@ -120,12 +139,13 @@ class AssetTypeFormPreservationTests(TestCase):
             "description": "New description",
             "custom_fieldsets": [str(second.pk)],
         }
-        form = AssetTypeForm(data=form_data, instance=asset_type)
+        request = self._authorized_request({**form_data, "return_url": "/"})
+        form = AssetTypeForm(data=form_data, instance=asset_type, request=request)
         self.assertTrue(form.is_valid(), form.errors)
         view = ObjectEditView()
         view.model = AssetType
         view.object = asset_type
-        view.request = RequestFactory().post("/", data={**form_data, "return_url": "/"})
+        view.request = request
         view.request._messages = CookieStorage(view.request)
 
         response = view.form_valid(form)
@@ -391,6 +411,7 @@ class AssetTypeFormPreservationTests(TestCase):
                 "cf_visible_spec": "updated",
             },
             instance=asset_type,
+            request=self._authorized_request(),
         )
 
         self.assertNotIn("custom_fieldset", form.fields)

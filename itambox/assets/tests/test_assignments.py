@@ -3,13 +3,15 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, StatusLabel
 from assets.services import checkin_asset, checkout_asset
 from compliance.models import CustodyReceipt, CustodyTemplate
+from core.tests.mixins import grant
+from organization.models import Role
 
 User = get_user_model()
 
@@ -323,6 +325,17 @@ class AssetTagSequenceTestCase(TestCase):
 
         self.status, _ = StatusLabel.objects.get_or_create(name="Deployable", defaults={"type": "deployable"})
 
+        self.user = User.objects.create_user(username="asset-tag-form-editor", password="password")
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Asset tag form editor",
+            permissions=["assets.change_asset"],
+        )
+        grant(self.user, self.tenant_a, role)
+        self.request = RequestFactory().post("/assets/")
+        self.request.user = self.user
+        self.request.tenant = self.tenant_a
+
     def test_sequence_resolution_hierarchy(self):
         from assets.models import AssetTagSequence
 
@@ -405,7 +418,7 @@ class AssetTagSequenceTestCase(TestCase):
             "asset_type": self.asset_type_laptop.pk,
             "tenant": self.tenant_a.pk,
         }
-        form_blank = AssetForm(data=form_data_blank)
+        form_blank = AssetForm(data=form_data_blank, request=self.request)
         self.assertFalse(form_blank.is_valid())
         self.assertIn("asset_tag", form_blank.errors)
 
@@ -420,7 +433,7 @@ class AssetTagSequenceTestCase(TestCase):
             "asset_type": self.asset_type_laptop.pk,
             "tenant": self.tenant_a.pk,
         }
-        form_valid = AssetForm(data=form_data_valid)
+        form_valid = AssetForm(data=form_data_valid, request=self.request)
         self.assertTrue(form_valid.is_valid(), form_valid.errors)
         asset = form_valid.save()
         self.assertEqual(asset.asset_tag, "FORM-001")
