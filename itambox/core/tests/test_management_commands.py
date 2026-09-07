@@ -6,14 +6,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import CommandError, call_command
-from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
 from assets.models import Asset, AssetType, Category
 from core.management.commands._seed.access import check_seed_access_invariants
+from core.management.commands._seed.catalog import (
+    _get_core_fieldset,
+    _reconcile_core_choice_rows,
+    _reconcile_core_fields,
+    _reconcile_core_fieldsets,
+)
 from core.management.commands._seed.inventory import check_seed_inventory_invariants
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
@@ -35,6 +42,184 @@ from organization.models import AssetHolder, Membership, Tenant
 from subscriptions.models import SubscriptionAssignment
 
 User = get_user_model()
+
+
+class CatalogConflictValidationTestCase(TestCase):
+    """Exercise catalog conflict contracts without seeding the full demo catalog."""
+
+    def setUp(self):
+        self.choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="itambox",
+            slug="fixture-choice-set",
+            label="Fixture Choice Set",
+            management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
+            lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+        )
+        self.choice = CustomFieldChoice.objects.create(
+            choice_set=self.choice_set,
+            key="fixture_choice",
+            label="Fixture choice",
+            position=10,
+            version=1,
+            lifecycle=CustomFieldChoice.LIFECYCLE_DEPRECATED,
+        )
+        self.field = CustomField.objects.create(
+            name="fixture_field",
+            namespace="itambox",
+            label="Fixture field",
+            help_text="",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            management_kind=CustomField.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+        )
+        self.fieldset = CustomFieldset.objects.create(
+            namespace="itambox",
+            slug="fixture-fieldset",
+            label="Fixture fieldset",
+            description="",
+            management_kind=CustomFieldset.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomFieldset.LIFECYCLE_DEPRECATED,
+        )
+
+    def test_active_choice_identity_rejects_deprecated_existing_choice(self):
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            _reconcile_core_choice_rows(
+                self.choice_set,
+                "fixture-choice-set",
+                [
+                    {
+                        "key": self.choice.key,
+                        "label": self.choice.label,
+                        "position": 10,
+                        "lifecycle": CustomFieldChoice.LIFECYCLE_ACTIVE,
+                    }
+                ],
+            )
+
+        self.choice.refresh_from_db()
+        self.assertEqual(self.choice.lifecycle, CustomFieldChoice.LIFECYCLE_DEPRECATED)
+
+    def test_deprecated_choice_identity_remains_reconcilable(self):
+        self.choice.lifecycle = CustomFieldChoice.LIFECYCLE_ACTIVE
+        self.choice.save(update_fields=["lifecycle"])
+        _reconcile_core_choice_rows(
+            self.choice_set,
+            "fixture-choice-set",
+            [
+                {
+                    "key": self.choice.key,
+                    "label": self.choice.label,
+                    "position": 10,
+                    "lifecycle": CustomFieldChoice.LIFECYCLE_DEPRECATED,
+                }
+            ],
+        )
+
+        self.choice.refresh_from_db()
+        self.assertEqual(self.choice.lifecycle, CustomFieldChoice.LIFECYCLE_DEPRECATED)
+
+    def _field_row(self, lifecycle):
+        return {
+            "identity": "itambox/fixture_field",
+            "namespace": "itambox",
+            "key": "fixture_field",
+            "label": "Fixture field",
+            "help_text": "",
+            "targets": ["asset"],
+            "activation": CustomField.ACTIVATION_COMPOSED,
+            "field_type": CustomField.FIELD_TYPE_TEXT,
+            "quantity_kind": None,
+            "canonical_unit": None,
+            "validation": {},
+            "required": False,
+            "nullable": False,
+            "lifecycle": lifecycle,
+            "choice_set": None,
+        }
+
+    def test_active_field_identity_rejects_deprecated_existing_field(self):
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            _reconcile_core_fields(
+                [self._field_row(CustomField.LIFECYCLE_ACTIVE)],
+                {},
+                ContentType.objects.get_for_model(Asset),
+                ContentType.objects.get_for_model(AssetType),
+                1,
+            )
+
+        self.field.refresh_from_db()
+        self.assertEqual(self.field.lifecycle, CustomField.LIFECYCLE_DEPRECATED)
+
+    def test_deprecated_field_identity_remains_reconcilable(self):
+        # Model save validates applicability; update represents an existing legacy row.
+        CustomField.objects.filter(pk=self.field.pk).update(lifecycle=CustomField.LIFECYCLE_ACTIVE)
+        _reconcile_core_fields(
+            [self._field_row(CustomField.LIFECYCLE_DEPRECATED)],
+            {},
+            ContentType.objects.get_for_model(Asset),
+            ContentType.objects.get_for_model(AssetType),
+            1,
+        )
+
+        self.field.refresh_from_db()
+        self.assertEqual(self.field.lifecycle, CustomField.LIFECYCLE_DEPRECATED)
+
+    def test_active_fieldset_identity_rejects_deprecated_existing_fieldset(self):
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            _get_core_fieldset(
+                "fixture-fieldset",
+                "Fixture fieldset",
+                "",
+                CustomFieldset.LIFECYCLE_ACTIVE,
+                1,
+                "itambox",
+            )
+
+        self.fieldset.refresh_from_db()
+        self.assertEqual(self.fieldset.lifecycle, CustomFieldset.LIFECYCLE_DEPRECATED)
+
+    def test_local_fieldset_membership_raises_ownership_collision_before_reconcile(self):
+        fieldset = CustomFieldset.objects.create(
+            namespace="itambox",
+            slug="ownership-fieldset",
+            label="Ownership fieldset",
+            description="",
+            management_kind=CustomFieldset.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+        )
+        local_field = CustomField.objects.create(
+            name="local_membership_field",
+            namespace="local",
+            label="Local membership field",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            management_kind=CustomField.MANAGEMENT_LOCAL,
+            version=1,
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        )
+        membership = CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=local_field, position=999)
+
+        with self.assertRaisesRegex(ValueError, "ownership collision"):
+            _reconcile_core_fieldsets(
+                [
+                    {
+                        "namespace": "itambox",
+                        "slug": "ownership-fieldset",
+                        "label": "Ownership fieldset",
+                        "description": "",
+                        "lifecycle": CustomFieldset.LIFECYCLE_ACTIVE,
+                        "memberships": [],
+                    }
+                ],
+                {},
+                1,
+            )
+
+        self.assertTrue(CustomFieldsetField.objects.filter(pk=membership.pk).exists())
 
 
 # Database names, caches, media roots, and queue execution are isolated per xdist
@@ -291,8 +476,8 @@ class ManagementCommandsTestCase(TransactionTestCase):
             label="Unexpected fieldset child",
             field_type="text",
             activation=CustomField.ACTIVATION_COMPOSED,
-            namespace="local",
-            management_kind=CustomField.MANAGEMENT_LOCAL,
+            namespace="itambox",
+            management_kind=CustomField.MANAGEMENT_CORE,
             version=1,
             lifecycle=CustomField.LIFECYCLE_ACTIVE,
         )
