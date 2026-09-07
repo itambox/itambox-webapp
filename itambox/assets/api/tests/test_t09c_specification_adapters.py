@@ -10,18 +10,19 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from PIL import Image
-from rest_framework import serializers as drf_serializers
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 from rest_framework.test import APITestCase
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
+from assets.api.specification_api import SpecificationCommandAPIException
 from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer, StatusLabel
 from assets.services.specifications.commands import create_asset_type
 from core.mixins import suppress_custom_field_data_validation
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from organization.models import Tenant
 
 
 def test_public_asset_serializers_collect_specification_patch_field():
@@ -64,8 +65,10 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
         )
         assert serializer.is_valid(), serializer.errors
 
-        with self.assertRaises(drf_serializers.ValidationError):
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
+
+        self.assertEqual(str(raised.exception.detail["error"]["code"]), "SPECIFICATION_VALIDATION_FAILED")
 
         self.asset_type.refresh_from_db()
         assert self.asset_type.model == original_model
@@ -187,6 +190,8 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
 
     def test_public_asset_type_create_uses_canonical_create(self):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        detail = self.client.get(reverse("api:assets_api:assettype-detail", args=[self.asset_type.pk]))
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
         with patch("assets.api.serializers.create_asset_type", wraps=create_asset_type) as command:
             response = self.client.post(
                 reverse("api:assets_api:assettype-list"),
@@ -194,6 +199,7 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
                     "manufacturer_id": self.asset_type.manufacturer_id,
                     "model": "Created via canonical command",
                     "slug": "created-via-canonical-command",
+                    "expected_definition_revision": detail.data["definition_revision"],
                     "specification_patch": {"set": {}, "clear": []},
                 },
                 format="json",
@@ -206,6 +212,8 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
 
     def test_public_type_image_is_staged_before_real_create_command(self):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        detail = self.client.get(reverse("api:assets_api:assettype-detail", args=[self.asset_type.pk]))
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
         image = BytesIO()
         Image.new("RGB", (2, 2), color="red").save(image, format="PNG")
         upload = SimpleUploadedFile("type.png", image.getvalue(), content_type="image/png")
@@ -218,6 +226,7 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
                             "manufacturer_id": self.asset_type.manufacturer_id,
                             "model": "Staged image type",
                             "slug": "staged-image-type",
+                            "expected_definition_revision": detail.data["definition_revision"],
                             "image": upload,
                         },
                         format="multipart",
@@ -260,7 +269,13 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
                 )
                 change_count = changes.count()
                 response = self.client.patch(
-                    url, {"specification_patch": value_patch}, format="json", HTTP_IF_MATCH=current["ETag"]
+                    url,
+                    {
+                        "specification_patch": value_patch,
+                        "expected_definition_revision": current.data["definition_revision"],
+                    },
+                    format="json",
+                    HTTP_IF_MATCH=current["ETag"],
                 )
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
                 asset.refresh_from_db()
@@ -289,7 +304,10 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
         self.assertEqual(current.status_code, status.HTTP_200_OK, current.data)
         response = self.client.patch(
             url,
-            {"specification_patch": {"set": {field.name: "observed"}, "clear": []}},
+            {
+                "specification_patch": {"set": {field.name: "observed"}, "clear": []},
+                "expected_definition_revision": current.data["definition_revision"],
+            },
             format="json",
             HTTP_IF_MATCH=current["ETag"],
         )
@@ -313,7 +331,11 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
         self.assertEqual(current.status_code, status.HTTP_200_OK, current.data)
         response = self.client.patch(
             url,
-            {"status_id": archived.pk, "specification_patch": {"set": {}, "clear": []}},
+            {
+                "status_id": archived.pk,
+                "specification_patch": {"set": {}, "clear": []},
+                "expected_definition_revision": current.data["definition_revision"],
+            },
             format="json",
             HTTP_IF_MATCH=current["ETag"],
         )
@@ -331,13 +353,18 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
             asset = Asset.objects.create(name="Public lock order", tenant=self.tenant, asset_type=self.asset_type)
         self.client_login_to_tenant(self.tenant_user, self.tenant)
         url = reverse("api:assets_api:asset-detail", args=[asset.pk])
-        etag = self.client.get(url)["ETag"]
+        current = self.client.get(url)
+        self.assertEqual(current.status_code, status.HTTP_200_OK, current.data)
         with CaptureQueriesContext(connection) as captured:
             response = self.client.patch(
                 url,
-                {"name": "Updated public lock order", "specification_patch": {"set": {}, "clear": []}},
+                {
+                    "name": "Updated public lock order",
+                    "specification_patch": {"set": {}, "clear": []},
+                    "expected_definition_revision": current.data["definition_revision"],
+                },
                 format="json",
-                HTTP_IF_MATCH=etag,
+                HTTP_IF_MATCH=current["ETag"],
             )
         self.assertEqual(response.status_code, 200, response.data)
         sql = [query["sql"] for query in captured.captured_queries]
@@ -380,6 +407,99 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
         self.assertEqual(created.tenant_id, self.tenant.pk)
         self.assertEqual(created.asset_type_id, self.asset_type.pk)
         self.assertEqual(created.custom_field_data, {})
+
+    def test_composition_preview_inputs_are_reusable_and_precedence_stays_safe(self):
+        def type_fieldset(slug, field_name):
+            field = CustomField.objects.create(
+                name=field_name,
+                namespace="local",
+                label=field_name.replace("_", " ").title(),
+                field_type=CustomField.FIELD_TYPE_TEXT,
+                activation=CustomField.ACTIVATION_COMPOSED,
+                management_kind=CustomField.MANAGEMENT_LOCAL,
+            )
+            field.object_types.add(ContentType.objects.get_for_model(AssetType))
+            fieldset = CustomFieldset.objects.create(
+                namespace="local",
+                slug=slug,
+                label=slug.replace("-", " ").title(),
+                management_kind=CustomFieldset.MANAGEMENT_LOCAL,
+            )
+            CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=1)
+            return fieldset
+
+        source = type_fieldset("preview-source", "preview_source")
+        proposed = type_fieldset("preview-proposed", "preview_proposed")
+        AssetTypeFieldset.objects.create(asset_type=self.asset_type, fieldset=source, position=1)
+
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        preview_url = reverse("api:assets_api:assettype-composition-preview", args=[self.asset_type.pk])
+        preview = self.client.post(
+            preview_url,
+            {
+                "fieldsets": [f"local/{proposed.slug}"],
+                "specification_patch": {"set": {}, "clear": []},
+            },
+            format="json",
+        )
+        self.assertEqual(preview.status_code, status.HTTP_200_OK, preview.data)
+        detail = self.client.get(reverse("api:assets_api:assettype-detail", args=[self.asset_type.pk]))
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        self.assertEqual(preview.data["expected_resource_revision"], detail.data["resource_revision"])
+
+        write = self.client.put(
+            reverse("api:assets_api:assettype-composition", args=[self.asset_type.pk]),
+            {
+                "fieldsets": preview.data["fieldsets"],
+                "expected_definition_revision": preview.data["expected_definition_revision"],
+                "specification_patch": {"set": {}, "clear": []},
+            },
+            format="json",
+            HTTP_IF_MATCH=f'"{preview.data["expected_resource_revision"]}"',
+        )
+        self.assertEqual(write.status_code, status.HTTP_200_OK, write.data)
+        self.assertEqual(
+            list(self.asset_type.fieldset_memberships.order_by("position").values_list("fieldset__slug", flat=True)),
+            ["preview-proposed"],
+        )
+
+        stale_reference = self.client.put(
+            reverse("api:assets_api:assettype-composition", args=[self.asset_type.pk]),
+            {
+                "fieldsets": ["local/missing-after-stale"],
+                "expected_definition_revision": "sha256:stale-definition",
+                "specification_patch": {"set": {}, "clear": []},
+            },
+            format="json",
+            HTTP_IF_MATCH='"sha256:stale-resource"',
+        )
+        self.assertEqual(stale_reference.status_code, status.HTTP_412_PRECONDITION_FAILED, stale_reference.data)
+        self.assertEqual(stale_reference.data["error"]["issues"][0]["code"], "STALE_RESOURCE")
+        self.assertNotIn("REFERENCE_CONFLICT", str(stale_reference.data))
+
+        foreign_tenant = Tenant.objects.create(name="T09-C foreign tenant", slug="t09-c-foreign-tenant")
+        with self.tenant_context(foreign_tenant):
+            foreign_asset = Asset.objects.create(
+                name="T09-C foreign composition asset",
+                asset_tag="T09-C-FOREIGN-COMPOSITION",
+                tenant=foreign_tenant,
+                asset_type=self.asset_type,
+            )
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        self.tenant_role.permissions = ["assets.add_asset", "assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save(update_fields=["permissions"])
+        denied = self.client.patch(
+            reverse("api:assets_api:asset-detail", args=[foreign_asset.pk]),
+            {
+                "specification_patch": {"set": {"local/hidden-reference": "hidden"}, "clear": []},
+                "expected_definition_revision": "sha256:stale-definition",
+            },
+            format="json",
+            HTTP_IF_MATCH='"sha256:stale-resource"',
+        )
+        self.assertEqual(denied.status_code, status.HTTP_404_NOT_FOUND, denied.data)
+        self.assertNotIn("STALE_RESOURCE", str(denied.data))
+        self.assertNotIn("REFERENCE_CONFLICT", str(denied.data))
 
     def _asset_fieldset(self, slug, field_name):
         field = CustomField.objects.create(
@@ -432,11 +552,17 @@ class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
         detail_url = reverse("api:assets_api:asset-detail", kwargs={"pk": asset.pk})
         current_response = self.client.get(detail_url)
         assert current_response.status_code == status.HTTP_200_OK, current_response.data
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        destination_definition_url = reverse("api:assets_api:assettype-specification-definition", args=[type_b.pk])
+        destination_response = self.client.get(destination_definition_url, {"target": "asset"})
+        self.assertEqual(destination_response.status_code, status.HTTP_200_OK, destination_response.data)
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
         response = self.client.patch(
             detail_url,
             {
                 "asset_type_id": type_b.pk,
                 "specification_patch": {"set": {}, "clear": []},
+                "expected_definition_revision": destination_response.data["revision"],
             },
             format="json",
             HTTP_IF_MATCH=current_response["ETag"],
