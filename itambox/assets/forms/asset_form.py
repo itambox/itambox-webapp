@@ -5,7 +5,6 @@ from crispy_forms.layout import HTML, Div, Fieldset, Layout
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -15,12 +14,10 @@ from core.forms import CrispyFormMixin, scope_tenant_field
 from core.mixins import suppress_custom_field_data_validation
 from extras.customfields import (
     build_custom_field_clear_form_field,
-    build_custom_field_form_field,
     clean_custom_field_form_values,
     custom_field_clear_key,
-    validate_custom_field_value,
 )
-from extras.models import CustomField, CustomFieldset
+from extras.models import CustomField
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
@@ -659,6 +656,31 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             return getattr(library, "namespace", None) or str(library)
         return str(getattr(fieldset, "management_kind", "local")).capitalize()
 
+    def _build_t15_model_specification_fields(self, selected_asset_type):
+        """Build the read-only Asset Type values shown beside the editor."""
+        if selected_asset_type is None:
+            return []
+
+        model_values = dict(selected_asset_type.custom_field_data or {})
+        fields = []
+        for resolved in resolve_asset_type_custom_fields(selected_asset_type):
+            definition = resolved.definition
+            value = model_values.get(definition.name)
+            has_value = definition.name in model_values
+            fields.append(
+                {
+                    "key": definition.name,
+                    "label": definition.label,
+                    "definition": definition,
+                    "value": value,
+                    "display_value": _display_t15_value(definition, value) if has_value else _("Not set"),
+                    "model_value_json": json.dumps(value, ensure_ascii=False),
+                    "model_value_script_id": f"asset-model-value-{definition.name}",
+                    "can_copy": definition.name in self.custom_field_definitions,
+                }
+            )
+        return fields
+
     def _build_t15_presentation(self, selected_asset_type, resolved_fields, cancel_url):
         stored_values = self._stored_custom_values()
         self.specification_sections = self._asset_fieldset_context(selected_asset_type, resolved_fields)
@@ -675,29 +697,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             except (ValidationError, AttributeError):
                 self.specification_definition_revision = ""
 
-        self.model_specification_fields = []
-        if selected_asset_type is not None:
-            model_values = dict(selected_asset_type.custom_field_data or {})
-            for resolved in resolve_asset_type_custom_fields(selected_asset_type):
-                definition = resolved.definition
-                if definition.name not in model_values:
-                    value = None
-                    has_value = False
-                else:
-                    value = model_values[definition.name]
-                    has_value = True
-                self.model_specification_fields.append(
-                    {
-                        "key": definition.name,
-                        "label": definition.label,
-                        "definition": definition,
-                        "value": value,
-                        "display_value": _display_t15_value(definition, value) if has_value else _("Not set"),
-                        "model_value_json": json.dumps(value, ensure_ascii=False),
-                        "model_value_script_id": f"asset-model-value-{definition.name}",
-                        "can_copy": definition.name in self.custom_field_definitions,
-                    }
-                )
+        self.model_specification_fields = self._build_t15_model_specification_fields(selected_asset_type)
 
         # Grouped, standardized section order: Identity -> Classification ->
         # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.

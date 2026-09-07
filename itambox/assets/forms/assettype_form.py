@@ -14,10 +14,8 @@ from assets.customfields import resolve_effective_custom_fields
 from core.forms import SlugModelForm
 from extras.customfields import (
     CustomFieldModelFormMixin,
-    build_custom_field_clear_form_field,
     build_custom_field_form_field,
     clean_custom_field_form_values,
-    custom_field_clear_key,
     validate_custom_field_value,
 )
 from extras.models import CustomField, CustomFieldset, Tag
