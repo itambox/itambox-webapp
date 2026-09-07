@@ -181,6 +181,21 @@ class ClassificationTests(unittest.TestCase):
         self.assertIsNone(is_allowed("assets.api.serializers", "assets.specification_adapters").rule)
         self.assertIsNotNone(is_allowed("assets.models.asset", "assets.specification_adapters").rule)
 
+    def test_typed_graphql_specification_modules_are_domain_presentation(self):
+        expected = {
+            "assets.graphql_specifications.__init__": "presentation",
+            "assets.graphql_specifications.integration": "presentation",
+            "assets.graphql_specifications.loaders": "presentation",
+            "assets.graphql_specifications.readers": "presentation",
+            "assets.graphql_specifications.scalars": "presentation",
+            "assets.graphql_specifications.types": "presentation",
+        }
+
+        for module, expected_layer in expected.items():
+            with self.subTest(module=module):
+                self.assertEqual(layer_of(module), expected_layer)
+                self.assertEqual(MODULE_LAYER_OVERRIDES[module], expected_layer)
+
     def test_composition_leaves_win_on_the_last_segment(self):
         for module in (
             "users.api.urls",
