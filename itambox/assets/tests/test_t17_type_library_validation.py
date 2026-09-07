@@ -131,6 +131,15 @@ def test_duplicate_json_properties_are_rejected_before_overwrite():
     assert any(issue.code == "DUPLICATE_PROPERTY" for issue in caught.value.issues)
 
 
+def test_oversized_json_integer_returns_a_structured_number_error():
+    raw = b'{"value":' + b"9" * 4_301 + b"}"
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(raw)
+
+    assert caught.value.code == "INVALID_NUMBER"
+
+
 def test_unknown_properties_are_rejected():
     document = _release_document()
     document["unexpected"] = True

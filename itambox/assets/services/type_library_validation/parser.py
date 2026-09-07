@@ -94,6 +94,10 @@ def parse_json_document(document: bytes | str, *, limits: ValidationLimits) -> d
         raise issue("INVALID_NUMBER", (), f"JSON number {exc.literal!r} is not finite") from exc
     except (json.JSONDecodeError, RecursionError) as exc:
         raise issue("INVALID_JSON", (), "The document is not valid JSON") from exc
+    except ValueError as exc:
+        # Python can reject an otherwise syntactically valid integer before the
+        # bounded semantic pass when it exceeds the interpreter's digit guard.
+        raise issue("INVALID_NUMBER", (), "JSON number exceeds the parser's integer limit") from exc
     if not isinstance(parsed, dict):
         raise issue("SCHEMA_TYPE", (), "The document root must be a JSON object")
     _walk_json_tree(parsed, depth=1, limits=limits, path=())
