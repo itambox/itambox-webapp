@@ -372,7 +372,7 @@ class SpecificationHistoryBoundaryTests(HistoryBoundaryFixtureMixin, DjangoTestC
         self.assertIsInstance(result, CommandRejectedDTO)
         self.assertEqual([issue.code for issue in result.issues], ["STALE_PLAN"])
         self.asset_type.refresh_from_db()
-        self.assertEqual(self.asset_type.custom_field_data["inactive_history"], True)
+        self.assertIs(self.asset_type.custom_field_data["inactive_history"], True)
         self.assertEqual(self.asset_type.updated_at, before_updated_at)
         self.assertEqual(self._changes(AssetType, self.asset_type.pk).count(), before_changes)
 
@@ -408,7 +408,7 @@ class SpecificationHistoryBoundaryTests(HistoryBoundaryFixtureMixin, DjangoTestC
         self.assertIsInstance(result, CommandRejectedDTO)
         self.assertEqual([issue.code for issue in result.issues], ["STALE_PLAN"])
         self.asset.refresh_from_db()
-        self.assertEqual(self.asset.custom_field_data["inactive_history"], True)
+        self.assertIs(self.asset.custom_field_data["inactive_history"], True)
         self.assertEqual(self.asset.updated_at, before_updated_at)
         self.assertEqual(self._changes(Asset, self.asset.pk).count(), before_changes)
 
