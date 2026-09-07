@@ -201,7 +201,13 @@ class ReportDefinition:
     def build_sample_chart(self, request: ReportRequest) -> str:
         return ""
 
-    def build_specification_export(self, records: Sequence[object], references, *, definitions=None):
+    def build_specification_export(
+        self,
+        records: Sequence[object],
+        references: Sequence[object],
+        *,
+        definitions: Mapping[object, object] | None = None,
+    ) -> object | None:
         """Build an optional domain-owned export from authorized records.
 
         Providers that support specifications may override this hook.  The
