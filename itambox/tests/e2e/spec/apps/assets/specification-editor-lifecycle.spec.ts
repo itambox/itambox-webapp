@@ -1,0 +1,129 @@
+import { test, expect } from '../../../fixtures/test';
+import { requireActiveTenant } from '../../../fixtures/tenant';
+import { deleteOwnedResource, getJsonRows, jsonResponse, type JsonObject } from '../../../helpers/api';
+import { selectTomOption } from '../../../helpers/forms';
+
+function seededAssetType(rows: JsonObject[], slug: string): { id: string; slug: string } {
+  const row = rows.find((candidate) => candidate.slug === slug);
+  if (!row) throw new Error(`The E2E seed must expose asset type ${slug}.`);
+  if (typeof row.id !== 'string' && typeof row.id !== 'number') {
+    throw new Error(`Seeded asset type ${slug} has no usable ID.`);
+  }
+  return { id: String(row.id), slug };
+}
+
+function primaryKey(row: JsonObject, label: string): string {
+  if (typeof row.id !== 'string' && typeof row.id !== 'number') {
+    throw new Error(`${label} has no usable ID.`);
+  }
+  return String(row.id);
+}
+
+test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
+  test('preserves a Type A draft through Type B and back to Type A', async ({
+    page,
+    api,
+    activeTenant,
+    cleanup,
+    runId,
+  }) => {
+    const tenant = requireActiveTenant(activeTenant);
+    const assetTypes = await getJsonRows(api, '/api/assets/asset-types/?limit=100', 'specification asset types');
+    const typeA = seededAssetType(assetTypes, 'dell-latitude-5550');
+    const typeB = seededAssetType(assetTypes, 'cisco-catalyst-9300');
+    const assetTag = `E2E-SPEC-${runId}`.toUpperCase().replace(/[^A-Z0-9-]/g, '-').slice(0, 50);
+    const assetName = `E2E specification journey ${runId}`;
+
+    const created = await jsonResponse(
+      await api.post('/api/assets/assets/', {
+        data: {
+          name: assetName,
+          asset_tag: assetTag,
+          asset_type_id: typeA.id,
+          tenant_id: tenant.id,
+        },
+      }),
+      201,
+      'create specification journey asset',
+    );
+    const assetId = primaryKey(created, 'created specification journey asset');
+    cleanup.add(`specification journey asset ${assetTag}`, async () => {
+      const current = await api.get(`/api/assets/assets/${assetId}/`);
+      if (current.status() === 404) return;
+      expect(current.status(), await current.text()).toBe(200);
+      await deleteOwnedResource(api, `/api/assets/assets/${assetId}/`, `delete specification journey asset ${assetTag}`);
+    });
+
+    const editPath = `/assets/assets/${assetId}/edit/`;
+    const initialPage = await page.goto(editPath, { waitUntil: 'domcontentloaded' });
+    expect(initialPage?.status(), `GET ${editPath}`).toBe(200);
+    const form = page.locator('#asset-specification-form[data-specification-editor]');
+    await expect(form).toHaveCount(1);
+    await expect(form.locator('select[name="asset_type"]')).toHaveValue(typeA.id);
+
+    const draftProcessor = `Draft CPU ${runId}`;
+    const processor = form.locator('[data-specification-key="processor_model"]');
+    await expect(processor).toHaveCount(1);
+    await processor.fill(draftProcessor);
+    await expect(form.locator('select[name="cf_processor_model__presence"]')).toHaveValue('value');
+
+    const toTypeB = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'POST' && url.pathname === editPath;
+    });
+    await selectTomOption(form, 'asset_type', typeB.id);
+    expect((await toTypeB).status(), 'Type A -> Type B draft reload').toBe(200);
+
+    const typeBForm = page.locator('#asset-specification-form[data-specification-editor]');
+    await expect(typeBForm.locator('select[name="asset_type"]')).toHaveValue(typeB.id);
+    await expect(typeBForm.locator('[data-specification-key="processor_model"]')).toHaveCount(0);
+    const hiddenProcessorDraft = typeBForm.locator(
+      'input[type="hidden"][name="specification_draft__cf_processor_model"]',
+    );
+    await expect(hiddenProcessorDraft).toHaveCount(1);
+    await expect(hiddenProcessorDraft).toHaveValue(JSON.stringify(draftProcessor));
+
+    const firmwarePresence = typeBForm.locator('select[name="cf_firmware_version__presence"]');
+    await expect(firmwarePresence).toHaveCount(1);
+    await firmwarePresence.selectOption('empty');
+    await expect(firmwarePresence).toHaveValue('empty');
+    await expect(typeBForm.locator('select[name="cf_hostname__presence"]')).toHaveValue('');
+
+    const toTypeA = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'POST' && url.pathname === editPath;
+    });
+    await selectTomOption(typeBForm, 'asset_type', typeA.id);
+    expect((await toTypeA).status(), 'Type B -> Type A draft reload').toBe(200);
+
+    const returnedForm = page.locator('#asset-specification-form[data-specification-editor]');
+    await expect(returnedForm.locator('select[name="asset_type"]')).toHaveValue(typeA.id);
+    await expect(returnedForm.locator('[data-specification-key="processor_model"]')).toHaveValue(draftProcessor);
+    await expect(returnedForm.locator('select[name="cf_processor_model__presence"]')).toHaveValue('value');
+    await expect(returnedForm.locator('input[name="specification_draft__cf_processor_model"]')).toHaveValue(
+      JSON.stringify(draftProcessor),
+    );
+    await expect(returnedForm.locator('select[name="cf_firmware_version__presence"]')).toHaveValue('empty');
+    await expect(returnedForm.locator('select[name="cf_hostname__presence"]')).toHaveValue('');
+
+    const updateResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'POST' && url.pathname === editPath;
+    });
+    await returnedForm.getByRole('button', { name: 'Update', exact: true }).click();
+    expect((await updateResponse).status(), 'save returned Type A specification').toBe(302);
+    await page.waitForURL((url) => url.pathname === `/assets/assets/${assetId}/`);
+
+    const saved = await jsonResponse(
+      await api.get(`/api/assets/assets/${assetId}/`),
+      200,
+      'saved specification journey asset',
+    );
+    expect(saved.asset_type).toMatchObject({ id: Number(typeA.id) });
+    expect(saved.custom_field_data).toMatchObject({
+      processor_model: draftProcessor,
+      firmware_version: '',
+    });
+    expect(Object.prototype.hasOwnProperty.call(saved.custom_field_data, 'hostname')).toBe(false);
+  });
+});

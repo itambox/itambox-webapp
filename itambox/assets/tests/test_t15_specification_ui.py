@@ -59,6 +59,7 @@ class AssetFormPresenceTests(SimpleTestCase):
 
         self.assertEqual(form.fields["cf_instance_note"].initial, "edited draft")
         self.assertEqual(form.data.get("cf_instance_note"), "edited draft")
+        self.assertEqual(form.data.get("cf_instance_note__presence"), "value")
 
 
 class T15SpecificationUiContractTests(unittest.TestCase):

@@ -545,6 +545,9 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 data[key] = ""
             else:
                 data[key] = str(value).lower() if isinstance(value, bool) else str(value)
+            presence_key = f"{key}__presence"
+            if value not in ("", None, []) and presence_key in self.fields and presence_key not in data:
+                data[presence_key] = "value"
         self.data = data
 
     def _configure_t15_draft_transport(self):
