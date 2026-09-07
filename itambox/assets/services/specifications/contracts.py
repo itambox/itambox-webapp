@@ -316,6 +316,17 @@ class AssetTypePreviewDTO:
 
 
 @dataclass(frozen=True)
+class HistoryCleanupPreviewDTO:
+    preview_token: PreviewToken
+    owner: OwnerRefDTO
+    keys: tuple[FieldKey, ...]
+    expected_resource_revision: ResourceRevision
+    expected_definition_revision: DefinitionRevision
+    historical_state_digest: str
+    issues: tuple[DomainIssueDTO, ...]
+
+
+@dataclass(frozen=True)
 class CommandRejectedDTO:
     outcome: Literal["rejected"]
     safe_owner: OwnerRefDTO | None
@@ -325,6 +336,7 @@ class CommandRejectedDTO:
 OwnerMutationResult: TypeAlias = OwnerChangedDTO | OwnerNoOpDTO | CommandRejectedDTO
 AssetTypeCreateResult: TypeAlias = OwnerCreatedDTO | CommandRejectedDTO
 AssetTypePreviewResult: TypeAlias = AssetTypePreviewDTO | CommandRejectedDTO
+HistoryCleanupPreviewResult: TypeAlias = HistoryCleanupPreviewDTO | CommandRejectedDTO
 
 
 @dataclass(frozen=True)

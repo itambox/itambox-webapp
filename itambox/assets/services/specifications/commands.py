@@ -63,6 +63,12 @@ from ._create_commands import (
     preview_apply_category_defaults,
     preview_asset_type_create,
 )
+from ._history_commands import (
+    cleanup_asset_history,
+    cleanup_asset_type_history,
+    preview_asset_history_cleanup,
+    preview_asset_type_history_cleanup,
+)
 
 _DEFAULT_DB = DEFAULT_DB_ALIAS
 _ASSET_CHANGE_PERMISSION = "assets.change_asset"
@@ -460,9 +466,13 @@ def update_asset_specifications(
 
 __all__ = [
     "apply_category_defaults",
+    "cleanup_asset_history",
+    "cleanup_asset_type_history",
     "create_asset_type",
     "preview_apply_category_defaults",
+    "preview_asset_history_cleanup",
     "preview_asset_type_create",
+    "preview_asset_type_history_cleanup",
     "set_asset_type_composition",
     "set_category_defaults",
     "update_asset_specifications",
