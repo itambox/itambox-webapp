@@ -865,15 +865,25 @@ def _validate_replacements(  # noqa: C901 - all same-kind replacement edges shar
             target = _resolve(
                 graph.fields_by_identity, field["replaced_by"], path + ("fields", identity, "replaced_by"), declared
             )
-            if target is not _EXTERNAL:
-                edges[("field", identity)] = ("field", field["replaced_by"])
+            if target is _EXTERNAL:
+                _fail(
+                    "DEPENDENCY_GRAPH_UNAVAILABLE",
+                    path + ("fields", identity, "replaced_by"),
+                    "Replacement dependency definitions are not loaded",
+                )
+            edges[("field", identity)] = ("field", field["replaced_by"])
     for identity, choice_set in graph.choice_sets.items():
         if "replaced_by" in choice_set:
             target = _resolve(
                 graph.choice_sets, choice_set["replaced_by"], path + ("choice_sets", identity, "replaced_by"), declared
             )
-            if target is not _EXTERNAL:
-                edges[("choice_set", identity)] = ("choice_set", choice_set["replaced_by"])
+            if target is _EXTERNAL:
+                _fail(
+                    "DEPENDENCY_GRAPH_UNAVAILABLE",
+                    path + ("choice_sets", identity, "replaced_by"),
+                    "Replacement dependency definitions are not loaded",
+                )
+            edges[("choice_set", identity)] = ("choice_set", choice_set["replaced_by"])
         choices = {choice["key"]: choice for choice in choice_set["choices"]}
         for key, choice in choices.items():
             if "replaced_by" not in choice:
@@ -892,8 +902,13 @@ def _validate_replacements(  # noqa: C901 - all same-kind replacement edges shar
                 target = _resolve(
                     mapping, item["replaced_by"], path + (mapping_name, identity, "replaced_by"), declared
                 )
-                if target is not _EXTERNAL:
-                    edges[(mapping_name, identity)] = (mapping_name, item["replaced_by"])
+                if target is _EXTERNAL:
+                    _fail(
+                        "DEPENDENCY_GRAPH_UNAVAILABLE",
+                        path + (mapping_name, identity, "replaced_by"),
+                        "Replacement dependency definitions are not loaded",
+                    )
+                edges[(mapping_name, identity)] = (mapping_name, item["replaced_by"])
     states: dict[tuple[str, str], int] = {}
 
     def visit(node: tuple[str, str]) -> None:
@@ -1166,7 +1181,13 @@ def _validate_graph(  # noqa: C901 - cross-definition graph checks run in one de
     for identity, field in graph.fields_by_identity.items():
         if "choice_set" in field:
             choice_set = _choice_set_for_field(field, graph, path + ("fields", identity), declared)
-            if choice_set is not _EXTERNAL and field["lifecycle"] == "active":
+            if choice_set is _EXTERNAL:
+                _fail(
+                    "DEPENDENCY_GRAPH_UNAVAILABLE",
+                    path + ("fields", identity, "choice_set"),
+                    "Referenced Choice Set definitions are not loaded",
+                )
+            if field["lifecycle"] == "active":
                 active_choices = [choice for choice in choice_set["choices"] if choice["lifecycle"] == "active"]
                 if choice_set["lifecycle"] != "active" or not active_choices:
                     _fail(
@@ -1180,7 +1201,11 @@ def _validate_graph(  # noqa: C901 - cross-definition graph checks run in one de
                 graph.fields_by_identity, field_ref, path + ("fieldsets", identity, "fields", index), declared
             )
             if field is _EXTERNAL:
-                continue
+                _fail(
+                    "DEPENDENCY_GRAPH_UNAVAILABLE",
+                    path + ("fieldsets", identity, "fields", index),
+                    "Referenced dependency Fields are not loaded",
+                )
             if field["activation"] == "global":
                 _fail(
                     "INVALID_APPLICABILITY",
@@ -1199,9 +1224,15 @@ def _validate_graph(  # noqa: C901 - cross-definition graph checks run in one de
                 )
     for identity, category in graph.categories.items():
         for index, fieldset_ref in enumerate(category["default_fieldsets"]):
-            _resolve(
+            resolved = _resolve(
                 graph.fieldsets, fieldset_ref, path + ("categories", identity, "default_fieldsets", index), declared
             )
+            if resolved is _EXTERNAL:
+                _fail(
+                    "DEPENDENCY_GRAPH_UNAVAILABLE",
+                    path + ("categories", identity, "default_fieldsets", index),
+                    "Referenced dependency Fieldsets are not loaded",
+                )
     for identity, asset_type in graph.asset_types.items():
         _validate_asset_type_graph(asset_type, graph, path + ("asset_types", identity), ctx, declared)
 

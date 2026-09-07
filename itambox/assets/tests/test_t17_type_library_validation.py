@@ -9,7 +9,11 @@ from hashlib import sha256
 import pytest
 import rfc8785
 
-from assets.services.type_library_validation import LibraryValidationError, validate_library_document
+from assets.services.type_library_validation import (
+    InstalledDependency,
+    LibraryValidationError,
+    validate_library_document,
+)
 
 
 def _release_document() -> dict[str, object]:
@@ -140,6 +144,32 @@ def test_oversized_json_integer_returns_a_structured_number_error():
     assert caught.value.code == "INVALID_NUMBER"
 
 
+@pytest.mark.parametrize(
+    ("raw", "code"),
+    (
+        (b"\xff", "INVALID_UTF8"),
+        (b'{"value":NaN}', "INVALID_NUMBER"),
+        (b"[]", "SCHEMA_TYPE"),
+    ),
+)
+def test_json_parser_rejects_unsafe_wire_values_with_structured_errors(raw: bytes, code: str):
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(raw)
+
+    assert caught.value.code == code
+
+
+def test_json_parser_enforces_size_and_depth_before_schema_validation():
+    with pytest.raises(LibraryValidationError) as size_error:
+        validate_library_document(b"{}", limits={"max_bytes": 1})
+    assert size_error.value.code == "RESOURCE_LIMIT"
+
+    raw = b'{"nested":' + b"[" * 32 + b"0" + b"]" * 32 + b"}"
+    with pytest.raises(LibraryValidationError) as depth_error:
+        validate_library_document(raw)
+    assert depth_error.value.code == "RESOURCE_LIMIT"
+
+
 def test_unknown_properties_are_rejected():
     document = _release_document()
     document["unexpected"] = True
@@ -158,6 +188,102 @@ def test_invalid_reference_and_global_field_in_fieldset_are_rejected():
         validate_library_document(json.dumps(document))
 
     assert any(issue.code == "INVALID_REFERENCE" for issue in caught.value.issues)
+
+
+def test_same_kind_choice_replacement_cycles_are_rejected():
+    document = _release_document()
+    choices = document["definitions"]["choice_sets"][0]["choices"]  # type: ignore[index]
+    choices[0]["replaced_by"] = "off"  # type: ignore[index]
+    choices[1]["replaced_by"] = "on"  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(json.dumps(document))
+
+    assert caught.value.code == "REFERENCE_CYCLE"
+
+
+def test_declared_dependency_without_loaded_field_graph_fails_closed():
+    document = _release_document()
+    digest = "sha256:" + "a" * 64
+    document["requires"] = [{"namespace": "core", "release": 1, "digest": digest}]
+    document["definitions"]["fieldsets"][0]["fields"].append("core/core__serial")  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(
+            json.dumps(document),
+            installed_dependencies=[InstalledDependency("core", 1, digest)],
+        )
+
+    assert caught.value.code == "DEPENDENCY_GRAPH_UNAVAILABLE"
+
+
+def test_external_replacement_target_requires_a_loaded_dependency_graph():
+    document = _release_document()
+    digest = "sha256:" + "b" * 64
+    document["requires"] = [{"namespace": "core", "release": 1, "digest": digest}]
+    document["definitions"]["fields"][0]["replaced_by"] = "core/core__state"  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(
+            json.dumps(document),
+            installed_dependencies=[InstalledDependency("core", 1, digest)],
+        )
+
+    assert caught.value.code == "DEPENDENCY_GRAPH_UNAVAILABLE"
+
+
+def test_external_choice_set_without_composition_use_fails_closed():
+    document = _release_document()
+    digest = "sha256:" + "e" * 64
+    document["requires"] = [{"namespace": "core", "release": 1, "digest": digest}]
+    document["definitions"]["fields"][0]["choice_set"] = "core/core__state"  # type: ignore[index]
+    document["definitions"]["fieldsets"][0]["fields"].remove("acme/acme__state")  # type: ignore[index]
+    document["definitions"]["asset_types"][0]["specifications"].pop("acme__state")  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(
+            json.dumps(document),
+            installed_dependencies=[InstalledDependency("core", 1, digest)],
+        )
+
+    assert caught.value.code == "DEPENDENCY_GRAPH_UNAVAILABLE"
+
+
+def test_external_category_default_fieldset_requires_a_loaded_graph():
+    document = _release_document()
+    digest = "sha256:" + "f" * 64
+    document["requires"] = [{"namespace": "core", "release": 1, "digest": digest}]
+    document["definitions"]["categories"][0]["default_fieldsets"] = ["core/core_specs"]  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(
+            json.dumps(document),
+            installed_dependencies=[InstalledDependency("core", 1, digest)],
+        )
+
+    assert caught.value.code == "DEPENDENCY_GRAPH_UNAVAILABLE"
+
+
+def test_exact_dependency_identity_and_digest_are_required():
+    document = _release_document()
+    digest = "sha256:" + "c" * 64
+    document["requires"] = [{"namespace": "core", "release": 1, "digest": digest}]
+
+    with pytest.raises(LibraryValidationError) as missing:
+        validate_library_document(json.dumps(document))
+    assert missing.value.code == "DEPENDENCY_MISSING"
+
+    with pytest.raises(LibraryValidationError) as mismatched:
+        validate_library_document(
+            json.dumps(document),
+            installed_dependencies=[InstalledDependency("core", 1, "sha256:" + "d" * 64)],
+        )
+    assert mismatched.value.code == "DEPENDENCY_DIGEST_MISMATCH"
+
+    validate_library_document(
+        json.dumps(document),
+        installed_dependencies=[InstalledDependency("core", 1, digest)],
+    )
 
 
 def test_repeated_hardware_structures_are_rejected():
@@ -262,6 +388,52 @@ def test_snapshot_allows_a_separate_local_namespace_and_retained_choice_history(
     assert any(
         item["id"] == "local/device" for item in result.normalized_document["effective_definitions"]["asset_types"]
     )
+
+
+def test_snapshot_rejects_active_same_namespace_additions():
+    release = _release_document()
+    snapshot = {
+        "schema_version": 1,
+        "kind": "itambox.type-library.snapshot",
+        "upstream": deepcopy(release),
+        "effective_definitions": deepcopy(release["definitions"]),
+    }
+    snapshot["effective_definitions"]["fields"].append(  # type: ignore[index]
+        {
+            "key": "acme__new",
+            "namespace": "acme",
+            "label": "New",
+            "help_text": "",
+            "targets": ["asset_type"],
+            "activation": "composed",
+            "field_type": "text",
+            "required": False,
+            "nullable": False,
+            "lifecycle": "active",
+            "validation": {"max_length": 32},
+        }
+    )
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(json.dumps(snapshot))
+
+    assert caught.value.code == "NAMESPACE_TAKEOVER"
+
+
+def test_snapshot_rejects_immutable_upstream_field_changes():
+    release = _release_document()
+    snapshot = {
+        "schema_version": 1,
+        "kind": "itambox.type-library.snapshot",
+        "upstream": deepcopy(release),
+        "effective_definitions": deepcopy(release["definitions"]),
+    }
+    snapshot["effective_definitions"]["fields"][0]["nullable"] = True  # type: ignore[index]
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(json.dumps(snapshot))
+
+    assert caught.value.code == "IMMUTABLE_DEFINITION"
 
 
 def test_publisher_namespace_length_is_bounded_before_graph_validation():
