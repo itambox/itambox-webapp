@@ -421,6 +421,27 @@ jobs:
               raise RuntimeError("E2E OIDC fixture Membership already exists")
           print("E2E OIDC fixture absence and Admin-role preconditions passed.")
 
+          def provision_tenant_role(principal, role_name):
+              membership, _ = Membership._base_manager.get_or_create(user=principal, tenant=tenant)
+              membership.is_active = True
+              membership.save(update_fields=["is_active"])
+              role = Role.all_objects.get(tenant=tenant, name=role_name, deleted_at__isnull=True)
+              grant, _ = RoleGrant._base_manager.get_or_create(
+                  membership=membership,
+                  role=role,
+                  defaults={
+                      "granted_by": user,
+                      "reason": "Disposable CI E2E role boundary.",
+                      "valid_until": timezone.now() + timedelta(hours=4),
+                  },
+              )
+              RoleGrantScope._base_manager.get_or_create(
+                  role_grant=grant,
+                  scope_type=RoleGrantScope.SCOPE_OWN,
+                  tenant=None,
+                  tenant_group=None,
+              )
+
           def provision_role_principal(username, email, first_name, last_name, role_name):
               principal, _ = User._base_manager.get_or_create(
                   username=username,
@@ -453,26 +474,11 @@ jobs:
               if holder.user_id is None:
                   holder.user = principal
                   holder.save(update_fields=["user"])
-              membership, _ = Membership._base_manager.get_or_create(user=principal, tenant=tenant)
-              membership.is_active = True
-              membership.save(update_fields=["is_active"])
-              role = Role.all_objects.get(tenant=tenant, name=role_name, deleted_at__isnull=True)
-              grant, _ = RoleGrant._base_manager.get_or_create(
-                  membership=membership,
-                  role=role,
-                  defaults={
-                      "granted_by": user,
-                      "reason": "Disposable CI E2E role boundary.",
-                      "valid_until": timezone.now() + timedelta(hours=4),
-                  },
-              )
-              RoleGrantScope._base_manager.get_or_create(
-                  role_grant=grant,
-                  scope_type=RoleGrantScope.SCOPE_OWN,
-                  tenant=None,
-                  tenant_group=None,
-              )
+              provision_tenant_role(principal, role_name)
               return principal
+
+          provision_tenant_role(user, "Administrator")
+          print("E2E admin role boundary provisioned with tenant-local grant.")
 
           provision_role_principal(
               os.environ["E2E_OPERATOR_USERNAME"],
