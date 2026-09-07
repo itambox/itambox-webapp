@@ -317,6 +317,11 @@ class AssetCloneView(ObjectCloneView):
     model_form = forms.AssetForm
     template_name = "generic/object_edit.html"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
     def pre_save_clone(self, original, cloned):
         cloned.asset_tag = ""
 
