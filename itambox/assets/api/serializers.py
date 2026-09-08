@@ -40,6 +40,7 @@ from assets.models import (
     Warranty,
 )
 from assets.services.specifications.contracts import (
+    CommandRejectedDTO,
     DefinitionRevision,
     DestinationAssetTypeSelectionDTO,
     ResourceRevision,
@@ -274,7 +275,9 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
                         )
                     )
                     if getattr(preview, "issues", ()):
-                        raise DjangoValidationError("; ".join(issue.message_key for issue in preview.issues))
+                        command_success_or_raise(
+                            CommandRejectedDTO(outcome="rejected", safe_owner=None, issues=tuple(preview.issues))
+                        )
                     expected_definition_revision = preview.expected_definition_revision
                     if preview_token is None:
                         preview_token = preview.preview_token
