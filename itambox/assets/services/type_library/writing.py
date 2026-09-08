@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from assets.models.asset import Asset
 from assets.models.catalog import AssetType, AssetTypeFieldset, Category, Manufacturer
-from assets.services.type_library.planning import LibraryPlan
+from assets.services.type_library.planning import LibraryPlan, _entity_map
 from assets.services.type_library_validation import ValidatedLibraryDocument
 from extras.models import (
     CustomField,
@@ -77,6 +77,7 @@ def write_library_document(
         )
         release.save(using=using)
 
+    _preserve_local_overrides(library, definitions, plan)
     _WriteContext(library=library, definitions=definitions, using=using).write_all()
     library.accept_release(release, using=using)
     return tuple(action.action_id for action in plan.actions if action.decision == "take_upstream")
@@ -113,6 +114,28 @@ def _source_and_definitions(
     if incoming.kind == "itambox.type-library.snapshot":
         return deepcopy(document["upstream"]), deepcopy(document["effective_definitions"])
     raise LibraryWriteError("INVALID_EXPORT_KIND")
+
+
+def _preserve_local_overrides(library: Any, definitions: dict[str, Any], plan: LibraryPlan) -> None:
+    retained = [action for action in plan.actions if action.decision == "keep_local"]
+    if not retained:
+        return
+    current = _entity_map(effective_definitions_from_library(library))
+    desired = _entity_map(definitions)
+    for action in retained:
+        _, section, identity, *path = action.path
+        _restore_local_path(desired[(section, identity)], current[(section, identity)], path)
+
+
+def _restore_local_path(desired: dict[str, Any], current: Mapping[str, Any], path: list[str]) -> None:
+    for key in path[:-1]:
+        desired = desired.setdefault(key, {})
+        current = current.get(key, {})
+    key = path[-1]
+    if key in current:
+        desired[key] = deepcopy(current[key])
+    else:
+        desired.pop(key, None)
 
 
 def _is_noop(library: Any, plan: LibraryPlan) -> bool:

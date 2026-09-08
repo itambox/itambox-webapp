@@ -234,6 +234,7 @@ def _apply_library_plan_locked(
                 label=source["library"].get("label", ""),
             )
             library.save(using=using)
+        accepted_release_before = library.accepted_release_id
         try:
             changed = tuple(write_library_document(library, incoming, prepared, using))
         except LibraryWriteError as exc:
@@ -244,7 +245,7 @@ def _apply_library_plan_locked(
             plan_digest=prepared.plan_digest,
             source_digest=prepared.source_digest,
             changed_action_ids=changed,
-            no_op=not changed,
+            no_op=not changed and library.accepted_release_id == accepted_release_before,
         )
 
 

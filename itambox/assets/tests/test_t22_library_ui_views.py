@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
+from assets.api.tests.test_type_library_http import _snapshot_rows
 from assets.tests.test_t17_type_library_validation import _release_document
 from extras.models import CustomField, SpecificationLibrary
 
@@ -177,11 +178,26 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         resolved_preview = self.client.post(reverse("assets:type_library_import"), resolution_data)
         self.assertTrue(resolved_preview.context["preview"].plan.can_apply)
         applied = self._apply_preview(resolved_preview)
+        self.assertFalse(applied.context["result"].no_op)
         self.assertContains(applied, "The Library was applied successfully.")
         self.assertEqual(
             CustomField.objects.get(namespace="acme", name="acme__state").label,
             "Local State" if decision == "keep_local" else "Upstream State",
         )
+        accepted = SpecificationLibrary.objects.get(namespace="acme").accepted_release
+        self.assertEqual(accepted.sequence, 2)
+        self.assertEqual(
+            next(
+                field["label"]
+                for field in accepted.source_document["definitions"]["fields"]
+                if field["key"] == "acme__state"
+            ),
+            "Upstream State",
+        )
+        before_reimport = _snapshot_rows()
+        reimport = self._apply_preview(self._upload(self._document(release=2, label="Upstream State")))
+        self.assertTrue(reimport.context["result"].no_op)
+        self.assertEqual(_snapshot_rows(), before_reimport)
 
     def test_stale_apply_refreshes_preview_and_retains_original_source(self):
         self._apply_preview(self._upload(self._document()))
