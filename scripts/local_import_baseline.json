@@ -424,12 +424,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/views/assettype_views.py",
-      "context": "ClassDef:AssetTypeEditView/FunctionDef:post",
-      "statement": "from django.shortcuts import render",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/views/bulk_scan_views.py",
       "context": "FunctionDef:_enqueue",
       "statement": "from django_q.tasks import async_task",

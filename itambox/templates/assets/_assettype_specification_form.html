@@ -1,0 +1,231 @@
+{% load crispy_forms_tags i18n %}
+<form method="post"
+      action="{{ request.path }}"
+      enctype="multipart/form-data"
+      id="asset-type-specification-form"
+      data-specification-editor>
+  {% csrf_token %}
+  {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+  {{ form.non_field_errors }}
+  {% if form.specification_revision_conflict %}
+    <div class="alert alert-warning" role="alert" data-specification-stale>
+      {% translate "This specification changed while you were editing. Your draft is retained; refresh the specification and review it before saving again." %}
+    </div>
+  {% endif %}
+  <section class="card mb-4" aria-labelledby="asset-type-general-heading">
+    <div class="card-header">
+      <h3 id="asset-type-general-heading" class="h5 mb-0">{% translate "General information" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.manufacturer|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.model|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.part_number|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.ean|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.slug|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.eol_months|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.image|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.description|as_crispy_field }}</div>
+      </div>
+    </div>
+  </section>
+  <section class="card mb-4" aria-labelledby="asset-type-classification-heading">
+    <div class="card-header">
+      <h3 id="asset-type-classification-heading" class="h5 mb-0">{% translate "Classification and financial" %}</h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">{{ form.category|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.asset_role|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.depreciation|as_crispy_field }}</div>
+        <div class="col-md-4">{{ form.requestable|as_crispy_field }}</div>
+      </div>
+    </div>
+  </section>
+  <section class="card mb-4"
+           aria-labelledby="asset-type-fieldsets-heading"
+           data-specification-composition>
+    <div class="card-header">
+      <h3 id="asset-type-fieldsets-heading" class="h5 mb-0">{% translate "Specification sections" %}</h3>
+      <p class="text-muted small mb-0">{% translate "Choose the ordered sections that define specifications for this model." %}</p>
+    </div>
+    <div class="card-body">
+      <p class="visually-hidden" aria-live="polite" data-specification-live></p>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <h4 class="h6">{% translate "Selected sections" %}</h4>
+          <div class="vstack gap-2" data-specification-selected-list>
+            {% for option in form.specification_fieldset_options %}
+              {% if option.selected %}
+                <article class="border rounded p-3"
+                         data-specification-fieldset
+                         data-fieldset-id="{{ option.id }}"
+                         data-fieldset-label="{{ option.label }}"
+                         data-selected="true"
+                         data-has-stored-values="{{ option.has_stored_values|yesno:'true,false' }}"
+                         aria-posinset="{{ forloop.counter }}"
+                         aria-setsize="{{ form.specification_fieldset_options|length }}">
+                  <div class="d-flex align-items-start gap-2">
+                    <input type="checkbox"
+                           class="form-check-input mt-1"
+                           data-specification-fieldset-toggle
+                           checked
+                           aria-label="{% blocktranslate with label=option.label %}Keep {{ label }} selected{% endblocktranslate %}">
+                    <div class="flex-grow-1">
+                      <div class="fw-semibold">{{ option.label }}</div>
+                      <div class="small text-muted">{{ option.identity }} · {{ option.source }}</div>
+                      {% if option.description %}<div class="small mt-1">{{ option.description }}</div>{% endif %}
+                    </div>
+                    <div class="btn-group btn-group-sm"
+                         role="group"
+                         aria-label="{% blocktranslate with label=option.label %}Reorder {{ label }}{% endblocktranslate %}">
+                      <button type="button"
+                              class="btn btn-outline-secondary"
+                              data-specification-move="up"
+                              aria-label="{% translate 'Move section up' %}">↑</button>
+                      <button type="button"
+                              class="btn btn-outline-secondary"
+                              data-specification-move="down"
+                              aria-label="{% translate 'Move section down' %}">↓</button>
+                    </div>
+                  </div>
+                </article>
+              {% endif %}
+            {% empty %}
+              <p class="text-muted mb-0">{% translate "No specification sections selected." %}</p>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <h4 class="h6">{% translate "Available sections" %}</h4>
+          <div class="vstack gap-2" data-specification-available-list>
+            {% for option in form.specification_fieldset_options %}
+              {% if not option.selected %}
+                <article class="border rounded p-3"
+                         data-specification-fieldset
+                         data-fieldset-id="{{ option.id }}"
+                         data-fieldset-label="{{ option.label }}"
+                         data-selected="false"
+                         data-has-stored-values="{{ option.has_stored_values|yesno:'true,false' }}">
+                  <div class="d-flex align-items-start gap-2">
+                    <input type="checkbox"
+                           class="form-check-input mt-1"
+                           data-specification-fieldset-toggle{% if option.deprecated %}
+                           disabled{% endif %}
+                           aria-label="{% blocktranslate with label=option.label %}Add {{ label }}{% endblocktranslate %}">
+                    <div class="flex-grow-1">
+                      <div class="fw-semibold">{{ option.label }}</div>
+                      <div class="small text-muted">{{ option.identity }} · {{ option.source }}</div>
+                      {% if option.description %}<div class="small mt-1">{{ option.description }}</div>{% endif %}
+                      {% if option.has_stored_values %}
+                        <div class="small text-warning" data-specification-retained-notice>{% translate "Stored values are retained until explicitly cleared." %}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </article>
+              {% endif %}
+            {% empty %}
+              <p class="text-muted mb-0">{% translate "No additional sections are available." %}</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="card mb-4" aria-labelledby="asset-type-values-heading">
+    <div class="card-header">
+      <h3 id="asset-type-values-heading" class="h5 mb-0">{% translate "Model specification values" %}</h3>
+    </div>
+    <div class="card-body">
+      {% for section in form.specification_sections %}
+        <fieldset class="border rounded p-3 mb-3"
+                  data-specification-section="{{ section.identity }}">
+          <legend class="float-none w-auto px-2 h6 mb-0">{{ section.label }}</legend>
+          {% if section.description %}<p class="small text-muted">{{ section.description }}</p>{% endif %}
+          <div class="row g-3">
+            {% for item in section.fields %}
+              <div class="col-md-6">
+                {{ item.bound|as_crispy_field }}
+                {% if item.presence %}{{ item.presence|as_crispy_field }}{% endif %}
+                {% if item.clear %}{{ item.clear|as_crispy_field }}{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </fieldset>
+      {% empty %}
+        <p class="text-muted mb-0">{% translate "No specification fields are defined for this selection." %}</p>
+      {% endfor %}
+    </div>
+  </section>
+  <details class="card mb-4" data-specification-history>
+    <summary class="card-header h6">{% translate "Previous specification values" %}</summary>
+    <div class="card-body">
+      {% if form.specification_history %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>{% translate "Field" %}</th>
+                <th>{% translate "Stored value" %}</th>
+                <th>{% translate "State" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in form.specification_history %}
+                <tr data-specification-history-key="{{ entry.key }}">
+                  <th scope="row">{{ entry.label }}</th>
+                  <td>{{ entry.display_value }}</td>
+                  <td><span class="badge text-bg-secondary">{{ entry.state }}</span>{% for reason in entry.reasons %}<span class="small text-muted d-block">{{ reason }}</span>{% endfor %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">{% translate "No previous values are stored." %}</p>
+      {% endif %}
+    </div>
+  </details>
+  <section class="card mb-4" aria-labelledby="asset-type-additional-heading">
+    <div class="card-header">
+      <h3 id="asset-type-additional-heading" class="h5 mb-0">{% translate "Additional information" %}</h3>
+    </div>
+    <div class="card-body">
+      {{ form.comments|as_crispy_field }}
+      {{ form.tags|as_crispy_field }}
+    </div>
+  </section>
+  {% if form.specification_revision_conflict %}
+    <button type="button"
+            class="btn btn-outline-primary mt-2"
+            data-specification-reload
+            hx-post="{{ request.path }}"
+            hx-trigger="click"
+            hx-target="closest form"
+            hx-swap="outerHTML"
+            hx-include="closest form"
+            hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
+  {% else %}
+    <button type="button"
+            class="d-none"
+            data-specification-reload
+            hx-post="{{ request.path }}"
+            hx-trigger="click"
+            hx-target="closest form"
+            hx-swap="outerHTML"
+            hx-include="closest form"
+            hx-vals='{"_reload":"1"}'>{% translate "Refresh specification" %}</button>
+  {% endif %}
+  <div class="mt-4">
+    <button type="submit" class="btn btn-primary">
+      {% if form.instance.pk %}
+        {% translate "Update" %}
+      {% else %}
+        {% translate "Create" %}
+      {% endif %}
+    </button>
+    <a href="{% if form.instance.pk %}{{ form.instance.get_absolute_url }}{% else %}{% url 'assets:assettype_list' %}{% endif %}"
+       class="btn btn-outline-secondary ms-2"
+       data-no-dirty-track="true">{% translate "Cancel" %}</a>
+  </div>
+</form>

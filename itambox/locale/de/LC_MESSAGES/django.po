@@ -14169,6 +14169,205 @@ msgstr "Ablaufzeitpunkt"
 msgid "Stage ID"
 msgstr "Stage-ID"
 
+#: itambox/assets/forms/assettype_form.py
+#, python-format
+msgid "Add %(label)s"
+msgstr "%(label)s hinzufügen"
+
+#: itambox/assets/forms/asset_form.py itambox/assets/forms/assettype_form.py
+msgid "Additional specifications"
+msgstr "Zusätzliche Spezifikationen"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Additional information"
+msgstr "Zusätzliche Informationen"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Asset specification values"
+msgstr "Spezifikationswerte des Assets"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Available sections"
+msgstr "Verfügbare Abschnitte"
+
+#: itambox/assets/forms/asset_form.py itambox/assets/forms/assettype_form.py
+msgid "Choose either removal or an explicit value, not both."
+msgstr "Wählen Sie entweder das Entfernen oder einen expliziten Wert, nicht beides."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Choose the ordered sections that define specifications for this model."
+msgstr "Wählen Sie die geordneten Abschnitte aus, die die Spezifikationen für dieses Modell festlegen."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Choose whether this draft value is omitted, explicit, empty, or null."
+msgstr "Wählen Sie, ob dieser Entwurfswert weggelassen, explizit, leer oder null sein soll."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Classification and financial"
+msgstr "Klassifizierung und Finanzen"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Copy to asset draft"
+msgstr "In den Asset-Entwurf kopieren"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Deprecated choice"
+msgstr "Veraltete Auswahl"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Deprecated field"
+msgstr "Veraltetes Feld"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Explicit null"
+msgstr "Explizites Null"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "General information"
+msgstr "Allgemeine Informationen"
+
+#: itambox/assets/forms/asset_form.py itambox/assets/forms/assettype_form.py
+msgid "Global specifications and values retained from an earlier composition."
+msgstr "Globale Spezifikationen und Werte aus einer früheren Zusammensetzung bleiben erhalten."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Inactive composition"
+msgstr "Inaktive Zusammensetzung"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Invalid stored value"
+msgstr "Ungültiger gespeicherter Wert"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+#, python-format
+msgid "Keep %(label)s selected"
+msgstr "%(label)s ausgewählt lassen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Leave unchanged"
+msgstr "Unverändert lassen"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Model default"
+msgstr "Modellstandard"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Model specification values"
+msgstr "Spezifikationswerte des Modells"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Model specifications"
+msgstr "Modellspezifikationen"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Move section down"
+msgstr "Abschnitt nach unten verschieben"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Move section up"
+msgstr "Abschnitt nach oben verschieben"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "No additional sections are available."
+msgstr "Keine weiteren Abschnitte verfügbar."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "No longer offered"
+msgstr "Nicht mehr angeboten"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "No previous values are stored."
+msgstr "Keine früheren Werte gespeichert."
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "No specification fields are defined for this Asset Type."
+msgstr "Für diesen Asset-Typ sind keine Spezifikationsfelder definiert."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "No specification fields are defined for this selection."
+msgstr "Für diese Auswahl sind keine Spezifikationsfelder definiert."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "No specification sections selected."
+msgstr "Keine Spezifikationsabschnitte ausgewählt."
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Notes and tags"
+msgstr "Notizen und Tags"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Optional warranty"
+msgstr "Optionale Garantie"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Presence"
+msgstr "Wertstatus"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "Previous specification values"
+msgstr "Frühere Spezifikationswerte"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Procurement and financial"
+msgstr "Beschaffung und Finanzen"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "Refresh specification"
+msgstr "Spezifikation aktualisieren"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+#, python-format
+msgid "Reorder %(label)s"
+msgstr "Reihenfolge von %(label)s ändern"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Selected sections"
+msgstr "Ausgewählte Abschnitte"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set empty selection"
+msgstr "Leere Auswahl setzen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set explicit empty text"
+msgstr "Explizit leeren Text setzen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set explicit null"
+msgstr "Expliziten Nullwert setzen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set value"
+msgstr "Wert setzen"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Specification sections"
+msgstr "Spezifikationsabschnitte"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "Stored value"
+msgstr "Gespeicherter Wert"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Stored values are retained until explicitly cleared."
+msgstr "Gespeicherte Werte bleiben erhalten, bis sie explizit gelöscht werden."
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "This Asset Type has no model specifications."
+msgstr "Dieser Asset-Typ hat keine Modellspezifikationen."
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "This specification changed while you were editing. Your draft is retained; refresh the specification and review it before saving again."
+msgstr "Diese Spezifikation wurde während der Bearbeitung geändert. Ihr Entwurf bleibt erhalten; aktualisieren Sie die Spezifikation und prüfen Sie sie erneut, bevor Sie speichern."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Unknown definition"
+msgstr "Unbekannte Definition"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Unset"
+msgstr "Nicht festgelegt"
+
 #: itambox/assets/models/catalog.py
 msgid "Storage Key"
 msgstr "Speicherschlüssel"

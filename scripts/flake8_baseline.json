@@ -2046,14 +2046,6 @@
     {
       "path": "itambox/assets/views/asset_views.py",
       "code": "F401",
-      "message": "'django.core.exceptions.ValidationError' imported but unused",
-      "source": "from django.core.exceptions import PermissionDenied, ValidationError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F401",
       "message": "'django.db.models.Count' imported but unused",
       "source": "from django.db.models import Count, Prefetch",
       "context": "Module:body",

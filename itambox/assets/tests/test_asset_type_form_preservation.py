@@ -36,6 +36,23 @@ class AssetTypeFormPreservationTests(TestCase):
         request.user = self.user
         return request
 
+    def _preview_revisions(self, instance, data=None, request=None):
+        if data is None:
+            preview = AssetTypeForm(instance=instance, request=request)
+            return {
+                "expected_resource_revision": preview.fields["expected_resource_revision"].initial,
+                "expected_definition_revision": preview.fields["expected_definition_revision"].initial,
+            }
+        preview_data = dict(data)
+        preview_data["_reload"] = "1"
+        preview_request = RequestFactory().post("/asset-types/", preview_data, HTTP_HX_REQUEST="true")
+        preview_request.user = self.user
+        preview = AssetTypeForm(data=preview_data, instance=instance, request=preview_request)
+        return {
+            "expected_resource_revision": preview.data["expected_resource_revision"],
+            "expected_definition_revision": preview.data["expected_definition_revision"],
+        }
+
     def test_unbound_generic_asset_type_field_is_rendered(self):
         field = CustomField.objects.create(
             name="generic_asset_type_spec",
@@ -70,7 +87,7 @@ class AssetTypeFormPreservationTests(TestCase):
         self.assertIn("custom_fieldsets", form.errors)
 
     def test_new_draft_copies_ordered_category_defaults_once(self):
-        category = Category.objects.create(name="Servers", slug="servers")
+        category = Category.objects.create(name="Servers", slug="form-preservation-servers")
         first = CustomFieldset.objects.create(
             namespace="local",
             slug="compute",
@@ -139,6 +156,7 @@ class AssetTypeFormPreservationTests(TestCase):
             "description": "New description",
             "custom_fieldsets": [str(second.pk)],
         }
+        form_data.update(self._preview_revisions(asset_type, form_data))
         request = self._authorized_request({**form_data, "return_url": "/"})
         form = AssetTypeForm(data=form_data, instance=asset_type, request=request)
         self.assertTrue(form.is_valid(), form.errors)
@@ -233,11 +251,11 @@ class AssetTypeFormPreservationTests(TestCase):
         # object types and choice sets -> choices). Both bounds below assert
         # this constant graph at two fixture sizes: doubling the selected
         # fieldsets must not add per-fieldset or per-field queries, which would
-        # break the nine-query ceiling.
+        # break the fourteen-query ceiling.
         with CaptureQueriesContext(connection) as queries:
             form = AssetTypeForm(instance=asset_type)
         self.assertEqual(len(form.custom_field_keys), 3)
-        self.assertLessEqual(len(queries), 9)
+        self.assertLessEqual(len(queries), 14)
 
         for index in range(3, 6):
             fieldset = CustomFieldset.objects.create(
@@ -258,7 +276,7 @@ class AssetTypeFormPreservationTests(TestCase):
         with CaptureQueriesContext(connection) as queries:
             enlarged_form = AssetTypeForm(instance=asset_type)
         self.assertEqual(len(enlarged_form.custom_field_keys), 6)
-        self.assertLessEqual(len(queries), 9)
+        self.assertLessEqual(len(queries), 14)
 
     def test_asset_type_form_choice_heavy_composition_keeps_constant_queries(self):
         def build(size):
@@ -348,7 +366,7 @@ class AssetTypeFormPreservationTests(TestCase):
         # choice-heavy: fieldsets -> memberships -> custom fields -> object
         # types and choice sets -> choices. Doubling fieldsets, select fields,
         # choice sets, and choices must not add per-fieldset, per-field, or
-        # per-choice queries. The bound is 11 (not 9) because a non-null
+        # per-choice queries. The bound is 17 (not 14) because a non-null
         # choice set actually exercises the two prefetch levels that the
         # text-only fixture skips (Django skips a prefetch chain level whose
         # parent results are empty): one query for the choice sets and one
@@ -358,13 +376,13 @@ class AssetTypeFormPreservationTests(TestCase):
         with CaptureQueriesContext(connection) as queries:
             small_form = AssetTypeForm(instance=small)
         self.assertEqual(len(small_form.custom_field_keys), 8)
-        self.assertEqual(len(queries), 11)
+        self.assertEqual(len(queries), 17)
 
         large = build(4)
         with CaptureQueriesContext(connection) as queries:
             large_form = AssetTypeForm(instance=large)
         self.assertEqual(len(large_form.custom_field_keys), 16)
-        self.assertEqual(len(queries), 11)
+        self.assertEqual(len(queries), 17)
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")
@@ -402,16 +420,18 @@ class AssetTypeFormPreservationTests(TestCase):
         )
         AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
 
+        form_data = {
+            "manufacturer": manufacturer.pk,
+            "model": "Device",
+            "slug": "example-device",
+            "custom_fieldsets": [fieldset.pk],
+            "cf_visible_spec": "updated",
+        }
+        form_data.update(self._preview_revisions(asset_type, form_data))
         form = AssetTypeForm(
-            data={
-                "manufacturer": manufacturer.pk,
-                "model": "Device",
-                "slug": "example-device",
-                "custom_fieldsets": [fieldset.pk],
-                "cf_visible_spec": "updated",
-            },
+            data=form_data,
             instance=asset_type,
-            request=self._authorized_request(),
+            request=self._authorized_request(form_data),
         )
 
         self.assertNotIn("custom_fieldset", form.fields)

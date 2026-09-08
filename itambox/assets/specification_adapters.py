@@ -15,6 +15,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from assets.models import Asset, AssetType
 from assets.services.specifications._command_support import (
     load_effective_definition,
+    load_prospective_definition,
     resource_revision_for_owner,
     stored_values_for,
 )
@@ -209,6 +210,25 @@ def current_specification_plan(
     )
 
 
+def prospective_specification_plan(
+    owner: Asset | AssetType,
+    *,
+    target_kind: str,
+    fieldset_identities: Sequence[str],
+) -> SpecificationPlan:
+    """Build the definition precondition for the submitted composition."""
+    stored = stored_values_for(owner)
+    definition, _definitions, _graph = load_prospective_definition(
+        tuple(fieldset_identities),
+        target_kind,
+        tuple(stored),
+    )
+    return SpecificationPlan(
+        resource_revision=resource_revision_for_owner(owner),
+        definition_revision=DefinitionRevision(definition.revision),
+    )
+
+
 def native_asset_type_create_input(
     values: Mapping[str, object],
     *,
@@ -295,6 +315,7 @@ __all__ = [
     "native_asset_type_create_input",
     "owner_id_from_result",
     "patch_from_mapping",
+    "prospective_specification_plan",
     "require_command_success",
     "specification_patch",
     "stage_uploaded_image",

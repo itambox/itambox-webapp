@@ -10,7 +10,6 @@ from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from rest_framework import serializers as drf_serializers
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
 from assets.api.specification_api import SpecificationCommandAPIException

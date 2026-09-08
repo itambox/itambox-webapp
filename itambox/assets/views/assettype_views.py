@@ -1,6 +1,7 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
@@ -90,7 +91,7 @@ class AssetTypeEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetType.objects.all()
     model = AssetType
     model_form = forms.AssetTypeForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/assettype_specification_form.html"
     quick_add_target = "id_asset_type"
 
     def get_form_kwargs(self):
@@ -102,10 +103,17 @@ class AssetTypeEditView(QuickAddMixin, ObjectEditView):
         if request.headers.get("HX-Request") and "_reload" in request.POST:
             self.object = self.get_object() if self.kwargs.get("pk") else None
             form = self.get_form()
-            from django.shortcuts import render
-
-            return render(request, "htmx/crispy_form.html", {"form": form})
+            context = self.get_context_data(form=form)
+            return render(request, "assets/_assettype_specification_form.html", context)
         return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            form.specification_revision_conflict = True
+            return self.form_invalid(form)
 
 
 class AssetTypeDeleteView(ObjectDeleteView):
@@ -136,7 +144,7 @@ class AssetTypeDeleteView(ObjectDeleteView):
 class AssetTypeCloneView(ObjectCloneView):
     model = AssetType
     model_form = forms.AssetTypeForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/assettype_specification_form.html"
     default_return_url = "assets:assettype_list"
 
     def get_form_kwargs(self):

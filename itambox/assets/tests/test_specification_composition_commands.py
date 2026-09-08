@@ -16,7 +16,11 @@ from django.test import TestCase
 from assets.models.asset import Asset
 from assets.models.catalog import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
 from assets.models.tagsequence import AssetTagSequence
-from assets.services.specifications._command_support import load_effective_definition, resource_revision_for_owner
+from assets.services.specifications._command_support import (
+    load_effective_definition,
+    load_prospective_definition,
+    resource_revision_for_owner,
+)
 from assets.services.specifications.commands import set_asset_type_composition, set_category_defaults
 from assets.services.specifications.contracts import (
     CommandRejectedDTO,
@@ -134,13 +138,20 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
             authentication_revision=authentication_revision_for_actor(self.user),
         )
 
-    def _type_plan(self):
+    def _type_plan(self, fieldsets=None):
         owner = AssetType.all_objects.get(pk=self.type.pk)
-        definition, _definitions = load_effective_definition(
-            owner.pk,
-            "asset_type",
-            tuple(owner.custom_field_data),
-        )
+        if fieldsets is not None:
+            definition, _definitions, _graph = load_prospective_definition(
+                tuple(f"{fieldset.namespace}/{fieldset.slug}" for fieldset in fieldsets),
+                "asset_type",
+                tuple(owner.custom_field_data),
+            )
+        else:
+            definition, _definitions = load_effective_definition(
+                owner.pk,
+                "asset_type",
+                tuple(owner.custom_field_data),
+            )
         return resource_revision_for_owner(owner), definition.revision
 
     def _category_plan(self):
@@ -177,7 +188,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
             ExplicitFieldsetSelectionDTO(("local/first/extra",))
 
     def test_type_composition_explicit_empty_clears_membership_but_preserves_stored_history(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan(())
         result = set_asset_type_composition(
             actor=self._actor(),
             asset_type_id=self.type.pk,
@@ -195,7 +206,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(result.owner.owner_id, self.type.pk)
 
     def test_type_composition_persists_requested_order_as_dense_ordinals(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.second, self.first))
         result = set_asset_type_composition(
             actor=self._actor(),
             asset_type_id=self.type.pk,
@@ -216,7 +227,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         )
 
     def test_duplicate_field_keys_resolve_once_with_ordered_provenance(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.first, self.second))
         result = set_asset_type_composition(
             actor=self._actor(),
             asset_type_id=self.type.pk,
@@ -319,7 +330,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         )
 
     def test_proposed_required_definition_rejects_combined_patch_atomically(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.required,))
         before_values = AssetType.all_objects.get(pk=self.type.pk).custom_field_data
         before_memberships = list(
             AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset_id", "position")
@@ -343,7 +354,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         )
 
     def test_owner_save_failure_rolls_back_membership_and_audit_side_effects(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.second,))
         before_memberships = list(
             AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset_id", "position")
         )
@@ -591,7 +602,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(result.issues[0].code, "OBJECT_UNAVAILABLE")
 
     def test_graph_definition_reads_are_owned_by_loader(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.second,))
         reads = []
 
         def check(execute, sql, params, many, context):
@@ -620,7 +631,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertTrue(reads)
 
     def test_type_success_is_once_only_actor_attributed_and_never_propagates_to_asset(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.required,))
         before_asset = Asset.all_objects.filter(pk=self.asset.pk).values().get()
         before_audit = self._changes(AssetType, self.type.pk).count()
         queries = []
