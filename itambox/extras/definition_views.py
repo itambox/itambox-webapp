@@ -39,7 +39,6 @@ from extras.services.definition_commands import (
     update_custom_field_choice,
     update_custom_field_choice_set,
 )
-from extras.services._definition_command_support import resource_revision_for_definition
 from extras.services.specifications.contracts import QualifiedIdentity
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
