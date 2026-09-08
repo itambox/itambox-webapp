@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory
@@ -27,6 +30,7 @@ from assets.services.specifications.contracts import (
     ResourceRevision,
     SpecificationDefinitionDTO,
 )
+from extras.customfields import validate_custom_field_data_values
 from extras.services.specifications.contracts import (
     ChoiceDTO,
     ChoiceSetDTO,
@@ -38,6 +42,43 @@ from extras.services.specifications.contracts import (
     SpecificationProjectionEntryDTO,
     SpecificationValidationDTO,
 )
+from extras.customfields import validate_custom_field_data_values
+
+
+class TemperatureRuleDomainCharacterizationTests(SimpleTestCase):
+    @staticmethod
+    def _definitions():
+        common = {
+            "field_type": "decimal",
+            "decimal_scale": 2,
+            "minimum_value": None,
+            "maximum_value": None,
+            "nullable": False,
+            "required": False,
+            "lifecycle": "active",
+            "read_only": False,
+        }
+        minimum = SimpleNamespace(name="operating_temperature_min", validation_rule=None, **common)
+        maximum = SimpleNamespace(
+            name="operating_temperature_max",
+            validation_rule="temperature_max_gte_min",
+            **common,
+        )
+        return (minimum, maximum)
+
+    def test_ordered_temperature_values_are_valid(self):
+        validate_custom_field_data_values(
+            self._definitions(),
+            {"operating_temperature_min": "5.00", "operating_temperature_max": "10.00"},
+        )
+
+    def test_inverted_temperature_values_raise_invalid_range(self):
+        with self.assertRaises(ValidationError) as raised:
+            validate_custom_field_data_values(
+                self._definitions(),
+                {"operating_temperature_min": "10.00", "operating_temperature_max": "5.00"},
+            )
+        self.assertEqual(raised.exception.code, "INVALID_RANGE")
 
 
 class SpecificationTransportSerializerTests(SimpleTestCase):

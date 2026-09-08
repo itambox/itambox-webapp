@@ -406,7 +406,7 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         self.assertEqual(asset_type.custom_field_data, {"required_clear_spec": "keep"})
         self.assertEqual(asset_type.updated_at, original_updated_at)
 
-    def test_asset_type_temperature_rule_patch_returns_validation_error(self):
+    def test_asset_type_temperature_rule_patch_rejects_invalid_range(self):
         minimum = CustomField.objects.get(name="operating_temperature_min")
         maximum = CustomField.objects.get(name="operating_temperature_max")
         CustomFieldsetField.objects.filter(custom_field__in=(minimum, maximum)).delete()
@@ -451,8 +451,8 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
             serializer.save()
         self._assert_structured_specification_error(
             raised,
-            "REFERENCE_CONFLICT",
-            status_code=409,
+            "INVALID_RANGE",
+            status_code=400,
         )
         asset_type.refresh_from_db()
         self.assertEqual(asset_type.custom_field_data, {})
