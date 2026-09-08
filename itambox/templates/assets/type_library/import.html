@@ -64,6 +64,11 @@
           <h3 id="preview-title" class="card-title">{% translate "2. Review preview" %}</h3>
         </div>
         <div class="card-body">
+          {% if apply_form.non_field_errors %}
+            <div class="alert alert-danger" role="alert" aria-live="assertive">
+              {% for error in apply_form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+          {% endif %}
           {% if preview %}
             <div class="alert alert-warning" role="note">
               <strong>{% translate "Preview is not an apply." %}</strong>
@@ -129,11 +134,6 @@
                     data-library-apply-form>
                 {% csrf_token %}
                 {% for hidden in apply_form.hidden_fields %}{{ hidden }}{% endfor %}
-                {% if apply_form.non_field_errors %}
-                  <div class="alert alert-danger" role="alert" aria-live="assertive">
-                    {% for error in apply_form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-                  </div>
-                {% endif %}
                 {% if preview.plan.conflicts %}
                   <fieldset>
                     <legend class="h5">{% translate "3. Choose conflict resolutions" %}</legend>
