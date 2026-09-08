@@ -13,7 +13,6 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView, DetailView, FormView, ListView, UpdateView
-from django.core.exceptions import PermissionDenied
 
 from core.context import get_current_all_accessible
 from extras.definition_forms import (
