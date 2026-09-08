@@ -8,6 +8,11 @@ from copy import deepcopy
 import pytest
 
 from assets.services.specifications.preview_tokens import PreviewTokenError
+from assets.services.type_library.application import (
+    LibraryApplyError,
+    LibraryApplyRequest,
+    prepare_library_apply,
+)
 from assets.services.type_library.planning import (
     LibraryPlanningError,
     LibraryReconciliationState,
@@ -195,3 +200,73 @@ def test_preview_token_binds_source_state_resolutions_actor_scope_and_expiry():
             signing_key="test-only-key",
             now=1_900,
         )
+
+
+def test_apply_recomputes_the_bound_plan_before_any_write():
+    baseline = _release_document()
+    local = deepcopy(baseline)
+    incoming = deepcopy(baseline)
+    local["definitions"]["fields"][0]["label"] = "Local label"  # type: ignore[index]
+    incoming["library"]["release"] = 2  # type: ignore[index]
+    incoming["definitions"]["fields"][0]["label"] = "Upstream label"  # type: ignore[index]
+    state = _state(baseline, local=local)
+    incoming_validated = _validated(incoming)
+    unresolved = plan_reconciliation(state, incoming_validated)
+    resolutions = {action.action_id: "take_upstream" for action in unresolved.conflicts}
+    plan = plan_reconciliation(state, incoming_validated, resolutions=resolutions)
+    token = issue_library_preview_token(
+        plan,
+        actor_id=7,
+        authentication_revision="auth-r1",
+        access_scope_fingerprint="scope-a",
+        signing_key="test-only-key",
+    )
+    request = LibraryApplyRequest(
+        plan=plan,
+        token=token,
+        actor_id=7,
+        authentication_revision="auth-r1",
+        access_scope_fingerprint="scope-a",
+        signing_key="test-only-key",
+    )
+
+    prepared = prepare_library_apply(
+        request,
+        incoming_validated,
+        state,
+        authorize=lambda: True,
+    )
+
+    assert prepared.plan_digest == plan.plan_digest
+    assert prepared.can_apply is True
+
+
+def test_apply_rejects_state_drift_and_current_authorization_failure():
+    baseline = _release_document()
+    incoming = deepcopy(baseline)
+    incoming["library"]["release"] = 2  # type: ignore[index]
+    incoming["definitions"]["fields"][0]["label"] = "Upstream label"  # type: ignore[index]
+    state = _state(baseline)
+    incoming_validated = _validated(incoming)
+    plan = plan_reconciliation(state, incoming_validated)
+    token = issue_library_preview_token(
+        plan,
+        actor_id=7,
+        authentication_revision="auth-r1",
+        access_scope_fingerprint="scope-a",
+        signing_key="test-only-key",
+    )
+    request = LibraryApplyRequest(
+        plan=plan,
+        token=token,
+        actor_id=7,
+        authentication_revision="auth-r1",
+        access_scope_fingerprint="scope-a",
+        signing_key="test-only-key",
+    )
+    drifted = _state(baseline, local=deepcopy(incoming))
+
+    with pytest.raises(LibraryApplyError, match="STALE_PLAN"):
+        prepare_library_apply(request, incoming_validated, drifted, authorize=lambda: True)
+    with pytest.raises(LibraryApplyError, match="OBJECT_UNAVAILABLE"):
+        prepare_library_apply(request, incoming_validated, state, authorize=lambda: False)
