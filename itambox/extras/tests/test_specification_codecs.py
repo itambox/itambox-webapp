@@ -312,6 +312,16 @@ class SpecificationPatchTests(unittest.TestCase):
                 validation_data=validation(max_values=2),
             ),
             FieldKey("cost"): field("cost", "decimal", validation_data=validation(scale=2)),
+            FieldKey("operating_temperature_min"): field(
+                "operating_temperature_min",
+                "decimal",
+                validation_data=validation(scale=2),
+            ),
+            FieldKey("operating_temperature_max"): field(
+                "operating_temperature_max",
+                "decimal",
+                validation_data=validation(scale=2, rule="temperature_max_gte_min"),
+            ),
         }
 
     def test_duplicate_setters_are_rejected_before_mapping_and_do_not_mutate_storage(self):
@@ -380,6 +390,143 @@ class SpecificationPatchTests(unittest.TestCase):
         self.assertEqual(result.set_values, {"owner_note": "  keep whitespace  "})
         self.assertEqual(result.clear_keys, ("serial",))
         self.assertEqual(initial["serial"], "ABC-1")
+
+    def test_temperature_rule_accepts_ordered_values_and_returns_maximum_issue_for_inverted_values(self):
+        fields = {
+            FieldKey("operating_temperature_min"): self.fields[FieldKey("operating_temperature_min")],
+            FieldKey("operating_temperature_max"): self.fields[FieldKey("operating_temperature_max")],
+        }
+        result = normalize_specification_patch(
+            fields,
+            {},
+            setters=(
+                ("operating_temperature_min", "5.00"),
+                ("operating_temperature_max", "10.00"),
+            ),
+            operation="value_edit",
+        )
+        self.assertEqual(
+            result.stored_values,
+            {"operating_temperature_min": "5.00", "operating_temperature_max": "10.00"},
+        )
+
+        with self.assertRaises(SpecificationCodecError) as raised:
+            normalize_specification_patch(
+                fields,
+                {},
+                setters=(
+                    ("operating_temperature_min", "10.00"),
+                    ("operating_temperature_max", "5.00"),
+                ),
+                operation="value_edit",
+            )
+        self.assertEqual(issue(raised.exception).code, "INVALID_RANGE")
+        self.assertEqual(issue(raised.exception).field_key, FieldKey("operating_temperature_max"))
+        self.assertEqual(issue(raised.exception).path, ("set", "operating_temperature_max"))
+
+    def test_temperature_rule_merges_min_only_and_max_only_updates(self):
+        fields = {
+            FieldKey("operating_temperature_min"): self.fields[FieldKey("operating_temperature_min")],
+            FieldKey("operating_temperature_max"): self.fields[FieldKey("operating_temperature_max")],
+        }
+        min_only = normalize_specification_patch(
+            fields,
+            {"operating_temperature_max": "10.00"},
+            setters=(("operating_temperature_min", "5.00"),),
+            operation="value_edit",
+        )
+        self.assertEqual(
+            min_only.stored_values,
+            {"operating_temperature_max": "10.00", "operating_temperature_min": "5.00"},
+        )
+        with self.assertRaises(SpecificationCodecError) as min_raised:
+            normalize_specification_patch(
+                fields,
+                {"operating_temperature_max": "10.00"},
+                setters=(("operating_temperature_min", "15.00"),),
+                operation="value_edit",
+            )
+        self.assertEqual(issue(min_raised.exception).code, "INVALID_RANGE")
+
+        max_only = normalize_specification_patch(
+            fields,
+            {"operating_temperature_min": "10.00"},
+            setters=(("operating_temperature_max", "15.00"),),
+            operation="value_edit",
+        )
+        self.assertEqual(
+            max_only.stored_values,
+            {"operating_temperature_min": "10.00", "operating_temperature_max": "15.00"},
+        )
+        missing_min = normalize_specification_patch(
+            fields,
+            {},
+            setters=(("operating_temperature_max", "5.00"),),
+            operation="value_edit",
+        )
+        self.assertEqual(missing_min.stored_values, {"operating_temperature_max": "5.00"})
+        null_min = normalize_specification_patch(
+            fields,
+            {"operating_temperature_min": None},
+            setters=(("operating_temperature_max", "5.00"),),
+            operation="value_edit",
+        )
+        self.assertEqual(
+            null_min.stored_values,
+            {"operating_temperature_min": None, "operating_temperature_max": "5.00"},
+        )
+        with self.assertRaises(SpecificationCodecError) as max_raised:
+            normalize_specification_patch(
+                fields,
+                {"operating_temperature_min": "10.00"},
+                setters=(("operating_temperature_max", "5.00"),),
+                operation="value_edit",
+            )
+        self.assertEqual(issue(max_raised.exception).code, "INVALID_RANGE")
+
+    def test_temperature_rule_preserves_unmentioned_invalid_history_and_unrelated_audit(self):
+        fields = {
+            FieldKey("operating_temperature_min"): self.fields[FieldKey("operating_temperature_min")],
+            FieldKey("operating_temperature_max"): self.fields[FieldKey("operating_temperature_max")],
+            FieldKey("owner_note"): self.fields[FieldKey("owner_note")],
+        }
+        initial = {
+            "operating_temperature_min": "10.00",
+            "operating_temperature_max": "5.00",
+            "owner_note": "before",
+            "historical_untyped": "preserve-me",
+        }
+        value_edit = normalize_specification_patch(
+            fields,
+            initial,
+            setters=(("owner_note", "unrelated correction"),),
+            operation="value_edit",
+        )
+        self.assertEqual(value_edit.stored_values["operating_temperature_min"], "10.00")
+        self.assertEqual(value_edit.stored_values["operating_temperature_max"], "5.00")
+        self.assertEqual(value_edit.stored_values["historical_untyped"], "preserve-me")
+
+        audit = normalize_specification_patch(
+            fields,
+            initial,
+            setters=(("owner_note", "audit note"),),
+            operation="audit",
+        )
+        self.assertEqual(audit.stored_values["operating_temperature_max"], "5.00")
+
+    def test_temperature_rule_validates_when_composition_activates_the_constraint(self):
+        fields = {
+            FieldKey("operating_temperature_min"): self.fields[FieldKey("operating_temperature_min")],
+            FieldKey("operating_temperature_max"): self.fields[FieldKey("operating_temperature_max")],
+        }
+        with self.assertRaises(SpecificationCodecError) as raised:
+            normalize_specification_patch(
+                fields,
+                {"operating_temperature_min": "10.00", "operating_temperature_max": "5.00"},
+                operation="composition_edit",
+                validate_required=False,
+            )
+        self.assertEqual(issue(raised.exception).code, "INVALID_RANGE")
 
     def test_optional_null_empty_false_zero_and_empty_list_are_distinct(self):
         fields = {

@@ -660,6 +660,58 @@ def _proposed_stored_values(
     return proposed
 
 
+_CROSS_FIELD_RULE_MINIMUM_KEYS: Mapping[str, FieldKey] = {
+    "temperature_max_gte_min": FieldKey("operating_temperature_min"),
+}
+_CROSS_FIELD_ACTIVATION_OPERATIONS = frozenset({"create", "asset_type_switch", "composition_edit"})
+
+
+def _stored_decimal_value(value: JSONInputValue | MissingValue) -> Decimal | None:
+    """Read a canonical stored decimal without revalidating historical content."""
+    if type(value) is not str:
+        return None
+    try:
+        parsed = Decimal(value)
+    except (InvalidOperation, ValueError):
+        return None
+    return parsed if parsed.is_finite() else None
+
+
+def _cross_field_issues(
+    definitions: Mapping[FieldKey, FieldDefinitionDTO],
+    proposed_values: Mapping[str, JSONInputValue],
+    *,
+    changed_keys: frozenset[str],
+    operation: SpecificationOperation,
+) -> tuple[SpecificationCodecIssue, ...]:
+    """Validate active cross-field rules only when the target is affected.
+
+    Submitted values have already passed scalar normalization. Values retained from
+    storage may be historical and malformed; an unrelated edit must preserve them
+    rather than turning this relational check into a full-map revalidation.
+    """
+    issues: list[SpecificationCodecIssue] = []
+    for maximum_key, maximum_definition in definitions.items():
+        rule = maximum_definition.validation.rule
+        minimum_key = _CROSS_FIELD_RULE_MINIMUM_KEYS.get(rule or "")
+        if (
+            minimum_key is None
+            or maximum_definition.lifecycle != "active"
+            or definitions.get(minimum_key) is None
+            or definitions[minimum_key].lifecycle != "active"
+        ):
+            continue
+        involved_keys = frozenset({str(minimum_key), str(maximum_key)})
+        if operation not in _CROSS_FIELD_ACTIVATION_OPERATIONS and not changed_keys.intersection(involved_keys):
+            continue
+        minimum_value = _stored_decimal_value(proposed_values.get(minimum_key, MISSING))
+        maximum_value = _stored_decimal_value(proposed_values.get(maximum_key, MISSING))
+        if minimum_value is None or maximum_value is None or maximum_value >= minimum_value:
+            continue
+        issues.append(_issue("INVALID_RANGE", ("set", str(maximum_key)), maximum_key))
+    return tuple(issues)
+
+
 def normalize_specification_patch(
     definitions: Mapping[FieldKey, FieldDefinitionDTO],
     stored_values: Mapping[str, JSONInputValue],
@@ -684,6 +736,14 @@ def normalize_specification_patch(
         raise SpecificationCodecError(issues)
 
     proposed = _proposed_stored_values(stored_values, normalized_values, clear_items)
+    cross_field_issues = _cross_field_issues(
+        definitions,
+        proposed,
+        changed_keys=frozenset({key for key, _ in setter_items}.union(clear_items)),
+        operation=operation,
+    )
+    if cross_field_issues:
+        raise SpecificationCodecError(cross_field_issues)
     should_validate_required = (
         operation_requires_requiredness(operation) if validate_required is None else validate_required
     )
