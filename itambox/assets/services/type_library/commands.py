@@ -19,6 +19,7 @@ from assets.services.type_library.application import (
     LibraryApplyRequest,
     LibraryApplyResult,
     _apply_library_plan_locked,
+    _catalogue_reference_issues,
     _has_global_model_permission,
     _has_library_plan_permissions,
     _reauthorize_apply_actor,
@@ -126,6 +127,10 @@ def preview_library(
                 using=using,
             ):
                 raise LibraryCommandError("OBJECT_UNAVAILABLE")
+            reference_issues = _catalogue_reference_issues(incoming, using=using)
+            if reference_issues:
+                issue = reference_issues[0]
+                raise LibraryCommandError(issue.code, issue.path, str(issue), issues=reference_issues)
             authentication_revision = authentication_revision_for_actor(fresh_actor)
             token = issue_library_preview_token(
                 plan,

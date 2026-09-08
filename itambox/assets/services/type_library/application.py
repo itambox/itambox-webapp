@@ -29,6 +29,7 @@ from assets.services.type_library.planning import (
 )
 from assets.services.type_library.writing import LibraryWriteError, write_library_document
 from assets.services.type_library_validation import ValidatedLibraryDocument
+from assets.services.type_library_validation.errors import ValidationIssue
 from extras.models import (
     CustomField,
     CustomFieldChoice,
@@ -225,6 +226,9 @@ def _apply_library_plan_locked(
             using=using,
         ):
             raise LibraryApplyError("OBJECT_UNAVAILABLE")
+        reference_issues = _catalogue_reference_issues(incoming, using=using)
+        if reference_issues:
+            raise LibraryApplyError(reference_issues[0].code, str(reference_issues[0]))
         if library is None:
             source = incoming.normalized_document
             if incoming.kind == "itambox.type-library.snapshot":
@@ -375,6 +379,30 @@ def _planned_definition_actions(plan: LibraryPlan) -> dict[str, dict[str, set[st
             continue
         actions.setdefault(action.path[1], {}).setdefault(action.identity, set()).add(action.action)
     return actions
+
+
+def _catalogue_reference_issues(incoming: ValidatedLibraryDocument, *, using: str) -> tuple[ValidationIssue, ...]:
+    definitions = _incoming_definitions(incoming)
+    prefix = "effective_definitions" if incoming.kind == "itambox.type-library.snapshot" else "definitions"
+    issues = []
+    for section, model in (("manufacturers", Manufacturer), ("categories", Category)):
+        for index, item in enumerate(definitions.get(section, [])):
+            slug = item["id"].split("/", 1)[1]
+            collision = (
+                model._base_manager.using(using)
+                .filter(name=item["label"], deleted_at__isnull=True)
+                .exclude(slug=slug)
+                .exists()
+            )
+            if collision:
+                issues.append(
+                    ValidationIssue(
+                        "IDENTITY_COLLISION",
+                        (prefix, section, index, "label"),
+                        "Catalogue name already belongs to another identity",
+                    )
+                )
+    return tuple(issues)
 
 
 def _incoming_definitions(incoming: ValidatedLibraryDocument) -> dict[str, list[dict[str, object]]]:
