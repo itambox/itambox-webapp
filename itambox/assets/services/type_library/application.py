@@ -36,7 +36,7 @@ class LibraryApplyRequest:
 
     plan: LibraryPlan
     token: str
-    actor_id: str | int
+    actor_id: int
     authentication_revision: str
     access_scope_fingerprint: str | None
     signing_key: str | bytes
@@ -151,8 +151,9 @@ def apply_library_plan(
     from assets.services._command_support import has_global_model_permission
     from assets.services.specifications.locking import catalogue_transaction_lock
     from assets.services.type_library.exporting import load_library_state
-    from assets.services.type_library.writing import write_library_document
+    from assets.services.type_library.writing import LibraryWriteError, write_library_document
     from extras.models import SpecificationLibrary
+    from organization.services.access_scope import authentication_revision_for_actor
 
     with transaction.atomic(using=using):
         with catalogue_transaction_lock(using=using, exclusive=True):
@@ -162,12 +163,21 @@ def apply_library_plan(
                 .filter(namespace=request.plan.namespace)
                 .first()
             )
-            if library is None:
-                raise LibraryApplyError("OBJECT_UNAVAILABLE")
             if not getattr(actor, "is_active", False) and not getattr(actor, "is_superuser", False):
                 raise LibraryApplyError("OBJECT_UNAVAILABLE")
+            if authentication_revision_for_actor(actor) != request.authentication_revision:
+                raise LibraryApplyError("STALE_PLAN")
             if not has_global_model_permission(actor, SpecificationLibrary, "change_specificationlibrary"):
                 raise LibraryApplyError("OBJECT_UNAVAILABLE")
+            if library is None:
+                source = incoming.normalized_document
+                if incoming.kind == "itambox.type-library.snapshot":
+                    source = source["upstream"]
+                library = SpecificationLibrary(
+                    namespace=request.plan.namespace,
+                    label=source["library"].get("label", ""),
+                )
+                library.save(using=using)
 
             current_state = (state_loader or load_library_state)(library)
             prepared = prepare_library_apply(
@@ -179,7 +189,10 @@ def apply_library_plan(
                 ),
             )
             write = writer or write_library_document
-            changed = tuple(write(library, incoming, prepared, using))
+            try:
+                changed = tuple(write(library, incoming, prepared, using))
+            except LibraryWriteError as exc:
+                raise LibraryApplyError(exc.code) from exc
             return LibraryApplyResult(
                 namespace=prepared.namespace,
                 release=prepared.incoming_release,
