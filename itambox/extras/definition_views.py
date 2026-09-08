@@ -24,6 +24,7 @@ from extras.definition_forms import (
     ChoiceUpdateForm,
 )
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet
+from extras.services._definition_command_support import resource_revision_for_definition
 from extras.services.definition_command_contracts import (
     CustomFieldChoiceCreateInputDTO,
     CustomFieldChoiceSetCreateInputDTO,

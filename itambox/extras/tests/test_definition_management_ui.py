@@ -14,7 +14,6 @@ from extras.definition_views import (
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet
 from organization.models import Tenant
 
-
 User = get_user_model()
 
 
