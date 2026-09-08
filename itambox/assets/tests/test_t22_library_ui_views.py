@@ -122,7 +122,13 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         self.assertContains(fork_apply, "The Library was applied successfully.")
         self.assertTrue(SpecificationLibrary.objects.filter(namespace="acme-fork").exists())
 
-    def test_blocking_conflict_explains_choices_and_disables_apply(self):
+    def test_blocking_conflict_explains_choices_and_takes_upstream(self):
+        self._resolve_conflict("take_upstream")
+
+    def test_blocking_conflict_keeps_local_value_after_apply(self):
+        self._resolve_conflict("keep_local")
+
+    def _resolve_conflict(self, decision):
         self._apply_preview(self._upload(self._document()))
         library = SpecificationLibrary.objects.get(namespace="acme")
         snapshot_response = self.client.post(
@@ -130,16 +136,23 @@ class T22LibraryBrowserWorkflowTests(TestCase):
             {"mode": "effective_snapshot", "acknowledge_retained_history": "on"},
         )
         local_snapshot = json.loads(snapshot_response.content)
-        local_snapshot["effective_definitions"]["fields"][0]["label"] = "Local State"
+        state_field = next(
+            field for field in local_snapshot["effective_definitions"]["fields"] if field["key"] == "acme__state"
+        )
+        state_field["label"] = "Local State"
         local_preview = self._upload(local_snapshot)
         self.assertEqual(local_preview.context["preview"].plan.can_apply, True)
         local_apply = self._apply_preview(local_preview)
         self.assertContains(local_apply, "The Library was applied successfully.")
         self.assertEqual(CustomField.objects.get(namespace="acme", name="acme__state").label, "Local State")
         self.assertEqual(
-            SpecificationLibrary.objects.get(namespace="acme").accepted_release.source_document["definitions"][
-                "fields"
-            ][0]["label"],
+            next(
+                field["label"]
+                for field in SpecificationLibrary.objects.get(namespace="acme").accepted_release.source_document[
+                    "definitions"
+                ]["fields"]
+                if field["key"] == "acme__state"
+            ),
             "State",
         )
 
@@ -159,13 +172,16 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         resolution_data = {field.name: field.value() for field in conflict_form.hidden_fields()}
         for name in conflict_form.fields:
             if name.startswith("resolution_"):
-                resolution_data[name] = "take_upstream"
+                resolution_data[name] = decision
         resolution_data["action"] = "review_resolutions"
         resolved_preview = self.client.post(reverse("assets:type_library_import"), resolution_data)
         self.assertTrue(resolved_preview.context["preview"].plan.can_apply)
         applied = self._apply_preview(resolved_preview)
         self.assertContains(applied, "The Library was applied successfully.")
-        self.assertEqual(CustomField.objects.get(namespace="acme", name="acme__state").label, "Upstream State")
+        self.assertEqual(
+            CustomField.objects.get(namespace="acme", name="acme__state").label,
+            "Local State" if decision == "keep_local" else "Upstream State",
+        )
 
     def test_stale_apply_refreshes_preview_and_retains_original_source(self):
         self._apply_preview(self._upload(self._document()))
