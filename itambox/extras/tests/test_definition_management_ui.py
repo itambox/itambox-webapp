@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase
 
 from core.context import override_current_tenant_scope, set_current_all_accessible
@@ -114,9 +115,8 @@ class DefinitionManagementUITests(TestCase):
             {"label": "Tampered", "expected_resource_revision": ChoiceSetUpdateView.current_revision(core)},
         )
         with self._global_configuration_scope():
-            response = ChoiceSetUpdateView.as_view()(request, pk=core.pk)
-
-        self.assertEqual(response.status_code, 403)
+            with self.assertRaises(PermissionDenied):
+                ChoiceSetUpdateView.as_view()(request, pk=core.pk)
         core.refresh_from_db()
         self.assertEqual(core.label, "Core modes")
 
@@ -155,8 +155,8 @@ class DefinitionManagementUITests(TestCase):
         post.user = limited_user
         post.active_tenant = tenant
         with override_current_tenant_scope(tenant):
-            response = ChoiceSetUpdateView.as_view()(post, pk=self.choice_set.pk)
-        self.assertEqual(response.status_code, 403)
+            with self.assertRaises(PermissionDenied):
+                ChoiceSetUpdateView.as_view()(post, pk=self.choice_set.pk)
 
     def test_retirement_uses_dependency_command_and_keeps_set_active_on_rejection(self):
         CustomField.objects.create(
