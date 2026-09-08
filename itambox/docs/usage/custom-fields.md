@@ -232,6 +232,13 @@ addressed inside the `set`/`clear` operation, for example
 
 ---
 
+For a GraphQL composition change, obtain the prospective preconditions from
+`POST /api/assets/asset-types/{id}/composition-preview/`, submitting the intended
+`fieldsets` and `specification_patch`. Pass its `expected_resource_revision` and
+`expected_definition_revision` to `setAssetTypeComposition`. A revision from the
+current definition query describes the old composition, not the proposed one.
+The preview is read-only; the mutation still rechecks both submitted revisions.
+
 ## Type Libraries
 
 Open **Asset Management > Type Libraries** to review installed global Library
@@ -268,7 +275,7 @@ The corresponding REST entry points are:
 |---|---|
 | Validate and preview | `POST /api/assets/type-libraries/preview/` |
 | Apply the signed preview | `POST /api/assets/type-libraries/apply/` |
-| Export | `GET /api/assets/type-libraries/{namespace}/export/` |
+| Export | `POST /api/assets/type-libraries/export/` |
 
 Use the generated API schema for request/response fields, export modes, and
 required preconditions. REST and the browser workflow use the same Library

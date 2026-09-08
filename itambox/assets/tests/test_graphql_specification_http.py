@@ -363,8 +363,22 @@ class GraphQLSpecificationHTTPTests(TestCase):
         self.assertEqual(explicit_type.custom_field_data, {})
         self.assertFalse(AssetTypeFieldset.objects.filter(asset_type=explicit_type).exists())
 
+    def _composition_plan(self, fieldsets):
+        # The existing REST preview exposes the prospective composition revision;
+        # the current GraphQL definition is not the requested new composition.
+        api = APIClient()
+        api.credentials(HTTP_AUTHORIZATION=f"Token {self.token_a.key}")
+        response = api.post(
+            f"/api/assets/asset-types/{self.asset_type.pk}/composition-preview/",
+            {"fieldsets": fieldsets, "specification_patch": {"set": {}, "clear": []}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["can_apply"], response.data)
+        return response.data
+
     def test_real_http_composition_and_asset_update_persist_typed_values(self):
-        initial_plan = self._type_plan(self.asset_type.pk)
+        initial_plan = self._composition_plan([self.fieldset_identity])
         composed = self._graphql_data(
             """
             mutation ($input: SetAssetTypeCompositionInput!) {
@@ -388,8 +402,8 @@ class GraphQLSpecificationHTTPTests(TestCase):
             {
                 "input": {
                     "assetTypeId": str(self.asset_type.pk),
-                    "expectedResourceRevision": initial_plan["resourceRevision"],
-                    "expectedDefinitionRevision": initial_plan["specificationDefinition"]["revision"],
+                    "expectedResourceRevision": initial_plan["expected_resource_revision"],
+                    "expectedDefinitionRevision": initial_plan["expected_definition_revision"],
                     "fieldsets": [self.fieldset_identity],
                     "patch": self._text_patch(self.specification_field.name, "type value"),
                 }
@@ -444,7 +458,7 @@ class GraphQLSpecificationHTTPTests(TestCase):
             {"__typename": "TextSpecificationValue", "text": "asset value"},
         )
 
-        clear_plan = self._type_plan(self.asset_type.pk)
+        clear_plan = self._composition_plan([])
         cleared = self._graphql_data(
             """
             mutation ($input: SetAssetTypeCompositionInput!) {
@@ -457,8 +471,8 @@ class GraphQLSpecificationHTTPTests(TestCase):
             {
                 "input": {
                     "assetTypeId": str(self.asset_type.pk),
-                    "expectedResourceRevision": clear_plan["resourceRevision"],
-                    "expectedDefinitionRevision": clear_plan["specificationDefinition"]["revision"],
+                    "expectedResourceRevision": clear_plan["expected_resource_revision"],
+                    "expectedDefinitionRevision": clear_plan["expected_definition_revision"],
                     "fieldsets": [],
                     "patch": self._empty_patch(),
                 }
@@ -469,6 +483,24 @@ class GraphQLSpecificationHTTPTests(TestCase):
         self.assertFalse(AssetTypeFieldset.objects.filter(asset_type=self.asset_type).exists())
         self.assertEqual(self.asset_type.custom_field_data, {self.specification_field.name: "type value"})
         self.assertEqual(cleared["assetType"]["specificationEntries"][0]["state"], "HISTORICAL")
+        self.asset_a.refresh_from_db()
+        self.assertEqual(self.asset_a.custom_field_data, {self.specification_field.name: "asset value"})
+        observed_history = self._graphql_data(
+            """
+            query ($id: ID!, $scope: RequestedScopeSelector!) {
+              asset(id: $id, requestedScope: $scope) {
+                specificationEntries {
+                  key state value { ... on TextSpecificationValue { text } }
+                }
+              }
+            }
+            """,
+            {"id": str(self.asset_a.pk), "scope": {"mode": "TENANT", "tenantId": str(self.tenant_a.pk)}},
+        )["asset"]["specificationEntries"]
+        self.assertEqual(
+            observed_history,
+            [{"key": self.specification_field.name, "state": "HISTORICAL", "value": {"text": "asset value"}}],
+        )
 
     def test_real_http_stale_denied_and_explicit_null_updates_leave_state_and_audit_unchanged(self):
         plan = self._asset_plan(self.asset_a.pk, self.tenant_a.pk)
