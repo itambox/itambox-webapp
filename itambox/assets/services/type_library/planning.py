@@ -27,6 +27,21 @@ PlanActionKind = Literal["create", "update", "unchanged", "deprecate", "conflict
 Resolution = Literal["unchanged", "take_upstream", "keep_local", "abort"]
 _MISSING = object()
 _SHARED_SECTIONS = frozenset({"categories", "manufacturers"})
+_STRUCTURAL_FIELD_KEYS = frozenset(
+    {
+        "namespace",
+        "key",
+        "targets",
+        "activation",
+        "field_type",
+        "required",
+        "nullable",
+        "validation",
+        "quantity_kind",
+        "canonical_unit",
+        "choice_set",
+    }
+)
 
 
 class LibraryPlanningError(ValueError):
@@ -140,6 +155,7 @@ def plan_reconciliation(
     normalized_resolutions = dict(resolutions or {})
     source_document, incoming_effective, incoming_release, snapshot_digest = _incoming_parts(incoming)
     namespace = _validate_release_boundary(state, source_document, incoming_release)
+    _reject_structural_field_changes(state.baseline_document, incoming_effective)
     source_digest = _source_digest(source_document)
     actions = _build_reconciliation_actions(state, incoming_effective, normalized_resolutions)
     reference_action = _reference_action(state.baseline_document, source_document)
@@ -194,6 +210,31 @@ def _validate_release_boundary(
     ):
         raise LibraryPlanningError("EQUIVOCATION", "the same library release has a different source digest")
     return namespace
+
+
+def _reject_structural_field_changes(
+    baseline: Mapping[str, Any] | None,
+    incoming_effective: Mapping[str, Any],
+) -> None:
+    baseline_fields = {
+        identity: item
+        for (section, identity), item in _entity_map(baseline).items()
+        if section == "fields"
+    }
+    incoming_fields = {
+        identity: item
+        for (section, identity), item in _entity_map(incoming_effective).items()
+        if section == "fields"
+    }
+    for identity in sorted(set(baseline_fields) & set(incoming_fields)):
+        baseline_field = baseline_fields[identity]
+        incoming_field = incoming_fields[identity]
+        for key in _STRUCTURAL_FIELD_KEYS:
+            if not _equal(baseline_field.get(key, _MISSING), incoming_field.get(key, _MISSING)):
+                raise LibraryPlanningError(
+                    "UNSUPPORTED_STRUCTURE",
+                    f"field {identity} structural path {key} changed",
+                )
 
 
 def _build_reconciliation_actions(

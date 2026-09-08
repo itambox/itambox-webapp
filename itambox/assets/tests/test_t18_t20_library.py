@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,12 @@ from assets.services.type_library.application import (
     LibraryApplyError,
     LibraryApplyRequest,
     prepare_library_apply,
+)
+from assets.services.type_library.exporting import (
+    LibraryExportError,
+    export_effective_snapshot,
+    export_fork,
+    export_original_release,
 )
 from assets.services.type_library.planning import (
     LibraryPlanningError,
@@ -154,6 +161,17 @@ def test_older_release_and_same_sequence_equivocation_are_rejected():
     plan_reconciliation(_state(baseline), _validated(newer))
 
 
+def test_structural_field_change_is_rejected_before_three_way_planning():
+    baseline = _release_document()
+    incoming = deepcopy(baseline)
+    incoming["library"]["release"] = 2  # type: ignore[index]
+    incoming["definitions"]["fields"][0]["targets"] = ["asset_type", "asset"]  # type: ignore[index]
+
+    with pytest.raises(LibraryPlanningError) as caught:
+        plan_reconciliation(_state(baseline), _validated(incoming))
+    assert caught.value.code == "UNSUPPORTED_STRUCTURE"
+
+
 def test_preview_token_binds_source_state_resolutions_actor_scope_and_expiry():
     baseline = _release_document()
     incoming = deepcopy(baseline)
@@ -270,3 +288,93 @@ def test_apply_rejects_state_drift_and_current_authorization_failure():
         prepare_library_apply(request, incoming_validated, drifted, authorize=lambda: True)
     with pytest.raises(LibraryApplyError, match="OBJECT_UNAVAILABLE"):
         prepare_library_apply(request, incoming_validated, state, authorize=lambda: False)
+
+
+def _kit_fixture(name: str) -> dict[str, object]:
+    path = Path("C:/Users/Hermes/Documents/ITAMbox-Hermes-Agent-Kit-v2/source") / name
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_original_export_preserves_the_retained_source_digest():
+    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+
+    artifact = export_original_release(release)
+
+    assert artifact.mode == "original_release"
+    assert artifact.identity_changed is False
+    assert artifact.semantic_digest == release.semantic_digest
+    assert artifact.document == release.normalized_document
+
+
+def test_effective_snapshot_round_trips_retained_upstream_and_local_24gib_edit():
+    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    source_snapshot = _validated(_kit_fixture("example-laptop-snapshot-v1.json"))
+    effective = source_snapshot.normalized_document["effective_definitions"]
+
+    artifact = export_effective_snapshot(release, effective)
+    repeated = export_effective_snapshot(release, artifact.document["effective_definitions"])
+    restored = _validated(json.loads(artifact.canonical_bytes.decode("utf-8")))
+
+    assert artifact.mode == "effective_snapshot"
+    assert artifact.source_digest == release.semantic_digest
+    assert artifact.semantic_digest == source_snapshot.semantic_digest
+    assert repeated.semantic_digest == artifact.semantic_digest
+    assert restored.semantic_digest == artifact.semantic_digest
+    assert (
+        artifact.document["effective_definitions"]["asset_types"][0]["specifications"]["example__memory_capacity"]
+        == "24.000"
+    )
+
+
+def test_snapshot_structural_change_is_not_a_local_override():
+    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    effective = deepcopy(release.normalized_document["definitions"])
+    effective["fields"][0]["targets"] = ["asset_type"]  # type: ignore[index]
+
+    with pytest.raises(LibraryExportError, match="SNAPSHOT_STRUCTURAL_MISMATCH"):
+        export_effective_snapshot(release, effective)
+
+
+def test_retained_history_requires_explicit_acknowledgement():
+    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    effective = deepcopy(release.normalized_document["definitions"])
+    effective["choice_sets"][0]["choices"].append(  # type: ignore[index]
+        {"key": "legacy_ddr", "label": "Legacy DDR", "lifecycle": "deprecated"}
+    )
+
+    with pytest.raises(LibraryExportError, match="RETAINED_HISTORY_ACK_REQUIRED"):
+        export_effective_snapshot(release, effective)
+    acknowledged = export_effective_snapshot(
+        release,
+        effective,
+        acknowledge_retained_history=True,
+    )
+    assert acknowledged.document["effective_definitions"]["choice_sets"][0]["choices"][-1]["key"] == "legacy_ddr"
+
+
+def test_unknown_historical_field_blocks_export_with_a_path_diagnostic():
+    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    effective = deepcopy(release.normalized_document["definitions"])
+    effective["asset_types"][0]["historical_specifications"] = {  # type: ignore[index]
+        "example__does_not_exist": {"value": "retired"}
+    }
+
+    with pytest.raises(LibraryExportError) as caught:
+        export_effective_snapshot(release, effective)
+    assert caught.value.issues
+    assert any("historical_specifications" in str(issue.path) for issue in caught.value.issues)
+
+
+def test_fork_requires_new_namespace_and_rewrites_owned_identities():
+    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+
+    artifact = export_fork(release, new_namespace="local-laptop")
+    forked = _validated(json.loads(artifact.canonical_bytes.decode("utf-8")))
+
+    assert artifact.mode == "fork"
+    assert artifact.identity_changed is True
+    assert artifact.document["library"]["namespace"] == "local-laptop"
+    assert artifact.document["requires"] == release.normalized_document["requires"]
+    assert artifact.document["definitions"]["fields"][0]["namespace"] == "local-laptop"
+    assert artifact.document["definitions"]["asset_types"][0]["id"].startswith("local-laptop/")
+    assert forked.semantic_digest == artifact.semantic_digest
