@@ -16,6 +16,13 @@ from assets.api.nested_serializers import (
     NestedManufacturerSerializer,
 )
 from assets.api.serializer_mixins import CanonicalSpecificationSerializerMixin
+from assets.api.specification_api import (
+    command_success_or_raise,
+    create_fieldset_selection_from_values,
+    if_match_revision,
+    owner_detail_specification_payload,
+    reject_transport_writes,
+)
 from assets.models import (
     Asset,
     AssetAssignment,
@@ -33,7 +40,9 @@ from assets.models import (
     Warranty,
 )
 from assets.services.specifications.contracts import (
+    DefinitionRevision,
     DestinationAssetTypeSelectionDTO,
+    ResourceRevision,
     SpecificationPatchDTO,
 )
 from core.mixins import suppress_custom_field_data_validation
@@ -56,13 +65,11 @@ from ..services.specifications.commands import (
 from ..specification_adapters import (
     actor_context_for_user,
     authorization_for_asset,
-    create_fieldset_selection,
     current_specification_plan,
     discard_staged_image,
     native_asset_type_create_input,
     owner_id_from_result,
     patch_from_mapping,
-    require_command_success,
     stage_uploaded_image,
 )
 
@@ -126,7 +133,6 @@ class DepreciationSerializer(BaseModelSerializer):
 
 
 class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer):
-    custom_field_data = serializers.JSONField(read_only=True)
     manufacturer = NestedManufacturerSerializer(read_only=True)
     manufacturer_id = serializers.PrimaryKeyRelatedField(
         queryset=Manufacturer.objects.all(), source="manufacturer", write_only=True
@@ -140,6 +146,24 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
     depreciation_id = serializers.PrimaryKeyRelatedField(
         queryset=Depreciation.objects.all(), source="depreciation", write_only=True, required=False, allow_null=True
     )
+    fieldsets = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        write_only=True,
+        required=False,
+        allow_empty=True,
+    )
+    expected_definition_revision = serializers.CharField(write_only=True, required=False, allow_blank=False)
+    preview_token = serializers.CharField(write_only=True, required=False, allow_blank=False)
+    expected_category_default_snapshot_revision = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+    )
+    specifications = serializers.JSONField(read_only=True, default=dict)
+    specification_state = serializers.JSONField(read_only=True, default=dict)
+    resource_revision = serializers.CharField(read_only=True, default=None)
+    definition_revision = serializers.CharField(read_only=True, default=None)
+    library = serializers.JSONField(read_only=True, default=None, source="library_contract")
 
     class Meta:
         model = AssetType
@@ -156,8 +180,16 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
             "assetrole_id",
             "depreciation",
             "depreciation_id",
-            "custom_field_data",
+            "fieldsets",
             "specification_patch",
+            "expected_definition_revision",
+            "preview_token",
+            "expected_category_default_snapshot_revision",
+            "specifications",
+            "specification_state",
+            "resource_revision",
+            "definition_revision",
+            "library",
             "image",
             "requestable",
             "description",
@@ -171,40 +203,100 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
     def _native_input(self, validated_data, *, staged_image_id=None):
         return native_asset_type_create_input(validated_data, staged_image_id=staged_image_id)
 
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
+        if self.nested:
+            return data
+        initial = getattr(self, "initial_data", None)
+        if isinstance(initial, Mapping):
+            reject_transport_writes(initial, self.fields)
+        if "fieldsets" in data:
+            # Validate identity syntax while the request is still at the
+            # transport boundary; resolution and availability remain command
+            # responsibilities.
+            create_fieldset_selection_from_values(data["fieldsets"], omitted=False)
+        return data
+
+    def _specification_payload(self, instance):
+        cached = getattr(self, "_specification_payload_cache", None)
+        if cached is None or cached.get("_owner_id") != instance.pk:
+            cached = owner_detail_specification_payload(instance)
+            cached["_owner_id"] = instance.pk
+            self._specification_payload_cache = cached
+        return cached
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        wanted = {
+            "fieldsets",
+            "specifications",
+            "specification_state",
+            "resource_revision",
+            "definition_revision",
+            "library",
+        }
+        view = self.context.get("view") if hasattr(self, "context") else None
+        if getattr(view, "action", None) != "list" and wanted.intersection(self.fields):
+            payload = self._specification_payload(instance)
+            for key in wanted:
+                if key in self.fields:
+                    data[key] = payload.get(key)
+        return data
+
     def create(self, validated_data):
         patch = patch_from_mapping(validated_data.pop("specification_patch", None))
+        fieldsets_marker = object()
+        raw_fieldsets = validated_data.pop("fieldsets", fieldsets_marker)
+        selection = create_fieldset_selection_from_values(
+            None if raw_fieldsets is fieldsets_marker else raw_fieldsets,
+            omitted=raw_fieldsets is fieldsets_marker,
+        )
+        expected_definition_revision = validated_data.pop("expected_definition_revision", None)
+        preview_token = validated_data.pop("preview_token", None)
+        expected_snapshot_revision = validated_data.pop("expected_category_default_snapshot_revision", None)
         actor = actor_context_for_user(self._request_user())
         uploaded = validated_data.get("image")
         stage_id = stage_uploaded_image(actor=actor, uploaded=uploaded) if uploaded else None
         succeeded = False
         try:
             native = self._native_input(validated_data, staged_image_id=stage_id)
-            selection = create_fieldset_selection((), omitted=True)
             with transaction.atomic():
-                preview = require_command_success(
-                    preview_asset_type_create(
-                        actor=actor,
-                        native=native,
-                        fieldsets=selection,
-                        patch=patch,
+                if expected_definition_revision is None:
+                    # Direct serializer callers predate the HTTP precondition
+                    # gate.  The real REST view rejects this before invoking
+                    # the serializer; retaining this local preview fallback
+                    # keeps non-HTTP presentation tests deterministic.
+                    preview = command_success_or_raise(
+                        preview_asset_type_create(
+                            actor=actor,
+                            native=native,
+                            fieldsets=selection,
+                            patch=patch,
+                        )
                     )
-                )
-                if getattr(preview, "issues", ()):
-                    raise DjangoValidationError("; ".join(issue.message_key for issue in preview.issues))
+                    if getattr(preview, "issues", ()):
+                        raise DjangoValidationError("; ".join(issue.message_key for issue in preview.issues))
+                    expected_definition_revision = preview.expected_definition_revision
+                    if preview_token is None:
+                        preview_token = preview.preview_token
+                    if expected_snapshot_revision is None:
+                        expected_snapshot_revision = preview.expected_category_default_snapshot_revision
                 result = create_asset_type(
                     actor=actor,
                     native=native,
                     fieldsets=selection,
                     patch=patch,
-                    preview_token=preview.preview_token,
-                    expected_definition_revision=preview.expected_definition_revision,
-                    expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+                    preview_token=preview_token,
+                    expected_definition_revision=expected_definition_revision,
+                    expected_category_default_snapshot_revision=expected_snapshot_revision,
                 )
+                command_success_or_raise(result)
                 owner_id = owner_id_from_result(result)
             succeeded = True
             return AssetType.all_objects.get(pk=owner_id)
         except (PermissionDenied, DjangoValidationError) as exc:
             self._command_error(exc)
+        except (TypeError, ValueError) as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         finally:
             if stage_id is not None and not succeeded:
                 discard_staged_image(stage_id=stage_id, actor=actor)
@@ -213,19 +305,24 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
         with transaction.atomic():
             patch_marker = object()
             patch_value = validated_data.pop("specification_patch", patch_marker)
+            expected_definition_revision = validated_data.pop("expected_definition_revision", None)
             current = AssetType.all_objects.get(pk=instance.pk)
             if patch_value is not patch_marker:
                 try:
                     actor = actor_context_for_user(self._request_user())
                     plan = current_specification_plan(current, target_kind="asset_type")
+                    expected_resource_revision = (
+                        if_match_revision(self.context.get("request")) or plan.resource_revision
+                    )
+                    expected_definition_revision = expected_definition_revision or plan.definition_revision
                     result = update_asset_type_specifications(
                         actor=actor,
                         asset_type_id=current.pk,
-                        expected_resource_revision=plan.resource_revision,
-                        expected_definition_revision=plan.definition_revision,
+                        expected_resource_revision=expected_resource_revision,
+                        expected_definition_revision=expected_definition_revision,
                         patch=patch_from_mapping(patch_value),
                     )
-                    require_command_success(result)
+                    command_success_or_raise(result)
                 except (PermissionDenied, DjangoValidationError) as exc:
                     self._command_error(exc)
             current = self._persist_native_update(current, validated_data)
@@ -235,7 +332,6 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
 
 @extend_schema_serializer(component_name="AssetResource")
 class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer):
-    custom_field_data = serializers.JSONField(read_only=True)
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetType.objects.all(), source="asset_type", write_only=True
@@ -264,6 +360,12 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
     tags = TagSerializer(many=True, read_only=True)
     assigned_to = serializers.SerializerMethodField()
     cost_center: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
+    expected_definition_revision = serializers.CharField(write_only=True, required=False, allow_blank=False)
+    specifications = serializers.JSONField(read_only=True, default=dict)
+    specification_state = serializers.JSONField(read_only=True, default=dict)
+    fieldsets = serializers.ListField(read_only=True, default=list)
+    resource_revision = serializers.CharField(read_only=True, default=None)
+    definition_revision = serializers.CharField(read_only=True, default=None)
 
     class Meta:
         model = Asset
@@ -293,8 +395,13 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             "cost_center_id",
             "last_audited",
             "last_audited_by",
-            "custom_field_data",
             "specification_patch",
+            "expected_definition_revision",
+            "fieldsets",
+            "specifications",
+            "specification_state",
+            "resource_revision",
+            "definition_revision",
             "requestable",
             "notes",
             "tags",
@@ -304,17 +411,41 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         ]
         brief_fields = ["id", "name", "asset_tag", "serial_number", "status"]
 
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
+        if self.nested:
+            return data
+        initial = getattr(self, "initial_data", None)
+        if isinstance(initial, Mapping):
+            reject_transport_writes(initial, self.fields)
+        return data
+
+    def to_representation(self, instance: Asset) -> dict[str, object]:
+        data = super().to_representation(instance)
+        wanted = {"fieldsets", "specifications", "specification_state", "resource_revision", "definition_revision"}
+        view = self.context.get("view") if hasattr(self, "context") else None
+        if getattr(view, "action", None) != "list" and wanted.intersection(self.fields):
+            payload = owner_detail_specification_payload(instance)
+            for key in wanted:
+                if key in self.fields:
+                    data[key] = payload.get(key)
+        return data
+
     def _apply_specification_command(
         self,
         current: Asset,
         target_type_id: int | None,
         patch: SpecificationPatchDTO,
+        *,
+        expected_resource_revision: ResourceRevision | None = None,
+        expected_definition_revision: DefinitionRevision | None = None,
     ) -> None:
         authorization = authorization_for_asset(
             user=self._request_user(),
             tenant_id=current.tenant_id,
         )
         plan = current_specification_plan(current, target_kind="asset", asset_type_id=target_type_id)
+        expected_resource_revision = expected_resource_revision or plan.resource_revision
+        expected_definition_revision = expected_definition_revision or plan.definition_revision
         result = update_asset_specifications(
             authorization=authorization,
             asset_id=current.pk,
@@ -322,11 +453,11 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
                 presence="replace" if target_type_id is not None else "keep_current",
                 asset_type_id=target_type_id,
             ),
-            expected_resource_revision=plan.resource_revision,
-            expected_definition_revision=plan.definition_revision,
+            expected_resource_revision=expected_resource_revision,
+            expected_definition_revision=expected_definition_revision,
             patch=patch,
         )
-        require_command_success(result)
+        command_success_or_raise(result)
 
     def create(self, validated_data: dict[str, object]) -> Asset:
         if "specification_patch" not in validated_data:
@@ -353,6 +484,7 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
         with transaction.atomic():
             patch_marker = object()
             patch_value = validated_data.pop("specification_patch", patch_marker)
+            expected_definition_revision = validated_data.pop("expected_definition_revision", None)
             target_marker = object()
             target_type = validated_data.pop("asset_type", target_marker)
             current = Asset._base_manager.get(pk=instance.pk)
@@ -360,10 +492,13 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             type_changed = target_type is not target_marker and target_type.pk != current.asset_type_id
             if patch_value is not patch_marker or type_changed:
                 try:
+                    expected_resource_revision = if_match_revision(self.context.get("request"))
                     self._apply_specification_command(
                         current,
                         current.asset_type_id if target_type is target_marker else target_type.pk,
                         patch_from_mapping(None if patch_value is patch_marker else patch_value),
+                        expected_resource_revision=expected_resource_revision,
+                        expected_definition_revision=expected_definition_revision,
                     )
                 except (PermissionDenied, DjangoValidationError) as exc:
                     self._command_error(exc)

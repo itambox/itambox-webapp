@@ -84,29 +84,71 @@ export interface paths {
     patch: operations["assets_asset_tag_sequences_partial_update"];
   };
   "/api/assets/asset-types/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
     get: operations["assets_asset_types_list"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_asset_types_update_bulk"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     post: operations["assets_asset_types_create"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     delete: operations["assets_asset_types_destroy_bulk"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     patch: operations["assets_asset_types_partial_update_bulk"];
   };
   "/api/assets/asset-types/{id}/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
     get: operations["assets_asset_types_retrieve"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_asset_types_update"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     delete: operations["assets_asset_types_destroy"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     patch: operations["assets_asset_types_partial_update"];
   };
+  "/api/assets/asset-types/{id}/apply-category-defaults/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_asset_types_apply_category_defaults_create"];
+  };
+  "/api/assets/asset-types/{id}/composition/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    put: operations["assets_asset_types_composition_update"];
+  };
+  "/api/assets/asset-types/{id}/composition-preview/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_asset_types_composition_preview_create"];
+  };
+  "/api/assets/asset-types/{id}/specification-definition/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    get: operations["assets_asset_types_specification_definition_retrieve"];
+  };
+  "/api/assets/asset-types/{id}/specification-history/cleanup/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_asset_types_specification_history_cleanup_create"];
+  };
+  "/api/assets/asset-types/{id}/specification-history/cleanup-preview/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_asset_types_specification_history_cleanup_preview_create"];
+  };
   "/api/assets/assets/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
     get: operations["assets_assets_list"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_assets_update_bulk"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     post: operations["assets_assets_create"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     delete: operations["assets_assets_destroy_bulk"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     patch: operations["assets_assets_partial_update_bulk"];
   };
   "/api/assets/assets/{id}/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
     get: operations["assets_assets_retrieve"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_assets_update"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     delete: operations["assets_assets_destroy"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     patch: operations["assets_assets_partial_update"];
   };
   "/api/assets/assets/{id}/checkin/": {
@@ -117,18 +159,41 @@ export interface paths {
     /** @description API Action to check out an asset. */
     post: operations["assets_assets_checkout_create"];
   };
+  "/api/assets/assets/{id}/specification-history/cleanup/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_assets_specification_history_cleanup_create"];
+  };
+  "/api/assets/assets/{id}/specification-history/cleanup-preview/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_assets_specification_history_cleanup_preview_create"];
+  };
   "/api/assets/categories/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
     get: operations["assets_categories_list"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_categories_update_bulk"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     post: operations["assets_categories_create"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     delete: operations["assets_categories_destroy_bulk"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     patch: operations["assets_categories_partial_update_bulk"];
   };
   "/api/assets/categories/{id}/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
     get: operations["assets_categories_retrieve"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_categories_update"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     delete: operations["assets_categories_destroy"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
     patch: operations["assets_categories_partial_update"];
+  };
+  "/api/assets/categories/{id}/default-fieldsets/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    get: operations["assets_categories_default_fieldsets_retrieve"];
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    put: operations["assets_categories_default_fieldsets_update"];
   };
   "/api/assets/depreciations/": {
     get: operations["assets_depreciations_list"];
@@ -1830,6 +1895,20 @@ export interface components {
      * @enum {string}
      */
     AlertTypeEnum: "low_stock" | "upcoming_eol" | "license_expiry" | "renewal_due" | "warranty_expiry" | "audit_overdue";
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    ApplyCategoryDefaultsInput: {
+      preview_token?: string;
+      expected_definition_revision?: string;
+      expected_category_default_snapshot_revision?: string;
+      specification_patch?: components["schemas"]["SpecificationPatchInput"];
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    ApplyCategoryDefaultsInputRequest: {
+      preview_token?: string;
+      expected_definition_revision?: string;
+      expected_category_default_snapshot_revision?: string;
+      specification_patch?: components["schemas"]["SpecificationPatchInputRequest"];
+    };
     AssetAssignment: {
       id: number;
       asset: components["schemas"]["NestedAsset"];
@@ -2227,7 +2306,11 @@ export interface components {
       /** Format: date-time */
       last_audited?: string | null;
       last_audited_by: string;
-      custom_field_data: unknown;
+      fieldsets: readonly unknown[];
+      specifications: unknown;
+      specification_state: unknown;
+      resource_revision: string;
+      definition_revision: string;
       /** @description Allow users to request this asset */
       requestable?: boolean | null;
       notes?: string;
@@ -2276,6 +2359,7 @@ export interface components {
       /** Format: date-time */
       last_audited?: string | null;
       specification_patch?: unknown;
+      expected_definition_revision?: string;
       /** @description Allow users to request this asset */
       requestable?: boolean | null;
       notes?: string;
@@ -2342,7 +2426,11 @@ export interface components {
       category?: number | null;
       asset_role: components["schemas"]["NestedAssetRole"];
       depreciation: components["schemas"]["Depreciation"];
-      custom_field_data: unknown;
+      specifications: unknown;
+      specification_state: unknown;
+      resource_revision: string;
+      definition_revision: string;
+      library: unknown;
       /**
        * Model Image
        * Format: uri
@@ -2372,7 +2460,11 @@ export interface components {
       category?: number | null;
       assetrole_id?: number | null;
       depreciation_id?: number | null;
+      fieldsets?: string[];
       specification_patch?: unknown;
+      expected_definition_revision?: string;
+      preview_token?: string;
+      expected_category_default_snapshot_revision?: string;
       /**
        * Model Image
        * Format: binary
@@ -2437,6 +2529,14 @@ export interface components {
       created_at: string;
       /** Format: date-time */
       updated_at: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CategoryDefaultFieldsetsInput: {
+      fieldsets: string[];
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CategoryDefaultFieldsetsInputRequest: {
+      fieldsets: string[];
     };
     /**
      * @description * `operating_system` - Operating System
@@ -2584,6 +2684,18 @@ export interface components {
       location_id: number;
       /** Quantity */
       qty?: number;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CompositionInput: {
+      fieldsets: string[];
+      expected_definition_revision?: string;
+      specification_patch?: components["schemas"]["SpecificationPatchInput"];
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CompositionInputRequest: {
+      fieldsets: string[];
+      expected_definition_revision?: string;
+      specification_patch?: components["schemas"]["SpecificationPatchInputRequest"];
     };
     Consumable: {
       id: number;
@@ -3279,6 +3391,28 @@ export interface components {
       url: string;
       name: string;
       user_count: number;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    HistoryCleanupInput: {
+      keys: string[];
+      expected_definition_revision?: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    HistoryCleanupInputRequest: {
+      keys: string[];
+      expected_definition_revision?: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    HistoryCleanupWriteInput: {
+      keys: string[];
+      expected_definition_revision?: string;
+      preview_token?: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    HistoryCleanupWriteInputRequest: {
+      keys: string[];
+      expected_definition_revision?: string;
+      preview_token?: string;
     };
     /**
      * @description * `GET` - GET
@@ -5136,6 +5270,7 @@ export interface components {
       /** Format: date-time */
       last_audited?: string | null;
       specification_patch?: unknown;
+      expected_definition_revision?: string;
       /** @description Allow users to request this asset */
       requestable?: boolean | null;
       notes?: string;
@@ -5172,7 +5307,11 @@ export interface components {
       category?: number | null;
       assetrole_id?: number | null;
       depreciation_id?: number | null;
+      fieldsets?: string[];
       specification_patch?: unknown;
+      expected_definition_revision?: string;
+      preview_token?: string;
+      expected_category_default_snapshot_revision?: string;
       /**
        * Model Image
        * Format: binary
@@ -6355,6 +6494,16 @@ export interface components {
       website?: string;
       /** @description Optional description of the software product. */
       description?: string;
+    };
+    /** @description Structural parsing only; command codecs own all specification semantics. */
+    SpecificationPatchInput: {
+      set?: unknown;
+      clear?: string[];
+    };
+    /** @description Structural parsing only; command codecs own all specification semantics. */
+    SpecificationPatchInputRequest: {
+      set?: unknown;
+      clear?: string[];
     };
     StatusLabel: {
       id: number;
@@ -9708,6 +9857,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_list: {
     parameters: {
       query?: {
@@ -9755,6 +9905,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_update_bulk: {
     requestBody: {
       content: {
@@ -9807,6 +9958,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_create: {
     requestBody: {
       content: {
@@ -9859,6 +10011,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_destroy_bulk: {
     responses: {
       /** @description No response body */
@@ -9897,6 +10050,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_partial_update_bulk: {
     requestBody?: {
       content: {
@@ -9949,6 +10103,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_retrieve: {
     parameters: {
       path: {
@@ -9988,6 +10143,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_update: {
     parameters: {
       path: {
@@ -10052,6 +10208,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_destroy: {
     parameters: {
       path: {
@@ -10102,6 +10259,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_partial_update: {
     parameters: {
       path: {
@@ -10166,6 +10324,372 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_apply_category_defaults_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ApplyCategoryDefaultsInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ApplyCategoryDefaultsInputRequest"];
+        "multipart/form-data": components["schemas"]["ApplyCategoryDefaultsInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ApplyCategoryDefaultsInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_composition_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CompositionInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CompositionInputRequest"];
+        "multipart/form-data": components["schemas"]["CompositionInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["CompositionInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_composition_preview_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CompositionInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CompositionInputRequest"];
+        "multipart/form-data": components["schemas"]["CompositionInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["CompositionInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_specification_definition_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["AssetType"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_specification_history_cleanup_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HistoryCleanupWriteInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["HistoryCleanupWriteInputRequest"];
+        "multipart/form-data": components["schemas"]["HistoryCleanupWriteInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["HistoryCleanupWriteInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_specification_history_cleanup_preview_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HistoryCleanupInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["HistoryCleanupInputRequest"];
+        "multipart/form-data": components["schemas"]["HistoryCleanupInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["HistoryCleanupInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_list: {
     parameters: {
       query?: {
@@ -10236,6 +10760,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_update_bulk: {
     requestBody: {
       content: {
@@ -10288,6 +10813,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_create: {
     requestBody: {
       content: {
@@ -10340,6 +10866,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_destroy_bulk: {
     responses: {
       /** @description No response body */
@@ -10378,6 +10905,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_partial_update_bulk: {
     requestBody?: {
       content: {
@@ -10430,6 +10958,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_retrieve: {
     parameters: {
       path: {
@@ -10469,6 +10998,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_update: {
     parameters: {
       path: {
@@ -10533,6 +11063,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_destroy: {
     parameters: {
       path: {
@@ -10583,6 +11114,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_assets_partial_update: {
     parameters: {
       path: {
@@ -10759,6 +11291,137 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_assets_specification_history_cleanup_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HistoryCleanupWriteInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["HistoryCleanupWriteInputRequest"];
+        "multipart/form-data": components["schemas"]["HistoryCleanupWriteInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["HistoryCleanupWriteInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_assets_specification_history_cleanup_preview_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HistoryCleanupInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["HistoryCleanupInputRequest"];
+        "multipart/form-data": components["schemas"]["HistoryCleanupInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["HistoryCleanupInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_list: {
     parameters: {
       query?: {
@@ -10799,6 +11462,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_update_bulk: {
     requestBody: {
       content: {
@@ -10851,6 +11515,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_create: {
     requestBody: {
       content: {
@@ -10903,6 +11568,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_destroy_bulk: {
     responses: {
       /** @description No response body */
@@ -10941,6 +11607,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_partial_update_bulk: {
     requestBody?: {
       content: {
@@ -10993,6 +11660,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_retrieve: {
     parameters: {
       path: {
@@ -11032,6 +11700,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_update: {
     parameters: {
       path: {
@@ -11096,6 +11765,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_destroy: {
     parameters: {
       path: {
@@ -11146,6 +11816,7 @@ export interface operations {
       };
     };
   };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_categories_partial_update: {
     parameters: {
       path: {
@@ -11164,6 +11835,111 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Category"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_categories_default_fieldsets_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Category. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["CategoryDefaultFieldsetsInput"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_categories_default_fieldsets_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Category. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CategoryDefaultFieldsetsInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CategoryDefaultFieldsetsInputRequest"];
+        "multipart/form-data": components["schemas"]["CategoryDefaultFieldsetsInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["CategoryDefaultFieldsetsInput"];
         };
       };
       /** @description The request could not be completed. */

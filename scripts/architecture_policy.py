@@ -202,6 +202,14 @@ MODULE_LAYER_OVERRIDES = {
     "assets.specification_adapters": "presentation",
     "assets.customfields": "domain-service",
     "assets.depreciation": "domain-service",
+    # GraphQL transport and DTO adapters are domain presentation, even though
+    # their package name does not expose one of the native presentation segments.
+    "assets.graphql_specifications.__init__": "presentation",
+    "assets.graphql_specifications.integration": "presentation",
+    "assets.graphql_specifications.loaders": "presentation",
+    "assets.graphql_specifications.readers": "presentation",
+    "assets.graphql_specifications.scalars": "presentation",
+    "assets.graphql_specifications.types": "presentation",
     "assets.scanning": "domain-service",
     "compliance.checks": "composition",
     "compliance.providers": "domain-service",

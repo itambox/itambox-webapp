@@ -231,6 +231,52 @@ def _persist_replacement(
     return None
 
 
+def _finish_type_mutation(
+    *,
+    owner,
+    type_id: int,
+    owner_ref: OwnerRefDTO,
+    actual_resource_revision: ResourceRevision,
+    current_definition,
+    proposed_definition,
+    proposed_values: dict[str, object],
+    desired_ids: Sequence[int],
+    actor,
+) -> OwnerMutationResult:
+    current_rows = _current_membership_rows(AssetType, type_id, using=_DEFAULT_DB)
+    desired_rows = tuple((fieldset_id, position) for position, fieldset_id in enumerate(desired_ids, start=1))
+    current_pairs = tuple((row["fieldset_id"], row["position"]) for row in current_rows)
+    membership_changed = current_pairs != desired_rows
+    values_changed = not json_values_equal(owner.custom_field_data, proposed_values)
+    if not membership_changed and not values_changed:
+        return OwnerNoOpDTO(
+            outcome="no_op",
+            owner=owner_ref,
+            resource_revision=actual_resource_revision,
+            definition_revision=current_definition.revision,
+        )
+
+    rejection = _persist_replacement(
+        owner=owner,
+        owner_model=AssetType,
+        owner_id=type_id,
+        fieldset_ids=desired_ids,
+        values_changed=values_changed,
+        proposed_values=proposed_values,
+        membership_changed=membership_changed,
+        actor=actor,
+        owner_ref=owner_ref,
+    )
+    if rejection is not None:
+        return rejection
+    return OwnerChangedDTO(
+        outcome="changed",
+        owner=owner_ref,
+        resource_revision=resource_revision_for_owner(owner),
+        definition_revision=proposed_definition.revision,
+    )
+
+
 def _set_type_locked(
     *,
     actor: ActorContextDTO,
@@ -254,13 +300,13 @@ def _set_type_locked(
         return current_plan
     stored_values, current_definition, _current_definitions = current_plan
     actual_resource_revision = resource_revision_for_owner(owner)
-    revision_issues = stale_revision_issues(
-        expected_resource_revision=expected_resource_revision,
-        actual_resource_revision=actual_resource_revision,
-        expected_definition_revision=expected_definition_revision,
-        actual_definition_revision=current_definition.revision,
-    )
-    if revision_issues:
+    if expected_resource_revision != actual_resource_revision:
+        revision_issues = stale_revision_issues(
+            expected_resource_revision=expected_resource_revision,
+            actual_resource_revision=actual_resource_revision,
+            expected_definition_revision=expected_definition_revision,
+            actual_definition_revision=current_definition.revision,
+        )
         return rejected(owner_ref, *revision_issues)
 
     proposed_plan = _proposed_definition(
@@ -271,6 +317,14 @@ def _set_type_locked(
     if isinstance(proposed_plan, CommandRejectedDTO):
         return proposed_plan
     proposed_definition, proposed_definitions, _graph = proposed_plan
+    revision_issues = stale_revision_issues(
+        expected_resource_revision=expected_resource_revision,
+        actual_resource_revision=actual_resource_revision,
+        expected_definition_revision=expected_definition_revision,
+        actual_definition_revision=proposed_definition.revision,
+    )
+    if revision_issues:
+        return rejected(owner_ref, *revision_issues)
     normalized = normalize_patch(
         patch,
         proposed_definitions,
@@ -285,37 +339,16 @@ def _set_type_locked(
     if any(fieldset_id is None for fieldset_id in proposed_ids):
         return _reference_rejection(owner_ref)
     desired_ids = tuple(fieldset_id for fieldset_id in proposed_ids if fieldset_id is not None)
-    current_rows = _current_membership_rows(AssetType, type_id, using=_DEFAULT_DB)
-    desired_rows = tuple((fieldset_id, position) for position, fieldset_id in enumerate(desired_ids, start=1))
-    current_pairs = tuple((row["fieldset_id"], row["position"]) for row in current_rows)
-    membership_changed = current_pairs != desired_rows
-    values_changed = not json_values_equal(owner.custom_field_data, proposed_values)
-    if not membership_changed and not values_changed:
-        return OwnerNoOpDTO(
-            outcome="no_op",
-            owner=owner_ref,
-            resource_revision=actual_resource_revision,
-            definition_revision=current_definition.revision,
-        )
-
-    rejection = _persist_replacement(
+    return _finish_type_mutation(
         owner=owner,
-        owner_model=AssetType,
-        owner_id=type_id,
-        fieldset_ids=desired_ids,
-        values_changed=values_changed,
-        proposed_values=proposed_values,
-        membership_changed=membership_changed,
-        actor=actor_model,
+        type_id=type_id,
         owner_ref=owner_ref,
-    )
-    if rejection is not None:
-        return rejection
-    return OwnerChangedDTO(
-        outcome="changed",
-        owner=owner_ref,
-        resource_revision=resource_revision_for_owner(owner),
-        definition_revision=proposed_definition.revision,
+        actual_resource_revision=actual_resource_revision,
+        current_definition=current_definition,
+        proposed_definition=proposed_definition,
+        proposed_values=proposed_values,
+        desired_ids=desired_ids,
+        actor=actor_model,
     )
 
 
