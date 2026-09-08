@@ -14371,3 +14371,115 @@ msgstr "Nicht festgelegt"
 #: itambox/assets/models/catalog.py
 msgid "Storage Key"
 msgstr "Speicherschlüssel"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Refresh the specification preview before submitting this form."
+msgstr "Aktualisiere die Spezifikationsvorschau, bevor du dieses Formular absendest."
+
+#: itambox/extras/definition_views.py itambox/templates/extras/definitions/choice_set_list.html
+msgid "Add choice set"
+msgstr "Auswahlset hinzufügen"
+
+#: itambox/extras/definition_views.py
+msgid "Edit choice set"
+msgstr "Auswahlset bearbeiten"
+
+#: itambox/extras/definition_views.py
+msgid "Retire choice set"
+msgstr "Auswahlset als veraltet markieren"
+
+#: itambox/extras/definition_views.py itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Add choice"
+msgstr "Auswahloption hinzufügen"
+
+#: itambox/extras/definition_views.py
+msgid "Edit choice"
+msgstr "Auswahloption bearbeiten"
+
+#: itambox/extras/definition_views.py
+msgid "Retire choice"
+msgstr "Auswahloption als veraltet markieren"
+
+#: itambox/templates/extras/definitions/choice_form.html
+msgid "Choice set"
+msgstr "Auswahlset"
+
+#: itambox/templates/extras/definitions/choice_form.html itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Key"
+msgstr "Schlüssel"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Ordered choices"
+msgstr "Geordnete Auswahloptionen"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Position"
+msgstr "Position"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html itambox/templates/extras/definitions/retire_form.html
+msgid "Retire"
+msgstr "Als veraltet markieren"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "No choices are defined."
+msgstr "Es sind keine Auswahloptionen definiert."
+
+#: itambox/templates/extras/definitions/choice_set_detail.html itambox/templates/extras/definitions/retire_form.html
+msgid "Definition"
+msgstr "Definition"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html itambox/templates/extras/definitions/choice_set_list.html
+msgid "Management"
+msgstr "Verwaltung"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Edit label"
+msgstr "Bezeichnung bearbeiten"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Managed definitions are read-only."
+msgstr "Verwaltete Definitionen sind schreibgeschützt."
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Usage impact"
+msgstr "Auswirkungen auf die Verwendung"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Active fields"
+msgstr "Aktive Felder"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Active choices"
+msgstr "Aktive Auswahloptionen"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Unscoped usage impact is available only in all-accessible scope."
+msgstr "Mandantenübergreifende Auswirkungen auf die Verwendung sind nur im Bereich „Alle zugänglichen Mandanten“ verfügbar."
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "Choice sets"
+msgstr "Auswahlsets"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "Global choice definitions"
+msgstr "Globale Auswahldefinitionen"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "Usage"
+msgstr "Verwendung"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "fields"
+msgstr "Felder"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "choices"
+msgstr "Auswahloptionen"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "No choice sets are available."
+msgstr "Es sind keine Auswahlsets verfügbar."
+
+#: itambox/templates/extras/definitions/retire_form.html
+msgid "Retirement is checked against current dependencies and the submitted resource revision."
+msgstr "Beim Markieren als veraltet werden die aktuellen Abhängigkeiten und die übermittelte Ressourcenrevision geprüft."

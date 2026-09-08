@@ -198,7 +198,9 @@
     "itambox/assets/tests/test_t18_t20_library.py",
     "itambox/assets/tests/test_t18_t20_library_db.py",
     "itambox/assets/tests/test_t18_t20_library_security_db.py",
-    "itambox/extras/tests/test_library_permission.py"
+    "itambox/extras/tests/test_library_permission.py",
+    "itambox/assets/tests/test_t18_t20_library_permissions_db.py",
+    "scripts/tests/test_contract_policy.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -401,7 +403,9 @@
     "itambox/assets/tests/test_t18_t20_library.py",
     "itambox/assets/tests/test_t18_t20_library_db.py",
     "itambox/assets/tests/test_t18_t20_library_security_db.py",
-    "itambox/extras/tests/test_library_permission.py"
+    "itambox/extras/tests/test_library_permission.py",
+    "itambox/assets/tests/test_t18_t20_library_permissions_db.py",
+    "scripts/tests/test_contract_policy.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

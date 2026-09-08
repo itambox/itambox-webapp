@@ -195,6 +195,7 @@ class DerivationSurfaceTests(unittest.TestCase):
                 "approve_purchaseorder",
                 "prepare_custodyreceipt",
                 "export_custodyreceipt",
+                "manage_specification_library",
             },
         )
 

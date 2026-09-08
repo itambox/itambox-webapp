@@ -18,7 +18,10 @@
           </div>
         {% endfor %}
         <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
-        {% if choice_set and choice_set.pk %}<a class="btn btn-outline-secondary ms-2" href="{{ choice_set.get_absolute_url }}">{% translate "Cancel" %}</a>{% endif %}
+        {% if choice_set and choice_set.pk %}
+          <a class="btn btn-outline-secondary ms-2"
+             href="{{ choice_set.get_absolute_url }}">{% translate "Cancel" %}</a>
+        {% endif %}
       </form>
     </div>
   </div>

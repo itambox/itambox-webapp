@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 51)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 52)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -594,6 +594,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0118_issue479_t06_definition_schema",
                 "extras.0119_issue479_t07_provenance_schema",
                 "extras.0120_issue479_t07_provenance_cutover",
+                "extras.0121_specification_library_permission",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",

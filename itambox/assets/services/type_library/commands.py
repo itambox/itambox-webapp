@@ -15,10 +15,12 @@ from django.db import transaction
 
 from assets.services.specifications.locking import catalogue_transaction_lock
 from assets.services.type_library.application import (
+    _LIBRARY_MANAGE_PERMISSION,
     LibraryApplyRequest,
     LibraryApplyResult,
     _apply_library_plan_locked,
-    _has_library_model_permission,
+    _has_global_model_permission,
+    _has_library_plan_permissions,
     _reauthorize_apply_actor,
     _reload_library_actor,
 )
@@ -116,6 +118,14 @@ def preview_library(
                 )
             except LibraryPlanningError as exc:
                 raise LibraryCommandError(exc.code) from exc
+            if not _has_library_plan_permissions(
+                fresh_actor,
+                library,
+                incoming,
+                plan,
+                using=using,
+            ):
+                raise LibraryCommandError("OBJECT_UNAVAILABLE")
             authentication_revision = authentication_revision_for_actor(fresh_actor)
             token = issue_library_preview_token(
                 plan,
@@ -193,10 +203,10 @@ def export_library(
 def _authorize(actor: object, model: type, *, using: str) -> object:
 
     fresh_actor = _reload_library_actor(actor, using=using)
-    if fresh_actor is None or not _has_library_model_permission(
+    if fresh_actor is None or not _has_global_model_permission(
         fresh_actor,
-        model,
-        "change_specificationlibrary",
+        SpecificationLibrary,
+        _LIBRARY_MANAGE_PERMISSION,
         using=using,
     ):
         raise LibraryCommandError("OBJECT_UNAVAILABLE")

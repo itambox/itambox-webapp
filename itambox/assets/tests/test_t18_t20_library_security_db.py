@@ -105,7 +105,9 @@ class LibraryCommandSecurityTests(TestCase):
         self.assertEqual(denied_invalid_source.exception.code, "OBJECT_UNAVAILABLE")
         after_inactive_failure = ObjectChange._base_manager.count()
 
-        get_user_model()._base_manager.filter(pk=self.actor.pk).update(is_active=True, is_superuser=False, is_staff=False)
+        get_user_model()._base_manager.filter(pk=self.actor.pk).update(
+            is_active=True, is_superuser=False, is_staff=False
+        )
         with self.assertRaises(LibraryApplyError) as demotion_error:
             self._apply(document, preview, authentication_revision=auth_revision)
         self.assertEqual(demotion_error.exception.code, "OBJECT_UNAVAILABLE")
