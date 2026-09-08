@@ -321,6 +321,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         return [getattr(value, "pk", value) for value in initial]
 
     def _selected_fieldsets(self):
+        cached = getattr(self, "_selected_fieldsets_cache", None)
+        if cached is not None:
+            return cached
         ids = self._raw_selected_fieldset_ids()
         by_id = (
             CustomFieldset.objects.filter(pk__in=ids)
@@ -330,7 +333,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             )
             .in_bulk(ids)
         )
-        return [by_id[fieldset_id] for fieldset_id in ids if fieldset_id in by_id]
+        selected = [by_id[fieldset_id] for fieldset_id in ids if fieldset_id in by_id]
+        self._selected_fieldsets_cache = selected
+        return selected
 
     def clean_custom_fieldsets(self):
         fieldsets = self.cleaned_data["custom_fieldsets"]
@@ -543,6 +548,8 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def _apply_t15_presence(self, cleaned_data):
         for key, presence_key in self.custom_field_presence_keys.items():
+            if self.is_bound and presence_key not in self.data:
+                continue
             mode = cleaned_data.get(presence_key, "")
             clear_key = self.custom_field_clear_keys.get(key)
             if clear_key and cleaned_data.get(clear_key) and mode in {"empty", "null", "value"}:

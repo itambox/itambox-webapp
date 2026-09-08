@@ -70,7 +70,7 @@ class AssetTypeFormPreservationTests(TestCase):
         self.assertIn("custom_fieldsets", form.errors)
 
     def test_new_draft_copies_ordered_category_defaults_once(self):
-        category = Category.objects.create(name="Servers", slug="servers")
+        category = Category.objects.create(name="Servers", slug="form-preservation-servers")
         first = CustomFieldset.objects.create(
             namespace="local",
             slug="compute",
