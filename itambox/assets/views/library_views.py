@@ -64,8 +64,8 @@ def _format_issue(issue: object) -> str:
     return f"{code} at {location}: {message}"
 
 
-def _add_command_errors(form: Any, error: LibraryCommandError | LibraryExportError) -> None:
-    for issue in getattr(error, "issues", ()):
+def _add_command_errors(form: Any, error: LibraryCommandError | LibraryExportError | LibraryApplyError) -> None:
+    for issue in getattr(error, "issues", ()) or (error,):
         form.add_error(None, _format_issue(issue))
 
 
