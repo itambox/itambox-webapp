@@ -7,7 +7,7 @@ back.  Every decision about *what* a report contains belongs to the provider in
 the owning domain application.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from django.utils import timezone
 
@@ -56,10 +56,33 @@ def _group_rows(
     return grouped_data
 
 
+def _report_specification_inputs(
+    template: object,
+    specification_filters: Sequence[object] | None,
+    specification_definitions: Mapping[object, object] | None,
+    specification_export_references: Sequence[object] | None,
+) -> tuple[tuple[object, ...], Mapping[object, object], tuple[object, ...]]:
+    """Resolve opaque domain DTOs without coupling core to a provider."""
+    filters = specification_filters
+    if filters is None:
+        filters = getattr(template, "specification_filters", ()) or ()
+    definitions = specification_definitions
+    if definitions is None:
+        definitions = getattr(template, "specification_definitions", {}) or {}
+    references = specification_export_references
+    if references is None:
+        references = getattr(template, "specification_export_references", ()) or ()
+    return tuple(filters), dict(definitions), tuple(references)
+
+
 def build_report_context(
     template: object,
     active_tenant: object | None = None,
     filter_tenants: Sequence[object] | None = None,
+    *,
+    specification_filters: Sequence[object] | None = None,
+    specification_definitions: Mapping[object, object] | None = None,
+    specification_export_references: Sequence[object] | None = None,
 ) -> tuple[
     list[str],
     list[ReportRow],
@@ -76,6 +99,16 @@ def build_report_context(
     filter_tenants = _resolve_report_scope(active_tenant, filter_tenants)
     provider = get_report_provider(template.report_type)
     columns = provider.build_columns(template)
+    (
+        resolved_specification_filters,
+        resolved_specification_definitions,
+        resolved_specification_export_references,
+    ) = _report_specification_inputs(
+        template,
+        specification_filters,
+        specification_definitions,
+        specification_export_references,
+    )
     request = ReportRequest(
         template=template,
         active_tenant=active_tenant,
@@ -83,6 +116,9 @@ def build_report_context(
         columns=tuple(columns),
         user=get_current_user(),
         as_of=timezone.now(),
+        specification_filters=resolved_specification_filters,
+        specification_definitions=resolved_specification_definitions,
+        specification_export_references=resolved_specification_export_references,
     )
     result = provider.build(request)
     headers = headers_for(request.columns)
@@ -95,6 +131,7 @@ def build_report_context(
         "grouped_data": grouped_data,
         "summary_cards": result.summary_cards,
         "distribution_chart": result.chart_svg,
+        "specification_export": result.specification_export,
         "style_preset": template.style_preset,
         "is_compact": template.style_preset == "compact",
         "is_financial": template.style_preset == "financial",

@@ -8,6 +8,11 @@ from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from assets.services.specification_writers import (
+    apply_asset_specification_patch,
+    authorize_generic_owner_scope,
+    merge_generic_asset_data,
+)
 from core.importers.snipeit.common import (
     HardwareCheckoutGateway,
     _nested_id,
@@ -40,6 +45,8 @@ class HardwareDependencies:
 class HardwareImporter:
     key = "assets"
     endpoint = "/api/v1/hardware"
+
+    _GENERIC_ASSET_DATA_KEYS = frozenset({"snipeit_id"})
 
     def __init__(self, context: ImportContext, dependencies: HardwareDependencies) -> None:
         self.context = context
@@ -106,7 +113,7 @@ class HardwareImporter:
         warranty_expiration = self._warranty_expiration(purchase_date, row.get("warranty_months"))
         cf_data = self._custom_field_data(sid, row.get("custom_fields"))
 
-        obj = Asset.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+        obj = Asset.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
         if not obj and serial:
             obj = Asset.all_objects.filter(serial_number=serial, tenant=tenant).first()
         if not obj:
@@ -116,9 +123,14 @@ class HardwareImporter:
             if not self.context.update:
                 return obj, "skipped"
             if not self.context.dry_run:
+                obj = merge_generic_asset_data(
+                    asset_id=obj.pk,
+                    user=self.context.user,
+                    updates={"snipeit_id": cf_data["snipeit_id"]},
+                    allowed_keys=self._GENERIC_ASSET_DATA_KEYS,
+                )
                 obj.name = name
                 obj.serial_number = serial
-                obj.asset_type = asset_type
                 obj.status = status_obj
                 obj.location = location
                 obj.purchase_date = purchase_date
@@ -126,14 +138,38 @@ class HardwareImporter:
                 obj.order_number = order_number
                 obj.notes = notes
                 obj.supplier = supplier
-                obj.custom_field_data.update(cf_data)
-                obj.save()
+                obj.save(
+                    update_fields=[
+                        "name",
+                        "serial_number",
+                        "status",
+                        "location",
+                        "purchase_date",
+                        "purchase_cost",
+                        "order_number",
+                        "notes",
+                        "supplier",
+                        "updated_at",
+                    ]
+                )
+                apply_asset_specification_patch(
+                    asset_id=obj.pk,
+                    user=self.context.user,
+                    set_values={key: value for key, value in cf_data.items() if key != "snipeit_id"},
+                    asset_type_id=asset_type.pk if asset_type is not None else None,
+                )
+                obj.asset_type = asset_type or obj.asset_type
                 self._upsert_warranty(Warranty, obj, purchase_date, warranty_expiration, supplier)
             return obj, "updated"
 
         if self.context.dry_run:
             obj = Asset(id=-sid, asset_tag=asset_tag, tenant=tenant)
         else:
+            authorize_generic_owner_scope(
+                user=self.context.user,
+                owner_model=Asset,
+                tenant_id=getattr(tenant, "pk", None),
+            )
             obj = Asset.objects.create(
                 name=name,
                 asset_tag=asset_tag,
@@ -147,7 +183,19 @@ class HardwareImporter:
                 order_number=order_number,
                 notes=notes,
                 supplier=supplier,
-                custom_field_data=cf_data,
+                custom_field_data={},
+            )
+            merge_generic_asset_data(
+                asset_id=obj.pk,
+                user=self.context.user,
+                updates={"snipeit_id": cf_data["snipeit_id"]},
+                allowed_keys=self._GENERIC_ASSET_DATA_KEYS,
+            )
+            apply_asset_specification_patch(
+                asset_id=obj.pk,
+                user=self.context.user,
+                set_values={key: value for key, value in cf_data.items() if key != "snipeit_id"},
+                asset_type_id=asset_type.pk if asset_type is not None else None,
             )
             self._upsert_warranty(Warranty, obj, purchase_date, warranty_expiration, supplier)
         return obj, "created"
@@ -164,18 +212,26 @@ class HardwareImporter:
 
     def _custom_field_data(self, sid, custom_fields) -> dict:
         data = {"snipeit_id": str(sid)}
-        for field_info in (custom_fields or {}).values():
-            if not isinstance(field_info, dict):
-                continue
+        if custom_fields is None:
+            return data
+        if not isinstance(custom_fields, Mapping):
+            raise ValueError("Unsupported Snipe-IT custom-field structure")
+        for field_info in custom_fields.values():
+            if not isinstance(field_info, Mapping):
+                raise ValueError("Unsupported Snipe-IT custom-field entry")
+            external_key = field_info.get("field")
+            if not isinstance(external_key, str) or not external_key:
+                raise ValueError("Unmapped Snipe-IT custom-field identity")
+            local_field = self.dependencies.custom_fields.get(external_key)
+            if local_field is None:
+                raise ValueError(f"Unmapped Snipe-IT custom field: {external_key}")
             value = field_info.get("value")
             if value is None or value == "":
                 continue
-            local_field = self.dependencies.custom_fields.get(field_info.get("field") or "")
-            if local_field:
-                try:
-                    data[local_field.name] = canonicalize_snipeit_custom_field_value(local_field, value)
-                except ValidationError as exc:
-                    raise ValueError(f"Invalid value for imported custom field: {local_field.name}") from exc
+            try:
+                data[local_field.name] = canonicalize_snipeit_custom_field_value(local_field, value)
+            except ValidationError as exc:
+                raise ValueError(f"Invalid value for imported custom field: {local_field.name}") from exc
         return data
 
     def _upsert_warranty(self, Warranty, asset, purchase_date, warranty_expiration, supplier) -> None:

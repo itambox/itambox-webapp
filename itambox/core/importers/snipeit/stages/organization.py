@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import transaction
 
+from assets.services.specification_writers import authorize_generic_owner_scope, merge_generic_owner_data
 from core.importers.snipeit.common import _nested_id, _unique_slug, tenant_for
 from core.importers.snipeit.contracts import ImportContext, StageResult
 from core.managers import get_current_tenant, set_current_tenant
@@ -112,14 +113,14 @@ class LocationImporter:
             map_companies=self.context.map_companies,
             tenants=self.dependencies.tenants,
         )
+        generic_data = {"snipeit_id": str(sid)}
         defaults = {
-            "custom_field_data": {"snipeit_id": str(sid)},
             "site": import_site,
             "tenant": tenant,
             "parent": parent_obj,
         }
         with transaction.atomic():
-            obj = Location.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+            obj = Location.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
             if not obj:
                 obj = Location.all_objects.filter(name=name, tenant=tenant).first()
             if obj:
@@ -127,13 +128,29 @@ class LocationImporter:
                     outcome = "skipped"
                 else:
                     if not self.context.dry_run:
+                        obj = merge_generic_owner_data(
+                            owner=obj,
+                            user=self.context.user,
+                            updates=generic_data,
+                            allowed_keys={"snipeit_id"},
+                        )
                         obj.parent = parent_obj
-                        obj.custom_field_data["snipeit_id"] = str(sid)
-                        obj.save(update_fields=["parent", "custom_field_data"])
+                        obj.save(update_fields=["parent", "updated_at"])
                     outcome = "updated"
             elif not self.context.dry_run:
                 defaults["slug"] = _unique_slug(Location, name)
-                obj = Location.objects.create(name=name, **defaults)
+                authorize_generic_owner_scope(
+                    user=self.context.user,
+                    owner_model=Location,
+                    tenant_id=getattr(tenant, "pk", None),
+                )
+                obj = Location.objects.create(name=name, custom_field_data={}, **defaults)
+                obj = merge_generic_owner_data(
+                    owner=obj,
+                    user=self.context.user,
+                    updates=generic_data,
+                    allowed_keys={"snipeit_id"},
+                )
                 outcome = "created"
             else:
                 obj = Location(id=-sid, name=name, site=import_site, tenant=tenant)
@@ -185,17 +202,17 @@ class UserImporter:
                 map_companies=self.context.map_companies,
                 tenants=self.dependencies.tenants,
             )
+            generic_data = {"snipeit_id": str(sid)}
             defaults = {
                 "first_name": first,
                 "last_name": last,
                 "email": email,
                 "upn": upn,
                 "tenant": tenant,
-                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
-                    obj = AssetHolder.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+                    obj = AssetHolder.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
                     if not obj:
                         obj = AssetHolder.all_objects.filter(upn=upn, tenant=tenant).first()
                     if obj:
@@ -203,12 +220,29 @@ class UserImporter:
                             outcome = "skipped"
                         else:
                             if not self.context.dry_run:
+                                obj = merge_generic_owner_data(
+                                    owner=obj,
+                                    user=self.context.user,
+                                    updates=generic_data,
+                                    allowed_keys={"snipeit_id"},
+                                )
                                 for field, value in defaults.items():
                                     setattr(obj, field, value)
-                                obj.save()
+                                obj.save(update_fields=[*defaults, "updated_at"])
                             outcome = "updated"
                     elif not self.context.dry_run:
-                        obj = AssetHolder.objects.create(**defaults)
+                        authorize_generic_owner_scope(
+                            user=self.context.user,
+                            owner_model=AssetHolder,
+                            tenant_id=getattr(tenant, "pk", None),
+                        )
+                        obj = AssetHolder.objects.create(custom_field_data={}, **defaults)
+                        obj = merge_generic_owner_data(
+                            owner=obj,
+                            user=self.context.user,
+                            updates=generic_data,
+                            allowed_keys={"snipeit_id"},
+                        )
                         outcome = "created"
                     else:
                         obj = AssetHolder(id=-sid, upn=upn, tenant=tenant)

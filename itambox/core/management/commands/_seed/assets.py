@@ -27,6 +27,7 @@ import random
 
 from django.utils import timezone
 
+from assets.services.specification_writers import apply_asset_specification_patch
 from core.tasks.context import TaskContext
 from inventory.services import COMPONENT_ALLOCATION_OPERATION, create_component_allocation
 
@@ -127,6 +128,12 @@ class SeedAssetsMixin:
                 ),
             )
         return True
+
+    def _apply_seed_specifications(self, asset, values):
+        if not values:
+            return
+        apply_asset_specification_patch(asset_id=asset.pk, user=self._provisioner, set_values=values)
+        asset.refresh_from_db(fields=["custom_field_data"])
 
     def _seed_assets(self):
         from assets.models import Asset, AssetAssignment, AssetTagSequence
@@ -356,8 +363,7 @@ class SeedAssetsMixin:
                 cv = {"operating_system_family": "embedded"}
             # Name is the model only (e.g. "Catalyst 9300"); the unique asset_tag is its
             # own field and column, not baked into the display name.
-            asset.custom_field_data = cv
-            asset.save(update_fields=["custom_field_data"])
+            self._apply_seed_specifications(asset, cv)
             if tags:
                 asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
             if status_slug == "in-use" and holder:

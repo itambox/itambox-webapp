@@ -8,14 +8,24 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 
 from assets.choices import StatusTypeChoices
-from assets.models import Asset, AssetAssignment, AssetType, Category, Manufacturer, StatusLabel, Supplier, Warranty
+from assets.models import (
+    Asset,
+    AssetAssignment,
+    AssetType,
+    AssetTypeFieldset,
+    Category,
+    Manufacturer,
+    StatusLabel,
+    Supplier,
+    Warranty,
+)
 from assets.services import checkout_asset as checkout_asset_service
 from core.importers.snipeit.common import HardwareCheckoutGateway
 from core.importers.snipeit.contracts import ImportContext, StageReporter
 from core.importers.snipeit.stages.hardware import HardwareDependencies, HardwareImporter
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
-from extras.models import CustomField
+from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 from organization.models import AssetHolder, Location, Site
 
 User = get_user_model()
@@ -67,6 +77,13 @@ class TestHardwareImporter(TenantTestMixin):
             activation=CustomField.ACTIVATION_COMPOSED,
         )
         self.custom_field.object_types.add(ContentType.objects.get_for_model(Asset))
+        self.fieldset = CustomFieldset.objects.create(
+            namespace="test",
+            slug="hardware",
+            label="Hardware",
+        )
+        CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=self.custom_field, position=1)
+        AssetTypeFieldset.objects.create(asset_type=self.asset_type, fieldset=self.fieldset, position=1)
 
     def _row(self, source_id=42, **overrides):
         row = {

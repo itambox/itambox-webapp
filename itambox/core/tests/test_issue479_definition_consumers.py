@@ -210,33 +210,50 @@ def test_seed_dense_memberships_preserve_declared_order(monkeypatch):
     assert [(row.custom_field.pk, row.position) for row in created] == [(2, 1), (1, 2)]
 
 
-def test_snipeit_type_composition_writes_dense_single_membership():
-    from unittest.mock import Mock, call
+def test_snipeit_type_composition_uses_canonical_command(monkeypatch):
+    from unittest.mock import Mock
 
-    from core.importers.snipeit.stages.asset_models import AssetModelImporter
+    from core.importers.snipeit.stages import asset_models
 
-    manager = Mock()
-    model = SimpleNamespace(objects=manager)
-    owner, fieldset = object(), object()
+    importer = asset_models.AssetModelImporter.__new__(asset_models.AssetModelImporter)
+    importer.context = SimpleNamespace(user=object())
+    asset_type = SimpleNamespace(pk=17)
+    fieldset = SimpleNamespace(namespace="local", slug="snipeit-42")
+    plan = SimpleNamespace(resource_revision="resource-1", definition_revision="definition-1")
+    command = Mock(return_value=SimpleNamespace(outcome="changed"))
 
-    AssetModelImporter._write_composition(model, owner, fieldset)
+    monkeypatch.setattr(asset_models, "current_specification_plan", Mock(return_value=plan))
+    monkeypatch.setattr(asset_models, "actor_context_for_user", Mock(return_value="actor"))
+    monkeypatch.setattr(asset_models, "set_asset_type_composition", command)
+    monkeypatch.setattr(asset_models, "require_command_success", lambda result: result)
 
-    assert manager.mock_calls == [
-        call.filter(asset_type=owner),
-        call.filter().delete(),
-        call.create(asset_type=owner, fieldset=fieldset, position=1),
-    ]
+    importer._write_composition(asset_type, fieldset)
+
+    kwargs = command.call_args.kwargs
+    assert kwargs["actor"] == "actor"
+    assert kwargs["asset_type_id"] == 17
+    assert kwargs["fieldsets"].identities == ("local/snipeit-42",)
+    assert kwargs["expected_resource_revision"] == "resource-1"
+    assert kwargs["expected_definition_revision"] == "definition-1"
+    assert kwargs["patch"].set_values == {}
+    assert kwargs["patch"].clear_keys == ()
 
 
-def test_snipeit_type_composition_explicit_clear_creates_no_membership():
-    from unittest.mock import Mock, call
+def test_snipeit_type_composition_explicit_clear_uses_canonical_command(monkeypatch):
+    from unittest.mock import Mock
 
-    from core.importers.snipeit.stages.asset_models import AssetModelImporter
+    from core.importers.snipeit.stages import asset_models
 
-    manager = Mock()
-    model = SimpleNamespace(objects=manager)
-    owner = object()
+    importer = asset_models.AssetModelImporter.__new__(asset_models.AssetModelImporter)
+    importer.context = SimpleNamespace(user=object())
+    plan = SimpleNamespace(resource_revision="resource-2", definition_revision="definition-2")
+    command = Mock(return_value=SimpleNamespace(outcome="changed"))
 
-    AssetModelImporter._write_composition(model, owner, None)
+    monkeypatch.setattr(asset_models, "current_specification_plan", Mock(return_value=plan))
+    monkeypatch.setattr(asset_models, "actor_context_for_user", Mock(return_value="actor"))
+    monkeypatch.setattr(asset_models, "set_asset_type_composition", command)
+    monkeypatch.setattr(asset_models, "require_command_success", lambda result: result)
 
-    assert manager.mock_calls == [call.filter(asset_type=owner), call.filter().delete()]
+    importer._write_composition(SimpleNamespace(pk=18), None)
+
+    assert command.call_args.kwargs["fieldsets"].identities == ()

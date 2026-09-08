@@ -5,6 +5,45 @@ from django.db.models import Q
 
 # Registry for search indexes
 SEARCH_INDEXES = defaultdict(list)
+_SEARCH_FILTERS_UNSET = object()
+
+
+def get_search_indexes(model):
+    """Return the registered indexes for ``model`` without exposing registry state."""
+    return tuple(SEARCH_INDEXES.get(model, ()))
+
+
+def search(
+    model,
+    term="",
+    queryset=None,
+    *,
+    specification_filters=_SEARCH_FILTERS_UNSET,
+    tenant_ids=None,
+    definitions=None,
+):
+    """Dispatch a public search request through the model's registered index.
+
+    Specification search is an optional index capability.  Core owns only the
+    dispatch contract; the domain index owns source-qualified query semantics.
+    Passing an empty specification sequence is intentional and still reaches
+    the domain method so its explicit tenant scope cannot be skipped.
+    """
+    indexes = get_search_indexes(model)
+    if not indexes:
+        raise ValueError(f"no search index registered for {model!r}")
+    if specification_filters is not _SEARCH_FILTERS_UNSET:
+        for index in indexes:
+            handler = getattr(index, "search_specifications", None)
+            if handler is not None:
+                return handler(
+                    specification_filters,
+                    queryset=queryset,
+                    tenant_ids=tenant_ids,
+                    definitions=definitions,
+                )
+        raise NotImplementedError(f"no specification search handler registered for {model!r}")
+    return indexes[0].get_results(term, queryset)
 
 
 def register_search():
@@ -58,9 +97,21 @@ class SearchIndex:
         else:
             return queryset.filter(query)
 
-    def get_results(self, term, queryset=None):
+    def search_specifications(self, filters, queryset=None, *, tenant_ids=None, definitions=None):
+        """Optional domain hook for source-qualified specification search."""
+        raise NotImplementedError
+
+    def get_results(
+        self, term, queryset=None, *, specification_filters=_SEARCH_FILTERS_UNSET, tenant_ids=None, definitions=None
+    ):
         """
-        Wrapper around search to potentially handle different return formats later.
-        For now, just calls search.
+        Wrapper around search with an explicit specification-search branch.
         """
+        if specification_filters is not _SEARCH_FILTERS_UNSET:
+            return self.search_specifications(
+                specification_filters,
+                queryset=queryset,
+                tenant_ids=tenant_ids,
+                definitions=definitions,
+            )
         return self.search(term, queryset)

@@ -332,17 +332,25 @@ class FieldsetImporter:
         return _definition_digest(self.context, "fieldset", source_id)
 
     def _reconcile_memberships(self, membership_model, fieldset, row):
-        field_payload = row.get("fields")
+        if "fields" not in row:
+            return
+        field_payload = row["fields"]
         if not isinstance(field_payload, Mapping) or "rows" not in field_payload:
-            return
-        remote_field_rows = field_payload.get("rows") or []
-        field_objects = [
-            self.dependencies.custom_fields[db_column]
-            for row2 in remote_field_rows
-            if (db_column := row2.get("db_column_name")) and db_column in self.dependencies.custom_fields
-        ]
-        if remote_field_rows and len(field_objects) != len(remote_field_rows):
-            return
+            raise ValueError("Unsupported Snipe-IT Fieldset field structure")
+        remote_field_rows = field_payload["rows"]
+        if not isinstance(remote_field_rows, list):
+            raise ValueError("Unsupported Snipe-IT Fieldset membership structure")
+        field_objects = []
+        for field_row in remote_field_rows:
+            if not isinstance(field_row, Mapping):
+                raise ValueError("Unsupported Snipe-IT Fieldset membership entry")
+            db_column = field_row.get("db_column_name")
+            if not isinstance(db_column, str) or not db_column:
+                raise ValueError("Unmapped Snipe-IT Fieldset field identity")
+            field = self.dependencies.custom_fields.get(db_column)
+            if field is None:
+                raise ValueError(f"Unmapped Snipe-IT Fieldset field: {db_column}")
+            field_objects.append(field)
         membership_model.objects.filter(fieldset_id=fieldset.pk).delete()
         if field_objects:
             membership_model.objects.bulk_create(

@@ -10,6 +10,14 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import transaction
 
+from assets.services.specifications.commands import set_asset_type_composition
+from assets.services.specifications.contracts import SpecificationPatchDTO
+from assets.specification_adapters import (
+    actor_context_for_user,
+    current_specification_plan,
+    fieldset_selection,
+    require_command_success,
+)
 from core.importers.snipeit.common import _nested_id
 from core.importers.snipeit.contracts import ImportContext, Outcome, StageResult
 
@@ -77,7 +85,7 @@ class AssetModelImporter:
             raise ValueError("Asset Type has legacy unprovenanced Snipe-IT identity")
         raise ValueError("Cannot claim an unprovenanced Asset Type from Snipe-IT")
 
-    def _update_existing(self, obj, defaults, composition_model, fieldset):
+    def _update_existing(self, obj, defaults, fieldset):
         if getattr(obj, "deleted_at", None) is not None:
             raise ValueError("Cannot update a deleted Asset Type from Snipe-IT")
         if getattr(obj, "management_kind", None) in {"core", "library"}:
@@ -87,22 +95,19 @@ class AssetModelImporter:
         previous_data = getattr(obj, "custom_field_data", None)
         if previous_data is not None and not isinstance(previous_data, Mapping):
             raise ValueError("Existing Asset Type specifications are not a JSON object")
-        merged_data = dict(previous_data or {})
-        merged_data.update(defaults["custom_field_data"])
-        defaults["custom_field_data"] = merged_data
         if not self.context.dry_run:
             for field, value in defaults.items():
                 setattr(obj, field, value)
-            obj.save()
+            obj.save(update_fields=[*defaults, "updated_at"])
             if fieldset is not _OMITTED_FIELDSET:
-                self._write_composition(composition_model, obj, fieldset)
+                self._write_composition(obj, fieldset)
         return obj, "updated"
 
-    def _create(self, model, source_id, defaults, composition_model, fieldset, model_name, manufacturer):
+    def _create(self, model, source_id, defaults, fieldset, model_name, manufacturer):
         if not self.context.dry_run:
             obj = model.objects.create(**defaults)
             if fieldset is not _OMITTED_FIELDSET:
-                self._write_composition(composition_model, obj, fieldset)
+                self._write_composition(obj, fieldset)
         else:
             obj = model(
                 id=-source_id,
@@ -112,7 +117,7 @@ class AssetModelImporter:
             )
         return obj, "created"
 
-    def _upsert(self, model, composition_model, row) -> tuple[object, Outcome]:
+    def _upsert(self, model, row) -> tuple[object, Outcome]:
         source_id = row["id"]
         source_identity = _snipeit_identity(self.context, source_id)
         connector_identity = _connector_identity(source_identity)
@@ -141,30 +146,38 @@ class AssetModelImporter:
             "category": category,
             "eol_months": eol_months,
             "part_number": part_number,
-            "custom_field_data": {},
             "connector_identity": connector_identity,
         }
         obj = self._find_existing(model, connector_identity, model_name, manufacturer)
         if obj is not None:
-            return self._update_existing(obj, defaults, composition_model, fieldset)
-        return self._create(model, source_id, defaults, composition_model, fieldset, model_name, manufacturer)
+            return self._update_existing(obj, defaults, fieldset)
+        return self._create(model, source_id, defaults, fieldset, model_name, manufacturer)
 
-    @staticmethod
-    def _write_composition(composition_model, asset_type, fieldset):
-        composition_model.objects.filter(asset_type=asset_type).delete()
-        if fieldset is not None:
-            composition_model.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
+    def _write_composition(self, asset_type, fieldset):
+        plan = current_specification_plan(asset_type, target_kind="asset_type")
+        selection = fieldset_selection(
+            () if fieldset is None else (fieldset,),
+            presence="explicit",
+        )
+        result = set_asset_type_composition(
+            actor=actor_context_for_user(self.context.user),
+            asset_type_id=asset_type.pk,
+            fieldsets=selection,
+            expected_resource_revision=plan.resource_revision,
+            expected_definition_revision=plan.definition_revision,
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        require_command_success(result)
 
     def run(self) -> StageResult:
         model = apps.get_model("assets", "AssetType")
-        composition_model = apps.get_model("assets", "AssetTypeFieldset")
         result = StageResult(self.key)
         self.context.reporter.start(result)
         for row in self.context.client.get_all("/api/v1/models"):
             source_id = row["id"]
             try:
                 with transaction.atomic():
-                    obj, outcome = self._upsert(model, composition_model, row)
+                    obj, outcome = self._upsert(model, row)
                 self.dependencies.asset_models[source_id] = obj
                 result.counts.record(outcome)
             # broad except: task-isolation: one remote row must not abort the reviewed import batch

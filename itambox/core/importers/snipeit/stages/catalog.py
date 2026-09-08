@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import transaction
 
+from assets.services.specification_writers import authorize_generic_owner_scope, merge_generic_owner_data
 from core.importers.snipeit.common import _CATEGORY_APPLIES_MAP, _STATUS_TYPE_MAP, _unique_slug
 from core.importers.snipeit.contracts import ImportContext, Outcome, StageResult
 
@@ -179,10 +180,10 @@ class SupplierImporter:
         contact_email = (row.get("email") or "")[:254]
         contact_phone = (row.get("phone") or "")[:50]
         contact_name = (row.get("contact") or "")[:255]
+        generic_data = {"snipeit_id": str(source_id)}
         defaults = {
             "website": (row.get("url") or "")[:200],
             "notes": row.get("notes") or "",
-            "custom_field_data": {"snipeit_id": str(source_id)},
         }
         obj = supplier_model.all_objects.filter(custom_field_data__snipeit_id=str(source_id)).first()
         if not obj:
@@ -191,12 +192,30 @@ class SupplierImporter:
             if not self.context.update:
                 return obj, "skipped"
             if not self.context.dry_run:
+                obj = merge_generic_owner_data(
+                    owner=obj,
+                    user=self.context.user,
+                    updates=generic_data,
+                    allowed_keys={"snipeit_id"},
+                )
                 for field, value in defaults.items():
                     setattr(obj, field, value)
-                obj.save()
+                obj.save(update_fields=[*defaults, "updated_at"])
             return obj, "updated"
         if not self.context.dry_run:
+            authorize_generic_owner_scope(
+                user=self.context.user,
+                owner_model=supplier_model,
+                tenant_id=None,
+                allow_global=True,
+            )
             obj = supplier_model.objects.create(name=name, **defaults)
+            obj = merge_generic_owner_data(
+                owner=obj,
+                user=self.context.user,
+                updates=generic_data,
+                allowed_keys={"snipeit_id"},
+            )
             if contact_name or contact_email or contact_phone:
                 supplier_ct = ct_model.objects.get_for_model(supplier_model)
                 primary_role, _ = role_model.objects.get_or_create(

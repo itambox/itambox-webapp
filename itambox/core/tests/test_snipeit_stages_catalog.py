@@ -874,7 +874,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         )
 
         fieldset = CustomFieldset._base_manager.get(namespace="local", slug="snipeit-118")
-        assert result.counts.updated == 1
+        assert result.counts.failed == 1
         assert list(fieldset.fields.all()) == [first]
         assert second not in fieldset.fields.all()
 
@@ -915,7 +915,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
             update=True,
         )
         obj.refresh_from_db()
-        assert updated.counts.updated == 1
+        assert updated.counts.failed == 1
         assert list(obj.fields.all()) == [field]
         assert other not in obj.fields.all()
 

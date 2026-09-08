@@ -137,9 +137,6 @@ def _snipeit_choice_key(definition, value):
     key_matches = [choice.key for choice in choices if choice.key == value]
     if len(key_matches) == 1:
         return key_matches[0]
-    label_matches = [choice.key for choice in choices if choice.label == value]
-    if len(label_matches) == 1:
-        return label_matches[0]
     raise ValidationError("Select a valid choice.", code="INVALID_CHOICE")
 
 
@@ -184,7 +181,12 @@ def canonicalize_snipeit_custom_field_value(definition, value):
         "text": _canonical_snipeit_text,
     }
     handler = handlers.get(definition.field_type)
-    return handler(definition, value) if handler else value
+    if handler is None:
+        raise ValidationError(
+            "Unsupported Snipe-IT custom-field type.",
+            code="UNSUPPORTED_FIELD_TYPE",
+        )
+    return handler(definition, value)
 
 
 def _clean_field_name(db_column: str) -> str:

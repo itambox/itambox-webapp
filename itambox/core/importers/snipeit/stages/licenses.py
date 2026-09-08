@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import transaction
 
+from assets.services.specification_writers import authorize_generic_owner_scope, merge_generic_owner_data
 from core.importers.snipeit.common import IMPORT_NOTE, _nested_id, _nested_str, _parse_date, _parse_decimal, tenant_for
 from core.importers.snipeit.contracts import ImportContext, StageResult
 
@@ -66,8 +67,8 @@ class LicenseImporter:
         license_type = "subscription_seat" if expiration_date else "perpetual_seat"
 
         with transaction.atomic():
-            software = self._software_for(sid, sw_name, mfr, Software)
-            license_obj = License.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+            software = self._software_for(sid, sw_name, mfr, Software, tenant)
+            license_obj = License.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
             if not license_obj:
                 license_obj = License.all_objects.filter(name=name, software=software, tenant=tenant).first()
             if license_obj:
@@ -88,6 +89,11 @@ class LicenseImporter:
                 return
 
             if not self.context.dry_run:
+                authorize_generic_owner_scope(
+                    user=self.context.user,
+                    owner_model=License,
+                    tenant_id=getattr(tenant, "pk", None),
+                )
                 license_obj = License.objects.create(
                     name=name,
                     software=software,
@@ -101,7 +107,12 @@ class LicenseImporter:
                     notes=notes,
                     supplier=supplier,
                     tenant=tenant,
-                    custom_field_data={"snipeit_id": str(sid)},
+                )
+                license_obj = merge_generic_owner_data(
+                    owner=license_obj,
+                    user=self.context.user,
+                    updates={"snipeit_id": str(sid)},
+                    allowed_keys={"snipeit_id"},
                 )
                 self._import_seats(license_obj, sid, LicenseSeatAssignment, result)
             else:
@@ -128,6 +139,12 @@ class LicenseImporter:
             result.counts.skipped += 1
         else:
             if not self.context.dry_run:
+                license_obj = merge_generic_owner_data(
+                    owner=license_obj,
+                    user=self.context.user,
+                    updates={"snipeit_id": str(sid)},
+                    allowed_keys={"snipeit_id"},
+                )
                 license_obj.seats = seats
                 license_obj.product_key = product_key
                 license_obj.purchase_date = purchase_date
@@ -136,30 +153,64 @@ class LicenseImporter:
                 license_obj.order_number = order_number
                 license_obj.notes = notes
                 license_obj.license_type = license_type
-                license_obj.custom_field_data = {
-                    **(license_obj.custom_field_data or {}),
-                    "snipeit_id": str(sid),
-                }
-                license_obj.save()
+                license_obj.save(
+                    update_fields=[
+                        "seats",
+                        "product_key",
+                        "purchase_date",
+                        "expiration_date",
+                        "purchase_cost",
+                        "order_number",
+                        "notes",
+                        "license_type",
+                        "updated_at",
+                    ]
+                )
             result.counts.updated += 1
         if not self.context.dry_run:
             self._import_seats(license_obj, sid, assignment_model, result)
 
-    def _software_for(self, sid: int, sw_name: str, mfr, Software):
+    def _software_for(self, sid: int, sw_name: str, mfr, Software, tenant):
         if sid not in self._software_cache:
             if not self.context.dry_run:
-                software_query = Software.all_objects.filter(name=sw_name, manufacturer=mfr)
-                if not mfr:
-                    software_query = Software.all_objects.filter(name=sw_name)
+                software_query = Software.all_objects.filter(
+                    custom_field_data__snipeit_id=f"sw_{sid}",
+                    tenant=tenant,
+                )
                 software = software_query.first()
                 if not software:
+                    software_query = Software.all_objects.filter(name=sw_name, tenant=tenant)
+                    if mfr:
+                        software_query = software_query.filter(manufacturer=mfr)
+                    software = software_query.first()
+                if software:
+                    software = merge_generic_owner_data(
+                        owner=software,
+                        user=self.context.user,
+                        updates={"snipeit_id": f"sw_{sid}"},
+                        allowed_keys={"snipeit_id"},
+                    )
+                else:
+                    authorize_generic_owner_scope(
+                        user=self.context.user,
+                        owner_model=Software,
+                        tenant_id=getattr(tenant, "pk", None),
+                        allow_global=bool(getattr(Software, "allow_global_tenant", False)),
+                    )
                     software = Software.objects.create(
                         name=sw_name,
                         manufacturer=mfr,
-                        custom_field_data={"snipeit_id": f"sw_{sid}"},
+                        tenant=tenant,
+                        custom_field_data={},
+                    )
+                    software = merge_generic_owner_data(
+                        owner=software,
+                        user=self.context.user,
+                        updates={"snipeit_id": f"sw_{sid}"},
+                        allowed_keys={"snipeit_id"},
                     )
             else:
-                software = Software(id=-sid, name=sw_name)
+                software = Software(id=-sid, name=sw_name, tenant=tenant)
             self._software_cache[sid] = software
         return self._software_cache[sid]
 
