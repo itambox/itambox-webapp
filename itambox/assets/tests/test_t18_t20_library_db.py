@@ -84,10 +84,7 @@ class LibraryTransactionalWriteTests(TestCase):
         self.assertIsNotNone(retired.deprecated_at)
 
         effective = effective_definitions_from_library(library)
-        effective_choices = {
-            choice["key"]: choice
-            for choice in effective["choice_sets"][0]["choices"]
-        }
+        effective_choices = {choice["key"]: choice for choice in effective["choice_sets"][0]["choices"]}
         self.assertEqual(effective_choices["legacy"]["lifecycle"], "deprecated")
         self.assertEqual(effective_choices["off"]["lifecycle"], "deprecated")
 

@@ -63,7 +63,9 @@ def _fixture_text(name: str) -> str:
 def _library_permissions() -> tuple[Permission, Permission]:
     content_type = ContentType.objects.get(app_label="extras", model="specificationlibrary")
     return (
-        Permission.objects.get(content_type=content_type, codename="change_specificationlibrary"),
+        Permission.objects.get(
+            content_type=ContentType.objects.get_for_model(CustomField), codename="change_customfield"
+        ),
         Permission.objects.get(content_type=content_type, codename="manage_specification_library"),
     )
 
@@ -78,6 +80,22 @@ def _provision_actor() -> tuple[object, Token, Token]:
     role = Role.objects.create(tenant=tenant, name="Type Library HTTP Role", permissions=[])
     grant(actor, tenant, role)
     actor.user_permissions.add(*_library_permissions())
+    # Preview/apply require the capability AND the concrete plan's model operations.
+    for model in (
+        CustomField,
+        CustomFieldChoiceSet,
+        CustomFieldChoice,
+        CustomFieldset,
+        AssetType,
+        Category,
+        Manufacturer,
+    ):
+        actor.user_permissions.add(
+            *Permission.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                codename__in=[f"{action}_{model._meta.model_name}" for action in ("add", "change", "view")],
+            )
+        )
     write_token = Token.objects.create(user=actor, tenant=tenant, write_enabled=True)
     read_token = Token.objects.create(user=actor, tenant=tenant, write_enabled=False)
     return actor, write_token, read_token
