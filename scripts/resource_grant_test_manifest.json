@@ -187,7 +187,8 @@
     "itambox/assets/tests/test_t12_rest_specifications.py",
     "itambox/assets/tests/test_t13_graphql_execution.py",
     "itambox/assets/tests/test_t13_graphql_readers.py",
-    "itambox/users/tests/test_i18n.py"
+    "itambox/users/tests/test_i18n.py",
+    "itambox/assets/tests/test_t17_type_library_validation.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -379,7 +380,8 @@
     "itambox/assets/tests/test_t12_rest_specifications.py",
     "itambox/assets/tests/test_t13_graphql_execution.py",
     "itambox/assets/tests/test_t13_graphql_readers.py",
-    "itambox/users/tests/test_i18n.py"
+    "itambox/users/tests/test_i18n.py",
+    "itambox/assets/tests/test_t17_type_library_validation.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
