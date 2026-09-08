@@ -36,6 +36,23 @@ class AssetTypeFormPreservationTests(TestCase):
         request.user = self.user
         return request
 
+    def _preview_revisions(self, instance, data=None, request=None):
+        if data is None:
+            preview = AssetTypeForm(instance=instance, request=request)
+            return {
+                "expected_resource_revision": preview.fields["expected_resource_revision"].initial,
+                "expected_definition_revision": preview.fields["expected_definition_revision"].initial,
+            }
+        preview_data = dict(data)
+        preview_data["_reload"] = "1"
+        preview_request = RequestFactory().post("/asset-types/", preview_data, HTTP_HX_REQUEST="true")
+        preview_request.user = self.user
+        preview = AssetTypeForm(data=preview_data, instance=instance, request=preview_request)
+        return {
+            "expected_resource_revision": preview.data["expected_resource_revision"],
+            "expected_definition_revision": preview.data["expected_definition_revision"],
+        }
+
     def test_unbound_generic_asset_type_field_is_rendered(self):
         field = CustomField.objects.create(
             name="generic_asset_type_spec",
@@ -139,6 +156,7 @@ class AssetTypeFormPreservationTests(TestCase):
             "description": "New description",
             "custom_fieldsets": [str(second.pk)],
         }
+        form_data.update(self._preview_revisions(asset_type, form_data))
         request = self._authorized_request({**form_data, "return_url": "/"})
         form = AssetTypeForm(data=form_data, instance=asset_type, request=request)
         self.assertTrue(form.is_valid(), form.errors)
@@ -402,16 +420,18 @@ class AssetTypeFormPreservationTests(TestCase):
         )
         AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
 
+        form_data = {
+            "manufacturer": manufacturer.pk,
+            "model": "Device",
+            "slug": "example-device",
+            "custom_fieldsets": [fieldset.pk],
+            "cf_visible_spec": "updated",
+        }
+        form_data.update(self._preview_revisions(asset_type, form_data))
         form = AssetTypeForm(
-            data={
-                "manufacturer": manufacturer.pk,
-                "model": "Device",
-                "slug": "example-device",
-                "custom_fieldsets": [fieldset.pk],
-                "cf_visible_spec": "updated",
-            },
+            data=form_data,
             instance=asset_type,
-            request=self._authorized_request(),
+            request=self._authorized_request(form_data),
         )
 
         self.assertNotIn("custom_fieldset", form.fields)

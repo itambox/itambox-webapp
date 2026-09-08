@@ -39,6 +39,23 @@ class SpecificationFormBoundaryTests(TenantTestMixin, TestCase):
         self.request.user = self.tenant_user
         self.request.tenant = self.tenant
 
+    def _asset_type_revisions(self, instance, data=None):
+        if data is None:
+            preview = AssetTypeForm(instance=instance, request=self.request)
+            return {
+                "expected_resource_revision": preview.fields["expected_resource_revision"].initial,
+                "expected_definition_revision": preview.fields["expected_definition_revision"].initial,
+            }
+        preview_data = dict(data)
+        preview_data["_reload"] = "1"
+        preview_request = RequestFactory().post("/asset-types/", preview_data, HTTP_HX_REQUEST="true")
+        preview_request.user = self.tenant_admin
+        preview = AssetTypeForm(data=preview_data, instance=instance, request=preview_request)
+        return {
+            "expected_resource_revision": preview.data["expected_resource_revision"],
+            "expected_definition_revision": preview.data["expected_definition_revision"],
+        }
+
     def test_http_asset_creation_reaches_native_form_with_authenticated_actor(self):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         data = _minimal_asset_form_data(
@@ -58,6 +75,12 @@ class SpecificationFormBoundaryTests(TenantTestMixin, TestCase):
     def test_mixed_form_updates_lock_catalogue_before_native_owner_write(self):
         admin_request = RequestFactory().post("/asset-types/")
         admin_request.user = self.tenant_admin
+        type_data = {
+            "manufacturer": self.source.manufacturer_id,
+            "model": "Changed native model",
+            "slug": self.source.slug,
+        }
+        type_data.update(self._asset_type_revisions(self.source))
         with self.tenant_context(self.tenant):
             forms = (
                 (
@@ -72,11 +95,7 @@ class SpecificationFormBoundaryTests(TenantTestMixin, TestCase):
                 ),
                 (
                     AssetTypeForm(
-                        data={
-                            "manufacturer": self.source.manufacturer_id,
-                            "model": "Changed native model",
-                            "slug": self.source.slug,
-                        },
+                        data=type_data,
                         instance=self.source,
                         request=admin_request,
                     ),
@@ -105,13 +124,15 @@ class SpecificationFormBoundaryTests(TenantTestMixin, TestCase):
         )
         request = RequestFactory().post("/asset-types/")
         request.user = self.tenant_admin
+        form_data = {
+            "manufacturer": self.source.manufacturer_id,
+            "model": self.source.model,
+            "slug": self.source.slug,
+            "custom_fieldsets": [fieldset.pk],
+        }
+        form_data.update(self._asset_type_revisions(self.source, form_data))
         form = AssetTypeForm(
-            data={
-                "manufacturer": self.source.manufacturer_id,
-                "model": self.source.model,
-                "slug": self.source.slug,
-                "custom_fieldsets": [fieldset.pk],
-            },
+            data=form_data,
             instance=self.source,
             request=request,
         )
@@ -150,12 +171,14 @@ class SpecificationFormBoundaryTests(TenantTestMixin, TestCase):
         request = RequestFactory().post("/asset-types/")
         request.user = self.tenant_admin
         previous_timestamp = self.source.updated_at
+        form_data = {
+            "manufacturer": self.source.manufacturer_id,
+            "model": "Updated native Type",
+            "slug": self.source.slug,
+        }
+        form_data.update(self._asset_type_revisions(self.source))
         form = AssetTypeForm(
-            data={
-                "manufacturer": self.source.manufacturer_id,
-                "model": "Updated native Type",
-                "slug": self.source.slug,
-            },
+            data=form_data,
             instance=self.source,
             request=request,
         )
