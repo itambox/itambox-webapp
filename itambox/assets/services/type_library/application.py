@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from assets.services.specifications.preview_tokens import PreviewTokenError
 from assets.services.type_library.planning import (
@@ -135,20 +134,16 @@ def apply_library_plan(
     *,
     actor: object,
     using: str = "default",
-    state_loader: Callable[[Any], LibraryReconciliationState] | None = None,
-    writer: Callable[[Any, ValidatedLibraryDocument, LibraryPlan, str], tuple[str, ...]] | None = None,
 ) -> LibraryApplyResult:
     """Apply a validated library plan in the canonical exclusive transaction.
 
-    ``state_loader`` and ``writer`` are narrow seams for the real domain reader
-    and writer; production callers leave them unset.  They are not transports
-    or alternate persistence paths.  The default path is wired to the Library
-    models and the dedicated exporter/writer below.
+    The production path is intentionally not injectable: it always uses the
+    existing Library models, exporter state loader, and dedicated writer.
     """
 
     from django.db import transaction
 
-    from assets.services._command_support import has_global_model_permission
+    from assets.services.specifications._command_support import has_global_model_permission
     from assets.services.specifications.locking import catalogue_transaction_lock
     from assets.services.type_library.exporting import load_library_state
     from assets.services.type_library.writing import LibraryWriteError, write_library_document
@@ -179,7 +174,7 @@ def apply_library_plan(
                 )
                 library.save(using=using)
 
-            current_state = (state_loader or load_library_state)(library)
+            current_state = load_library_state(library)
             prepared = prepare_library_apply(
                 request,
                 incoming,
@@ -188,9 +183,8 @@ def apply_library_plan(
                     actor, SpecificationLibrary, "change_specificationlibrary"
                 ),
             )
-            write = writer or write_library_document
             try:
-                changed = tuple(write(library, incoming, prepared, using))
+                changed = tuple(write_library_document(library, incoming, prepared, using))
             except LibraryWriteError as exc:
                 raise LibraryApplyError(exc.code) from exc
             return LibraryApplyResult(
