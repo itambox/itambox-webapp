@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -79,6 +80,11 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         self.assertContains(listing, "acme")
         detail = self.client.get(reverse("assets:type_library_detail", kwargs={"pk": library.pk}))
         self.assertEqual(detail.status_code, 200)
+        export_action = re.escape(reverse("assets:type_library_export", kwargs={"pk": library.pk}))
+        self.assertRegex(
+            detail.content.decode(),
+            rf'<form\b(?=[^>]*action="{export_action}")(?=[^>]*hx-boost="false")',
+        )
         self.assertContains(detail, "Immutable release history")
         self.assertContains(detail, "Tenant Asset values")
 
