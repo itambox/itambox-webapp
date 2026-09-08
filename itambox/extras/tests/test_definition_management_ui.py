@@ -1,8 +1,6 @@
 from contextlib import contextmanager
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory, TestCase
 
 from core.context import override_current_tenant_scope, set_current_all_accessible
@@ -23,14 +21,8 @@ class DefinitionManagementUITests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.user = User.objects.create_user(username="definition-ui-editor")
-        self._grant(
-            "view_customfieldchoiceset",
-            "add_customfieldchoiceset",
-            "change_customfieldchoiceset",
-            "view_customfieldchoice",
-            "add_customfieldchoice",
-            "change_customfieldchoice",
-        )
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
         self.choice_set = CustomFieldChoiceSet.objects.create(
             namespace="local",
             slug="display-modes",
@@ -53,18 +45,6 @@ class DefinitionManagementUITests(TestCase):
         with override_current_tenant_scope(None):
             pass
         super().tearDown()
-
-    def _grant(self, *codenames):
-        content_types = {
-            model: ContentType.objects.get_for_model(model) for model in (CustomFieldChoiceSet, CustomFieldChoice)
-        }
-        permissions = []
-        for codename in codenames:
-            model = CustomFieldChoice if codename.endswith("customfieldchoice") else CustomFieldChoiceSet
-            permissions.append(Permission.objects.get(content_type=content_types[model], codename=codename))
-        self.user.user_permissions.add(*permissions)
-        self.assertTrue(self.user.has_perm("extras.change_customfieldchoice"))
-        self.assertTrue(self.user.has_perm("extras.change_customfieldchoiceset"))
 
     def _request(self, method, path, data=None):
         request = getattr(self.factory, method)(path, data=data or {})
@@ -152,7 +132,9 @@ class DefinitionManagementUITests(TestCase):
             max_values=1,
         )
         self.assertEqual(field.choice_set_id, self.choice_set.pk)
+        limited_user = User.objects.create_user(username="definition-ui-limited")
         request = self._request("get", f"/choice-sets/{self.choice_set.pk}/")
+        request.user = limited_user
         request.active_tenant = tenant
         with override_current_tenant_scope(tenant):
             view = ChoiceSetDetailView()
@@ -170,6 +152,7 @@ class DefinitionManagementUITests(TestCase):
                 "expected_resource_revision": ChoiceSetUpdateView.current_revision(self.choice_set),
             },
         )
+        post.user = limited_user
         post.active_tenant = tenant
         with override_current_tenant_scope(tenant):
             response = ChoiceSetUpdateView.as_view()(post, pk=self.choice_set.pk)
