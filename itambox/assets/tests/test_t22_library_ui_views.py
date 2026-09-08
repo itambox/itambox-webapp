@@ -11,7 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.api.tests.test_type_library_http import _snapshot_rows
-from assets.models import AssetType
+from assets.models import AssetType, Manufacturer
 from assets.tests.test_t17_type_library_validation import _release_document
 from extras.models import CustomField, SpecificationLibrary
 
@@ -206,6 +206,29 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         reimport = self._apply_preview(self._upload(upstream))
         self.assertTrue(reimport.context["result"].no_op)
         self.assertEqual(_snapshot_rows(), before_reimport)
+
+    def test_catalogue_name_collision_is_rejected_before_preview_token(self):
+        document = self._document()
+        Manufacturer.objects.create(
+            name=document["definitions"]["manufacturers"][0]["label"], slug="other-catalogue-identity"
+        )
+        before = _snapshot_rows()
+        response = self._upload(document)
+        self.assertContains(response, "IDENTITY_COLLISION")
+        self.assertIsNone(response.context["preview"])
+        self.assertEqual(_snapshot_rows(), before)
+
+    def test_catalogue_name_collision_after_preview_leaves_no_partial_apply(self):
+        document = self._document()
+        preview = self._upload(document)
+        self.assertTrue(preview.context["preview"].plan.can_apply)
+        Manufacturer.objects.create(
+            name=document["definitions"]["manufacturers"][0]["label"], slug="late-catalogue-identity"
+        )
+        before = _snapshot_rows()
+        response = self._apply_preview(preview)
+        self.assertContains(response, "IDENTITY_COLLISION")
+        self.assertEqual(_snapshot_rows(), before)
 
     def test_stale_apply_refreshes_preview_and_retains_original_source(self):
         self._apply_preview(self._upload(self._document()))

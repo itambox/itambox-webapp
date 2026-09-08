@@ -7,7 +7,7 @@ import { test, expect } from '../../../fixtures/test';
 
 type LibrarySnapshot = {
   effective_definitions: { fields: Array<{ key: string; label: string }> };
-  upstream: { source_document: { definitions: { fields: Array<{ key: string; label: string }> } } };
+  upstream: { definitions: { fields: Array<{ key: string; label: string }> } };
 };
 
 function uniqueNamespace(runId: string): string {
@@ -69,7 +69,7 @@ function releaseDocument(namespace: string, release: number, fieldLabel: string)
       categories: [
         {
           id: category,
-          label: 'Browser devices',
+          label: `${namespace} devices`,
           description: 'Browser journey category',
           lifecycle: 'active',
           applies_to: ['asset'],
@@ -79,7 +79,7 @@ function releaseDocument(namespace: string, release: number, fieldLabel: string)
       manufacturers: [
         {
           id: manufacturer,
-          label: 'Browser manufacturer',
+          label: `${namespace} manufacturer`,
           description: 'Browser journey manufacturer',
           lifecycle: 'active',
         },
@@ -88,7 +88,7 @@ function releaseDocument(namespace: string, release: number, fieldLabel: string)
         {
           id: `${namespace}/device-a`,
           manufacturer,
-          model: 'Browser Device',
+          model: `${namespace} device`,
           part_number: 'E2E-A',
           gtin: null,
           region: '',
@@ -189,7 +189,7 @@ test.describe('assets Type Library browser workflow', { tag: '@pr' }, () => {
     expect(finalPath).not.toBeNull();
     const acceptedSnapshot = JSON.parse(await readFile(finalPath!, 'utf8')) as LibrarySnapshot;
     expect(acceptedSnapshot.effective_definitions.fields.find(field => field.key === fieldKey)?.label).toBe('Upstream State');
-    expect(acceptedSnapshot.upstream.source_document.definitions.fields.find(field => field.key === fieldKey)?.label).toBe('Upstream State');
+    expect(acceptedSnapshot.upstream.definitions.fields.find(field => field.key === fieldKey)?.label).toBe('Upstream State');
     await uploadAndPreview(page, acceptedSnapshot, 'effective-snapshot-reimport.json');
     await page.getByRole('button', { name: 'Apply Library' }).click();
     await expect(page.locator('[data-library-apply-result]')).toContainText('no changes were applied');
