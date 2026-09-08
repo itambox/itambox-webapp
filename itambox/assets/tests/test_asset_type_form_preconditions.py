@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
+from django.http import QueryDict
 from django.test import SimpleTestCase
 
 from assets.forms.assettype_form import AssetTypeForm
@@ -17,6 +18,58 @@ class AssetTypeFormPreconditionTests(SimpleTestCase):
         form._create_selection = lambda: SimpleNamespace(presence="explicit", identities=selection)
         form._patch = lambda: object()
         return form
+
+    def _render_form(self, *, bound, reload_request=False, data=None):
+        form = AssetTypeForm.__new__(AssetTypeForm)
+        form.instance = SimpleNamespace(pk=23)
+        form.is_bound = bound
+        form.data = data or QueryDict(mutable=True)
+        form.request = SimpleNamespace(
+            headers={"HX-Request": "true"} if reload_request else {},
+        )
+        form.fields = {
+            "expected_resource_revision": SimpleNamespace(initial=""),
+            "expected_definition_revision": SimpleNamespace(initial=""),
+        }
+        form.specification_definition_revision = ""
+        return form
+
+    def test_initial_render_issues_hidden_prospective_tokens(self):
+        form = self._render_form(bound=False)
+        selected = (SimpleNamespace(namespace="local", slug="second"), SimpleNamespace(namespace="local", slug="first"))
+        plan = SimpleNamespace(resource_revision="resource-preview", definition_revision="definition-preview")
+
+        with patch("assets.forms.assettype_form.prospective_specification_plan", return_value=plan) as preview:
+            form._set_render_preconditions(selected)
+
+        preview.assert_called_once()
+        self.assertEqual(form.fields["expected_resource_revision"].initial, "resource-preview")
+        self.assertEqual(form.fields["expected_definition_revision"].initial, "definition-preview")
+        self.assertEqual(form.specification_definition_revision, "definition-preview")
+
+    def test_hx_reload_replaces_hidden_tokens_for_changed_composition_preview(self):
+        data = QueryDict("_reload=1&expected_resource_revision=old-resource&expected_definition_revision=old-definition")
+        form = self._render_form(bound=True, reload_request=True, data=data)
+        plan = SimpleNamespace(resource_revision="new-resource", definition_revision="new-definition")
+
+        with patch("assets.forms.assettype_form.prospective_specification_plan", return_value=plan) as preview:
+            form._set_render_preconditions((SimpleNamespace(namespace="local", slug="only"),))
+
+        preview.assert_called_once()
+        self.assertEqual(form.data["expected_resource_revision"], "new-resource")
+        self.assertEqual(form.data["expected_definition_revision"], "new-definition")
+
+    def test_normal_post_preserves_supplied_tokens_without_preview_refresh(self):
+        data = QueryDict("expected_resource_revision=submitted-resource&expected_definition_revision=submitted-definition")
+        form = self._render_form(bound=True, data=data)
+
+        with patch("assets.forms.assettype_form.prospective_specification_plan") as preview:
+            form._set_render_preconditions((SimpleNamespace(namespace="local", slug="changed"),))
+
+        preview.assert_not_called()
+        self.assertEqual(form.data["expected_resource_revision"], "submitted-resource")
+        self.assertEqual(form.data["expected_definition_revision"], "submitted-definition")
+        self.assertEqual(form.specification_definition_revision, "submitted-definition")
 
     def test_changed_order_uses_preview_tokens_without_rebuilding_them(self):
         form = self._form(selection=("local/second", "local/first"))
