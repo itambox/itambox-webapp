@@ -234,6 +234,14 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         required=False,
         widget=forms.HiddenInput(attrs={"data-specification-fieldsets-presence": "1"}),
     )
+    expected_resource_revision = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-specification-resource-revision": "1"}),
+    )
+    expected_definition_revision = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-specification-definition-revision": "1"}),
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -651,7 +659,47 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         self.specification_sections = sections
         self.specification_history = _history_entries(self._stored_custom_values(), self.custom_field_definitions)
         self.specification_fieldset_options = self._fieldset_options(selected)
-        self.specification_definition_revision = ""
+        self._set_render_preconditions(selected)
+
+    def _is_t15_preview_request(self):
+        return not self.is_bound or bool(
+            self.request
+            and self.request.headers.get("HX-Request")
+            and self.data.get("_reload") == "1"
+        )
+
+    def _set_render_preconditions(self, selected):
+        if not self.instance or not self.instance.pk:
+            self.specification_definition_revision = ""
+            return
+        if self._is_t15_preview_request():
+            plan = prospective_specification_plan(
+                self.instance,
+                target_kind="asset_type",
+                fieldset_identities=tuple(f"{fieldset.namespace}/{fieldset.slug}" for fieldset in selected),
+            )
+            resource_revision = str(plan.resource_revision)
+            definition_revision = str(plan.definition_revision)
+            self.fields["expected_resource_revision"].initial = resource_revision
+            self.fields["expected_definition_revision"].initial = definition_revision
+            if self.is_bound:
+                data = self.data.copy()
+                data["expected_resource_revision"] = resource_revision
+                data["expected_definition_revision"] = definition_revision
+                self.data = data
+            self.specification_definition_revision = definition_revision
+            return
+        self.specification_definition_revision = self.data.get("expected_definition_revision", "")
+
+    def _submitted_preconditions(self):
+        resource_revision = self.cleaned_data.get("expected_resource_revision", "")
+        definition_revision = self.cleaned_data.get("expected_definition_revision", "")
+        if not resource_revision or not definition_revision:
+            raise ValidationError(
+                _("Refresh the specification preview before submitting this form."),
+                code="missing_specification_precondition",
+            )
+        return resource_revision, definition_revision
 
     def _t15_field_context(self, key):
         return {
@@ -758,27 +806,22 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def _command_update(self, instance, actor):
         selection = self._create_selection()
+        expected_resource_revision, expected_definition_revision = self._submitted_preconditions()
         if selection.presence == "omitted":
-            plan = current_specification_plan(instance, target_kind="asset_type")
             result = update_asset_type_specifications(
                 actor=actor,
                 asset_type_id=instance.pk,
-                expected_resource_revision=plan.resource_revision,
-                expected_definition_revision=plan.definition_revision,
+                expected_resource_revision=expected_resource_revision,
+                expected_definition_revision=expected_definition_revision,
                 patch=self._patch(),
             )
         else:
-            plan = prospective_specification_plan(
-                instance,
-                target_kind="asset_type",
-                fieldset_identities=selection.identities,
-            )
             result = set_asset_type_composition(
                 actor=actor,
                 asset_type_id=instance.pk,
                 fieldsets=ExplicitFieldsetSelectionDTO(identities=selection.identities),
-                expected_resource_revision=plan.resource_revision,
-                expected_definition_revision=plan.definition_revision,
+                expected_resource_revision=expected_resource_revision,
+                expected_definition_revision=expected_definition_revision,
                 patch=self._patch(),
             )
         require_command_success(result)
