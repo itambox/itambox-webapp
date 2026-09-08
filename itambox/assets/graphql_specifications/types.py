@@ -52,6 +52,14 @@ class ScopeModeEnum(graphene.Enum):
         name = "ScopeMode"
 
 
+class LibraryExportModeEnum(graphene.Enum):
+    ORIGINAL_RELEASE = "original_release"
+    EFFECTIVE_SNAPSHOT = "effective_snapshot"
+
+    class Meta:
+        name = "LibraryExportMode"
+
+
 class SpecificationFieldTypeEnum(graphene.Enum):
     TEXT = "text"
     INTEGER = "integer"
@@ -458,6 +466,7 @@ __all__ = [
     "IntegerSpecificationValue",
     "IntegerSpecificationValueType",
     "JSONScalar",
+    "LibraryExportModeEnum",
     "LibraryOriginType",
     "LibraryOriginView",
     "LibraryReconciliationStateEnum",

@@ -109,10 +109,11 @@ class GraphQLSecurityTestCase(TestCase):
         # aliased block is cheap on its own and stays within the depth and
         # field/alias caps, but together they blow the complexity budget.
         block = """
-            assets {
+            assets(requestedScope: SCOPE_PLACEHOLDER) {
                 assetType { manufacturer { softwareProducts { name slug } } }
             }
         """
+        block = block.replace("SCOPE_PLACEHOLDER", f'{{ mode: TENANT, tenantId: "{self.tenant.pk}" }}')
         aliased = "\n".join(f"a{i}: {block}" for i in range(12))
         query = "{" + aliased + "}"
 
@@ -128,7 +129,7 @@ class GraphQLSecurityTestCase(TestCase):
     @override_settings(DEBUG=False, MIDDLEWARE=_MIDDLEWARE_NO_TOOLBAR)
     def test_normal_query_passes_complexity_rule(self):
         # A small, realistic query is well under the budget and must succeed.
-        query = "{ assets { name assetTag } }"
+        query = f'{{ assets(requestedScope: {{ mode: TENANT, tenantId: "{self.tenant.pk}" }}) {{ name assetTag }} }}'
         response = self._post(query)
         self.assertEqual(response.status_code, 200)
         res_data = response.json()

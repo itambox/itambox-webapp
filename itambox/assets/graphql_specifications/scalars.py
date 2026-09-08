@@ -112,6 +112,33 @@ class DateScalar(graphene.Scalar):
         return DateScalar._parse(node.value)
 
 
+class CategoryDefaultSnapshotRevision(graphene.Scalar):
+    """Opaque non-empty Category-default snapshot revision."""
+
+    class Meta:
+        name = "CategoryDefaultSnapshotRevision"
+
+    @staticmethod
+    def _parse(value: object) -> str:
+        if type(value) is not str or not value:
+            raise _scalar_error("CategoryDefaultSnapshotRevision", value)
+        return value
+
+    @staticmethod
+    def serialize(value: object) -> str:
+        return CategoryDefaultSnapshotRevision._parse(value)
+
+    @staticmethod
+    def parse_value(value: object) -> str:
+        return CategoryDefaultSnapshotRevision._parse(value)
+
+    @staticmethod
+    def parse_literal(node: ast.ValueNode, _variables: Mapping[str, object] | None = None) -> str:
+        if not isinstance(node, ast.StringValueNode):
+            raise _scalar_error("CategoryDefaultSnapshotRevision", getattr(node, "value", node))
+        return CategoryDefaultSnapshotRevision._parse(node.value)
+
+
 class CursorScalar(graphene.Scalar):
     """Opaque, non-empty cursor text used by bounded connections."""
 
@@ -182,6 +209,7 @@ class JSONScalar(graphene.Scalar):
 
 
 __all__ = [
+    "CategoryDefaultSnapshotRevision",
     "CursorScalar",
     "DateScalar",
     "DecimalScalar",

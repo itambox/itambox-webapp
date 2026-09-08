@@ -7,11 +7,13 @@ from graphql import GraphQLError
 from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
 from organization.models import Location, Tenant
 
+from .graphql_specifications.inputs import RequestedScopeSelectorInput
 from .graphql_specifications.integration import (
     asset_queryset_for_scope,
     asset_type_connection,
     authenticated_user,
     bind_scope,
+    category_fieldsets_for,
     choice_set_for_identity,
     decode_cursor,
     fieldsets_for_type,
@@ -27,12 +29,36 @@ from .graphql_specifications.integration import (
     specification_field_connection,
 )
 from .graphql_specifications.loaders import request_loader_for_info
+from .graphql_specifications.mutations import (
+    AddChoice,
+    ApplyCategoryDefaults,
+    ApplyLibrary,
+    CleanupSpecificationHistory,
+    CreateAssetType,
+    CreateChoiceSet,
+    CreateSpecificationField,
+    CreateSpecificationFieldset,
+    ExportLibrary,
+    PreviewApplyCategoryDefaults,
+    PreviewAssetTypeComposition,
+    PreviewAssetTypeCreate,
+    PreviewLibrary,
+    PreviewSpecificationHistoryCleanup,
+    ReorderChoices,
+    SetAssetTypeComposition,
+    SetCategoryDefaults,
+    UpdateAssetSpecifications,
+    UpdateAssetTypeSpecifications,
+    UpdateChoice,
+    UpdateChoiceSet,
+    UpdateSpecificationFieldPolicy,
+    UpdateSpecificationFieldset,
+)
 from .graphql_specifications.scalars import CursorScalar
 from .graphql_specifications.types import (
     ChoiceSetType,
     LibraryOriginType,
     PageInfoType,
-    ScopeModeEnum,
     SpecificationDefinitionType,
     SpecificationEntryType,
     SpecificationFieldConnectionType,
@@ -41,6 +67,23 @@ from .graphql_specifications.types import (
     UserErrorType,
 )
 from .models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
+
+_SCHEMA_MISSING = object()
+
+
+def _apply_asset_relation_updates(asset, kwargs, *, user, tenant):
+    for key, model, attribute in (
+        ("asset_role_id", AssetRole, "asset_role"),
+        ("status_id", StatusLabel, "status"),
+        ("location_id", Location, "location"),
+        ("supplier_id", Supplier, "supplier"),
+    ):
+        if key in kwargs:
+            setattr(
+                asset,
+                attribute,
+                get_object_or_denied(model, kwargs.pop(key), user, tenant=tenant),
+            )
 
 
 class TenantNode(DjangoObjectType):
@@ -149,9 +192,29 @@ class SupplierNode(DjangoObjectType):
 
 
 class CategoryNode(DjangoObjectType):
+    key = graphene.String(required=True)
+    resource_revision = graphene.String(required=True)
+    default_fieldsets = graphene.List(graphene.NonNull(SpecificationFieldsetType), required=True)
+
     class Meta:
         model = Category
+        name = "Category"
         fields = ("id", "name", "slug", "color", "description", "applies_to", "created_at", "updated_at")
+
+    @staticmethod
+    def resolve_key(root, info):
+        del info
+        return root.slug
+
+    @staticmethod
+    def resolve_resource_revision(root, info):
+        del info
+        return owner_resource_revision(root)
+
+    @staticmethod
+    def resolve_default_fieldsets(root, info):
+        del info
+        return category_fieldsets_for(root)
 
 
 class AssetNode(DjangoObjectType):
@@ -224,15 +287,6 @@ ASSET_SORTABLE_FIELDS = {
 }
 
 
-class RequestedScopeSelectorInput(graphene.InputObjectType):
-    class Meta:
-        name = "RequestedScopeSelector"
-
-    mode = ScopeModeEnum(required=True)
-    tenant_id = graphene.ID()
-    tenant_group_id = graphene.ID()
-
-
 class AssetTypeEdgeType(graphene.ObjectType):
     class Meta:
         name = "AssetTypeEdge"
@@ -281,6 +335,14 @@ class Query(graphene.ObjectType):
         required=True,
     )
     choice_set = graphene.Field(ChoiceSetType, identity=graphene.String(required=True))
+    category = graphene.Field(CategoryNode, id=graphene.ID(required=True))
+    preview_asset_type_definition = graphene.Field(
+        SpecificationDefinitionType,
+        category_id=graphene.ID(),
+        fieldsets=graphene.List(graphene.NonNull(graphene.String)),
+        target=SpecificationTargetEnum(required=True),
+        required=True,
+    )
 
     def resolve_assets(self, info, requested_scope, limit=None, offset=None, sort_by=None, **kwargs):
         authenticated_user(info)
@@ -345,6 +407,55 @@ class Query(graphene.ObjectType):
         require_global_permission(info, "extras.view_customfieldchoiceset")
         return choice_set_for_identity(identity, loader=request_loader_for_info(info))
 
+    def resolve_category(self, info, id):
+        require_global_permission(info, "assets.view_category")
+        return Category.objects.filter(pk=id).first()
+
+    def resolve_preview_asset_type_definition(
+        self,
+        info,
+        target,
+        category_id=None,
+        fieldsets=_SCHEMA_MISSING,
+    ):
+        require_global_permission(info, "assets.view_assettype")
+        target_kind = getattr(target, "value", target)
+        if target_kind not in {"asset_type", "asset"}:
+            raise GraphQLError(
+                "The submitted value has an invalid type.",
+                extensions={"code": "INVALID_TYPE", "path": ["target"]},
+            )
+        category = None
+        if category_id is not None:
+            category = Category.objects.filter(pk=category_id).first()
+            if category is None:
+                raise GraphQLError(
+                    "The requested object is unavailable.",
+                    extensions={"code": "OBJECT_UNAVAILABLE", "path": ["categoryId"]},
+                )
+        if fieldsets is _SCHEMA_MISSING:
+            if category is None:
+                selected_fieldsets = ()
+            else:
+                selected_fieldsets = tuple(str(item.definition.identity) for item in category_fieldsets_for(category))
+        elif fieldsets is None:
+            raise GraphQLError(
+                "The submitted value has an invalid type.",
+                extensions={"code": "INVALID_TYPE", "path": ["fieldsets"]},
+            )
+        else:
+            selected_fieldsets = tuple(str(identity) for identity in fieldsets)
+        try:
+            from assets.services.specifications._command_support import load_prospective_definition
+
+            definition, _, _ = load_prospective_definition(selected_fieldsets, target_kind, ())
+        except (KeyError, TypeError, ValueError):
+            raise GraphQLError(
+                "The requested object is unavailable.",
+                extensions={"code": "OBJECT_UNAVAILABLE", "path": ["fieldsets"]},
+            ) from None
+        return definition
+
 
 class CreateAsset(graphene.Mutation):
     class Arguments:
@@ -366,20 +477,16 @@ class CreateAsset(graphene.Mutation):
 
     def mutate(self, info, **kwargs):
         user = check_permission(info, "assets.add_asset")
+        if "asset_type_id" in kwargs:
+            raise GraphQLError(
+                "Asset Type assignment must use the typed specification command.",
+                extensions={"code": "INVALID_TYPE", "path": ["assetTypeId"]},
+            )
         active_tenant = getattr(info.context, "active_tenant", None)
 
         asset = Asset(tenant=active_tenant)
 
-        if "asset_type_id" in kwargs:
-            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop("asset_type_id"), user, tenant=active_tenant)
-        if "asset_role_id" in kwargs:
-            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop("asset_role_id"), user, tenant=active_tenant)
-        if "status_id" in kwargs:
-            asset.status = get_object_or_denied(StatusLabel, kwargs.pop("status_id"), user, tenant=active_tenant)
-        if "location_id" in kwargs:
-            asset.location = get_object_or_denied(Location, kwargs.pop("location_id"), user, tenant=active_tenant)
-        if "supplier_id" in kwargs:
-            asset.supplier = get_object_or_denied(Supplier, kwargs.pop("supplier_id"), user, tenant=active_tenant)
+        _apply_asset_relation_updates(asset, kwargs, user=user, tenant=active_tenant)
 
         ALLOWED_FIELDS = {
             "name",
@@ -427,20 +534,16 @@ class UpdateAsset(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, "assets.change_asset")
+        if "asset_type_id" in kwargs:
+            raise GraphQLError(
+                "Asset Type changes must use updateAssetSpecifications.",
+                extensions={"code": "INVALID_TYPE", "path": ["assetTypeId"]},
+            )
         active_tenant = getattr(info.context, "active_tenant", None)
         asset = get_object_or_denied(Asset, id, user, tenant=active_tenant)
         check_permission(info, "assets.change_asset", obj=asset)
 
-        if "asset_type_id" in kwargs:
-            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop("asset_type_id"), user, tenant=active_tenant)
-        if "asset_role_id" in kwargs:
-            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop("asset_role_id"), user, tenant=active_tenant)
-        if "status_id" in kwargs:
-            asset.status = get_object_or_denied(StatusLabel, kwargs.pop("status_id"), user, tenant=active_tenant)
-        if "location_id" in kwargs:
-            asset.location = get_object_or_denied(Location, kwargs.pop("location_id"), user, tenant=active_tenant)
-        if "supplier_id" in kwargs:
-            asset.supplier = get_object_or_denied(Supplier, kwargs.pop("supplier_id"), user, tenant=active_tenant)
+        _apply_asset_relation_updates(asset, kwargs, user=user, tenant=active_tenant)
 
         ALLOWED_FIELDS = {
             "name",
@@ -486,3 +589,26 @@ class Mutation(graphene.ObjectType):
     create_asset = CreateAsset.Field()
     update_asset = UpdateAsset.Field()
     delete_asset = DeleteAsset.Field()
+    preview_asset_type_create = PreviewAssetTypeCreate.Field(required=True)
+    create_asset_type = CreateAssetType.Field(required=True)
+    update_asset_type_specifications = UpdateAssetTypeSpecifications.Field(required=True)
+    preview_apply_category_defaults = PreviewApplyCategoryDefaults.Field(required=True)
+    apply_category_defaults = ApplyCategoryDefaults.Field(required=True)
+    set_asset_type_composition = SetAssetTypeComposition.Field(required=True)
+    update_asset_specifications = UpdateAssetSpecifications.Field(required=True)
+    set_category_defaults = SetCategoryDefaults.Field(required=True)
+    cleanup_specification_history = CleanupSpecificationHistory.Field(required=True)
+    preview_specification_history_cleanup = PreviewSpecificationHistoryCleanup.Field(required=True)
+    create_specification_field = CreateSpecificationField.Field(required=True)
+    update_specification_field_policy = UpdateSpecificationFieldPolicy.Field(required=True)
+    create_specification_fieldset = CreateSpecificationFieldset.Field(required=True)
+    update_specification_fieldset = UpdateSpecificationFieldset.Field(required=True)
+    create_choice_set = CreateChoiceSet.Field(required=True)
+    update_choice_set = UpdateChoiceSet.Field(required=True)
+    add_choice = AddChoice.Field(required=True)
+    update_choice = UpdateChoice.Field(required=True)
+    reorder_choices = ReorderChoices.Field(required=True)
+    preview_asset_type_composition = PreviewAssetTypeComposition.Field(required=True)
+    preview_library = PreviewLibrary.Field(required=True)
+    apply_library = ApplyLibrary.Field(required=True)
+    export_library = ExportLibrary.Field(required=True)
