@@ -227,17 +227,6 @@ def test_apply_uses_the_client_plan_and_token_without_silent_repreview():
 
 def test_apply_rejects_top_level_resolution_changes_instead_of_replacing_signed_plan():
     plan = _plan_payload()
-    request = APIRequestFactory().post(
-        "/api/assets/type-libraries/apply/",
-        {
-            "document": "{}",
-            "preview_token": "signed-preview-token",
-            "plan": plan,
-            "resolutions": {"sha256:changed": "keep_local"},
-        },
-        format="json",
-    )
-
     serializer = LibraryApplyInputSerializer(
         data={
             "document": "{}",
@@ -340,7 +329,7 @@ def test_plan_decoder_returns_a_typed_plan_not_a_client_dataclass():
 def test_drf_spectacular_annotations_describe_the_dedicated_routes():
     from drf_spectacular.generators import SchemaGenerator
 
-    from assets.api.tests.type_library_urls import urlpatterns
+    from core.urls import urlpatterns
 
     schema = SchemaGenerator(patterns=urlpatterns).get_schema(request=None, public=True)
     for path in (

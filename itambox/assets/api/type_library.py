@@ -8,7 +8,6 @@ canonical Type Library commands.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -83,7 +82,7 @@ class BoundedJSONDocumentField(serializers.Field[bytes]):
         "read_failed": "The uploaded document could not be read.",
     }
 
-    def to_internal_value(self, data: object) -> bytes:
+    def _read_document_bytes(self, data: object) -> bytes:
         if isinstance(data, UploadedFile):
             try:
                 raw = data.read(MAX_LIBRARY_DOCUMENT_BYTES + 1)
@@ -102,6 +101,10 @@ class BoundedJSONDocumentField(serializers.Field[bytes]):
             raw = data
         else:
             self.fail("invalid_type")
+        return raw
+
+    def to_internal_value(self, data: object) -> bytes:
+        raw = self._read_document_bytes(data)
         if len(raw) > MAX_LIBRARY_DOCUMENT_BYTES:
             self.fail("resource_limit")
         try:
@@ -421,10 +424,10 @@ def _preview_command(
 
 
 def _preview_payload(result: object) -> dict[str, object]:
-    plan = getattr(result, "plan")
-    validated = getattr(result, "validated")
+    plan = result.plan
+    validated = result.validated
     return {
-        "preview_token": str(getattr(result, "preview_token")),
+        "preview_token": str(result.preview_token),
         "plan": _plan_payload(plan),
         "can_apply": bool(plan.can_apply),
         "document": {

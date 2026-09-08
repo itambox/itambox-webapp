@@ -151,6 +151,19 @@ ASSETS_MENU = Menu(
             label=_("Catalog"),
             items=(
                 get_model_item("assets", "assettype", _("Asset Types")),
+                MenuItem(
+                    link="assets:type_library_list",
+                    link_text=_("Type Libraries"),
+                    permissions=["extras.view_specificationlibrary"],
+                    buttons=(
+                        MenuItemButton(
+                            link="assets:type_library_import",
+                            title=_("Import Library"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["extras.manage_specification_library"],
+                        ),
+                    ),
+                ),
                 get_model_item("assets", "manufacturer", _("Manufacturers")),
                 get_model_item("assets", "category", _("Categories")),
             ),
