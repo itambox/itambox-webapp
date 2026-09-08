@@ -7,7 +7,7 @@ from django import forms
 from extras.models import CustomFieldChoice, CustomFieldChoiceSet
 
 
-class _RevisionFormMixin:
+class _RevisionFormMixin(forms.Form):
     expected_resource_revision = forms.CharField(
         required=True,
         widget=forms.HiddenInput,
@@ -40,7 +40,7 @@ class ChoiceSetCreateForm(forms.Form):
     label = forms.CharField(max_length=255)
 
 
-class ChoiceSetUpdateForm(_RevisionFormMixin, forms.Form):
+class ChoiceSetUpdateForm(_RevisionFormMixin):
     label = forms.CharField(max_length=255, required=False)
     replacement_identity = forms.CharField(max_length=255, required=False)
 
@@ -52,7 +52,7 @@ class ChoiceSetUpdateForm(_RevisionFormMixin, forms.Form):
         self._disable_managed_fields("label", "replacement_identity")
 
 
-class ChoiceSetRetireForm(_RevisionFormMixin, forms.Form):
+class ChoiceSetRetireForm(_RevisionFormMixin):
     replacement_identity = forms.CharField(max_length=255, required=False)
 
     def __init__(self, *args, **kwargs):
@@ -68,7 +68,7 @@ class ChoiceCreateForm(forms.Form):
     position = forms.IntegerField(min_value=1)
 
 
-class ChoiceUpdateForm(_RevisionFormMixin, forms.Form):
+class ChoiceUpdateForm(_RevisionFormMixin):
     label = forms.CharField(max_length=255, required=False)
     position = forms.IntegerField(min_value=1, required=False)
     replacement_identity = forms.CharField(max_length=255, required=False)
@@ -82,7 +82,7 @@ class ChoiceUpdateForm(_RevisionFormMixin, forms.Form):
         self._disable_managed_fields("label", "position", "replacement_identity")
 
 
-class ChoiceRetireForm(_RevisionFormMixin, forms.Form):
+class ChoiceRetireForm(_RevisionFormMixin):
     replacement_identity = forms.CharField(max_length=255, required=False)
 
     def __init__(self, *args, **kwargs):

@@ -7,12 +7,13 @@ can wire these views without changing the command or presentation contract.
 from __future__ import annotations
 
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView, DetailView, FormView, ListView, UpdateView
+from django.core.exceptions import PermissionDenied
 
 from core.context import get_current_all_accessible
 from extras.definition_forms import (
@@ -89,8 +90,9 @@ class _LocalDefinitionMutationMixin(_DefinitionPermissionMixin):
     def _is_local_definition(self, definition):
         return definition.management_kind == CustomFieldChoiceSet.MANAGEMENT_LOCAL
 
-    def has_permission(self):
-        return super().has_permission() and self._is_local_definition(self.object)
+    def _require_local_definition(self, definition):
+        if not self._is_local_definition(definition):
+            raise PermissionDenied
 
     @staticmethod
     def current_revision(definition):
@@ -231,11 +233,8 @@ class ChoiceSetUpdateView(LoginRequiredMixin, _LocalDefinitionMutationMixin, Upd
     template_name = "extras/definitions/choice_set_form.html"
     context_object_name = "choice_set"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        return super().dispatch(request, *args, **kwargs)
-
     def get_form_kwargs(self):
+        self._require_local_definition(self.object)
         kwargs = super().get_form_kwargs()
         kwargs["expected_resource_revision"] = self.current_revision(self.object)
         return kwargs
@@ -271,16 +270,20 @@ class ChoiceSetRetireView(LoginRequiredMixin, _LocalDefinitionMutationMixin, For
     permission_required = "extras.change_customfieldchoiceset"
     template_name = "extras/definitions/retire_form.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.object = get_object_or_404(CustomFieldChoiceSet, pk=kwargs["pk"])
-        return super().dispatch(request, *args, **kwargs)
+    def _load_object(self):
+        if not hasattr(self, "object"):
+            self.object = get_object_or_404(CustomFieldChoiceSet, pk=self.kwargs["pk"])
+            self._require_local_definition(self.object)
+        return self.object
 
     def get_form_kwargs(self):
+        self._load_object()
         kwargs = super().get_form_kwargs()
         kwargs.update(instance=self.object, expected_resource_revision=self.current_revision(self.object))
         return kwargs
 
     def form_valid(self, form):
+        self._load_object()
         result = deprecate_custom_field_choice_set(
             actor=_actor_for_user(self.request.user),
             choice_set_id=self.object.pk,
@@ -308,7 +311,15 @@ class _ChoiceMutationMixin(_LocalDefinitionMutationMixin):
         return definition.choice_set.management_kind == CustomFieldChoiceSet.MANAGEMENT_LOCAL
 
     def get_queryset(self):
-        return super().get_queryset().select_related("choice_set")
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                choice_set_id=self.kwargs.get("choice_set_pk"),
+                choice_set__management_kind=CustomFieldChoiceSet.MANAGEMENT_LOCAL,
+            )
+            .select_related("choice_set")
+        )
 
 
 class ChoiceCreateView(LoginRequiredMixin, _DefinitionPermissionMixin, CreateView):
@@ -317,13 +328,15 @@ class ChoiceCreateView(LoginRequiredMixin, _DefinitionPermissionMixin, CreateVie
     template_name = "extras/definitions/choice_form.html"
     require_global_configuration = True
 
-    def dispatch(self, request, *args, **kwargs):
-        self.choice_set = get_object_or_404(CustomFieldChoiceSet, pk=kwargs["choice_set_pk"])
-        if self.choice_set.management_kind != CustomFieldChoiceSet.MANAGEMENT_LOCAL:
-            return HttpResponse(status=403)
-        return super().dispatch(request, *args, **kwargs)
+    def _load_choice_set(self):
+        if not hasattr(self, "choice_set"):
+            self.choice_set = get_object_or_404(CustomFieldChoiceSet, pk=self.kwargs["choice_set_pk"])
+            if self.choice_set.management_kind != CustomFieldChoiceSet.MANAGEMENT_LOCAL:
+                raise PermissionDenied
+        return self.choice_set
 
     def form_valid(self, form):
+        self._load_choice_set()
         result = create_custom_field_choice(
             actor=_actor_for_user(self.request.user),
             definition=CustomFieldChoiceCreateInputDTO(
@@ -340,9 +353,11 @@ class ChoiceCreateView(LoginRequiredMixin, _DefinitionPermissionMixin, CreateVie
         return redirect(self.get_success_url())
 
     def get_success_url(self):
+        self._load_choice_set()
         return _safe_reverse("extras:definition_choice_set_detail", pk=self.choice_set.pk) or "/"
 
     def get_context_data(self, **kwargs):
+        self._load_choice_set()
         context = super().get_context_data(**kwargs)
         context.update({"choice_set": self.choice_set, "form_title": _("Add choice")})
         return context
@@ -354,12 +369,8 @@ class ChoiceUpdateView(LoginRequiredMixin, _ChoiceMutationMixin, UpdateView):
     template_name = "extras/definitions/choice_form.html"
     context_object_name = "choice"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        self.choice_set = self.object.choice_set
-        return super().dispatch(request, *args, **kwargs)
-
     def get_form_kwargs(self):
+        self.choice_set = self.object.choice_set
         kwargs = super().get_form_kwargs()
         kwargs["expected_resource_revision"] = self.current_revision(self.object)
         return kwargs
@@ -394,17 +405,25 @@ class ChoiceRetireView(LoginRequiredMixin, _ChoiceMutationMixin, FormView):
     permission_required = "extras.change_customfieldchoice"
     template_name = "extras/definitions/retire_form.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.object = get_object_or_404(CustomFieldChoice, pk=kwargs["pk"])
-        self.choice_set = self.object.choice_set
-        return super().dispatch(request, *args, **kwargs)
+    def _load_object(self):
+        if not hasattr(self, "object"):
+            self.object = get_object_or_404(
+                CustomFieldChoice,
+                pk=self.kwargs["pk"],
+                choice_set_id=self.kwargs["choice_set_pk"],
+                choice_set__management_kind=CustomFieldChoiceSet.MANAGEMENT_LOCAL,
+            )
+            self.choice_set = self.object.choice_set
+        return self.object
 
     def get_form_kwargs(self):
+        self._load_object()
         kwargs = super().get_form_kwargs()
         kwargs.update(instance=self.object, expected_resource_revision=self.current_revision(self.object))
         return kwargs
 
     def form_valid(self, form):
+        self._load_object()
         result = deprecate_custom_field_choice(
             actor=_actor_for_user(self.request.user),
             choice_id=self.object.pk,
