@@ -124,7 +124,7 @@ test.describe('assets Type Library browser workflow', { tag: '@pr' }, () => {
 
     const listResponse = await page.goto('/assets/type-libraries/', { waitUntil: 'domcontentloaded' });
     expect(listResponse?.status(), 'GET Type Library list').toBe(200);
-    await page.getByRole('link', { name: 'Import Library' }).click();
+    await page.locator('a.btn-primary[href="/assets/type-libraries/import/"]').click();
 
     await page.locator('input[name="document"]').setInputFiles({
       name: 'release-1.json',
