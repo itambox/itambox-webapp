@@ -143,7 +143,7 @@ test.describe('assets Type Library browser workflow', { tag: '@pr' }, () => {
     await expect(detailLink).toHaveCount(1);
     await detailLink.click();
     await expect(page.getByRole('heading', { name: namespace })).toBeVisible();
-    await expect(page.getByText('Tenant Asset values')).toBeVisible();
+    await expect(page.locator('p.text-muted.small').filter({ hasText: 'Tenant Asset values' })).toBeVisible();
 
     const exportForm = page.locator('form[action*="/export/"]');
     await exportForm.locator('select[name="mode"]').selectOption('effective_snapshot');
@@ -178,7 +178,7 @@ test.describe('assets Type Library browser workflow', { tag: '@pr' }, () => {
     await page.goto('/assets/type-libraries/', { waitUntil: 'domcontentloaded' });
     await page.getByRole('link', { name: namespace, exact: true }).click();
     await expect(page.getByText('Immutable release history')).toBeVisible();
-    await expect(page.getByText('Tenant Asset values')).toBeVisible();
+    await expect(page.locator('p.text-muted.small').filter({ hasText: 'Tenant Asset values' })).toBeVisible();
     const finalExport = page.locator('form[action*="/export/"]');
     await finalExport.locator('select[name="mode"]').selectOption('effective_snapshot');
     await finalExport.locator('input[name="acknowledge_retained_history"]').check();
