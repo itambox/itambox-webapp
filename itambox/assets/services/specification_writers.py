@@ -9,19 +9,74 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
 from assets.models import Asset
-from assets.services.specifications._command_support import save_owner_in_savepoint
+from assets.services.specifications._command_support import (
+    load_effective_definition,
+    resource_revision_for_owner,
+    save_owner_in_savepoint,
+    stored_values_for,
+)
 from assets.services.specifications.commands import update_asset_specifications
 from assets.services.specifications.contracts import (
+    CommandRejectedDTO,
+    DefinitionRevision,
     DestinationAssetTypeSelectionDTO,
     SpecificationPatchDTO,
 )
-from assets.specification_adapters import (
-    authorization_for_asset,
-    current_specification_plan,
-    require_command_success,
-)
 from organization.access import authorize_tenant_operation
 from organization.models import Tenant
+from organization.services.access_scope import (
+    AccessScopeDeniedDTO,
+    AccessScopeResolutionRequestDTO,
+    AccessScopeResolvedDTO,
+    ActorContextDTO,
+    RequestedScopeSelectorDTO,
+    ResolvedAccessAuthorizationDTO,
+    TenantId,
+    authentication_revision_for_actor,
+    resolve_access_scope,
+)
+
+
+def _actor_context_for_user(user: object) -> ActorContextDTO:
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        raise PermissionDenied("An authenticated actor is required for specification changes.")
+    return ActorContextDTO(
+        actor_id=int(user.pk),
+        authentication_revision=authentication_revision_for_actor(user),
+    )
+
+
+def _authorization_for_asset(*, user: object, tenant_id: int | None) -> ResolvedAccessAuthorizationDTO:
+    if tenant_id is None:
+        raise PermissionDenied("A tenant-bound Asset is required for specification changes.")
+    actor = _actor_context_for_user(user)
+    request = AccessScopeResolutionRequestDTO(
+        actor=actor,
+        selector=RequestedScopeSelectorDTO(
+            mode="tenant",
+            tenant_id=TenantId(int(tenant_id)),
+            tenant_group_id=None,
+        ),
+        operation="update_asset_specifications",
+        required_permission="assets.change_asset",
+    )
+    resolved = resolve_access_scope(request)
+    if isinstance(resolved, AccessScopeDeniedDTO):
+        raise PermissionDenied("The actor is not authorized for this Asset tenant.")
+    if not isinstance(resolved, AccessScopeResolvedDTO):
+        raise PermissionDenied("The Asset authorization scope could not be resolved.")
+    return ResolvedAccessAuthorizationDTO(
+        actor=actor,
+        request=request,
+        initial_scope=resolved.access_scope,
+    )
+
+
+def _require_command_success(result: object) -> object:
+    if isinstance(result, CommandRejectedDTO):
+        messages = [issue.message_key for issue in result.issues]
+        raise ValidationError("; ".join(messages) or "The specification command was rejected.")
+    return result
 
 
 def _is_json_value(value: object) -> bool:
@@ -74,7 +129,7 @@ def merge_generic_asset_data(
             raise ValidationError("The Asset no longer exists.")
         if asset.tenant_id is None:
             raise PermissionDenied("Generic Asset data requires a tenant-owned Asset.")
-        authorization_for_asset(user=user, tenant_id=asset.tenant_id)
+        _authorization_for_asset(user=user, tenant_id=asset.tenant_id)
         current = dict(asset.custom_field_data or {})
         proposed = {**current, **normalized}
         if proposed == current:
@@ -161,11 +216,11 @@ def apply_asset_specification_patch(
     asset = Asset._base_manager.filter(pk=asset_id, deleted_at__isnull=True).first()
     if asset is None:
         raise ValidationError("The Asset no longer exists.")
-    authorization = authorization_for_asset(user=user, tenant_id=asset.tenant_id)
-    plan = current_specification_plan(
-        asset,
-        target_kind="asset",
-        asset_type_id=asset_type_id,
+    authorization = _authorization_for_asset(user=user, tenant_id=asset.tenant_id)
+    definition, _definitions = load_effective_definition(
+        asset_type_id if asset_type_id is not None else asset.asset_type_id,
+        "asset",
+        tuple(stored_values_for(asset)),
     )
     destination = (
         DestinationAssetTypeSelectionDTO("replace", asset_type_id)
@@ -176,11 +231,11 @@ def apply_asset_specification_patch(
         authorization=authorization,
         asset_id=asset_id,
         destination=destination,
-        expected_resource_revision=plan.resource_revision,
-        expected_definition_revision=plan.definition_revision,
+        expected_resource_revision=resource_revision_for_owner(asset),
+        expected_definition_revision=DefinitionRevision(definition.revision),
         patch=SpecificationPatchDTO(set_values=dict(set_values), clear_keys=()),
     )
-    return require_command_success(result)
+    return _require_command_success(result)
 
 
 __all__ = [

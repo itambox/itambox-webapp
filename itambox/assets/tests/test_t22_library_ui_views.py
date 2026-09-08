@@ -11,6 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.api.tests.test_type_library_http import _snapshot_rows
+from assets.models import AssetType
 from assets.tests.test_t17_type_library_validation import _release_document
 from extras.models import CustomField, SpecificationLibrary
 
@@ -141,6 +142,7 @@ class T22LibraryBrowserWorkflowTests(TestCase):
             field for field in local_snapshot["effective_definitions"]["fields"] if field["key"] == "acme__state"
         )
         state_field["label"] = "Local State"
+        local_snapshot["effective_definitions"]["asset_types"][0]["specifications"]["acme__capacity"] = "24"
         local_preview = self._upload(local_snapshot)
         self.assertEqual(local_preview.context["preview"].plan.can_apply, True)
         local_apply = self._apply_preview(local_preview)
@@ -157,7 +159,9 @@ class T22LibraryBrowserWorkflowTests(TestCase):
             "State",
         )
 
-        conflict_preview = self._upload(self._document(release=2, label="Upstream State"))
+        upstream = self._document(release=2, label="Upstream State")
+        upstream["definitions"]["asset_types"][0]["specifications"]["acme__capacity"] = "64"
+        conflict_preview = self._upload(upstream)
         self.assertEqual(conflict_preview.status_code, 200)
         plan = conflict_preview.context["preview"].plan
         self.assertTrue(plan.conflicts)
@@ -184,6 +188,8 @@ class T22LibraryBrowserWorkflowTests(TestCase):
             CustomField.objects.get(namespace="acme", name="acme__state").label,
             "Local State" if decision == "keep_local" else "Upstream State",
         )
+        updated_type = AssetType.objects.get(model="Device", part_number="A")
+        self.assertEqual(updated_type.custom_field_data["acme__capacity"], "24" if decision == "keep_local" else "64")
         accepted = SpecificationLibrary.objects.get(namespace="acme").accepted_release
         self.assertEqual(accepted.sequence, 2)
         self.assertEqual(
@@ -195,7 +201,7 @@ class T22LibraryBrowserWorkflowTests(TestCase):
             "Upstream State",
         )
         before_reimport = _snapshot_rows()
-        reimport = self._apply_preview(self._upload(self._document(release=2, label="Upstream State")))
+        reimport = self._apply_preview(self._upload(upstream))
         self.assertTrue(reimport.context["result"].no_op)
         self.assertEqual(_snapshot_rows(), before_reimport)
 

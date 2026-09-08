@@ -811,6 +811,16 @@ class GraphQLSpecificationHTTPTests(TestCase):
         )
         self.assertEqual(graphql_original["semanticDigest"], rest_original.data["semantic_digest"])
 
+        source_type = json.loads(release_text)["definitions"]["asset_types"][0]
+        imported_type = AssetType.objects.get(model=source_type["model"], part_number=source_type["part_number"])
+        imported_type.custom_field_data = {
+            **imported_type.custom_field_data,
+            self.specification_field.name: "retained model note",
+        }
+        imported_type.save(update_fields=["custom_field_data"])
+        before_export = dict(imported_type.custom_field_data)
+        audit_before_export = ObjectChange._base_manager.count()
+
         rest_effective = rest_client.post(
             EXPORT_URL,
             {
@@ -839,6 +849,17 @@ class GraphQLSpecificationHTTPTests(TestCase):
             rest_effective.data["document"],
         )
         self.assertEqual(graphql_effective["semanticDigest"], rest_effective.data["semantic_digest"])
+        imported_type.refresh_from_db()
+        self.assertEqual(imported_type.custom_field_data, before_export)
+        self.assertEqual(ObjectChange._base_manager.count(), audit_before_export)
+        retained_type = next(
+            item
+            for item in rest_effective.data["document"]["effective_definitions"]["asset_types"]
+            if item["id"] == source_type["id"]
+        )
+        self.assertEqual(
+            retained_type["historical_specifications"][self.specification_field.name], "retained model note"
+        )
 
         rest_missing = rest_client.post(
             EXPORT_URL,

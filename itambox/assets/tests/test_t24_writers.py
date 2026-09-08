@@ -52,6 +52,11 @@ def test_non_ui_writers_use_the_audited_writer_seam():
     assert "asset.custom_field_data = data" not in intune
     assert "_lock_and_authorize_generic_owner" in writer
     assert "authorize_tenant_operation" in writer
+    assert "assets.specification_adapters" not in writer
+    assert "load_effective_definition" in writer
+    assert "resolve_access_scope" in writer
+    assert "assets.specification_adapters" not in asset_models
+    assert "load_prospective_definition" in asset_models
     assert "def _software_for(self, sid: int, sw_name: str, mfr, Software, tenant)" in licenses
     assert "authorize_generic_owner_scope" in inventory
     assert "authorize_generic_owner_scope" in catalog

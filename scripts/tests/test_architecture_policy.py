@@ -181,6 +181,22 @@ class ClassificationTests(unittest.TestCase):
         self.assertIsNone(is_allowed("assets.api.serializers", "assets.specification_adapters").rule)
         self.assertIsNotNone(is_allowed("assets.models.asset", "assets.specification_adapters").rule)
 
+    def test_snipe_importer_orchestration_is_composition(self):
+        expected = {
+            "core.importers.snipeit.__init__",
+            "core.importers.snipeit.orchestrator",
+            "core.importers.snipeit.stages.asset_models",
+            "core.importers.snipeit.stages.catalog",
+            "core.importers.snipeit.stages.hardware",
+            "core.importers.snipeit.stages.inventory",
+            "core.importers.snipeit.stages.licenses",
+            "core.importers.snipeit.stages.organization",
+        }
+        for module in expected:
+            with self.subTest(module=module):
+                self.assertEqual(layer_of(module), "composition")
+                self.assertEqual(MODULE_LAYER_OVERRIDES[module], "composition")
+
     def test_typed_graphql_specification_modules_are_domain_presentation(self):
         expected = {
             "assets.graphql_specifications.__init__": "presentation",

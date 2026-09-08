@@ -228,6 +228,19 @@ MODULE_LAYER_OVERRIDES = {
     "extras.utils": "domain-service",
     "organization.access": "domain-service",
     "organization.rbac": "domain-service",
+    # These Snipe-IT stages translate remote rows into existing domain commands;
+    # they are orchestration, not transport/client modules. The client/common
+    # importer boundary remains integration-layer code.
+    # The stage runner is the matching application orchestration seam; the
+    # transport/client modules below it remain integration-layer code.
+    "core.importers.snipeit.__init__": "composition",
+    "core.importers.snipeit.orchestrator": "composition",
+    "core.importers.snipeit.stages.asset_models": "composition",
+    "core.importers.snipeit.stages.catalog": "composition",
+    "core.importers.snipeit.stages.hardware": "composition",
+    "core.importers.snipeit.stages.inventory": "composition",
+    "core.importers.snipeit.stages.licenses": "composition",
+    "core.importers.snipeit.stages.organization": "composition",
 }
 
 # Declared cross-application model coupling. Same-application

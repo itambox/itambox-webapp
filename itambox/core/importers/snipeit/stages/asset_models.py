@@ -8,18 +8,24 @@ from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 
 from django.apps import apps
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
+from assets.services.specifications._command_support import (
+    load_prospective_definition,
+    resource_revision_for_owner,
+    stored_values_for,
+)
 from assets.services.specifications.commands import set_asset_type_composition
-from assets.services.specifications.contracts import SpecificationPatchDTO
-from assets.specification_adapters import (
-    actor_context_for_user,
-    prospective_specification_plan,
-    fieldset_selection,
-    require_command_success,
+from assets.services.specifications.contracts import (
+    CommandRejectedDTO,
+    DefinitionRevision,
+    ExplicitFieldsetSelectionDTO,
+    SpecificationPatchDTO,
 )
 from core.importers.snipeit.common import _nested_id
 from core.importers.snipeit.contracts import ImportContext, Outcome, StageResult
+from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 _OMITTED_FIELDSET = object()
 
@@ -50,6 +56,22 @@ def _connector_identity(source_identity):
         ensure_ascii=True,
     )
     return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _actor_context_for_user(user: object) -> ActorContextDTO:
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        raise PermissionDenied("An authenticated actor is required for specification changes.")
+    return ActorContextDTO(
+        actor_id=int(user.pk),
+        authentication_revision=authentication_revision_for_actor(user),
+    )
+
+
+def _require_command_success(result: object) -> object:
+    if isinstance(result, CommandRejectedDTO):
+        messages = [issue.message_key for issue in result.issues]
+        raise ValidationError("; ".join(messages) or "The specification command was rejected.")
+    return result
 
 
 class AssetModelImporter:
@@ -154,22 +176,21 @@ class AssetModelImporter:
         return self._create(model, source_id, defaults, fieldset, model_name, manufacturer)
 
     def _write_composition(self, asset_type, fieldset):
-        selection = fieldset_selection(
-            () if fieldset is None else (fieldset,),
-            presence="explicit",
+        selection = ExplicitFieldsetSelectionDTO(
+            identities=() if fieldset is None else (f"{fieldset.namespace}/{fieldset.slug}",)
         )
-        plan = prospective_specification_plan(
-            asset_type, target_kind="asset_type", fieldset_identities=selection.identities
+        definition, _definitions, _graph = load_prospective_definition(
+            selection.identities, "asset_type", tuple(stored_values_for(asset_type))
         )
         result = set_asset_type_composition(
-            actor=actor_context_for_user(self.context.user),
+            actor=_actor_context_for_user(self.context.user),
             asset_type_id=asset_type.pk,
             fieldsets=selection,
-            expected_resource_revision=plan.resource_revision,
-            expected_definition_revision=plan.definition_revision,
+            expected_resource_revision=resource_revision_for_owner(asset_type),
+            expected_definition_revision=DefinitionRevision(definition.revision),
             patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
         )
-        require_command_success(result)
+        _require_command_success(result)
 
     def run(self) -> StageResult:
         model = apps.get_model("assets", "AssetType")
