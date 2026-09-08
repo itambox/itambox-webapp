@@ -198,7 +198,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 51)
+        self.assertEqual(len(manifest["post_transition_ids"]), 52)
         self.assertTrue(
             {
                 "assets.0114_issue479_t06_composition_schema",
@@ -207,6 +207,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
                 "extras.0118_issue479_t06_definition_schema",
                 "extras.0119_issue479_t07_provenance_schema",
                 "extras.0120_issue479_t07_provenance_cutover",
+                "extras.0121_specification_library_permission",
             }.issubset(manifest["post_transition_ids"])
         )
         self.assertEqual(
@@ -214,6 +215,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
             [
                 "assets.0117_issue479_final_core_vocabulary",
                 "compliance.0105_custodyhandoffdelivery",
+                "extras.0121_specification_library_permission",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0103_tenant_resource_grant_expiry",
                 "procurement.0101_alter_purchaseorder_options",

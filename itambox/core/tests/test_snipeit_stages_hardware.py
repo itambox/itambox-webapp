@@ -47,7 +47,9 @@ class TestHardwareImporter(TenantTestMixin):
         self.setup_tenant_context(name="Acme", slug="acme")
         self.admin = User.objects.create_superuser(username="impadmin", email="impadmin@example.com", password="pw")
         self.manufacturer = Manufacturer.objects.create(name="Acme Devices", slug="acme-devices")
-        self.category = Category.objects.create(name="Laptops", slug="laptops", applies_to={"asset": True})
+        self.category, _created = Category.objects.get_or_create(
+            slug="laptops", defaults={"name": "Laptops", "applies_to": {"asset": True}}
+        )
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="ThinkPad X1",

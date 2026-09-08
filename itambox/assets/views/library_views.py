@@ -36,6 +36,7 @@ from assets.services.type_library.commands import (
     preview_library,
 )
 from assets.services.type_library.exporting import LibraryExportError
+from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.models import SpecificationLibrary
 from organization.services.access_scope import authentication_revision_for_actor
 
@@ -134,6 +135,7 @@ class TypeLibraryListView(LoginRequiredMixin, _GlobalLibraryPermissionMixin, Lis
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["table_empty_value"] = TABLE_EMPTY_VALUE
         context["can_manage_library"] = _permission_codename(self.request.user, "manage_specification_library")
         context["global_impact_notice"] = _(
             "This global catalogue workflow changes definitions for all accessible tenants; tenant Asset values, "
@@ -157,6 +159,7 @@ class TypeLibraryDetailView(LoginRequiredMixin, _GlobalLibraryPermissionMixin, D
         context = super().get_context_data(**kwargs)
         context["releases"] = tuple(self.object.releases.order_by("-sequence"))
         context["export_form"] = LibraryExportForm(current_namespace=self.object.namespace)
+        context["table_empty_value"] = TABLE_EMPTY_VALUE
         context["can_manage_library"] = _permission_codename(self.request.user, "manage_specification_library")
         context["global_impact_notice"] = _(
             "Applying this Library updates the global definition catalogue. Tenant Asset values, assignments, "
@@ -375,6 +378,7 @@ class TypeLibraryExportView(LoginRequiredMixin, _GlobalLibraryPermissionMixin, S
             self.template_name,
             {
                 "library": self.object,
+                "table_empty_value": TABLE_EMPTY_VALUE,
                 "releases": tuple(self.object.releases.order_by("-sequence")),
                 "export_form": form,
                 "can_manage_library": True,

@@ -1,31 +1,30 @@
 {% extends "layout.html" %}
 {% load i18n %}
-
 {% block title %}{% translate "Import Type Library" %} - ITAMbox{% endblock %}
-
 {% block page_header %}
   <div class="page-pretitle">{% translate "Global catalogue" %}</div>
   <h2 class="page-title">{% translate "Import Type Library" %}</h2>
 {% endblock page_header %}
-
 {% block page_actions %}
-  <a class="btn btn-ghost-secondary" href="{% url 'assets:type_library_list' %}">
+  <a class="btn btn-ghost-secondary"
+     href="{% url 'assets:type_library_list' %}">
     <i class="mdi mdi-arrow-left me-1" aria-hidden="true"></i>
     {% translate "Back to libraries" %}
   </a>
 {% endblock page_actions %}
-
 {% block content %}
   <div class="alert alert-info d-flex align-items-start" role="note">
     <i class="mdi mdi-earth me-2 mt-1" aria-hidden="true"></i>
     <div>{{ global_impact_notice }}</div>
   </div>
   {% if stale_error %}
-    <div class="alert alert-warning" role="alert" aria-live="assertive" data-library-stale>
+    <div class="alert alert-warning"
+         role="alert"
+         aria-live="assertive"
+         data-library-stale>
       <strong>{% translate "Preview refreshed" %}.</strong> {{ stale_error }}
     </div>
   {% endif %}
-
   <div class="row g-3">
     <div class="col-12 col-xl-5">
       <section class="card" aria-labelledby="upload-title">
@@ -36,7 +35,9 @@
           <p class="text-muted">
             {% translate "Upload a bounded UTF-8 JSON document. Validation runs on the server before any apply is possible." %}
           </p>
-          <form method="post" enctype="multipart/form-data" action="{% url 'assets:type_library_import' %}">
+          <form method="post"
+                enctype="multipart/form-data"
+                action="{% url 'assets:type_library_import' %}">
             {% csrf_token %}
             {% if upload_form.non_field_errors %}
               <div class="alert alert-danger" role="alert" aria-live="assertive">
@@ -57,7 +58,6 @@
         </div>
       </section>
     </div>
-
     <div class="col-12 col-xl-7">
       <section class="card" aria-labelledby="preview-title" data-library-preview>
         <div class="card-header">
@@ -71,32 +71,49 @@
             </div>
             <dl class="row">
               <dt class="col-sm-5">{% translate "Namespace" %}</dt>
-              <dd class="col-sm-7"><code>{{ preview.plan.namespace }}</code></dd>
+              <dd class="col-sm-7">
+                <code>{{ preview.plan.namespace }}</code>
+              </dd>
               <dt class="col-sm-5">{% translate "Incoming release" %}</dt>
-              <dd class="col-sm-7">{{ preview.plan.incoming_release }}</dd>
+              <dd class="col-sm-7">
+                {{ preview.plan.incoming_release }}
+              </dd>
               <dt class="col-sm-5">{% translate "Planned paths" %}</dt>
-              <dd class="col-sm-7">{{ preview_context.planned_paths }}</dd>
+              <dd class="col-sm-7">
+                {{ preview_context.planned_paths }}
+              </dd>
               <dt class="col-sm-5">{% translate "Preview digest" %}</dt>
-              <dd class="col-sm-7"><code class="text-break">{{ preview.plan.plan_digest }}</code></dd>
+              <dd class="col-sm-7">
+                <code class="text-break">{{ preview.plan.plan_digest }}</code>
+              </dd>
             </dl>
-
             {% if preview.plan.conflicts %}
-              <div class="alert alert-danger" role="alert" aria-live="assertive" data-library-blocking-conflict>
+              <div class="alert alert-danger"
+                   role="alert"
+                   aria-live="assertive"
+                   data-library-blocking-conflict>
                 <strong>{% translate "Blocking conflicts require a decision." %}</strong>
                 {% translate "Apply stays disabled until every conflict is reviewed." %}
               </div>
               <div class="vstack gap-3 mb-3">
                 {% for row in preview_context.conflict_rows %}
-                  <article class="border rounded p-3" data-library-conflict="{{ row.action.action_id }}">
+                  <article class="border rounded p-3"
+                           data-library-conflict="{{ row.action.action_id }}">
                     <h4 class="h5 mb-1">{{ row.action.identity }}</h4>
                     <p class="text-muted small mb-2">{{ row.action.reason }}</p>
                     <dl class="row small mb-0">
                       <dt class="col-sm-3">{% translate "Baseline" %}</dt>
-                      <dd class="col-sm-9"><code class="text-break">{{ row.baseline }}</code></dd>
+                      <dd class="col-sm-9">
+                        <code class="text-break">{{ row.baseline }}</code>
+                      </dd>
                       <dt class="col-sm-3">{% translate "Local" %}</dt>
-                      <dd class="col-sm-9"><code class="text-break">{{ row.local }}</code></dd>
+                      <dd class="col-sm-9">
+                        <code class="text-break">{{ row.local }}</code>
+                      </dd>
                       <dt class="col-sm-3">{% translate "Upstream" %}</dt>
-                      <dd class="col-sm-9"><code class="text-break">{{ row.incoming }}</code></dd>
+                      <dd class="col-sm-9">
+                        <code class="text-break">{{ row.incoming }}</code>
+                      </dd>
                     </dl>
                   </article>
                 {% endfor %}
@@ -106,9 +123,10 @@
                 {% translate "No blocking conflicts were found. Review the planned paths before applying." %}
               </div>
             {% endif %}
-
             {% if apply_form %}
-              <form method="post" action="{% url 'assets:type_library_import' %}" data-library-apply-form>
+              <form method="post"
+                    action="{% url 'assets:type_library_import' %}"
+                    data-library-apply-form>
                 {% csrf_token %}
                 {% for hidden in apply_form.hidden_fields %}{{ hidden }}{% endfor %}
                 {% if apply_form.non_field_errors %}
@@ -121,15 +139,16 @@
                     <legend class="h5">{% translate "3. Choose conflict resolutions" %}</legend>
                     {% for row in preview_context.conflict_rows %}
                       <div class="mb-3">
-                        <label class="form-label" for="{{ row.field.id_for_label }}">
-                          {{ row.action.identity }}
-                        </label>
+                        <label class="form-label" for="{{ row.field.id_for_label }}">{{ row.action.identity }}</label>
                         {{ row.field }}
                         {% for error in row.field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                       </div>
                     {% endfor %}
                   </fieldset>
-                  <button class="btn btn-outline-secondary me-2" type="submit" name="action" value="review_resolutions">
+                  <button class="btn btn-outline-secondary me-2"
+                          type="submit"
+                          name="action"
+                          value="review_resolutions">
                     <i class="mdi mdi-refresh me-1" aria-hidden="true"></i>
                     {% translate "Review choices" %}
                   </button>
@@ -152,9 +171,10 @@
       </section>
     </div>
   </div>
-
   {% if result %}
-    <section class="card mt-3" aria-labelledby="apply-result-title" data-library-apply-result>
+    <section class="card mt-3"
+             aria-labelledby="apply-result-title"
+             data-library-apply-result>
       <div class="card-header">
         <h3 id="apply-result-title" class="card-title">{% translate "Apply result" %}</h3>
       </div>
@@ -166,13 +186,21 @@
         {% endif %}
         <dl class="row mb-0">
           <dt class="col-sm-5">{% translate "Namespace" %}</dt>
-          <dd class="col-sm-7"><code>{{ result.namespace }}</code></dd>
+          <dd class="col-sm-7">
+            <code>{{ result.namespace }}</code>
+          </dd>
           <dt class="col-sm-5">{% translate "Accepted release" %}</dt>
-          <dd class="col-sm-7">{{ result.release }}</dd>
+          <dd class="col-sm-7">
+            {{ result.release }}
+          </dd>
           <dt class="col-sm-5">{% translate "Changed paths" %}</dt>
-          <dd class="col-sm-7">{{ result_context.changed_path_count }}</dd>
+          <dd class="col-sm-7">
+            {{ result_context.changed_path_count }}
+          </dd>
           <dt class="col-sm-5">{% translate "Preserved local overrides" %}</dt>
-          <dd class="col-sm-7">{{ result_context.preserved_local_count }}</dd>
+          <dd class="col-sm-7">
+            {{ result_context.preserved_local_count }}
+          </dd>
         </dl>
         <p class="text-muted small mt-3 mb-0">
           {% translate "The command transaction supplied the audit actor and retained the signed preview preconditions; the UI did not recalculate them." %}

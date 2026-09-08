@@ -1,13 +1,10 @@
 {% extends "layout.html" %}
 {% load i18n %}
-
 {% block title %}{{ library.namespace }} - {% translate "Type Library" %} - ITAMbox{% endblock %}
-
 {% block page_header %}
   <div class="page-pretitle">{% translate "Global Type Library" %}</div>
   <h2 class="page-title">{{ library.namespace }}</h2>
 {% endblock page_header %}
-
 {% block page_actions %}
   {% if can_manage_library %}
     <a class="btn btn-primary" href="{% url 'assets:type_library_import' %}">
@@ -16,7 +13,6 @@
     </a>
   {% endif %}
 {% endblock page_actions %}
-
 {% block content %}
   <div class="alert alert-warning d-flex align-items-start" role="note">
     <i class="mdi mdi-earth-alert me-2 mt-1" aria-hidden="true"></i>
@@ -29,7 +25,6 @@
     <i class="mdi mdi-history me-2 mt-1" aria-hidden="true"></i>
     <div>{{ history_notice }}</div>
   </div>
-
   <div class="row g-3">
     <div class="col-12 col-lg-7">
       <section class="card" aria-labelledby="library-summary-title">
@@ -38,15 +33,21 @@
         </div>
         <dl class="card-body row mb-0">
           <dt class="col-sm-5">{% translate "Namespace" %}</dt>
-          <dd class="col-sm-7"><code>{{ library.namespace }}</code></dd>
+          <dd class="col-sm-7">
+            <code>{{ library.namespace }}</code>
+          </dd>
           <dt class="col-sm-5">{% translate "Label" %}</dt>
-          <dd class="col-sm-7">{{ library.label|default:"–" }}</dd>
+          <dd class="col-sm-7">
+            {{ library.label|default:table_empty_value }}
+          </dd>
           <dt class="col-sm-5">{% translate "Accepted release" %}</dt>
           <dd class="col-sm-7">
-            {% if library.accepted_release %}{{ library.accepted_release.sequence }}{% else %}–{% endif %}
+            {{ library.accepted_release.sequence|default:table_empty_value }}
           </dd>
           <dt class="col-sm-5">{% translate "Release history" %}</dt>
-          <dd class="col-sm-7">{{ releases|length }}</dd>
+          <dd class="col-sm-7">
+            {{ releases|length }}
+          </dd>
         </dl>
       </section>
     </div>
@@ -60,7 +61,8 @@
             {% translate "Exports contain the Library graph only; tenant Asset values, assignments, audit/policy state, and installation decisions are never included." %}
           </p>
           {% if can_manage_library %}
-            <form method="post" action="{% url 'assets:type_library_export' pk=library.pk %}">
+            <form method="post"
+                  action="{% url 'assets:type_library_export' pk=library.pk %}">
               {% csrf_token %}
               {% if export_form.non_field_errors %}
                 <div class="alert alert-danger" role="alert" aria-live="assertive">
@@ -80,7 +82,8 @@
               </div>
               <div class="form-check mb-3">
                 {{ export_form.acknowledge_retained_history }}
-                <label class="form-check-label" for="{{ export_form.acknowledge_retained_history.id_for_label }}">
+                <label class="form-check-label"
+                       for="{{ export_form.acknowledge_retained_history.id_for_label }}">
                   {{ export_form.acknowledge_retained_history.label }}
                 </label>
                 {% for error in export_form.acknowledge_retained_history.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
@@ -97,7 +100,6 @@
       </section>
     </div>
   </div>
-
   <section class="card mt-3" aria-labelledby="release-history-title">
     <div class="card-header">
       <h3 id="release-history-title" class="card-title">{% translate "Immutable release history" %}</h3>
@@ -127,7 +129,9 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="text-muted">{% translate "No releases are recorded." %}</td></tr>
+            <tr>
+              <td colspan="4" class="text-muted">{% translate "No releases are recorded." %}</td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>

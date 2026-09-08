@@ -14,7 +14,7 @@ from assets.services.specifications.commands import set_asset_type_composition
 from assets.services.specifications.contracts import SpecificationPatchDTO
 from assets.specification_adapters import (
     actor_context_for_user,
-    current_specification_plan,
+    prospective_specification_plan,
     fieldset_selection,
     require_command_success,
 )
@@ -154,10 +154,12 @@ class AssetModelImporter:
         return self._create(model, source_id, defaults, fieldset, model_name, manufacturer)
 
     def _write_composition(self, asset_type, fieldset):
-        plan = current_specification_plan(asset_type, target_kind="asset_type")
         selection = fieldset_selection(
             () if fieldset is None else (fieldset,),
             presence="explicit",
+        )
+        plan = prospective_specification_plan(
+            asset_type, target_kind="asset_type", fieldset_identities=selection.identities
         )
         result = set_asset_type_composition(
             actor=actor_context_for_user(self.context.user),

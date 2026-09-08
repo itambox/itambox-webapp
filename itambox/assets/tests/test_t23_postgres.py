@@ -166,7 +166,7 @@ class T23PostgreSQLConsumerTests(TenantTestMixin, TestCase):
                 reference=reference,
                 definition=definition,
             )
-            self.assertEqual(list(query.values_list("asset_tag", flat=True)), expected_tags, key=key)
+            self.assertEqual(list(query.values_list("asset_tag", flat=True)), expected_tags, msg=key)
 
     def test_core_search_registry_reaches_asset_specification_entrypoint(self):
         import assets.search  # noqa: F401  # registers the real AssetIndex
