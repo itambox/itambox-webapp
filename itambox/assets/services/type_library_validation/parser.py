@@ -38,6 +38,8 @@ def _reject_non_finite_number(literal: str) -> Any:
 
 
 def _as_utf8_bytes(document: bytes | str, max_bytes: int) -> tuple[bytes, str]:
+    if isinstance(document, (bytes, str)) and len(document) > max_bytes:
+        raise issue("RESOURCE_LIMIT", (), f"The UTF-8 document exceeds the {max_bytes}-byte limit")
     if isinstance(document, bytes):
         raw = document
         try:

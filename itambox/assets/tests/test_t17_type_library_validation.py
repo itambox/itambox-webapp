@@ -126,6 +126,70 @@ def test_validate_normalizes_domain_before_real_jcs_hashing():
     assert result.semantic_digest == "sha256:" + sha256(result.canonical_bytes).hexdigest()
 
 
+@pytest.mark.parametrize(
+    ("value", "required", "code"),
+    (("   ", True, "REQUIRED_FIELD"), ("a\x00b", False, "INVALID_TYPE")),
+)
+def test_library_text_values_preserve_shared_codec_rejections(value, required, code):
+    document = _release_document()
+    definition = document["definitions"]["fields"][1]
+    definition.update(field_type="text", required=required, validation={"max_length": 50})
+    definition.pop("quantity_kind")
+    definition.pop("canonical_unit")
+    document["definitions"]["asset_types"][0]["specifications"]["acme__capacity"] = value
+
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(json.dumps(document))
+
+    assert caught.value.issues[0].code == code
+    assert caught.value.issues[0].path == (
+        "definitions",
+        "asset_types",
+        "acme/device-a",
+        "specifications",
+        "acme__capacity",
+    )
+
+
+@pytest.mark.parametrize("close_cycle", (False, True))
+def test_replacement_walk_handles_long_chains_within_document_limits(close_cycle):
+    document = _release_document()
+    fields = document["definitions"]["fields"]
+    keys = [f"acme__retained_{index:04d}" for index in range(1_100)]
+    for index, key in enumerate(keys):
+        definition = deepcopy(fields[1])
+        definition.update(key=key, lifecycle="deprecated")
+        if index + 1 < len(keys):
+            definition["replaced_by"] = f"acme/{keys[index + 1]}"
+        elif close_cycle:
+            definition["replaced_by"] = f"acme/{keys[0]}"
+        fields.append(definition)
+
+    if close_cycle:
+        with pytest.raises(LibraryValidationError) as caught:
+            validate_library_document(json.dumps(document))
+        assert caught.value.issues[0].code == "REFERENCE_CYCLE"
+    else:
+        result = validate_library_document(json.dumps(document))
+        assert len(result.normalized_document["definitions"]["fields"]) == len(fields)
+
+
+@pytest.mark.parametrize("document", (b"\xff" * 17, "\ud800" * 17))
+def test_document_size_limit_precedes_unicode_decoding(document):
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(document, limits={"max_bytes": 16})
+    assert caught.value.issues[0].code == "RESOURCE_LIMIT"
+
+
+def test_library_metadata_rejects_nul_before_persistence():
+    document = _release_document()
+    document["library"]["label"] = "Acme\x00label"
+    with pytest.raises(LibraryValidationError) as caught:
+        validate_library_document(json.dumps(document))
+    assert caught.value.issues[0].code == "INVALID_TYPE"
+    assert caught.value.issues[0].path == ("library", "label")
+
+
 def test_duplicate_json_properties_are_rejected_before_overwrite():
     raw = json.dumps(_release_document())[:-1] + ', "definitions": {}}'
 

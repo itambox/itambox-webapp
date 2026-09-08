@@ -206,6 +206,8 @@ def _expect_array(value: Any, path: tuple[PathPart, ...]) -> list[Any]:
 def _expect_string(value: Any, path: tuple[PathPart, ...], *, nonempty: bool = False) -> str:
     if type(value) is not str or (nonempty and not value):
         _fail("SCHEMA_TYPE", path, "Expected a non-empty string" if nonempty else "Expected a string")
+    if "\x00" in value:
+        _fail("INVALID_TYPE", path, "Strings must not contain NUL")
     return value
 
 
@@ -469,43 +471,55 @@ def _validate_field(value: Any, path: tuple[PathPart, ...], namespace: str | fro
     return field
 
 
-def _validate_field_metadata(  # noqa: C901 - type-specific schema branches are one bounded pass
+def _validate_text_metadata(validation: dict[str, Any], path: tuple[PathPart, ...]):
+    if "max_length" not in validation:
+        _fail("MISSING_PROPERTY", path + ("validation", "max_length"), "Text Fields require max_length")
+    _expect_int(validation["max_length"], path + ("validation", "max_length"), minimum=1, maximum=4096)
+    if "regex" in validation:
+        _validate_safe_regex(
+            _expect_string(validation["regex"], path + ("validation", "regex")), path + ("validation", "regex")
+        )
+    if "rule" in validation:
+        rule = _expect_string(validation["rule"], path + ("validation", "rule"))
+        if rule != "rfc1123_hostname":
+            _fail("INVALID_VALIDATION", path + ("validation", "rule"), "Unknown text validation rule")
+    for key in set(validation) - {"max_length", "regex", "rule"}:
+        _fail("INVALID_VALIDATION", path + ("validation", key), "Property is not valid for text Fields")
+    return
+
+
+def _validate_decimal_metadata(validation: dict[str, Any], path: tuple[PathPart, ...]):
+    if "scale" not in validation:
+        _fail("MISSING_PROPERTY", path + ("validation", "scale"), "Decimal Fields require scale")
+    _expect_int(validation["scale"], path + ("validation", "scale"), minimum=0, maximum=6)
+    allowed = {"minimum", "maximum", "scale", "rule"}
+    if set(validation) - allowed:
+        _fail("INVALID_VALIDATION", path + ("validation",), "Property is not valid for decimal Fields")
+    _validate_bounds(validation, path)
+    if "rule" in validation:
+        rule = _expect_string(validation["rule"], path + ("validation", "rule"))
+        if rule not in _RULES - {"rfc1123_hostname"}:
+            _fail("INVALID_VALIDATION", path + ("validation", "rule"), "Unknown decimal validation rule")
+    return
+
+
+def _validate_integer_metadata(validation: dict[str, Any], path: tuple[PathPart, ...]):
+    allowed = {"minimum", "maximum"}
+    if set(validation) - allowed:
+        _fail("INVALID_VALIDATION", path + ("validation",), "Property is not valid for integer Fields")
+    _validate_bounds(validation, path)
+    return
+
+
+def _validate_field_metadata(
     field: dict[str, Any], validation: dict[str, Any], path: tuple[PathPart, ...], field_type: str
 ) -> None:
     if field_type == "text":
-        if "max_length" not in validation:
-            _fail("MISSING_PROPERTY", path + ("validation", "max_length"), "Text Fields require max_length")
-        _expect_int(validation["max_length"], path + ("validation", "max_length"), minimum=1, maximum=4096)
-        if "regex" in validation:
-            _validate_safe_regex(
-                _expect_string(validation["regex"], path + ("validation", "regex")), path + ("validation", "regex")
-            )
-        if "rule" in validation:
-            rule = _expect_string(validation["rule"], path + ("validation", "rule"))
-            if rule != "rfc1123_hostname":
-                _fail("INVALID_VALIDATION", path + ("validation", "rule"), "Unknown text validation rule")
-        for key in set(validation) - {"max_length", "regex", "rule"}:
-            _fail("INVALID_VALIDATION", path + ("validation", key), "Property is not valid for text Fields")
-        return
+        return _validate_text_metadata(validation, path)
     if field_type == "integer":
-        allowed = {"minimum", "maximum"}
-        if set(validation) - allowed:
-            _fail("INVALID_VALIDATION", path + ("validation",), "Property is not valid for integer Fields")
-        _validate_bounds(validation, path)
-        return
+        return _validate_integer_metadata(validation, path)
     if field_type == "decimal":
-        if "scale" not in validation:
-            _fail("MISSING_PROPERTY", path + ("validation", "scale"), "Decimal Fields require scale")
-        _expect_int(validation["scale"], path + ("validation", "scale"), minimum=0, maximum=6)
-        allowed = {"minimum", "maximum", "scale", "rule"}
-        if set(validation) - allowed:
-            _fail("INVALID_VALIDATION", path + ("validation",), "Property is not valid for decimal Fields")
-        _validate_bounds(validation, path)
-        if "rule" in validation:
-            rule = _expect_string(validation["rule"], path + ("validation", "rule"))
-            if rule not in _RULES - {"rfc1123_hostname"}:
-                _fail("INVALID_VALIDATION", path + ("validation", "rule"), "Unknown decimal validation rule")
-        return
+        return _validate_decimal_metadata(validation, path)
     if field_type in {"boolean", "date"}:
         if validation:
             _fail(
@@ -700,7 +714,15 @@ def _validate_historical_map(value: Any, path: tuple[PathPart, ...], limits: Val
     return history
 
 
-def _validate_asset_type(  # noqa: C901 - one bounded structural pass keeps all Type limits together
+def _validate_type_gtin(asset_type: dict[str, Any], path: tuple[PathPart, ...]) -> None:
+    gtin = asset_type["gtin"]
+    if gtin is not None:
+        gtin = _expect_string(gtin, path + ("gtin",))
+        if _GTIN_RE.fullmatch(gtin) is None:
+            _fail("INVALID_VALIDATION", path + ("gtin",), "GTIN must contain 8, 12, 13, or 14 digits")
+
+
+def _validate_asset_type(
     value: Any,
     path: tuple[PathPart, ...],
     namespace: str | frozenset[str] | None,
@@ -735,11 +757,7 @@ def _validate_asset_type(  # noqa: C901 - one bounded structural pass keeps all 
         _expect_string(asset_type[name], path + (name,))
         if len(asset_type[name]) > maximum:
             _fail("INVALID_RANGE", path + (name,), f"{name} exceeds its length bound")
-    gtin = asset_type["gtin"]
-    if gtin is not None:
-        gtin = _expect_string(gtin, path + ("gtin",))
-        if _GTIN_RE.fullmatch(gtin) is None:
-            _fail("INVALID_VALIDATION", path + ("gtin",), "GTIN must contain 8, 12, 13, or 14 digits")
+    _validate_type_gtin(asset_type, path)
     category = asset_type["category"]
     if category is not None:
         _catalog_identity(category, path + ("category",))
@@ -856,10 +874,12 @@ def _resolve_catalog(
     _fail("INVALID_REFERENCE", path, f"Catalogue reference {identity!r} does not resolve")
 
 
-def _validate_replacements(  # noqa: C901 - all same-kind replacement edges share one cycle walk
-    graph: _Graph, path: tuple[PathPart, ...], declared: frozenset[str]
+def _field_replacement_edges(
+    graph: _Graph,
+    path: tuple[PathPart, ...],
+    declared: frozenset[str],
+    edges: dict[tuple[str, str], tuple[str, str]],
 ) -> None:
-    edges: dict[tuple[str, str], tuple[str, str]] = {}
     for identity, field in graph.fields_by_identity.items():
         if "replaced_by" in field:
             target = _resolve(
@@ -872,6 +892,14 @@ def _validate_replacements(  # noqa: C901 - all same-kind replacement edges shar
                     "Replacement dependency definitions are not loaded",
                 )
             edges[("field", identity)] = ("field", field["replaced_by"])
+
+
+def _choice_replacement_edges(
+    graph: _Graph,
+    path: tuple[PathPart, ...],
+    declared: frozenset[str],
+    edges: dict[tuple[str, str], tuple[str, str]],
+) -> None:
     for identity, choice_set in graph.choice_sets.items():
         if "replaced_by" in choice_set:
             target = _resolve(
@@ -896,6 +924,29 @@ def _validate_replacements(  # noqa: C901 - all same-kind replacement edges shar
                     "Replacement Choice does not resolve",
                 )
             edges[("choice", f"{identity}#{key}")] = ("choice", f"{identity}#{replacement}")
+
+
+def _validate_replacement_cycles(edges: dict[tuple[str, str], tuple[str, str]], path: tuple[PathPart, ...]) -> None:
+    finished: set[tuple[str, str]] = set()
+    for start in edges:
+        if start in finished:
+            continue
+        chain: set[tuple[str, str]] = set()
+        node = start
+        while node not in finished:
+            if node in chain:
+                _fail("REFERENCE_CYCLE", path, f"Replacement graph contains a cycle at {node[1]!r}")
+            chain.add(node)
+            if node not in edges:
+                break
+            node = edges[node]
+        finished.update(chain)
+
+
+def _validate_replacements(graph: _Graph, path: tuple[PathPart, ...], declared: frozenset[str]) -> None:
+    edges: dict[tuple[str, str], tuple[str, str]] = {}
+    _field_replacement_edges(graph, path, declared, edges)
+    _choice_replacement_edges(graph, path, declared, edges)
     for mapping_name, mapping in (("fieldsets", graph.fieldsets), ("asset_types", graph.asset_types)):
         for identity, item in mapping.items():
             if "replaced_by" in item:
@@ -909,21 +960,7 @@ def _validate_replacements(  # noqa: C901 - all same-kind replacement edges shar
                         "Replacement dependency definitions are not loaded",
                     )
                 edges[(mapping_name, identity)] = (mapping_name, item["replaced_by"])
-    states: dict[tuple[str, str], int] = {}
-
-    def visit(node: tuple[str, str]) -> None:
-        state = states.get(node, 0)
-        if state == 1:
-            _fail("REFERENCE_CYCLE", path, f"Replacement graph contains a cycle at {node[1]!r}")
-        if state == 2:
-            return
-        states[node] = 1
-        if node in edges:
-            visit(edges[node])
-        states[node] = 2
-
-    for node in edges:
-        visit(node)
+    _validate_replacement_cycles(edges, path)
 
 
 def _choice_set_for_field(
@@ -1022,61 +1059,50 @@ def _check_range(value: Decimal, validation: dict[str, Any], path: tuple[PathPar
                 _fail("INVALID_RANGE", path, f"Value violates the {bound_name} bound")
 
 
-def _validate_typed_value(  # noqa: C901 - seven fixed wire codecs share one error/path boundary
+def _validate_text_value(field: dict[str, Any], value: Any, path: tuple[PathPart, ...], historical: bool):
+    validation = field["validation"]
+    value = _expect_string(value, path)
+    if field["required"] and not historical and not value.strip():
+        _fail("REQUIRED_FIELD", path, "Required text must not be empty or whitespace")
+    if value == "" and not field["required"]:
+        return value
+    if len(value) > validation["max_length"]:
+        _fail("INVALID_RANGE", path, "Text value exceeds max_length")
+    if "regex" in validation and re.fullmatch(validation["regex"], value, flags=re.ASCII) is None:
+        _fail("INVALID_VALUE", path, "Text value does not match regex")
+    if validation.get("rule") == "rfc1123_hostname":
+        labels = value.split(".")
+        label_re = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+        if (
+            not 1 <= len(value) <= 253
+            or value.endswith(".")
+            or any(label_re.fullmatch(label) is None for label in labels)
+        ):
+            _fail("INVALID_VALUE", path, "Text value is not an RFC 1123 hostname")
+    return value
+
+
+def _validate_date_value(value: Any, path: tuple[PathPart, ...]):
+    value = _expect_string(value, path)
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        _fail("INVALID_VALUE", path, "Date must be an ISO calendar date")
+        raise AssertionError from exc
+    if parsed.isoformat() != value:
+        _fail("INVALID_VALUE", path, "Date must use canonical ISO spelling")
+    return value
+
+
+def _validate_choice_value(
     field: dict[str, Any],
     value: Any,
     graph: _Graph,
     path: tuple[PathPart, ...],
     declared: frozenset[str],
-    *,
     historical: bool,
 ) -> Any:
-    if value is None:
-        if field["required"] and not historical:
-            _fail("REQUIRED_FIELD", path, "Required Fields may not be null or omitted")
-        if not field["nullable"]:
-            _fail("INVALID_TYPE", path, "Null is not allowed for this Field")
-        return None
     field_type = field["field_type"]
-    validation = field["validation"]
-    if field_type == "text":
-        value = _expect_string(value, path)
-        if value == "" and not field["required"]:
-            return value
-        if len(value) > validation["max_length"]:
-            _fail("INVALID_RANGE", path, "Text value exceeds max_length")
-        if "regex" in validation and re.fullmatch(validation["regex"], value, flags=re.ASCII) is None:
-            _fail("INVALID_VALUE", path, "Text value does not match regex")
-        if validation.get("rule") == "rfc1123_hostname":
-            labels = value.split(".")
-            label_re = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
-            if (
-                not 1 <= len(value) <= 253
-                or value.endswith(".")
-                or any(label_re.fullmatch(label) is None for label in labels)
-            ):
-                _fail("INVALID_VALUE", path, "Text value is not an RFC 1123 hostname")
-        return value
-    if field_type == "integer":
-        value = _expect_int(value, path, minimum=-9007199254740991, maximum=9007199254740991)
-        _check_range(Decimal(value), validation, path)
-        return value
-    if field_type == "decimal":
-        value = _canonical_decimal_value(value, validation["scale"], path)
-        _check_range(Decimal(value), validation, path)
-        return value
-    if field_type == "boolean":
-        return _expect_bool(value, path)
-    if field_type == "date":
-        value = _expect_string(value, path)
-        try:
-            parsed = date.fromisoformat(value)
-        except ValueError as exc:
-            _fail("INVALID_VALUE", path, "Date must be an ISO calendar date")
-            raise AssertionError from exc
-        if parsed.isoformat() != value:
-            _fail("INVALID_VALUE", path, "Date must use canonical ISO spelling")
-        return value
     choice_set = _choice_set_for_field(field, graph, path, declared)
     if choice_set is _EXTERNAL:
         _fail("DEPENDENCY_GRAPH_UNAVAILABLE", path, "Referenced Choice Set definitions are not loaded")
@@ -1100,6 +1126,40 @@ def _validate_typed_value(  # noqa: C901 - seven fixed wire codecs share one err
     return sorted(value)
 
 
+def _validate_typed_value(
+    field: dict[str, Any],
+    value: Any,
+    graph: _Graph,
+    path: tuple[PathPart, ...],
+    declared: frozenset[str],
+    *,
+    historical: bool,
+) -> Any:
+    if value is None:
+        if field["required"] and not historical:
+            _fail("REQUIRED_FIELD", path, "Required Fields may not be null or omitted")
+        if not field["nullable"]:
+            _fail("INVALID_TYPE", path, "Null is not allowed for this Field")
+        return None
+    field_type = field["field_type"]
+    validation = field["validation"]
+    if field_type == "text":
+        return _validate_text_value(field, value, path, historical)
+    if field_type == "integer":
+        value = _expect_int(value, path, minimum=-9007199254740991, maximum=9007199254740991)
+        _check_range(Decimal(value), validation, path)
+        return value
+    if field_type == "decimal":
+        value = _canonical_decimal_value(value, validation["scale"], path)
+        _check_range(Decimal(value), validation, path)
+        return value
+    if field_type == "boolean":
+        return _expect_bool(value, path)
+    if field_type == "date":
+        return _validate_date_value(value, path)
+    return _validate_choice_value(field, value, graph, path, declared, historical)
+
+
 def _validate_cross_field_rules(
     values: dict[str, Any], fields_by_key: dict[str, dict[str, Any]], path: tuple[PathPart, ...]
 ) -> None:
@@ -1121,7 +1181,29 @@ def _validate_cross_field_rules(
                 _fail("REQUIRED_FIELD", path + ("battery_runtime_load",), "Battery runtime requires an explicit load")
 
 
-def _validate_asset_type_graph(  # noqa: C901 - complete Type graph validation is intentionally coordinated
+def _validate_historical_type_values(
+    asset_type: dict[str, Any],
+    graph: _Graph,
+    path: tuple[PathPart, ...],
+    declared: frozenset[str],
+) -> None:
+    for key, record in asset_type["historical_specifications"].items():
+        field = graph.fields_by_key.get(key)
+        if field is None:
+            _fail(
+                "INVALID_REFERENCE", path + ("historical_specifications", key), "Historical Field key does not resolve"
+            )
+        _validate_typed_value(
+            field,
+            record["value"],
+            graph,
+            path + ("historical_specifications", key, "value"),
+            declared,
+            historical=True,
+        )
+
+
+def _validate_asset_type_graph(
     asset_type: dict[str, Any],
     graph: _Graph,
     path: tuple[PathPart, ...],
@@ -1158,26 +1240,14 @@ def _validate_asset_type_graph(  # noqa: C901 - complete Type graph validation i
         if field["required"] and not _value_present(field, normalized_values.get(key)):
             _fail("REQUIRED_FIELD", path + ("specifications", key), "Required Field is missing")
     _validate_cross_field_rules(normalized_values, effective, path + ("specifications",))
-    for key, record in asset_type["historical_specifications"].items():
-        field = graph.fields_by_key.get(key)
-        if field is None:
-            _fail(
-                "INVALID_REFERENCE", path + ("historical_specifications", key), "Historical Field key does not resolve"
-            )
-        _validate_typed_value(
-            field,
-            record["value"],
-            graph,
-            path + ("historical_specifications", key, "value"),
-            declared,
-            historical=True,
-        )
+    _validate_historical_type_values(asset_type, graph, path, declared)
 
 
-def _validate_graph(  # noqa: C901 - cross-definition graph checks run in one deterministic pass
-    graph: _Graph, path: tuple[PathPart, ...], ctx: _ValidationContext, declared: frozenset[str]
+def _validate_field_choice_graph(
+    graph: _Graph,
+    path: tuple[PathPart, ...],
+    declared: frozenset[str],
 ) -> None:
-    _validate_replacements(graph, path, declared)
     for identity, field in graph.fields_by_identity.items():
         if "choice_set" in field:
             choice_set = _choice_set_for_field(field, graph, path + ("fields", identity), declared)
@@ -1195,6 +1265,13 @@ def _validate_graph(  # noqa: C901 - cross-definition graph checks run in one de
                         path + ("fields", identity),
                         "Active select Fields need an active Choice Set",
                     )
+
+
+def _validate_fieldset_graph(
+    graph: _Graph,
+    path: tuple[PathPart, ...],
+    declared: frozenset[str],
+) -> None:
     for identity, fieldset in graph.fieldsets.items():
         for index, field_ref in enumerate(fieldset["fields"]):
             field = _resolve(
@@ -1222,6 +1299,14 @@ def _validate_graph(  # noqa: C901 - cross-definition graph checks run in one de
                     path + ("fieldsets", identity, "fields", index),
                     "Field has no supported target",
                 )
+
+
+def _validate_graph(
+    graph: _Graph, path: tuple[PathPart, ...], ctx: _ValidationContext, declared: frozenset[str]
+) -> None:
+    _validate_replacements(graph, path, declared)
+    _validate_field_choice_graph(graph, path, declared)
+    _validate_fieldset_graph(graph, path, declared)
     for identity, category in graph.categories.items():
         for index, fieldset_ref in enumerate(category["default_fieldsets"]):
             resolved = _resolve(
@@ -1379,9 +1464,26 @@ def _snapshot_extra_is_allowed(
     return True
 
 
-def _validate_snapshot_consistency(  # noqa: C901 - source/effective closure is one deterministic comparison
-    upstream: _ValidatedPart, effective: _Graph, path: tuple[PathPart, ...]
+def _validate_snapshot_choices(
+    source: dict[str, Any],
+    target: dict[str, Any],
+    identity: str,
+    path: tuple[PathPart, ...],
 ) -> None:
+    source_choices = {choice["key"]: choice for choice in source["choices"]}
+    target_choices = {choice["key"]: choice for choice in target["choices"]}
+    if not source_choices.keys() <= target_choices.keys():
+        _fail("HISTORICAL_CLOSURE", path, f"Snapshot omits upstream Choice in {identity!r}")
+    for key, choice in target_choices.items():
+        if key not in source_choices and choice["lifecycle"] != "deprecated":
+            _fail("NAMESPACE_TAKEOVER", path, f"Snapshot adds active Choice {identity}#{key!r}")
+        if key in source_choices and _immutable_signature("choice", choice) != _immutable_signature(
+            "choice", source_choices[key]
+        ):
+            _fail("IMMUTABLE_DEFINITION", path, f"Snapshot changes Choice identity {identity}#{key!r}")
+
+
+def _validate_snapshot_consistency(upstream: _ValidatedPart, effective: _Graph, path: tuple[PathPart, ...]) -> None:
     for kind, upstream_mapping, effective_mapping in (
         ("choice_set", upstream.graph.choice_sets, effective.choice_sets),
         ("field", upstream.graph.fields_by_identity, effective.fields_by_identity),
@@ -1397,17 +1499,7 @@ def _validate_snapshot_consistency(  # noqa: C901 - source/effective closure is 
             if _immutable_signature(kind, source) != _immutable_signature(kind, target):
                 _fail("IMMUTABLE_DEFINITION", path, f"Snapshot changes immutable {kind} identity {identity!r}")
             if kind == "choice_set":
-                source_choices = {choice["key"]: choice for choice in source["choices"]}
-                target_choices = {choice["key"]: choice for choice in target["choices"]}
-                if not source_choices.keys() <= target_choices.keys():
-                    _fail("HISTORICAL_CLOSURE", path, f"Snapshot omits upstream Choice in {identity!r}")
-                for key, choice in target_choices.items():
-                    if key not in source_choices and choice["lifecycle"] != "deprecated":
-                        _fail("NAMESPACE_TAKEOVER", path, f"Snapshot adds active Choice {identity}#{key!r}")
-                    if key in source_choices and _immutable_signature("choice", choice) != _immutable_signature(
-                        "choice", source_choices[key]
-                    ):
-                        _fail("IMMUTABLE_DEFINITION", path, f"Snapshot changes Choice identity {identity}#{key!r}")
+                _validate_snapshot_choices(source, target, identity, path)
         for identity, value in effective_mapping.items():
             if identity not in upstream_mapping:
                 if not _snapshot_extra_is_allowed(kind, identity, value, upstream):
