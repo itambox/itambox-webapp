@@ -113,6 +113,7 @@ def export_fork(
     release: ValidatedLibraryDocument | Mapping[str, Any],
     *,
     new_namespace: str,
+    effective_definitions: Mapping[str, Any] | None = None,
     installed_dependencies: Mapping[Any, Any] | None = None,
 ) -> LibraryExportArtifact:
     """Publish a deliberate new namespace with rewritten owned identities."""
@@ -123,7 +124,12 @@ def export_fork(
         raise LibraryExportError("INVALID_NAMESPACE", ("library", "namespace"), "Invalid fork namespace")
     if new_namespace == old_namespace:
         raise LibraryExportError("IDENTITY_UNCHANGED", ("library", "namespace"), "A fork needs a new namespace")
-    fork = _rewrite_fork(validated_release.normalized_document, old_namespace, new_namespace)
+    source_document = deepcopy(validated_release.normalized_document)
+    if effective_definitions is not None:
+        if not isinstance(effective_definitions, Mapping):
+            raise LibraryExportError("SCHEMA_TYPE", ("effective_definitions",), "Expected an object")
+        source_document["definitions"] = deepcopy(dict(effective_definitions))
+    fork = _rewrite_fork(source_document, old_namespace, new_namespace)
     validated_fork = _validate_mapping(fork, installed_dependencies=installed_dependencies)
     return _artifact(
         mode="fork",

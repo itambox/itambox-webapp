@@ -68,6 +68,7 @@ def prepare_library_apply(
 
     _validate_apply_inputs(request, incoming, current_state, authorize)
     _verify_apply_token(request)
+    _ensure_current_state_is_current(request, current_state)
     recomputed = _recompute_apply_plan(request, incoming, current_state)
     _ensure_plan_is_current(request.plan, recomputed)
     return recomputed
@@ -123,6 +124,14 @@ def _recompute_apply_plan(
     return recomputed
 
 
+def _ensure_current_state_is_current(
+    expected: LibraryApplyRequest,
+    current_state: LibraryReconciliationState,
+) -> None:
+    if expected.plan.current_digest != current_state.current_digest:
+        raise LibraryApplyError("STALE_PLAN")
+
+
 def _ensure_plan_is_current(expected: LibraryPlan, recomputed: LibraryPlan) -> None:
     if recomputed.plan_digest != expected.plan_digest:
         raise LibraryApplyError("STALE_PLAN")
@@ -143,58 +152,132 @@ def apply_library_plan(
 
     from django.db import transaction
 
-    from assets.services.specifications._command_support import has_global_model_permission
     from assets.services.specifications.locking import catalogue_transaction_lock
-    from assets.services.type_library.exporting import load_library_state
-    from assets.services.type_library.writing import LibraryWriteError, write_library_document
-    from extras.models import SpecificationLibrary
-    from organization.services.access_scope import authentication_revision_for_actor
 
     with transaction.atomic(using=using):
         with catalogue_transaction_lock(using=using, exclusive=True):
-            library = (
-                SpecificationLibrary.objects.using(using)
-                .select_for_update()
-                .filter(namespace=request.plan.namespace)
-                .first()
-            )
-            if not getattr(actor, "is_active", False) and not getattr(actor, "is_superuser", False):
-                raise LibraryApplyError("OBJECT_UNAVAILABLE")
-            if authentication_revision_for_actor(actor) != request.authentication_revision:
-                raise LibraryApplyError("STALE_PLAN")
-            if not has_global_model_permission(actor, SpecificationLibrary, "change_specificationlibrary"):
-                raise LibraryApplyError("OBJECT_UNAVAILABLE")
-            if library is None:
-                source = incoming.normalized_document
-                if incoming.kind == "itambox.type-library.snapshot":
-                    source = source["upstream"]
-                library = SpecificationLibrary(
-                    namespace=request.plan.namespace,
-                    label=source["library"].get("label", ""),
-                )
-                library.save(using=using)
+            fresh_actor = _reauthorize_apply_actor(actor, request, using=using)
+            return _apply_library_plan_locked(request, incoming, fresh_actor, using=using)
 
-            current_state = load_library_state(library)
-            prepared = prepare_library_apply(
-                request,
-                incoming,
-                current_state,
-                authorize=lambda: has_global_model_permission(
-                    actor, SpecificationLibrary, "change_specificationlibrary"
-                ),
+
+def _apply_library_plan_locked(
+    request: LibraryApplyRequest,
+    incoming: ValidatedLibraryDocument,
+    fresh_actor: object,
+    *,
+    using: str,
+) -> LibraryApplyResult:
+    from assets.services.specifications._command_support import actor_change_context
+    from assets.services.type_library.exporting import load_library_state
+    from assets.services.type_library.writing import LibraryWriteError, write_library_document
+    from extras.models import SpecificationLibrary
+
+    library = (
+        SpecificationLibrary.objects.using(using)
+        .select_for_update()
+        .filter(namespace=request.plan.namespace)
+        .first()
+    )
+    if not _has_library_model_permission(
+        fresh_actor,
+        SpecificationLibrary,
+        "change_specificationlibrary",
+        using=using,
+    ):
+        raise LibraryApplyError("OBJECT_UNAVAILABLE")
+
+    with actor_change_context(fresh_actor):
+        if library is None:
+            source = incoming.normalized_document
+            if incoming.kind == "itambox.type-library.snapshot":
+                source = source["upstream"]
+            library = SpecificationLibrary(
+                namespace=request.plan.namespace,
+                label=source["library"].get("label", ""),
             )
-            try:
-                changed = tuple(write_library_document(library, incoming, prepared, using))
-            except LibraryWriteError as exc:
-                raise LibraryApplyError(exc.code) from exc
-            return LibraryApplyResult(
-                namespace=prepared.namespace,
-                release=prepared.incoming_release,
-                plan_digest=prepared.plan_digest,
-                source_digest=prepared.source_digest,
-                changed_action_ids=changed,
-                no_op=not changed,
-            )
+            library.save(using=using)
+
+        current_state = load_library_state(library)
+        prepared = prepare_library_apply(
+            request,
+            incoming,
+            current_state,
+            authorize=lambda: _has_library_model_permission(
+                fresh_actor,
+                SpecificationLibrary,
+                "change_specificationlibrary",
+                using=using,
+            ),
+        )
+        try:
+            changed = tuple(write_library_document(library, incoming, prepared, using))
+        except LibraryWriteError as exc:
+            raise LibraryApplyError(exc.code) from exc
+        return LibraryApplyResult(
+            namespace=prepared.namespace,
+            release=prepared.incoming_release,
+            plan_digest=prepared.plan_digest,
+            source_digest=prepared.source_digest,
+            changed_action_ids=changed,
+            no_op=not changed,
+        )
+
+
+def _reauthorize_apply_actor(actor: object, request: LibraryApplyRequest, *, using: str) -> object:
+    actual_actor_id = getattr(actor, "pk", None)
+    if actual_actor_id != request.actor_id:
+        raise LibraryApplyError("OBJECT_UNAVAILABLE")
+    fresh_actor = _reload_library_actor(actor, using=using)
+    if fresh_actor is None:
+        raise LibraryApplyError("OBJECT_UNAVAILABLE")
+    from organization.services.access_scope import authentication_revision_for_actor
+
+    if authentication_revision_for_actor(fresh_actor) != request.authentication_revision:
+        raise LibraryApplyError("STALE_PLAN")
+    from extras.models import SpecificationLibrary
+
+    if not _has_library_model_permission(
+        fresh_actor,
+        SpecificationLibrary,
+        "change_specificationlibrary",
+        using=using,
+    ):
+        raise LibraryApplyError("OBJECT_UNAVAILABLE")
+    return fresh_actor
+
+
+def _reload_library_actor(actor: object, *, using: str) -> object | None:
+    from django.contrib.auth import get_user_model
+
+    actor_id = getattr(actor, "pk", None)
+    if type(actor_id) is not int or actor_id <= 0:
+        return None
+    return get_user_model()._base_manager.using(using).filter(pk=actor_id, is_active=True).first()
+
+
+def _has_library_model_permission(
+    actor: object,
+    model: type,
+    codename: str,
+    *,
+    using: str,
+) -> bool:
+    """Check a freshly loaded actor through the requested database alias."""
+
+    from django.contrib.auth.models import Permission
+    from django.contrib.contenttypes.models import ContentType
+
+    if getattr(actor, "is_superuser", False):
+        return True
+    content_type = ContentType.objects.db_manager(using).get_for_model(model)
+    permission = Permission.objects.using(using).filter(content_type=content_type, codename=codename).first()
+    if permission is None:
+        return False
+    user_permissions = getattr(actor, "user_permissions", None)
+    if user_permissions is not None and user_permissions.using(using).filter(pk=permission.pk).exists():
+        return True
+    groups = getattr(actor, "groups", None)
+    return groups is not None and groups.using(using).filter(permissions__pk=permission.pk).exists()
 
 
 __all__ = [

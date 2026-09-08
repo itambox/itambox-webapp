@@ -7,13 +7,13 @@ No HTTP, GraphQL, or form transport concerns belong here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 from assets.services.type_library.application import (
     LibraryApplyRequest,
     LibraryApplyResult,
-    apply_library_plan,
 )
 from assets.services.type_library.exporting import (
     LibraryExportArtifact,
@@ -72,20 +72,20 @@ def preview_library(
     actor: object,
     signing_key: str | bytes,
     access_scope_fingerprint: str | None = None,
+    resolutions: Mapping[str, str] | None = None,
     using: str = "default",
 ) -> LibraryPreviewResult:
     """Validate and preview a release against the current DB-backed state."""
 
     from django.db import transaction
 
-    from assets.services.specifications._command_support import has_global_model_permission
     from assets.services.specifications.locking import catalogue_transaction_lock
     from extras.models import SpecificationLibrary
     from organization.services.access_scope import authentication_revision_for_actor
 
     with transaction.atomic(using=using):
         with catalogue_transaction_lock(using=using, exclusive=False):
-            _authorize(actor, SpecificationLibrary, has_global_model_permission)
+            fresh_actor = _authorize(actor, SpecificationLibrary, using=using)
             installed = _installed_dependencies(using)
             incoming = _validate_document(document, installed)
             source = incoming.normalized_document
@@ -107,13 +107,19 @@ def preview_library(
             else:
                 state = load_library_state(library)
             try:
-                plan = plan_reconciliation(state, incoming)
+                base_plan = plan_reconciliation(state, incoming)
+                normalized_resolutions = _validated_resolutions(base_plan, resolutions)
+                plan = plan_reconciliation(
+                    state,
+                    incoming,
+                    resolutions=normalized_resolutions,
+                )
             except LibraryPlanningError as exc:
                 raise LibraryCommandError(exc.code) from exc
-            authentication_revision = authentication_revision_for_actor(actor)
+            authentication_revision = authentication_revision_for_actor(fresh_actor)
             token = issue_library_preview_token(
                 plan,
-                actor_id=actor.pk,
+                actor_id=fresh_actor.pk,
                 authentication_revision=authentication_revision,
                 access_scope_fingerprint=access_scope_fingerprint,
                 signing_key=signing_key,
@@ -130,9 +136,20 @@ def apply_library(
 ) -> LibraryApplyResult:
     """Validate raw source and apply it through the real locked transaction."""
 
-    installed = _installed_dependencies(using)
-    incoming = _validate_document(document, installed)
-    return apply_library_plan(request, incoming, actor=actor, using=using)
+    from django.db import transaction
+
+    from assets.services.specifications.locking import catalogue_transaction_lock
+    from assets.services.type_library.application import (
+        _apply_library_plan_locked,
+        _reauthorize_apply_actor,
+    )
+
+    with transaction.atomic(using=using):
+        with catalogue_transaction_lock(using=using, exclusive=True):
+            fresh_actor = _reauthorize_apply_actor(actor, request, using=using)
+            installed = _installed_dependencies(using)
+            incoming = _validate_document(document, installed)
+            return _apply_library_plan_locked(request, incoming, fresh_actor, using=using)
 
 
 def export_library(
@@ -148,7 +165,6 @@ def export_library(
 
     from django.db import transaction
 
-    from assets.services.specifications._command_support import has_global_model_permission
     from assets.services.specifications.locking import catalogue_transaction_lock
     from extras.models import SpecificationLibrary
 
@@ -158,7 +174,7 @@ def export_library(
         raise LibraryCommandError("INVALID_NAMESPACE", ("new_namespace",))
     with transaction.atomic(using=using):
         with catalogue_transaction_lock(using=using, exclusive=False):
-            _authorize(actor, SpecificationLibrary, has_global_model_permission)
+            _authorize(actor, SpecificationLibrary, using=using)
             library = (
                 SpecificationLibrary.objects.using(using)
                 .select_related("accepted_release")
@@ -172,9 +188,12 @@ def export_library(
             if mode == "original_release":
                 return export_original_release(release, installed_dependencies=installed)
             if mode == "fork":
+                from assets.services.type_library.writing import effective_definitions_from_library
+
                 return export_fork(
                     release,
                     new_namespace=new_namespace,
+                    effective_definitions=effective_definitions_from_library(library),
                     installed_dependencies=installed,
                 )
             from assets.services.type_library.writing import effective_definitions_from_library
@@ -187,11 +206,44 @@ def export_library(
             )
 
 
-def _authorize(actor: object, model: type, checker: Any) -> None:
-    if not getattr(actor, "is_active", False) and not getattr(actor, "is_superuser", False):
+def _authorize(actor: object, model: type, *, using: str) -> object:
+    from assets.services.type_library.application import (
+        _has_library_model_permission,
+        _reload_library_actor,
+    )
+
+    fresh_actor = _reload_library_actor(actor, using=using)
+    if fresh_actor is None or not _has_library_model_permission(
+        fresh_actor,
+        model,
+        "change_specificationlibrary",
+        using=using,
+    ):
         raise LibraryCommandError("OBJECT_UNAVAILABLE")
-    if not checker(actor, model, "change_specificationlibrary"):
-        raise LibraryCommandError("OBJECT_UNAVAILABLE")
+    return fresh_actor
+
+
+def _validated_resolutions(
+    base_plan: LibraryPlan,
+    resolutions: Mapping[str, str] | None,
+) -> dict[str, str]:
+    if resolutions is None:
+        return {}
+    if not isinstance(resolutions, Mapping):
+        raise LibraryCommandError("INVALID_RESOLUTION", ("resolutions",))
+    allowed_action_ids = {
+        action.action_id
+        for action in base_plan.actions
+        if action.action == "conflict"
+    }
+    normalized: dict[str, str] = {}
+    for action_id, decision in resolutions.items():
+        if type(action_id) is not str or action_id not in allowed_action_ids:
+            raise LibraryCommandError("INVALID_RESOLUTION", ("resolutions", str(action_id)))
+        if type(decision) is not str or decision not in {"keep_local", "take_upstream", "abort"}:
+            raise LibraryCommandError("INVALID_RESOLUTION", ("resolutions", action_id))
+        normalized[action_id] = decision
+    return normalized
 
 
 def _installed_dependencies(using: str) -> tuple[InstalledDependency, ...]:
