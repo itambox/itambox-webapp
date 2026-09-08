@@ -116,7 +116,7 @@ async function uploadAndPreview(page: Page, document: object, filename: string) 
   await expect(page.locator('[data-library-preview]')).toBeVisible();
 }
 
-test.describe('assets Type Library browser workflow', { tag: '@operator' }, () => {
+test.describe('assets Type Library browser workflow', { tag: '@pr' }, () => {
   test('imports, preserves a local snapshot edit, resolves an update conflict, and exports/reimports', async ({ page, runId }) => {
     const namespace = uniqueNamespace(runId);
     const releaseOne = releaseDocument(namespace, 1, 'State');
