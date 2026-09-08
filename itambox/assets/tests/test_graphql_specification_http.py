@@ -818,7 +818,7 @@ class GraphQLSpecificationHTTPTests(TestCase):
         )
         retained_choice = CustomFieldChoice.objects.create(
             choice_set=retained_set,
-            key="retired-old-choice",
+            key="retired_old_choice",
             label="Retained old choice",
             position=1000,
             lifecycle="deprecated",
@@ -865,7 +865,7 @@ class GraphQLSpecificationHTTPTests(TestCase):
             if item["id"] == source_choice_set["id"]
         )
         self.assertIn(
-            {"key": "retired-old-choice", "label": "Retained old choice", "lifecycle": "deprecated"},
+            {"key": "retired_old_choice", "label": "Retained old choice", "lifecycle": "deprecated"},
             retained_set_document["choices"],
         )
 
