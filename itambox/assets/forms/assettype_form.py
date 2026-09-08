@@ -38,6 +38,7 @@ from ..specification_adapters import (
     native_asset_type_create_input,
     native_persistence_fields,
     owner_id_from_result,
+    prospective_specification_plan,
     require_command_success,
     specification_patch,
     stage_uploaded_image,
@@ -617,8 +618,12 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         self.specification_definition_revision = ""
         if self.instance and self.instance.pk:
             try:
-                self.specification_definition_revision = current_specification_plan(
-                    self.instance, target_kind="asset_type"
+                self.specification_definition_revision = prospective_specification_plan(
+                    self.instance,
+                    target_kind="asset_type",
+                    fieldset_identities=tuple(
+                        f"{fieldset.namespace}/{fieldset.slug}" for fieldset in selected
+                    ),
                 ).definition_revision
             except (ValidationError, AttributeError):
                 self.specification_definition_revision = ""
@@ -722,9 +727,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         return current
 
     def _command_update(self, instance, actor):
-        plan = current_specification_plan(instance, target_kind="asset_type")
         selection = self._create_selection()
         if selection.presence == "omitted":
+            plan = current_specification_plan(instance, target_kind="asset_type")
             result = update_asset_type_specifications(
                 actor=actor,
                 asset_type_id=instance.pk,
@@ -733,6 +738,11 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
                 patch=self._patch(),
             )
         else:
+            plan = prospective_specification_plan(
+                instance,
+                target_kind="asset_type",
+                fieldset_identities=selection.identities,
+            )
             result = set_asset_type_composition(
                 actor=actor,
                 asset_type_id=instance.pk,
