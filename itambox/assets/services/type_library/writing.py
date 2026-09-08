@@ -66,14 +66,7 @@ def write_library_document(
         )
         release.save(using=using)
 
-    _reject_unrepresentable_choice_history(definitions)
-    context = _WriteContext(library=library, definitions=definitions, using=using)
-    context.write_choice_sets()
-    context.write_fields()
-    context.write_fieldsets()
-    context.write_references()
-    context.write_asset_types()
-    context.retire_missing()
+    _WriteContext(library=library, definitions=definitions, using=using).write_all()
     library.accept_release(release, using=using)
     return tuple(action.action_id for action in plan.actions if action.decision == "take_upstream")
 
@@ -119,16 +112,6 @@ def _is_noop(library: Any, plan: LibraryPlan) -> bool:
     )
 
 
-def _reject_unrepresentable_choice_history(definitions: Mapping[str, Any]) -> None:
-    for index, choice_set in enumerate(definitions.get("choice_sets", [])):
-        for choice_index, choice in enumerate(choice_set.get("choices", [])):
-            if choice.get("lifecycle") == "deprecated":
-                raise LibraryWriteError(
-                    "UNSUPPORTED_STRUCTURE",
-                    ("definitions", "choice_sets", index, "choices", choice_index, "lifecycle"),
-                )
-
-
 class _WriteContext:
     def __init__(self, *, library: Any, definitions: Mapping[str, Any], using: str):
         self.library = library
@@ -140,7 +123,17 @@ class _WriteContext:
         self.categories: dict[str, Any] = {}
         self.manufacturers: dict[str, Any] = {}
 
+    def write_all(self) -> None:
+        self.write_choice_sets()
+        self.write_fields()
+        self.write_fieldsets()
+        self.write_references()
+        self.write_asset_types()
+        self.retire_missing()
+
     def write_choice_sets(self) -> None:
+        from django.utils import timezone
+
         from extras.models import CustomFieldChoice, CustomFieldChoiceSet
 
         for item in self.definitions.get("choice_sets", []):
@@ -158,22 +151,53 @@ class _WriteContext:
             else:
                 _save_fields(choice_set, {"label": item["label"], "lifecycle": item.get("lifecycle", "active")}, self.using)
             self.choice_sets[item["id"]] = choice_set
+            existing = list(
+                CustomFieldChoice.objects.using(self.using)
+                .filter(choice_set_id=choice_set.pk)
+                .order_by("position", "pk")
+            )
+            temporary_base = (
+                max((choice.position for choice in existing), default=0)
+                + len(existing)
+                + len(item.get("choices", []))
+                + 1
+            )
+            for offset, choice in enumerate(existing):
+                if choice.position != temporary_base + offset:
+                    choice.position = temporary_base + offset
+                    choice.save(using=self.using, update_fields=["position"])
+            existing_by_key = {choice.key: choice for choice in existing}
+            desired_keys = set()
             for position, choice_data in enumerate(item.get("choices", []), start=1):
-                choice = (
-                    CustomFieldChoice.objects.using(self.using)
-                    .filter(choice_set_id=choice_set.pk, key=choice_data["key"])
-                    .first()
-                )
+                key = choice_data["key"]
+                desired_keys.add(key)
+                choice = existing_by_key.get(key)
+                lifecycle = choice_data.get("lifecycle", "active")
                 values = {
                     "label": choice_data["label"],
                     "position": position,
                     "replaced_by": choice_data.get("replaced_by"),
+                    "lifecycle": lifecycle,
+                    "deprecated_at": (
+                        choice.deprecated_at
+                        if choice is not None and choice.lifecycle == "deprecated" and lifecycle == "deprecated"
+                        else timezone.now() if lifecycle == "deprecated" else None
+                    ),
                 }
                 if choice is None:
-                    choice = CustomFieldChoice(choice_set=choice_set, key=choice_data["key"], **values)
+                    choice = CustomFieldChoice(choice_set=choice_set, key=key, **values)
                     choice.save(using=self.using)
                 else:
                     _save_fields(choice, values, self.using)
+            retained_position = len(desired_keys) + 1
+            for choice in existing:
+                if choice.key in desired_keys:
+                    continue
+                values = {"position": retained_position, "lifecycle": "deprecated"}
+                if choice.lifecycle != "deprecated" or choice.deprecated_at is None:
+                    values["deprecated_at"] = timezone.now()
+                _save_fields(choice, values, self.using)
+                retained_position += 1
 
     def write_fields(self) -> None:
         from django.contrib.contenttypes.models import ContentType
@@ -318,7 +342,7 @@ class _WriteContext:
         from django.utils import timezone
 
         from assets.models.catalog import AssetType
-        from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset
+        from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset
 
         now = timezone.now()
         ids = {
@@ -343,6 +367,24 @@ class _WriteContext:
                 if instance.lifecycle != "deprecated":
                     _save_fields(instance, {"lifecycle": "deprecated", "deprecated_at": now}, self.using)
 
+        for choice_set in CustomFieldChoiceSet.objects.using(self.using).filter(library_id=self.library.pk):
+            definition = next(
+                (
+                    item
+                    for item in self.definitions.get("choice_sets", [])
+                    if item.get("id") == f"{choice_set.namespace}/{choice_set.slug}"
+                ),
+                None,
+            )
+            retained_keys = {choice["key"] for choice in (definition or {}).get("choices", [])}
+            for choice in CustomFieldChoice.objects.using(self.using).filter(choice_set_id=choice_set.pk):
+                if choice.key not in retained_keys and choice.lifecycle != "deprecated":
+                    _save_fields(
+                        choice,
+                        {"lifecycle": "deprecated", "deprecated_at": now},
+                        self.using,
+                    )
+
 
 class _ReadContext:
     def __init__(self, *, library: Any, definitions: dict[str, list[dict[str, Any]]]):
@@ -361,7 +403,7 @@ class _ReadContext:
                 {
                     "key": choice.key,
                     "label": choice.label,
-                    "lifecycle": _source_choice_lifecycle(item, choice.key),
+                    "lifecycle": choice.lifecycle,
                     **({"replaced_by": choice.replaced_by} if choice.replaced_by else {}),
                 }
                 for choice in choices
@@ -496,13 +538,6 @@ def _find_definition(items: list[dict[str, Any]], identity: str) -> dict[str, An
 
 def _find_field(items: list[dict[str, Any]], identity: str) -> dict[str, Any] | None:
     return next((item for item in items if f"{item.get('namespace')}/{item.get('key')}" == identity), None)
-
-
-def _source_choice_lifecycle(item: Mapping[str, Any], key: str) -> str:
-    for choice in item.get("choices", []):
-        if choice.get("key") == key:
-            return choice.get("lifecycle", "active")
-    return "active"
 
 
 __all__ = [
