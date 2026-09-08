@@ -42,7 +42,6 @@ from extras.services.specifications.contracts import (
     SpecificationProjectionEntryDTO,
     SpecificationValidationDTO,
 )
-from extras.customfields import validate_custom_field_data_values
 
 
 class TemperatureRuleDomainCharacterizationTests(SimpleTestCase):
