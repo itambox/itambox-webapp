@@ -242,7 +242,8 @@ class TypeLibraryImportView(LoginRequiredMixin, _GlobalLibraryPermissionMixin, F
                 resolutions=resolutions,
             )
         except LibraryCommandError as error:
-            form = LibraryUploadForm()
+            form = LibraryUploadForm(data=self.request.POST, files=self.request.FILES)
+            form.is_valid()
             _add_command_errors(form, error)
             return self._render_import(upload_form=form, preview=None)
         apply_form = LibraryApplyForm(
@@ -291,6 +292,7 @@ class TypeLibraryImportView(LoginRequiredMixin, _GlobalLibraryPermissionMixin, F
             if error.code in _REFRESH_AFTER_APPLY_ERRORS:
                 return self._refresh_after_apply_error(apply_form.cleaned_data["source_document"], message)
             apply_form.add_error(None, message)
+            _add_command_errors(apply_form, error)
             return self._render_import(apply_form=apply_form, preview=None, stale_error=message)
         except LibraryCommandError as error:
             _add_command_errors(apply_form, error)
