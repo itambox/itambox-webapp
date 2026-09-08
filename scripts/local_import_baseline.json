@@ -167,12 +167,6 @@
     },
     {
       "path": "itambox/assets/models/asset.py",
-      "context": "ClassDef:Asset/FunctionDef:save",
-      "statement": "from assets.models.tagsequence import AssetTagSequence",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/models/asset.py",
       "context": "ClassDef:Asset/FunctionDef:time_to_eol",
       "statement": "from dateutil.relativedelta import relativedelta",
       "count": 1

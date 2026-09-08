@@ -452,14 +452,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/models/asset.py",
-      "code": "F401",
-      "message": "'core.mixins.SoftDeleteMixin' imported but unused",
-      "source": "from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SoftDeleteMixin, SubscribableMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/models/assignment.py",
       "code": "F401",
       "message": "'django.urls.reverse' imported but unused",

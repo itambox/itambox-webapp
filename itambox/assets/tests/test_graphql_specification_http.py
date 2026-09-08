@@ -812,18 +812,20 @@ class GraphQLSpecificationHTTPTests(TestCase):
         )
         self.assertEqual(graphql_original["semanticDigest"], rest_original.data["semantic_digest"])
 
-        self.specification_field.lifecycle = "deprecated"
-        self.specification_field.deprecated_at = timezone.now()
-        self.specification_field.save(update_fields=["lifecycle", "deprecated_at"])
-        source_type = json.loads(release_text)["definitions"]["asset_types"][0]
-        imported_type = AssetType.objects.get(model=source_type["model"], part_number=source_type["part_number"])
-        imported_type.custom_field_data = {
-            **imported_type.custom_field_data,
-            self.specification_field.name: "retained model note",
-        }
-        imported_type.save(update_fields=["custom_field_data"])
-        before_export = dict(imported_type.custom_field_data)
+        source_choice_set = json.loads(release_text)["definitions"]["choice_sets"][0]
+        retained_set = CustomFieldChoiceSet.objects.get(
+            namespace="example", slug=source_choice_set["id"].split("/", 1)[1]
+        )
+        retained_choice = CustomFieldChoice.objects.create(
+            choice_set=retained_set,
+            key="retired-old-choice",
+            label="Retained old choice",
+            position=1000,
+            lifecycle="deprecated",
+            deprecated_at=timezone.now(),
+        )
         audit_before_export = ObjectChange._base_manager.count()
+        choice_before_export = CustomFieldChoice._base_manager.filter(pk=retained_choice.pk).values().get()
 
         rest_effective = rest_client.post(
             EXPORT_URL,
@@ -853,16 +855,18 @@ class GraphQLSpecificationHTTPTests(TestCase):
             rest_effective.data["document"],
         )
         self.assertEqual(graphql_effective["semanticDigest"], rest_effective.data["semantic_digest"])
-        imported_type.refresh_from_db()
-        self.assertEqual(imported_type.custom_field_data, before_export)
-        self.assertEqual(ObjectChange._base_manager.count(), audit_before_export)
-        retained_type = next(
-            item
-            for item in rest_effective.data["document"]["effective_definitions"]["asset_types"]
-            if item["id"] == source_type["id"]
-        )
         self.assertEqual(
-            retained_type["historical_specifications"][self.specification_field.name], "retained model note"
+            CustomFieldChoice._base_manager.filter(pk=retained_choice.pk).values().get(), choice_before_export
+        )
+        self.assertEqual(ObjectChange._base_manager.count(), audit_before_export)
+        retained_set_document = next(
+            item
+            for item in rest_effective.data["document"]["effective_definitions"]["choice_sets"]
+            if item["id"] == source_choice_set["id"]
+        )
+        self.assertIn(
+            {"key": "retired-old-choice", "label": "Retained old choice", "lifecycle": "deprecated"},
+            retained_set_document["choices"],
         )
 
         rest_missing = rest_client.post(
