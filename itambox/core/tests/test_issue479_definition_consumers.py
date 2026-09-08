@@ -222,12 +222,15 @@ def test_snipeit_type_composition_uses_canonical_command(monkeypatch):
     plan = SimpleNamespace(resource_revision="resource-1", definition_revision="definition-1")
     command = Mock(return_value=SimpleNamespace(outcome="changed"))
 
-    monkeypatch.setattr(asset_models, "current_specification_plan", Mock(return_value=plan))
+    monkeypatch.setattr(asset_models, "prospective_specification_plan", Mock(return_value=plan))
     monkeypatch.setattr(asset_models, "actor_context_for_user", Mock(return_value="actor"))
     monkeypatch.setattr(asset_models, "set_asset_type_composition", command)
     monkeypatch.setattr(asset_models, "require_command_success", lambda result: result)
 
     importer._write_composition(asset_type, fieldset)
+    asset_models.prospective_specification_plan.assert_called_once_with(
+        asset_type, target_kind="asset_type", fieldset_identities=("local/snipeit-42",)
+    )
 
     kwargs = command.call_args.kwargs
     assert kwargs["actor"] == "actor"
@@ -249,7 +252,7 @@ def test_snipeit_type_composition_explicit_clear_uses_canonical_command(monkeypa
     plan = SimpleNamespace(resource_revision="resource-2", definition_revision="definition-2")
     command = Mock(return_value=SimpleNamespace(outcome="changed"))
 
-    monkeypatch.setattr(asset_models, "current_specification_plan", Mock(return_value=plan))
+    monkeypatch.setattr(asset_models, "prospective_specification_plan", Mock(return_value=plan))
     monkeypatch.setattr(asset_models, "actor_context_for_user", Mock(return_value="actor"))
     monkeypatch.setattr(asset_models, "set_asset_type_composition", command)
     monkeypatch.setattr(asset_models, "require_command_success", lambda result: result)
@@ -257,3 +260,4 @@ def test_snipeit_type_composition_explicit_clear_uses_canonical_command(monkeypa
     importer._write_composition(SimpleNamespace(pk=18), None)
 
     assert command.call_args.kwargs["fieldsets"].identities == ()
+    assert asset_models.prospective_specification_plan.call_args.kwargs["fieldset_identities"] == ()

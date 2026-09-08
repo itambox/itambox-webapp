@@ -7,7 +7,6 @@ never writes ``custom_field_data`` or composition rows itself.
 
 from __future__ import annotations
 
-import importlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -55,6 +54,13 @@ from assets.services.specifications.contracts import (
 from assets.services.specifications.contracts import (
     CategoryDefaultSnapshotRevision as CategoryDefaultSnapshotRevisionValue,
 )
+from assets.services.specifications.loader import (
+    _assemble_current_fields,
+    _assemble_fieldsets,
+    _definition_queryset,
+    _field_dto,
+    _load_fieldset_memberships,
+)
 from assets.services.specifications.preview_tokens import (
     OwnerRef as PreviewOwnerRef,
 )
@@ -63,6 +69,10 @@ from assets.services.specifications.preview_tokens import (
     issue_preview_token,
     normalized_input_digest,
 )
+from assets.services.type_library import commands as library_commands
+from assets.services.type_library.application import LibraryApplyError, LibraryApplyRequest
+from assets.services.type_library.commands import LibraryCommandError
+from assets.services.type_library.exporting import LibraryExportError
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset
 from extras.services._definition_command_support import resource_revision_for_definition
 from extras.services.definition_command_contracts import (
@@ -176,32 +186,11 @@ class _InputError(Exception):
     issues: tuple[DomainIssueDTO, ...]
 
 
-def _asset_node_type():
-    # inline import: cycle: assets.schema imports this mutation module before AssetNode exists
-    from assets.schema import AssetNode
-
-    return AssetNode
-
-
-def _asset_type_node_type():
-    # inline import: cycle: assets.schema imports this mutation module before AssetTypeNode exists
-    from assets.schema import AssetTypeNode
-
-    return AssetTypeNode
-
-
-def _category_node_type():
-    # inline import: cycle: assets.schema imports this mutation module before CategoryNode exists
-    from assets.schema import CategoryNode
-
-    return CategoryNode
-
-
 class AssetSpecificationPayload(graphene.ObjectType):
     class Meta:
         name = "AssetSpecificationPayload"
 
-    asset = graphene.Field(lambda: _asset_node_type())
+    asset = graphene.Field("assets.schema.AssetNode")
     user_errors = graphene.List(graphene.NonNull(UserErrorType), required=True)
 
 
@@ -209,7 +198,7 @@ class AssetTypeSpecificationPayload(graphene.ObjectType):
     class Meta:
         name = "AssetTypeSpecificationPayload"
 
-    asset_type = graphene.Field(lambda: _asset_type_node_type())
+    asset_type = graphene.Field("assets.schema.AssetTypeNode")
     user_errors = graphene.List(graphene.NonNull(UserErrorType), required=True)
 
 
@@ -217,7 +206,7 @@ class CategoryDefaultsPayload(graphene.ObjectType):
     class Meta:
         name = "CategoryDefaultsPayload"
 
-    category = graphene.Field(lambda: _category_node_type())
+    category = graphene.Field("assets.schema.CategoryNode")
     user_errors = graphene.List(graphene.NonNull(UserErrorType), required=True)
 
 
@@ -467,20 +456,12 @@ def _definition_model(kind: str, identity: str):
 
 def _definition_view(kind: str, identity: str):
     if kind == "field":
-        from assets.services.specifications.loader import _definition_queryset, _field_dto
-
         definition = _definition_model(kind, identity)
         if definition is None:
             return None
         field = _definition_queryset(CustomField.objects.filter(pk=definition.pk)).first()
         return None if field is None else {"field": _field_dto(field, {})}
     if kind == "fieldset":
-        from assets.services.specifications.loader import (
-            _assemble_current_fields,
-            _assemble_fieldsets,
-            _load_fieldset_memberships,
-        )
-
         fieldset = _definition_model(kind, identity)
         if fieldset is None:
             return None
@@ -1984,15 +1965,6 @@ class CleanupSpecificationHistory(graphene.Mutation):
         return _cleanup_payload(result, keys)
 
 
-def _library_commands_module():
-    try:
-        return importlib.import_module("assets.services.type_library.commands")
-    except ModuleNotFoundError as error:
-        if error.name and error.name.startswith("assets.services.type_library"):
-            raise _InputError((_issue("OBJECT_UNAVAILABLE"),)) from None
-        raise
-
-
 def _library_errors(error: Exception) -> tuple[UserErrorType, ...]:
     issues = getattr(error, "issues", ())
     rendered = []
@@ -2018,35 +1990,6 @@ def _library_resolution_map(value: object, *, path: Sequence[str]) -> dict[str, 
             _raise_input("DUPLICATE_FIELD", path=path)
         result[action_id] = decision
     return result
-
-
-def _library_state_for_plan(plan, incoming):
-    from assets.services.type_library.exporting import load_library_state
-    from assets.services.type_library.planning import LibraryReconciliationState
-    from extras.models import SpecificationLibrary
-
-    library = SpecificationLibrary.objects.filter(namespace=plan.namespace).first()
-    if library is not None:
-        return load_library_state(library)
-    source = incoming.normalized_document
-    if incoming.kind == "itambox.type-library.snapshot":
-        source = source["upstream"]
-    return LibraryReconciliationState(
-        namespace=plan.namespace,
-        accepted_release=None,
-        baseline_document=None,
-        effective_document=None,
-    )
-
-
-def _library_preview_with_resolutions(document: str, actor: object, resolutions: dict[str, str]):
-    commands = _library_commands_module()
-    return commands.preview_library(
-        document,
-        actor=actor,
-        signing_key=_preview_token_key(),
-        resolutions=resolutions or None,
-    )
 
 
 def _library_plan_payload(result) -> LibraryPlanType:
@@ -2086,13 +2029,13 @@ class PreviewLibrary(graphene.Mutation):
             actor = authenticated_user(info)
             if actor is None:
                 _raise_input("OBJECT_UNAVAILABLE", path=("input",))
-            result = _library_preview_with_resolutions(document, actor, resolutions)
+            result = library_commands.preview_library(
+                document, actor=actor, signing_key=_preview_token_key(), resolutions=resolutions or None
+            )
         except _InputError as error:
             _raise_preview_failure(error.issues)
-        except Exception as error:
-            if error.__class__.__name__ in {"LibraryCommandError", "LibraryPlanningError", "LibraryValidationError"}:
-                _raise_preview_failure((_issue(str(getattr(error, "code", "OBJECT_UNAVAILABLE"))),))
-            raise
+        except LibraryCommandError as error:
+            _raise_preview_failure((_issue(error.code),))
         return _library_plan_payload(result)
 
 
@@ -2117,10 +2060,10 @@ class ApplyLibrary(graphene.Mutation):
                     accepted_release=None,
                     user_errors=_user_errors((_issue("OBJECT_UNAVAILABLE"),)),
                 )
-            preview = _library_preview_with_resolutions(document, actor, resolutions)
-            library_module = _library_commands_module()
-            from assets.services.type_library.application import LibraryApplyRequest
-            from organization.services.access_scope import authentication_revision_for_actor
+            preview = library_commands.preview_library(
+                document, actor=actor, signing_key=_preview_token_key(), resolutions=resolutions or None
+            )
+            library_module = library_commands
 
             request = LibraryApplyRequest(
                 plan=preview.plan,
@@ -2138,20 +2081,13 @@ class ApplyLibrary(graphene.Mutation):
                 accepted_release=None,
                 user_errors=_user_errors(error.issues),
             )
-        except Exception as error:
-            if error.__class__.__name__ in {
-                "LibraryApplyError",
-                "LibraryCommandError",
-                "LibraryPlanningError",
-                "LibraryValidationError",
-            }:
-                return LibraryApplyPayload(
-                    applied=False,
-                    changed=False,
-                    accepted_release=None,
-                    user_errors=_library_errors(error),
-                )
-            raise
+        except (LibraryApplyError, LibraryCommandError) as error:
+            return LibraryApplyPayload(
+                applied=False,
+                changed=False,
+                accepted_release=None,
+                user_errors=_library_errors(error),
+            )
         return LibraryApplyPayload(
             applied=True,
             changed=not result.no_op,
@@ -2180,19 +2116,17 @@ class ExportLibrary(graphene.Mutation):
         try:
             namespace = _string_value(namespace, path=("namespace",), allow_empty=False)
             mode = str(_enum_value(mode))
-            result = _library_commands_module().export_library(namespace, actor=actor, mode=mode)
+            result = library_commands.export_library(namespace, actor=actor, mode=mode)
         except _InputError as error:
             return LibraryExportPayload(
                 document_text=None, semantic_digest=None, user_errors=_user_errors(error.issues)
             )
-        except Exception as error:
-            if error.__class__.__name__ in {"LibraryCommandError", "LibraryExportError", "LibraryValidationError"}:
-                return LibraryExportPayload(
-                    document_text=None,
-                    semantic_digest=None,
-                    user_errors=_library_errors(error),
-                )
-            raise
+        except (LibraryCommandError, LibraryExportError) as error:
+            return LibraryExportPayload(
+                document_text=None,
+                semantic_digest=None,
+                user_errors=_library_errors(error),
+            )
         return LibraryExportPayload(
             document_text=json.dumps(result.document, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             semantic_digest=str(result.semantic_digest),

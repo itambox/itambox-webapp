@@ -461,7 +461,7 @@ class GraphQLSpecificationMutationTransportTests(unittest.TestCase):
 
         with (
             patch.object(mutations, "authenticated_user", return_value=actor),
-            patch.object(mutations, "_library_commands_module", return_value=commands),
+            patch.object(mutations, "library_commands", commands),
             patch.object(mutations, "_preview_token_key", return_value="unit-test-secret"),
         ):
             mutations.PreviewLibrary.mutate(None, object(), input_value)

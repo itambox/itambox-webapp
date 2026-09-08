@@ -232,6 +232,70 @@ addressed inside the `set`/`clear` operation, for example
 
 ---
 
+## Type Libraries
+
+Open **Asset Management > Type Libraries** to review installed global Library
+identities and immutable release history. **Import Library** opens the JSON
+upload and preview workflow. Library management requires the global
+`extras.manage_specification_library` capability together with the model
+permissions required by the operation; permission to view a Library alone
+never permits applying one.
+
+1. Upload a UTF-8 JSON Library document of at most 10 MiB. Validation and preview
+   do not apply changes.
+2. Review the proposed paths and global catalogue impact. For each blocking
+   conflict, choose **Keep local**, **Take upstream**, or **Abort import**, then
+   review the resulting preview. Apply remains disabled while conflicts remain.
+3. Choose **Apply Library** explicitly. A stale preview is rejected without
+   applying its changes; the page retains the uploaded draft and offers a new
+   preview to review. Revoked permissions are also checked again when applying.
+4. Open the Library detail page to export its **Original release**, an
+   **Effective snapshot**, or a fork into a new namespace. Original release
+   data remains immutable. An effective snapshot contains the current local
+   definition state separately from the accepted upstream source. A fork needs
+   a distinct namespace. Acknowledge retained historical definitions when the
+   selected export requires it.
+
+Keeping a local value during an upstream update does not rewrite the original
+source. Reimporting the already accepted document is a no-op: it does not erase
+local overrides or create another release. Library documents never include
+Tenant Asset observations, assignments, audit/policy state, or installation
+policy.
+
+The corresponding REST entry points are:
+
+| Operation | Endpoint |
+|---|---|
+| Validate and preview | `POST /api/assets/type-libraries/preview/` |
+| Apply the signed preview | `POST /api/assets/type-libraries/apply/` |
+| Export | `GET /api/assets/type-libraries/{namespace}/export/` |
+
+Use the generated API schema for request/response fields, export modes, and
+required preconditions. REST and the browser workflow use the same Library
+commands and authorization rules.
+
+### Source-qualified specification consumers
+
+Asset observations and model-level Asset Type values are separate sources.
+Saved specification columns identify both source and stable Field key, for
+example `asset.spec.support_tier` and `asset_type.spec.support_tier`.
+Changing a display label does not change those identities.
+
+The **Specification filters** field accepts an explicit filter document. For a
+Field named `support_tier`, an Asset-value equality filter is:
+
+```json
+{"filters": [{"source": "asset", "field_key": "support_tier", "operator": "eq", "value": "gold"}]}
+```
+
+Use `asset_type` as the source to test the model-level value instead. Current
+values are selected by default; missing, null, empty, historical, invalid, and
+unknown states are not interchangeable. Reports and exports retain the selected
+source and apply authorized Tenant scope before filtering. Saved label-based or
+unresolved references are not silently redirected to another Field.
+
+---
+
 ## Troubleshooting
 
 **Custom field is not appearing on the edit form**

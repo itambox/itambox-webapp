@@ -4,6 +4,7 @@ from django.db.models import Q
 from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 
+from assets.services.specifications._command_support import load_prospective_definition
 from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
 from organization.models import Location, Tenant
 
@@ -69,6 +70,18 @@ from .graphql_specifications.types import (
 from .models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
 
 _SCHEMA_MISSING = object()
+
+
+def _apply_native_asset_type_create(asset, kwargs, *, user, tenant):
+    if "asset_type_id" not in kwargs:
+        return
+    asset_type_id = kwargs.pop("asset_type_id")
+    if asset_type_id is None:
+        raise GraphQLError(
+            "Asset Type assignment must use the typed specification command.",
+            extensions={"code": "INVALID_TYPE", "path": ["assetTypeId"]},
+        )
+    asset.asset_type = get_object_or_denied(AssetType, asset_type_id, user, tenant=tenant)
 
 
 def _apply_asset_relation_updates(asset, kwargs, *, user, tenant):
@@ -446,8 +459,6 @@ class Query(graphene.ObjectType):
         else:
             selected_fieldsets = tuple(str(identity) for identity in fieldsets)
         try:
-            from assets.services.specifications._command_support import load_prospective_definition
-
             definition, _, _ = load_prospective_definition(selected_fieldsets, target_kind, ())
         except (KeyError, TypeError, ValueError):
             raise GraphQLError(
@@ -477,15 +488,15 @@ class CreateAsset(graphene.Mutation):
 
     def mutate(self, info, **kwargs):
         user = check_permission(info, "assets.add_asset")
-        if "asset_type_id" in kwargs:
+        if "asset_type_id" in kwargs and kwargs["asset_type_id"] is None:
             raise GraphQLError(
-                "Asset Type assignment must use the typed specification command.",
+                "Asset Type must be an ID when supplied.",
                 extensions={"code": "INVALID_TYPE", "path": ["assetTypeId"]},
             )
         active_tenant = getattr(info.context, "active_tenant", None)
 
         asset = Asset(tenant=active_tenant)
-
+        _apply_native_asset_type_create(asset, kwargs, user=user, tenant=active_tenant)
         _apply_asset_relation_updates(asset, kwargs, user=user, tenant=active_tenant)
 
         ALLOWED_FIELDS = {

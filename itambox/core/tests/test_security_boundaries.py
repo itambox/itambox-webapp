@@ -75,7 +75,10 @@ class SecurityBoundariesTestCase(TestCase):
         # Try querying Tenant B's asset via GraphQL
         query = f"""
         query {{
-            asset(id: "{self.asset_b.pk}", requestedScope: {{ mode: TENANT, tenantId: "{self.tenant_a.pk}" }}) {{
+            asset(
+                id: {json.dumps(str(self.asset_b.pk))},
+                requestedScope: {{ mode: TENANT, tenantId: {json.dumps(str(self.tenant_a.pk))} }}
+            ) {{
                 id
                 name
             }}

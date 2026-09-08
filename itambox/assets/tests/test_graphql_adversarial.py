@@ -159,14 +159,16 @@ class GraphQLAdversarialTestCase(TestCase):
 
     def _scope(self, tenant_id=None):
         tenant_id = self.tenant_a.pk if tenant_id is None else tenant_id
-        return f'{{ mode: TENANT, tenantId: "{tenant_id}" }}'
+        return f"{{ mode: TENANT, tenantId: {json.dumps(str(tenant_id))} }}"
 
     def _assets_query(self, *, tenant_id=None, selection="name", arguments=""):
         suffix = f", {arguments}" if arguments else ""
         return f"{{ assets(requestedScope: {self._scope(tenant_id)}{suffix}) {{ {selection} }} }}"
 
     def _asset_query(self, asset_id, *, tenant_id=None, selection="name"):
-        return f'{{ asset(id: "{asset_id}", requestedScope: {self._scope(tenant_id)}) {{ {selection} }} }}'
+        return (
+            f"{{ asset(id: {json.dumps(str(asset_id))}, requestedScope: {self._scope(tenant_id)}) {{ {selection} }} }}"
+        )
 
     # =========================================================================
     # 1. Query Parameters Tests (invalid limit, negative offset, large pages)

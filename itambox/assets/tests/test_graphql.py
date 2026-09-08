@@ -198,13 +198,13 @@ class GraphQLTestCase(TestCase):
 
     @staticmethod
     def _tenant_scope(tenant_id):
-        return f'{{ mode: TENANT, tenantId: "{tenant_id}" }}'
+        return f"{{ mode: TENANT, tenantId: {json.dumps(str(tenant_id))} }}"
 
     def _assets_query(self, tenant_id, selection):
         return f"{{ assets(requestedScope: {self._tenant_scope(tenant_id)}) {{ {selection} }} }}"
 
     def _asset_query(self, tenant_id, asset_id, selection):
-        return f'{{ asset(id: "{asset_id}", requestedScope: {self._tenant_scope(tenant_id)}) {{ {selection} }} }}'
+        return f"{{ asset(id: {json.dumps(str(asset_id))}, requestedScope: {self._tenant_scope(tenant_id)}) {{ {selection} }} }}"
 
     @override_settings(
         DEBUG=True,
@@ -272,7 +272,7 @@ class GraphQLTestCase(TestCase):
         )
 
     def test_asset_lookup_requires_explicit_scope(self):
-        query = f'{{ asset(id: "{self.asset_a.pk}") {{ name }} }}'
+        query = f"{{ asset(id: {json.dumps(str(self.asset_a.pk))}) {{ name }} }}"
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),

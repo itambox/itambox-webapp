@@ -208,7 +208,8 @@
     "itambox/assets/tests/test_t23_consumers.py",
     "itambox/assets/tests/test_t23_postgres.py",
     "itambox/assets/tests/test_t24_writers.py",
-    "itambox/assets/tests/test_graphql_specification_mutation_transport.py"
+    "itambox/assets/tests/test_graphql_specification_mutation_transport.py",
+    "itambox/assets/tests/test_graphql_specification_http.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -421,7 +422,8 @@
     "itambox/assets/tests/test_t23_consumers.py",
     "itambox/assets/tests/test_t23_postgres.py",
     "itambox/assets/tests/test_t24_writers.py",
-    "itambox/assets/tests/test_graphql_specification_mutation_transport.py"
+    "itambox/assets/tests/test_graphql_specification_mutation_transport.py",
+    "itambox/assets/tests/test_graphql_specification_http.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

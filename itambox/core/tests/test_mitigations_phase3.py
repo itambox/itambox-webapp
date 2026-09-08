@@ -143,7 +143,7 @@ class MitigationsPhase3Tests(TestCase):
             }
           }
         }
-        """.replace("SCOPE_PLACEHOLDER", f'{{ mode: TENANT, tenantId: "{self.tenant.pk}" }}')
+        """.replace("SCOPE_PLACEHOLDER", f"{{ mode: TENANT, tenantId: {json.dumps(str(self.tenant.pk))} }}")
 
         def run_graphql_query():
             with CaptureQueriesContext(connection) as captured:
@@ -186,7 +186,7 @@ class MitigationsPhase3Tests(TestCase):
         second_asset_queries = asset_read_queries(second_queries)
         self.assertEqual(len(first_asset_queries), 1)
         self.assertEqual(len(second_asset_queries), 1)
-        self.assertIn('inner join "assets_assettype"', second_asset_queries[0].lower())
+        self.assertIn('left outer join "assets_assettype"', second_asset_queries[0].lower())
 
         # Relation reads are constant as well: the expanded fixture must not cause
         # repeated prefetches, and total work may only grow by a bounded setup read.
