@@ -197,7 +197,8 @@
     "itambox/assets/tests/test_specification_ui_integration.py",
     "itambox/assets/tests/test_t18_t20_library.py",
     "itambox/assets/tests/test_t18_t20_library_db.py",
-    "itambox/assets/tests/test_t18_t20_library_security_db.py"
+    "itambox/assets/tests/test_t18_t20_library_security_db.py",
+    "itambox/extras/tests/test_library_permission.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -399,10 +400,13 @@
     "itambox/assets/tests/test_specification_ui_integration.py",
     "itambox/assets/tests/test_t18_t20_library.py",
     "itambox/assets/tests/test_t18_t20_library_db.py",
-    "itambox/assets/tests/test_t18_t20_library_security_db.py"
+    "itambox/assets/tests/test_t18_t20_library_security_db.py",
+    "itambox/extras/tests/test_library_permission.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
-    "scripts/tests/assignment_corruption.py"
+    "scripts/tests/assignment_corruption.py",
+    "itambox/assets/tests/fixtures/type_library/example-laptop-library-v1.json",
+    "itambox/assets/tests/fixtures/type_library/example-laptop-snapshot-v1.json"
   ]
 }

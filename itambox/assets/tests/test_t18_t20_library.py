@@ -290,13 +290,13 @@ def test_apply_rejects_state_drift_and_current_authorization_failure():
         prepare_library_apply(request, incoming_validated, state, authorize=lambda: False)
 
 
-def _kit_fixture(name: str) -> dict[str, object]:
-    path = Path("C:/Users/Hermes/Documents/ITAMbox-Hermes-Agent-Kit-v2/source") / name
+def _retained_fixture(name: str) -> dict[str, object]:
+    path = Path(__file__).parent / "fixtures" / "type_library" / name
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_original_export_preserves_the_retained_source_digest():
-    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    release = _validated(_retained_fixture("example-laptop-library-v1.json"))
 
     artifact = export_original_release(release)
 
@@ -307,8 +307,8 @@ def test_original_export_preserves_the_retained_source_digest():
 
 
 def test_effective_snapshot_round_trips_retained_upstream_and_local_24gib_edit():
-    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
-    source_snapshot = _validated(_kit_fixture("example-laptop-snapshot-v1.json"))
+    release = _validated(_retained_fixture("example-laptop-library-v1.json"))
+    source_snapshot = _validated(_retained_fixture("example-laptop-snapshot-v1.json"))
     effective = source_snapshot.normalized_document["effective_definitions"]
 
     artifact = export_effective_snapshot(release, effective)
@@ -327,7 +327,7 @@ def test_effective_snapshot_round_trips_retained_upstream_and_local_24gib_edit()
 
 
 def test_snapshot_structural_change_is_not_a_local_override():
-    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    release = _validated(_retained_fixture("example-laptop-library-v1.json"))
     effective = deepcopy(release.normalized_document["definitions"])
     effective["fields"][0]["targets"] = ["asset_type"]  # type: ignore[index]
 
@@ -336,7 +336,7 @@ def test_snapshot_structural_change_is_not_a_local_override():
 
 
 def test_retained_history_requires_explicit_acknowledgement():
-    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    release = _validated(_retained_fixture("example-laptop-library-v1.json"))
     effective = deepcopy(release.normalized_document["definitions"])
     effective["choice_sets"][0]["choices"].append(  # type: ignore[index]
         {"key": "legacy_ddr", "label": "Legacy DDR", "lifecycle": "deprecated"}
@@ -353,7 +353,7 @@ def test_retained_history_requires_explicit_acknowledgement():
 
 
 def test_unknown_historical_field_blocks_export_with_a_path_diagnostic():
-    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    release = _validated(_retained_fixture("example-laptop-library-v1.json"))
     effective = deepcopy(release.normalized_document["definitions"])
     effective["asset_types"][0]["historical_specifications"] = {  # type: ignore[index]
         "example__does_not_exist": {"value": "retired"}
@@ -366,7 +366,7 @@ def test_unknown_historical_field_blocks_export_with_a_path_diagnostic():
 
 
 def test_fork_requires_new_namespace_and_rewrites_owned_identities():
-    release = _validated(_kit_fixture("example-laptop-library-v1.json"))
+    release = _validated(_retained_fixture("example-laptop-library-v1.json"))
 
     artifact = export_fork(release, new_namespace="local-laptop")
     forked = _validated(json.loads(artifact.canonical_bytes.decode("utf-8")))

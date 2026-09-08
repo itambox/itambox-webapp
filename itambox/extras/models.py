@@ -219,6 +219,7 @@ class SpecificationLibrary(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ["namespace"]
+        permissions = [("manage_specification_library", "Can manage specification libraries")]
         constraints = [
             models.UniqueConstraint(fields=["namespace"], name="unique_specificationlibrary_namespace"),
         ]
