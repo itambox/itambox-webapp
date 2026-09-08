@@ -129,6 +129,10 @@ class VisibleFormHelpTextTests(SimpleTestCase):
 
 
 class StablePresentationContractTests(SimpleTestCase):
+    def setUp(self):
+        super().setUp()
+        self.enterContext(override("en"))
+
     def test_asset_status_display_keeps_the_current_model_contract(self):
         self.assertEqual(Asset(status=None).get_status_display(), "Not set")
 
