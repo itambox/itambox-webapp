@@ -54,8 +54,7 @@ class DefinitionManagementUITests(TestCase):
 
     def _grant(self, *codenames):
         content_types = {
-            model: ContentType.objects.get_for_model(model)
-            for model in (CustomFieldChoiceSet, CustomFieldChoice)
+            model: ContentType.objects.get_for_model(model) for model in (CustomFieldChoiceSet, CustomFieldChoice)
         }
         permissions = []
         for codename in codenames:
@@ -155,7 +154,10 @@ class DefinitionManagementUITests(TestCase):
         post = self._request(
             "post",
             f"/choice-sets/{self.choice_set.pk}/edit/",
-            {"label": "No global edit", "expected_resource_revision": ChoiceSetUpdateView.current_revision(self.choice_set)},
+            {
+                "label": "No global edit",
+                "expected_resource_revision": ChoiceSetUpdateView.current_revision(self.choice_set),
+            },
         )
         post.active_tenant = tenant
         with override_current_tenant_scope(tenant):

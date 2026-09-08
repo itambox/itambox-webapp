@@ -663,9 +663,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def _is_t15_preview_request(self):
         return not self.is_bound or bool(
-            self.request
-            and self.request.headers.get("HX-Request")
-            and self.data.get("_reload") == "1"
+            self.request and self.request.headers.get("HX-Request") and self.data.get("_reload") == "1"
         )
 
     def _set_render_preconditions(self, selected):

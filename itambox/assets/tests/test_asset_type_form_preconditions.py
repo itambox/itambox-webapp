@@ -48,7 +48,9 @@ class AssetTypeFormPreconditionTests(SimpleTestCase):
         self.assertEqual(form.specification_definition_revision, "definition-preview")
 
     def test_hx_reload_replaces_hidden_tokens_for_changed_composition_preview(self):
-        data = QueryDict("_reload=1&expected_resource_revision=old-resource&expected_definition_revision=old-definition")
+        data = QueryDict(
+            "_reload=1&expected_resource_revision=old-resource&expected_definition_revision=old-definition"
+        )
         form = self._render_form(bound=True, reload_request=True, data=data)
         plan = SimpleNamespace(resource_revision="new-resource", definition_revision="new-definition")
 
@@ -60,7 +62,9 @@ class AssetTypeFormPreconditionTests(SimpleTestCase):
         self.assertEqual(form.data["expected_definition_revision"], "new-definition")
 
     def test_normal_post_preserves_supplied_tokens_without_preview_refresh(self):
-        data = QueryDict("expected_resource_revision=submitted-resource&expected_definition_revision=submitted-definition")
+        data = QueryDict(
+            "expected_resource_revision=submitted-resource&expected_definition_revision=submitted-definition"
+        )
         form = self._render_form(bound=True, data=data)
 
         with patch("assets.forms.assettype_form.prospective_specification_plan") as preview:
