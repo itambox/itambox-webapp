@@ -13,6 +13,7 @@ from django.urls import reverse
 from rest_framework import serializers as drf_serializers
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
+from assets.api.specification_api import SpecificationCommandAPIException
 from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer
 from core.tests.mixins import TenantTestMixin
 from extras.api.serializers import CustomFieldSerializer, CustomFieldsetSerializer
@@ -41,6 +42,19 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
     @staticmethod
     def _serializer_context(user):
         return {"request": SimpleNamespace(user=user)}
+
+    def _assert_structured_specification_error(self, raised, code, *, field_key=None, status_code=400):
+        exception = raised.exception
+        self.assertIsInstance(exception, SpecificationCommandAPIException)
+        self.assertEqual(exception.status_code, status_code)
+        error = exception.detail["error"]
+        self.assertEqual(error["code"], "SPECIFICATION_VALIDATION_FAILED")
+        self.assertTrue(error["issues"])
+        issue = error["issues"][0]
+        self.assertEqual(issue["code"], code)
+        if field_key is not None:
+            self.assertEqual(issue["field_key"], field_key)
+        return issue
 
     def test_definition_api_rejects_invalid_regex(self):
         serializer = CustomFieldSerializer(
@@ -330,9 +344,9 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
-        self.assertIn("specifications.invalid_type", str(raised.exception.detail))
+        self._assert_structured_specification_error(raised, "INVALID_TYPE", field_key="api_integer_value")
         self.assertFalse(AssetType.all_objects.filter(model="API Test Type").exists())
 
     def test_required_asset_type_field_is_required_on_rest_create(self):
@@ -385,9 +399,9 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
-        self.assertIn("specifications.required_field", str(raised.exception.detail))
+        self._assert_structured_specification_error(raised, "REQUIRED_FIELD", field_key="required_clear_spec")
         asset_type.refresh_from_db()
         self.assertEqual(asset_type.custom_field_data, {"required_clear_spec": "keep"})
         self.assertEqual(asset_type.updated_at, original_updated_at)
@@ -433,13 +447,17 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
-        self.assertIn("specifications.reference_conflict", str(raised.exception.detail))
+        self._assert_structured_specification_error(
+            raised,
+            "REFERENCE_CONFLICT",
+            status_code=409,
+        )
         asset_type.refresh_from_db()
         self.assertEqual(asset_type.custom_field_data, {})
 
-    def test_get_to_put_roundtrip_preserves_unknown_stored_keys(self):
+    def test_retired_custom_field_data_write_is_rejected_by_rest(self):
         field = CustomField.objects.create(
             name="roundtrip_spec",
             label="Roundtrip specification",
@@ -461,12 +479,48 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
             partial=True,
         )
 
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("custom_field_data", serializer.errors)
+
+    def test_supported_rest_roundtrip_preserves_historical_values(self):
+        field = CustomField.objects.create(
+            name="roundtrip_supported_spec",
+            label="Supported roundtrip specification",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
+        field.object_types.add(self.asset_type_ct)
+        manufacturer = Manufacturer.objects.create(name="Supported Roundtrip Manufacturer")
+        asset_type = AssetType.objects.create(
+            model="Supported Roundtrip Type",
+            slug="supported-roundtrip-type",
+            manufacturer=manufacturer,
+            custom_field_data={
+                "roundtrip_supported_spec": "keep",
+                "removed_fieldset": "preserve",
+            },
+        )
+
+        representation = AssetTypeSerializer(instance=asset_type).data
+        self.assertEqual(
+            representation["specifications"],
+            {"roundtrip_supported_spec": "keep", "removed_fieldset": "preserve"},
+        )
+        self.assertIn("removed_fieldset", representation["specification_state"]["historical_keys"])
+
+        serializer = AssetTypeSerializer(
+            instance=asset_type,
+            data={"specification_patch": {"set": {"roundtrip_supported_spec": "updated"}}},
+            partial=True,
+            context=self._serializer_context(self.tenant_admin),
+        )
+
         self.assertTrue(serializer.is_valid(), serializer.errors)
         serializer.save()
         asset_type.refresh_from_db()
         self.assertEqual(
             asset_type.custom_field_data,
-            {"roundtrip_spec": "keep", "removed_fieldset": "preserve"},
+            {"roundtrip_supported_spec": "updated", "removed_fieldset": "preserve"},
         )
 
     def test_deprecated_specification_is_read_only_through_rest(self):
@@ -495,10 +549,9 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
-        # Deprecated definitions are absent from the writable effective graph.
-        self.assertIn("specifications.unknown_field_key", str(raised.exception.detail))
+        self._assert_structured_specification_error(raised, "UNKNOWN_FIELD_KEY", field_key="deprecated_spec")
         asset_type.refresh_from_db()
         self.assertEqual(asset_type.custom_field_data, {"deprecated_spec": "old"})
         self.assertEqual(asset_type.updated_at, original_updated_at)
@@ -599,9 +652,9 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         self.assertTrue(invalid.is_valid(), invalid.errors)
         original_data = dict(asset_type.custom_field_data)
         original_updated_at = asset_type.updated_at
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             invalid.save()
-        self.assertIn("specifications.unknown_field_key", str(raised.exception.detail))
+        self._assert_structured_specification_error(raised, "UNKNOWN_FIELD_KEY", field_key="outside_spec")
         asset_type.refresh_from_db()
         self.assertEqual(asset_type.custom_field_data, original_data)
         self.assertEqual(asset_type.updated_at, original_updated_at)

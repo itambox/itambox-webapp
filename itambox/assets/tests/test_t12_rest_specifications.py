@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory
 
+from assets.api.serializers import AssetTypeSerializer
 from assets.api.specification_api import (
     ApplyCategoryDefaultsInputSerializer,
     CompositionInputSerializer,
@@ -34,6 +35,7 @@ from extras.services.specifications.contracts import (
     ResolvedFieldDTO,
     ResolvedSectionDTO,
     SpecificationProjectionDTO,
+    SpecificationProjectionEntryDTO,
     SpecificationValidationDTO,
 )
 
@@ -113,6 +115,29 @@ class SpecificationTransportSerializerTests(SimpleTestCase):
         self.assertEqual(
             response.data["error"]["issues"][0]["path"],
             ["expected_definition_revision"],
+        )
+
+
+class AssetSpecificationSerializerTransportTests(SimpleTestCase):
+    def test_retired_custom_field_data_write_is_rejected(self):
+        serializer = AssetTypeSerializer(
+            data={"custom_field_data": {"legacy": "value"}},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("custom_field_data", serializer.errors)
+
+    def test_specification_patch_is_the_supported_value_write(self):
+        serializer = AssetTypeSerializer(
+            data={"specification_patch": {"set": {"legacy": "value"}, "clear": []}},
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(
+            serializer.validated_data["specification_patch"],
+            {"set": {"legacy": "value"}, "clear": []},
         )
 
 
@@ -205,6 +230,25 @@ class SpecificationPayloadTests(SimpleTestCase):
             payload,
             {"specifications": {}, "specification_state": {"complete": True, "issues": [], "historical_keys": []}},
         )
+
+    def test_projection_payload_round_trips_historical_value_metadata(self):
+        projection = SpecificationProjectionDTO(
+            entries=(
+                SpecificationProjectionEntryDTO(
+                    key=FieldKey("retired_note"),
+                    value="preserve",
+                    state="historical",
+                    reason_codes=("DEPRECATED_FIELD",),
+                    definition=None,
+                ),
+            ),
+            missing_required_issues=(),
+        )
+
+        payload = projection_payload(projection)
+        self.assertEqual(payload["specifications"], {"retired_note": "preserve"})
+        self.assertEqual(payload["specification_state"]["historical_keys"], ["retired_note"])
+        self.assertEqual(payload["specification_state"]["issues"][0]["code"], "DEPRECATED_FIELD")
 
 
 class SpecificationMutationPayloadTests(SimpleTestCase):
