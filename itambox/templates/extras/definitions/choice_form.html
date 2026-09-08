@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% block title %}{{ form_title }} - ITAMbox{% endblock %}
+{% block page_header %}<h2 class="page-title">{{ form_title }}</h2>{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      {% if choice_set %}<p class="text-muted">{% translate "Choice set" %}: <code>{{ choice_set.namespace }}/{{ choice_set.slug }}</code></p>{% endif %}
+      {% if choice %}<p class="text-muted">{% translate "Key" %}: <code>{{ choice.key }}</code></p>{% endif %}
+      <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% for field in form.visible_fields %}
+          <div class="mb-3">
+            {{ field.label_tag }}{{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+      </form>
+    </div>
+  </div>
+{% endblock content %}

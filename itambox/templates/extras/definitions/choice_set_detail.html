@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% block title %}{{ choice_set.label }} - ITAMbox{% endblock %}
+{% block page_header %}<h2 class="page-title">{{ choice_set.label }}</h2>{% endblock %}
+{% block content %}
+  <div class="row g-3">
+    <div class="col-12 col-xl-8">
+      <div class="card">
+        <div class="card-header d-flex align-items-center">
+          <h3 class="card-title mb-0">{% translate "Ordered choices" %}</h3>
+          {% if can_edit and choice_add_url %}<a class="btn btn-primary ms-auto" href="{{ choice_add_url }}">{% translate "Add choice" %}</a>{% endif %}
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead><tr><th>{% translate "Position" %}</th><th>{% translate "Key" %}</th><th>{% translate "Label" %}</th><th>{% translate "Lifecycle" %}</th><th></th></tr></thead>
+            <tbody>
+              {% for row in choice_rows %}
+                <tr>
+                  <td>{{ row.choice.position }}</td>
+                  <th scope="row"><code>{{ row.choice.key }}</code></th>
+                  <td>{{ row.choice.label }}</td>
+                  <td>{{ row.choice.get_lifecycle_display }}</td>
+                  <td class="text-end">
+                    {% if can_edit and row.edit_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ row.edit_url }}">{% translate "Edit" %}</a>{% endif %}
+                    {% if can_edit and row.retire_url and row.choice.lifecycle == "active" %}<a class="btn btn-sm btn-outline-warning" href="{{ row.retire_url }}">{% translate "Retire" %}</a>{% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-muted">{% translate "No choices are defined." %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-4">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">{% translate "Definition" %}</h3></div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5">{% translate "Identity" %}</dt><dd class="col-7"><code>{{ choice_set.namespace }}/{{ choice_set.slug }}</code></dd>
+            <dt class="col-5">{% translate "Management" %}</dt><dd class="col-7">{{ choice_set.get_management_kind_display }}</dd>
+            <dt class="col-5">{% translate "Lifecycle" %}</dt><dd class="col-7">{{ choice_set.get_lifecycle_display }}</dd>
+          </dl>
+          {% if can_edit %}
+            <div class="mt-3 d-flex gap-2">
+              {% if edit_url %}<a class="btn btn-outline-secondary" href="{{ edit_url }}">{% translate "Edit label" %}</a>{% endif %}
+              {% if retire_url and choice_set.lifecycle == "active" %}<a class="btn btn-outline-warning" href="{{ retire_url }}">{% translate "Retire" %}</a>{% endif %}
+            </div>
+          {% else %}<p class="small text-muted mt-3 mb-0">{% translate "Managed definitions are read-only." %}</p>{% endif %}
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">{% translate "Usage impact" %}</h3></div>
+        <div class="card-body">
+          {% if show_usage_impact %}
+            <dl class="row mb-0"><dt class="col-8">{% translate "Active fields" %}</dt><dd class="col-4 text-end">{{ usage_impact.active_field_count }}</dd><dt class="col-8">{% translate "Active choices" %}</dt><dd class="col-4 text-end">{{ usage_impact.active_choice_count }}</dd></dl>
+          {% else %}<p class="text-muted mb-0">{% translate "Unscoped usage impact is available only in all-accessible scope." %}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}
