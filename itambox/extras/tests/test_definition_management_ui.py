@@ -8,6 +8,7 @@ from django.test import RequestFactory, TestCase
 from core.context import override_current_tenant_scope, set_current_all_accessible
 from extras.definition_forms import ChoiceSetUpdateForm, ChoiceUpdateForm
 from extras.definition_views import (
+    ChoiceRetireView,
     ChoiceSetDetailView,
     ChoiceSetRetireView,
     ChoiceSetUpdateView,
