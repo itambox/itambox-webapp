@@ -189,7 +189,9 @@ class T22LibraryBrowserWorkflowTests(TestCase):
             "Local State" if decision == "keep_local" else "Upstream State",
         )
         updated_type = AssetType.objects.get(model="Device", part_number="A")
-        self.assertEqual(updated_type.custom_field_data["acme__capacity"], "24" if decision == "keep_local" else "64")
+        self.assertEqual(
+            updated_type.custom_field_data["acme__capacity"], "24.000" if decision == "keep_local" else "64.000"
+        )
         accepted = SpecificationLibrary.objects.get(namespace="acme").accepted_release
         self.assertEqual(accepted.sequence, 2)
         self.assertEqual(

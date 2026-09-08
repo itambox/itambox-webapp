@@ -1,12 +1,15 @@
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from django.core.exceptions import ValidationError
 
+from assets.models import Asset, AssetTagSequence, StatusLabel
 from assets.services.specification_writers import normalize_generic_asset_data
 from core.importers.snipeit.common import _snipeit_choice_key, canonicalize_snipeit_custom_field_value
 from core.importers.snipeit.stages.hardware import HardwareImporter
+from organization.models import Tenant
 
 
 def test_generic_asset_data_requires_explicit_supported_keys_and_json_values():
@@ -99,3 +102,20 @@ def test_snipeit_choice_transform_accepts_only_canonical_keys():
 def test_snipeit_canonicalizer_rejects_unsupported_field_types():
     with pytest.raises(ValidationError, match="Unsupported Snipe-IT custom-field type"):
         canonicalize_snipeit_custom_field_value(SimpleNamespace(field_type="quantity"), "12 kg")
+
+
+@pytest.mark.django_db
+def test_specification_only_partial_save_does_not_reserve_asset_tags():
+    tenant = Tenant.objects.create(name="Partial write tenant", slug="partial-write-tenant")
+    status = StatusLabel.objects.create(name="Partial write status", slug="partial-write-status", type="deployable")
+    asset = Asset.objects.create(name="Partial write asset", asset_tag="PARTIAL-001", tenant=tenant, status=status)
+    before = list(AssetTagSequence._base_manager.order_by("pk").values())
+    asset.custom_field_data = {"legacy_observation": "preserved"}
+    with patch.object(
+        AssetTagSequence, "resolve_sequence_for_asset", side_effect=AssertionError("unrelated tag allocator")
+    ):
+        asset.save(update_fields=["custom_field_data"])
+    asset.refresh_from_db()
+    assert asset.custom_field_data == {"legacy_observation": "preserved"}
+    assert asset.asset_tag == "PARTIAL-001"
+    assert list(AssetTagSequence._base_manager.order_by("pk").values()) == before

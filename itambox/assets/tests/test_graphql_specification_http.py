@@ -8,6 +8,7 @@ from pathlib import Path
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from assets.api.tests.test_type_library_http import EXPORT_URL, PREVIEW_URL
@@ -811,6 +812,9 @@ class GraphQLSpecificationHTTPTests(TestCase):
         )
         self.assertEqual(graphql_original["semanticDigest"], rest_original.data["semantic_digest"])
 
+        self.specification_field.lifecycle = "deprecated"
+        self.specification_field.deprecated_at = timezone.now()
+        self.specification_field.save(update_fields=["lifecycle", "deprecated_at"])
         source_type = json.loads(release_text)["definitions"]["asset_types"][0]
         imported_type = AssetType.objects.get(model=source_type["model"], part_number=source_type["part_number"])
         imported_type.custom_field_data = {
