@@ -180,17 +180,31 @@ def test_seed_dense_memberships_preserve_declared_order(monkeypatch):
     from core.management.commands._seed import catalog
 
     fieldset = SimpleNamespace(save=Mock(), field_memberships=Mock())
+    fieldset.field_memberships.select_related.return_value = []
     membership = Mock(side_effect=lambda **values: SimpleNamespace(**values))
     membership._base_manager.filter.return_value.values_list.return_value = []
-    monkeypatch.setattr(catalog, "_get_core_fieldset", lambda slug, label: fieldset)
+    monkeypatch.setattr(
+        catalog,
+        "_get_core_fieldset",
+        lambda slug, label, description, lifecycle, version, namespace: fieldset,
+    )
     monkeypatch.setattr(catalog, "CustomFieldsetField", membership)
-    fields = {"later": SimpleNamespace(pk=1), "earlier": SimpleNamespace(pk=2)}
+    fields = {"itambox/later": SimpleNamespace(pk=1), "itambox/earlier": SimpleNamespace(pk=2)}
     rows = [
-        {"key": "later", "fieldset_slug": "hardware", "position": 20},
-        {"key": "earlier", "fieldset_slug": "hardware", "position": 10},
+        {
+            "namespace": "itambox",
+            "slug": "hardware",
+            "label": "Hardware",
+            "description": "",
+            "lifecycle": "active",
+            "memberships": [
+                {"field": "itambox/earlier", "position": 1},
+                {"field": "itambox/later", "position": 2},
+            ],
+        },
     ]
 
-    catalog._reconcile_core_fieldsets(rows, {"hardware": "Hardware"}, fields)
+    catalog._reconcile_core_fieldsets(rows, fields, "v1")
 
     created = membership.objects.bulk_create.call_args.args[0]
     assert [(row.custom_field.pk, row.position) for row in created] == [(2, 1), (1, 2)]

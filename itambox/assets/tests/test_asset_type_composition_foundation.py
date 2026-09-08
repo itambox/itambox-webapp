@@ -122,7 +122,7 @@ class AssetTypeCompositionFoundationTests(TestCase):
         manufacturer = Manufacturer.objects.create(name="Example Networks", slug="example-networks")
         first = CustomFieldset.objects.create(namespace="local", slug="product", label="Product")
         second = CustomFieldset.objects.create(namespace="local", slug="networking", label="Networking")
-        category = Category.objects.create(name="Switch", slug="switch")
+        category = Category.objects.create(name="Foundation Switch", slug="foundation-switch")
         CategoryDefaultFieldset.objects.create(category=category, fieldset=first, position=1)
         CategoryDefaultFieldset.objects.create(category=category, fieldset=second, position=2)
         asset_type = AssetType.objects.create(
