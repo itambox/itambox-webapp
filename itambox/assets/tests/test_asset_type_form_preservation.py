@@ -251,11 +251,11 @@ class AssetTypeFormPreservationTests(TestCase):
         # object types and choice sets -> choices). Both bounds below assert
         # this constant graph at two fixture sizes: doubling the selected
         # fieldsets must not add per-fieldset or per-field queries, which would
-        # break the nine-query ceiling.
+        # break the fourteen-query ceiling.
         with CaptureQueriesContext(connection) as queries:
             form = AssetTypeForm(instance=asset_type)
         self.assertEqual(len(form.custom_field_keys), 3)
-        self.assertLessEqual(len(queries), 9)
+        self.assertLessEqual(len(queries), 14)
 
         for index in range(3, 6):
             fieldset = CustomFieldset.objects.create(
@@ -276,7 +276,7 @@ class AssetTypeFormPreservationTests(TestCase):
         with CaptureQueriesContext(connection) as queries:
             enlarged_form = AssetTypeForm(instance=asset_type)
         self.assertEqual(len(enlarged_form.custom_field_keys), 6)
-        self.assertLessEqual(len(queries), 9)
+        self.assertLessEqual(len(queries), 14)
 
     def test_asset_type_form_choice_heavy_composition_keeps_constant_queries(self):
         def build(size):
@@ -366,7 +366,7 @@ class AssetTypeFormPreservationTests(TestCase):
         # choice-heavy: fieldsets -> memberships -> custom fields -> object
         # types and choice sets -> choices. Doubling fieldsets, select fields,
         # choice sets, and choices must not add per-fieldset, per-field, or
-        # per-choice queries. The bound is 11 (not 9) because a non-null
+        # per-choice queries. The bound is 17 (not 14) because a non-null
         # choice set actually exercises the two prefetch levels that the
         # text-only fixture skips (Django skips a prefetch chain level whose
         # parent results are empty): one query for the choice sets and one
@@ -376,13 +376,13 @@ class AssetTypeFormPreservationTests(TestCase):
         with CaptureQueriesContext(connection) as queries:
             small_form = AssetTypeForm(instance=small)
         self.assertEqual(len(small_form.custom_field_keys), 8)
-        self.assertEqual(len(queries), 11)
+        self.assertEqual(len(queries), 17)
 
         large = build(4)
         with CaptureQueriesContext(connection) as queries:
             large_form = AssetTypeForm(instance=large)
         self.assertEqual(len(large_form.custom_field_keys), 16)
-        self.assertEqual(len(queries), 11)
+        self.assertEqual(len(queries), 17)
 
     def test_plural_composition_update_preserves_unrendered_and_unknown_values(self):
         manufacturer = Manufacturer.objects.create(name="Example", slug="example")

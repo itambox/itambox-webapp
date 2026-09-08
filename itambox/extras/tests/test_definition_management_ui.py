@@ -1,9 +1,11 @@
+from contextlib import contextmanager
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory, TestCase
 
-from core.context import override_current_tenant_scope
+from core.context import override_current_tenant_scope, set_current_all_accessible
 from extras.definition_forms import ChoiceSetUpdateForm, ChoiceUpdateForm
 from extras.definition_views import (
     ChoiceSetDetailView,
@@ -69,6 +71,12 @@ class DefinitionManagementUITests(TestCase):
         request.active_tenant_group = None
         return request
 
+    @contextmanager
+    def _global_configuration_scope(self):
+        with override_current_tenant_scope(None):
+            set_current_all_accessible(True)
+            yield
+
     def test_update_forms_never_expose_identity_keys(self):
         choice_set_form = ChoiceSetUpdateForm(instance=self.choice_set)
         choice_form = ChoiceUpdateForm(instance=self.first)
@@ -83,7 +91,7 @@ class DefinitionManagementUITests(TestCase):
             f"/choice-sets/{self.choice_set.pk}/choices/{self.first.pk}/edit/",
             {"label": "Compact view", "position": "30", "expected_resource_revision": "stale"},
         )
-        with override_current_tenant_scope(None):
+        with self._global_configuration_scope():
             response = ChoiceUpdateView.as_view()(request, choice_set_pk=self.choice_set.pk, pk=self.first.pk)
 
         self.assertEqual(response.status_code, 200)
@@ -101,7 +109,7 @@ class DefinitionManagementUITests(TestCase):
                 "expected_resource_revision": "placeholder",
             },
         )
-        with override_current_tenant_scope(None):
+        with self._global_configuration_scope():
             revision = ChoiceUpdateView.current_revision(self.first)
             request.POST = request.POST.copy()
             request.POST["expected_resource_revision"] = revision
@@ -123,7 +131,7 @@ class DefinitionManagementUITests(TestCase):
             f"/choice-sets/{core.pk}/edit/",
             {"label": "Tampered", "expected_resource_revision": ChoiceSetUpdateView.current_revision(core)},
         )
-        with override_current_tenant_scope(None):
+        with self._global_configuration_scope():
             response = ChoiceSetUpdateView.as_view()(request, pk=core.pk)
 
         self.assertEqual(response.status_code, 403)
@@ -139,6 +147,7 @@ class DefinitionManagementUITests(TestCase):
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
             activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=self.choice_set,
+            max_values=1,
         )
         self.assertEqual(field.choice_set_id, self.choice_set.pk)
         request = self._request("get", f"/choice-sets/{self.choice_set.pk}/")
@@ -172,6 +181,7 @@ class DefinitionManagementUITests(TestCase):
             field_type=CustomField.FIELD_TYPE_SINGLE_SELECT,
             activation=CustomField.ACTIVATION_GLOBAL,
             choice_set=self.choice_set,
+            max_values=1,
         )
         request = self._request(
             "post",
@@ -181,7 +191,7 @@ class DefinitionManagementUITests(TestCase):
                 "replacement_identity": "",
             },
         )
-        with override_current_tenant_scope(None):
+        with self._global_configuration_scope():
             response = ChoiceSetRetireView.as_view()(request, pk=self.choice_set.pk)
 
         self.assertEqual(response.status_code, 200)
