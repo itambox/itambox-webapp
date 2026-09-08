@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.test import RequestFactory, TestCase
 
 from core.context import override_current_tenant_scope, set_current_all_accessible
@@ -119,6 +120,57 @@ class DefinitionManagementUITests(TestCase):
                 ChoiceSetUpdateView.as_view()(request, pk=core.pk)
         core.refresh_from_db()
         self.assertEqual(core.label, "Core modes")
+
+    def test_nested_choice_update_and_retire_bind_to_requested_parent(self):
+        other_set = CustomFieldChoiceSet.objects.create(
+            namespace="local",
+            slug="other-display-modes",
+            label="Other display modes",
+        )
+        update_request = self._request(
+            "post",
+            f"/choice-sets/{other_set.pk}/choices/{self.first.pk}/edit/",
+            {
+                "label": "Tampered",
+                "position": "99",
+                "expected_resource_revision": ChoiceUpdateView.current_revision(self.first),
+            },
+        )
+        retire_request = self._request(
+            "post",
+            f"/choice-sets/{other_set.pk}/choices/{self.first.pk}/retire/",
+            {
+                "expected_resource_revision": ChoiceUpdateView.current_revision(self.first),
+                "replacement_identity": "",
+            },
+        )
+        with self._global_configuration_scope():
+            with self.assertRaises(Http404):
+                ChoiceUpdateView.as_view()(update_request, choice_set_pk=other_set.pk, pk=self.first.pk)
+            with self.assertRaises(Http404):
+                ChoiceRetireView.as_view()(retire_request, choice_set_pk=other_set.pk, pk=self.first.pk)
+
+        self.first.refresh_from_db()
+        self.assertEqual((self.first.key, self.first.label, self.first.position), ("compact", "Compact", 10))
+
+    def test_unauthorized_nested_choice_requests_do_not_disclose_target_existence(self):
+        tenant = Tenant.objects.create(name="Unauthorized scope", slug="unauthorized-definition-ui")
+        limited_user = User.objects.create_user(username="definition-ui-unauthorized")
+        for choice_pk in (self.first.pk, self.first.pk + 1000000):
+            request = self._request(
+                "post",
+                f"/choice-sets/{self.choice_set.pk}/choices/{choice_pk}/edit/",
+                {"label": "No access", "expected_resource_revision": "probe"},
+            )
+            request.user = limited_user
+            request.active_tenant = tenant
+            with override_current_tenant_scope(tenant):
+                with self.assertRaises(PermissionDenied):
+                    ChoiceUpdateView.as_view()(
+                        request,
+                        choice_set_pk=self.choice_set.pk,
+                        pk=choice_pk,
+                    )
 
     def test_tenant_limited_user_cannot_see_unscoped_usage_or_configure(self):
         tenant = Tenant.objects.create(name="Scoped tenant", slug="scoped-definition-ui")
