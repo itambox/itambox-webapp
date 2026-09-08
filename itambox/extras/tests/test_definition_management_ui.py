@@ -63,6 +63,8 @@ class DefinitionManagementUITests(TestCase):
             model = CustomFieldChoice if codename.endswith("customfieldchoice") else CustomFieldChoiceSet
             permissions.append(Permission.objects.get(content_type=content_types[model], codename=codename))
         self.user.user_permissions.add(*permissions)
+        self.assertTrue(self.user.has_perm("extras.change_customfieldchoice"))
+        self.assertTrue(self.user.has_perm("extras.change_customfieldchoiceset"))
 
     def _request(self, method, path, data=None):
         request = getattr(self.factory, method)(path, data=data or {})
