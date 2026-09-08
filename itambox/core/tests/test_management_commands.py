@@ -1,17 +1,26 @@
 import io
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import CommandError, call_command
-from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
 from assets.models import Asset, AssetType, Category
 from core.management.commands._seed.access import check_seed_access_invariants
+from core.management.commands._seed.catalog import (
+    _get_core_fieldset,
+    _reconcile_core_choice_rows,
+    _reconcile_core_fields,
+    _reconcile_core_fieldsets,
+)
 from core.management.commands._seed.inventory import check_seed_inventory_invariants
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
@@ -35,7 +44,187 @@ from subscriptions.models import SubscriptionAssignment
 User = get_user_model()
 
 
-@pytest.mark.serial_only
+class CatalogConflictValidationTestCase(TestCase):
+    """Exercise catalog conflict contracts without seeding the full demo catalog."""
+
+    def setUp(self):
+        self.choice_set = CustomFieldChoiceSet.objects.create(
+            namespace="itambox",
+            slug="fixture-choice-set",
+            label="Fixture Choice Set",
+            management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
+            lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+        )
+        self.choice = CustomFieldChoice.objects.create(
+            choice_set=self.choice_set,
+            key="fixture_choice",
+            label="Fixture choice",
+            position=10,
+            version=1,
+            lifecycle=CustomFieldChoice.LIFECYCLE_DEPRECATED,
+        )
+        self.field = CustomField.objects.create(
+            name="fixture_field",
+            namespace="itambox",
+            label="Fixture field",
+            help_text="",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            management_kind=CustomField.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomField.LIFECYCLE_DEPRECATED,
+        )
+        self.fieldset = CustomFieldset.objects.create(
+            namespace="itambox",
+            slug="fixture-fieldset",
+            label="Fixture fieldset",
+            description="",
+            management_kind=CustomFieldset.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomFieldset.LIFECYCLE_DEPRECATED,
+        )
+
+    def test_active_choice_identity_rejects_deprecated_existing_choice(self):
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            _reconcile_core_choice_rows(
+                self.choice_set,
+                "fixture-choice-set",
+                [
+                    {
+                        "key": self.choice.key,
+                        "label": self.choice.label,
+                        "position": 10,
+                        "lifecycle": CustomFieldChoice.LIFECYCLE_ACTIVE,
+                    }
+                ],
+            )
+
+        self.choice.refresh_from_db()
+        self.assertEqual(self.choice.lifecycle, CustomFieldChoice.LIFECYCLE_DEPRECATED)
+
+    def test_deprecated_choice_identity_remains_reconcilable(self):
+        self.choice.lifecycle = CustomFieldChoice.LIFECYCLE_ACTIVE
+        self.choice.save(update_fields=["lifecycle"])
+        _reconcile_core_choice_rows(
+            self.choice_set,
+            "fixture-choice-set",
+            [
+                {
+                    "key": self.choice.key,
+                    "label": self.choice.label,
+                    "position": 10,
+                    "lifecycle": CustomFieldChoice.LIFECYCLE_DEPRECATED,
+                }
+            ],
+        )
+
+        self.choice.refresh_from_db()
+        self.assertEqual(self.choice.lifecycle, CustomFieldChoice.LIFECYCLE_DEPRECATED)
+
+    def _field_row(self, lifecycle):
+        return {
+            "identity": "itambox/fixture_field",
+            "namespace": "itambox",
+            "key": "fixture_field",
+            "label": "Fixture field",
+            "help_text": "",
+            "targets": ["asset"],
+            "activation": CustomField.ACTIVATION_COMPOSED,
+            "field_type": CustomField.FIELD_TYPE_TEXT,
+            "quantity_kind": None,
+            "canonical_unit": None,
+            "validation": {},
+            "required": False,
+            "nullable": False,
+            "lifecycle": lifecycle,
+            "choice_set": None,
+        }
+
+    def test_active_field_identity_rejects_deprecated_existing_field(self):
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            _reconcile_core_fields(
+                [self._field_row(CustomField.LIFECYCLE_ACTIVE)],
+                {},
+                ContentType.objects.get_for_model(Asset),
+                ContentType.objects.get_for_model(AssetType),
+                1,
+            )
+
+        self.field.refresh_from_db()
+        self.assertEqual(self.field.lifecycle, CustomField.LIFECYCLE_DEPRECATED)
+
+    def test_deprecated_field_identity_remains_reconcilable(self):
+        # Model save validates applicability; update represents an existing legacy row.
+        CustomField.objects.filter(pk=self.field.pk).update(lifecycle=CustomField.LIFECYCLE_ACTIVE)
+        _reconcile_core_fields(
+            [self._field_row(CustomField.LIFECYCLE_DEPRECATED)],
+            {},
+            ContentType.objects.get_for_model(Asset),
+            ContentType.objects.get_for_model(AssetType),
+            1,
+        )
+
+        self.field.refresh_from_db()
+        self.assertEqual(self.field.lifecycle, CustomField.LIFECYCLE_DEPRECATED)
+
+    def test_active_fieldset_identity_rejects_deprecated_existing_fieldset(self):
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            _get_core_fieldset(
+                "fixture-fieldset",
+                "Fixture fieldset",
+                "",
+                CustomFieldset.LIFECYCLE_ACTIVE,
+                1,
+                "itambox",
+            )
+
+        self.fieldset.refresh_from_db()
+        self.assertEqual(self.fieldset.lifecycle, CustomFieldset.LIFECYCLE_DEPRECATED)
+
+    def test_local_fieldset_membership_raises_ownership_collision_before_reconcile(self):
+        fieldset = CustomFieldset.objects.create(
+            namespace="itambox",
+            slug="ownership-fieldset",
+            label="Ownership fieldset",
+            description="",
+            management_kind=CustomFieldset.MANAGEMENT_CORE,
+            version=1,
+            lifecycle=CustomFieldset.LIFECYCLE_ACTIVE,
+        )
+        local_field = CustomField.objects.create(
+            name="local_membership_field",
+            namespace="local",
+            label="Local membership field",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            management_kind=CustomField.MANAGEMENT_LOCAL,
+            version=1,
+            lifecycle=CustomField.LIFECYCLE_ACTIVE,
+        )
+        membership = CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=local_field, position=999)
+
+        with self.assertRaisesRegex(ValueError, "ownership collision"):
+            _reconcile_core_fieldsets(
+                [
+                    {
+                        "namespace": "itambox",
+                        "slug": "ownership-fieldset",
+                        "label": "Ownership fieldset",
+                        "description": "",
+                        "lifecycle": CustomFieldset.LIFECYCLE_ACTIVE,
+                        "memberships": [],
+                    }
+                ],
+                {},
+                1,
+            )
+
+        self.assertTrue(CustomFieldsetField.objects.filter(pk=membership.pk).exists())
+
+
+# Database names, caches, media roots, and queue execution are isolated per xdist
+# process by itambox/conftest.py. Only the seed-data methods below retain the
+# serial-only marker because seed_data.handle() resets process-global random state.
 class ManagementCommandsTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
@@ -65,6 +254,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
         call_command("run_jobs", stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Job processing complete", self.stdout.getvalue())
 
+    @pytest.mark.serial_only
     def test_seed_data_command(self):
         # Run seed data with --production option to verify minimal bootstrap execution paths.
         # --force is required because seed_data refuses to clear data when DEBUG is off
@@ -92,41 +282,73 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_writes_complete_normative_composition(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        choice_ids = dict(CustomFieldChoiceSet.objects.values_list("slug", "pk"))
-        command._seed_catalog()
-        self.assertEqual(dict(CustomFieldChoiceSet.objects.values_list("slug", "pk")), choice_ids)
-        self.assertEqual(CustomField.objects.filter(management_kind=CustomField.MANAGEMENT_CORE).count(), 48)
-        self.assertEqual(CustomFieldChoiceSet.objects.filter(namespace="itambox").count(), 13)
-        self.assertEqual(CustomFieldset.objects.filter(namespace="itambox").count(), 12)
+        canonical = json.loads(
+            (
+                Path(__file__).resolve().parents[3]
+                / "scripts"
+                / "tests"
+                / "fixtures"
+                / "specification_vocabulary"
+                / "canonical-target.json"
+            ).read_text(encoding="utf-8")
+        )
+        expected_fields = {row["key"]: row for row in canonical["active_fields"] + canonical["reserved_retired_fields"]}
+        expected_choice_sets = {row["slug"]: row for row in canonical["choice_sets"]}
+        expected_fieldsets = {row["slug"]: row for row in canonical["sections"]}
 
-        for field in CustomField.objects.filter(management_kind=CustomField.MANAGEMENT_CORE):
+        choice_ids = dict(CustomFieldChoiceSet.objects.filter(namespace="itambox").values_list("slug", "pk"))
+        command._seed_catalog()
+        self.assertEqual(
+            dict(CustomFieldChoiceSet.objects.filter(namespace="itambox").values_list("slug", "pk")),
+            choice_ids,
+        )
+        self.assertEqual(
+            CustomField.objects.filter(namespace="itambox", management_kind=CustomField.MANAGEMENT_CORE).count(),
+            len(expected_fields),
+        )
+        self.assertEqual(CustomFieldChoiceSet.objects.filter(namespace="itambox").count(), len(expected_choice_sets))
+        self.assertEqual(CustomFieldset.objects.filter(namespace="itambox").count(), len(expected_fieldsets))
+
+        for field in CustomField.objects.filter(namespace="itambox", management_kind=CustomField.MANAGEMENT_CORE):
+            expected = expected_fields[field.name]
             self.assertFalse(field.required)
-            self.assertIn(field.scope, {choice[0] for choice in CustomField.SCOPE_CHOICES})
-            if field.field_type in {CustomField.FIELD_TYPE_SINGLE_SELECT, CustomField.FIELD_TYPE_MULTI_SELECT}:
-                self.assertIsNotNone(field.choice_set_id)
+            self.assertEqual(field.activation, expected["activation"])
+            self.assertEqual(field.lifecycle, expected["lifecycle"])
+            expected_models = {"assettype" if target == "asset_type" else target for target in expected["targets"]}
+            self.assertEqual(set(field.object_types.values_list("model", flat=True)), expected_models)
+            expected_choice_slug = (
+                expected["choice_set"].rsplit("/", 1)[1] if expected["choice_set"] is not None else None
+            )
+            expected_choice_id = (
+                CustomFieldChoiceSet.objects.get(namespace="itambox", slug=expected_choice_slug).pk
+                if expected_choice_slug is not None
+                else None
+            )
+            self.assertEqual(field.choice_set_id, expected_choice_id)
             if field.field_type == CustomField.FIELD_TYPE_SINGLE_SELECT:
                 self.assertEqual(field.max_values, 1)
-            expected_models = {
-                "asset": {"asset"},
-                "asset_type": {"assettype"},
-                "both": {"asset", "assettype"},
-            }[field.scope]
-            self.assertEqual(set(field.object_types.values_list("model", flat=True)), expected_models)
 
         asset_type = AssetType.objects.get(slug="dell-latitude-5550")
         self.assertFalse(hasattr(asset_type, "custom_fieldset"))
         self.assertGreater(asset_type.fieldset_memberships.count(), 1)
+        expected_asset_type_fieldsets = [
+            (slug, index) for index, slug in enumerate(command._category_fieldsets["laptops"], start=1)
+        ]
         self.assertEqual(
             list(asset_type.fieldset_memberships.values_list("fieldset__slug", "position")),
-            [(slug, index * 10) for index, slug in enumerate(command._category_fieldsets["laptops"], start=1)],
+            expected_asset_type_fieldsets,
         )
+        expected_category_fieldsets = [
+            (item["fieldset"].rsplit("/", 1)[1], item["position"])
+            for item in next(row for row in canonical["categories"] if row["slug"] == "laptops")["default_fieldsets"]
+        ]
         self.assertEqual(
             list(
                 Category.objects.get(slug="laptops").default_fieldset_memberships.values_list(
                     "fieldset__slug", "position"
                 )
             ),
-            [(slug, index * 10) for index, slug in enumerate(command._category_fieldsets["laptops"], start=1)],
+            expected_category_fieldsets,
         )
         stored_keys = set(asset_type.custom_field_data)
         resolved_keys = {item.definition.name for item in resolve_asset_type_custom_fields(asset_type)}
@@ -142,7 +364,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
         field = CustomField.objects.get(name="form_factor")
         asset_ct = ContentType.objects.get(app_label="assets", model="asset")
         field.object_types.set([asset_ct])
-        CustomField.all_objects.filter(pk=field.pk).update(field_type=CustomField.FIELD_TYPE_TEXT)
+        CustomField.objects.filter(pk=field.pk).update(field_type=CustomField.FIELD_TYPE_TEXT)
 
         with self.assertRaisesRegex(ValueError, "Core field semantics differ for identity: form_factor"):
             command._seed_catalog()
@@ -153,7 +375,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_local_choice_set_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        choice_set = CustomFieldChoiceSet.all_objects.get(namespace="itambox", slug="form-factor")
+        choice_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="form-factor")
         choice_set.management_kind = CustomFieldChoiceSet.MANAGEMENT_LOCAL
         choice_set.save(update_fields=["management_kind"])
 
@@ -177,7 +399,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_local_field_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        field = CustomField.all_objects.get(name="processor_model")
+        field = CustomField.objects.get(name="processor_model")
         field.management_kind = CustomField.MANAGEMENT_LOCAL
         field.save(update_fields=["namespace", "management_kind"])
 
@@ -187,7 +409,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_local_fieldset_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        fieldset = CustomFieldset.all_objects.get(namespace="itambox", slug="compute-memory")
+        fieldset = CustomFieldset.objects.get(namespace="itambox", slug="compute-memory")
         fieldset.management_kind = CustomFieldset.MANAGEMENT_LOCAL
         fieldset.save(update_fields=["management_kind"])
 
@@ -211,7 +433,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_inactive_core_field_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        field = CustomField.all_objects.get(name="processor_model")
+        field = CustomField.objects.get(name="processor_model")
         field.lifecycle = CustomField.LIFECYCLE_DEPRECATED
         field.save(update_fields=["lifecycle"])
 
@@ -221,7 +443,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_inactive_core_choice_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        choice_set = CustomFieldChoiceSet.all_objects.get(namespace="itambox", slug="form-factor")
+        choice_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="form-factor")
         choice = choice_set.choices.get(key="notebook")
         choice.lifecycle = CustomFieldChoice.LIFECYCLE_DEPRECATED
         choice.save(update_fields=["lifecycle"])
@@ -232,13 +454,12 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_unexpected_choice_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        choice_set = CustomFieldChoiceSet.all_objects.get(namespace="itambox", slug="form-factor")
+        choice_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="form-factor")
         CustomFieldChoice.objects.create(
             choice_set=choice_set,
             key="unexpected-core",
             label="Unexpected local",
             position=999,
-            management_kind=CustomFieldChoice.MANAGEMENT_CORE,
             version=1,
             lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
         )
@@ -249,14 +470,14 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_unexpected_fieldset_membership(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        fieldset = CustomFieldset.all_objects.get(namespace="itambox", slug="compute-memory")
+        fieldset = CustomFieldset.objects.get(namespace="itambox", slug="compute-memory")
         unexpected = CustomField.objects.create(
             name="unexpected_fieldset_child",
             label="Unexpected fieldset child",
             field_type="text",
-            scope="asset_type",
-            namespace="local",
-            management_kind=CustomField.MANAGEMENT_LOCAL,
+            activation=CustomField.ACTIVATION_COMPOSED,
+            namespace="itambox",
+            management_kind=CustomField.MANAGEMENT_CORE,
             version=1,
             lifecycle=CustomField.LIFECYCLE_ACTIVE,
         )
@@ -268,13 +489,14 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_seed_catalog_refuses_inactive_core_fieldset_identity(self):
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()
-        fieldset = CustomFieldset.all_objects.get(namespace="itambox", slug="compute-memory")
+        fieldset = CustomFieldset.objects.get(namespace="itambox", slug="compute-memory")
         fieldset.lifecycle = CustomFieldset.LIFECYCLE_DEPRECATED
         fieldset.save(update_fields=["lifecycle"])
 
         with self.assertRaisesRegex(ValueError, "lifecycle"):
             SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
 
+    @pytest.mark.serial_only
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
         with override_settings(SEED_PASSWORD="configured-seed-password"):
             call_command("seed_data", force=True, stdout=self.stdout, stderr=self.stderr)
@@ -420,6 +642,7 @@ class ManagementCommandsTestCase(TransactionTestCase):
         Membership._base_manager.create(user=named_person, tenant=tenant, is_active=True)
         check_seed_access_invariants([named_person])
 
+    @pytest.mark.serial_only
     def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
         # The destructive clear must be blocked outside DEBUG unless --force is passed.
         from django.test import override_settings

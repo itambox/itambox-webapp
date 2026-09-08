@@ -45,8 +45,14 @@ def _get_core_choice_set(slug, label):
 
 
 def _validate_core_choice_row(choice, slug, desired_choices):
-    if choice.key not in desired_choices:
+    desired = desired_choices.get(choice.key)
+    if desired is None:
         raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
+    if (
+        desired["lifecycle"] == CustomFieldChoice.LIFECYCLE_ACTIVE
+        and choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice lifecycle collision: itambox/{slug}#{choice.key}")
 
 
 def _reconcile_core_choice_rows(choice_set, slug, choices):
@@ -94,11 +100,13 @@ def _reconcile_core_choice_set(choice_set_data):
     return choice_sets
 
 
-def _validate_core_field_identity(matches, key):
+def _validate_core_field_identity(matches, key, lifecycle):
     if len(matches) > 1:
         raise ValueError(f"Ambiguous core field identity: {key}")
     if matches and (matches[0].namespace != "itambox" or matches[0].management_kind != CustomField.MANAGEMENT_CORE):
         raise ValueError(f"Core field identity has incompatible namespace or management: {key}")
+    if matches and lifecycle == CustomField.LIFECYCLE_ACTIVE and matches[0].lifecycle != CustomField.LIFECYCLE_ACTIVE:
+        raise ValueError(f"Core field lifecycle collision: {key}")
 
 
 def _core_field_options(row, choice_sets, version):
@@ -187,7 +195,7 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct, vers
         options = _core_field_options(row, choice_sets, version)
         target_content_types = _core_field_target_types(row, content_types)
         matches = list(CustomField.objects.filter(name=row["key"]))
-        _validate_core_field_identity(matches, row["key"])
+        _validate_core_field_identity(matches, row["key"], row["lifecycle"])
         field = matches[0] if matches else CustomField(name=row["key"], **options)
         if not matches:
             # The normalized release is already the validated source of truth.
@@ -211,6 +219,12 @@ def _get_core_fieldset(slug, label, description, lifecycle, version, namespace):
         or matches[0].lifecycle not in {CustomFieldset.LIFECYCLE_ACTIVE, CustomFieldset.LIFECYCLE_DEPRECATED}
     ):
         raise ValueError(f"Core fieldset identity has incompatible management or lifecycle: {namespace}/{slug}")
+    if (
+        matches
+        and lifecycle == CustomFieldset.LIFECYCLE_ACTIVE
+        and matches[0].lifecycle != CustomFieldset.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core fieldset lifecycle collision: {namespace}/{slug}")
     if matches:
         return matches[0]
     return CustomFieldset.objects.create(
@@ -251,6 +265,12 @@ def _reconcile_core_fieldsets(section_rows, custom_fields, version):
             for membership in existing_memberships
         ):
             raise ValueError(f"Core fieldset membership ownership collision: {namespace}/{slug}")
+        expected_memberships = {member["field"].rsplit("/", 1)[1] for member in section["memberships"]}
+        for membership in existing_memberships:
+            if membership.custom_field.name not in expected_memberships:
+                raise ValueError(
+                    f"Core fieldset unexpected membership: {namespace}/{slug}#{membership.custom_field.name}"
+                )
         fieldset.field_memberships.all().delete()
         CustomFieldsetField.objects.bulk_create(
             [
