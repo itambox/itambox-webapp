@@ -623,17 +623,6 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         self.specification_history = _history_entries(self._stored_custom_values(), self.custom_field_definitions)
         self.specification_fieldset_options = self._fieldset_options(selected)
         self.specification_definition_revision = ""
-        if self.instance and self.instance.pk:
-            try:
-                self.specification_definition_revision = prospective_specification_plan(
-                    self.instance,
-                    target_kind="asset_type",
-                    fieldset_identities=tuple(
-                        f"{fieldset.namespace}/{fieldset.slug}" for fieldset in selected
-                    ),
-                ).definition_revision
-            except (ValidationError, AttributeError):
-                self.specification_definition_revision = ""
 
     def _t15_field_context(self, key):
         return {
