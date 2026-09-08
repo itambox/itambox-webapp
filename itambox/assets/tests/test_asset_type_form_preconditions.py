@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from assets.forms.assettype_form import AssetTypeForm
-from assets.services.specifications.contracts import ExplicitFieldsetSelectionDTO
 
 
 class AssetTypeFormPreconditionTests(SimpleTestCase):
@@ -15,7 +14,7 @@ class AssetTypeFormPreconditionTests(SimpleTestCase):
             "expected_resource_revision": resource,
             "expected_definition_revision": definition,
         }
-        form._create_selection = lambda: ExplicitFieldsetSelectionDTO(identities=selection)
+        form._create_selection = lambda: SimpleNamespace(presence="explicit", identities=selection)
         form._patch = lambda: object()
         return form
 
