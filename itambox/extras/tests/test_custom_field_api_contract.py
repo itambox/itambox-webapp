@@ -369,9 +369,9 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
-        self.assertIn("specifications.required_field", str(raised.exception.detail))
+        self._assert_structured_specification_error(raised, "REQUIRED_FIELD", field_key="required_rest_spec")
         self.assertFalse(AssetType.all_objects.filter(model="Required REST Type").exists())
 
     def test_required_asset_type_field_cannot_be_cleared(self):
@@ -702,9 +702,9 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(drf_serializers.ValidationError) as raised:
+        with self.assertRaises(SpecificationCommandAPIException) as raised:
             serializer.save()
-        self.assertIn("specifications.unknown_field_key", str(raised.exception.detail))
+        self._assert_structured_specification_error(raised, "UNKNOWN_FIELD_KEY", field_key="fieldset_only_create_spec")
         self.assertFalse(AssetType.all_objects.filter(model="Fieldset Create API Model").exists())
 
     def test_asset_api_type_switch_uses_new_composition_for_custom_field_patch(self):
