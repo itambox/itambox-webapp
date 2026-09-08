@@ -5,7 +5,7 @@ from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -18,7 +18,7 @@ from extras.customfields import (
     clean_custom_field_form_values,
     validate_custom_field_value,
 )
-from extras.models import CustomField, CustomFieldset, Tag
+from extras.models import CustomField, CustomFieldset, CustomFieldsetField, Tag
 
 from ..models import AssetRole, AssetType, Category, Manufacturer
 from ..services.specifications.commands import (
@@ -300,6 +300,14 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         kwargs["data"] = normalized
 
     def _raw_selected_fieldset_ids(self):
+        cached = getattr(self, "_raw_selected_fieldset_ids_cache", None)
+        if cached is not None:
+            return list(cached)
+        ids = self._calculate_raw_selected_fieldset_ids()
+        self._raw_selected_fieldset_ids_cache = tuple(ids)
+        return list(ids)
+
+    def _calculate_raw_selected_fieldset_ids(self):
         if self.is_bound:
             if self.data.get("specification_fieldsets_presence") == "omitted" and "custom_fieldsets" not in self.data:
                 return self._category_default_fieldset_ids(self.data.get("category"))
@@ -358,7 +366,28 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         self._custom_fieldsets_explicit = "custom_fieldsets" in supplied_initial
         self._draft_category = supplied_initial.get("category")
         self._normalize_omitted_fieldset_data(kwargs)
-        super().__init__(*args, **kwargs)
+        model_instance = kwargs.get("instance")
+        instance_prefetch_cache = None
+        instance_prefetch_previous = _T15_UNSET
+        instance_prefetch_created = False
+        if model_instance is not None and model_instance.pk:
+            instance_prefetch_cache = getattr(model_instance, "_prefetched_objects_cache", None)
+            if instance_prefetch_cache is None:
+                instance_prefetch_cache = {}
+                model_instance._prefetched_objects_cache = instance_prefetch_cache
+                instance_prefetch_created = True
+            instance_prefetch_previous = instance_prefetch_cache.get("custom_fieldsets", _T15_UNSET)
+            instance_prefetch_cache["custom_fieldsets"] = CustomFieldset.objects.none()
+        try:
+            super().__init__(*args, **kwargs)
+        finally:
+            if instance_prefetch_cache is not None:
+                if instance_prefetch_previous is _T15_UNSET:
+                    instance_prefetch_cache.pop("custom_fieldsets", None)
+                else:
+                    instance_prefetch_cache["custom_fieldsets"] = instance_prefetch_previous
+                if instance_prefetch_created and not instance_prefetch_cache:
+                    delattr(model_instance, "_prefetched_objects_cache")
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
@@ -589,7 +618,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         sections = []
         for fieldset in selected:
             fields = []
-            memberships = fieldset.field_memberships.select_related("custom_field").all()
+            memberships = fieldset.field_memberships.all()
             for membership in memberships:
                 key = f"cf_{membership.custom_field.name}"
                 if key not in current or key in used:
@@ -637,7 +666,12 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
         selected_ids = [fieldset.pk for fieldset in selected]
         fieldsets = (
             CustomFieldset.objects.filter(Q(lifecycle=CustomFieldset.LIFECYCLE_ACTIVE) | Q(pk__in=selected_ids))
-            .prefetch_related("field_memberships__custom_field")
+            .prefetch_related(
+                Prefetch(
+                    "field_memberships",
+                    queryset=CustomFieldsetField.objects.select_related("custom_field"),
+                )
+            )
             .order_by("namespace", "slug")
         )
         stored = self._stored_custom_values()
