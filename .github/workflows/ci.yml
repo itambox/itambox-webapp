@@ -750,13 +750,26 @@ jobs:
       - name: Determine relevance
         id: relevance
         run: |
-          # On demand only (workflow_dispatch): PR CI stays lean and the
-          # rehearsals run explicitly during release qualification.
+          # Always on for explicit dispatches (release qualification). On pull
+          # requests the rehearsals run when the full change set touches
+          # Django migrations, the seed implementation, the migration harness,
+          # or the qualification area itself; their coverage then feeds the
+          # combined differential measurement.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.event.pull_request.base.sha }}" >/dev/null 2>&1 || true
+            if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" \
+                | grep -Eq '^(itambox/.+migrations/|itambox/core/management/commands/_seed/|itambox/core/management/commands/seed_data.py|itambox/core/tests/migration_harness.py|scripts/qualification/)'; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python 3.12
         if: steps.relevance.outputs.enabled == 'true'
