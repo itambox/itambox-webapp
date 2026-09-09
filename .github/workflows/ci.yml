@@ -746,9 +746,9 @@ jobs:
       - name: Determine relevance
         id: relevance
         run: |
+          # On demand only (workflow_dispatch): PR CI stays lean and the
+          # rehearsals run explicitly during release qualification.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(itambox/.+migrations/|scripts/qualification/|itambox/core/management/commands/_seed/)'; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
