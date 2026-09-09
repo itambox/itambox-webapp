@@ -300,13 +300,13 @@ def _set_type_locked(
         return current_plan
     stored_values, current_definition, _current_definitions = current_plan
     actual_resource_revision = resource_revision_for_owner(owner)
-    if expected_resource_revision != actual_resource_revision:
-        revision_issues = stale_revision_issues(
-            expected_resource_revision=expected_resource_revision,
-            actual_resource_revision=actual_resource_revision,
-            expected_definition_revision=expected_definition_revision,
-            actual_definition_revision=current_definition.revision,
-        )
+    revision_issues = stale_revision_issues(
+        expected_resource_revision=expected_resource_revision,
+        actual_resource_revision=actual_resource_revision,
+        expected_definition_revision=expected_definition_revision,
+        actual_definition_revision=current_definition.revision,
+    )
+    if revision_issues:
         return rejected(owner_ref, *revision_issues)
 
     proposed_plan = _proposed_definition(
@@ -317,14 +317,6 @@ def _set_type_locked(
     if isinstance(proposed_plan, CommandRejectedDTO):
         return proposed_plan
     proposed_definition, proposed_definitions, _graph = proposed_plan
-    revision_issues = stale_revision_issues(
-        expected_resource_revision=expected_resource_revision,
-        actual_resource_revision=actual_resource_revision,
-        expected_definition_revision=expected_definition_revision,
-        actual_definition_revision=proposed_definition.revision,
-    )
-    if revision_issues:
-        return rejected(owner_ref, *revision_issues)
     normalized = normalize_patch(
         patch,
         proposed_definitions,
