@@ -336,12 +336,13 @@ class AssetFormCommandAdapterTests(TenantTestMixin, TestCase):
             is_active=True,
         )
 
-    def _asset_field(self, name, *, required=False):
+    def _asset_field(self, name, *, required=False, field_type=CustomField.FIELD_TYPE_TEXT):
         field = CustomField.objects.create(
             name=name,
             namespace="local",
             label=name.replace("_", " ").title(),
             activation=CustomField.ACTIVATION_COMPOSED,
+            field_type=field_type,
             required=required,
         )
         field.object_types.add(ContentType.objects.get_for_model(Asset))
@@ -351,6 +352,46 @@ class AssetFormCommandAdapterTests(TenantTestMixin, TestCase):
         fieldset = CustomFieldset.objects.create(namespace="local", slug=slug, label=slug.replace("-", " ").title())
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
         return fieldset
+
+    def test_required_boolean_false_is_persisted_and_read_back(self):
+        required_boolean = self._asset_field(
+            "required_boolean",
+            required=True,
+            field_type=CustomField.FIELD_TYPE_BOOLEAN,
+        )
+        fieldset = self._fieldset("required-boolean", required_boolean)
+        asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Boolean device",
+            slug="boolean-device",
+        )
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+        asset = Asset.objects.create(
+            name="Boolean asset",
+            asset_tag="BOOLEAN-1",
+            tenant=self.tenant,
+            asset_type=asset_type,
+            status=self.status,
+            custom_field_data={"required_boolean": True},
+        )
+
+        request = RequestFactory().post(f"/assets/{asset.pk}/edit/")
+        request.user = self.user
+        form = AssetForm(
+            request=request,
+            data=_minimal_asset_form_data(
+                asset,
+                self.status,
+                asset_type,
+                cf_required_boolean="false",
+            ),
+            instance=asset,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        saved.refresh_from_db()
+        self.assertIs(saved.custom_field_data["required_boolean"], False)
 
     def test_tenant_authorized_form_switch_uses_destination_definition_revision(self):
         source_field = self._asset_field("source_revision_spec")

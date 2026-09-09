@@ -571,8 +571,14 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             self.data = data
 
     def _apply_t15_presence(self, cleaned_data):
-        """Translate presence selectors into explicit patch values for Assets."""
+        """Translate posted presence selectors into explicit patch values."""
         for key, presence_key in self.custom_field_presence_keys.items():
+            # Older/full-page submissions and unchanged HTMX drafts do not
+            # necessarily carry the optional presence control. In that case the
+            # value itself is still an explicit submission; only a posted
+            # presence selector may translate it to omission/empty/null.
+            if self.is_bound and presence_key not in self.data:
+                continue
             mode = cleaned_data.get(presence_key, "")
             clear_key = self.custom_field_clear_keys.get(key)
             if clear_key and cleaned_data.get(clear_key) and mode in {"empty", "null", "value"}:

@@ -4,7 +4,9 @@
       id="asset-specification-form"
       data-specification-editor>
   {% csrf_token %}
-  {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+  {% for hidden in form.hidden_fields %}
+    {% if hidden.name != "tenant" %}{{ hidden }}{% endif %}
+  {% endfor %}
   {{ form.non_field_errors }}
   {% if form.specification_revision_conflict %}
     <div class="alert alert-warning" role="alert" data-specification-stale>

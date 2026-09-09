@@ -79,6 +79,17 @@ def _coerce_t15_boolean(value):
 
 def _build_t15_custom_field(definition, initial_value=None, *, has_stored_value=False, read_only=False):
     if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+        # Required booleans use an explicit two-choice control: Django's
+        # BooleanField treats false as missing when required=True.  Keep that
+        # distinction so required false is a valid persisted value while
+        # omission remains invalid. Nullable booleans also need the explicit
+        # null option, which a checkbox cannot represent.
+        if not definition.required and not definition.nullable:
+            field = build_custom_field_form_field(definition, initial_value, read_only=read_only)
+            if field is not None:
+                field.widget.attrs["data-specification-input"] = "1"
+            return field
+
         if definition.required:
             choices = (("true", _("Yes")), ("false", _("No")))
         else:
@@ -216,18 +227,19 @@ def _history_entries(stored_values, current_definitions):
 
 class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
-        queryset=Manufacturer.objects.all(), widget=forms.Select(attrs={"class": "form-select"})
+        queryset=Manufacturer.objects.all(),
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     asset_role = forms.ModelChoiceField(
         queryset=AssetRole.objects.all(),
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
         label=_("Asset Role"),
     )
     custom_fieldsets = forms.ModelMultipleChoiceField(
         queryset=CustomFieldset.objects.all(),
         required=False,
-        widget=forms.MultipleHiddenInput(attrs={"data-specification-fieldsets": "1"}),
+        widget=forms.MultipleHiddenInput(attrs={"data-specification-fieldsets": "1", "data-tom-select": ""}),
         label=_("Specification fieldsets"),
     )
     specification_fieldsets_presence = forms.CharField(
@@ -245,7 +257,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={"class": "form-select", "data-tomselect-tags": "true"}),
+        widget=forms.SelectMultiple(
+            attrs={"class": "form-select", "data-tomselect-tags": "true", "data-tom-select": ""}
+        ),
         label=_("Tags"),
     )
 
@@ -274,8 +288,8 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             "part_number": forms.TextInput(attrs={"class": "form-control"}),
             "ean": forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric"}),
             "eol_months": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
-            "category": forms.Select(attrs={"class": "form-select"}),
-            "depreciation": forms.Select(attrs={"class": "form-select"}),
+            "category": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "depreciation": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "image": forms.FileInput(attrs={"class": "form-control", "style": "max-width: 400px;"}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "comments": forms.Textarea(attrs={"class": "form-control", "rows": 5}),
