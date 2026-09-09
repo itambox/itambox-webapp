@@ -426,7 +426,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         )
 
     def test_stale_resource_and_definition_are_rejected_after_locked_reload(self):
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.second,))
         AssetType._base_manager.filter(pk=self.type.pk).update(model="Composition type changed")
         stale_resource = set_asset_type_composition(
             actor=self._actor(),
@@ -439,7 +439,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertIsInstance(stale_resource, CommandRejectedDTO)
         self.assertEqual([issue.code for issue in stale_resource.issues], ["STALE_RESOURCE"])
 
-        resource_revision, definition_revision = self._type_plan()
+        resource_revision, definition_revision = self._type_plan((self.second,))
         CustomField.objects.filter(pk=self.first_field.pk).update(label="Changed after plan")
         stale_definition = set_asset_type_composition(
             actor=self._actor(),
