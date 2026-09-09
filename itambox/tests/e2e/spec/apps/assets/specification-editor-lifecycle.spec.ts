@@ -63,8 +63,9 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     const assetName = `E2E specification journey ${runId}`;
 
     const foreignAssetPath = `/assets/assets/${encodeURIComponent(isolationAssetId)}/`;
-    const deniedForeignAsset = await page.goto(foreignAssetPath, { waitUntil: 'domcontentloaded' });
-    expect(deniedForeignAsset?.status(), `foreign-tenant GET ${foreignAssetPath}`).toBe(404);
+    // Use the same operator browser session without rendering Django's DEBUG error page.
+    const deniedForeignAsset = await page.request.get(foreignAssetPath);
+    expect(deniedForeignAsset.status(), `foreign-tenant GET ${foreignAssetPath}`).toBe(404);
 
     const created = await jsonResponse(
       await api.post('/api/assets/assets/', {
@@ -100,13 +101,6 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     await expect(form.locator('select[name="asset_type"]')).toHaveValue(typeA.id);
     await expect(form.locator('[name="tenant"]')).toHaveValue(tenant.id);
 
-    const hotSwap = form.locator('[data-specification-key="hot_swap_supported"]');
-    await expect(hotSwap).toHaveCount(1);
-    expect(await hotSwap.evaluate((element) => (element as HTMLSelectElement).required)).toBe(false);
-    await expect(hotSwap).toHaveValue('');
-    await hotSwap.selectOption('false');
-    await expect(hotSwap).toHaveValue('false');
-
     const requiredBoolean = form.locator('[data-specification-key="e2e_required_boolean"]');
     await expect(requiredBoolean).toHaveCount(1);
     expect(await requiredBoolean.evaluate((element) => (element as HTMLSelectElement).required)).toBe(true);
@@ -135,16 +129,12 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     );
     await expect(hiddenProcessorDraft).toHaveCount(1);
     await expect(hiddenProcessorDraft).toHaveValue(JSON.stringify(draftProcessor));
-    const hiddenHotSwapDraft = typeBForm.locator(
-      'input[type="hidden"][name="specification_draft__cf_hot_swap_supported"]',
-    );
-    await expect(hiddenHotSwapDraft).toHaveCount(1);
-    await expect(hiddenHotSwapDraft).toHaveValue(JSON.stringify('false'));
     const hiddenRequiredBooleanDraft = typeBForm.locator(
       'input[type="hidden"][name="specification_draft__cf_e2e_required_boolean"]',
     );
     await expect(hiddenRequiredBooleanDraft).toHaveCount(1);
-    await expect(hiddenRequiredBooleanDraft).toHaveValue(JSON.stringify(false));
+    // Draft transport preserves the HTML lexeme; persistence below must be a JSON boolean.
+    await expect(hiddenRequiredBooleanDraft).toHaveValue(JSON.stringify("false"));
 
     const firmwarePresence = typeBForm.locator('select[name="cf_firmware_version__presence"]');
     await expect(firmwarePresence).toHaveCount(1);
@@ -162,12 +152,6 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     const returnedForm = page.locator('#asset-specification-form[data-specification-editor]');
     await expect(returnedForm.locator('select[name="asset_type"]')).toHaveValue(typeA.id);
     await expect(returnedForm.locator('[name="tenant"]')).toHaveValue(tenant.id);
-    await expect(returnedForm.locator('[data-specification-key="hot_swap_supported"]')).toHaveValue('false');
-    expect(
-      await returnedForm.locator('[data-specification-key="hot_swap_supported"]').evaluate(
-        (element) => (element as HTMLSelectElement).required,
-      ),
-    ).toBe(false);
     const returnedRequiredBoolean = returnedForm.locator('[data-specification-key="e2e_required_boolean"]');
     await expect(returnedRequiredBoolean).toHaveValue('false');
     expect(await returnedRequiredBoolean.evaluate((element) => (element as HTMLSelectElement).required)).toBe(true);
@@ -197,9 +181,82 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     expect(saved.specifications).toMatchObject({
       processor_model: draftProcessor,
       firmware_version: '',
-      hot_swap_supported: false,
       e2e_required_boolean: false,
     });
     expect(Object.prototype.hasOwnProperty.call(saved.specifications, 'hostname')).toBe(false);
   });
+});
+
+
+test('orders model sections, distinguishes unknown from false, and retains stale drafts', { tag: '@pr' }, async ({
+  page, api, cleanup, runId,
+}) => {
+  const types = await getJsonRows(api, '/api/assets/asset-types/?limit=100', 'model composition prerequisites');
+  const source = types.find((row) => row.slug === 'dell-latitude-5550');
+  expect(source).toBeTruthy();
+  const manufacturer = source!.manufacturer as { id: number };
+  const originalOrder = ['itambox/storage', 'itambox/compute-memory'];
+  const modelName = `E2E model composition ${runId}`;
+  const preview = await jsonResponse(await api.post(`/api/assets/asset-types/${source!.id}/composition-preview/`, {
+    data: { fieldsets: originalOrder, specification_patch: { set: {}, clear: [] } },
+  }), 200, 'preview the proposed model definition');
+  expect(preview.can_apply).toBe(true);
+  const created = await jsonResponse(await api.post('/api/assets/asset-types/', { data: {
+    model: modelName, slug: `e2e-model-${runId}`.slice(0, 150),
+    manufacturer_id: manufacturer.id, fieldsets: originalOrder,
+    expected_definition_revision: preview.expected_definition_revision,
+  } }), 201, 'create owned model composition');
+  const id = primaryKey(created, 'owned model composition');
+  cleanup.add(`model composition ${id}`, async () => {
+    await deleteOwnedResource(api, `/api/assets/asset-types/${id}/`, 'delete owned model composition');
+  });
+  expect(created.fieldsets).toEqual(originalOrder);
+  expect(Object.prototype.hasOwnProperty.call(created.specifications, 'hot_swap_supported')).toBe(false);
+  const editPath = `/assets/types/${id}/edit/`;
+  expect((await page.goto(editPath))?.status()).toBe(200);
+  const form = page.locator('#asset-type-specification-form[data-specification-editor]');
+  await expect(form).toHaveCount(1);
+  const selected = form.locator('[data-specification-selected-list] [data-specification-fieldset]');
+  await expect(selected).toHaveCount(2);
+  const originalIds = await selected.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-fieldset-id')));
+  const reload = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === editPath);
+  await selected.nth(1).locator('[data-specification-move="up"]').click();
+  expect((await reload).status()).toBe(200);
+  await expect(form.locator('[name="custom_fieldsets"]')).toHaveCount(2);
+  expect(await form.locator('[name="custom_fieldsets"]').evaluateAll((elements) => elements.map((element) => (element as HTMLInputElement).value))).toEqual([...originalIds].reverse());
+  await expect(form.locator('[name="cf_hot_swap_supported__presence"]')).toHaveValue('');
+  await expect(form.locator('[name="cf_hot_swap_supported"]')).not.toBeChecked();
+  const saveOrder = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === editPath);
+  await form.getByRole('button', { name: 'Update', exact: true }).click();
+  expect((await saveOrder).status()).toBe(302);
+  await page.waitForURL((url) => url.pathname === `/assets/types/${id}/`);
+  const reordered = await jsonResponse(await api.get(`/api/assets/asset-types/${id}/`), 200, 'ordered model readback');
+  expect(reordered.fieldsets).toEqual([...originalOrder].reverse());
+  expect(Object.prototype.hasOwnProperty.call(reordered.specifications, 'hot_swap_supported')).toBe(false);
+
+  expect((await page.goto(editPath))?.status()).toBe(200);
+  await form.locator('[name="cf_hot_swap_supported__presence"]').selectOption('value');
+  await expect(form.locator('[name="cf_hot_swap_supported"]')).not.toBeChecked();
+  const saveFalse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === editPath);
+  await form.getByRole('button', { name: 'Update', exact: true }).click();
+  expect((await saveFalse).status()).toBe(302);
+  await page.waitForURL((url) => url.pathname === `/assets/types/${id}/`);
+  const persisted = await jsonResponse(await api.get(`/api/assets/asset-types/${id}/`), 200, 'explicit model false readback');
+  expect(persisted.specifications).toMatchObject({ hot_swap_supported: false });
+
+  expect((await page.goto(editPath))?.status()).toBe(200);
+  const winnerName = `${modelName} winner`;
+  const winner = await jsonResponse(await api.patch(`/api/assets/asset-types/${id}/`, {
+    headers: { 'If-Match': String(persisted.resource_revision) }, data: { model: winnerName },
+  }), 200, 'concurrent native model update');
+  await form.locator('[name="model"]').fill(`${modelName} stale draft`);
+  const stale = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === editPath);
+  await form.getByRole('button', { name: 'Update', exact: true }).click();
+  expect((await stale).status()).toBe(200);
+  await expect(form.locator('[data-specification-stale]')).toBeVisible();
+  await expect(form.locator('[name="model"]')).toHaveValue(`${modelName} stale draft`);
+  const after = await jsonResponse(await api.get(`/api/assets/asset-types/${id}/`), 200, 'stale rejection readback');
+  expect(after.model).toBe(winnerName);
+  expect(after.resource_revision).toBe(winner.resource_revision);
+  expect(after.specifications).toEqual(persisted.specifications);
 });
