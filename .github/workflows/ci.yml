@@ -347,6 +347,7 @@ jobs:
             artifacts/.coverage.parallel
             artifacts/.coverage.serial
             artifacts/.coverage.combined
+          include-hidden-files: "true"
           if-no-files-found: error
           retention-days: 30
 
