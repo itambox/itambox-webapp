@@ -310,7 +310,7 @@ class AssetTagSequenceTestCase(TestCase):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
 
-        self.category_laptop = Category.objects.create(name="Laptops", slug="laptops")
+        self.category_laptop = Category.objects.create(name="Laptops", slug="assignment-laptops")
         self.category_server = Category.objects.create(name="Servers", slug="servers")
 
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")

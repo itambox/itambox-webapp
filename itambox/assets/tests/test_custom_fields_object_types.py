@@ -22,7 +22,7 @@ class CustomFieldsObjectTypesTestCase(TestCase):
 
     def setUp(self):
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
-        self.category = Category.objects.create(name="Laptops", slug="laptops", applies_to={"asset": True})
+        self.category = Category.objects.create(name="Laptops", slug="object-types-laptops", applies_to={"asset": True})
         self.role = AssetRole.objects.create(name="Laptop", slug="laptop")
         self.status = StatusLabel.objects.get_or_create(
             slug="available", defaults={"name": "Available", "type": "deployable"}

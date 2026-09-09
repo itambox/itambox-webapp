@@ -522,7 +522,7 @@ class CustodyUXAndPreviewTests(TestCase):
         self.client.login(username=self.user.username, password="testpassword")
 
         self.tenant = baker.make("organization.Tenant", name="Custody UX Tenant", slug="custody-ux")
-        self.category = baker.make("assets.Category", name="Laptops", slug="laptops")
+        self.category = baker.make("assets.Category", name="Laptops", slug="custody-laptops")
         self.template = baker.make(
             CustodyTemplate,
             tenant=self.tenant,
