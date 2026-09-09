@@ -330,3 +330,23 @@ unresolved references are not silently redirected to another Field.
 : Check the Asset's Type and its explicit Fieldset selection first, then the
   members' targets, activation and lifecycle. Target binding alone does not
   select a Fieldset. An explicitly empty composition remains empty.
+
+### GraphQL retained-history export confirmation
+
+`exportLibrary(namespace: String!, mode: LibraryExportMode!, acknowledgeRetainedHistory: Boolean = false)`
+uses the same authorization and export validation as REST. For an effective snapshot that
+contains retained history, pass `acknowledgeRetainedHistory: true` explicitly. Omission,
+`false`, and `null` do not consent and return `RETAINED_HISTORY_ACK_REQUIRED`.
+Selecting `EFFECTIVE_SNAPSHOT` alone is not consent. Confirmation does not bypass
+permissions or make unknown or structurally invalid historical content exportable.
+Exports that do not require confirmation keep their existing behavior.
+
+```graphql
+mutation {
+  exportLibrary(namespace: "example", mode: EFFECTIVE_SNAPSHOT, acknowledgeRetainedHistory: true) {
+    documentText
+    semanticDigest
+    userErrors { code path }
+  }
+}
+```

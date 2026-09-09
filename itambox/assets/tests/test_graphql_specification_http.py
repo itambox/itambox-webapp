@@ -124,6 +124,13 @@ class GraphQLSpecificationHTTPTests(TestCase):
         # An ambient has_perm() check here is not that authorization boundary.
         self.assertTrue(self.staff_a.user_permissions.filter(pk=manage_permission.pk).exists())
 
+    def test_library_export_acknowledgement_schema_contract(self):
+        from core.schema import schema
+
+        argument = schema.graphql_schema.mutation_type.fields["exportLibrary"].args["acknowledgeRetainedHistory"]
+        self.assertEqual(str(argument.type), "Boolean")
+        self.assertIs(argument.default_value, False)
+
     def _graphql_response(self, query, variables=None, *, token=None):
         token = token or self.token_a
         body = {"query": query}
@@ -827,6 +834,20 @@ class GraphQLSpecificationHTTPTests(TestCase):
         audit_before_export = ObjectChange._base_manager.count()
         choice_before_export = CustomFieldChoice._base_manager.filter(pk=retained_choice.pk).values().get()
 
+        for acknowledgement in ("", ", acknowledgeRetainedHistory: false", ", acknowledgeRetainedHistory: null"):
+            with self.subTest(acknowledgement=acknowledgement):
+                rejected = self._graphql_data(
+                    'mutation { exportLibrary(namespace: "example", mode: EFFECTIVE_SNAPSHOT'
+                    + acknowledgement
+                    + ") { documentText userErrors { code path } } }"
+                )["exportLibrary"]
+                self.assertIsNone(rejected["documentText"])
+                self.assertEqual(rejected["userErrors"][0]["code"], "RETAINED_HISTORY_ACK_REQUIRED")
+                self.assertEqual(ObjectChange._base_manager.count(), audit_before_export)
+                self.assertEqual(
+                    CustomFieldChoice._base_manager.filter(pk=retained_choice.pk).values().get(), choice_before_export
+                )
+
         rest_effective = rest_client.post(
             EXPORT_URL,
             {
@@ -840,7 +861,7 @@ class GraphQLSpecificationHTTPTests(TestCase):
         graphql_effective = self._graphql_data(
             """
             mutation ($namespace: String!) {
-              exportLibrary(namespace: $namespace, mode: EFFECTIVE_SNAPSHOT) {
+              exportLibrary(namespace: $namespace, mode: EFFECTIVE_SNAPSHOT, acknowledgeRetainedHistory: true) {
                 documentText
                 semanticDigest
                 userErrors { code path }
@@ -868,6 +889,15 @@ class GraphQLSpecificationHTTPTests(TestCase):
             {"key": "retired_old_choice", "label": "Retained old choice", "lifecycle": "deprecated"},
             retained_set_document["choices"],
         )
+
+        denied = self._graphql_data(
+            'mutation { exportLibrary(namespace: "example", mode: EFFECTIVE_SNAPSHOT, '
+            "acknowledgeRetainedHistory: true) { documentText userErrors { code path } } }",
+            token=self.token_b,
+        )["exportLibrary"]
+        self.assertIsNone(denied["documentText"])
+        self.assertEqual(denied["userErrors"][0]["code"], "OBJECT_UNAVAILABLE")
+        self.assertEqual(ObjectChange._base_manager.count(), audit_before_export)
 
         rest_missing = rest_client.post(
             EXPORT_URL,

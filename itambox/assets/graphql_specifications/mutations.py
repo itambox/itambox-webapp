@@ -2100,11 +2100,12 @@ class ExportLibrary(graphene.Mutation):
     class Arguments:
         namespace = graphene.String(required=True)
         mode = LibraryExportModeEnum(required=True)
+        acknowledge_retained_history = graphene.Boolean(default_value=False)
 
     Output = LibraryExportPayload
 
     @staticmethod
-    def mutate(root, info, namespace, mode):
+    def mutate(root, info, namespace, mode, acknowledge_retained_history=False):
         del root
         actor = authenticated_user(info)
         if actor is None:
@@ -2116,7 +2117,9 @@ class ExportLibrary(graphene.Mutation):
         try:
             namespace = _string_value(namespace, path=("namespace",), allow_empty=False)
             mode = str(_enum_value(mode))
-            result = library_commands.export_library(namespace, actor=actor, mode=mode)
+            result = library_commands.export_library(
+                namespace, actor=actor, mode=mode, acknowledge_retained_history=acknowledge_retained_history is True
+            )
         except _InputError as error:
             return LibraryExportPayload(
                 document_text=None, semantic_digest=None, user_errors=_user_errors(error.issues)
