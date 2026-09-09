@@ -38,6 +38,11 @@ BLOCK_INDENT = "          "
 POST_SUITE_GATES = {
     "Check the lane matrix gate": "scripts/check_xdist_matrix.py",
     "Certify the run and publish durations": "scripts/check_test_report.py",
+}
+
+# The coverage gates consume the combined report of both lanes plus the
+# qualification suites, so they live in the downstream coverage-gates job.
+COVERAGE_GATES = {
     "Check the global coverage ratchet": "scripts/check_coverage_baseline.py",
     "Check differential coverage for changed production code": "scripts/check_diff_coverage.py",
 }
@@ -45,6 +50,10 @@ POST_SUITE_GATES = {
 # Both lanes must have succeeded: the gates read files the lanes write, and
 # the combined coverage report exists only when both lanes ran.
 LANES_SUCCEEDED = "steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'"
+
+# The coverage-gates job consumes the test job's artifacts, so its gates are
+# conditioned on that job's result instead of its sibling steps.
+LANES_RESULT_SUCCEEDED = "needs.test.result == 'success'"
 
 
 class AccessibilityE2EWorkflowPolicyTests(unittest.TestCase):
@@ -192,10 +201,21 @@ class PostSuiteGateIndependenceTests(unittest.TestCase):
                     "without always() this gate inherits success() and is skipped by any earlier failure",
                 )
                 self.assertIn(LANES_SUCCEEDED, condition)
+        for name, script in COVERAGE_GATES.items():
+            with self.subTest(gate=name):
+                step = step_named(self.steps, name)
+                self.assertIn(script, step.get("run", ""))
+                condition = step.get("if", "")
+                self.assertIn(
+                    "always()",
+                    condition,
+                    "without always() this gate inherits success() and is skipped by any earlier failure",
+                )
+                self.assertIn(LANES_RESULT_SUCCEEDED, condition)
 
     def test_only_the_differential_gate_is_restricted_to_pull_requests(self):
         """On a push to a protected branch there is no "changed code" range."""
-        for name in POST_SUITE_GATES:
+        for name in dict(**POST_SUITE_GATES, **COVERAGE_GATES):
             with self.subTest(gate=name):
                 condition = step_named(self.steps, name).get("if", "")
                 pull_request_only = "github.event_name == 'pull_request'" in condition

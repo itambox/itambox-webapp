@@ -444,7 +444,7 @@ jobs:
             -o ../artifacts/coverage-combined.json
 
       - name: Check the global coverage ratchet
-        if: always() && hashFiles('artifacts/coverage-combined.json') != ''
+        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != ''
         run: |
           python scripts/check_coverage_baseline.py \
             --coverage-json artifacts/coverage-combined.json \
@@ -453,7 +453,7 @@ jobs:
       # Pull requests only: on a push to a protected branch there is no
       # meaningful "changed code" range to hold to the differential target.
       - name: Check differential coverage for changed production code
-        if: always() && hashFiles('artifacts/coverage-combined.json') != '' && github.event_name == 'pull_request'
+        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != '' && github.event_name == 'pull_request'
         run: |
           python scripts/check_diff_coverage.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
