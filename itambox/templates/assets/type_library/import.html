@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+{% extends base_template|default:"layout.html" %}
 {% load i18n %}
 {% block title %}{% translate "Import Type Library" %} - ITAMbox{% endblock %}
 {% block page_header %}
@@ -93,13 +93,15 @@
               </dd>
             </dl>
             {% if preview.plan.conflicts %}
-              <div class="alert alert-danger"
-                   role="alert"
-                   aria-live="assertive"
-                   data-library-blocking-conflict>
-                <strong>{% translate "Blocking conflicts require a decision." %}</strong>
-                {% translate "Apply stays disabled until every conflict is reviewed." %}
-              </div>
+              {% if not preview.plan.can_apply %}
+                <div class="alert alert-danger"
+                     role="alert"
+                     aria-live="assertive"
+                     data-library-blocking-conflict>
+                  <strong>{% translate "Blocking conflicts require a decision." %}</strong>
+                  {% translate "Apply stays disabled until every conflict is reviewed." %}
+                </div>
+              {% endif %}
               <div class="vstack gap-3 mb-3">
                 {% for row in preview_context.conflict_rows %}
                   <article class="border rounded p-3"

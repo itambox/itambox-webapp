@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+{% extends base_template|default:"layout.html" %}
 {% load i18n %}
 {% block title %}{% translate "Type Libraries" %} - ITAMbox{% endblock %}
 {% block page_header %}

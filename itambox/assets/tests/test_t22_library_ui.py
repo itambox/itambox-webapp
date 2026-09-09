@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.template import Context, Engine
 from django.test import RequestFactory, SimpleTestCase
 from django.urls import resolve, reverse
 
@@ -60,6 +62,37 @@ def _plan(*, can_apply: bool = False) -> LibraryPlan:
 
 
 class T22LibraryPureFormTests(SimpleTestCase):
+    def test_import_fragment_honors_boosted_layout_and_resolved_conflicts(self):
+        default_engine = Engine.get_default()
+        engine = Engine(
+            dirs=default_engine.dirs,
+            libraries=default_engine.libraries,
+            loaders=[
+                (
+                    "django.template.loaders.locmem.Loader",
+                    {
+                        "layout.html": "<html>{% block content %}{% endblock %}</html>",
+                        "base_htmx.html": "{% block content %}{% endblock %}",
+                    },
+                ),
+                "django.template.loaders.filesystem.Loader",
+            ],
+        )
+        template = engine.get_template("assets/type_library/import.html")
+        for can_apply in (False, True):
+            with self.subTest(can_apply=can_apply):
+                rendered = template.render(
+                    Context(
+                        {
+                            "base_template": "base_htmx.html",
+                            "preview": SimpleNamespace(plan=_plan(can_apply=can_apply)),
+                            "preview_context": {"conflict_rows": []},
+                        }
+                    )
+                )
+                self.assertNotIn("<html>", rendered)
+                self.assertEqual("data-library-blocking-conflict" in rendered, not can_apply)
+
     def test_library_routes_are_registered_in_production(self):
         for name, kwargs in (
             ("type_library_list", {}),
