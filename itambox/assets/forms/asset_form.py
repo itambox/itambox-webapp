@@ -503,7 +503,9 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         )
 
     def _stored_custom_values(self):
-        if not self.instance or not self.instance.pk:
+        # Explicit clones already carry copied values before they receive a PK.
+        # Fresh Assets still start with their own empty map, never Type values.
+        if not self.instance:
             return {}
         return dict(self.instance.custom_field_data or {})
 

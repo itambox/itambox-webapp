@@ -36,6 +36,13 @@ class AssetFormPresenceTests(SimpleTestCase):
 
         self.assertIsNone(cleaned_data["cf_instance_note"])
 
+    def test_unsaved_clone_keeps_its_copied_specification_values(self):
+        form = object.__new__(AssetForm)
+        form.instance = SimpleNamespace(pk=None, custom_field_data={"required_boolean": False})
+        self.assertEqual(form._stored_custom_values(), {"required_boolean": False})
+        form.instance = SimpleNamespace(pk=None, custom_field_data={})
+        self.assertEqual(form._stored_custom_values(), {})
+
     def test_asset_type_omitted_value_and_presence_are_not_an_empty_patch(self):
         form = object.__new__(AssetTypeForm)
         form.is_bound = True
