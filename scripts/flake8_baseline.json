@@ -3900,22 +3900,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_management_commands.py",
-      "code": "F401",
-      "message": "'core.models.EmailSettings' imported but unused",
-      "source": "from core.models import EmailSettings, Job",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_management_commands.py",
-      "code": "F401",
-      "message": "'unittest.mock.MagicMock' imported but unused",
-      "source": "from unittest.mock import MagicMock, patch",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_mitigations_phase2.py",
       "code": "F401",
       "message": "'sys' imported but unused",
