@@ -565,6 +565,37 @@ jobs:
               description="GitHub Actions E2E SCIM",
           )
           Token.objects.filter(user=user, description="GitHub Actions E2E aggregate setup").delete()
+          # The aggregate second-tenant write context uses the same principal,
+          # so provision the tenant-B membership and Administrator grant before
+          # issuing the tenant-B token. The specification-write path resolves
+          # explicit tenant authorization and a tenant-bound token alone does
+          # not grant it (issue #438 qualification boundary).
+          aggregate_admin = Role.all_objects.get(
+              tenant=aggregate_second_tenant,
+              name="Administrator",
+              deleted_at__isnull=True,
+          )
+          aggregate_membership, _ = Membership._base_manager.get_or_create(
+              user=user,
+              tenant=aggregate_second_tenant,
+          )
+          aggregate_membership.is_active = True
+          aggregate_membership.save(update_fields=["is_active"])
+          aggregate_grant, _ = RoleGrant._base_manager.get_or_create(
+              membership=aggregate_membership,
+              role=aggregate_admin,
+              defaults={
+                  "granted_by": user,
+                  "reason": "Disposable CI E2E aggregate second-tenant boundary.",
+                  "valid_until": timezone.now() + timedelta(hours=4),
+              },
+          )
+          RoleGrantScope._base_manager.get_or_create(
+              role_grant=aggregate_grant,
+              scope_type=RoleGrantScope.SCOPE_OWN,
+              tenant=None,
+              tenant_group=None,
+          )
           secondary_token = Token.objects.create(
               user=user,
               tenant=aggregate_second_tenant,
