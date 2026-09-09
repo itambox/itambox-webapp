@@ -440,7 +440,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertEqual([issue.code for issue in stale_resource.issues], ["STALE_RESOURCE"])
 
         resource_revision, definition_revision = self._type_plan((self.second,))
-        CustomField.objects.filter(pk=self.first_field.pk).update(label="Changed after plan")
+        CustomField.objects.filter(pk=self.second_field.pk).update(label="Changed after plan")
         stale_definition = set_asset_type_composition(
             actor=self._actor(),
             asset_type_id=self.type.pk,
