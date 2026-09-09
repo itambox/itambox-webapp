@@ -40,6 +40,26 @@ class AssetFormPresenceTests(SimpleTestCase):
         form = object.__new__(AssetForm)
         form.instance = SimpleNamespace(pk=None, custom_field_data={"required_boolean": False})
         self.assertEqual(form._stored_custom_values(), {"required_boolean": False})
+        definition = SimpleNamespace(
+            name="required_boolean",
+            field_type=CustomField.FIELD_TYPE_BOOLEAN,
+            nullable=False,
+            label="Required boolean",
+            help_text="",
+            required=True,
+            text_max_length=255,
+            regex="",
+            validation_rule=None,
+        )
+        resolved = SimpleNamespace(definition=definition, read_only=False, provenance=("local/flags",))
+        form.is_bound = False
+        form.data = {}
+        form.fields = {}
+        form.helper = SimpleNamespace(layout=None)
+        form._build_t15_presentation = lambda *args: None
+        with patch("assets.forms.asset_form.resolve_asset_custom_fields", return_value=[resolved]):
+            AssetForm._configure_custom_fields(form, SimpleNamespace())
+        self.assertEqual(form.fields["cf_required_boolean"].initial, "false")
         form.instance = SimpleNamespace(pk=None, custom_field_data={})
         self.assertEqual(form._stored_custom_values(), {})
 

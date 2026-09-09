@@ -458,9 +458,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
     def _configure_custom_fields(self, selected_asset_type):
         """Attach target fields and retain one model/type presentation separately."""
-        stored_values = {}
-        if self.instance and self.instance.pk and self.instance.custom_field_data:
-            stored_values = dict(self.instance.custom_field_data)
+        stored_values = self._stored_custom_values()
 
         self.custom_field_keys = []
         self.custom_field_definitions = {}
