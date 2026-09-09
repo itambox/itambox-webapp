@@ -836,8 +836,13 @@ jobs:
       - name: Upload qualification coverage
         if: steps.relevance.outputs.enabled == 'true'
         run: |
+          # The suites write COVERAGE_FILE relative to ./itambox (../artifacts),
+          # which resolves to the repository root; move the real data file into
+          # the workspace-relative directory the artifact upload expects.
           mkdir -p artifacts
-          if [ ! -s artifacts/.coverage.qualification ]; then
+          if [ -s ../artifacts/.coverage.qualification ]; then
+            cp ../artifacts/.coverage.qualification artifacts/.coverage.qualification
+          else
             : > artifacts/.coverage.qualification
           fi
         working-directory: ./itambox
