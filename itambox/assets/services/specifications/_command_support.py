@@ -447,12 +447,15 @@ def stale_revision_issues(
     expected_definition_revision: str,
     actual_definition_revision: DefinitionRevision,
 ) -> tuple[DomainIssueDTO, ...]:
-    # T01 precedence: a stale owner wins over definition diagnostics.
+    # A stale owner and a stale definition are reported together so callers can
+    # reject the whole request in one response; the fieldset/reference checks
+    # are skipped by callers whenever any issue is present here.
+    issues: list[DomainIssueDTO] = []
     if expected_resource_revision != actual_resource_revision:
-        return (issue("STALE_RESOURCE", message_key=_STALE_RESOURCE_MESSAGE),)
+        issues.append(issue("STALE_RESOURCE", message_key=_STALE_RESOURCE_MESSAGE))
     if expected_definition_revision != actual_definition_revision:
-        return (issue("STALE_DEFINITION", message_key=_STALE_DEFINITION_MESSAGE),)
-    return ()
+        issues.append(issue("STALE_DEFINITION", message_key=_STALE_DEFINITION_MESSAGE))
+    return tuple(issues)
 
 
 def stale_plan_issue() -> DomainIssueDTO:

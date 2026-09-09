@@ -131,12 +131,24 @@ def _canonical_snipeit_boolean(value):
 
 
 def _snipeit_choice_key(definition, value):
+    # Public writer boundary: canonical keys only. Snipe-IT source labels are
+    # translated exclusively in the import adapter below.
     if not isinstance(value, str) or definition.choice_set is None:
         raise ValidationError("Select a valid choice.", code="INVALID_CHOICE")
     choices = list(definition.choice_set.choices.filter(lifecycle="active"))
-    # Snipe-IT sends source option labels. Translate only in this external
-    # adapter; public specification writers still receive canonical keys only.
-    # A label/key collision must not silently select the wrong identity.
+    key_matches = [choice.key for choice in choices if choice.key == value]
+    if len(key_matches) == 1:
+        return key_matches[0]
+    raise ValidationError("Select a valid choice.", code="INVALID_CHOICE")
+
+
+def _snipeit_source_choice_key(definition, value):
+    # Import boundary: Snipe-IT sends source option labels. Translate only in
+    # this external adapter. A label/key collision must not silently select
+    # the wrong identity.
+    if not isinstance(value, str) or definition.choice_set is None:
+        raise ValidationError("Select a valid choice.", code="INVALID_CHOICE")
+    choices = list(definition.choice_set.choices.filter(lifecycle="active"))
     key_matches = {choice.key for choice in choices if choice.key == value or choice.label == value}
     if len(key_matches) == 1:
         return key_matches.pop()
