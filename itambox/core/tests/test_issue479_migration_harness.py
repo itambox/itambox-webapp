@@ -27,6 +27,24 @@ class MigrationHarnessContractTests(SimpleTestCase):
     def test_parent_process_is_db_free(self):
         self.assertEqual(IsolatedMigrationTestCase.databases, set())
 
+    def test_empty_child_database_has_no_sequences_to_reset(self):
+        with (
+            patch("core.tests.migration_harness._is_isolated_child", return_value=True),
+            patch.object(connection.introspection, "table_names", return_value=[]),
+            patch("django.test.TransactionTestCase._reset_sequences") as reset,
+        ):
+            IsolatedMigrationTestCase._reset_sequences("default")
+        reset.assert_not_called()
+
+    def test_populated_child_database_keeps_normal_sequence_reset(self):
+        with (
+            patch("core.tests.migration_harness._is_isolated_child", return_value=True),
+            patch.object(connection.introspection, "table_names", return_value=["auth_group"]),
+            patch("django.test.TransactionTestCase._reset_sequences") as reset,
+        ):
+            IsolatedMigrationTestCase._reset_sequences("default")
+        reset.assert_called_once_with("default")
+
     def test_child_database_names_are_scoped_and_distinct(self):
         first = _child_database_name("core/tests/test_issue183_alert_migration.py::TestA::test_one", 101)
         second = _child_database_name("core/tests/test_issue183_alert_migration.py::TestB::test_two", 102)

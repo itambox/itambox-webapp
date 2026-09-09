@@ -11,7 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, connections
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 
@@ -507,6 +507,16 @@ def isolate_migration_tests(test_class):
 
 class IsolatedMigrationTestCase(TransactionTestCase):
     databases = {"default"} if _is_isolated_child() else set()
+
+    @staticmethod
+    def _reset_sequences(db_name):
+        # Children deliberately start with no current-model tables. Django's
+        # sequence list comes from the app registry, not the historical schema.
+        # An empty database has nothing to reset; populated databases retain
+        # the ordinary reset semantics before the migration test runs.
+        if _is_isolated_child() and not connections[db_name].introspection.table_names():
+            return
+        TransactionTestCase._reset_sequences(db_name)
 
     @classmethod
     def setUpClass(cls):
