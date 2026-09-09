@@ -13,7 +13,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import close_old_connections, connection, connections, transaction
 
 from assets.models.catalog import AssetType, AssetTypeFieldset, Manufacturer
-from assets.services.specifications._command_support import load_effective_definition, resource_revision_for_owner
+from assets.services.specifications._command_support import (
+    load_effective_definition,
+    load_prospective_definition,
+    resource_revision_for_owner,
+)
 from assets.services.specifications.commands import set_asset_type_composition, update_asset_type_specifications
 from assets.services.specifications.contracts import (
     CommandRejectedDTO,
@@ -57,9 +61,17 @@ def composition_race_type():
     return owner, first, second, actor
 
 
-def _type_plan(owner):
+def _type_plan(owner, proposed_fieldset=None):
     owner.refresh_from_db()
-    definition, _ = load_effective_definition(owner.pk, "asset_type", tuple(owner.custom_field_data))
+    if proposed_fieldset is None:
+        definition, _ = load_effective_definition(owner.pk, "asset_type", tuple(owner.custom_field_data))
+    else:
+        # T01's adopted composition contract pins the proposed preview revision.
+        definition, _, _ = load_prospective_definition(
+            (f"{proposed_fieldset.namespace}/{proposed_fieldset.slug}",),
+            "asset_type",
+            tuple(owner.custom_field_data),
+        )
     return resource_revision_for_owner(owner), definition.revision
 
 
@@ -144,20 +156,21 @@ def _finish(started):
 @pytest.mark.parametrize("first_writer", ["value", "composition"])
 def test_actual_composition_and_value_commands_serialize_and_reject_stale_plan(composition_race_type, first_writer):
     owner, first, second, actor = composition_race_type
-    plan = _type_plan(owner)
+    value_plan = _type_plan(owner)
+    composition_plan = _type_plan(owner, second)
     started = None
     try:
         with transaction.atomic():
             if first_writer == "value":
-                result = _value(owner, actor, plan)
+                result = _value(owner, actor, value_plan)
 
                 def target():
-                    return _composition(owner, second, actor, plan)
+                    return _composition(owner, second, actor, composition_plan)
             else:
-                result = _composition(owner, second, actor, plan)
+                result = _composition(owner, second, actor, composition_plan)
 
                 def target():
-                    return _value(owner, actor, plan)
+                    return _value(owner, actor, value_plan)
 
             assert isinstance(result, OwnerChangedDTO)
             started = _start(target)
@@ -184,7 +197,7 @@ def test_actual_composition_and_value_commands_serialize_and_reject_stale_plan(c
 )
 def test_composition_reauthorizes_and_reloads_after_observed_wait(composition_race_type, change, code):
     owner, first, second, actor = composition_race_type
-    plan = _type_plan(owner)
+    plan = _type_plan(owner, second)
     started = None
     try:
         with transaction.atomic(), catalogue_transaction_lock(exclusive=True):
@@ -229,7 +242,7 @@ def test_empty_current_and_proposed_library_fieldsets_contend_before_owner_lock(
         )
     owner.fieldset_memberships.all().delete()
     AssetTypeFieldset.objects.create(asset_type=owner, fieldset=groups[0], position=1)
-    plan = _type_plan(owner)
+    plan = _type_plan(owner, groups[1])
     started = None
     try:
         with transaction.atomic():

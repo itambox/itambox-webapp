@@ -84,10 +84,9 @@ def _build_t15_custom_field(definition, initial_value=None, *, has_stored_value=
         # distinction so required false is a valid persisted value while
         # omission remains invalid. Nullable booleans also need the explicit
         # null option, which a checkbox cannot represent.
-        if definition.required:
-            choices = (("true", _("Yes")), ("false", _("No")))
-        else:
-            choices = (("", _("Unset")), ("true", _("Yes")), ("false", _("No")))
+        # The empty first choice makes the HTML control required as well;
+        # without it browsers silently select true for an unset required value.
+        choices = (("", _("Unset")), ("true", _("Yes")), ("false", _("No")))
         if definition.nullable:
             choices = (*choices, ("__null__", _("Explicit null")))
         if has_stored_value:

@@ -11,7 +11,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import connection
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from assets.models.asset import Asset
 from assets.models.catalog import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
@@ -20,13 +20,16 @@ from assets.services.specifications._command_support import (
     load_effective_definition,
     load_prospective_definition,
     resource_revision_for_owner,
+    stale_revision_issues,
 )
 from assets.services.specifications.commands import set_asset_type_composition, set_category_defaults
 from assets.services.specifications.contracts import (
     CommandRejectedDTO,
+    DefinitionRevision,
     ExplicitFieldsetSelectionDTO,
     OwnerChangedDTO,
     OwnerNoOpDTO,
+    ResourceRevision,
     SpecificationPatchDTO,
 )
 from core.models import ObjectChange
@@ -790,3 +793,23 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertIsInstance(result, CommandRejectedDTO)
         self.assertIsNone(result.safe_owner)
         self.assertEqual(result.issues[0].code, "OBJECT_UNAVAILABLE")
+
+
+class SpecificationRevisionPrecedenceTests(SimpleTestCase):
+    def test_owner_staleness_precedes_definition_staleness(self):
+        issues = stale_revision_issues(
+            expected_resource_revision="owner-old",
+            actual_resource_revision=ResourceRevision("owner-new"),
+            expected_definition_revision="definition-old",
+            actual_definition_revision=DefinitionRevision("definition-new"),
+        )
+        self.assertEqual([issue.code for issue in issues], ["STALE_RESOURCE"])
+
+    def test_definition_staleness_requires_matching_owner_revision(self):
+        issues = stale_revision_issues(
+            expected_resource_revision="owner-current",
+            actual_resource_revision=ResourceRevision("owner-current"),
+            expected_definition_revision="definition-old",
+            actual_definition_revision=DefinitionRevision("definition-new"),
+        )
+        self.assertEqual([issue.code for issue in issues], ["STALE_DEFINITION"])

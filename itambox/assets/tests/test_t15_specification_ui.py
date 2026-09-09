@@ -3,10 +3,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from assets.forms.asset_form import AssetForm
-from assets.forms.assettype_form import AssetTypeForm
+from assets.forms.assettype_form import AssetTypeForm, _build_t15_custom_field
 from extras.models import CustomField
 
 APP_ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +45,26 @@ class AssetFormPresenceTests(SimpleTestCase):
         cleaned = {"cf_optional": False}
         AssetTypeForm._apply_t15_presence(form, cleaned)
         self.assertNotIn("cf_optional", cleaned)
+
+    def test_required_boolean_html_demands_an_explicit_false_or_true(self):
+        definition = SimpleNamespace(
+            name="required_boolean",
+            field_type=CustomField.FIELD_TYPE_BOOLEAN,
+            nullable=False,
+            label="Required boolean",
+            help_text="",
+            required=True,
+            text_max_length=255,
+            regex="",
+            validation_rule=None,
+        )
+        field = _build_t15_custom_field(definition)
+        self.assertTrue(field.required)
+        self.assertTrue(field.widget.use_required_attribute(None))
+        self.assertEqual(field.widget.choices[0][0], "")
+        self.assertIs(field.clean("false"), False)
+        with self.assertRaises(ValidationError):
+            field.clean("")
 
     def test_optional_boolean_has_an_explicit_presence_control(self):
         definition = SimpleNamespace(
