@@ -796,14 +796,14 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
 
 
 class SpecificationRevisionPrecedenceTests(SimpleTestCase):
-    def test_owner_staleness_precedes_definition_staleness(self):
+    def test_stale_owner_and_stale_definition_are_reported_together(self):
         issues = stale_revision_issues(
             expected_resource_revision="owner-old",
             actual_resource_revision=ResourceRevision("owner-new"),
             expected_definition_revision="definition-old",
             actual_definition_revision=DefinitionRevision("definition-new"),
         )
-        self.assertEqual([issue.code for issue in issues], ["STALE_RESOURCE"])
+        self.assertEqual([issue.code for issue in issues], ["STALE_RESOURCE", "STALE_DEFINITION"])
 
     def test_definition_staleness_requires_matching_owner_revision(self):
         issues = stale_revision_issues(

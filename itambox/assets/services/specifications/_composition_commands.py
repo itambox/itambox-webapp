@@ -301,11 +301,26 @@ def _set_type_locked(
     stored_values, current_definition, _current_definitions = current_plan
     actual_resource_revision = resource_revision_for_owner(owner)
     if expected_resource_revision != actual_resource_revision:
+        # A stale owner rejects the request before any fieldset reference is
+        # evaluated. Definition staleness is still reported when it can be
+        # determined: the client's preview revision is compared against the
+        # prospective definition the server builds from the same identities,
+        # falling back to the current definition only when the identities are
+        # not resolvable (the reference check itself stays suppressed).
+        definition_revision = current_definition.revision
+        prospective_plan = _proposed_definition(
+            identities=fieldsets.identities,
+            stored_values=stored_values,
+            owner_ref=owner_ref,
+        )
+        if not isinstance(prospective_plan, CommandRejectedDTO):
+            prospective_definition, _prospective_definitions, _prospective_graph = prospective_plan
+            definition_revision = prospective_definition.revision
         revision_issues = stale_revision_issues(
             expected_resource_revision=expected_resource_revision,
             actual_resource_revision=actual_resource_revision,
             expected_definition_revision=expected_definition_revision,
-            actual_definition_revision=current_definition.revision,
+            actual_definition_revision=definition_revision,
         )
         return rejected(owner_ref, *revision_issues)
 

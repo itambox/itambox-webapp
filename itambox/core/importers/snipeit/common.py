@@ -167,14 +167,14 @@ def _canonical_snipeit_date(definition, value):
 
 
 def _canonical_snipeit_single_select(definition, value):
-    return _snipeit_choice_key(definition, value)
+    return _snipeit_source_choice_key(definition, value)
 
 
 def _canonical_snipeit_multi_select(definition, value):
     values = [item.strip() for item in value.splitlines() if item.strip()] if isinstance(value, str) else value
     if not isinstance(values, list):
         raise ValidationError("Select unique valid choices.", code="INVALID_TYPE")
-    return [_snipeit_choice_key(definition, item) for item in values]
+    return [_snipeit_source_choice_key(definition, item) for item in values]
 
 
 def _canonical_snipeit_text(definition, value):
