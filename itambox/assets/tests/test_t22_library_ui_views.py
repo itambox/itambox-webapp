@@ -83,7 +83,7 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         export_action = re.escape(reverse("assets:type_library_export", kwargs={"pk": library.pk}))
         self.assertRegex(
             detail.content.decode(),
-            rf'<form\b(?=[^>]*action="{export_action}")(?=[^>]*hx-boost="false")',
+            r'<form\b(?=[^>]*action="' + export_action + r'")(?=[^>]*hx-boost="false")',
         )
         self.assertContains(detail, "Immutable release history")
         self.assertContains(detail, "Tenant Asset values")
