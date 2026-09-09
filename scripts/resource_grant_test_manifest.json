@@ -209,7 +209,12 @@
     "itambox/assets/tests/test_t23_postgres.py",
     "itambox/assets/tests/test_t24_writers.py",
     "itambox/assets/tests/test_graphql_specification_mutation_transport.py",
-    "itambox/assets/tests/test_graphql_specification_http.py"
+    "itambox/assets/tests/test_graphql_specification_http.py",
+    "itambox/assets/tests/test_graphql.py",
+    "itambox/assets/tests/test_graphql_adversarial.py",
+    "itambox/assets/tests/test_sec_graphql.py",
+    "itambox/core/tests/test_mitigations_phase3.py",
+    "itambox/core/tests/test_security_boundaries.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -423,7 +428,12 @@
     "itambox/assets/tests/test_t23_postgres.py",
     "itambox/assets/tests/test_t24_writers.py",
     "itambox/assets/tests/test_graphql_specification_mutation_transport.py",
-    "itambox/assets/tests/test_graphql_specification_http.py"
+    "itambox/assets/tests/test_graphql_specification_http.py",
+    "itambox/assets/tests/test_graphql.py",
+    "itambox/assets/tests/test_graphql_adversarial.py",
+    "itambox/assets/tests/test_sec_graphql.py",
+    "itambox/core/tests/test_mitigations_phase3.py",
+    "itambox/core/tests/test_security_boundaries.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
