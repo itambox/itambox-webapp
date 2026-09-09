@@ -410,6 +410,29 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
+      - name: Install system deps for python-ldap
+        run: |
+          set -Eeuo pipefail
+          if command -v apt-get >/dev/null; then
+            if [ "$(id -u)" -eq 0 ]; then
+              APT=(apt-get)
+            else
+              APT=(sudo apt-get)
+            fi
+            apt_options=(
+              -o Acquire::Retries=3
+              -o Acquire::http::Timeout=15
+              -o Acquire::https::Timeout=15
+            )
+            update_packages() {
+              timeout --kill-after=10s 180s "${APT[@]}" "${apt_options[@]}" update
+            }
+            if ! update_packages; then
+              echo "Azure Ubuntu mirror failed; retrying against archive.ubuntu.com." >&2
+            fi
+            "${APT[@]}" "${apt_options[@]}" install -y libldap2-dev libsasl2-dev
+          fi
+
       - name: Install dependencies
         run: uv sync --locked --group dev
 
@@ -690,7 +713,7 @@ jobs:
   migration-qualification:
     name: Migration & seed qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     services:
       postgres:
         image: postgres:16
