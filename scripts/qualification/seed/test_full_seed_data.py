@@ -11,6 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth import get_user_model
+
+User = get_user_model()
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
