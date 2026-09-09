@@ -63,7 +63,8 @@
           {% if can_manage_library %}
             <form method="post"
                   action="{% url 'assets:type_library_export' pk=library.pk %}"
-                  hx-boost="false">
+                  hx-boost="false"
+                  data-submit-loading="false">
               {% csrf_token %}
               {% if export_form.non_field_errors %}
                 <div class="alert alert-danger" role="alert" aria-live="assertive">
