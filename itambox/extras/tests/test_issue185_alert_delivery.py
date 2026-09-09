@@ -1,12 +1,8 @@
-"""extras/tests/test_issue185_alert_delivery.py (migration rehearsals live under scripts/qualification/migrations/)."""
+"extras/tests/test_issue185_alert_delivery.py (migration rehearsals live under scripts/qualification/migrations/)."
 
-"WP-13 (#185): truthful, observable alert-channel delivery failure semantics.\n\nPath B contract: exactly one delivery attempt per planned dispatch; typed\nper-channel outcomes persisted in ``delivery_status``; filterable\n``delivery_outcome``; stable unique delivery ids with idempotent repeated\ninvocation; attempt counter and typed failure queryable in-product; Stable\ninbox lifecycle independent of delivery success; explicit absence of manual\nredelivery (nothing to advertise in UI/API).\n"
-
-import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db import connection, transaction
-from django.db.migrations.executor import MigrationExecutor
+from django.db import transaction
 from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -15,7 +11,6 @@ from rest_framework.test import APITestCase
 
 from core.events import DeliveryDisposition, DeliveryResult
 from core.models import Notification
-from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 from core.tests.mixins import TenantTestMixin
 from extras.filters import AlertLogFilterSet
 from extras.models import AlertLog, AlertRule, NotificationChannel

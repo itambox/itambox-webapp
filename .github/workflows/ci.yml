@@ -709,10 +709,6 @@ jobs:
         if: steps.relevance.outputs.enabled == 'true'
         run: uv sync --locked --group dev
 
-      - name: Apply migrations
-        if: steps.relevance.outputs.enabled == 'true'
-        run: uv run --locked --no-sync python manage.py migrate --noinput
-
       - name: Run migration rehearsals
         if: steps.relevance.outputs.enabled == 'true'
         run: PYTHONPATH=itambox uv run --locked --no-sync python -m pytest scripts/qualification/migrations/ -q

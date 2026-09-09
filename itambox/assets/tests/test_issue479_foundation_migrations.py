@@ -1,18 +1,10 @@
 """assets/tests/test_issue479_foundation_migrations.py (migration rehearsals live under scripts/qualification/migrations/)."""
 
-import hashlib
 import importlib
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from django.contrib.contenttypes.models import ContentType
-from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import SimpleTestCase
-from django.utils import timezone
-
-from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 
 
 class AdoptionPreflightUnitTests(SimpleTestCase):

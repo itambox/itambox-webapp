@@ -2,44 +2,23 @@ import io
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import CommandError, call_command
-from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
-from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
-from assets.forms.asset_form import AssetForm
-from assets.forms.assettype_form import AssetTypeForm
-from assets.models import Asset, AssetType, Category
+from assets.customfields import resolve_asset_type_custom_fields
+from assets.models import AssetType, Category
 from core.management.commands._seed.access import check_seed_access_invariants
-from core.management.commands._seed.catalog import (
-    _get_core_fieldset,
-    _reconcile_core_choice_rows,
-    _reconcile_core_fields,
-    _reconcile_core_fieldsets,
-)
-from core.management.commands._seed.inventory import check_seed_inventory_invariants
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
-from core.models import EmailSettings, Job
+from core.models import Job
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
-from inventory.models import (
-    Accessory,
-    AccessoryAssignment,
-    AccessoryStock,
-    Component,
-    ComponentAllocation,
-    ComponentStock,
-    Consumable,
-    ConsumableAssignment,
-    ConsumableStock,
-)
 from licenses.models import License
 from organization.models import AssetHolder, Membership, Tenant
-from subscriptions.models import SubscriptionAssignment
 
 User = get_user_model()
 
@@ -158,7 +137,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
         self.assertFalse(stored_keys & {"cpu", "ram_gb", "storage_gb", "storage_type", "os_version"})
 
     def test_seed_catalog_validates_field_before_reconciling_object_types(self):
-        from django.contrib.contenttypes.models import ContentType
 
         command = SeedDataCommand(stdout=self.stdout, stderr=self.stderr)
         command._seed_catalog()

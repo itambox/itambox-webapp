@@ -1,36 +1,22 @@
-"Full demo-seed qualification (scripts/qualification/seed/). Run explicitly:\n\nPYTHONPATH=itambox pytest scripts/qualification/seed/\n"
+"""Full demo-seed qualification (scripts/qualification/seed/).
+
+Run explicitly:
+
+    PYTHONPATH=itambox pytest scripts/qualification/seed/
+"""
 
 import io
-import json
-from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
-import pytest
 from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
-from django.contrib.contenttypes.models import ContentType
 from django.core.management import CommandError, call_command
-from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
+from django.test import TransactionTestCase, override_settings
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
-from assets.models import Asset, AssetType, Category
+from assets.models import Asset, AssetType
 from core.management.commands._seed.access import check_seed_access_invariants
-from core.management.commands._seed.catalog import (
-    _get_core_fieldset,
-    _reconcile_core_choice_rows,
-    _reconcile_core_fields,
-    _reconcile_core_fieldsets,
-)
 from core.management.commands._seed.inventory import check_seed_inventory_invariants
-from core.management.commands.seed_data import Command as SeedDataCommand
-from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
-from core.models import EmailSettings, Job
-from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -42,9 +28,10 @@ from inventory.models import (
     ConsumableAssignment,
     ConsumableStock,
 )
-from licenses.models import License
-from organization.models import AssetHolder, Membership, Tenant
+from organization.models import AssetHolder, Membership
 from subscriptions.models import SubscriptionAssignment
+
+User = get_user_model()
 
 
 class FullSeedDataQualificationTests(TransactionTestCase):

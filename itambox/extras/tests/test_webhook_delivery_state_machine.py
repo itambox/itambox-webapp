@@ -1,7 +1,6 @@
 """extras/tests/test_webhook_delivery_state_machine.py (migration rehearsals live under scripts/qualification/migrations/)."""
 
 import ast
-import importlib
 import json
 import logging
 import threading
@@ -10,14 +9,11 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
-import pytest
 import requests
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import close_old_connections, connection
-from django.db.migrations.executor import MigrationExecutor
-from django.db.migrations.operations.special import RunPython
+from django.db import close_old_connections
 from django.test import TransactionTestCase
 from django.utils import timezone
 from django_q.models import Schedule
@@ -25,7 +21,6 @@ from django_q.models import Schedule
 from assets.models import Manufacturer
 from core.events import DeliveryDisposition, DeliveryResult
 from core.managers import set_current_membership, set_current_tenant
-from core.tests.migration_harness import IsolatedMigrationTestCase, isolate_migration_tests
 from core.tests.mixins import TenantTestMixin, grant
 from extras.models import Event, EventRule, WebhookDelivery, WebhookEndpoint
 from extras.services.events import process_event_rules
