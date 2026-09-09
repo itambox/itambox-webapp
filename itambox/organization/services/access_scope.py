@@ -197,10 +197,16 @@ def authentication_revision_for_actor(actor: object) -> AuthenticationRevision:
 
     actor_id = getattr(actor, "pk", None)
     _require_positive_id(actor_id, "actor pk")
+    # The password field itself is never digested. Django's supported session
+    # auth hash is an opaque, salted fingerprint of the stored credentials and
+    # already invalidates when the password changes.
+    session_auth_hash = getattr(actor, "get_session_auth_hash", None)
+    if callable(session_auth_hash):
+        session_auth_hash = session_auth_hash()
     payload = {
-        "version": 1,
+        "version": 2,
         "actor_id": actor_id,
-        "password": str(getattr(actor, "password", "")),
+        "session_auth_hash": str(session_auth_hash or ""),
         "is_active": bool(getattr(actor, "is_active", False)),
         "can_login": bool(getattr(actor, "can_login", True)),
         "last_login": _canonical_datetime(getattr(actor, "last_login", None)),

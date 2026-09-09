@@ -299,7 +299,7 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
         except (PermissionDenied, DjangoValidationError) as exc:
             self._command_error(exc)
         except (TypeError, ValueError) as exc:
-            raise serializers.ValidationError(str(exc)) from exc
+            raise serializers.ValidationError("The submitted specification patch is invalid.") from exc
         finally:
             if stage_id is not None and not succeeded:
                 discard_staged_image(stage_id=stage_id, actor=actor)

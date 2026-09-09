@@ -216,7 +216,8 @@
     "itambox/core/tests/test_mitigations_phase3.py",
     "itambox/core/tests/test_security_boundaries.py",
     "itambox/assets/tests/test_asset_form_fk_scoping.py",
-    "itambox/compliance/tests/test_views.py"
+    "itambox/compliance/tests/test_views.py",
+    "itambox/assets/api/tests/test_error_boundary_disclosure.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -437,7 +438,8 @@
     "itambox/core/tests/test_mitigations_phase3.py",
     "itambox/core/tests/test_security_boundaries.py",
     "itambox/assets/tests/test_asset_form_fk_scoping.py",
-    "itambox/compliance/tests/test_views.py"
+    "itambox/compliance/tests/test_views.py",
+    "itambox/assets/api/tests/test_error_boundary_disclosure.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

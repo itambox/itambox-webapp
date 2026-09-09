@@ -670,7 +670,7 @@ def explicit_fieldset_selection(values: Sequence[str]) -> ExplicitFieldsetSelect
     try:
         return ExplicitFieldsetSelectionDTO(tuple(str(value) for value in values))
     except (TypeError, ValueError) as exc:
-        raise serializers.ValidationError({"fieldsets": str(exc)}) from exc
+        raise serializers.ValidationError({"fieldsets": "Invalid fieldset selection."}) from exc
 
 
 def create_fieldset_selection_from_values(
@@ -685,7 +685,7 @@ def create_fieldset_selection_from_values(
     try:
         explicit = ExplicitFieldsetSelectionDTO(tuple(str(value) for value in (values or ())))
     except (TypeError, ValueError) as exc:
-        raise serializers.ValidationError({"fieldsets": str(exc)}) from exc
+        raise serializers.ValidationError({"fieldsets": "Invalid fieldset selection."}) from exc
     return FieldsetSelectionDTO(presence="explicit", identities=explicit.identities)
 
 

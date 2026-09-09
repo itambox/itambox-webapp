@@ -417,3 +417,22 @@ class SpecificationAccessScopeTests(TestCase):
         result = resolve_access_scope(self._request(tenant_id=TenantId(self.tenant_a.pk)))
 
         self.assertIsInstance(result, AccessScopeDeniedDTO)
+
+
+class AuthenticationRevisionInvalidationTests(TestCase):
+    def test_revision_changes_when_the_password_changes(self):
+        user = User.objects.create_user(username="auth-revision-user", password="first-password")
+        before = authentication_revision_for_actor(user)
+        user.set_password("second-password")
+        user.save(update_fields=["password"])
+        after = authentication_revision_for_actor(user)
+        self.assertNotEqual(before, after)
+
+    def test_revision_is_stable_without_authentication_state_changes(self):
+        user = User.objects.create_user(username="auth-revision-stable", password="stable-password")
+        self.assertEqual(authentication_revision_for_actor(user), authentication_revision_for_actor(user))
+
+    def test_explicit_server_revision_still_wins(self):
+        user = User.objects.create_user(username="auth-revision-explicit", password="stable-password")
+        user.authentication_revision = "server-owned-revision"
+        self.assertEqual(str(authentication_revision_for_actor(user)), "server-owned-revision")

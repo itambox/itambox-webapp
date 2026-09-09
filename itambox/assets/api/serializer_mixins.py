@@ -50,8 +50,12 @@ class CanonicalSpecificationSerializerMixin(serializers.Serializer):
     @staticmethod
     def _command_error(exc):
         if isinstance(exc, PermissionDenied):
-            raise DRFPermissionDenied(str(exc)) from exc
+            raise DRFPermissionDenied("You do not have permission to perform this action.") from exc
         if isinstance(exc, DjangoValidationError):
-            detail = getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or str(exc)
+            message_dict = getattr(exc, "message_dict", None)
+            if isinstance(message_dict, dict) and message_dict:
+                detail = {str(field): "Invalid value." for field in message_dict}
+            else:
+                detail = "The submitted data is invalid."
             raise serializers.ValidationError(detail) from exc
         raise exc

@@ -46,6 +46,7 @@ _PLAN_ACTIONS = ("create", "update", "unchanged", "deprecate", "conflict", "refe
 _PLAN_DECISIONS = ("unchanged", "take_upstream", "keep_local", "abort", "conflict")
 _RESOLUTION_CHOICES = ("keep_local", "take_upstream", "abort")
 
+_DEFAULT_PUBLIC_ERROR = "The submitted library request is invalid."
 _ERROR_MESSAGES = {
     "REFERENCE_CONFLICT": "The submitted library conflicts with existing state.",
     "OWNERSHIP_CONFLICT": "The submitted library is not owned by this scope.",
@@ -56,6 +57,10 @@ _ERROR_MESSAGES = {
     "EXPORT_BLOCKED": "The requested export is blocked.",
     "INVALID_RESOLUTION": "The conflict resolution is invalid.",
     "CONFLICT": "The preview contains unresolved conflicts.",
+    "STALE_RESOURCE": "The submitted request is stale.",
+    "STALE_DEFINITION": "The submitted definition is stale.",
+    "RESOURCE_LIMIT": "The submitted library exceeds the resource limit.",
+    "INVALID_TYPE": "The submitted library request is invalid.",
 }
 _STALE_CODES = frozenset({"STALE_RESOURCE", "STALE_DEFINITION", "STALE_PLAN"})
 _CONFLICT_CODES = frozenset(
@@ -506,7 +511,18 @@ def _flatten_serializer_errors(value: object, path: tuple[str | int, ...] = ()) 
             issues.extend(_flatten_serializer_errors(nested, path + (index,)))
         return issues
     code = str(getattr(value, "code", "invalid")).upper()
-    return [{"code": _transport_error_code(code), "path": list(path), "field_key": None, "message": str(value)}]
+    return [
+        {
+            "code": _transport_error_code(code),
+            "path": list(path),
+            "field_key": None,
+            "message": _public_error_message(_transport_error_code(code)),
+        }
+    ]
+
+
+def _public_error_message(code: str) -> str:
+    return _ERROR_MESSAGES.get(code, _DEFAULT_PUBLIC_ERROR)
 
 
 def _transport_error_code(code: str) -> str:
@@ -527,15 +543,14 @@ def _command_error_response(exc: LibraryCommandError | LibraryApplyError | Libra
                 "code": str(issue.code),
                 "path": [part for part in issue.path],
                 "field_key": None,
-                "message": str(issue.message),
+                "message": _public_error_message(str(issue.code)),
             }
             for issue in raw_issues
         )
     else:
         code = str(getattr(exc, "code", "UNSUPPORTED_STRUCTURE"))
         path = tuple(getattr(exc, "path", ()))
-        message = str(getattr(exc, "message", None) or str(exc) or code)
-        issues = ({"code": code, "path": list(path), "field_key": None, "message": message},)
+        issues = ({"code": code, "path": list(path), "field_key": None, "message": _public_error_message(code)},)
     return _error_response(issues)
 
 
@@ -559,7 +574,7 @@ def _error_response(issues: Sequence[Mapping[str, object]]) -> Response:
         {
             "error": {
                 "code": first_code,
-                "message": _ERROR_MESSAGES.get(first_code, str(normalized[0]["message"])),
+                "message": _public_error_message(first_code),
                 "issues": list(normalized),
             }
         },
