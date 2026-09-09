@@ -617,3 +617,106 @@ jobs:
       - name: Lint (ESLint)
         working-directory: ./itambox
         run: npx eslint static/src
+
+  # Historical migration rehearsals and the full demo-seed qualification were
+  # moved out of the ordinary serial_only lane (scripts/qualification/). They
+  # remain explicitly runnable and execute here only when migration files, the
+  # seed implementation, or the qualification area itself change, plus on
+  # workflow_dispatch (release qualification).
+  migration-qualification:
+    name: Migration & seed qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: itambox_ci
+          POSTGRES_USER: itambox_ci
+          POSTGRES_PASSWORD: itambox_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=2s
+          --health-timeout=2s
+          --health-retries=30
+
+    env:
+      ITAMBOX_ENV: dev
+      ITAMBOX_DB_NAME: itambox_ci
+      ITAMBOX_DB_USER: itambox_ci
+      ITAMBOX_DB_PASSWORD: itambox_ci
+      ITAMBOX_DB_HOST: localhost
+      ITAMBOX_DB_PORT: "5432"
+      ITAMBOX_DB_SSLMODE: disable
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Determine relevance
+        id: relevance
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(itambox/.+migrations/|scripts/qualification/|itambox/core/management/commands/_seed/)'; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python 3.12
+        if: steps.relevance.outputs.enabled == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        if: steps.relevance.outputs.enabled == 'true'
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install system deps for python-ldap
+        if: steps.relevance.outputs.enabled == 'true'
+        run: |
+          set -Eeuo pipefail
+          if command -v apt-get >/dev/null; then
+            if [ "$(id -u)" -eq 0 ]; then
+              APT=(apt-get)
+            else
+              APT=(sudo apt-get)
+            fi
+            apt_options=(
+              -o Acquire::Retries=3
+              -o Acquire::http::Timeout=15
+              -o Acquire::https::Timeout=15
+            )
+            update_packages() {
+              timeout --kill-after=10s 180s "${APT[@]}" "${apt_options[@]}" update
+            }
+            if ! update_packages; then
+              echo "Azure Ubuntu mirror failed; retrying against archive.ubuntu.com." >&2
+            fi
+            "${APT[@]}" "${apt_options[@]}" install -y libldap2-dev libsasl2-dev
+          fi
+
+      - name: Install dependencies
+        if: steps.relevance.outputs.enabled == 'true'
+        run: uv sync --locked --group dev
+
+      - name: Apply migrations
+        if: steps.relevance.outputs.enabled == 'true'
+        run: uv run --locked --no-sync python manage.py migrate --noinput
+
+      - name: Run migration rehearsals
+        if: steps.relevance.outputs.enabled == 'true'
+        run: PYTHONPATH=itambox uv run --locked --no-sync python -m pytest scripts/qualification/migrations/ -q
+
+      - name: Run full demo-seed qualification
+        if: steps.relevance.outputs.enabled == 'true'
+        run: PYTHONPATH=itambox uv run --locked --no-sync python -m pytest scripts/qualification/seed/ -q
