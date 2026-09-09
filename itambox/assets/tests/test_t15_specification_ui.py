@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 
 from assets.forms.asset_form import AssetForm
+from assets.forms.assettype_form import AssetTypeForm
 from extras.models import CustomField
 
 APP_ROOT = Path(__file__).resolve().parents[2]
@@ -19,6 +20,8 @@ class AssetFormPresenceTests(SimpleTestCase):
             nullable=True,
         )
         form = object.__new__(AssetForm)
+        form.is_bound = True
+        form.data = {"cf_instance_note__presence": "null"}
         form.custom_field_presence_keys = {"cf_instance_note": "cf_instance_note__presence"}
         form.custom_field_clear_keys = {}
         form.custom_field_definitions = {"cf_instance_note": definition}
@@ -31,6 +34,41 @@ class AssetFormPresenceTests(SimpleTestCase):
         AssetForm._apply_t15_presence(form, cleaned_data)
 
         self.assertIsNone(cleaned_data["cf_instance_note"])
+
+    def test_asset_type_omitted_value_and_presence_are_not_an_empty_patch(self):
+        form = object.__new__(AssetTypeForm)
+        form.is_bound = True
+        form.data = {}
+        form.custom_field_presence_keys = {"cf_optional": "cf_optional__presence"}
+        form.custom_field_clear_keys = {}
+        cleaned = {"cf_optional": False}
+        AssetTypeForm._apply_t15_presence(form, cleaned)
+        self.assertNotIn("cf_optional", cleaned)
+
+    def test_optional_boolean_has_an_explicit_presence_control(self):
+        definition = SimpleNamespace(
+            name="optional_boolean",
+            field_type=CustomField.FIELD_TYPE_BOOLEAN,
+            nullable=False,
+            label="Optional boolean",
+            help_text="",
+            required=False,
+            text_max_length=255,
+            regex="",
+            validation_rule=None,
+        )
+        resolved = SimpleNamespace(definition=definition, read_only=False, provenance=("local/flags",))
+        form = object.__new__(AssetForm)
+        form.is_bound = False
+        form.data = {}
+        form.instance = SimpleNamespace(pk=None, custom_field_data={})
+        form.fields = {}
+        form.helper = SimpleNamespace(layout=None)
+        form._build_t15_presentation = lambda *args: None
+        with patch("assets.forms.asset_form.resolve_asset_custom_fields", return_value=[resolved]):
+            AssetForm._configure_custom_fields(form, SimpleNamespace())
+        self.assertIn("cf_optional_boolean__presence", form.fields)
+        self.assertEqual(form.fields["cf_optional_boolean__presence"].initial, "")
 
     def test_asset_draft_transport_rehydrates_a_field_after_type_switch(self):
         from django.http import QueryDict

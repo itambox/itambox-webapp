@@ -488,7 +488,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 clear_key = custom_field_clear_key(field.name)
                 self.fields[clear_key] = build_custom_field_clear_form_field()
                 self.custom_field_clear_keys[field_key] = clear_key
-                if not field.required and field.field_type != CustomField.FIELD_TYPE_BOOLEAN:
+                if not field.required:
                     presence_key = f"{field_key}__presence"
                     self.fields[presence_key] = _build_t15_presence_field(field)
                     self.fields[presence_key].widget.attrs["data-specification-presence-for"] = field.name

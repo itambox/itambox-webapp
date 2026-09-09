@@ -558,11 +558,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
             )
             self.fields[key] = field
             field.widget.attrs.update({"data-specification-key": key[3:]})
-            if (
-                not field.disabled
-                and not definition.required
-                and definition.field_type != CustomField.FIELD_TYPE_BOOLEAN
-            ):
+            if not field.disabled and not definition.required:
                 presence_key = f"{key}__presence"
                 self.fields[presence_key] = _build_t15_presence_field(definition)
                 self.fields[presence_key].widget.attrs["data-specification-presence-for"] = key[3:]
@@ -594,6 +590,9 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     def _apply_t15_presence(self, cleaned_data):
         for key, presence_key in self.custom_field_presence_keys.items():
             if self.is_bound and presence_key not in self.data:
+                clear_key = self.custom_field_clear_keys.get(key)
+                if key not in self.data and not (clear_key and cleaned_data.get(clear_key)):
+                    cleaned_data.pop(key, None)
                 continue
             mode = cleaned_data.get(presence_key, "")
             clear_key = self.custom_field_clear_keys.get(key)
