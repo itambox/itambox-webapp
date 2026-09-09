@@ -52,7 +52,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    needs: migration-qualification
     # Parallel and serial lanes run sequentially in this job; the previous
     # 60-minute budget cancelled the serial lane before the certification gates.
     timeout-minutes: 90
@@ -312,26 +311,15 @@ jobs:
       # coverage.py resolves relative_files=true paths at report time against
       # the report command's CWD, so the JSON report (and only it) must be
       # generated from itambox/; the combine step's CWD is irrelevant.
-      - name: Download qualification coverage
-        if: always()
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        continue-on-error: true
-        with:
-          name: qualification-coverage
-          path: artifacts/qualification-coverage
-
       - name: Combine the lane coverage reports
         if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
         working-directory: ./itambox
         run: |
-          COMBINE_INPUTS="../artifacts/.coverage.parallel ../artifacts/.coverage.serial"
-          if [ -s ../artifacts/qualification-coverage/.coverage.qualification ]; then
-            COMBINE_INPUTS="$COMBINE_INPUTS ../artifacts/qualification-coverage/.coverage.qualification"
-          fi
           uv run --locked --no-sync coverage combine \
             --rcfile=../pyproject.toml \
             --data-file=../artifacts/.coverage.combined \
-            $COMBINE_INPUTS
+            ../artifacts/.coverage.parallel \
+            ../artifacts/.coverage.serial
           uv run --locked --no-sync coverage json \
             --rcfile=../pyproject.toml \
             --data-file=../artifacts/.coverage.combined \
@@ -356,6 +344,9 @@ jobs:
             artifacts/node-ids.txt
             artifacts/coverage-parallel.json
             artifacts/coverage-serial-only.json
+            artifacts/.coverage.parallel
+            artifacts/.coverage.serial
+            artifacts/.coverage.combined
           if-no-files-found: error
           retention-days: 30
 
@@ -391,8 +382,69 @@ jobs:
             --expected-node-ids artifacts/node-ids.txt \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
+
+  # Runs after the lane job AND the qualification job so the ratchet can see
+  # the complete measurement without delaying either producer. It combines the
+  # lane reports with the qualification report (when the qualification suites
+  # ran) and then executes the two coverage gates on the union.
+  coverage-gates:
+    name: Coverage gates
+    runs-on: ubuntu-latest
+    needs: [test, migration-qualification]
+    if: always()
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Download lane coverage
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          name: coverage-and-durations-py3.12
+          path: artifacts
+
+      - name: Download qualification coverage
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          name: qualification-coverage
+          path: artifacts/qualification-coverage
+
+      - name: Combine lane and qualification coverage
+        working-directory: ./itambox
+        run: |
+          COMBINE_INPUTS="../artifacts/.coverage.parallel ../artifacts/.coverage.serial"
+          if [ -s ../artifacts/qualification-coverage/.coverage.qualification ]; then
+            COMBINE_INPUTS="$COMBINE_INPUTS ../artifacts/qualification-coverage/.coverage.qualification"
+          fi
+          uv run --locked --no-sync coverage combine \
+            --rcfile=../pyproject.toml \
+            --data-file=../artifacts/.coverage.combined \
+            $COMBINE_INPUTS
+          uv run --locked --no-sync coverage json \
+            --rcfile=../pyproject.toml \
+            --data-file=../artifacts/.coverage.combined \
+            -o ../artifacts/coverage-combined.json
+
       - name: Check the global coverage ratchet
-        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
+        if: always() && hashFiles('artifacts/coverage-combined.json') != ''
         run: |
           python scripts/check_coverage_baseline.py \
             --coverage-json artifacts/coverage-combined.json \
@@ -401,7 +453,7 @@ jobs:
       # Pull requests only: on a push to a protected branch there is no
       # meaningful "changed code" range to hold to the differential target.
       - name: Check differential coverage for changed production code
-        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success' && github.event_name == 'pull_request'
+        if: always() && hashFiles('artifacts/coverage-combined.json') != '' && github.event_name == 'pull_request'
         run: |
           python scripts/check_diff_coverage.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
