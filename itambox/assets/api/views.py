@@ -196,8 +196,15 @@ class AssetStateActionPermissions(TokenPermissions):
 class SpecificationCommandUpdateMixin(SpecificationContractMixin):
     # Preserve the legacy ETag lock without taking it before command locks.
 
+    def _validate_etag(self, request, instance):
+        if getattr(self, "_defer_initial_specification_etag", False):
+            self._defer_initial_specification_etag = False
+            return
+        return super()._validate_etag(request, instance)
+
     def update(self, request, *args, **kwargs):
         data = request.data
+        defer_etag = False
         if isinstance(data, dict):
             needs_definition = "specification_patch" in data
             if "asset_type_id" in data and not needs_definition:
@@ -211,7 +218,14 @@ class SpecificationCommandUpdateMixin(SpecificationContractMixin):
                     needs_definition = submitted_type_id != current.asset_type_id
             if needs_definition and not data.get("expected_definition_revision"):
                 return missing_precondition_response(("expected_definition_revision",))
-        return super().update(request, *args, **kwargs)
+            defer_etag = needs_definition
+        if not defer_etag:
+            return super().update(request, *args, **kwargs)
+        self._defer_initial_specification_etag = True
+        try:
+            return super().update(request, *args, **kwargs)
+        finally:
+            self.__dict__.pop("_defer_initial_specification_etag", None)
 
     def perform_update(self, serializer):
         data = serializer.validated_data
