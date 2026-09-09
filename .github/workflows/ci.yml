@@ -817,7 +817,7 @@ jobs:
           COVERAGE_FILE: ../artifacts/.coverage.qualification
 
       - name: Upload qualification coverage
-        if: always()
+        if: steps.relevance.outputs.enabled == 'true'
         run: |
           mkdir -p artifacts
           if [ ! -s artifacts/.coverage.qualification ]; then
@@ -826,7 +826,7 @@ jobs:
         working-directory: ./itambox
 
       - name: Upload qualification coverage artifact
-        if: always()
+        if: steps.relevance.outputs.enabled == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qualification-coverage
