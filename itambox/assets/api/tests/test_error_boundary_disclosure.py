@@ -6,6 +6,8 @@ from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+import json
+
 from rest_framework.test import APITestCase
 
 from assets.api.serializer_mixins import CanonicalSpecificationSerializerMixin
@@ -67,7 +69,7 @@ class TypeLibraryErrorBoundaryTests(APITestCase):
             ),
         )
         response = _command_error_response(error)
-        body = response.content.decode()
+        body = json.dumps(response.data)
         self.assertNotIn(INTERNAL_SENTINEL, body)
         self.assertEqual(response.status_code, 409)
         data = response.data["error"]
@@ -83,13 +85,13 @@ class TypeLibraryErrorBoundaryTests(APITestCase):
             message=INTERNAL_SENTINEL,
         )
         response = _command_error_response(error)
-        self.assertNotIn(INTERNAL_SENTINEL, response.content.decode())
+        self.assertNotIn(INTERNAL_SENTINEL, json.dumps(response.data))
         self.assertEqual(response.status_code, 409)
 
     def test_unknown_code_falls_back_to_the_generic_public_message(self):
         error = SimpleNamespace(code="MYSTERY_CODE", path=(), issues=(), message=INTERNAL_SENTINEL)
         response = _command_error_response(error)
-        body = response.content.decode()
+        body = json.dumps(response.data)
         self.assertNotIn(INTERNAL_SENTINEL, body)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"]["message"], "The submitted library request is invalid.")
