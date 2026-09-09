@@ -2,6 +2,7 @@ import { test, expect } from '../../../fixtures/test';
 import { requireActiveTenant } from '../../../fixtures/tenant';
 import { deleteOwnedResource, getJsonRows, jsonResponse, type JsonObject } from '../../../helpers/api';
 import { selectTomOption } from '../../../helpers/forms';
+import { createOwnedAsset } from '../../../fixtures/factories/assets';
 
 function seededAssetType(rows: JsonObject[], slug: string): { id: string; slug: string } {
   const row = rows.find((candidate) => candidate.slug === slug);
@@ -18,6 +19,26 @@ function primaryKey(row: JsonObject, label: string): string {
   }
   return String(row.id);
 }
+
+
+test('owned-asset factory persists an explicitly required false', { tag: '@pr' }, async ({
+  api, activeTenant, cleanup, runId,
+}) => {
+  const tenant = requireActiveTenant(activeTenant);
+  const owned = await createOwnedAsset(api, cleanup, tenant.id, runId);
+  const saved = await jsonResponse(await api.get(`/api/assets/assets/${owned.id}/`), 200, 'required false readback');
+  expect(saved.specifications).toMatchObject({ e2e_required_boolean: false });
+  const rejected = await api.post('/api/assets/assets/', {
+    data: {
+      name: `${owned.name} missing required value`,
+      asset_tag: `${owned.assetTag.slice(0, 42)}-MISSING`,
+      asset_type_id: (saved.asset_type as JsonObject).id,
+      tenant_id: tenant.id,
+    },
+  });
+  expect(rejected.status()).toBe(400);
+  expect(await rejected.json()).toHaveProperty('e2e_required_boolean');
+});
 
 test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
   test('preserves a Type A draft through Type B and back to Type A', async ({
@@ -173,12 +194,12 @@ test.describe('assets-owned specification editor', { tag: '@operator' }, () => {
     );
     expect(saved.asset_type).toMatchObject({ id: Number(typeA.id) });
     expect(saved.tenant).toMatchObject({ id: Number(tenant.id), slug: tenant.slug });
-    expect(saved.custom_field_data).toMatchObject({
+    expect(saved.specifications).toMatchObject({
       processor_model: draftProcessor,
       firmware_version: '',
       hot_swap_supported: false,
       e2e_required_boolean: false,
     });
-    expect(Object.prototype.hasOwnProperty.call(saved.custom_field_data, 'hostname')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(saved.specifications, 'hostname')).toBe(false);
   });
 });

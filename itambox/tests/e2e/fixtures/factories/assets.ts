@@ -32,7 +32,9 @@ export async function createOwnedAsset(
 ): Promise<OwnedAsset> {
   const assetTypes = await getJsonRows(request, '/api/assets/asset-types/?limit=100', 'asset type prerequisites');
   expect(assetTypes, 'the seeded E2E database must provide an asset type').not.toHaveLength(0);
-  const assetTypeId = primaryKey(assetTypes[0], 'asset type');
+  const assetType = assetTypes.find((row) => row.slug === 'dell-latitude-5550');
+  if (!assetType) throw new Error('The E2E seed must expose dell-latitude-5550 with its required Boolean.');
+  const assetTypeId = primaryKey(assetType, 'asset type');
   const scope = (options.tagScope || 'asset').replace(/[^a-z0-9-]+/gi, '-');
   const digest = createHash('sha256').update(runId).digest('hex').slice(0, 10);
   const tagPrefix = `E2E-${scope}`.slice(0, 35);
@@ -45,6 +47,7 @@ export async function createOwnedAsset(
       asset_tag: assetTag,
       asset_type_id: assetTypeId,
       tenant_id: tenant,
+      specification_patch: { set: { e2e_required_boolean: false }, clear: [] },
     },
   });
   const body = await jsonResponse(response, 201, 'create owned asset');
@@ -59,5 +62,7 @@ export async function createOwnedAsset(
     }
     await deleteOwnedResource(request, `/api/assets/assets/${id}/`, `delete owned asset ${assetTag}`);
   });
+  const saved = await jsonResponse(await request.get(`/api/assets/assets/${id}/`), 200, 'owned asset persistence');
+  expect(saved.specifications).toMatchObject({ e2e_required_boolean: false });
   return owned;
 }
