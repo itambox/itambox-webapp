@@ -57,6 +57,7 @@ class TestLegacySpecificationHTTPContention(TenantTestMixin, APITransactionTestC
                         url,
                         {
                             "model": "Stale competing native edit",
+                            "expected_definition_revision": str(plan.definition_revision),
                             "specification_patch": {"set": {"http_contention_note": "loser"}, "clear": []},
                         },
                         format="json",
