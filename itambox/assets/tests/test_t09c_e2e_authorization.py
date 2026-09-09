@@ -11,6 +11,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 from django.utils import timezone
 
+from assets.models import AssetType, Manufacturer, StatusLabel
 from assets.specification_adapters import authorization_for_asset
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from organization.services.access_scope import ResolvedAccessAuthorizationDTO
@@ -99,6 +100,10 @@ class E2CE2EPrincipalAuthorizationTests(TestCase):
         )
 
     def test_workflow_provisions_e2e_admin_for_explicit_asset_scope(self):
+        manufacturer = Manufacturer.objects.create(name="E2E workflow manufacturer", slug="e2e-workflow-manufacturer")
+        for slug in ("dell-latitude-5550", "cisco-catalyst-9300"):
+            AssetType.objects.create(manufacturer=manufacturer, model=slug, slug=slug)
+        StatusLabel.objects.create(name="E2E workflow deployable", slug="e2e-workflow-deployable", type="deployable")
         _run_workflow_provisioning(self.tenant, self.secondary_tenant)
 
         e2e_admin = User._base_manager.get(username="e2e-admin")

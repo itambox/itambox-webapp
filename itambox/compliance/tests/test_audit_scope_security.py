@@ -938,9 +938,10 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
         # flag_cold, flag_warm). Each cold/warm pair exercises the same
         # operation against the same fixture size with a different actor;
         # equal pairs prove the cost is constant and independent of the acting
-        # user. The rehome/flag values (19/16/19/16) reflect the Foundation
-        # prefetch graph measured in the CI follow-up; they are exact counts,
-        # not ceilings, so a regression in the audit query plan fails here.
+        # user. Rehome/flag field-limited saves no longer resolve or advance
+        # the unrelated Asset Tag Sequence (two queries per operation). The
+        # resulting 17/14/17/14 values remain exact counts, not ceilings, so
+        # restoring those unrelated queries or growing the audit plan fails.
         self.assertEqual(
             (
                 expected_cold,
@@ -954,7 +955,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 flag_cold,
                 flag_warm,
             ),
-            (4, 1, 6, 3, 13, 13, 19, 16, 19, 16),
+            (4, 1, 6, 3, 13, 13, 17, 14, 17, 14),
         )
 
 

@@ -78,18 +78,12 @@ def _coerce_t15_boolean(value):
 
 
 def _build_t15_custom_field(definition, initial_value=None, *, has_stored_value=False, read_only=False):
-    if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+    if definition.field_type == CustomField.FIELD_TYPE_BOOLEAN and (definition.required or definition.nullable):
         # Required booleans use an explicit two-choice control: Django's
         # BooleanField treats false as missing when required=True.  Keep that
         # distinction so required false is a valid persisted value while
         # omission remains invalid. Nullable booleans also need the explicit
         # null option, which a checkbox cannot represent.
-        if not definition.required and not definition.nullable:
-            field = build_custom_field_form_field(definition, initial_value, read_only=read_only)
-            if field is not None:
-                field.widget.attrs["data-specification-input"] = "1"
-            return field
-
         if definition.required:
             choices = (("true", _("Yes")), ("false", _("No")))
         else:
@@ -239,7 +233,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
     custom_fieldsets = forms.ModelMultipleChoiceField(
         queryset=CustomFieldset.objects.all(),
         required=False,
-        widget=forms.MultipleHiddenInput(attrs={"data-specification-fieldsets": "1", "data-tom-select": ""}),
+        widget=forms.MultipleHiddenInput(attrs={"data-specification-fieldsets": "1"}),
         label=_("Specification fieldsets"),
     )
     specification_fieldsets_presence = forms.CharField(

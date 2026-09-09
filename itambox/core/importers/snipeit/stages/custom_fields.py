@@ -237,7 +237,7 @@ class CustomFieldImporter:
                 raw_choices,
             )
 
-    def _upsert(self, model, asset_ct, choice_set_model, choice_model, row) -> tuple[object, Outcome]:
+    def _upsert(self, model, object_types, choice_set_model, choice_model, row) -> tuple[object, Outcome]:
         source_id = row["id"]
         db_column = row.get("db_column_name") or ""
         raw_name = self._field_name(db_column, source_id)
@@ -283,17 +283,17 @@ class CustomFieldImporter:
         candidate = obj or model()
         for field, value in defaults.items():
             setattr(candidate, field, value)
-        candidate.validate_definition_contract(object_types=[asset_ct])
+        candidate.validate_definition_contract(object_types=object_types)
         if obj:
             if not self.context.dry_run:
                 for field, value in defaults.items():
                     setattr(obj, field, value)
                 obj.save()
-                obj.object_types.set([asset_ct])
+                obj.object_types.set(object_types)
             return obj, "updated"
         if not self.context.dry_run:
             obj = model.objects.create(name=raw_name, **defaults)
-            obj.object_types.add(asset_ct)
+            obj.object_types.set(object_types)
         else:
             obj = model(id=-source_id, name=raw_name, **defaults)
         return obj, "created"
@@ -304,13 +304,15 @@ class CustomFieldImporter:
         choice_model = apps.get_model("extras", "CustomFieldChoice")
         asset_model = apps.get_model("assets", "Asset")
         content_type_model = apps.get_model("contenttypes", "ContentType")
-        asset_ct = content_type_model.objects.get_for_model(asset_model)
+        asset_type_model = apps.get_model("assets", "AssetType")
+        # Imported model Fieldsets define defaults and instance fields together.
+        object_types = tuple(content_type_model.objects.get_for_models(asset_model, asset_type_model).values())
         result = StageResult(self.key)
         self.context.reporter.start(result)
         for row in self.context.client.get_all("/api/v1/fields"):
             try:
                 with transaction.atomic():
-                    obj, outcome = self._upsert(model, asset_ct, choice_set_model, choice_model, row)
+                    obj, outcome = self._upsert(model, object_types, choice_set_model, choice_model, row)
                 db_column = row.get("db_column_name") or ""
                 self.dependencies.custom_fields[db_column] = obj
                 result.counts.record(outcome)

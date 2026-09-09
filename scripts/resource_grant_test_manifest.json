@@ -214,7 +214,9 @@
     "itambox/assets/tests/test_graphql_adversarial.py",
     "itambox/assets/tests/test_sec_graphql.py",
     "itambox/core/tests/test_mitigations_phase3.py",
-    "itambox/core/tests/test_security_boundaries.py"
+    "itambox/core/tests/test_security_boundaries.py",
+    "itambox/assets/tests/test_asset_form_fk_scoping.py",
+    "itambox/compliance/tests/test_views.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py"
@@ -433,7 +435,9 @@
     "itambox/assets/tests/test_graphql_adversarial.py",
     "itambox/assets/tests/test_sec_graphql.py",
     "itambox/core/tests/test_mitigations_phase3.py",
-    "itambox/core/tests/test_security_boundaries.py"
+    "itambox/core/tests/test_security_boundaries.py",
+    "itambox/assets/tests/test_asset_form_fk_scoping.py",
+    "itambox/compliance/tests/test_views.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

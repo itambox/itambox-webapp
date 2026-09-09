@@ -298,7 +298,10 @@ class TestSnipeITImporter(TenantTestMixin):
         asset_type = AssetType._base_manager.get(model="ThinkPad X1")
         assert field.activation == CustomField.ACTIVATION_COMPOSED
         assert field.lifecycle == CustomField.LIFECYCLE_ACTIVE
-        assert set(field.object_types.values_list("app_label", "model")) == {("assets", "asset")}
+        assert set(field.object_types.values_list("app_label", "model")) == {
+            ("assets", "asset"),
+            ("assets", "assettype"),
+        }
         assert fieldset.lifecycle == CustomFieldset.LIFECYCLE_ACTIVE
         assert list(fieldset.field_memberships.values_list("custom_field_id", "position")) == [(field.pk, 1)]
         assert list(asset_type.fieldset_memberships.values_list("fieldset_id", "position")) == [(fieldset.pk, 1)]
@@ -365,7 +368,11 @@ class TestSnipeITImporter(TenantTestMixin):
             ],
         }
 
-        self._run(pages={"/api/v1/fields": fields, "/api/v1/hardware": hardware})
+        fieldsets = {
+            "total": 1,
+            "rows": [{**SNIPE_FIELDSETS["rows"][0], "fields": {"rows": fields["rows"]}}],
+        }
+        self._run(pages={"/api/v1/fields": fields, "/api/v1/fieldsets": fieldsets, "/api/v1/hardware": hardware})
 
         asset = Asset._base_manager.get(asset_tag="NW-0001")
         assert asset.custom_field_data["stage_core_count"] == "16.00"

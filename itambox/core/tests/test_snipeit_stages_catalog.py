@@ -231,7 +231,7 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert created.counts.created == 1
         assert obj.field_type == "single-select"
         assert obj.activation == CustomField.ACTIVATION_COMPOSED
-        assert set(obj.object_types.values_list("app_label", "model")) == {("assets", "asset")}
+        assert set(obj.object_types.values_list("app_label", "model")) == {("assets", "asset"), ("assets", "assettype")}
         assert list(self._active_choices(obj.choice_set).values_list("key", flat=True)) == ["one", "two"]
         assert deps.custom_fields["_snipeit_stage_cpu_105"] == obj
 

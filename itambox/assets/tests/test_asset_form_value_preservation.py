@@ -353,6 +353,29 @@ class AssetFormCommandAdapterTests(TenantTestMixin, TestCase):
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
         return fieldset
 
+    def test_omitted_value_and_presence_leave_stored_value_unchanged(self):
+        definition = self._asset_field("optional_preserved")
+        fieldset = self._fieldset("optional-preserved", definition)
+        asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer, model="Omission device", slug="omission-device"
+        )
+        AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=10)
+        asset = Asset.objects.create(
+            name="Omission asset",
+            asset_tag="OMISSION-1",
+            tenant=self.tenant,
+            asset_type=asset_type,
+            status=self.status,
+            custom_field_data={"optional_preserved": "Keep this value"},
+        )
+        request = RequestFactory().post(f"/assets/{asset.pk}/edit/")
+        request.user = self.user
+        form = AssetForm(request=request, data=_minimal_asset_form_data(asset, self.status, asset_type), instance=asset)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        saved.refresh_from_db()
+        self.assertEqual(saved.custom_field_data["optional_preserved"], "Keep this value")
+
     def test_required_boolean_false_is_persisted_and_read_back(self):
         required_boolean = self._asset_field(
             "required_boolean",

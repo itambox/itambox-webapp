@@ -267,3 +267,29 @@ def test_snipeit_type_composition_explicit_clear_uses_canonical_command(monkeypa
 
     assert command.call_args.kwargs["fieldsets"].identities == ()
     asset_models.load_prospective_definition.assert_called_once_with((), "asset_type", ())
+
+
+def test_snipeit_source_choice_labels_are_translated_to_canonical_keys():
+    from core.importers.snipeit.common import canonicalize_snipeit_custom_field_value
+
+    choices = SimpleNamespace(filter=lambda **_filters: [SimpleNamespace(key="production", label="Production")])
+    definition = SimpleNamespace(field_type="single-select", choice_set=SimpleNamespace(choices=choices))
+    assert canonicalize_snipeit_custom_field_value(definition, "Production") == "production"
+    assert canonicalize_snipeit_custom_field_value(definition, "production") == "production"
+
+
+def test_snipeit_source_choice_translation_rejects_unknown_or_ambiguous_values():
+    from django.core.exceptions import ValidationError
+
+    from core.importers.snipeit.common import canonicalize_snipeit_custom_field_value
+
+    choices = SimpleNamespace(
+        filter=lambda **_filters: [
+            SimpleNamespace(key="production", label="Production"),
+            SimpleNamespace(key="another", label="production"),
+        ]
+    )
+    definition = SimpleNamespace(field_type="single-select", choice_set=SimpleNamespace(choices=choices))
+    for value in ("production", "Unknown", " production ", 1):
+        with pytest.raises(ValidationError):
+            canonicalize_snipeit_custom_field_value(definition, value)
