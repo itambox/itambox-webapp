@@ -119,6 +119,8 @@ class AssetModelImporter:
             raise ValueError("Existing Asset Type specifications are not a JSON object")
         if not self.context.dry_run:
             for field, value in defaults.items():
+                if field == "custom_field_data" and isinstance(value, Mapping):
+                    value = {**(previous_data or {}), **value}
                 setattr(obj, field, value)
             obj.save(update_fields=[*defaults, "updated_at"])
             if fieldset is not _OMITTED_FIELDSET:

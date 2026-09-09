@@ -205,7 +205,6 @@ def test_asset_dry_run_writer_stores_connector_identity_without_archive_metadata
 
     obj, outcome = importer._upsert(
         DryAssetType,
-        object(),
         {"id": 9, "name": "Stage Model", "manufacturer": {"id": 1}},
     )
 
@@ -244,7 +243,7 @@ def test_type_update_preserves_unrequested_historical_keys():
         deleted_at=None,
         management_kind="local",
         custom_field_data=values,
-        save=lambda: None,
+        save=lambda **_kwargs: None,
     )
     importer = AssetModelImporter(
         SimpleNamespace(update=True, dry_run=False),
@@ -253,7 +252,6 @@ def test_type_update_preserves_unrequested_historical_keys():
     result, outcome = importer._update_existing(
         obj,
         {"custom_field_data": {}},
-        None,
         _OMITTED_FIELDSET,
     )
     assert result is obj
