@@ -454,18 +454,21 @@ jobs:
       - name: Combine lane and qualification coverage
         working-directory: ./itambox
         run: |
-          COMBINE_INPUTS="../artifacts/.coverage.parallel ../artifacts/.coverage.serial"
           if [ -s ../artifacts/qualification-coverage/.coverage.qualification ]; then
-            COMBINE_INPUTS="$COMBINE_INPUTS ../artifacts/qualification-coverage/.coverage.qualification"
+            uv run --locked --no-sync coverage combine \
+              --rcfile=../pyproject.toml \
+              --data-file=../artifacts/.coverage.gates \
+              ../artifacts/.coverage.combined ../artifacts/qualification-coverage/.coverage.qualification
+            uv run --locked --no-sync coverage json \
+              --rcfile=../pyproject.toml \
+              --data-file=../artifacts/.coverage.gates \
+              -o ../artifacts/coverage-combined.json
+          else
+            uv run --locked --no-sync coverage json \
+              --rcfile=../pyproject.toml \
+              --data-file=../artifacts/.coverage.combined \
+              -o ../artifacts/coverage-combined.json
           fi
-          uv run --locked --no-sync coverage combine \
-            --rcfile=../pyproject.toml \
-            --data-file=../artifacts/.coverage.combined \
-            $COMBINE_INPUTS
-          uv run --locked --no-sync coverage json \
-            --rcfile=../pyproject.toml \
-            --data-file=../artifacts/.coverage.combined \
-            -o ../artifacts/coverage-combined.json
 
       - name: Check the global coverage ratchet
         if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != ''
