@@ -223,8 +223,11 @@ class CatalogConflictValidationTestCase(TestCase):
 
 
 # Database names, caches, media roots, and queue execution are isolated per xdist
-# process by itambox/conftest.py. Only the seed-data methods below retain the
-# serial-only marker because seed_data.handle() resets process-global random state.
+# process by itambox/conftest.py. This TransactionTestCase class stays serial-only
+# as a whole: seed_data.handle() resets process-global random state and the seed
+# commands commit shared catalogue rows (fixed slugs such as "laptops") that
+# collide with parallel-lane fixtures.
+@pytest.mark.serial_only
 class ManagementCommandsTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
@@ -254,7 +257,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
         call_command("run_jobs", stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Job processing complete", self.stdout.getvalue())
 
-    @pytest.mark.serial_only
     def test_seed_data_command(self):
         # Run seed data with --production option to verify minimal bootstrap execution paths.
         # --force is required because seed_data refuses to clear data when DEBUG is off
@@ -496,7 +498,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
         with self.assertRaisesRegex(ValueError, "lifecycle"):
             SeedDataCommand(stdout=self.stdout, stderr=self.stderr)._seed_catalog()
 
-    @pytest.mark.serial_only
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
         with override_settings(SEED_PASSWORD="configured-seed-password"):
             call_command("seed_data", force=True, stdout=self.stdout, stderr=self.stderr)
@@ -642,7 +643,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
         Membership._base_manager.create(user=named_person, tenant=tenant, is_active=True)
         check_seed_access_invariants([named_person])
 
-    @pytest.mark.serial_only
     def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
         # The destructive clear must be blocked outside DEBUG unless --force is passed.
         from django.test import override_settings

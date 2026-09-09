@@ -74,6 +74,11 @@ class E2CE2EPrincipalAuthorizationTests(TestCase):
             permissions=["assets.add_asset", "assets.change_asset"],
         )
         Role.objects.create(
+            tenant=self.secondary_tenant,
+            name="Administrator",
+            permissions=["assets.add_asset", "assets.change_asset"],
+        )
+        Role.objects.create(
             tenant=self.tenant,
             name="Asset Manager",
             permissions=["assets.add_asset", "assets.change_asset"],
@@ -111,6 +116,15 @@ class E2CE2EPrincipalAuthorizationTests(TestCase):
 
         self.assertIsInstance(authorization, ResolvedAccessAuthorizationDTO)
         self.assertEqual(authorization.initial_scope.authorized_tenant_ids, frozenset({self.tenant.pk}))
+
+        # The workflow also provisions the aggregate second tenant so its
+        # tenant-bound token can write Assets there (issue #438 boundary).
+        secondary_authorization = authorization_for_asset(user=e2e_admin, tenant_id=self.secondary_tenant.pk)
+        self.assertIsInstance(secondary_authorization, ResolvedAccessAuthorizationDTO)
+        self.assertEqual(
+            secondary_authorization.initial_scope.authorized_tenant_ids,
+            frozenset({self.secondary_tenant.pk}),
+        )
 
     def test_unprovisioned_superuser_remains_denied(self):
         actor = User.objects.create_user(username="e2e-unprovisioned", password="test-password")
