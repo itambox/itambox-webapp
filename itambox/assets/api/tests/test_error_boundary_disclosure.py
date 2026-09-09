@@ -1,13 +1,12 @@
 """Boundary regression: internal exception text must never become a REST message."""
 
+import json
 from types import SimpleNamespace
 
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
-import json
-
 from rest_framework.test import APITestCase
 
 from assets.api.serializer_mixins import CanonicalSpecificationSerializerMixin
