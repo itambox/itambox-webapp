@@ -305,7 +305,7 @@ def test_command_errors_are_structured_and_preserve_paths():
                     "code": "REFERENCE_CONFLICT",
                     "path": ["definitions", "fields", 0],
                     "field_key": None,
-                    "message": "REFERENCE_CONFLICT",
+                    "message": "The submitted library conflicts with existing state.",
                 }
             ],
         }
