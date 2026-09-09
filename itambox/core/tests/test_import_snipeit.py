@@ -249,8 +249,13 @@ class TestHelpers:
 class TestSnipeITImporter(TenantTestMixin):
     @pytest.fixture(autouse=True)
     def _setup(self, db):
-        self.setup_tenant_context(name="Acme", slug="acme")
+        self.setup_tenant_context(
+            name="Acme",
+            slug="acme",
+            permissions=["assets.change_asset"],
+        )
         self.admin = User.objects.create_superuser(username="impadmin", email="impadmin@example.com", password="pw")
+        self.grant(self.admin, self.tenant, self.tenant_role)
 
     def _run(self, pages=None, dry_run=False, update=False, map_companies=False, skip=None):
         from core.tasks.context import TaskContext
