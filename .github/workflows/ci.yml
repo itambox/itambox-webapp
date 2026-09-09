@@ -52,6 +52,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    needs: migration-qualification
     # Parallel and serial lanes run sequentially in this job; the previous
     # 60-minute budget cancelled the serial lane before the certification gates.
     timeout-minutes: 90
@@ -311,15 +312,26 @@ jobs:
       # coverage.py resolves relative_files=true paths at report time against
       # the report command's CWD, so the JSON report (and only it) must be
       # generated from itambox/; the combine step's CWD is irrelevant.
+      - name: Download qualification coverage
+        if: always()
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          name: qualification-coverage
+          path: artifacts/qualification-coverage
+
       - name: Combine the lane coverage reports
         if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
         working-directory: ./itambox
         run: |
+          COMBINE_INPUTS="../artifacts/.coverage.parallel ../artifacts/.coverage.serial"
+          if [ -s ../artifacts/qualification-coverage/.coverage.qualification ]; then
+            COMBINE_INPUTS="$COMBINE_INPUTS ../artifacts/qualification-coverage/.coverage.qualification"
+          fi
           uv run --locked --no-sync coverage combine \
             --rcfile=../pyproject.toml \
             --data-file=../artifacts/.coverage.combined \
-            ../artifacts/.coverage.parallel \
-            ../artifacts/.coverage.serial
+            $COMBINE_INPUTS
           uv run --locked --no-sync coverage json \
             --rcfile=../pyproject.toml \
             --data-file=../artifacts/.coverage.combined \
@@ -711,8 +723,38 @@ jobs:
 
       - name: Run migration rehearsals
         if: steps.relevance.outputs.enabled == 'true'
-        run: PYTHONPATH=itambox uv run --locked --no-sync python -m pytest scripts/qualification/migrations/ -q
+        working-directory: ./itambox
+        run: |
+          PYTHONPATH=. uv run --locked --no-sync python -m pytest ../scripts/qualification/migrations/ -q \
+            --cov=. --cov-fail-under=0 --cov-config=../pyproject.toml \
+            --cov-report=json:../artifacts/coverage-qualification.json
+        env:
+          COVERAGE_FILE: ../artifacts/.coverage.qualification
 
       - name: Run full demo-seed qualification
         if: steps.relevance.outputs.enabled == 'true'
-        run: PYTHONPATH=itambox uv run --locked --no-sync python -m pytest scripts/qualification/seed/ -q
+        working-directory: ./itambox
+        run: |
+          PYTHONPATH=. uv run --locked --no-sync python -m pytest ../scripts/qualification/seed/ -q \
+            --cov=. --cov-append --cov-fail-under=0 --cov-config=../pyproject.toml \
+            --cov-report=json:../artifacts/coverage-qualification.json
+        env:
+          COVERAGE_FILE: ../artifacts/.coverage.qualification
+
+      - name: Upload qualification coverage
+        if: always()
+        run: |
+          mkdir -p artifacts
+          if [ ! -s artifacts/.coverage.qualification ]; then
+            : > artifacts/.coverage.qualification
+          fi
+        working-directory: ./itambox
+
+      - name: Upload qualification coverage artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qualification-coverage
+          path: itambox/artifacts/.coverage.qualification
+          if-no-files-found: error
+          retention-days: 30
