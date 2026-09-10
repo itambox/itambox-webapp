@@ -9,7 +9,6 @@ from decimal import Decimal
 from django.test import SimpleTestCase
 
 from assets.graphql_specifications.mutations import (
-    DefinitionPayload,
     _decimal_or_none,
     _definition_payload,
     _definition_result,
@@ -35,10 +34,7 @@ from assets.graphql_specifications.mutations import (
     _targets,
     _validation,
 )
-from extras.services.definition_command_contracts import (
-    DefinitionRejectedDTO,
-    DefinitionSuccessDTO,
-)
+from extras.services.definition_command_contracts import DefinitionRejectedDTO
 
 
 class _Value:
