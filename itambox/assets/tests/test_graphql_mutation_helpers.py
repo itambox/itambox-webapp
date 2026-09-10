@@ -7,6 +7,7 @@ rejection branches that the happy-path suites leave uncovered.
 from decimal import Decimal
 
 from django.test import SimpleTestCase
+from graphql import GraphQLError
 
 from assets.graphql_specifications.mutations import (
     _decimal_or_none,
@@ -69,9 +70,9 @@ class MutationHelperTests(SimpleTestCase):
         self.assertEqual(_graphql_path(_issue("X", path=("a",)), prefix_input=True), ("input", "a"))
 
     def test_raise_preview_failure_with_and_without_issues(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(GraphQLError):
             _raise_preview_failure((_issue("STALE_RESOURCE"),))
-        with self.assertRaises(Exception):
+        with self.assertRaises(GraphQLError):
             _raise_preview_failure(())
 
     def test_identity_rejections(self):
