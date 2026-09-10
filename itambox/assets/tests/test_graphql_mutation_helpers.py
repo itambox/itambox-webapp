@@ -38,6 +38,8 @@ from extras.services.definition_command_contracts import DefinitionRejectedDTO
 
 
 class _Value:
+    __slots__ = ("value",)
+
     def __init__(self, value):
         self.value = value
 
