@@ -384,10 +384,17 @@ jobs:
             --summary-file "$GITHUB_STEP_SUMMARY"
 
 
-  # Runs after the lane job AND the qualification job so the ratchet can see
-  # the complete measurement without delaying either producer. It combines the
-  # lane reports with the qualification report (when the qualification suites
-  # ran) and then executes the two coverage gates on the union.
+  # Runs after the lane job AND the qualification job so both reports can be
+  # produced without delaying either producer. The two coverage gates answer
+  # different questions and therefore read different reports:
+  #
+  # * `coverage-lanes.json` is the stable ordinary population -- the parallel
+  #   and serial lanes only. The global ratchet reads it, so whether the
+  #   optional qualification ran on this change set never moves the recorded
+  #   baseline.
+  # * `coverage-combined.json` is the union of this same checkout, including
+  #   the qualification coverage whenever the change set requires it. The
+  #   differential gate reads it.
   coverage-gates:
     name: Coverage gates
     runs-on: ubuntu-latest
@@ -437,24 +444,49 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --group dev
 
+      # The ordinary report is rendered first, on purpose: `coverage combine`
+      # consumes -- and removes -- the `.coverage.combined` data file it reads.
       - name: Download lane coverage
+        if: needs.test.result == 'success'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        continue-on-error: true
         with:
           name: coverage-and-durations-py3.12
           path: artifacts
 
+      - name: Render the ordinary lane report
+        if: always() && needs.test.result == 'success'
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync coverage json \
+            --rcfile=../pyproject.toml \
+            --data-file=../artifacts/.coverage.combined \
+            -o ../artifacts/coverage-lanes.json
+
+      # Required means required: when the change set requires the qualification,
+      # its coverage artifact must arrive intact. A missing, empty, or
+      # unreadable file fails here instead of quietly degrading the differential
+      # measurement to the ordinary lanes.
       - name: Download qualification coverage
+        if: always() && needs.migration-qualification.outputs.enabled == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        continue-on-error: true
         with:
           name: qualification-coverage
           path: artifacts/qualification-coverage
+          if-no-files-found: error
+
+      - name: Verify the required qualification coverage
+        if: always() && needs.migration-qualification.outputs.enabled == 'true'
+        run: |
+          if [ ! -s artifacts/qualification-coverage/.coverage.qualification ]; then
+            echo "::error::the change set requires the migration/seed qualification, but its coverage artifact is missing or empty"
+            exit 1
+          fi
 
       - name: Combine lane and qualification coverage
+        if: always() && needs.test.result == 'success'
         working-directory: ./itambox
         run: |
-          if [ -s ../artifacts/qualification-coverage/.coverage.qualification ]; then
+          if [ "${{ needs.migration-qualification.outputs.enabled }}" = "true" ]; then
             uv run --locked --no-sync coverage combine \
               --rcfile=../pyproject.toml \
               --data-file=../artifacts/.coverage.gates \
@@ -464,21 +496,26 @@ jobs:
               --data-file=../artifacts/.coverage.gates \
               -o ../artifacts/coverage-combined.json
           else
-            uv run --locked --no-sync coverage json \
-              --rcfile=../pyproject.toml \
-              --data-file=../artifacts/.coverage.combined \
-              -o ../artifacts/coverage-combined.json
+            # Legitimately not required: the union of this checkout is the
+            # ordinary lanes, already rendered above.
+            cp ../artifacts/coverage-lanes.json ../artifacts/coverage-combined.json
           fi
 
+      # The global ratchet holds the ordinary lanes against the reviewed
+      # baseline. Qualification coverage is deliberately excluded here: its
+      # presence depends on the change set, and a baseline that moved with it
+      # would compare two different test populations from run to run.
       - name: Check the global coverage ratchet
-        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != ''
+        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-lanes.json') != ''
         run: |
           python scripts/check_coverage_baseline.py \
-            --coverage-json artifacts/coverage-combined.json \
+            --coverage-json artifacts/coverage-lanes.json \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
       # Pull requests only: on a push to a protected branch there is no
       # meaningful "changed code" range to hold to the differential target.
+      # Reads the union of this checkout, so qualification coverage counts for
+      # the changed lines it exercises.
       - name: Check differential coverage for changed production code
         if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != '' && github.event_name == 'pull_request'
         run: |
@@ -488,8 +525,17 @@ jobs:
             --coverage-json artifacts/coverage-combined.json \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload combined coverage JSON
-        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != ''
+      - name: Upload the ordinary lane report
+        if: always() && hashFiles('artifacts/coverage-lanes.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-lanes-json
+          path: artifacts/coverage-lanes.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload the differential union report
+        if: always() && hashFiles('artifacts/coverage-combined.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-combined-json
@@ -727,6 +773,13 @@ jobs:
     name: Migration & seed qualification
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    # The relevance decision is published so the downstream coverage gates can
+    # tell "this change set requires qualification coverage" from "this change
+    # set legitimately does not", instead of inferring it from a possibly
+    # missing artifact.
+    outputs:
+      enabled: ${{ steps.relevance.outputs.enabled }}
+      reason: ${{ steps.relevance.outputs.reason }}
     services:
       postgres:
         image: postgres:16
@@ -764,21 +817,40 @@ jobs:
           # Django migrations, the seed implementation, the migration harness,
           # or the qualification area itself; their coverage then feeds the
           # combined differential measurement.
+          #
+          # When the qualification is required, its coverage is part of the
+          # differential measurement, so this decision fails closed: an
+          # unresolvable base or an uncomputable change set fails the job
+          # instead of defaulting the change to "irrelevant".
+          set -Eeuo pipefail
+          emit() {
+            echo "enabled=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+          }
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            emit true "explicit dispatch: release qualification always runs"
             exit 0
           fi
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch --no-tags origin "${{ github.event.pull_request.base.sha }}" >/dev/null 2>&1 || true
-            if git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" \
-                | grep -Eq '^(itambox/.+migrations/|itambox/core/management/commands/_seed/|itambox/core/management/commands/seed_data.py|itambox/core/tests/migration_harness.py|scripts/qualification/)'; then
-              echo "enabled=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "enabled=false" >> "$GITHUB_OUTPUT"
-            fi
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            emit false "no changed-code range to qualify outside pull requests"
             exit 0
           fi
-          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          base="${{ github.event.pull_request.base.sha }}"
+          git fetch --no-tags origin "$base" >/dev/null 2>&1 || true
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "::error::cannot resolve the pull-request base $base; the relevance of the migration/seed qualification cannot be decided"
+            exit 1
+          fi
+          if ! changed="$(git diff --name-only "$base...HEAD")"; then
+            echo "::error::cannot compute the pull-request change set against $base"
+            exit 1
+          fi
+          if printf '%s\n' "$changed" \
+              | grep -Eq '^(itambox/.+migrations/|itambox/core/management/commands/_seed/|itambox/core/management/commands/seed_data.py|itambox/core/tests/migration_harness.py|scripts/qualification/)'; then
+            emit true "the change set touches migrations, the seed implementation, the migration harness, or the qualification area"
+          else
+            emit false "the change set touches no qualification-relevant path"
+          fi
 
       - name: Set up Python 3.12
         if: steps.relevance.outputs.enabled == 'true'
@@ -848,12 +920,16 @@ jobs:
           # The suites write COVERAGE_FILE relative to ./itambox (../artifacts),
           # which resolves to the repository root; move the real data file into
           # the workspace-relative directory the artifact upload expects.
+          #
+          # A required qualification that wrote no coverage data is an error:
+          # publishing an empty placeholder would silently drop qualification
+          # coverage from the differential measurement instead of failing closed.
           mkdir -p artifacts
-          if [ -s ../artifacts/.coverage.qualification ]; then
-            cp ../artifacts/.coverage.qualification artifacts/.coverage.qualification
-          else
-            : > artifacts/.coverage.qualification
+          if [ ! -s ../artifacts/.coverage.qualification ]; then
+            echo "::error::the change set requires the migration/seed qualification, but it wrote no coverage data"
+            exit 1
           fi
+          cp ../artifacts/.coverage.qualification artifacts/.coverage.qualification
         working-directory: ./itambox
 
       - name: Upload qualification coverage artifact
