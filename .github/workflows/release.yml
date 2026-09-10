@@ -263,12 +263,14 @@ jobs:
             echo "sarif=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Retain draft-image results in Code Scanning
+      - name: Retain reviewed image results in Code Scanning
         if: always() && steps.draft-image-gate.outputs.sarif == 'true'
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: ${{ runner.temp }}/trivy-image.sarif
-          category: trivy-draft-image
+          # Same conceptual scan as the rehearsal, so it shares the analysis
+          # identity instead of opening a second, never-populated configuration.
+          category: trivy-release-image
 
       - name: Enforce draft-image gate
         if: always()

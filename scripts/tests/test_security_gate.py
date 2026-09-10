@@ -252,9 +252,11 @@ class SecurityAutomationContractTests(unittest.TestCase):
         self.assertIn("security-events: write", prepare_release)
         self.assertIn("id: draft-image-gate", prepare_release)
         self.assertIn("steps.draft-image-gate.outputs.sarif == 'true'", prepare_release)
-        self.assertIn("category: trivy-draft-image", prepare_release)
+        self.assertIn("category: trivy-release-image", prepare_release)
+        self.assertNotIn("category: trivy-draft-image", workflow)
+        self.assertEqual(workflow.count("category: trivy-release-image"), 2)
         self.assertLess(
-            prepare_release.index("category: trivy-draft-image"),
+            prepare_release.index("category: trivy-release-image"),
             prepare_release.index("docker save"),
         )
 
