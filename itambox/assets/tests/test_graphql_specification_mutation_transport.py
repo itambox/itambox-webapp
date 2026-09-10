@@ -2,6 +2,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
+from graphql import GraphQLError
+
 from assets.api.specification_api import command_result_response, issue_payload
 from assets.graphql_specifications import mutations
 from assets.services.specifications.contracts import (
@@ -472,6 +475,1108 @@ class GraphQLSpecificationMutationTransportTests(unittest.TestCase):
             signing_key="unit-test-secret",
             resolutions={"action-1": "take_upstream"},
         )
+
+
+class GraphQLSpecificationCommandAdapterTests(unittest.TestCase):
+    pytestmark = pytest.mark.django_db
+
+    """Command-adapter behaviour for the field/fieldset/choice/history surfaces.
+
+    Every test drives the public mutation adapter and asserts the exact command
+    invocation, the rendered rejection code/path and the preserved values.  The
+    domain commands are replaced inside the adapter module so that the assertion
+    is about adapter transport behaviour, not about a second write path.
+    """
+
+    ACTOR = ActorContextDTO(actor_id=ActorId(1), authentication_revision="auth-1")
+
+    def _adapter(self, **extra):
+        patchers = [
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+        ]
+        for name, value in extra.items():
+            patchers.append(patch.object(mutations, name, **value))
+        return patchers
+
+    # -- choice sets ------------------------------------------------------
+
+    def test_create_choice_set_creates_choices_in_declared_order(self):
+        set_command = Mock(return_value=SimpleNamespace(definition_id=70))
+        choice_command = Mock(side_effect=[SimpleNamespace(definition_id=71), SimpleNamespace(definition_id=72)])
+        input_value = {
+            "identity": "acme/colors",
+            "label": "Colors",
+            "choices": [{"key": "red", "label": "Red"}, {"key": "blue", "label": "Blue"}],
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "create_custom_field_choice_set", set_command),
+            patch.object(mutations, "create_custom_field_choice", choice_command),
+        ):
+            result = mutations.CreateChoiceSet.mutate(None, object(), input_value)
+
+        definition = set_command.call_args.kwargs["definition"]
+        self.assertEqual((definition.namespace, definition.slug, definition.label), ("acme", "colors", "Colors"))
+        self.assertEqual(set_command.call_args.kwargs["actor"], self.ACTOR)
+        created = [call.kwargs["definition"] for call in choice_command.call_args_list]
+        self.assertEqual([item.position for item in created], [1, 2])
+        self.assertEqual([item.key for item in created], ["red", "blue"])
+        self.assertEqual([item.label for item in created], ["Red", "Blue"])
+        self.assertEqual([item.choice_set_id for item in created], [70, 70])
+        self.assertIs(result, set_command.return_value)
+
+    def test_create_choice_set_aborts_after_rejected_choice_without_further_writes(self):
+        rejected = mutations._definition_rejection(mutations._issue("REFERENCE_CONFLICT"))
+        set_command = Mock(return_value=SimpleNamespace(definition_id=70))
+        choice_command = Mock(side_effect=[SimpleNamespace(definition_id=71), rejected])
+        input_value = {
+            "identity": "acme/colors",
+            "label": "Colors",
+            "choices": [
+                {"key": "red", "label": "Red"},
+                {"key": "blue", "label": "Blue"},
+                {"key": "green", "label": "Green"},
+            ],
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "create_custom_field_choice_set", set_command),
+            patch.object(mutations, "create_custom_field_choice", choice_command),
+        ):
+            result = mutations.CreateChoiceSet.mutate(None, object(), input_value)
+
+        self.assertIs(result, rejected)
+        self.assertEqual(choice_command.call_count, 2)
+        self.assertEqual([call.kwargs["definition"].key for call in choice_command.call_args_list], ["red", "blue"])
+
+    def test_create_choice_set_renders_invalid_choices_without_dispatching(self):
+        set_command = Mock()
+        choice_command = Mock()
+        input_value = {"identity": "acme/colors", "label": "Colors", "choices": "red"}
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "create_custom_field_choice_set", set_command),
+            patch.object(mutations, "create_custom_field_choice", choice_command),
+        ):
+            payload = mutations.CreateChoiceSet.mutate(None, object(), input_value)
+
+        self.assertIsNone(payload.choice_set)
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "choices"])
+        set_command.assert_not_called()
+        choice_command.assert_not_called()
+
+    def test_create_choice_set_maps_unexpected_command_failure_to_invalid_type(self):
+        set_command = Mock(side_effect=TypeError("bad definition"))
+        input_value = {"identity": "acme/colors", "label": "Colors", "choices": []}
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "create_custom_field_choice_set", set_command),
+            patch.object(mutations, "create_custom_field_choice", Mock()),
+        ):
+            payload = mutations.CreateChoiceSet.mutate(None, object(), input_value)
+
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input"])
+
+    def test_update_choice_set_lifecycle_selects_the_right_command(self):
+        cases = (
+            ("deprecated", None, "deprecate_custom_field_choice_set"),
+            (None, "Renamed", "update_custom_field_choice_set"),
+        )
+        for lifecycle, label, expected_command in cases:
+            with self.subTest(lifecycle=lifecycle, label=label):
+                model = SimpleNamespace(pk=5, lifecycle="active")
+                commands = {
+                    name: Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+                    for name in (
+                        "deprecate_custom_field_choice_set",
+                        "update_custom_field_choice_set",
+                    )
+                }
+                input_value = {"identity": "acme/colors", "expected_resource_revision": "rev-1"}
+                if lifecycle is not None:
+                    input_value["lifecycle"] = lifecycle
+                if label is not None:
+                    input_value["label"] = label
+
+                with (
+                    patch.object(mutations, "_actor", return_value=self.ACTOR),
+                    patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+                    patch.object(mutations, "_definition_model", return_value=model),
+                    patch.object(
+                        mutations, "deprecate_custom_field_choice_set", commands["deprecate_custom_field_choice_set"]
+                    ),
+                    patch.object(
+                        mutations, "update_custom_field_choice_set", commands["update_custom_field_choice_set"]
+                    ),
+                ):
+                    mutations.UpdateChoiceSet.mutate(None, object(), input_value)
+
+                for name, command in commands.items():
+                    if name == expected_command:
+                        command.assert_called_once()
+                        self.assertEqual(command.call_args.kwargs["choice_set_id"], 5)
+                        self.assertEqual(command.call_args.kwargs["expected_resource_revision"], "rev-1")
+                    else:
+                        command.assert_not_called()
+
+    def test_update_choice_set_rejects_policy_change_on_deprecation(self):
+        for label in ("Renamed", None):
+            with self.subTest(label=label):
+                update_command = Mock()
+                deprecate_command = Mock()
+                model = SimpleNamespace(pk=5, lifecycle="active")
+                input_value = {
+                    "identity": "acme/colors",
+                    "expected_resource_revision": "rev-1",
+                    "lifecycle": "deprecated",
+                }
+                if label is not None:
+                    input_value["label"] = label
+
+                with (
+                    patch.object(mutations, "_actor", return_value=self.ACTOR),
+                    patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+                    patch.object(mutations, "_definition_model", return_value=model),
+                    patch.object(mutations, "deprecate_custom_field_choice_set", deprecate_command),
+                    patch.object(mutations, "update_custom_field_choice_set", update_command),
+                ):
+                    result = mutations.UpdateChoiceSet.mutate(None, object(), input_value)
+
+                if label is None:
+                    deprecate_command.assert_called_once()
+                    update_command.assert_not_called()
+                else:
+                    self.assertEqual([issue.code for issue in result.issues], ["UNSUPPORTED_STRUCTURE"])
+                    self.assertEqual([issue.path for issue in result.issues], [()])
+                    deprecate_command.assert_not_called()
+                    update_command.assert_not_called()
+
+    def test_update_choice_set_blocks_reactivation_of_deprecated_set(self):
+        command = Mock()
+        model = SimpleNamespace(pk=5, lifecycle="deprecated")
+        input_value = {
+            "identity": "acme/colors",
+            "expected_resource_revision": "rev-1",
+            "lifecycle": "active",
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=model),
+            patch.object(mutations, "update_custom_field_choice_set", command),
+        ):
+            payload = mutations.UpdateChoiceSet.mutate(None, object(), input_value)
+
+        self.assertEqual([error.code for error in payload.user_errors], ["IMMUTABLE_DEFINITION"])
+        command.assert_not_called()
+
+    def test_update_choice_set_rejects_impact_token_and_unresolved_identity(self):
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "update_custom_field_choice_set", Mock()),
+        ):
+            payload = mutations.UpdateChoiceSet.mutate(
+                None,
+                object(),
+                {
+                    "identity": "acme/colors",
+                    "expected_resource_revision": "rev-1",
+                    "impact_token": "signed-plan",
+                },
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["UNSUPPORTED_STRUCTURE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "impactToken"])
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=None),
+            patch.object(mutations, "update_custom_field_choice_set", Mock()),
+        ):
+            payload = mutations.UpdateChoiceSet.mutate(
+                None,
+                object(),
+                {"identity": "acme/colors", "expected_resource_revision": "rev-1"},
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+        self.assertIsNone(payload.choice_set)
+
+    # -- choices ----------------------------------------------------------
+
+    def test_add_choice_appends_after_the_highest_position(self):
+        choice_set = SimpleNamespace(pk=9, choices=Mock())
+        choice_set.choices.order_by.return_value.values_list.return_value.first.return_value = 4
+        command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+        input_value = {
+            "choice_set": "acme/colors",
+            "expected_resource_revision": "rev-4",
+            "choice": {"key": "green", "label": "Green"},
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "_definition_model", return_value=choice_set),
+            patch.object(mutations, "resource_revision_for_definition", return_value="rev-4"),
+            patch.object(mutations, "create_custom_field_choice", command),
+        ):
+            mutations.AddChoice.mutate(None, object(), input_value)
+
+        definition = command.call_args.kwargs["definition"]
+        self.assertEqual(definition.choice_set_id, 9)
+        self.assertEqual(definition.position, 5)
+        self.assertEqual((definition.key, definition.label), ("green", "Green"))
+
+    def test_add_choice_rejects_stale_choice_set_without_writing(self):
+        choice_set = SimpleNamespace(pk=9, choices=Mock())
+        choice_set.choices.order_by.return_value.values_list.return_value.first.return_value = 4
+        command = Mock()
+        input_value = {
+            "choice_set": "acme/colors",
+            "expected_resource_revision": "rev-9",
+            "choice": {"key": "green", "label": "Green"},
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "_definition_model", return_value=choice_set),
+            patch.object(mutations, "resource_revision_for_definition", return_value="rev-4"),
+            patch.object(mutations, "create_custom_field_choice", command),
+        ):
+            result = mutations.AddChoice.mutate(None, object(), input_value)
+
+        self.assertEqual([issue.code for issue in result.issues], ["STALE_RESOURCE"])
+        command.assert_not_called()
+
+    def test_add_choice_rejects_empty_or_missing_choice_key(self):
+        choice_set = SimpleNamespace(pk=9, choices=Mock())
+        choice_set.choices.order_by.return_value.values_list.return_value.first.return_value = None
+        command = Mock()
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=choice_set),
+            patch.object(mutations, "resource_revision_for_definition", return_value="rev-4"),
+            patch.object(mutations, "create_custom_field_choice", command),
+        ):
+            payload = mutations.AddChoice.mutate(
+                None,
+                object(),
+                {
+                    "choice_set": "acme/colors",
+                    "expected_resource_revision": "rev-4",
+                    "choice": {"key": "", "label": "Green"},
+                },
+            )
+
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "choice", "key"])
+        command.assert_not_called()
+
+    def test_update_choice_handles_deprecate_reactivate_and_relabel(self):
+        choice = SimpleNamespace(pk=33, lifecycle="deprecated")
+        update_command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+        deprecate_command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+
+        def run(**overrides):
+            input_value = {
+                "choice_set": "acme/colors",
+                "key": "red",
+                "expected_resource_revision": "rev-1",
+            }
+            input_value.update(overrides)
+            with (
+                patch.object(mutations, "_actor", return_value=self.ACTOR),
+                patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+                patch.object(mutations, "_definition_model", return_value=choice),
+                patch.object(mutations, "update_custom_field_choice", update_command),
+                patch.object(mutations, "deprecate_custom_field_choice", deprecate_command),
+            ):
+                return mutations.UpdateChoice.mutate(None, object(), input_value)
+
+        update_command.reset_mock()
+        deprecate_command.reset_mock()
+        run(lifecycle="deprecated")
+        self.assertEqual(deprecate_command.call_args.kwargs["choice_id"], 33)
+        self.assertEqual(deprecate_command.call_args.kwargs["expected_resource_revision"], "rev-1")
+        update_command.assert_not_called()
+
+        update_command.reset_mock()
+        deprecate_command.reset_mock()
+        result = run(lifecycle="deprecated", label="Crimson")
+        self.assertEqual([issue.code for issue in result.issues], ["UNSUPPORTED_STRUCTURE"])
+        self.assertEqual([issue.path for issue in result.issues], [()])
+        update_command.assert_not_called()
+        deprecate_command.assert_not_called()
+
+        update_command.reset_mock()
+        result = run(lifecycle="active")
+        self.assertEqual([issue.code for issue in result.issues], ["IMMUTABLE_DEFINITION"])
+        update_command.assert_not_called()
+
+        update_command.reset_mock()
+        run(label="Crimson")
+        self.assertEqual(update_command.call_args.kwargs["choice_id"], 33)
+        self.assertEqual(update_command.call_args.kwargs["changes"].label, "Crimson")
+        self.assertEqual(update_command.call_args.kwargs["changes"].position, None)
+
+    def test_reorder_choices_validates_keys_before_any_definition_lookup(self):
+        cases = (
+            ("not-a-list", "INVALID_TYPE", ("input", "keys")),
+            (["red", "red"], "DUPLICATE_FIELD", ("input", "keys")),
+            (["red", 7], "INVALID_TYPE", ("input", "keys")),
+        )
+        for keys, code, path in cases:
+            with self.subTest(keys=keys):
+                model = Mock()
+                update_command = Mock()
+                with (
+                    patch.object(mutations, "_actor", return_value=self.ACTOR),
+                    patch.object(mutations, "_definition_model", model),
+                    patch.object(mutations, "update_custom_field_choice", update_command),
+                ):
+                    payload = mutations.ReorderChoices.mutate(
+                        None,
+                        object(),
+                        {"choice_set": "acme/colors", "expected_resource_revision": "rev-1", "keys": keys},
+                    )
+                self.assertEqual([error.code for error in payload.user_errors], [code])
+                self.assertEqual(list(payload.user_errors[0].path), list(path))
+                update_command.assert_not_called()
+                model.assert_not_called()
+
+    def test_reorder_choices_rejects_key_sets_that_do_not_match_the_choice_set(self):
+        choice_set = SimpleNamespace(pk=8)
+        choice_set.choices = Mock()
+        choice_set.choices.all.return_value = [
+            SimpleNamespace(pk=1, key="red"),
+            SimpleNamespace(pk=2, key="blue"),
+        ]
+        update_command = Mock()
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=choice_set),
+            patch.object(mutations, "update_custom_field_choice", update_command),
+        ):
+            payload = mutations.ReorderChoices.mutate(
+                None,
+                object(),
+                {"choice_set": "acme/colors", "expected_resource_revision": "rev-1", "keys": ["red", "green"]},
+            )
+
+        self.assertEqual([error.code for error in payload.user_errors], ["REFERENCE_CONFLICT"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "keys"])
+        update_command.assert_not_called()
+
+    def test_reorder_choices_rewrites_positions_then_bumps_the_choice_set(self):
+        choice_set = SimpleNamespace(pk=8, lifecycle="active")
+        choice_set.choices = Mock()
+        choice_set.choices.all.return_value = [
+            SimpleNamespace(pk=1, key="red"),
+            SimpleNamespace(pk=2, key="blue"),
+        ]
+        update_command = Mock(side_effect=[SimpleNamespace(definition_id=1), SimpleNamespace(definition_id=2)])
+        set_command = Mock(return_value=SimpleNamespace(definition_id=8))
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "_definition_model", return_value=choice_set),
+            patch.object(mutations, "resource_revision_for_definition", return_value="rev-1"),
+            patch.object(mutations, "update_custom_field_choice", update_command),
+            patch.object(mutations, "update_custom_field_choice_set", set_command),
+        ):
+            result = mutations.ReorderChoices.mutate(
+                None,
+                object(),
+                {"choice_set": "acme/colors", "expected_resource_revision": "rev-1", "keys": ["blue", "red"]},
+            )
+
+        self.assertEqual([call.kwargs["choice_id"] for call in update_command.call_args_list], [2, 1])
+        self.assertEqual(
+            [call.kwargs["changes"].position for call in update_command.call_args_list],
+            [1, 2],
+        )
+        self.assertEqual(
+            [call.kwargs["expected_resource_revision"] for call in update_command.call_args_list],
+            ["rev-1", "rev-1"],
+        )
+        set_command.assert_called_once()
+        self.assertEqual(set_command.call_args.kwargs["choice_set_id"], 8)
+        self.assertIs(result, set_command.return_value)
+
+    def test_reorder_choices_stops_when_the_choice_set_revision_moved(self):
+        choice_set = SimpleNamespace(pk=8, lifecycle="active")
+        choice_set.choices = Mock()
+        choice_set.choices.all.return_value = [SimpleNamespace(pk=1, key="red")]
+        update_command = Mock()
+        set_command = Mock()
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "_definition_model", return_value=choice_set),
+            patch.object(mutations, "resource_revision_for_definition", return_value="rev-2"),
+            patch.object(mutations, "update_custom_field_choice", update_command),
+            patch.object(mutations, "update_custom_field_choice_set", set_command),
+        ):
+            result = mutations.ReorderChoices.mutate(
+                None,
+                object(),
+                {"choice_set": "acme/colors", "expected_resource_revision": "rev-1", "keys": ["red"]},
+            )
+
+        self.assertEqual([issue.code for issue in result.issues], ["STALE_RESOURCE"])
+        update_command.assert_not_called()
+        set_command.assert_not_called()
+
+    # -- history cleanup --------------------------------------------------
+
+    def test_preview_history_cleanup_requires_asset_authorization(self):
+        with patch.object(mutations, "_asset_authorization", return_value=None):
+            with self.assertRaises(GraphQLError) as context:
+                mutations.PreviewSpecificationHistoryCleanup.mutate(
+                    None,
+                    object(),
+                    **{"owner_id": "11", "target": "asset", "keys": ["serial"]},
+                )
+
+        self.assertEqual(context.exception.extensions["code"], "OBJECT_UNAVAILABLE")
+
+    def test_preview_history_cleanup_dispatches_asset_command_with_revisions(self):
+        command = Mock(
+            return_value=SimpleNamespace(
+                preview_token="signed-plan",
+                expected_definition_revision="definition-2",
+                issues=(),
+            )
+        )
+        with (
+            patch.object(mutations, "_asset_authorization", return_value="authorization"),
+            patch.object(mutations, "_history_revisions", return_value=("resource-1", "definition-2")),
+            patch.object(mutations, "preview_asset_history_cleanup", command),
+        ):
+            preview = mutations.PreviewSpecificationHistoryCleanup.mutate(
+                None,
+                object(),
+                **{"owner_id": "11", "target": "asset", "keys": ["serial", "mac"]},
+            )
+
+        self.assertEqual(command.call_args.kwargs["authorization"], "authorization")
+        self.assertEqual(command.call_args.kwargs["asset_id"], 11)
+        self.assertEqual(command.call_args.kwargs["keys"], ("serial", "mac"))
+        self.assertEqual(command.call_args.kwargs["expected_resource_revision"], "resource-1")
+        self.assertEqual(command.call_args.kwargs["expected_definition_revision"], "definition-2")
+        self.assertEqual(preview.token, "signed-plan")
+        self.assertEqual(preview.definition_revision, "definition-2")
+        self.assertEqual(preview.issues, ())
+
+    def test_preview_history_cleanup_asset_type_rejects_requested_scope(self):
+        with self.assertRaises(GraphQLError) as context:
+            mutations.PreviewSpecificationHistoryCleanup.mutate(
+                None,
+                object(),
+                **{
+                    "owner_id": "11",
+                    "target": "asset_type",
+                    "keys": ["serial"],
+                    "requested_scope": {"kind": "tenant", "tenant_id": "7"},
+                },
+            )
+
+        self.assertEqual(context.exception.extensions["code"], "INVALID_TYPE")
+        self.assertEqual(context.exception.extensions["path"], ["requestedScope"])
+
+    def test_preview_history_cleanup_asset_type_dispatches_actor_command(self):
+        command = Mock(
+            return_value=SimpleNamespace(
+                preview_token="signed-plan",
+                expected_definition_revision="definition-2",
+                issues=(),
+            )
+        )
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_history_revisions", return_value=("resource-1", "definition-2")),
+            patch.object(mutations, "preview_asset_type_history_cleanup", command),
+        ):
+            mutations.PreviewSpecificationHistoryCleanup.mutate(
+                None,
+                object(),
+                **{"owner_id": "11", "target": "asset_type", "keys": ["serial"]},
+            )
+
+        self.assertEqual(command.call_args.kwargs["actor"], self.ACTOR)
+        self.assertEqual(command.call_args.kwargs["asset_type_id"], 11)
+        self.assertNotIn("authorization", command.call_args.kwargs)
+
+    def test_preview_history_cleanup_maps_rejection_and_missing_token_to_graphql_error(self):
+        rejected = CommandRejectedDTO(
+            outcome="rejected",
+            safe_owner=None,
+            issues=(mutations._issue("STALE_RESOURCE"),),
+        )
+        with (
+            patch.object(mutations, "_asset_authorization", return_value="authorization"),
+            patch.object(mutations, "_history_revisions", return_value=("resource-1", "definition-2")),
+            patch.object(mutations, "preview_asset_history_cleanup", Mock(return_value=rejected)),
+        ):
+            with self.assertRaises(GraphQLError) as context:
+                mutations.PreviewSpecificationHistoryCleanup.mutate(
+                    None,
+                    object(),
+                    **{"owner_id": "11", "target": "asset", "keys": ["serial"]},
+                )
+        self.assertEqual(context.exception.extensions["code"], "STALE_RESOURCE")
+        self.assertEqual(context.exception.extensions["path"], ["expectedResourceRevision"])
+
+        tokenless = SimpleNamespace(
+            preview_token=None,
+            expected_definition_revision="definition-2",
+            issues=(),
+        )
+        with (
+            patch.object(mutations, "_asset_authorization", return_value="authorization"),
+            patch.object(mutations, "_history_revisions", return_value=("resource-1", "definition-2")),
+            patch.object(mutations, "preview_asset_history_cleanup", Mock(return_value=tokenless)),
+        ):
+            with self.assertRaises(GraphQLError) as context:
+                mutations.PreviewSpecificationHistoryCleanup.mutate(
+                    None,
+                    object(),
+                    **{"owner_id": "11", "target": "asset", "keys": ["serial"]},
+                )
+        self.assertEqual(context.exception.extensions["code"], "OBJECT_UNAVAILABLE")
+
+    def test_cleanup_history_requires_token_revisions_and_valid_target(self):
+        command = Mock()
+        with (
+            patch.object(mutations, "_asset_authorization", return_value="authorization"),
+            patch.object(mutations, "cleanup_asset_history", command),
+        ):
+            payload = mutations.CleanupSpecificationHistory.mutate(
+                None,
+                object(),
+                {
+                    "target": "asset",
+                    "owner_id": "11",
+                    "keys": ["serial"],
+                    "expected_resource_revision": "resource-1",
+                    "expected_definition_revision": "definition-2",
+                },
+            )
+        self.assertEqual(payload.removed_keys, ())
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "previewToken"])
+        command.assert_not_called()
+
+        with patch.object(mutations, "cleanup_asset_history", command):
+            payload = mutations.CleanupSpecificationHistory.mutate(
+                None,
+                object(),
+                {
+                    "target": "unsupported",
+                    "owner_id": "11",
+                    "keys": ["serial"],
+                    "preview_token": "signed-plan",
+                    "expected_resource_revision": "resource-1",
+                    "expected_definition_revision": "definition-2",
+                },
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "target"])
+        command.assert_not_called()
+
+    def test_cleanup_history_dispatches_per_target_and_reports_removed_keys(self):
+        asset_keys = ("serial", "mac")
+        asset_result = OwnerChangedDTO(
+            outcome="changed",
+            owner=OwnerRefDTO(owner_kind="asset", owner_id=11),
+            resource_revision="resource-2",
+            definition_revision="definition-2",
+        )
+        asset_command = Mock(return_value=asset_result)
+        with (
+            patch.object(mutations, "_asset_authorization", return_value="authorization"),
+            patch.object(mutations, "cleanup_asset_history", asset_command),
+        ):
+            payload = mutations.CleanupSpecificationHistory.mutate(
+                None,
+                object(),
+                {
+                    "target": "asset",
+                    "owner_id": "11",
+                    "keys": list(asset_keys),
+                    "preview_token": "signed-plan",
+                    "expected_resource_revision": "resource-1",
+                    "expected_definition_revision": "definition-2",
+                },
+            )
+        self.assertEqual(payload.removed_keys, tuple(asset_keys))
+        self.assertEqual(payload.user_errors, ())
+        self.assertEqual(asset_command.call_args.kwargs["keys"], asset_keys)
+        self.assertEqual(asset_command.call_args.kwargs["preview_token"], "signed-plan")
+        self.assertEqual(asset_command.call_args.kwargs["asset_id"], 11)
+        self.assertEqual(asset_command.call_args.kwargs["authorization"], "authorization")
+
+        type_command = Mock(return_value=asset_result)
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "cleanup_asset_type_history", type_command),
+        ):
+            payload = mutations.CleanupSpecificationHistory.mutate(
+                None,
+                object(),
+                {
+                    "target": "asset_type",
+                    "owner_id": "11",
+                    "keys": ["serial"],
+                    "preview_token": "signed-plan",
+                    "expected_resource_revision": "resource-1",
+                    "expected_definition_revision": "definition-2",
+                },
+            )
+        self.assertEqual(payload.removed_keys, ("serial",))
+        self.assertEqual(type_command.call_args.kwargs["actor"], self.ACTOR)
+        self.assertEqual(type_command.call_args.kwargs["asset_type_id"], 11)
+
+    def test_cleanup_history_rejects_asset_scope_and_denied_authorization(self):
+        command = Mock()
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "cleanup_asset_type_history", command),
+        ):
+            payload = mutations.CleanupSpecificationHistory.mutate(
+                None,
+                object(),
+                {
+                    "target": "asset_type",
+                    "owner_id": "11",
+                    "keys": ["serial"],
+                    "preview_token": "signed-plan",
+                    "expected_resource_revision": "resource-1",
+                    "expected_definition_revision": "definition-2",
+                    "requested_scope": {"kind": "tenant", "tenant_id": "7"},
+                },
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "requestedScope"])
+        command.assert_not_called()
+
+        with (
+            patch.object(mutations, "_asset_authorization", return_value=None),
+            patch.object(mutations, "cleanup_asset_history", command),
+        ):
+            payload = mutations.CleanupSpecificationHistory.mutate(
+                None,
+                object(),
+                {
+                    "target": "asset",
+                    "owner_id": "11",
+                    "keys": ["serial"],
+                    "preview_token": "signed-plan",
+                    "expected_resource_revision": "resource-1",
+                    "expected_definition_revision": "definition-2",
+                },
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+        self.assertEqual(payload.removed_keys, ())
+        command.assert_not_called()
+
+    # -- category defaults ------------------------------------------------
+
+    def test_apply_category_defaults_requires_every_revision_and_forwards_the_patch(self):
+        command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+        base = {
+            "asset_type_id": "11",
+            "expected_resource_revision": "resource-1",
+            "expected_definition_revision": "definition-2",
+            "expected_category_default_snapshot_revision": "snapshot-3",
+            "preview_token": "signed-plan",
+            "patch": {"set": [{"key": "hostname", "value": {"text": "rack-1"}}], "clear": []},
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "apply_category_defaults", command),
+        ):
+            incomplete = dict(base)
+            del incomplete["expected_category_default_snapshot_revision"]
+            payload = mutations.ApplyCategoryDefaults.mutate(None, object(), incomplete)
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(
+            list(payload.user_errors[0].path),
+            ["input", "expectedCategoryDefaultSnapshotRevision"],
+        )
+        command.assert_not_called()
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_owner_payload", return_value="rendered"),
+            patch.object(mutations, "apply_category_defaults", command),
+        ):
+            rendered = mutations.ApplyCategoryDefaults.mutate(None, object(), base)
+
+        self.assertEqual(rendered, "rendered")
+        kwargs = command.call_args.kwargs
+        self.assertEqual(kwargs["actor"], self.ACTOR)
+        self.assertEqual(kwargs["asset_type_id"], 11)
+        self.assertEqual(kwargs["preview_token"], "signed-plan")
+        self.assertEqual(kwargs["expected_resource_revision"], "resource-1")
+        self.assertEqual(kwargs["expected_definition_revision"], "definition-2")
+        self.assertEqual(kwargs["expected_category_default_snapshot_revision"], "snapshot-3")
+        self.assertEqual(dict(kwargs["patch"].set_values), {"hostname": "rack-1"})
+        self.assertEqual(kwargs["patch"].clear_keys, ())
+
+    def test_preview_apply_category_defaults_reports_input_errors_and_dispatches(self):
+        command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "preview_apply_category_defaults", command),
+        ):
+            payload = mutations.PreviewApplyCategoryDefaults.mutate(
+                None,
+                object(),
+                {
+                    "asset_type_id": "0",
+                    "expected_resource_revision": "resource-1",
+                    "patch": {"set": [], "clear": []},
+                },
+            )
+        self.assertIsNone(payload.preview)
+        self.assertEqual([error.code for error in payload.user_errors], ["INVALID_TYPE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "assetTypeId"])
+        command.assert_not_called()
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_preview_payload", return_value="preview-payload"),
+            patch.object(mutations, "preview_apply_category_defaults", command),
+        ):
+            rendered = mutations.PreviewApplyCategoryDefaults.mutate(
+                None,
+                object(),
+                {
+                    "asset_type_id": 11,
+                    "expected_resource_revision": "resource-1",
+                    "patch": {"set": [], "clear": []},
+                },
+            )
+
+        self.assertEqual(rendered, "preview-payload")
+        self.assertEqual(command.call_args.kwargs["asset_type_id"], 11)
+        self.assertEqual(command.call_args.kwargs["expected_resource_revision"], "resource-1")
+
+    # -- fields and fieldsets ---------------------------------------------
+
+    def test_update_specification_fieldset_selects_membership_or_policy_command(self):
+        model = SimpleNamespace(pk=6, lifecycle="active")
+        commands = {
+            name: Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+            for name in (
+                "deprecate_custom_fieldset",
+                "replace_custom_fieldset_memberships",
+                "update_custom_fieldset",
+            )
+        }
+
+        def run(**overrides):
+            input_value = {
+                "identity": "acme/identity",
+                "expected_resource_revision": "rev-1",
+            }
+            input_value.update(overrides)
+            for command in commands.values():
+                command.reset_mock()
+            with (
+                patch.object(mutations, "_actor", return_value=self.ACTOR),
+                patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+                patch.object(mutations, "_definition_model", return_value=model),
+                patch.object(mutations, "deprecate_custom_fieldset", commands["deprecate_custom_fieldset"]),
+                patch.object(
+                    mutations,
+                    "replace_custom_fieldset_memberships",
+                    commands["replace_custom_fieldset_memberships"],
+                ),
+                patch.object(mutations, "update_custom_fieldset", commands["update_custom_fieldset"]),
+            ):
+                return mutations.UpdateSpecificationFieldset.mutate(None, object(), input_value)
+
+        run(lifecycle="deprecated")
+        commands["deprecate_custom_fieldset"].assert_called_once()
+        self.assertEqual(commands["deprecate_custom_fieldset"].call_args.kwargs["fieldset_id"], 6)
+        commands["update_custom_fieldset"].assert_not_called()
+
+        result = run(lifecycle="deprecated", label="Renamed")
+        self.assertEqual([issue.code for issue in result.issues], ["UNSUPPORTED_STRUCTURE"])
+
+        run(fields=["acme/a", "acme/b"])
+        self.assertEqual(
+            commands["replace_custom_fieldset_memberships"].call_args.kwargs["field_identities"],
+            ("acme/a", "acme/b"),
+        )
+        commands["update_custom_fieldset"].assert_not_called()
+
+        result = run(fields=["acme/a"], label="Renamed")
+        self.assertEqual([issue.code for issue in result.issues], ["UNSUPPORTED_STRUCTURE"])
+        commands["replace_custom_fieldset_memberships"].assert_not_called()
+
+        run(description="Structured identity data")
+        self.assertEqual(
+            commands["update_custom_fieldset"].call_args.kwargs["changes"].description,
+            "Structured identity data",
+        )
+        self.assertIsNone(commands["update_custom_fieldset"].call_args.kwargs["changes"].label)
+
+    def test_update_specification_fieldset_blocks_reactivation_and_scope_errors(self):
+        model = SimpleNamespace(pk=6, lifecycle="deprecated")
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=model),
+            patch.object(mutations, "update_custom_fieldset", Mock()),
+        ):
+            payload = mutations.UpdateSpecificationFieldset.mutate(
+                None,
+                object(),
+                {"identity": "acme/identity", "expected_resource_revision": "rev-1", "lifecycle": "active"},
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["IMMUTABLE_DEFINITION"])
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=None),
+            patch.object(mutations, "update_custom_fieldset", Mock()),
+        ):
+            payload = mutations.UpdateSpecificationFieldset.mutate(
+                None,
+                object(),
+                {"identity": "acme/identity", "expected_resource_revision": "rev-1"},
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+
+    def test_update_specification_field_policy_deprecates_and_preserves_false_required(self):
+        model = SimpleNamespace(pk=4, lifecycle="active")
+        update_command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+        deprecate_command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+
+        def run(**overrides):
+            input_value = {
+                "identity": "acme/rack_owner",
+                "expected_resource_revision": "rev-1",
+            }
+            input_value.update(overrides)
+            update_command.reset_mock()
+            deprecate_command.reset_mock()
+            with (
+                patch.object(mutations, "_actor", return_value=self.ACTOR),
+                patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+                patch.object(mutations, "_definition_model", return_value=model),
+                patch.object(mutations, "update_custom_field", update_command),
+                patch.object(mutations, "deprecate_custom_field", deprecate_command),
+            ):
+                return mutations.UpdateSpecificationFieldPolicy.mutate(None, object(), input_value)
+
+        run(lifecycle="deprecated")
+        self.assertEqual(deprecate_command.call_args.kwargs["field_id"], 4)
+        update_command.assert_not_called()
+
+        result = run(lifecycle="deprecated", label="Renamed")
+        self.assertEqual([issue.code for issue in result.issues], ["UNSUPPORTED_STRUCTURE"])
+        update_command.assert_not_called()
+        deprecate_command.assert_not_called()
+
+        result = run(required=False)
+        self.assertFalse(update_command.call_args.kwargs["changes"].required)
+        self.assertEqual(update_command.call_args.kwargs["changes"].label, None)
+
+        run(label="Rack owner", help_text="Who owns it", required=False, activation="composed")
+        changes = update_command.call_args.kwargs["changes"]
+        self.assertEqual(changes.label, "Rack owner")
+        self.assertEqual(changes.help_text, "Who owns it")
+        self.assertEqual(changes.activation, "composed")
+        self.assertIs(changes.required, False)
+
+    def test_update_specification_field_policy_blocks_reactivation_and_impact_tokens(self):
+        deprecated = SimpleNamespace(pk=4, lifecycle="deprecated")
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=deprecated),
+            patch.object(mutations, "update_custom_field", Mock()),
+        ):
+            payload = mutations.UpdateSpecificationFieldPolicy.mutate(
+                None,
+                object(),
+                {"identity": "acme/rack_owner", "expected_resource_revision": "rev-1", "lifecycle": "active"},
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["IMMUTABLE_DEFINITION"])
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=deprecated),
+            patch.object(mutations, "update_custom_field", Mock()),
+        ):
+            payload = mutations.UpdateSpecificationFieldPolicy.mutate(
+                None,
+                object(),
+                {
+                    "identity": "acme/rack_owner",
+                    "expected_resource_revision": "rev-1",
+                    "impact_token": "signed-plan",
+                },
+            )
+        self.assertEqual([error.code for error in payload.user_errors], ["UNSUPPORTED_STRUCTURE"])
+        self.assertEqual(list(payload.user_errors[0].path), ["input", "impactToken"])
+
+    def test_create_specification_field_resolves_or_rejects_the_choice_set(self):
+        create_command = Mock(return_value=mutations._definition_rejection(mutations._issue("OBJECT_UNAVAILABLE")))
+        input_value = {
+            "key": "rack_owner",
+            "namespace": "acme",
+            "label": "Rack owner",
+            "help_text": "",
+            "targets": ["asset_type"],
+            "activation": "composed",
+            "field_type": "text",
+            "required": False,
+            "nullable": False,
+            "validation": {},
+            "choice_set": "acme/colors",
+        }
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_model", return_value=None),
+            patch.object(mutations, "create_custom_field", create_command),
+        ):
+            payload = mutations.CreateSpecificationField.mutate(None, object(), dict(input_value))
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+        self.assertIsNone(payload.field)
+        create_command.assert_not_called()
+
+        with (
+            patch.object(mutations, "_actor", return_value=self.ACTOR),
+            patch.object(mutations, "_definition_payload", side_effect=lambda result: result),
+            patch.object(mutations, "_definition_model", return_value=SimpleNamespace(pk=12)),
+            patch.object(mutations, "create_custom_field", create_command),
+        ):
+            mutations.CreateSpecificationField.mutate(None, object(), dict(input_value))
+        self.assertEqual(create_command.call_args.kwargs["definition"].choice_set_id, 12)
+
+    def test_definition_payload_maps_missing_definitions_and_views(self):
+        payload = mutations._definition_payload(object())
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+        self.assertIsNone(payload.field)
+
+        success = self._definition_success()
+        with patch.object(
+            mutations, "_definition_view", return_value={"field": None, "fieldset": None, "choice_set": None}
+        ):
+            payload = mutations._definition_payload(success)
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+
+        with patch.object(
+            mutations,
+            "_definition_view",
+            return_value={"field": "field-node", "fieldset": None, "choice_set": None},
+        ):
+            payload = mutations._definition_payload(success)
+        self.assertEqual([error.code for error in payload.user_errors], ["OBJECT_UNAVAILABLE"])
+
+        with patch.object(
+            mutations,
+            "_definition_view",
+            return_value={"field": "field-node", "fieldset": "fieldset-node", "choice_set": "choice-set-node"},
+        ):
+            payload = mutations._definition_payload(success)
+        self.assertEqual(payload.field, "field-node")
+        self.assertEqual(payload.fieldset, "fieldset-node")
+        self.assertEqual(payload.choice_set, "choice-set-node")
+        self.assertEqual(payload.user_errors, ())
+
+    @staticmethod
+    def _definition_success():
+        from extras.services.definition_command_contracts import DefinitionSuccessDTO
+
+        return DefinitionSuccessDTO(
+            outcome="changed",
+            definition_kind="field",
+            definition_id=12,
+            identity="acme/rack_owner",
+            resource_revision="rev-2",
+            lifecycle="active",
+            version=2,
+        )
+
+    # -- shared guards ----------------------------------------------------
+
+    def test_impact_token_guard_rejects_any_token_and_allows_absence(self):
+        mutations._impact_token_guard(mutations._MISSING, path=("input", "impactToken"))
+        mutations._impact_token_guard(None, path=("input", "impactToken"))
+        with self.assertRaises(mutations._InputError) as context:
+            mutations._impact_token_guard("signed-plan", path=("input", "impactToken"))
+        self.assertEqual([issue.code for issue in context.exception.issues], ["UNSUPPORTED_STRUCTURE"])
+        self.assertEqual([issue.path for issue in context.exception.issues], [("input", "impactToken")])
+
+    def test_lifecycle_and_target_guards_report_exact_paths(self):
+        self.assertIsNone(mutations._lifecycle(mutations._MISSING, path=("input", "lifecycle")))
+        self.assertIsNone(mutations._lifecycle(None, path=("input", "lifecycle")))
+        self.assertEqual(mutations._lifecycle("deprecated", path=("input", "lifecycle")), "deprecated")
+        with self.assertRaises(mutations._InputError) as context:
+            mutations._lifecycle("archived", path=("input", "lifecycle"))
+        self.assertEqual([issue.code for issue in context.exception.issues], ["INVALID_TYPE"])
+        self.assertEqual([issue.path for issue in context.exception.issues], [("input", "lifecycle")])
+
+        self.assertEqual(mutations._target("asset"), "asset")
+        self.assertEqual(mutations._target("asset_type"), "asset_type")
+        with self.assertRaises(mutations._InputError) as context:
+            mutations._target("category")
+        self.assertEqual([issue.code for issue in context.exception.issues], ["INVALID_TYPE"])
+        self.assertEqual([issue.path for issue in context.exception.issues], [("input", "target")])
+
+    def test_keys_guard_preserves_order_and_rejects_non_strings(self):
+        self.assertEqual(mutations._keys(["serial", "mac"], path=("input", "keys")), ("serial", "mac"))
+        self.assertEqual(mutations._keys([], path=("input", "keys")), ())
+        with self.assertRaises(mutations._InputError) as context:
+            mutations._keys(["serial", 7], path=("input", "keys"))
+        self.assertEqual([issue.code for issue in context.exception.issues], ["INVALID_TYPE"])
+        self.assertEqual([issue.path for issue in context.exception.issues], [("input", "keys")])
+
+    def test_graphql_path_keeps_declared_paths_and_derives_missing_ones(self):
+        cases = (
+            (mutations._issue("INVALID_TYPE", path=("input", "choices")), True, ("input", "choices")),
+            (mutations._issue("INVALID_TYPE", path=("input", "choices")), False, ("input", "choices")),
+            (
+                mutations._issue("STALE_RESOURCE", path=("input", "expected_resource_revision")),
+                True,
+                ("input", "expected_resource_revision"),
+            ),
+            (mutations._issue("STALE_RESOURCE"), True, ("input", "expectedResourceRevision")),
+            (mutations._issue("STALE_DEFINITION"), True, ("input", "expectedDefinitionRevision")),
+            (mutations._issue("STALE_PLAN"), True, ("input", "previewToken")),
+            (mutations._issue("REFERENCE_CONFLICT"), True, ()),
+            (mutations._issue("INVALID_TYPE", path=("set", "hostname")), True, ("input", "patch", "set", "hostname")),
+            (
+                mutations._issue("INVALID_TYPE", path=("specification_patch", "clear")),
+                True,
+                ("input", "patch", "clear"),
+            ),
+        )
+        for issue, prefix_input, expected in cases:
+            with self.subTest(issue=issue.code, path=issue.path, prefix_input=prefix_input):
+                self.assertEqual(
+                    mutations._graphql_path(issue, prefix_input=prefix_input),
+                    expected,
+                )
 
 
 if __name__ == "__main__":
