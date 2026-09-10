@@ -5,11 +5,11 @@
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
     "num_statements": 64885,
-    "covered_lines": 56111,
-    "line_rate": 86.48,
+    "covered_lines": 57124,
+    "line_rate": 88.04,
     "num_branches": 18380,
-    "covered_branches": 13165,
-    "branch_rate": 71.63,
+    "covered_branches": 13855,
+    "branch_rate": 75.38,
     "excluded_lines": 49,
     "measured_files": 622
   }
