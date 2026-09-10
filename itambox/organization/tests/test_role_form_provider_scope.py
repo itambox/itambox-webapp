@@ -97,7 +97,7 @@ class DeletedProviderCapabilityVocabularyTests(TenantTestMixin, TestCase):
         form = RoleForm(user=self.superuser, tenant=self.tenant)
         self.assertNotIn("shared_with_managed", form.fields)
 
-    def test_matrix_and_custom_permissions_offer_no_manage_star_codenames(self):
+    def test_matrix_and_custom_permissions_offer_only_current_management_capabilities(self):
         """The MATRIX_MODELS / CUSTOM_PERMISSIONS tables the form builds its
         checkboxes from must never reoffer a deleted ``manage_*`` capability
         codename (``manage_staff``, ``manage_provider``, ``manage_groups``,
@@ -115,7 +115,7 @@ class DeletedProviderCapabilityVocabularyTests(TenantTestMixin, TestCase):
             )
         offered_codenames.update(full for _field_key, _label, full in role_form_module.get_custom_permissions())
         manage_star = {c for c in offered_codenames if c.split(".", 1)[-1].startswith("manage_")}
-        self.assertEqual(manage_star, set())
+        self.assertEqual(manage_star, {"extras.manage_specification_library"})
 
     def test_role_model_has_no_scope_or_provider_field(self):
         field_names = {f.name for f in Role._meta.get_fields()}

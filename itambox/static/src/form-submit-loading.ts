@@ -6,10 +6,13 @@
  * to provide crisp visual feedback and prevent accidental double-submits.
  */
 (function () {
+  // Boosted navigation may evaluate the page bundle again on the same body.
+  if (document.body.dataset.submitLoadingBound === 'true') return;
+  document.body.dataset.submitLoadingBound = 'true';
   const activeSubmits: Map<HTMLFormElement, HTMLElement> = new Map();
 
   function showLoadingState(form: HTMLFormElement, submitter?: HTMLElement): void {
-    if (!form || activeSubmits.has(form)) return;
+    if (!form || form.dataset.submitLoading === 'false' || activeSubmits.has(form)) return;
 
     let submitBtn = submitter;
     if (!submitBtn || submitBtn === form) {
@@ -69,7 +72,7 @@
   // --- 1. Traditional Form Submission Event ---
   document.body.addEventListener('submit', function (evt) {
     const form = evt.target as HTMLFormElement;
-    if (form && form.tagName === 'FORM') {
+    if (form && form.tagName === 'FORM' && form.dataset.submitLoading !== 'false') {
       if (form.dataset.submitting === 'true') {
         evt.preventDefault();
         return;

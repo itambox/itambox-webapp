@@ -20,7 +20,7 @@ from extras.webhook_views import (
     WebhookEndpointTestView,
 )
 
-from . import views
+from . import definition_views, views
 
 app_name = "extras"
 
@@ -51,6 +51,47 @@ urlpatterns = [
     path("custom-fieldsets/<int:pk>/", views.CustomFieldsetDetailView.as_view(), name="customfieldset_detail"),
     path("custom-fieldsets/<int:pk>/edit/", views.CustomFieldsetEditView.as_view(), name="customfieldset_update"),
     path("custom-fieldsets/<int:pk>/delete/", views.CustomFieldsetDeleteView.as_view(), name="customfieldset_delete"),
+    # Reusable Choice Sets and Choices
+    path(
+        "choice-sets/",
+        definition_views.ChoiceSetListView.as_view(),
+        name="definition_choice_set_list",
+    ),
+    path(
+        "choice-sets/add/",
+        definition_views.ChoiceSetCreateView.as_view(),
+        name="definition_choice_set_add",
+    ),
+    path(
+        "choice-sets/<int:pk>/",
+        definition_views.ChoiceSetDetailView.as_view(),
+        name="definition_choice_set_detail",
+    ),
+    path(
+        "choice-sets/<int:pk>/edit/",
+        definition_views.ChoiceSetUpdateView.as_view(),
+        name="definition_choice_set_edit",
+    ),
+    path(
+        "choice-sets/<int:pk>/retire/",
+        definition_views.ChoiceSetRetireView.as_view(),
+        name="definition_choice_set_retire",
+    ),
+    path(
+        "choice-sets/<int:choice_set_pk>/choices/add/",
+        definition_views.ChoiceCreateView.as_view(),
+        name="definition_choice_add",
+    ),
+    path(
+        "choice-sets/<int:choice_set_pk>/choices/<int:pk>/edit/",
+        definition_views.ChoiceUpdateView.as_view(),
+        name="definition_choice_edit",
+    ),
+    path(
+        "choice-sets/<int:choice_set_pk>/choices/<int:pk>/retire/",
+        definition_views.ChoiceRetireView.as_view(),
+        name="definition_choice_retire",
+    ),
     # Saved Filters
     path("saved-filters/", views.SavedFilterListView.as_view(), name="savedfilter_list"),
     path("saved-filters/add/", views.SavedFilterEditView.as_view(), name="savedfilter_create"),

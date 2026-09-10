@@ -196,6 +196,16 @@ class GraphQLTestCase(TestCase):
 
         self.graphql_url = reverse("graphql")
 
+    @staticmethod
+    def _tenant_scope(tenant_id):
+        return f"{{ mode: TENANT, tenantId: {json.dumps(str(tenant_id))} }}"
+
+    def _assets_query(self, tenant_id, selection):
+        return f"{{ assets(requestedScope: {self._tenant_scope(tenant_id)}) {{ {selection} }} }}"
+
+    def _asset_query(self, tenant_id, asset_id, selection):
+        return f"{{ asset(id: {json.dumps(str(asset_id))}, requestedScope: {self._tenant_scope(tenant_id)}) {{ {selection} }} }}"
+
     @override_settings(
         DEBUG=True,
         MIDDLEWARE=[m for m in settings.MIDDLEWARE if m != "debug_toolbar.middleware.DebugToolbarMiddleware"],
@@ -229,7 +239,7 @@ class GraphQLTestCase(TestCase):
         self.assertNotIn("https://cdn.jsdelivr.net", response["Content-Security-Policy"])
 
     def test_graphql_post_gated_by_auth(self):
-        query = "{ assets { name } }"
+        query = self._assets_query(self.tenant_a.pk, "name")
         # Unauthenticated POST request should return 401
         response = self.client.post(self.graphql_url, data={"query": query})
         self.assertEqual(response.status_code, 401)
@@ -245,9 +255,42 @@ class GraphQLTestCase(TestCase):
         res_data = response.json()
         self.assertNotIn("errors", res_data)
 
+    def test_asset_list_requires_explicit_scope(self):
+        response = self.client.post(
+            self.graphql_url,
+            data=json.dumps({"query": "{ assets { name } }"}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertNotIn("data", payload)
+        self.assertEqual(
+            payload["errors"][0]["message"],
+            "Field 'assets' argument 'requestedScope' of type 'RequestedScopeSelector!' is required, but it was not provided.",
+        )
+
+    def test_asset_lookup_requires_explicit_scope(self):
+        query = f"{{ asset(id: {json.dumps(str(self.asset_a.pk))}) {{ name }} }}"
+        response = self.client.post(
+            self.graphql_url,
+            data=json.dumps({"query": query}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertNotIn("data", payload)
+        self.assertEqual(
+            payload["errors"][0]["message"],
+            "Field 'asset' argument 'requestedScope' of type 'RequestedScopeSelector!' is required, but it was not provided.",
+        )
+
     def test_tenant_isolation_boundary_query(self):
         # When querying under Tenant A, only Asset A should be returned
-        query = "{ assets { name assetTag } }"
+        query = self._assets_query(self.tenant_a.pk, "name assetTag")
 
         response = self.client.post(
             self.graphql_url,
@@ -262,6 +305,7 @@ class GraphQLTestCase(TestCase):
         self.assertEqual(assets[0]["name"], "Laptop A")
 
         # When querying under Tenant B, only Asset B should be returned
+        query = self._assets_query(self.tenant_b.pk, "name assetTag")
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -276,7 +320,7 @@ class GraphQLTestCase(TestCase):
 
     def test_unauthorized_individual_lookup_returns_none(self):
         # Query asset of Tenant B as Staff A
-        query = f'{{ asset(id: "{self.asset_b.id}") {{ name }} }}'
+        query = self._asset_query(self.tenant_a.pk, self.asset_b.id, "name")
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -353,7 +397,7 @@ class GraphQLTestCase(TestCase):
         self.assertIn("denied", res_data["errors"][0]["message"].lower())
 
     def test_post_request_using_session_auth(self):
-        query = "{ assets { name } }"
+        query = self._assets_query(self.tenant_a.pk, "name")
         self.client.force_login(self.staff_a)
         response = self.client.post(
             self.graphql_url, data=json.dumps({"query": query}), content_type="application/json"

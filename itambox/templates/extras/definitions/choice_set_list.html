@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% block title %}{% translate "Choice sets" %} - ITAMbox{% endblock %}
+{% block page_header %}
+  <h2 class="page-title">{% translate "Choice sets" %}</h2>
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="card-header d-flex align-items-center">
+      <h3 class="card-title mb-0">{% translate "Global choice definitions" %}</h3>
+      {% if can_configure_global and create_url %}
+        <a class="btn btn-primary ms-auto" href="{{ create_url }}">{% translate "Add choice set" %}</a>
+      {% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr>
+            <th>{% translate "Identity" %}</th>
+            <th>{% translate "Label" %}</th>
+            <th>{% translate "Management" %}</th>
+            <th>{% translate "Lifecycle" %}</th>
+            {% if can_configure_global %}
+              <th>{% translate "Usage" %}</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in choice_set_rows %}
+            <tr>
+              <th scope="row">
+                {% if row.detail_url %}<a href="{{ row.detail_url }}">{{ row.choice_set.namespace }}/{{ row.choice_set.slug }}</a>{% else %}{{ row.choice_set.namespace }}/{{ row.choice_set.slug }}{% endif %}
+              </th>
+              <td>{{ row.choice_set.label }}</td>
+              <td>{{ row.choice_set.get_management_kind_display }}</td>
+              <td>{{ row.choice_set.get_lifecycle_display }}</td>
+              {% if can_configure_global %}<td>{{ row.choice_set.active_field_count|default:"0" }} {% translate "fields" %}, {{ row.choice_set.active_choice_count|default:"0" }} {% translate "choices" %}</td>{% endif %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-muted">{% translate "No choice sets are available." %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock content %}

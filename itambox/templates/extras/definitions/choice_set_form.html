@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% block title %}{{ form_title }} - ITAMbox{% endblock %}
+{% block page_header %}<h2 class="page-title">{{ form_title }}</h2>{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% for field in form.visible_fields %}
+          <div class="mb-3">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+        {% if choice_set and choice_set.pk %}
+          <a class="btn btn-outline-secondary ms-2"
+             href="{{ choice_set.get_absolute_url }}">{% translate "Cancel" %}</a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+{% endblock content %}

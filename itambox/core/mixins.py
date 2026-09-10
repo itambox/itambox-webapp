@@ -1,10 +1,37 @@
+from contextlib import contextmanager
+
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from core.choices import ObjectChangeActionChoices
 from core.serialization import serialize_object
 from core.slugs import generate_unique_slug
 from itambox.registry import registry
+
+_SKIP_CUSTOM_FIELD_DATA_VALIDATION = "_skip_custom_field_data_validation"
+
+
+@contextmanager
+def suppress_custom_field_data_validation(instance):
+    """Temporarily suppress the dynamic custom-field validator on one instance.
+
+    The marker is instance state, so it must be restored exactly: a nested or
+    re-entrant suppression has to preserve an existing marker value, and an
+    exception must never leave the instance in a bypassed state. This helper is
+    the single place that manipulates the marker; ModelForm staging and the
+    pre-save signal both use it so their semantics cannot drift apart.
+    """
+    had_marker = hasattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION)
+    previous = getattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, None)
+    setattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, True)
+    try:
+        yield
+    finally:
+        if had_marker:
+            setattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, previous)
+        else:
+            delattr(instance, _SKIP_CUSTOM_FIELD_DATA_VALIDATION)
 
 
 class BookmarkableMixin:
@@ -56,8 +83,24 @@ class CustomFieldDataMixin(models.Model):
         verbose_name=_("Custom Field Data"),
     )
 
+    #: Fields whose limited ``save(update_fields=...)`` must still run the
+    #: dynamic custom-field validator, because changing them alters which
+    #: custom fields are effective for the instance (for example
+    #: ``Asset.asset_type`` changes the composed fieldsets, required fields,
+    #: and Choice Set validity). Concrete models declare their own set; the
+    #: pre-save signal reads it generically so ``core`` stays domain-neutral.
+    custom_field_data_validation_dependencies: frozenset[str] = frozenset()
+
     class Meta:
         abstract = True
+
+    def clean(self):
+        super().clean()
+        if getattr(self, _SKIP_CUSTOM_FIELD_DATA_VALIDATION, False):
+            return
+        validator = registry.get_custom_field_data_validator(type(self))
+        if validator is not None:
+            validator(self)
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -193,13 +236,13 @@ class SoftDeleteMixin(models.Model):
             from django.db import transaction
 
             with transaction.atomic():
-                if hasattr(self, "_changelog_action"):
-                    from core.choices import ObjectChangeActionChoices
-
-                    self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
-
                 if hasattr(self, "snapshot") and callable(self.snapshot):
                     self.snapshot()
+                self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
+
+                if getattr(self, "soft_delete_preserve_references", False):
+                    self.soft_delete()
+                    return
 
                 # Recurse and soft-delete/hard-delete cascading relations
                 from django.db.models.deletion import Collector

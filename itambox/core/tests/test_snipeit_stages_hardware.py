@@ -5,16 +5,29 @@ from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 
 from assets.choices import StatusTypeChoices
-from assets.models import Asset, AssetAssignment, AssetType, Category, Manufacturer, StatusLabel, Supplier, Warranty
+from assets.models import (
+    Asset,
+    AssetAssignment,
+    AssetType,
+    AssetTypeFieldset,
+    Category,
+    Manufacturer,
+    StatusLabel,
+    Supplier,
+    Warranty,
+)
 from assets.services import checkout_asset as checkout_asset_service
 from core.importers.snipeit.common import HardwareCheckoutGateway
 from core.importers.snipeit.contracts import ImportContext, StageReporter
 from core.importers.snipeit.stages.hardware import HardwareDependencies, HardwareImporter
+from core.models import ObjectChange
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
-from extras.models import CustomField
+from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 from organization.models import AssetHolder, Location, Site
 
 User = get_user_model()
@@ -36,7 +49,9 @@ class TestHardwareImporter(TenantTestMixin):
         self.setup_tenant_context(name="Acme", slug="acme")
         self.admin = User.objects.create_superuser(username="impadmin", email="impadmin@example.com", password="pw")
         self.manufacturer = Manufacturer.objects.create(name="Acme Devices", slug="acme-devices")
-        self.category = Category.objects.create(name="Laptops", slug="laptops", applies_to={"asset": True})
+        self.category, _created = Category.objects.get_or_create(
+            slug="laptops", defaults={"name": "Laptops", "applies_to": {"asset": True}}
+        )
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="ThinkPad X1",
@@ -60,7 +75,22 @@ class TestHardwareImporter(TenantTestMixin):
             email="jane@example.com",
             tenant=self.tenant,
         )
-        self.custom_field = CustomField.objects.create(name="cpu_model", label="CPU Model")
+        self.custom_field = CustomField.objects.create(
+            name="cpu_model",
+            label="CPU Model",
+            activation=CustomField.ACTIVATION_COMPOSED,
+        )
+        self.custom_field.object_types.add(ContentType.objects.get_for_model(Asset))
+        self.fieldset = CustomFieldset.objects.create(
+            namespace="test",
+            slug="hardware",
+            label="Hardware",
+        )
+        CustomFieldsetField.objects.create(fieldset=self.fieldset, custom_field=self.custom_field, position=1)
+        AssetTypeFieldset.objects.create(asset_type=self.asset_type, fieldset=self.fieldset, position=1)
+        self.tenant_role.permissions = ["assets.change_asset"]
+        self.tenant_role.save(update_fields=["permissions"])
+        self.specification_grant = self.grant(self.admin, self.tenant, self.tenant_role)
 
     def _row(self, source_id=42, **overrides):
         row = {
@@ -123,6 +153,22 @@ class TestHardwareImporter(TenantTestMixin):
         with TaskContext(tenant_id=self.tenant.pk, user_id=self.admin.pk):
             result = HardwareImporter(context, dependencies).run()
         return result, dependencies, checkout_asset
+
+    def test_revoked_specification_scope_rolls_back_native_values_and_side_effects(self):
+        initial, _dependencies, _checkout = self._run([self._row()])
+        assert initial.counts.created == 1
+        self.specification_grant.delete()
+        models = (Asset, Warranty, ObjectChange)
+        before = {model: list(model._base_manager.order_by("pk").values()) for model in models}
+        callbacks_before = tuple(connection.run_on_commit)
+
+        rejected, dependencies, checkout = self._run([self._row(name="Forbidden native update")], update=True)
+
+        assert rejected.counts.failed == 1
+        assert dependencies.assets == {}
+        checkout.assert_not_called()
+        assert {model: list(model._base_manager.order_by("pk").values()) for model in models} == before
+        assert tuple(connection.run_on_commit) == callbacks_before
 
     def test_persistence_create_warranty_custom_fields_and_map(self):
         result, dependencies, _ = self._run([self._row()])

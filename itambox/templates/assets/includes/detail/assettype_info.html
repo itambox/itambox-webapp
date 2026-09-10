@@ -28,13 +28,14 @@
       <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}
   </dd>
-  <dt class="col-sm-3">{% translate "Custom Fieldset:" %}</dt>
+  <dt class="col-sm-3">{% translate "Specification Sections:" %}</dt>
   <dd class="col-sm-9">
-    {% if object.custom_fieldset %}
-      <a href="{% url 'extras:customfieldset_detail' pk=object.custom_fieldset.pk %}">{{ object.custom_fieldset.name }}</a>
-    {% else %}
+    {% for membership in object.fieldset_memberships.all %}
+      {% if not forloop.first %},{% endif %}
+      <a href="{% url 'extras:customfieldset_detail' pk=membership.fieldset.pk %}">{{ membership.fieldset.label }}</a>
+    {% empty %}
       <span class="text-muted"><i>{% translate "None" %}</i></span>
-    {% endif %}
+    {% endfor %}
   </dd>
   <dt class="col-sm-3">{% translate "Depreciation Policy:" %}</dt>
   <dd class="col-sm-9">

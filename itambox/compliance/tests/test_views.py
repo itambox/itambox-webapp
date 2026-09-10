@@ -522,7 +522,7 @@ class CustodyUXAndPreviewTests(TestCase):
         self.client.login(username=self.user.username, password="testpassword")
 
         self.tenant = baker.make("organization.Tenant", name="Custody UX Tenant", slug="custody-ux")
-        self.category = baker.make("assets.Category", name="Laptops", slug="laptops")
+        self.category = baker.make("assets.Category", name="Laptops", slug="custody-laptops")
         self.template = baker.make(
             CustodyTemplate,
             tenant=self.tenant,
@@ -623,7 +623,7 @@ class CustodyTemplateOverrideTests(TestCase):
         self.tenant_b = baker.make("organization.Tenant", name="Tenant B", slug="tenant-b", group=self.tg)
 
         # Create Category
-        self.category = baker.make("assets.Category", name="Laptops", slug="laptops")
+        self.category = baker.make("assets.Category", name="Custody Override Laptops", slug="custody-override-laptops")
 
         # Create global default template (linked to Category via ForeignKey)
         self.global_template = baker.make(

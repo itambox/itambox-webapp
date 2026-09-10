@@ -3,6 +3,10 @@
 _PURGE_HANDLERS = {}
 
 
+class TombstonePurgeBlocked(RuntimeError):
+    """Raised when a permanent schema tombstone reaches a hard-purge caller."""
+
+
 def register_purge_handler(model_label, handler):
     existing = _PURGE_HANDLERS.get(model_label)
     if existing is not None and existing is not handler:
@@ -11,6 +15,8 @@ def register_purge_handler(model_label, handler):
 
 
 def purge_object(obj):
+    if getattr(obj.__class__, "preserve_tombstones", False):
+        raise TombstonePurgeBlocked(f"Permanent tombstones cannot be purged: {obj._meta.label_lower}")
     handler = _PURGE_HANDLERS.get(obj._meta.label_lower)
     if handler is not None:
         return handler(obj)

@@ -16,6 +16,8 @@ from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
+    is_managed_definition,
+    lock_unmanaged_definition,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import resolve_view_model, safe_return_url
@@ -33,6 +35,12 @@ class ObjectEditView(
     def has_permission(self):
         if not user_can_mutate_model(self.request.user, self._get_model()):
             return False
+        if self.kwargs.get("pk") or self.kwargs.get("slug"):
+            try:
+                if is_managed_definition(self.get_object()):
+                    return False
+            except Http404:
+                raise
         perms = self.get_permission_required()
         return self.request.user.has_perms(perms, obj=PermissionResolver.object_under_check(self))
 
@@ -159,7 +167,9 @@ class ObjectEditView(
                     )
                     return self.form_invalid(form)
 
-        self.object = form.save()
+        write_target = self.object if self.object is not None else form.instance
+        with lock_unmanaged_definition(write_target):
+            self.object = form.save()
         msg_verb = _("Created") if is_creating else _("Modified")
         msg_link = (
             f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>"
@@ -229,7 +239,8 @@ class ObjectCloneView(ObjectEditView):
     """
 
     def get_object(self, queryset=None):
-        self.original_object = get_object_or_404(self.model, pk=self.kwargs["pk"])
+        source_queryset = queryset if queryset is not None else self.get_queryset()
+        self.original_object = get_object_or_404(source_queryset, pk=self.kwargs["pk"])
         cloned = self.original_object.clone()
 
         if hasattr(cloned, "name"):

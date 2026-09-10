@@ -237,7 +237,7 @@ class MultiDashboardTenantScopingTests(TestCase):
         self.mfr = Manufacturer.objects.create(name="Manufacturer X", slug="mfr-x")
         from assets.models import Category
 
-        self.cat = Category.objects.create(name="Laptops", slug="laptops", applies_to={"asset": True})
+        self.cat = Category.objects.create(name="Laptops", slug="dashboard-laptops", applies_to={"asset": True})
         self.asset_type = AssetType.objects.create(
             manufacturer=self.mfr, model="Standard Pro", slug="standard-pro", category=self.cat
         )

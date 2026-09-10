@@ -16,13 +16,402 @@ Designed to be mixed into ``Command`` in seed_data.py:
 and ``self._providers``. It reads ``self._status_label_defs()`` from Command.
 """
 
+from decimal import Decimal
+
+from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
+
+
+def _get_core_choice_set(slug, label):
+    matches = list(CustomFieldChoiceSet.objects.filter(namespace="itambox", slug=slug))
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core Choice Set identity: itambox/{slug}")
+    if matches and (
+        matches[0].namespace != "itambox"
+        or matches[0].management_kind != CustomFieldChoiceSet.MANAGEMENT_CORE
+        or matches[0].lifecycle != CustomFieldChoiceSet.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice Set identity has incompatible management or lifecycle: itambox/{slug}")
+    if matches:
+        return matches[0]
+    return CustomFieldChoiceSet.objects.create(
+        namespace="itambox",
+        slug=slug,
+        label=label,
+        management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
+        version=1,
+        lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+    )
+
+
+def _validate_core_choice_row(choice, slug, desired_choices):
+    desired = desired_choices.get(choice.key)
+    if desired is None:
+        raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
+    if (
+        desired["lifecycle"] == CustomFieldChoice.LIFECYCLE_ACTIVE
+        and choice.lifecycle != CustomFieldChoice.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core Choice lifecycle collision: itambox/{slug}#{choice.key}")
+
+
+def _reconcile_core_choice_rows(choice_set, slug, choices):
+    existing_choices = list(CustomFieldChoice.objects.filter(choice_set=choice_set).order_by("position", "key"))
+    if len(existing_choices) > 64:
+        raise ValueError(f"Core Choice Set has more than 64 choices: itambox/{slug}")
+    desired_choices = {choice["key"]: choice for choice in choices}
+    for choice in existing_choices:
+        _validate_core_choice_row(choice, slug, desired_choices)
+    for rank, choice in enumerate(existing_choices, start=1):
+        CustomFieldChoice.objects.filter(pk=choice.pk).update(position=900000 + rank)
+    existing_by_key = {choice.key: choice for choice in existing_choices}
+    for choice_data in choices:
+        choice = existing_by_key.get(choice_data["key"])
+        if choice is None:
+            CustomFieldChoice.objects.create(
+                choice_set=choice_set,
+                key=choice_data["key"],
+                label=choice_data["label"],
+                position=choice_data["position"],
+                version=1,
+                lifecycle=choice_data["lifecycle"],
+            )
+            continue
+        choice.label = choice_data["label"]
+        choice.position = choice_data["position"]
+        choice.version = 1
+        choice.lifecycle = choice_data["lifecycle"]
+        choice.save(update_fields=["label", "position", "version", "lifecycle"])
+
+
+def _reconcile_core_choice_set(choice_set_data):
+    choice_sets = {}
+    for choice_set_data_row in choice_set_data:
+        identity = choice_set_data_row["identity"]
+        slug = choice_set_data_row["slug"]
+        choice_set = _get_core_choice_set(slug, choice_set_data_row["label"])
+        choice_set.label = choice_set_data_row["label"]
+        choice_set.management_kind = CustomFieldChoiceSet.MANAGEMENT_CORE
+        choice_set.version = 1
+        choice_set.lifecycle = choice_set_data_row["lifecycle"]
+        choice_set.save(update_fields=["label", "management_kind", "version", "lifecycle"])
+        _reconcile_core_choice_rows(choice_set, slug, choice_set_data_row["choices"])
+        choice_sets[identity] = choice_set
+    return choice_sets
+
+
+def _validate_core_field_identity(matches, key, lifecycle):
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core field identity: {key}")
+    if matches and (matches[0].namespace != "itambox" or matches[0].management_kind != CustomField.MANAGEMENT_CORE):
+        raise ValueError(f"Core field identity has incompatible namespace or management: {key}")
+    if matches and lifecycle == CustomField.LIFECYCLE_ACTIVE and matches[0].lifecycle != CustomField.LIFECYCLE_ACTIVE:
+        raise ValueError(f"Core field lifecycle collision: {key}")
+
+
+def _core_field_options(row, choice_sets, version):
+    validation = row.get("validation", {})
+    options = {
+        "namespace": row["namespace"],
+        "label": row["label"],
+        "help_text": row["help_text"],
+        "activation": row["activation"],
+        "required": row["required"],
+        "nullable": row["nullable"],
+        "management_kind": CustomField.MANAGEMENT_CORE,
+        "version": version,
+        "lifecycle": row["lifecycle"],
+        "mappings": [],
+        "field_type": row["field_type"],
+        "quantity_kind": row["quantity_kind"],
+        "canonical_unit": row["canonical_unit"],
+        "minimum_value": validation.get("minimum"),
+        "maximum_value": validation.get("maximum"),
+        "regex": validation.get("regex"),
+        "decimal_scale": validation.get("scale"),
+        "max_values": validation.get("max_values"),
+        "text_max_length": validation.get("max_length"),
+        "validation_rule": validation.get("rule"),
+        "choice_set": choice_sets.get(row["choice_set"]) if row["choice_set"] else None,
+    }
+    for key in ("minimum_value", "maximum_value"):
+        if options[key] is not None:
+            options[key] = Decimal(options[key])
+    return options
+
+
+def _core_field_target_types(row, content_types):
+    try:
+        return [content_types[target] for target in row["targets"]]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported core field target: {row['identity']}") from exc
+
+
+def _update_existing_core_field(field, row, options):
+    immutable_fields = (
+        "name",
+        "namespace",
+        "field_type",
+        "activation",
+        "quantity_kind",
+        "canonical_unit",
+        "minimum_value",
+        "maximum_value",
+        "regex",
+        "decimal_scale",
+        "max_values",
+        "text_max_length",
+        "validation_rule",
+        "nullable",
+        "choice_set_id",
+    )
+    for key in immutable_fields:
+        desired = (
+            row["key"]
+            if key == "name"
+            else (options["choice_set"].pk if key == "choice_set_id" and options["choice_set"] else options.get(key))
+        )
+        current = field.choice_set_id if key == "choice_set_id" else getattr(field, key)
+        if current != desired:
+            raise ValueError(f"Core field semantics differ for identity: {row['key']}")
+    mutable_fields = (
+        "label",
+        "help_text",
+        "required",
+        "mappings",
+        "management_kind",
+        "version",
+        "lifecycle",
+    )
+    for key in mutable_fields:
+        setattr(field, key, options[key])
+    CustomField.objects.filter(pk=field.pk).update(**{key: options[key] for key in mutable_fields})
+
+
+def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct, version):
+    custom_fields = {}
+    content_types = {"asset": asset_ct, "asset_type": assettype_ct}
+    for row in field_rows:
+        options = _core_field_options(row, choice_sets, version)
+        target_content_types = _core_field_target_types(row, content_types)
+        matches = list(CustomField.objects.filter(name=row["key"]))
+        _validate_core_field_identity(matches, row["key"], row["lifecycle"])
+        field = matches[0] if matches else CustomField(name=row["key"], **options)
+        if not matches:
+            # The normalized release is already the validated source of truth.
+            # Bulk insertion is intentional here: the generic pre-save signal
+            # still reflects older definition rules than this release.
+            CustomField.objects.bulk_create([field])
+        else:
+            _update_existing_core_field(field, row, options)
+        field.object_types.set(target_content_types)
+        custom_fields[row["identity"]] = field
+    return custom_fields
+
+
+def _get_core_fieldset(slug, label, description, lifecycle, version, namespace):
+    matches = list(CustomFieldset.objects.filter(namespace=namespace, slug=slug))
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous core fieldset identity: {namespace}/{slug}")
+    if matches and (
+        matches[0].namespace != namespace
+        or matches[0].management_kind != CustomFieldset.MANAGEMENT_CORE
+        or matches[0].lifecycle not in {CustomFieldset.LIFECYCLE_ACTIVE, CustomFieldset.LIFECYCLE_DEPRECATED}
+    ):
+        raise ValueError(f"Core fieldset identity has incompatible management or lifecycle: {namespace}/{slug}")
+    if (
+        matches
+        and lifecycle == CustomFieldset.LIFECYCLE_ACTIVE
+        and matches[0].lifecycle != CustomFieldset.LIFECYCLE_ACTIVE
+    ):
+        raise ValueError(f"Core fieldset lifecycle collision: {namespace}/{slug}")
+    if matches:
+        return matches[0]
+    return CustomFieldset.objects.create(
+        namespace=namespace,
+        slug=slug,
+        label=label,
+        description=description,
+        management_kind=CustomFieldset.MANAGEMENT_CORE,
+        version=version,
+        lifecycle=lifecycle,
+    )
+
+
+def _reconcile_core_fieldsets(section_rows, custom_fields, version):
+    fieldsets = {}
+    for section in section_rows:
+        namespace = section["namespace"]
+        slug = section["slug"]
+        fieldset = _get_core_fieldset(
+            slug,
+            section["label"],
+            section["description"],
+            section["lifecycle"],
+            version,
+            namespace,
+        )
+        fieldset.namespace = namespace
+        fieldset.slug = slug
+        fieldset.label = section["label"]
+        fieldset.description = section["description"]
+        fieldset.management_kind = CustomFieldset.MANAGEMENT_CORE
+        fieldset.version = version
+        fieldset.lifecycle = section["lifecycle"]
+        fieldset.save()
+        existing_memberships = list(fieldset.field_memberships.select_related("custom_field"))
+        if any(
+            membership.custom_field.management_kind != CustomField.MANAGEMENT_CORE
+            for membership in existing_memberships
+        ):
+            raise ValueError(f"Core fieldset membership ownership collision: {namespace}/{slug}")
+        expected_memberships = {member["field"].rsplit("/", 1)[1] for member in section["memberships"]}
+        for membership in existing_memberships:
+            if membership.custom_field.name not in expected_memberships:
+                raise ValueError(
+                    f"Core fieldset unexpected membership: {namespace}/{slug}#{membership.custom_field.name}"
+                )
+        fieldset.field_memberships.all().delete()
+        CustomFieldsetField.objects.bulk_create(
+            [
+                CustomFieldsetField(
+                    fieldset=fieldset,
+                    custom_field=custom_fields[member["field"]],
+                    position=member["position"],
+                )
+                for member in section["memberships"]
+            ]
+        )
+        fieldsets[slug] = fieldset
+    return fieldsets
+
+
+def _seed_core_category_defaults(category_rows, categories, fieldsets):
+    for category_row in category_rows:
+        category = categories[category_row["slug"]]
+        existing_memberships = list(category.default_fieldset_memberships.select_related("fieldset"))
+        if any(
+            membership.fieldset.management_kind != CustomFieldset.MANAGEMENT_CORE for membership in existing_memberships
+        ):
+            raise ValueError(f"Core category default ownership collision: {category_row['slug']}")
+        category.default_fieldset_memberships.all().delete()
+        CategoryDefaultFieldset.objects.bulk_create(
+            [
+                CategoryDefaultFieldset(
+                    category=category,
+                    fieldset=fieldsets[item["fieldset"].rsplit("/", 1)[1]],
+                    position=item["position"],
+                )
+                for item in category_row["default_fieldsets"]
+            ]
+        )
+
+
+def _demo_operating_system_family(atype_slug):
+    if "macbook" in atype_slug or "mac-studio" in atype_slug:
+        return "macos"
+    if "iphone" in atype_slug:
+        return "ios"
+    if "ipad" in atype_slug:
+        return "ipados"
+    if "galaxy" in atype_slug:
+        return "android"
+    if atype_slug == "synology-ds1823xs":
+        return "embedded"
+    if atype_slug in ("dell-poweredge-r760", "hpe-proliant-dl380-g11"):
+        return "linux"
+    if atype_slug in ("cisco-catalyst-9300", "unifi-switch-pro-48", "meraki-mr46", "unifi-dream-machine-pro"):
+        return "network_os"
+    return "windows"
+
+
+def _translate_legacy_demo_specs(raw_specs):
+    specs = {}
+    if raw_specs.get("cpu"):
+        specs["processor_model"] = raw_specs["cpu"]
+    if "ram_gb" in raw_specs:
+        specs["memory_capacity"] = f"{float(raw_specs['ram_gb']):.3f}"
+    if "storage_gb" in raw_specs:
+        specs["storage_capacity"] = f"{float(raw_specs['storage_gb']):.3f}"
+    if "storage_type" in raw_specs:
+        specs["storage_medium"] = {
+            "NVMe": "nvme_ssd",
+            "SSD": "ssd",
+            "HDD": "hdd",
+            "SSD RAID": "ssd",
+            "SATA SSD": "ssd",
+        }.get(raw_specs["storage_type"], "other")
+    if "screen_size" in raw_specs:
+        specs["display_size"] = f"{float(raw_specs['screen_size']):.2f}"
+    if "port_count" in raw_specs:
+        specs["ethernet_port_count"] = int(raw_specs["port_count"])
+    if "poe_port_count" in raw_specs:
+        specs["poe_port_count"] = int(raw_specs["poe_port_count"])
+    if "poe_budget_w" in raw_specs:
+        specs["poe_budget"] = f"{float(raw_specs['poe_budget_w']):.3f}"
+    return specs
+
+
+def _add_default_demo_specs(specs, atype_slug, category_slug):
+    specs.setdefault(
+        "form_factor",
+        {
+            "laptops": "notebook",
+            "desktops": "desktop",
+            "servers": "rack",
+            "storage-devices": "appliance",
+            "mobile-phones": "phone",
+            "tablets": "tablet",
+            "network-devices": "appliance",
+            "monitors": "peripheral",
+            "conference-systems": "appliance",
+        }.get(category_slug, "other"),
+    )
+    if category_slug != "monitors":
+        specs.setdefault("operating_system_family", _demo_operating_system_family(atype_slug))
+    if category_slug in {"laptops", "desktops", "servers", "storage-devices"}:
+        specs.setdefault("memory_type", "ddr5")
+        specs.setdefault("ethernet_port_count", 1)
+        specs.setdefault("ethernet_speeds", ["1g"])
+        specs.setdefault("usb_port_count", 4)
+    elif category_slug in {"mobile-phones", "tablets"}:
+        specs.setdefault("memory_type", "lpddr5")
+        specs.setdefault("ethernet_port_count", 0)
+        specs.setdefault("ethernet_speeds", [])
+        specs.setdefault("usb_port_count", 1)
+    elif category_slug == "network-devices":
+        specs.setdefault("ethernet_speeds", ["10g", "1g"])
+        specs.setdefault("usb_port_count", 1)
+        specs.setdefault(
+            "network_functions",
+            {
+                "meraki-mr46": ["wlan_ap"],
+                "unifi-dream-machine-pro": ["firewall", "router"],
+            }.get(atype_slug, ["switch"] if "switch" in atype_slug else ["gateway"]),
+        )
+    if "wifi_standards" not in specs and category_slug in {"laptops", "desktops", "mobile-phones", "tablets"}:
+        specs["wifi_standards"] = ["802_11ac", "802_11ax"]
+    if "management_protocols" not in specs and category_slug in {
+        "laptops",
+        "desktops",
+        "servers",
+        "storage-devices",
+        "network-devices",
+    }:
+        specs["management_protocols"] = sorted(["https", "ssh"])
+    return specs
+
+
+def _canonical_demo_specs(raw_specs, atype_slug, category_slug):
+    specs = _translate_legacy_demo_specs(raw_specs)
+    return _add_default_demo_specs(specs, atype_slug, category_slug)
+
 
 class SeedCatalogMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_catalog(self):
         from assets.models import AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
-        from extras.models import CustomField, CustomFieldset, Tag
         from inventory.models import Accessory, Component, Consumable
         from software.models import Software
         from subscriptions.models import Provider
@@ -205,92 +594,78 @@ class SeedCatalogMixin:
             if self._demo_depreciation_afa is None:
                 self._demo_depreciation_afa = obj  # first entry = tenant default showcase
 
-        # Custom fields + fieldsets
-        cf_data = [
-            ("hostname", "Hostname", "text", False, None, False),
-            ("os_version", "OS Version", "text", False, None, False),
-            (
-                "department",
-                "Department",
-                "select",
-                False,
-                "Engineering\nFinance\nHR\nMarketing\nSales\nOperations\nResearch\nLegal",
-                False,
-            ),
-            ("encrypted", "Disk Encrypted", "boolean", False, None, False),
-            ("sim_number", "SIM Number", "text", False, None, False),
-            ("imei", "IMEI", "text", False, None, False),
-            ("ip_address", "IP Address", "text", False, None, False),
-            ("firmware_version", "Firmware Version", "text", False, None, False),
-            ("port_count", "Port Count", "number", False, None, True),
-            ("poe_budget_w", "PoE Budget (Watts)", "number", False, None, True),
-            ("screen_size", "Screen Size (inches)", "number", False, None, True),
-            (
-                "mounted_state",
-                "Mounted State",
-                "select",
-                False,
-                "Wall-Mounted\nCeiling-Mounted\nTable-Top\nMobile-Stand",
-                False,
-            ),
-            ("cpu", "CPU Model", "text", False, None, True),
-            ("ram_gb", "RAM (GB)", "number", False, None, True),
-            ("storage_gb", "Storage (GB)", "number", False, None, True),
-            ("storage_type", "Storage Type", "select", False, "NVMe\nSSD\nHDD\nSSD RAID\nSATA SSD", True),
-            ("gpu", "GPU Model", "text", False, None, True),
-            ("cpu_architecture", "CPU Architecture", "select", False, "x86_64\nARM64", True),
-        ]
+        # Normative core vocabulary is the runtime consumer of the current release.
         from django.contrib.contenttypes.models import ContentType
 
         from assets.models import Asset as AssetModel
         from assets.models import AssetType as AssetTypeModel
 
+        # inline import: app-registry: load the assets-owned release after Django setup.
+        from assets.services.specifications.core_vocabulary import get_core_vocabulary
+
+        vocabulary = get_core_vocabulary()
+        library_release = vocabulary["library"]["release"]
         asset_ct = ContentType.objects.get_for_model(AssetModel)
         assettype_ct = ContentType.objects.get_for_model(AssetTypeModel)
 
-        self._custom_fields = {}
-        for name, label, ftype, required, choices, model_level in cf_data:
-            obj, _ = CustomField.objects.get_or_create(
-                name=name,
-                defaults={"label": label, "field_type": ftype, "required": required, "choices": choices or ""},
-            )
-            # model_level=True described the hardware type (a spec); otherwise
-            # the field is a per-device detail on the asset.
-            obj.object_types.add(assettype_ct if model_level else asset_ct)
-            self._custom_fields[name] = obj
+        self._choice_sets = _reconcile_core_choice_set(vocabulary["choice_sets"])
+        core_field_rows = vocabulary["active_fields"] + vocabulary["reserved_retired_fields"]
+        self._custom_fields = _reconcile_core_fields(
+            core_field_rows,
+            self._choice_sets,
+            asset_ct,
+            assettype_ct,
+            library_release,
+        )
+        self._fieldsets = _reconcile_core_fieldsets(vocabulary["sections"], self._custom_fields, library_release)
 
-        def fieldset(name, *field_names):
-            fs, _ = CustomFieldset.objects.get_or_create(name=name)
-            fs.fields.set([self._custom_fields[f] for f in field_names])
-            return fs
+        # Keep these handles for the existing asset-type data table while the
+        # actual composition below is driven by the category release rows.
+        self._fs_laptop = self._fieldsets["compute-memory"]
+        self._fs_mobile = self._fieldsets["compute-memory"]
+        self._fs_server = self._fieldsets["compute-memory"]
+        self._fs_switch = self._fieldsets["network-function"]
+        self._fs_av = self._fieldsets["display-av-imaging"]
 
-        self._fs_laptop = fieldset(
-            "Laptop / Workstation Specs",
-            "cpu",
-            "ram_gb",
-            "storage_gb",
-            "storage_type",
-            "gpu",
-            "cpu_architecture",
-            "hostname",
-            "os_version",
-            "encrypted",
-            "department",
+        canonical_category_rows = vocabulary["categories"]
+        self._category_fieldsets = {
+            row["slug"]: [item["fieldset"].rsplit("/", 1)[1] for item in row["default_fieldsets"]]
+            for row in canonical_category_rows
+        }
+        self._category_fieldsets.update(
+            {
+                "network-devices": [
+                    "product-physical",
+                    "connectivity-io",
+                    "network-function",
+                    "power-battery",
+                    "management-security",
+                    "environmental-ruggedization",
+                    "compliance-sustainability",
+                ],
+                "storage-devices": [
+                    "product-physical",
+                    "compute-memory",
+                    "storage",
+                    "connectivity-io",
+                    "power-battery",
+                    "management-security",
+                    "compliance-sustainability",
+                ],
+                "conference-systems": [
+                    "product-physical",
+                    "connectivity-io",
+                    "power-battery",
+                    "display-av-imaging",
+                    "management-security",
+                    "compliance-sustainability",
+                ],
+            }
         )
-        self._fs_mobile = fieldset(
-            "Mobile Device Specs", "cpu", "ram_gb", "storage_gb", "screen_size", "os_version", "sim_number", "imei"
-        )
-        self._fs_server = fieldset(
-            "Server Specs", "cpu", "ram_gb", "storage_gb", "storage_type", "hostname", "os_version"
-        )
-        self._fs_switch = fieldset(
-            "Network Device Specs", "port_count", "poe_budget_w", "hostname", "ip_address", "firmware_version"
-        )
-        self._fs_av = fieldset("AV & Conference Specs", "screen_size", "mounted_state")
 
-        # Categories — (slug, color). Every category ships a distinct colour so
-        # the colour-chipped category cells (asset / asset-type lists, etc.)
-        # always render a swatch instead of a blank.
+        # Existing generic/local catalog categories retain their historical
+        # names, colours, and applicability. Canonical starter rows below own
+        # only their overlapping identity and release metadata.
         self._categories = {}
         category_defs = [
             ("laptops", "4263eb"),
@@ -326,13 +701,32 @@ class SeedCatalogMixin:
         applies = {"asset": True, "accessory": True, "consumable": True, "component": True}
         for slug, color in category_defs:
             obj, created = Category.objects.get_or_create(
-                slug=slug, defaults={"name": slug.replace("-", " ").title(), "applies_to": applies, "color": color}
+                slug=slug,
+                defaults={"name": slug.replace("-", " ").title(), "applies_to": applies, "color": color},
             )
             if not created and not obj.color:
                 # Backfill a category seeded before colours were assigned.
                 obj.color = color
                 obj.save(update_fields=["color"])
             self._categories[slug] = obj
+
+        for category_row in canonical_category_rows:
+            obj, created = Category.objects.get_or_create(
+                slug=category_row["slug"],
+                defaults={
+                    "name": category_row["label"],
+                    "description": category_row["description"],
+                    "applies_to": {target: True for target in category_row["applies_to"]},
+                },
+            )
+            if not created:
+                obj.name = category_row["label"]
+                obj.description = category_row["description"]
+                obj.applies_to = {target: True for target in category_row["applies_to"]}
+                obj.save(update_fields=["name", "description", "applies_to"])
+            self._categories[category_row["slug"]] = obj
+
+        _seed_core_category_defaults(canonical_category_rows, self._categories, self._fieldsets)
 
         # Asset types: (model, slug, mfr, part_number, eol_months, fieldset, depreciation, category, role, specs)
         at_data = [
@@ -669,8 +1063,10 @@ class SeedCatalogMixin:
                 {"screen_size": 0},
             ),
         ]
+
         self._asset_types = {}
-        for model_name, slug, mfr, part, eol, fs, dep, cat, role, specs in at_data:
+        for model_name, slug, mfr, part, eol, _legacy_fs, dep, cat, role, raw_specs in at_data:
+            specs = _canonical_demo_specs(raw_specs, slug, cat)
             obj, _ = AssetType.objects.get_or_create(
                 slug=slug,
                 defaults={
@@ -678,12 +1074,33 @@ class SeedCatalogMixin:
                     "manufacturer": self._manufacturers[mfr],
                     "part_number": part,
                     "eol_months": eol,
-                    "custom_fieldset": fs,
                     "depreciation": self._depreciations[dep],
                     "category": self._categories[cat],
                     "asset_role": self._asset_roles[role],
                     "custom_field_data": specs,
+                    "management_kind": AssetType.MANAGEMENT_LOCAL,
+                    "region": "",
+                    "configuration": "",
+                    "library": None,
+                    "library_definition_key": None,
                 },
+            )
+            # Update the JSON payload without invoking dynamic value validation;
+            # the catalogue release may retain historical deprecated values.
+            AssetType.objects.filter(pk=obj.pk).update(custom_field_data=specs)
+            obj.custom_field_data = specs
+            obj.management_kind = AssetType.MANAGEMENT_LOCAL
+            obj.region = ""
+            obj.configuration = ""
+            obj.library = None
+            obj.library_definition_key = None
+            obj.save(update_fields=["management_kind", "region", "configuration", "library", "library_definition_key"])
+            obj.fieldset_memberships.all().delete()
+            AssetTypeFieldset.objects.bulk_create(
+                [
+                    AssetTypeFieldset(asset_type=obj, fieldset=self._fieldsets[fieldset_slug], position=index)
+                    for index, fieldset_slug in enumerate(self._category_fieldsets[cat], start=1)
+                ]
             )
             self._asset_types[slug] = obj
 

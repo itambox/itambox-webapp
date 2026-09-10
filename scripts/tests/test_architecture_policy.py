@@ -175,6 +175,45 @@ class ClassificationTests(unittest.TestCase):
 
         self.assertEqual(layer_of(module), MODULE_LAYER_OVERRIDES[module])
 
+    def test_specification_adapter_remains_presentation(self):
+        self.assertEqual(layer_of("assets.specification_adapters"), "presentation")
+        self.assertIsNone(is_allowed("assets.forms.asset_form", "assets.specification_adapters").rule)
+        self.assertIsNone(is_allowed("assets.api.serializers", "assets.specification_adapters").rule)
+        self.assertIsNotNone(is_allowed("assets.models.asset", "assets.specification_adapters").rule)
+
+    def test_snipe_importer_orchestration_is_composition(self):
+        expected = {
+            "core.importers.snipeit.__init__",
+            "core.importers.snipeit.orchestrator",
+            "core.importers.snipeit.stages.asset_models",
+            "core.importers.snipeit.stages.catalog",
+            "core.importers.snipeit.stages.hardware",
+            "core.importers.snipeit.stages.inventory",
+            "core.importers.snipeit.stages.licenses",
+            "core.importers.snipeit.stages.organization",
+        }
+        for module in expected:
+            with self.subTest(module=module):
+                self.assertEqual(layer_of(module), "composition")
+                self.assertEqual(MODULE_LAYER_OVERRIDES[module], "composition")
+
+    def test_typed_graphql_specification_modules_are_domain_presentation(self):
+        expected = {
+            "assets.graphql_specifications.__init__": "presentation",
+            "assets.graphql_specifications.integration": "presentation",
+            "assets.graphql_specifications.inputs": "presentation",
+            "assets.graphql_specifications.mutations": "presentation",
+            "assets.graphql_specifications.loaders": "presentation",
+            "assets.graphql_specifications.readers": "presentation",
+            "assets.graphql_specifications.scalars": "presentation",
+            "assets.graphql_specifications.types": "presentation",
+        }
+
+        for module, expected_layer in expected.items():
+            with self.subTest(module=module):
+                self.assertEqual(layer_of(module), expected_layer)
+                self.assertEqual(MODULE_LAYER_OVERRIDES[module], expected_layer)
+
     def test_composition_leaves_win_on_the_last_segment(self):
         for module in (
             "users.api.urls",

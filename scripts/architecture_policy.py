@@ -198,7 +198,20 @@ PLATFORM_LAYER_PREFIXES = {
 # of the fingerprint; a rule defect belongs in the tables above instead, because
 # an override map that absorbs rule defects rots into a lookup table.
 MODULE_LAYER_OVERRIDES = {
+    # Shared form/REST input translation; domain code must not depend on it.
+    "assets.specification_adapters": "presentation",
+    "assets.customfields": "domain-service",
     "assets.depreciation": "domain-service",
+    # GraphQL transport and DTO adapters are domain presentation, even though
+    # their package name does not expose one of the native presentation segments.
+    "assets.graphql_specifications.__init__": "presentation",
+    "assets.graphql_specifications.integration": "presentation",
+    "assets.graphql_specifications.inputs": "presentation",
+    "assets.graphql_specifications.mutations": "presentation",
+    "assets.graphql_specifications.loaders": "presentation",
+    "assets.graphql_specifications.readers": "presentation",
+    "assets.graphql_specifications.scalars": "presentation",
+    "assets.graphql_specifications.types": "presentation",
     "assets.scanning": "domain-service",
     "compliance.checks": "composition",
     "compliance.providers": "domain-service",
@@ -207,12 +220,27 @@ MODULE_LAYER_OVERRIDES = {
     "core.graphql_utils": "presentation",
     "core.otp_middleware": "framework",
     "core.paginator": "presentation",
+    "extras.canonicalization": "domain-model",
     "extras.customfields": "domain-service",
+    "extras.definition_contract": "domain-model",
     "extras.dashboard.utils": "presentation",
     "extras.management.commands.eventrule_withdrawn_report": "composition",
     "extras.utils": "domain-service",
     "organization.access": "domain-service",
     "organization.rbac": "domain-service",
+    # These Snipe-IT stages translate remote rows into existing domain commands;
+    # they are orchestration, not transport/client modules. The client/common
+    # importer boundary remains integration-layer code.
+    # The stage runner is the matching application orchestration seam; the
+    # transport/client modules below it remain integration-layer code.
+    "core.importers.snipeit.__init__": "composition",
+    "core.importers.snipeit.orchestrator": "composition",
+    "core.importers.snipeit.stages.asset_models": "composition",
+    "core.importers.snipeit.stages.catalog": "composition",
+    "core.importers.snipeit.stages.hardware": "composition",
+    "core.importers.snipeit.stages.inventory": "composition",
+    "core.importers.snipeit.stages.licenses": "composition",
+    "core.importers.snipeit.stages.organization": "composition",
 }
 
 # Declared cross-application model coupling. Same-application

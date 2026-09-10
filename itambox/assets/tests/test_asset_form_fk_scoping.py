@@ -8,10 +8,11 @@ FK that belongs to a different tenant (defence-in-depth, also covers API/import)
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
 from model_bakery import baker
 
 from assets.forms.asset_form import AssetForm
-from assets.models import Asset, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from core.tests.mixins import TenantTestMixin
 from organization.models import Location, Site, Tenant
 
@@ -51,3 +52,22 @@ class AssetFkTenantScopingTests(TenantTestMixin, TestCase):
         ids = set(form.fields["location"].queryset.values_list("pk", flat=True))
         self.assertIn(self.loc_a.pk, ids)
         self.assertNotIn(self.loc_b.pk, ids)
+
+    def test_http_edit_of_foreign_tenant_asset_is_not_disclosed(self):
+        foreign_type = AssetType.objects.create(
+            manufacturer=Manufacturer.objects.create(name="Foreign maker", slug="foreign-maker"),
+            model="Foreign device",
+            slug="foreign-device",
+        )
+        foreign_asset = Asset.objects.create(
+            name="Foreign asset",
+            asset_tag="FOREIGN-1",
+            tenant=self.tenant_b,
+            asset_type=foreign_type,
+            status=self.status,
+        )
+
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        response = self.client.get(reverse("assets:asset_update", kwargs={"pk": foreign_asset.pk}))
+
+        self.assertEqual(response.status_code, 404)

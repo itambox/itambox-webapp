@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import transaction
 
+from assets.services.specification_writers import authorize_generic_owner_scope, merge_generic_owner_data
 from core.importers.snipeit.common import InventoryAssignmentGateway, _nested_id, tenant_for
 from core.importers.snipeit.contracts import ImportContext, StageResult
 
@@ -76,16 +77,16 @@ class AccessoryImporter:
             tenants=self.dependencies.tenants,
         )
         qty = row.get("qty") or 1
+        generic_data = {"snipeit_id": str(sid)}
         defaults = {
             "manufacturer": mfr,
             "category": cat,
             "supplier": supplier,
             "tenant": tenant,
             "notes": row.get("notes") or "",
-            "custom_field_data": {"snipeit_id": str(sid)},
         }
         with transaction.atomic():
-            obj = Accessory.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+            obj = Accessory.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
             if not obj:
                 obj = Accessory.all_objects.filter(name=name, tenant=tenant).first()
             if obj:
@@ -93,16 +94,33 @@ class AccessoryImporter:
                     result.counts.skipped += 1
                 else:
                     if not self.context.dry_run:
+                        obj = merge_generic_owner_data(
+                            owner=obj,
+                            user=self.context.user,
+                            updates=generic_data,
+                            allowed_keys={"snipeit_id"},
+                        )
                         for field, value in defaults.items():
                             setattr(obj, field, value)
-                        obj.save()
+                        obj.save(update_fields=[*defaults, "updated_at"])
                     result.counts.updated += 1
                 if not self.context.dry_run:
                     self._import_checkouts(obj, sid, AccessoryAssignment, result)
                 return
 
             if not self.context.dry_run:
+                authorize_generic_owner_scope(
+                    user=self.context.user,
+                    owner_model=Accessory,
+                    tenant_id=getattr(tenant, "pk", None),
+                )
                 obj = Accessory.objects.create(name=name, **defaults)
+                obj = merge_generic_owner_data(
+                    owner=obj,
+                    user=self.context.user,
+                    updates=generic_data,
+                    allowed_keys={"snipeit_id"},
+                )
                 loc = Location.objects.filter(tenant=tenant).first() if tenant else None
                 if loc:
                     AccessoryStock.objects.create(accessory=obj, location=loc, qty=qty)
@@ -170,16 +188,16 @@ class ConsumableImporter:
             tenants=self.dependencies.tenants,
         )
         qty = row.get("qty") or 0
+        generic_data = {"snipeit_id": str(sid)}
         defaults = {
             "manufacturer": mfr,
             "category": cat,
             "supplier": supplier,
             "tenant": tenant,
             "notes": row.get("notes") or "",
-            "custom_field_data": {"snipeit_id": str(sid)},
         }
         with transaction.atomic():
-            obj = Consumable.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+            obj = Consumable.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
             if not obj:
                 obj = Consumable.all_objects.filter(name=name, tenant=tenant).first()
             if obj:
@@ -187,14 +205,31 @@ class ConsumableImporter:
                     result.counts.skipped += 1
                 else:
                     if not self.context.dry_run:
+                        obj = merge_generic_owner_data(
+                            owner=obj,
+                            user=self.context.user,
+                            updates=generic_data,
+                            allowed_keys={"snipeit_id"},
+                        )
                         for field, value in defaults.items():
                             setattr(obj, field, value)
-                        obj.save()
+                        obj.save(update_fields=[*defaults, "updated_at"])
                     result.counts.updated += 1
                 return
 
             if not self.context.dry_run:
+                authorize_generic_owner_scope(
+                    user=self.context.user,
+                    owner_model=Consumable,
+                    tenant_id=getattr(tenant, "pk", None),
+                )
                 obj = Consumable.objects.create(name=name, **defaults)
+                obj = merge_generic_owner_data(
+                    owner=obj,
+                    user=self.context.user,
+                    updates=generic_data,
+                    allowed_keys={"snipeit_id"},
+                )
                 loc = Location.objects.filter(tenant=tenant).first() if tenant else None
                 if loc and qty:
                     ConsumableStock.objects.create(consumable=obj, location=loc, qty=qty)
@@ -241,33 +276,50 @@ class ComponentImporter:
             tenants=self.dependencies.tenants,
         )
         qty = row.get("qty") or 0
+        generic_data = {"snipeit_id": str(sid)}
         defaults = {
             "manufacturer": mfr,
             "category": cat,
             "supplier": supplier,
             "tenant": tenant,
             "notes": row.get("notes") or "",
-            "custom_field_data": {"snipeit_id": str(sid)},
         }
         with transaction.atomic():
-            obj = Component.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
+            obj = Component.all_objects.filter(custom_field_data__snipeit_id=str(sid), tenant=tenant).first()
             if not obj:
-                obj = Component.all_objects.filter(name=name, manufacturer=mfr).first()
+                obj = Component.all_objects.filter(name=name, manufacturer=mfr, tenant=tenant).first()
             if obj:
                 if not self.context.update:
                     result.counts.skipped += 1
                 else:
                     if not self.context.dry_run:
+                        obj = merge_generic_owner_data(
+                            owner=obj,
+                            user=self.context.user,
+                            updates=generic_data,
+                            allowed_keys={"snipeit_id"},
+                        )
                         for field, value in defaults.items():
                             setattr(obj, field, value)
-                        obj.save()
+                        obj.save(update_fields=[*defaults, "updated_at"])
                     result.counts.updated += 1
                 if not self.context.dry_run:
                     self._import_allocations(obj, sid, ComponentAllocation, result)
                 return
 
             if not self.context.dry_run:
+                authorize_generic_owner_scope(
+                    user=self.context.user,
+                    owner_model=Component,
+                    tenant_id=getattr(tenant, "pk", None),
+                )
                 obj = Component.objects.create(name=name, **defaults)
+                obj = merge_generic_owner_data(
+                    owner=obj,
+                    user=self.context.user,
+                    updates=generic_data,
+                    allowed_keys={"snipeit_id"},
+                )
                 loc = Location.objects.filter(tenant=tenant).first() if tenant else None
                 if loc and qty:
                     ComponentStock.objects.create(component=obj, location=loc, qty=qty)

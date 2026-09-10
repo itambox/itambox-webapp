@@ -1,9 +1,12 @@
 from django.contrib import messages
-from django.shortcuts import redirect
+from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
+from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from assets.customfields import resolve_asset_type_custom_fields
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.utils import get_paginate_count
@@ -17,7 +20,7 @@ from itambox.views.generic import (
 )
 
 from .. import filters, forms, tables
-from ..models import AssetType
+from ..models import AssetType, AssetTypeFieldset
 
 
 class AssetTypeListView(ObjectListView):
@@ -29,7 +32,16 @@ class AssetTypeListView(ObjectListView):
 
 
 class AssetTypeDetailView(ObjectDetailView):
-    queryset = AssetType.objects.select_related("manufacturer").prefetch_related("tags", "assets")
+    queryset = AssetType.objects.select_related("manufacturer").prefetch_related(
+        "tags",
+        "assets",
+        Prefetch(
+            "fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types"
+            ),
+        ),
+    )
 
     layout = (((Panel("info", _("Asset Type Details")), Panel("specs", _("Hardware Specifications"))),),)
 
@@ -53,6 +65,7 @@ class AssetTypeDetailView(ObjectDetailView):
 
         context["assets_table"] = assets_table
         context["related_objects_list"] = related_objects_list
+        context["specification_fields"] = resolve_asset_type_custom_fields(assettype)
 
         # Requests
         from ..models import AssetRequest
@@ -78,17 +91,29 @@ class AssetTypeEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetType.objects.all()
     model = AssetType
     model_form = forms.AssetTypeForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/assettype_specification_form.html"
     quick_add_target = "id_asset_type"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def post(self, request, *args, **kwargs):
         if request.headers.get("HX-Request") and "_reload" in request.POST:
             self.object = self.get_object() if self.kwargs.get("pk") else None
             form = self.get_form()
-            from django.shortcuts import render
-
-            return render(request, "htmx/crispy_form.html", {"form": form})
+            context = self.get_context_data(form=form)
+            return render(request, "assets/_assettype_specification_form.html", context)
         return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            form.specification_revision_conflict = True
+            return self.form_invalid(form)
 
 
 class AssetTypeDeleteView(ObjectDeleteView):
@@ -119,5 +144,10 @@ class AssetTypeDeleteView(ObjectDeleteView):
 class AssetTypeCloneView(ObjectCloneView):
     model = AssetType
     model_form = forms.AssetTypeForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/assettype_specification_form.html"
     default_return_url = "assets:assettype_list"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs

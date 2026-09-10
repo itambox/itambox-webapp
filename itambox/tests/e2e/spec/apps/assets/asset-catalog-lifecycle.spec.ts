@@ -18,6 +18,8 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
       getJsonRows(api, '/api/assets/status-labels/?limit=100', 'asset status prerequisites'),
     ]);
     expect(assetTypes).not.toHaveLength(0);
+    const assetType = assetTypes.find((row) => row.slug === 'dell-latitude-5550');
+    if (!assetType) throw new Error('The E2E seed must expose the type with the required Boolean.');
     expect(assetRoles).not.toHaveLength(0);
     const deployable = statuses.find((row) => row.type === 'deployable');
     if (!deployable) throw new Error('The E2E seed must expose a deployable asset status.');
@@ -32,11 +34,13 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     await expect(createForm).toHaveCount(1);
     await createForm.locator('input[name="name"]').fill(originalName);
     await createForm.getByLabel('Asset tag').fill(assetTag);
-    await selectTomOption(createForm, 'asset_type', String(assetTypes[0].id));
+    await selectTomOption(createForm, 'asset_type', String(assetType.id));
+    await createForm.locator('[name="cf_e2e_required_boolean"]').selectOption('false');
     await selectTomOption(createForm, 'asset_role', String(assetRoles[0].id));
     await selectTomOption(createForm, 'status', String(deployable.id));
+    await expect(createForm.locator('[name="tenant"]')).toHaveCount(1);
     await selectTomOption(createForm, 'tenant', tenant.id);
-    await createForm.getByLabel('Notes').fill(`Owned asset catalog lifecycle ${runId}`);
+    await createForm.locator('textarea[name="notes"]').fill(`Owned asset catalog lifecycle ${runId}`);
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === createPath,
@@ -64,7 +68,8 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
       id: Number(assetId),
       name: originalName,
       asset_tag: assetTag,
-      asset_type: expect.objectContaining({ id: Number(assetTypes[0].id) }),
+      specifications: expect.objectContaining({ e2e_required_boolean: false }),
+      asset_type: expect.objectContaining({ id: Number(assetType.id) }),
       asset_role: expect.objectContaining({ id: Number(assetRoles[0].id) }),
       status: expect.objectContaining({ id: Number(deployable.id) }),
       tenant: expect.objectContaining({ id: Number(tenant.id) }),
@@ -75,7 +80,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
     expect(updatePage?.status(), `GET ${updatePath}`).toBe(200);
     const updateForm = page.locator('form[method="post"]').filter({ has: page.locator('input[name="name"]') });
     await updateForm.locator('input[name="name"]').fill(renamedName);
-    await updateForm.getByLabel('Notes').fill(`Updated owned asset lifecycle ${runId}`);
+    await updateForm.locator('textarea[name="notes"]').fill(`Updated owned asset lifecycle ${runId}`);
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === updatePath,
     );
@@ -121,7 +126,7 @@ test.describe('assets-owned catalog lifecycle', { tag: '@pr' }, () => {
       id: Number(cloneId),
       name: cloneName,
       asset_tag: cloneTag,
-      asset_type: expect.objectContaining({ id: Number(assetTypes[0].id) }),
+      asset_type: expect.objectContaining({ id: Number(assetType.id) }),
       tenant: expect.objectContaining({ id: Number(tenant.id) }),
     });
 

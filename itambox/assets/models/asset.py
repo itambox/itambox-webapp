@@ -1,3 +1,5 @@
+from assets.models.tagsequence import AssetTagSequence
+
 """Asset state machine and the core Asset model."""
 
 import datetime
@@ -15,7 +17,7 @@ from django.utils.translation import ngettext
 from assets.model_book_value import compute_book_value
 from core.currency import CurrencyField
 from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
-from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SoftDeleteMixin, SubscribableMixin
+from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SubscribableMixin
 from core.models import DeletableVaultModel
 
 
@@ -51,6 +53,12 @@ class AssetStateMachine:
 class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, DeletableVaultModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
+
+    # Changing the Asset Type changes the effective fieldsets, field
+    # definitions, required fields, and Choice Set validity, so a field-limited
+    # save that touches only ``asset_type`` must still run the dynamic
+    # custom-field validator against the target composition.
+    custom_field_data_validation_dependencies = frozenset({"asset_type"})
 
     # NOTE: asset status is a FK to StatusLabel; the lifecycle vocabulary is
     # StatusLabel.type (assets.choices.StatusTypeChoices), not a local choice set.
@@ -362,15 +370,19 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
                     old_asset.status.type, self.status.type, self.assignments.filter(is_active=True).exists()
                 )
 
-    def save(self, *args, **kwargs):
-        from assets.models.tagsequence import AssetTagSequence
-
+    def _prepare_asset_tag(self, update_fields):
+        # A specification-only save must not reserve or change unrelated tags.
+        if update_fields is not None and "asset_tag" not in update_fields:
+            return
         if not self.asset_tag:
             self.asset_tag = AssetTagSequence.get_next_tag_for_asset(self)
         else:
             seq = AssetTagSequence.resolve_sequence_for_asset(self)
             if seq and self.asset_tag == seq.next_tag_preview:
                 seq.next_tag()
+
+    def save(self, *args, **kwargs):
+        self._prepare_asset_tag(kwargs.get("update_fields"))
 
         # Freeze/unfreeze sign-off value on archive transition.
         # State-machine transition validation is NOT done here: it lives in

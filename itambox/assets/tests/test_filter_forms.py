@@ -15,7 +15,7 @@ class AssetFilterFormTest(TestCase):
         self.location2 = Location.objects.create(name="Location 2", slug="loc-2", site=self.site, tenant=self.tenant)
 
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
-        self.category = Category.objects.create(name="Laptops", slug="laptops")
+        self.category = Category.objects.create(name="Filter Laptops", slug="filter-laptops")
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer, model="Latitude 5420", category=self.category
         )
@@ -105,7 +105,7 @@ class AssetFilterFormTest(TestCase):
     def test_bound_form_filters_exclude_unmatching(self):
         """Verify that mismatching filter values exclude the asset from search results."""
         # Category mismatch
-        other_category = Category.objects.create(name="Monitors", slug="monitors")
+        other_category = Category.objects.create(name="Filter Monitors", slug="filter-monitors")
         form = AssetFilterForm(data={"category": str(other_category.pk)})
         self.assertTrue(form.is_valid())
         self.assertNotIn(self.asset, form.search())
@@ -134,7 +134,15 @@ class AssetTypeFormTest(TestCase):
     def test_asset_type_form_select_fields_have_tom_select(self):
         """Verify that all select fields in AssetTypeForm get the data-tom-select attribute automatically."""
         form = AssetTypeForm()
-        select_fields = ["manufacturer", "category", "asset_role", "custom_fieldset", "depreciation", "tags"]
+        select_fields = ["manufacturer", "category", "asset_role", "depreciation", "tags"]
         for field_name in select_fields:
             field = form.fields[field_name]
             self.assertIn("data-tom-select", field.widget.attrs)
+
+    def test_ordered_fieldset_transport_is_not_a_tom_select_control(self):
+        from django.forms import MultipleHiddenInput
+
+        widget = AssetTypeForm().fields["custom_fieldsets"].widget
+        self.assertIsInstance(widget, MultipleHiddenInput)
+        self.assertEqual(widget.attrs["data-specification-fieldsets"], "1")
+        self.assertNotIn("data-tom-select", widget.attrs)

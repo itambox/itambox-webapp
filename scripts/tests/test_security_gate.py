@@ -241,8 +241,9 @@ class SecurityAutomationContractTests(unittest.TestCase):
         self.assertIn("id: image-gate", workflow)
         self.assertIn("steps.image-gate.outputs.sarif == 'true'", workflow)
         self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", workflow)
-        self.assertIn("category: trivy-release-image", workflow)
-        upload = workflow.index("category: trivy-release-image")
+        self.assertEqual(workflow.count("category: trivy-draft-image"), 2)
+        self.assertNotIn("category: trivy-release-image", workflow)
+        upload = workflow.index("category: trivy-draft-image")
         self.assertLess(workflow.index("id: image-gate"), upload)
         self.assertLess(upload, workflow.index("Enforce release-image gate"))
 
@@ -252,11 +253,30 @@ class SecurityAutomationContractTests(unittest.TestCase):
         self.assertIn("security-events: write", prepare_release)
         self.assertIn("id: draft-image-gate", prepare_release)
         self.assertIn("steps.draft-image-gate.outputs.sarif == 'true'", prepare_release)
+        # Every image upload in this workflow uses the analysis identity that code
+        # scanning already knows on the default branch. A second category for the
+        # same image makes code scanning report "configuration not found" instead
+        # of comparing the pull request against the branch.
         self.assertIn("category: trivy-draft-image", prepare_release)
+        self.assertNotIn("category: trivy-release-image", workflow)
+        self.assertEqual(workflow.count("category: trivy-draft-image"), 2)
         self.assertLess(
             prepare_release.index("category: trivy-draft-image"),
             prepare_release.index("docker save"),
         )
+
+    def test_image_scan_uploads_share_the_default_branch_configuration(self):
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        rehearsal = workflow[: workflow.index("prepare-release:")]
+        prepare_release = workflow[workflow.index("prepare-release:") :]
+        # A code scanning configuration is the pair (tool, category). Both image
+        # scans therefore have to use the one category that already exists on the
+        # default branch; the rehearsal upload is the one the pull request run
+        # produces, and it is the upload code scanning compares against the branch.
+        self.assertEqual(workflow.count("category: trivy-draft-image"), 2)
+        self.assertEqual(workflow.count("category: trivy-release-image"), 0)
+        self.assertIn("category: trivy-draft-image", rehearsal)
+        self.assertIn("category: trivy-draft-image", prepare_release)
 
     def test_installer_pins_tool_versions_and_literal_checksums(self):
         installer = (REPOSITORY_ROOT / "scripts" / "install_security_tools.sh").read_text(encoding="utf-8")

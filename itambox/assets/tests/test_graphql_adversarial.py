@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from assets import schema as assets_schema
+from assets.graphql_specifications import integration as graphql_integration
 from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel, Supplier
 from core.context import get_current_membership, get_current_tenant
 from core.tenant_access import override_tenant_access_policy
@@ -156,12 +157,25 @@ class GraphQLAdversarialTestCase(TestCase):
 
         self.graphql_url = reverse("graphql")
 
+    def _scope(self, tenant_id=None):
+        tenant_id = self.tenant_a.pk if tenant_id is None else tenant_id
+        return f"{{ mode: TENANT, tenantId: {json.dumps(str(tenant_id))} }}"
+
+    def _assets_query(self, *, tenant_id=None, selection="name", arguments=""):
+        suffix = f", {arguments}" if arguments else ""
+        return f"{{ assets(requestedScope: {self._scope(tenant_id)}{suffix}) {{ {selection} }} }}"
+
+    def _asset_query(self, asset_id, *, tenant_id=None, selection="name"):
+        return (
+            f"{{ asset(id: {json.dumps(str(asset_id))}, requestedScope: {self._scope(tenant_id)}) {{ {selection} }} }}"
+        )
+
     # =========================================================================
     # 1. Query Parameters Tests (invalid limit, negative offset, large pages)
     # =========================================================================
 
     def test_negative_limit_returns_empty_or_fails(self):
-        query = "{ assets(limit: -5) { name } }"
+        query = self._assets_query(arguments="limit: -5")
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -178,7 +192,7 @@ class GraphQLAdversarialTestCase(TestCase):
             self.assertEqual(len(res_data["data"]["assets"]), 0)
 
     def test_negative_offset_raises_error_gracefully(self):
-        query = "{ assets(offset: -1) { name } }"
+        query = self._assets_query(arguments="offset: -1")
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -191,7 +205,7 @@ class GraphQLAdversarialTestCase(TestCase):
         self.assertIn("errors", res_data)
 
     def test_extremely_large_page_limit(self):
-        query = "{ assets(limit: 1000000) { name } }"
+        query = self._assets_query(arguments="limit: 1000000")
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -222,7 +236,7 @@ class GraphQLAdversarialTestCase(TestCase):
 
     def test_sql_injection_sort_by(self):
         # Query: sort_by parameter injection attempt
-        query = '{ assets(sort_by: "name; DROP TABLE assets_asset;") { name } }'
+        query = self._assets_query(arguments='sort_by: "name; DROP TABLE assets_asset;"')
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -236,7 +250,7 @@ class GraphQLAdversarialTestCase(TestCase):
 
     def test_sql_injection_filter_parameters(self):
         # Query: filter parameters injection attempt
-        query = "{ assets(name: \"' OR '1'='1\") { name } }"
+        query = self._assets_query(arguments="name: \"' OR '1'='1'\"")
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -254,7 +268,7 @@ class GraphQLAdversarialTestCase(TestCase):
         # Since Software is related to Manufacturer, and Manufacturer has software_products, etc.
         query = """
         {
-          assets {
+          assets(requestedScope: SCOPE_PLACEHOLDER) {
             assetType {
               manufacturer {
                 softwareProducts {
@@ -268,7 +282,7 @@ class GraphQLAdversarialTestCase(TestCase):
             }
           }
         }
-        """
+        """.replace("SCOPE_PLACEHOLDER", self._scope())
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -285,7 +299,7 @@ class GraphQLAdversarialTestCase(TestCase):
     # =========================================================================
 
     def test_token_forgery_invalid_header_formats(self):
-        query = "{ assets { name } }"
+        query = self._assets_query()
 
         # Test case: Missing value
         response = self.client.post(
@@ -317,7 +331,7 @@ class GraphQLAdversarialTestCase(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_token_forgery_expired_token(self):
-        query = "{ assets { name } }"
+        query = self._assets_query()
         expired_token = Token.objects.create(user=self.staff_a, expires=timezone.now() - timezone.timedelta(seconds=1))
         response = self.client.post(
             self.graphql_url,
@@ -329,7 +343,7 @@ class GraphQLAdversarialTestCase(TestCase):
         self.assertEqual(response.json(), EXPECTED_AUTHENTICATION_FAILURE)
 
     def test_token_forgery_fake_or_nonexistent_token(self):
-        query = "{ assets { name } }"
+        query = self._assets_query()
         response = self.client.post(
             self.graphql_url,
             data=json.dumps({"query": query}),
@@ -340,7 +354,7 @@ class GraphQLAdversarialTestCase(TestCase):
         self.assertEqual(response.json(), EXPECTED_AUTHENTICATION_FAILURE)
 
     def test_tenant_access_configuration_failure_escapes_graphql_auth_boundary(self):
-        query = "{ assets { name } }"
+        query = self._assets_query()
 
         with override_tenant_access_policy(_FailingTenantAccessPolicy()):
             with self.assertRaisesMessage(
@@ -491,20 +505,29 @@ class GraphQLAdversarialTestCase(TestCase):
         session.save()
 
         observed = {}
-        original_check_permission = assets_schema.check_permission
+        original_resolve_read_scope = assets_schema.resolve_read_scope
+        original_resolve_access_scope = graphql_integration.resolve_access_scope
 
-        def capture_context(info, permission, *args, **kwargs):
+        def capture_scope(info, requested_scope):
             observed["request_active_tenant"] = info.context.active_tenant
             observed["tenant_context"] = get_current_tenant()
             observed["request_active_membership"] = info.context.active_membership
             observed["membership_context"] = get_current_membership()
             observed["resolver_permission_boundary_reached"] = True
-            return original_check_permission(info, permission, *args, **kwargs)
+            return original_resolve_read_scope(info, requested_scope)
 
-        with patch.object(assets_schema, "check_permission", capture_context):
+        def capture_access_scope(scope_request):
+            observed["requested_scope_tenant"] = scope_request.selector.tenant_id
+            observed["scope_permission_entrypoint_reached"] = True
+            return original_resolve_access_scope(scope_request)
+
+        with (
+            patch.object(assets_schema, "resolve_read_scope", capture_scope),
+            patch.object(graphql_integration, "resolve_access_scope", capture_access_scope),
+        ):
             response = self.client.post(
                 self.graphql_url,
-                data=json.dumps({"query": "{ assets { name } }"}),
+                data=json.dumps({"query": self._assets_query(tenant_id=self.tenant_b.pk)}),
                 content_type="application/json",
                 HTTP_AUTHORIZATION=f"Token {token_b.key}",
             )
@@ -514,6 +537,8 @@ class GraphQLAdversarialTestCase(TestCase):
         self.assertNotIn("errors", payload)
         self.assertEqual({asset["name"] for asset in payload["data"]["assets"]}, {"Laptop B"})
         self.assertTrue(observed["resolver_permission_boundary_reached"])
+        self.assertTrue(observed["scope_permission_entrypoint_reached"])
+        self.assertEqual(observed["requested_scope_tenant"], self.tenant_b.pk)
         self.assertIs(observed["request_active_tenant"], observed["tenant_context"])
         self.assertEqual(observed["request_active_tenant"].pk, self.tenant_b.pk)
         self.assertEqual(observed["tenant_context"].pk, self.tenant_b.pk)
@@ -526,15 +551,11 @@ class GraphQLAdversarialTestCase(TestCase):
         """Querying tenant B's asset by pk while authenticated as tenant A returns null."""
         # Pass switch_tenant so TenantMiddleware sets active_tenant = tenant_a
         url = self.graphql_url + f"?switch_tenant={self.tenant_a.pk}"
-        query = f'''
-        query {{
-            asset(id: "{self.asset_b.id}") {{
-                id
-                name
-                assetTag
-            }}
-        }}
-        '''
+        query = self._asset_query(
+            self.asset_b.id,
+            tenant_id=self.tenant_a.pk,
+            selection="id name assetTag",
+        )
         response = self.client.post(
             url,
             data=json.dumps({"query": query}),
@@ -549,13 +570,7 @@ class GraphQLAdversarialTestCase(TestCase):
     def test_cross_tenant_query_assets_list_excludes_tenant_b(self):
         """Listing assets as tenant A must not include tenant B's asset."""
         url = self.graphql_url + f"?switch_tenant={self.tenant_a.pk}"
-        query = """
-        query {
-            assets {
-                assetTag
-            }
-        }
-        """
+        query = self._assets_query(tenant_id=self.tenant_a.pk, selection="assetTag")
         response = self.client.post(
             url,
             data=json.dumps({"query": query}),

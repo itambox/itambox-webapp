@@ -18,7 +18,7 @@ function slug(value: string): string {
 export function runIdentity(testInfo: TestInfo): string {
   const configured = process.env.E2E_RUN_ID || process.env.GITHUB_RUN_ID;
   if (configured) return slug(configured);
-  return `local-${process.pid}-${testInfo.startTime.getTime()}`;
+  return `local-${process.pid}-${slug(testInfo.testId)}`;
 }
 
 export function retrySafeName(testInfo: TestInfo, suffix: string): string {

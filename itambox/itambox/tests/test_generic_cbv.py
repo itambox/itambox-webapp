@@ -605,7 +605,7 @@ class TenantScopingTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(
             name="TenantA GCBV",
             slug="tenanta-gcbv",
-            permissions=["assets.view_asset"],
+            permissions=["assets.view_asset", "assets.add_asset"],
         )
 
         # Tenant B — a different tenant whose assets must not be visible to A
@@ -635,6 +635,11 @@ class TenantScopingTests(TenantTestMixin, TestCase):
     def test_cross_tenant_asset_detail_returns_404(self):
         """Tenant-A user cannot access tenant-B's Asset detail — gets 404."""
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset_b.pk}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_cross_tenant_asset_clone_returns_404(self):
+        """The clone source lookup must use the tenant-scoped queryset."""
+        response = self.client.get(reverse("assets:asset_clone", kwargs={"pk": self.asset_b.pk}))
         self.assertEqual(response.status_code, 404)
 
     def test_own_tenant_asset_detail_accessible(self):

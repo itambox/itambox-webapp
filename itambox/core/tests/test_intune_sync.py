@@ -17,6 +17,7 @@ from django.utils import timezone
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from core.models import Job
 from core.tests.mixins import TenantTestMixin
+from organization.models import Role
 from software.models import InstalledSoftware, Software
 
 User = get_user_model()
@@ -154,7 +155,12 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        self.setup_tenant_context(name="Tenant A", slug="tenant-a")
+        self.setup_tenant_context(
+            name="Tenant A",
+            slug="tenant-a",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.tenant_admin, self.tenant, self.tenant_role)
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
@@ -214,7 +220,12 @@ class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        self.setup_tenant_context(name="Tenant A", slug="tenant-a")
+        self.setup_tenant_context(
+            name="Tenant A",
+            slug="tenant-a",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.tenant_admin, self.tenant, self.tenant_role)
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
@@ -268,7 +279,12 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        self.setup_tenant_context(name="Tenant A", slug="tenant-a")
+        self.setup_tenant_context(
+            name="Tenant A",
+            slug="tenant-a",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.tenant_admin, self.tenant, self.tenant_role)
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
@@ -349,7 +365,12 @@ class IntuneSyncDryRunTest(TenantTestMixin, TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        self.setup_tenant_context(name="Tenant A", slug="tenant-a")
+        self.setup_tenant_context(
+            name="Tenant A",
+            slug="tenant-a",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.tenant_admin, self.tenant, self.tenant_role)
         _make_status()
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
@@ -381,7 +402,12 @@ class IntuneSyncTenantIsolationTest(TenantTestMixin, TransactionTestCase):
 
     def setUp(self):
         super().setUp()
-        self.setup_tenant_context(name="Tenant A", slug="tenant-a")
+        self.setup_tenant_context(
+            name="Tenant A",
+            slug="tenant-a",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.tenant_admin, self.tenant, self.tenant_role)
         _make_status()
 
         # Second tenant
@@ -389,6 +415,12 @@ class IntuneSyncTenantIsolationTest(TenantTestMixin, TransactionTestCase):
 
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
         self.admin_b = User.objects.create_superuser(username="admin_b", email="admin_b@example.com", password="pw")
+        role_b = Role.objects.create(
+            tenant=self.tenant_b,
+            name="Test Role B",
+            permissions=["assets.change_asset"],
+        )
+        self.grant(self.admin_b, self.tenant_b, role_b)
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
     @patch("assets.tasks.intune_sync.IntuneClient")

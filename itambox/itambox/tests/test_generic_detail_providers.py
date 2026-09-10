@@ -52,7 +52,11 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
             custom_field_data={"rack_code": "R1"},
         )
         self.content_type = ContentType.objects.get_for_model(self.asset)
-        custom_field = CustomField.objects.create(name="rack_code", label="Rack Code")
+        custom_field = CustomField.objects.create(
+            name="rack_code",
+            label="Rack Code",
+            activation=CustomField.ACTIVATION_GLOBAL,
+        )
         custom_field.object_types.add(self.content_type)
 
         self.journal_entry = JournalEntry.objects.create(

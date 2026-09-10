@@ -16,14 +16,12 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
+from assets.choices import RequestStatusChoices
+from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.tasks.labels import _default_label_card, generate_base64_barcode, render_labels_pdf
 from compliance.audit_services import audit_asset_from_form
-from compliance.services import scope_custody_receipts
-
-logger = logging.getLogger(__name__)
-
-from assets.choices import RequestStatusChoices
 from compliance.models import CustodyReceipt
+from compliance.services import scope_custody_receipts
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 from itambox.panels import Panel
@@ -46,9 +44,10 @@ from software.models import InstalledSoftware
 from software.tables import InstalledSoftwareTable
 
 from .. import filters, forms, tables
-from ..models import Asset, AssetAssignment, StatusLabel
+from ..models import Asset, AssetAssignment, AssetTypeFieldset
 from ..services import checkin_asset, checkout_asset
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -86,7 +85,6 @@ class AssetDetailView(ObjectDetailView):
         "location",
         "asset_type",
         "asset_type__manufacturer",
-        "asset_type__custom_fieldset",
     ).prefetch_related(
         "tags",
         "maintenances",
@@ -97,7 +95,12 @@ class AssetDetailView(ObjectDetailView):
             ),
             to_attr="prefetched_active_assignments",
         ),
-        "asset_type__custom_fieldset__fields",
+        Prefetch(
+            "asset_type__fieldset_memberships",
+            queryset=AssetTypeFieldset.objects.select_related("fieldset").prefetch_related(
+                "fieldset__field_memberships__custom_field__object_types"
+            ),
+        ),
         "component_allocations__component",
         "component_allocations__component__manufacturer",
     )
@@ -125,6 +128,10 @@ class AssetDetailView(ObjectDetailView):
 
         active_assignment = asset.active_assignment
         context["assignment"] = active_assignment
+        context["asset_type_specification_fields"] = (
+            resolve_asset_type_custom_fields(asset.asset_type) if asset.asset_type else []
+        )
+        context["asset_specification_fields"] = resolve_asset_custom_fields(asset.asset_type, asset.custom_field_data)
 
         sw_qs = InstalledSoftware.objects.filter(asset=asset).select_related("software", "software__manufacturer")
         sw_table = InstalledSoftwareTable(sw_qs)
@@ -277,7 +284,7 @@ class AssetEditView(ObjectEditView):
     queryset = Asset.objects.all()
     model = Asset
     model_form = forms.AssetForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/asset_specification_form.html"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -288,11 +295,17 @@ class AssetEditView(ObjectEditView):
         if request.headers.get("HX-Request") and "_reload" in request.POST:
             self.object = self.get_object()
             form = self.get_form()
-            return render(request, "htmx/crispy_form.html", {"form": form})
+            context = self.get_context_data(form=form)
+            return render(request, "assets/_asset_specification_form.html", context)
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        try:
+            response = super().form_valid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            form.specification_revision_conflict = True
+            return self.form_invalid(form)
         if getattr(self, "object", None) is not None:
             form.create_inline_warranty(self.object)
         return response
@@ -308,7 +321,12 @@ class AssetDeleteView(ObjectDeleteView):
 class AssetCloneView(ObjectCloneView):
     model = Asset
     model_form = forms.AssetForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/asset_specification_form.html"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def pre_save_clone(self, original, cloned):
         cloned.asset_tag = ""

@@ -19,6 +19,12 @@ msgstr ""
 msgid "Assets"
 msgstr "Assets"
 
+msgid "The regular expression is invalid."
+msgstr "Der reguläre Ausdruck ist ungültig."
+
+msgid "The regular expression is too complex."
+msgstr "Der reguläre Ausdruck ist zu komplex."
+
 msgid "Either holder_id, location_id, or asset_target_id must be provided."
 msgstr ""
 "Es muss entweder holder_id, location_id oder asset_target_id angegeben "
@@ -3350,14 +3356,6 @@ msgstr "Erstellt vor"
 msgid "Hexadecimal color code (e.g., 00ff00 for green)."
 msgstr "Hexadezimaler Farbcode (z. B. 00ff00 für Grün)."
 
-msgid ""
-"Models this field applies to. Fields applying to Asset Type act as hardware "
-"specifications; fields applying to Asset are per-device details."
-msgstr ""
-"Modelle, für die dieses Feld gilt. Felder, die für den Asset-Typ gelten, "
-"fungieren als Hardware-Spezifikationen; Felder, die für ein Asset gelten, "
-"sind gerätespezifische Details."
-
 msgid "Custom"
 msgstr "Benutzerdefiniert"
 
@@ -3588,38 +3586,20 @@ msgstr "Dashboards"
 msgid "Text"
 msgstr "Text"
 
-msgid "Number"
-msgstr "Zahl"
-
 msgid "Date"
 msgstr "Datum"
 
 msgid "Boolean"
 msgstr "Boolescher Wert"
 
-msgid "Select / Dropdown"
-msgstr "Auswahl / Dropdown"
-
 msgid "Field Name"
 msgstr "Feldname"
-
-msgid "Slug-like name (e.g. sim_card_number)"
-msgstr "Slug-artiger Name (z. B. sim_card_number)"
 
 msgid "Display Label"
 msgstr "Anzeige-Label"
 
 msgid "Field Type"
 msgstr "Feldtyp"
-
-#| msgid "Choices:"
-msgid "Choices"
-msgstr "Auswahloptionen"
-
-msgid "New-line separated list of choices (only for 'select' type)"
-msgstr ""
-"Durch Zeilenumbrüche getrennte Liste von Auswahlmöglichkeiten (nur für Typ "
-"'select')"
 
 msgid "Required"
 msgstr "Erforderlich"
@@ -3638,9 +3618,6 @@ msgstr ""
 
 msgid "Custom Field"
 msgstr "Benutzerdefiniertes Feld"
-
-msgid "Fieldset Name"
-msgstr "Feldgruppenname"
 
 #| msgid "Proceeds"
 msgid "Processed"
@@ -7437,9 +7414,6 @@ msgstr "Modellname:"
 msgid "Part Number:"
 msgstr "Teilenummer:"
 
-msgid "Custom Fieldset:"
-msgstr "Benutzerdefiniertes Feldset:"
-
 msgid "Depreciation Policy:"
 msgstr "Abschreibungsregel:"
 
@@ -7682,7 +7656,7 @@ msgid "Source Stock Location"
 msgstr "Quell-Lagerort"
 
 msgid "Requester (Myself)"
-msgstr "Anforderer (Ich selbst)"
+msgstr "Anforderer (Mich selbst)"
 
 msgid "Notes &amp; Justification"
 msgstr "Notizen &amp; Begründung"
@@ -10496,8 +10470,6 @@ msgstr "Wählen Sie eine Benutzergruppe aus, die zu einem Mandanten gehört."
 msgid "Choose a valid role coverage option."
 msgstr "Wählen Sie einen gültigen Geltungsbereich für die Rolle aus."
 
-
-
 #: itambox/organization/models.py:894
 msgid "Choose either a member or a user group for this role, not both."
 msgstr "Wählen Sie für diese Rolle entweder ein Mitglied oder eine Benutzergruppe aus, nicht beides."
@@ -10694,8 +10666,6 @@ msgstr "Nicht abgeschlossen"
 #: itambox/templates/organization/resource_grant_expiry_run_detail.html:21
 msgid "Not finished"
 msgstr "Nicht abgeschlossen"
-
-
 
 #: itambox/extras/tables.py:604
 msgid "Not sent"
@@ -13744,3 +13714,1100 @@ msgstr "Der ausgewählte Zielstandort gehört nicht zum Mandanten der Prüfsitzu
 #, python-format
 msgid "Renewed subscription. Next renewal date: %(renewal_date)s. Cost: %(renewal_cost)s %(currency)s."
 msgstr "Abonnement verlängert. Nächster Verlängerungstermin: %(renewal_date)s. Kosten: %(renewal_cost)s %(currency)s."
+
+
+#: itambox/extras/customfields.py
+msgid "A field cannot be set and cleared together."
+msgstr "Ein Feld kann nicht gleichzeitig gesetzt und gelöscht werden."
+
+#: itambox/extras/models.py
+msgid "Decimal"
+msgstr "Dezimalzahl"
+
+#: itambox/assets/models/catalog.py
+msgid "Deprecated"
+msgstr "Veraltet"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Each specification fieldset may only be selected once."
+msgstr "Jede Spezifikationsfeldgruppe darf nur einmal ausgewählt werden."
+
+#: itambox/extras/customfields.py
+msgid "Enter a base-10 decimal without an exponent."
+msgstr "Gib eine Dezimalzahl ohne Exponent ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a boolean."
+msgstr "Gib einen Wahrheitswert ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a canonical decimal value."
+msgstr "Gib eine kanonische Dezimalzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a date."
+msgstr "Gib ein Datum ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a decimal value."
+msgstr "Gib eine Dezimalzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter a valid hostname."
+msgstr "Gib einen gültigen Hostnamen ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter an ISO date."
+msgstr "Gib ein ISO-Datum ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter an integer."
+msgstr "Gib eine Ganzzahl ein."
+
+#: itambox/extras/customfields.py
+msgid "Enter text."
+msgstr "Gib Text ein."
+
+#: itambox/extras/models.py
+msgid "Integer"
+msgstr "Ganzzahl"
+
+#: itambox/assets/models/catalog.py
+msgid "Library"
+msgstr "Bibliothek"
+
+#: itambox/assets/models/catalog.py
+msgid "Local"
+msgstr "Lokal"
+
+#: itambox/extras/customfields.py
+msgid "Maximum temperature must not be below minimum."
+msgstr "Die Höchsttemperatur darf nicht unter der Mindesttemperatur liegen."
+
+#: itambox/extras/models.py
+msgid "Multi select"
+msgstr "Mehrfachauswahl"
+
+#: itambox/extras/customfields.py
+msgid "Negative zero is not allowed."
+msgstr "Negativ null ist nicht zulässig."
+
+#: itambox/extras/customfields.py
+msgid "Null is not allowed for this field."
+msgstr "Null ist für dieses Feld nicht zulässig."
+
+#: itambox/extras/customfields.py
+msgid "Select a list of values."
+msgstr "Wähle eine Werteliste aus."
+
+#: itambox/extras/customfields.py
+msgid "Select a valid choice."
+msgstr "Wähle eine gültige Option aus."
+
+#: itambox/extras/customfields.py
+msgid "Select one value."
+msgstr "Wähle einen Wert aus."
+
+#: itambox/extras/customfields.py
+msgid "Select unique valid choices."
+msgstr "Wähle eindeutige gültige Optionen aus."
+
+#: itambox/extras/models.py
+msgid "Single select"
+msgstr "Einzelauswahl"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Specification fieldsets"
+msgstr "Spezifikationsfeldgruppen"
+
+#: itambox/extras/models.py
+msgid "Stable JSON key (e.g. sim_card_number)"
+msgstr "Stabiler JSON-Schlüssel (z. B. sim_card_number)"
+
+#: itambox/extras/customfields.py
+msgid "The choice definition is invalid."
+msgstr "Die Auswahldefinition ist ungültig."
+
+#: itambox/extras/customfields.py
+msgid "The decimal definition is invalid."
+msgstr "Die Dezimaldefinition ist ungültig."
+
+#: itambox/extras/customfields.py
+msgid "The decimal value is too large."
+msgstr "Die Dezimalzahl ist zu groß."
+
+#: itambox/extras/customfields.py
+msgid "The field type is unsupported."
+msgstr "Der Feldtyp wird nicht unterstützt."
+
+#: itambox/extras/customfields.py
+msgid "The integer is outside the supported range."
+msgstr "Die Ganzzahl liegt außerhalb des unterstützten Bereichs."
+
+#: itambox/assets/models/catalog.py
+msgid "The library Asset Type identity is immutable after creation."
+msgstr "Die Identität des Asset-Typs aus der Bibliothek kann nach der Erstellung nicht geändert werden."
+
+#: itambox/extras/customfields.py
+msgid "The text is too long."
+msgstr "Der Text ist zu lang."
+
+#: itambox/extras/customfields.py
+msgid "The value has an invalid format."
+msgstr "Der Wert hat ein ungültiges Format."
+
+#: itambox/extras/customfields.py
+msgid "The value is above the allowed maximum."
+msgstr "Der Wert liegt über dem zulässigen Maximum."
+
+#: itambox/extras/customfields.py
+msgid "The value is below the allowed minimum."
+msgstr "Der Wert liegt unter dem zulässigen Minimum."
+
+#: itambox/extras/models.py
+msgid "This value is immutable after creation."
+msgstr "Dieser Wert kann nach der Erstellung nicht geändert werden."
+
+#: itambox/extras/customfields.py
+msgid "Too many values were selected."
+msgstr "Es wurden zu viele Werte ausgewählt."
+
+#: itambox/extras/customfields.py
+msgid "Unknown custom field key."
+msgstr "Unbekannter Schlüssel für ein benutzerdefiniertes Feld."
+
+#: itambox/extras/forms.py
+msgid "Applicability"
+msgstr "Anwendbarkeit"
+
+
+#: itambox/extras/forms.py
+msgid "Every field position must be a positive integer."
+msgstr "Jede Feldposition muss eine positive Ganzzahl sein."
+
+#: itambox/extras/customfields.py
+msgid "Explicitly remove the stored value."
+msgstr "Gespeicherten Wert explizit entfernen."
+
+#: itambox/extras/forms.py
+msgid "Field positions must be unique."
+msgstr "Feldpositionen müssen eindeutig sein."
+
+#: itambox/extras/forms.py
+msgid "Multi-select fields require a maximum value count."
+msgstr "Mehrfachauswahlfelder benötigen eine maximale Anzahl von Werten."
+
+#: itambox/extras/forms.py
+msgid "Only decimal fields may define a scale."
+msgstr "Nur Dezimalfelder dürfen eine Skalierung definieren."
+
+#: itambox/extras/forms.py
+msgid "Only select fields may reference a Choice Set."
+msgstr "Nur Auswahlfelder dürfen auf ein Auswahlset verweisen."
+
+#: itambox/extras/forms.py
+msgid "Optional JSON object mapping field keys to positive positions. Omitted keys use selection order."
+msgstr "Optionales JSON-Objekt, das Feldschlüssel positiven Positionen zuordnet. Nicht angegebene Schlüssel verwenden die Auswahlreihenfolge."
+
+#: itambox/extras/forms.py
+msgid "Ordered fields"
+msgstr "Geordnete Felder"
+
+#: itambox/extras/forms.py
+msgid "Positions must be a JSON object."
+msgstr "Positionen müssen ein JSON-Objekt sein."
+
+#: itambox/extras/forms.py
+msgid "Remove value"
+msgstr "Wert entfernen"
+
+
+#: itambox/extras/forms.py
+msgid "Select fields require a Choice Set."
+msgstr "Auswahlfelder benötigen ein Auswahlset."
+
+#: itambox/extras/forms.py
+msgid "Single-select fields must limit values to exactly one."
+msgstr "Einzelauswahlfelder müssen die Werte auf genau einen begrenzen."
+
+
+#: itambox/templates/assets/includes/detail/assettype_info.html
+msgid "Specification Sections:"
+msgstr "Spezifikationsabschnitte:"
+
+#: itambox/templates/assets/assets/asset_detail.html
+msgid "Values inherited from the selected Asset Type"
+msgstr "Vom ausgewählten Asset-Typ geerbte Werte"
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch 'clear' must be a list of field keys."
+msgstr "Die Liste für 'clear' muss Schlüssel benutzerdefinierter Felder enthalten."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch 'set' must be an object."
+msgstr "Der Wert für 'set' muss ein Objekt sein."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field patch contains an unknown operation."
+msgstr "Der Custom-Field-Patch enthält eine unbekannte Operation."
+
+#: itambox/extras/definition_contract.py
+msgid "Decimal fields require a scale from 0 to 6."
+msgstr "Dezimalfelder benötigen eine Skalierung von 0 bis 6."
+
+#: itambox/extras/api/serializers.py
+msgid "Custom field specification patch must be an object."
+msgstr "Der Patch für benutzerdefinierte Feldspezifikationen muss ein Objekt sein."
+
+#: itambox/extras/customfields.py
+msgid "Deprecated custom fields are read-only."
+msgstr "Veraltete benutzerdefinierte Felder sind schreibgeschützt."
+
+#: itambox/extras/definition_contract.py
+msgid "Inline regular-expression flags are not allowed."
+msgstr "Inline-Flags für reguläre Ausdrücke sind nicht zulässig."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a Library."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen eine Bibliothek."
+
+#: itambox/assets/models/catalog.py
+msgid "Library-managed Asset Types require a non-empty definition key."
+msgstr "Von einer Bibliothek verwaltete Asset-Typen benötigen einen nicht leeren Definitionsschlüssel."
+
+#: itambox/itambox/views/generic/restore.py
+msgid "Skipped %(count)s permanent schema tombstone(s)."
+msgstr "%(count)s dauerhafte Schema-Tombstones übersprungen."
+
+#: itambox/extras/customfields.py
+msgid "The choice set is not active."
+msgstr "Das Auswahlset ist nicht aktiv."
+
+#: itambox/extras/customfields.py
+msgid "This field is required."
+msgstr "Dieses Feld ist erforderlich."
+
+#: itambox/extras/models.py:400
+msgid "A field with memberships cannot be global."
+msgstr "Ein Feld, das einer Feldgruppe zugeordnet ist, kann nicht global sein."
+
+#: itambox/extras/models.py:310
+msgid "Activation"
+msgstr "Aktivierung"
+
+#: itambox/extras/forms.py:198
+msgid "Activation and validation"
+msgstr "Aktivierung und Validierung"
+
+#: itambox/extras/definition_contract.py:308
+msgid "Choice Sets must be active."
+msgstr "Auswahlsets müssen aktiv sein."
+
+#: itambox/extras/models.py:286
+msgid "Composed"
+msgstr "Über Feldgruppen"
+
+#: itambox/extras/models.py:499
+msgid "Global fields cannot join a fieldset."
+msgstr "Globale Felder können keiner Feldgruppe zugeordnet werden."
+
+#: itambox/extras/definition_contract.py:327
+msgid "Select at least one applicable model."
+msgstr "Wählen Sie mindestens ein zutreffendes Modell aus."
+
+#: itambox/extras/forms.py:173
+msgid "Select every model this field applies to. Applicability is stored only in this relation."
+msgstr "Wählen Sie alle Modelle aus, für die dieses Feld gilt. Die Anwendbarkeit wird ausschließlich über diese Zuordnung festgelegt."
+
+#: itambox/extras/api/serializers.py:187
+#, python-format
+msgid "Unsupported custom-field owner: %(models)s."
+msgstr "Nicht unterstütztes Modell für benutzerdefinierte Felder: %(models)s."
+
+
+#: itambox/extras/models.py:250
+msgid "A Library namespace is immutable after creation."
+msgstr "Der Namespace einer Bibliothek kann nach der Erstellung nicht geändert werden."
+
+#: itambox/extras/models.py:162
+msgid "A release document must be a JSON object."
+msgstr "Ein Release-Dokument muss ein JSON-Objekt sein."
+
+#: itambox/extras/models.py:280
+msgid "An older Release cannot become accepted."
+msgstr "Ein älteres Release kann nicht akzeptiert werden."
+
+#: itambox/extras/models.py:378
+msgid "Choice"
+msgstr "Auswahl"
+
+#: itambox/extras/models.py:377
+msgid "Choice Set"
+msgstr "Auswahlset"
+
+#: itambox/extras/models.py:493
+msgid "Core and local definitions cannot carry a Library link."
+msgstr "Kern- und lokale Definitionen dürfen keine Bibliotheksverknüpfung enthalten."
+
+#: itambox/extras/models.py:258
+msgid "Create a Library before accepting a Release."
+msgstr "Erstellen Sie eine Bibliothek, bevor Sie ein Release akzeptieren."
+
+#: itambox/extras/models.py:421
+msgid "Legacy managed paths must be a JSON object."
+msgstr "Legacy-verwaltete Pfade müssen ein JSON-Objekt sein."
+
+#: itambox/extras/models.py:425
+msgid "Legacy provenance is immutable transition evidence."
+msgstr "Die Legacy-Herkunft ist ein unveränderlicher Übergangsnachweis."
+
+#: itambox/extras/models.py:419
+msgid "Legacy provenance rows are immutable after insertion."
+msgstr "Legacy-Herkunftsdatensätze können nach dem Einfügen nicht geändert werden."
+
+#: itambox/extras/models.py:491
+msgid "Library-managed definitions require a Library."
+msgstr "Von einer Bibliothek verwaltete Definitionen benötigen eine Bibliothek."
+
+#: itambox/assets/models/catalog.py:391
+msgid "Only library-managed Asset Types may carry Library identity."
+msgstr "Nur von einer Bibliothek verwaltete Asset-Typen dürfen eine Bibliotheksidentität enthalten."
+
+#: itambox/extras/models.py:355
+msgid "Release rows are immutable after insertion."
+msgstr "Release-Datensätze können nach dem Einfügen nicht geändert werden."
+
+#: itambox/extras/models.py:360
+msgid "Release rows are immutable and retained."
+msgstr "Release-Datensätze sind unveränderlich und bleiben erhalten."
+
+#: itambox/extras/models.py:332
+msgid "Release sequence must be a positive integer."
+msgstr "Die Release-Sequenz muss eine positive Ganzzahl sein."
+
+#: itambox/extras/models.py:262
+msgid "Specification Library identities are permanent."
+msgstr "Identitäten von Spezifikationsbibliotheken sind dauerhaft."
+
+#: itambox/extras/models.py:267
+msgid "The Library must be saved before accepting a Release."
+msgstr "Die Bibliothek muss gespeichert sein, bevor ein Release akzeptiert werden kann."
+
+#: itambox/extras/models.py:275
+msgid "The Release belongs to another Library."
+msgstr "Das Release gehört zu einer anderen Bibliothek."
+
+#: itambox/extras/models.py:351
+msgid "The Release library identity is inconsistent."
+msgstr "Die Bibliotheksidentität des Releases ist inkonsistent."
+
+#: itambox/extras/models.py:255
+msgid "The accepted Release may only change through the library command."
+msgstr "Das akzeptierte Release darf nur über den Bibliotheksbefehl geändert werden."
+
+#: itambox/extras/models.py:235
+msgid "The accepted Release must belong to this Library."
+msgstr "Das akzeptierte Release muss zu dieser Bibliothek gehören."
+
+#: itambox/extras/models.py:343
+msgid "The digest does not match the normalized release document."
+msgstr "Der Digest stimmt nicht mit dem normalisierten Release-Dokument überein."
+
+#: itambox/extras/models.py:166
+msgid "The release document is not valid normalized JSON."
+msgstr "Das Release-Dokument ist kein gültiges normalisiertes JSON."
+
+#: itambox/extras/models.py:383
+msgid "Uninitialized"
+msgstr "Nicht initialisiert"
+
+#: itambox/extras/models.py:384
+msgid "Unreconciled"
+msgstr "Nicht abgeglichen"
+
+#: itambox/assets/models/catalog.py
+msgid "Actor ID"
+msgstr "Actor-ID"
+
+#: itambox/assets/models/catalog.py
+msgid "Asset Type Image Stage"
+msgstr "Bild-Stage für Asset-Typen"
+
+#: itambox/assets/models/catalog.py
+msgid "Asset Type Image Stages"
+msgstr "Bild-Stages für Asset-Typen"
+
+#: itambox/assets/models/catalog.py
+msgid "Authentication Revision"
+msgstr "Authentifizierungsrevision"
+
+#: itambox/assets/models/catalog.py
+msgid "Byte Size"
+msgstr "Bytegröße"
+
+#: itambox/assets/models/catalog.py
+msgid "Command Kind"
+msgstr "Befehlsart"
+
+#: itambox/assets/models/catalog.py
+msgid "Consumed Asset Type"
+msgstr "Verbrauchter Asset-Typ"
+
+#: itambox/assets/models/catalog.py
+msgid "Content Digest"
+msgstr "Inhaltsprüfsumme"
+
+#: itambox/assets/models/catalog.py
+msgid "Discarded"
+msgstr "Verworfen"
+
+#: itambox/assets/models/catalog.py
+msgid "Expires At"
+msgstr "Ablaufzeitpunkt"
+
+#: itambox/assets/models/catalog.py
+msgid "Stage ID"
+msgstr "Stage-ID"
+
+#: itambox/assets/forms/assettype_form.py
+#, python-format
+msgid "Add %(label)s"
+msgstr "%(label)s hinzufügen"
+
+#: itambox/assets/forms/asset_form.py itambox/assets/forms/assettype_form.py
+msgid "Additional specifications"
+msgstr "Zusätzliche Spezifikationen"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Additional information"
+msgstr "Zusätzliche Informationen"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Asset specification values"
+msgstr "Spezifikationswerte des Assets"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Available sections"
+msgstr "Verfügbare Abschnitte"
+
+#: itambox/assets/forms/asset_form.py itambox/assets/forms/assettype_form.py
+msgid "Choose either removal or an explicit value, not both."
+msgstr "Wählen Sie entweder das Entfernen oder einen expliziten Wert, nicht beides."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Choose the ordered sections that define specifications for this model."
+msgstr "Wählen Sie die geordneten Abschnitte aus, die die Spezifikationen für dieses Modell festlegen."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Choose whether this draft value is omitted, explicit, empty, or null."
+msgstr "Wählen Sie, ob dieser Entwurfswert weggelassen, explizit, leer oder null sein soll."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Classification and financial"
+msgstr "Klassifizierung und Finanzen"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Copy to asset draft"
+msgstr "In den Asset-Entwurf kopieren"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Deprecated choice"
+msgstr "Veraltete Auswahl"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Deprecated field"
+msgstr "Veraltetes Feld"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Explicit null"
+msgstr "Explizites Null"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "General information"
+msgstr "Allgemeine Informationen"
+
+#: itambox/assets/forms/asset_form.py itambox/assets/forms/assettype_form.py
+msgid "Global specifications and values retained from an earlier composition."
+msgstr "Globale Spezifikationen und Werte aus einer früheren Zusammensetzung bleiben erhalten."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Inactive composition"
+msgstr "Inaktive Zusammensetzung"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Invalid stored value"
+msgstr "Ungültiger gespeicherter Wert"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+#, python-format
+msgid "Keep %(label)s selected"
+msgstr "%(label)s ausgewählt lassen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Leave unchanged"
+msgstr "Unverändert lassen"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Model default"
+msgstr "Modellstandard"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Model specification values"
+msgstr "Spezifikationswerte des Modells"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Model specifications"
+msgstr "Modellspezifikationen"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Move section down"
+msgstr "Abschnitt nach unten verschieben"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Move section up"
+msgstr "Abschnitt nach oben verschieben"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "No additional sections are available."
+msgstr "Keine weiteren Abschnitte verfügbar."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "No longer offered"
+msgstr "Nicht mehr angeboten"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "No previous values are stored."
+msgstr "Keine früheren Werte gespeichert."
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "No specification fields are defined for this Asset Type."
+msgstr "Für diesen Asset-Typ sind keine Spezifikationsfelder definiert."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "No specification fields are defined for this selection."
+msgstr "Für diese Auswahl sind keine Spezifikationsfelder definiert."
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "No specification sections selected."
+msgstr "Keine Spezifikationsabschnitte ausgewählt."
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Notes and tags"
+msgstr "Notizen und Tags"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Optional warranty"
+msgstr "Optionale Garantie"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Presence"
+msgstr "Wertstatus"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "Previous specification values"
+msgstr "Frühere Spezifikationswerte"
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "Procurement and financial"
+msgstr "Beschaffung und Finanzen"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "Refresh specification"
+msgstr "Spezifikation aktualisieren"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+#, python-format
+msgid "Reorder %(label)s"
+msgstr "Reihenfolge von %(label)s ändern"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Selected sections"
+msgstr "Ausgewählte Abschnitte"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set empty selection"
+msgstr "Leere Auswahl setzen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set explicit empty text"
+msgstr "Explizit leeren Text setzen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set explicit null"
+msgstr "Expliziten Nullwert setzen"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Set value"
+msgstr "Wert setzen"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Specification sections"
+msgstr "Spezifikationsabschnitte"
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "Stored value"
+msgstr "Gespeicherter Wert"
+
+#: itambox/templates/assets/_assettype_specification_form.html
+msgid "Stored values are retained until explicitly cleared."
+msgstr "Gespeicherte Werte bleiben erhalten, bis sie explizit gelöscht werden."
+
+#: itambox/templates/assets/_asset_specification_form.html
+msgid "This Asset Type has no model specifications."
+msgstr "Dieser Asset-Typ hat keine Modellspezifikationen."
+
+#: itambox/templates/assets/_asset_specification_form.html itambox/templates/assets/_assettype_specification_form.html
+msgid "This specification changed while you were editing. Your draft is retained; refresh the specification and review it before saving again."
+msgstr "Diese Spezifikation wurde während der Bearbeitung geändert. Ihr Entwurf bleibt erhalten; aktualisieren Sie die Spezifikation und prüfen Sie sie erneut, bevor Sie speichern."
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Unknown definition"
+msgstr "Unbekannte Definition"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Unset"
+msgstr "Nicht festgelegt"
+
+#: itambox/assets/models/catalog.py
+msgid "Storage Key"
+msgstr "Speicherschlüssel"
+
+#: itambox/assets/forms/assettype_form.py
+msgid "Refresh the specification preview before submitting this form."
+msgstr "Aktualisiere die Spezifikationsvorschau, bevor du dieses Formular absendest."
+
+#: itambox/extras/definition_views.py itambox/templates/extras/definitions/choice_set_list.html
+msgid "Add choice set"
+msgstr "Auswahlset hinzufügen"
+
+#: itambox/extras/definition_views.py
+msgid "Edit choice set"
+msgstr "Auswahlset bearbeiten"
+
+#: itambox/extras/definition_views.py
+msgid "Retire choice set"
+msgstr "Auswahlset als veraltet markieren"
+
+#: itambox/extras/definition_views.py itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Add choice"
+msgstr "Auswahloption hinzufügen"
+
+#: itambox/extras/definition_views.py
+msgid "Edit choice"
+msgstr "Auswahloption bearbeiten"
+
+#: itambox/extras/definition_views.py
+msgid "Retire choice"
+msgstr "Auswahloption als veraltet markieren"
+
+#: itambox/templates/extras/definitions/choice_form.html
+msgid "Choice set"
+msgstr "Auswahlset"
+
+#: itambox/templates/extras/definitions/choice_form.html itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Key"
+msgstr "Schlüssel"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Ordered choices"
+msgstr "Geordnete Auswahloptionen"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Position"
+msgstr "Position"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html itambox/templates/extras/definitions/retire_form.html
+msgid "Retire"
+msgstr "Als veraltet markieren"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "No choices are defined."
+msgstr "Es sind keine Auswahloptionen definiert."
+
+#: itambox/templates/extras/definitions/choice_set_detail.html itambox/templates/extras/definitions/retire_form.html
+msgid "Definition"
+msgstr "Definition"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html itambox/templates/extras/definitions/choice_set_list.html
+msgid "Management"
+msgstr "Verwaltung"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Edit label"
+msgstr "Bezeichnung bearbeiten"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Managed definitions are read-only."
+msgstr "Verwaltete Definitionen sind schreibgeschützt."
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Usage impact"
+msgstr "Auswirkungen auf die Verwendung"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Active fields"
+msgstr "Aktive Felder"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Active choices"
+msgstr "Aktive Auswahloptionen"
+
+#: itambox/templates/extras/definitions/choice_set_detail.html
+msgid "Unscoped usage impact is available only in all-accessible scope."
+msgstr "Mandantenübergreifende Auswirkungen auf die Verwendung sind nur im Bereich „Alle zugänglichen Mandanten“ verfügbar."
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "Choice sets"
+msgstr "Auswahlsets"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "Global choice definitions"
+msgstr "Globale Auswahldefinitionen"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "Usage"
+msgstr "Verwendung"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "fields"
+msgstr "Felder"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "choices"
+msgstr "Auswahloptionen"
+
+#: itambox/templates/extras/definitions/choice_set_list.html
+msgid "No choice sets are available."
+msgstr "Es sind keine Auswahlsets verfügbar."
+
+#: itambox/templates/extras/definitions/retire_form.html
+msgid "Retirement is checked against current dependencies and the submitted resource revision."
+msgstr "Beim Markieren als veraltet werden die aktuellen Abhängigkeiten und die übermittelte Ressourcenrevision geprüft."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "1. Choose a JSON Library"
+msgstr "1. JSON-Bibliothek auswählen"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "2. Review preview"
+msgstr "2. Vorschau prüfen"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "3. Choose conflict resolutions"
+msgstr "3. Konfliktentscheidungen treffen"
+
+#: itambox/assets/library_forms.py
+msgid "A fork needs a different namespace."
+msgstr "Eine Abspaltung benötigt einen anderen Namensraum."
+
+#: itambox/assets/views/library_views.py
+msgid "A new blocking conflict appeared during apply. A fresh preview is shown below."
+msgstr "Beim Anwenden ist ein neuer blockierender Konflikt aufgetreten. Unten wird eine neue Vorschau angezeigt."
+
+#: itambox/assets/library_forms.py
+msgid "A new namespace is only used for a fork."
+msgstr "Ein neuer Namensraum wird nur für eine Abspaltung verwendet."
+
+#: itambox/assets/library_forms.py
+msgid "Abort import"
+msgstr "Import abbrechen"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Accepted at"
+msgstr "Angenommen am"
+
+#: itambox/templates/assets/type_library/detail.html itambox/templates/assets/type_library/import.html itambox/templates/assets/type_library/list.html
+msgid "Accepted release"
+msgstr "Angenommene Version"
+
+#: itambox/assets/library_forms.py
+msgid "Acknowledge retained historical definitions"
+msgstr "Beibehaltene historische Definitionen bestätigen"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Apply Library"
+msgstr "Bibliothek anwenden"
+
+#: itambox/assets/views/library_views.py
+msgid "Apply changes the global catalogue only. Tenant Asset values, assignments, audit/policy state, and tenant installation policy are excluded from this document."
+msgstr "Das Anwenden ändert ausschließlich den globalen Katalog. Mandantenspezifische Asset-Werte, Zuweisungen, Audit- und Richtlinienzustände sowie Installationsrichtlinien sind von diesem Dokument ausgeschlossen."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Apply result"
+msgstr "Ergebnis des Anwendens"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Apply stays disabled until every conflict is reviewed."
+msgstr "Das Anwenden bleibt deaktiviert, bis alle Konflikte geprüft wurden."
+
+#: itambox/assets/views/library_views.py
+msgid "Applying this Library updates the global definition catalogue. Tenant Asset values, assignments, audit/policy state, and tenant installation decisions remain excluded."
+msgstr "Das Anwenden dieser Bibliothek aktualisiert den globalen Definitionskatalog. Mandantenspezifische Asset-Werte, Zuweisungen, Audit- und Richtlinienzustände sowie Installationsentscheidungen bleiben ausgeschlossen."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Back to libraries"
+msgstr "Zurück zu den Bibliotheken"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Baseline"
+msgstr "Ausgangsstand"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Blocking conflicts require a decision."
+msgstr "Blockierende Konflikte erfordern eine Entscheidung."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Changed paths"
+msgstr "Geänderte Pfade"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Choose a file to create a server-side preview."
+msgstr "Eine Datei auswählen, um eine serverseitige Vorschau zu erstellen."
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Download export"
+msgstr "Export herunterladen"
+
+#: itambox/assets/library_forms.py
+msgid "Effective snapshot"
+msgstr "Snapshot des wirksamen Stands"
+
+#: itambox/assets/library_forms.py
+msgid "Export mode"
+msgstr "Exportmodus"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Exports contain the Library graph only; tenant Asset values, assignments, audit/policy state, and installation decisions are never included."
+msgstr "Exporte enthalten ausschließlich den Bibliotheksgraphen. Mandantenspezifische Asset-Werte, Zuweisungen, Audit- und Richtlinienzustände sowie Installationsentscheidungen sind niemals enthalten."
+
+#: itambox/assets/library_forms.py
+msgid "Fork into a new namespace"
+msgstr "In einen neuen Namensraum abspalten"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Global Type Library"
+msgstr "Globale Typbibliothek"
+
+#: itambox/templates/assets/type_library/import.html itambox/templates/assets/type_library/list.html
+msgid "Global catalogue"
+msgstr "Globaler Katalog"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Global catalogue impact"
+msgstr "Auswirkungen auf den globalen Katalog"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Immutable release history"
+msgstr "Unveränderlicher Versionsverlauf"
+
+#: itambox/core/navigation/menu.py itambox/templates/assets/type_library/list.html
+msgid "Import Library"
+msgstr "Bibliothek importieren"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Import Type Library"
+msgstr "Typbibliothek importieren"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Import another release"
+msgstr "Weitere Version importieren"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Incoming release"
+msgstr "Eingehende Version"
+
+#: itambox/templates/assets/type_library/list.html
+msgid "Installed"
+msgstr "Installiert"
+
+#: itambox/templates/assets/type_library/list.html
+msgid "Installed library identities"
+msgstr "Installierte Bibliotheksidentitäten"
+
+#: itambox/assets/library_forms.py
+msgid "Keep local"
+msgstr "Lokalen Stand beibehalten"
+
+#: itambox/assets/library_forms.py
+msgid "Library JSON file"
+msgstr "JSON-Datei der Bibliothek"
+
+#: itambox/assets/library_forms.py
+msgid "Library JSON files must be 10 MiB or smaller."
+msgstr "JSON-Dateien für Bibliotheken dürfen höchstens 10 MiB groß sein."
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Library identity"
+msgstr "Bibliotheksidentität"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Maximum 10 MiB; the original draft is retained through preview and stale retries."
+msgstr "Höchstens 10 MiB; der ursprüngliche Entwurf bleibt während der Vorschau und bei Wiederholungen nach veralteten Vorschauen erhalten."
+
+#: itambox/templates/assets/type_library/detail.html itambox/templates/assets/type_library/import.html itambox/templates/assets/type_library/list.html
+msgid "Namespace"
+msgstr "Namensraum"
+
+#: itambox/assets/library_forms.py
+msgid "New namespace"
+msgstr "Neuer Namensraum"
+
+#: itambox/templates/assets/type_library/list.html
+msgid "No Type Libraries are installed."
+msgstr "Es sind keine Typbibliotheken installiert."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "No blocking conflicts were found. Review the planned paths before applying."
+msgstr "Es wurden keine blockierenden Konflikte gefunden. Vor dem Anwenden die geplanten Pfade prüfen."
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "No releases are recorded."
+msgstr "Es sind keine Versionen erfasst."
+
+#: itambox/assets/library_forms.py
+msgid "Original release"
+msgstr "Originalversion"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Planned paths"
+msgstr "Geplante Pfade"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Preserved local overrides"
+msgstr "Beibehaltene lokale Anpassungen"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Preview digest"
+msgstr "Vorschau-Digest"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Preview is not an apply."
+msgstr "Eine Vorschau wendet noch keine Änderungen an."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Preview refreshed"
+msgstr "Vorschau aktualisiert"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Release history"
+msgstr "Versionsverlauf"
+
+#: itambox/assets/views/library_views.py
+msgid "Release rows and the original source remain immutable; an effective snapshot includes current local overrides only when you explicitly acknowledge retained history."
+msgstr "Versionseinträge und die Originalquelle bleiben unveränderlich. Ein Snapshot des wirksamen Stands enthält aktuelle lokale Anpassungen nur nach ausdrücklicher Bestätigung beibehaltener Historie."
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Required only for a namespace fork."
+msgstr "Nur für eine Abspaltung in einen neuen Namensraum erforderlich."
+
+#: itambox/assets/library_forms.py
+msgid "Resolution for %(path)s"
+msgstr "Konfliktentscheidung für %(path)s"
+
+#: itambox/assets/views/library_views.py
+msgid "Resolve every blocking conflict before applying the Library."
+msgstr "Vor dem Anwenden der Bibliothek müssen alle blockierenden Konflikte gelöst werden."
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Retained"
+msgstr "Beibehalten"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Review choices"
+msgstr "Entscheidungen prüfen"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Semantic digest"
+msgstr "Semantischer Digest"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Sequence"
+msgstr "Sequenz"
+
+#: itambox/assets/filters.py
+msgid "Specification filters"
+msgstr "Spezifikationsfilter"
+
+#: itambox/assets/library_forms.py
+msgid "Take upstream"
+msgstr "Upstream-Stand übernehmen"
+
+#: itambox/assets/views/library_views.py
+msgid "The JSON document exceeds the 10 MiB upload limit."
+msgstr "Das JSON-Dokument überschreitet die Uploadgrenze von 10 MiB."
+
+#: itambox/assets/views/library_views.py
+msgid "The Library changed after preview. A fresh preview is shown below; your uploaded draft was retained."
+msgstr "Die Bibliothek wurde nach der Vorschau geändert. Unten wird eine neue Vorschau angezeigt; der hochgeladene Entwurf wurde beibehalten."
+
+#: itambox/assets/views/library_views.py
+msgid "The Library could not be applied."
+msgstr "Die Bibliothek konnte nicht angewendet werden."
+
+#: itambox/assets/views/library_views.py
+msgid "The Library operation is no longer available for this actor. The draft was retained."
+msgstr "Die Bibliotheksoperation ist für diesen Benutzer nicht mehr verfügbar. Der Entwurf wurde beibehalten."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "The Library was already current; no changes were applied."
+msgstr "Die Bibliothek war bereits aktuell; es wurden keine Änderungen angewendet."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "The Library was applied successfully."
+msgstr "Die Bibliothek wurde erfolgreich angewendet."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "The command transaction supplied the audit actor and retained the signed preview preconditions; the UI did not recalculate them."
+msgstr "Die Befehlstransaktion hat den Auditbenutzer bereitgestellt und die signierten Vorschauvorbedingungen beibehalten; die Oberfläche hat sie nicht neu berechnet."
+
+#: itambox/assets/library_forms.py
+msgid "The preview plan is invalid."
+msgstr "Der Vorschauplan ist ungültig."
+
+#: itambox/assets/library_forms.py
+msgid "The preview plan is too large or invalid."
+msgstr "Der Vorschauplan ist zu groß oder ungültig."
+
+#: itambox/assets/library_forms.py
+msgid "The retained library document is too large."
+msgstr "Das beibehaltene Bibliotheksdokument ist zu groß."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "The signed preconditions below are applied only after you explicitly choose Apply."
+msgstr "Die nachfolgenden signierten Vorbedingungen werden erst beim ausdrücklichen Anwenden verwendet."
+
+#: itambox/assets/views/library_views.py
+msgid "The uploaded Library must be UTF-8 JSON."
+msgstr "Die hochgeladene Bibliothek muss UTF-8-kodiertes JSON enthalten."
+
+#: itambox/assets/views/library_views.py
+msgid "This global catalogue workflow changes definitions for all accessible tenants; tenant Asset values, assignments, audit history, and installation policy are not part of a Library document."
+msgstr "Dieser globale Katalogablauf ändert Definitionen für alle zugänglichen Mandanten. Mandantenspezifische Asset-Werte, Zuweisungen, Auditverläufe und Installationsrichtlinien sind nicht Bestandteil eines Bibliotheksdokuments."
+
+#: itambox/core/navigation/menu.py itambox/templates/assets/type_library/list.html
+msgid "Type Libraries"
+msgstr "Typbibliotheken"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "Type Library"
+msgstr "Typbibliothek"
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Upload a bounded UTF-8 JSON document. Validation runs on the server before any apply is possible."
+msgstr "Ein UTF-8-JSON-Dokument innerhalb der Größenbegrenzung hochladen. Vor jedem möglichen Anwenden erfolgt eine serverseitige Validierung."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Upstream"
+msgstr "Upstream"
+
+#: itambox/assets/library_forms.py
+msgid "Use lowercase letters, digits and single hyphens for a namespace."
+msgstr "Für einen Namensraum sind Kleinbuchstaben, Ziffern und einzelne Bindestriche zulässig."
+
+#: itambox/templates/assets/type_library/import.html
+msgid "Validate and preview"
+msgstr "Validieren und Vorschau anzeigen"
+
+#: itambox/templates/assets/type_library/detail.html
+msgid "You have read-only access to this Library."
+msgstr "Für diese Bibliothek besteht ausschließlich Lesezugriff."

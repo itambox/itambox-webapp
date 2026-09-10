@@ -2,6 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db import transaction
 from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
@@ -20,6 +21,29 @@ from itambox.views.generic.utils import safe_return_url
 from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
+
+
+def _has_managed_definition_rows(queryset, model):
+    try:
+        model._meta.get_field("management_kind")
+    except FieldDoesNotExist:
+        return False
+    return any(getattr(row, "management_kind", None) != "local" for row in queryset)
+
+
+def _is_managed_definition_model(model):
+    if model is None:
+        return False
+    try:
+        model._meta.get_field("management_kind")
+    except FieldDoesNotExist:
+        return False
+    return True
+
+
+def _ensure_unmanaged_definition_rows(queryset, model):
+    if _has_managed_definition_rows(queryset, model):
+        raise PermissionDenied("Managed definitions cannot be mutated through bulk actions.")
 
 
 class ObjectBulkEditView(
@@ -54,6 +78,8 @@ class ObjectBulkEditView(
 
     def has_permission(self):
         model = self._get_model()
+        if _is_managed_definition_model(model):
+            return False
         if (
             self._uses_request_selected_model()
             and model is not None
@@ -103,6 +129,7 @@ class ObjectBulkEditView(
                 _("Skipped %(count)s %(objects)s you do not have permission to change.")
                 % {"count": skipped, "objects": model._meta.verbose_name_plural},
             )
+        _ensure_unmanaged_definition_rows(queryset, model)
         if not queryset:
             return HttpResponseRedirect(return_url)
 
@@ -234,6 +261,48 @@ class ObjectBulkDeleteView(
             return (f"{model._meta.app_label}.delete_{model._meta.model_name}",)
         return ("",)
 
+    def _confirm_locked_delete(self, request, pks, model, return_url):
+        try:
+            with transaction.atomic():
+                objects_to_delete, skipped = filter_permitted_rows(
+                    request.user,
+                    self._get_queryset(pks).select_for_update(),
+                    model,
+                    "delete",
+                )
+                if skipped:
+                    messages.warning(
+                        request,
+                        _("Skipped %(count)s %(objects)s you do not have permission to delete.")
+                        % {"count": skipped, "objects": model._meta.verbose_name_plural},
+                    )
+                _ensure_unmanaged_definition_rows(objects_to_delete, model)
+                if not objects_to_delete:
+                    messages.warning(
+                        request,
+                        _("No valid %(objects)s selected for deletion.") % {"objects": model._meta.verbose_name_plural},
+                    )
+                    return HttpResponseRedirect(return_url)
+                deleted_count = 0
+                for obj in objects_to_delete:
+                    if hasattr(obj, "snapshot") and callable(obj.snapshot):
+                        obj.snapshot()
+                    obj.delete()
+                    deleted_count += 1
+        except ProtectedError as exc:
+            messages.error(
+                request,
+                _("Could not delete objects due to protected relationships: %(error)s") % {"error": exc},
+            )
+            return HttpResponseRedirect(return_url)
+
+        messages.success(
+            request,
+            _("Successfully deleted %(count)s %(objects)s.")
+            % {"count": deleted_count, "objects": model._meta.verbose_name_plural},
+        )
+        return HttpResponseRedirect(return_url)
+
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist("pk")
         model = self._get_model()
@@ -246,6 +315,9 @@ class ObjectBulkDeleteView(
         if not pks:
             messages.warning(request, _("No %(objects)s were selected.") % {"objects": model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
+
+        if "_confirm" in request.POST:
+            return self._confirm_locked_delete(request, pks, model, return_url)
 
         # Per-row delete-perm enforcement (see filter_permitted_rows): the
         # dispatch gate alone is too coarse inside a multi-tenant group scope.
@@ -262,48 +334,27 @@ class ObjectBulkDeleteView(
                 % {"count": skipped, "objects": model._meta.verbose_name_plural},
             )
 
+        _ensure_unmanaged_definition_rows(objects_to_delete, model)
+
         if not objects_to_delete:
             messages.warning(
                 request, _("No valid %(objects)s selected for deletion.") % {"objects": model._meta.verbose_name_plural}
             )
             return HttpResponseRedirect(return_url)
 
-        if "_confirm" in request.POST:
-            try:
-                deleted_count = 0
-                with transaction.atomic():
-                    for obj in objects_to_delete:
-                        if hasattr(obj, "snapshot") and callable(obj.snapshot):
-                            obj.snapshot()
-                        obj.delete()
-                        deleted_count += 1
-
-                messages.success(
-                    request,
-                    _("Successfully deleted %(count)s %(objects)s.")
-                    % {"count": deleted_count, "objects": model._meta.verbose_name_plural},
-                )
-                return HttpResponseRedirect(return_url)
-            except ProtectedError as e:
-                messages.error(
-                    request,
-                    _("Could not delete objects due to protected relationships: %(error)s") % {"error": e},
-                )
-                return HttpResponseRedirect(return_url)
-        else:
-            context = {
-                "model": model,
-                "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
-                "model_verbose_name": model._meta.verbose_name,
-                "model_verbose_name_plural": model._meta.verbose_name_plural,
-                "objects": objects_to_delete,
-                "object_pks": pks,
-                "return_url": return_url,
-                "title": _("Confirm Bulk Deletion"),
-                "breadcrumbs": [
-                    (reverse("dashboard"), _("Dashboard")),
-                    (return_url, str(model._meta.verbose_name_plural).title()),
-                    (None, _("Delete (%(count)s)") % {"count": len(objects_to_delete)}),
-                ],
-            }
-            return self.render_to_response(context)
+        context = {
+            "model": model,
+            "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
+            "model_verbose_name": model._meta.verbose_name,
+            "model_verbose_name_plural": model._meta.verbose_name_plural,
+            "objects": objects_to_delete,
+            "object_pks": pks,
+            "return_url": return_url,
+            "title": _("Confirm Bulk Deletion"),
+            "breadcrumbs": [
+                (reverse("dashboard"), _("Dashboard")),
+                (return_url, str(model._meta.verbose_name_plural).title()),
+                (None, _("Delete (%(count)s)") % {"count": len(objects_to_delete)}),
+            ],
+        }
+        return self.render_to_response(context)

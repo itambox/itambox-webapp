@@ -2,6 +2,7 @@ import importlib
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.graph import MigrationGraph
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 
@@ -20,10 +21,27 @@ class ReportDesignerMigrationTests(TransactionTestCase):
         finally:
             super().tearDown()
 
+    def _historical_executor(self):
+        # Keep this test focused on extras.0105; never reverse unrelated irreversible
+        # Asset-Type cutovers just to reach the historical report state.
+        executor = MigrationExecutor(connection)
+        loader = executor.loader
+        allowed = set(loader.graph.forwards_plan(self.migrate_to))
+        graph = MigrationGraph()
+        for key in allowed:
+            graph.add_node(key, loader.disk_migrations[key])
+        for key in allowed:
+            migration = loader.disk_migrations[key]
+            for dependency in migration.dependencies:
+                if dependency in allowed:
+                    graph.add_dependency(migration, key, dependency)
+        loader.graph = graph
+        return executor
+
     def setUp(self):
         super().setUp()
         MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
-        self.executor = MigrationExecutor(connection)
+        self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
         ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
@@ -69,7 +87,7 @@ class ReportDesignerMigrationTests(TransactionTestCase):
 
         connection.commit()
         connection.close()
-        self.executor = MigrationExecutor(connection)
+        self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_to])
 
     def test_only_live_non_empty_template_is_grandfathered(self):
@@ -84,7 +102,7 @@ class ReportDesignerMigrationTests(TransactionTestCase):
     def test_upgrade_report_names_out_of_bound_custom_html_templates(self):
         connection.commit()
         connection.close()
-        self.executor = MigrationExecutor(connection)
+        self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
         with connection.cursor() as cursor:
             cursor.execute(
@@ -94,7 +112,7 @@ class ReportDesignerMigrationTests(TransactionTestCase):
 
         connection.commit()
         connection.close()
-        self.executor = MigrationExecutor(connection)
+        self.executor = self._historical_executor()
         with self.assertLogs("extras.migrations.0105_reporttemplate_advanced_mode_and_more", level="WARNING") as logs:
             self.executor.migrate([self.migrate_to])
 
@@ -127,7 +145,7 @@ class ReportDesignerMigrationTests(TransactionTestCase):
 
         connection.commit()
         connection.close()
-        self.executor = MigrationExecutor(connection)
+        self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
         connection.close()
         reversed_apps = self.executor.loader.project_state([self.migrate_from]).apps
@@ -158,7 +176,7 @@ class ReportDesignerMigrationTests(TransactionTestCase):
         # Re-applying the migration must not duplicate columns, rewrite content,
         # or broaden grandfathering beyond the bounded live-schedule set.
         connection.close()
-        self.executor = MigrationExecutor(connection)
+        self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_to])
         forward_apps = self.executor.loader.project_state([self.migrate_to]).apps
         forward_row = forward_apps.get_model("extras", "ReportTemplate").objects.get(name="live-content")

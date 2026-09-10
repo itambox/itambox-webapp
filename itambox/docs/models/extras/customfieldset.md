@@ -11,5 +11,6 @@ A **Custom Fieldset** groups custom fields together into logical sections on the
 
 ## Features & Validation
 
-* **Form Grouping**: Custom fieldsets automatically structure the target model edit forms into distinct panels.
+* **Explicit Composition**: Asset Types select an ordered list of Fieldsets. Member target bindings determine applicability, not automatic selection.
+* **History Preservation**: Removing a Fieldset from a Type does not erase values that become historical.
 * **Layout Organization**: Fields inside a fieldset are rendered together in the UI, enhancing readability for large sets of custom properties.

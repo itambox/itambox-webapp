@@ -18,9 +18,11 @@ from collections.abc import Mapping
 from typing import Any, Protocol, TypedDict
 
 from django.conf import settings as _settings
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.services.specification_writers import merge_generic_asset_data
 from core.context import get_current_request_id
 from core.errors import (
     IntegrationAuthenticationError,
@@ -55,6 +57,7 @@ class _IntuneTenant(Protocol):
 
 
 class _IntuneAsset(Protocol):
+    pk: int
     custom_field_data: dict[str, object] | None
 
     def save(self, *, update_fields: list[str]) -> None:
@@ -94,6 +97,17 @@ class IntuneSyncResult(TypedDict):
     software_degraded: int
 
 
+_INTUNE_GENERIC_ASSET_KEYS = frozenset(
+    {
+        "intune_device_id",
+        "intune_last_sync",
+        "os_version",
+        "intune_primary_user",
+        "intune_primary_user_matched",
+    }
+)
+
+
 def sync_tenant_intune(
     tenant_id: int,
     user_id: int,
@@ -123,7 +137,7 @@ def sync_tenant_intune(
                 actor_id=user_id,
                 request_id=str(request_id) if request_id else None,
             )
-            counts = _run_sync(ctx.tenant, dry_run, job, integration_context)
+            counts = _run_sync(ctx.tenant, dry_run, job, integration_context, actor=ctx.user)
             job.mark_completed(result=counts)
         except IntegrationError as exc:
             log_extra = exc.log_extra(cause_type=type(exc.__cause__).__name__ if exc.__cause__ else None)
@@ -187,6 +201,8 @@ def _run_sync(
     dry_run: bool,
     job: Job,
     integration_context: IntegrationContext | None = None,
+    *,
+    actor: object | None = None,
 ) -> IntuneSyncResult:
 
     integration_context = integration_context or IntegrationContext(
@@ -207,6 +223,8 @@ def _run_sync(
         default_status_slug,
         sync_software,
     ) = _read_intune_config(config, context=integration_context)
+    if not dry_run and actor is None:
+        raise PermissionDenied("Intune writes require the task actor.")
 
     client = IntuneClient(
         azure_tenant_id,
@@ -244,10 +262,10 @@ def _run_sync(
 
         if asset:
             counts["matched"] += 1
-            _stamp_discovery_facts(asset, device, tenant, dry_run)
+            _stamp_discovery_facts(asset, device, tenant, dry_run, user=actor)
             counts["updated"] += 1
         elif create_missing:
-            asset = _create_asset(device, tenant, default_status_slug, dry_run)
+            asset = _create_asset(device, tenant, default_status_slug, dry_run, user=actor)
             if asset:
                 counts["created"] += 1
             else:
@@ -274,6 +292,8 @@ def _stamp_discovery_facts(
     device: IntuneDevicePayload,
     tenant: _IntuneTenant,
     dry_run: bool,
+    *,
+    user: object | None,
 ) -> None:
     """Write Intune discovery metadata into custom_field_data."""
 
@@ -289,12 +309,15 @@ def _stamp_discovery_facts(
         facts["intune_primary_user"] = upn
         facts["intune_primary_user_matched"] = holder is not None
 
-    data = dict(asset.custom_field_data or {})
-    data.update(facts)
-
     if not dry_run:
-        asset.custom_field_data = data
-        asset.save(update_fields=["custom_field_data"])
+        if user is None:
+            raise PermissionDenied("Intune writes require the task actor.")
+        merge_generic_asset_data(
+            asset_id=asset.pk,
+            user=user,
+            updates=facts,
+            allowed_keys=_INTUNE_GENERIC_ASSET_KEYS,
+        )
 
 
 def _create_asset(
@@ -302,6 +325,8 @@ def _create_asset(
     tenant: _IntuneTenant,
     default_status_slug: str,
     dry_run: bool,
+    *,
+    user: object | None,
 ) -> _IntuneAsset | None:
     """Create a Manufacturer, AssetType (get_or_create), and Asset for a new device."""
 
@@ -312,6 +337,8 @@ def _create_asset(
 
     if dry_run:
         return None
+    if user is None:
+        raise PermissionDenied("Intune writes require the task actor.")
 
     manufacturer, _ = Manufacturer.objects.get_or_create(
         name=manufacturer_name,
@@ -339,7 +366,13 @@ def _create_asset(
         asset_type=asset_type,
         status=status,
         tenant=tenant,
-        custom_field_data=discovery_facts,
+        custom_field_data={},
+    )
+    merge_generic_asset_data(
+        asset_id=asset.pk,
+        user=user,
+        updates=discovery_facts,
+        allowed_keys=_INTUNE_GENERIC_ASSET_KEYS,
     )
     return asset
 

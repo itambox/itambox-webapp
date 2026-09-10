@@ -1,13 +1,21 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import translation
 
 User = get_user_model()
 
 
 class InternationalizationTests(TestCase):
     def setUp(self):
+        self._language_before_test = translation.get_language()
+        translation.activate(settings.LANGUAGE_CODE)
         self.user = User.objects.create_user(username="testuser", password="testpass", is_staff=True, is_superuser=True)
+
+    def tearDown(self):
+        translation.activate(self._language_before_test or settings.LANGUAGE_CODE)
+        super().tearDown()
 
     def test_language_selection_german(self):
         # Log in user

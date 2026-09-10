@@ -1,7 +1,9 @@
 import json
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from model_bakery import baker
 
@@ -113,7 +115,7 @@ class MitigationsPhase3Tests(TestCase):
         # Request all relation fields: asset_type, asset_role, status, location, tenant, supplier
         query = """
         {
-          assets {
+          assets(requestedScope: SCOPE_PLACEHOLDER) {
             name
             assetType {
               model
@@ -141,9 +143,27 @@ class MitigationsPhase3Tests(TestCase):
             }
           }
         }
-        """
+        """.replace("SCOPE_PLACEHOLDER", f"{{ mode: TENANT, tenantId: {json.dumps(str(self.tenant.pk))} }}")
 
-        # Create a second asset to ensure N+1 is not present
+        def run_graphql_query():
+            with CaptureQueriesContext(connection) as captured:
+                response = self.client.post(
+                    self.graphql_url,
+                    data=json.dumps({"query": query}),
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+            return response, tuple(entry["sql"] for entry in captured.captured_queries)
+
+        # First establish the fixed authentication/scope/loader cost with one asset.
+        first_response, first_queries = run_graphql_query()
+        self.assertEqual(first_response.status_code, 200)
+        first_data = first_response.json()
+        self.assertNotIn("errors", first_data)
+        self.assertEqual(len(first_data["data"]["assets"]), 1)
+
+        # Expand only the asset fixture. A joined/prefetched read must not add one
+        # query per returned row, while authorization remains a fixed request cost.
         Asset.objects.create(
             name="Laptop 2",
             asset_tag="TAG-2",
@@ -153,31 +173,29 @@ class MitigationsPhase3Tests(TestCase):
             location=self.location,
             supplier=self.supplier,
         )
+        second_response, second_queries = run_graphql_query()
+        self.assertEqual(second_response.status_code, 200)
+        second_data = second_response.json()
+        self.assertNotIn("errors", second_data)
+        self.assertEqual(len(second_data["data"]["assets"]), 2)
 
-        # The key assertion is the single JOIN'd Asset query (select_related works — no
-        # N+1 on asset relations). The remaining queries are the users-owned token
-        # authenticator and GraphQL permission/query path: token lookup, canonical
-        # accessible-tenant and RoleGrant/scope resolution, bounded own-tenant
-        # coverage, last_used update, the token's direct-membership lookup,
-        # TenantGroup/descendant resolution, and the software relation query.
-        # Managed projection is skipped because this tenant is not managed by a
-        # provider. The all-accessible scope caching from #29 (82f1cf5) avoids the
-        # extra token revocation re-validation queries that were present in the
-        # pre-#29 baseline (cf774f2). build_accessible_tenant_permissions_map
-        # (phase 3 for issue #56) folds the per-tenant scoped-tenant-id/coverage walk
-        # into the one bounded Tenant lookup above instead of re-deriving it per grant.
-        # GraphQL token authentication already binds the token tenant and membership;
-        # #442 intentionally does not run a second TenantMiddleware.process_request()
-        # session-resolution pass. The BASE control's five additional queries were
-        # that pass's fallback membership lookup plus its session read/save sequence.
-        with self.assertNumQueries(11):
-            response = self.client.post(
-                self.graphql_url,
-                data=json.dumps({"query": query}),
-                content_type="application/json",
-                HTTP_AUTHORIZATION=f"Token {self.token.key}",
-            )
-            self.assertEqual(response.status_code, 200)
-            res_data = response.json()
-            self.assertNotIn("errors", res_data)
-            self.assertEqual(len(res_data["data"]["assets"]), 2)
+        def asset_read_queries(queries):
+            return [sql for sql in queries if 'from "assets_asset"' in sql.lower()]
+
+        first_asset_queries = asset_read_queries(first_queries)
+        second_asset_queries = asset_read_queries(second_queries)
+        self.assertEqual(len(first_asset_queries), 1)
+        self.assertEqual(len(second_asset_queries), 1)
+        self.assertIn('left outer join "assets_assettype"', second_asset_queries[0].lower())
+
+        # Relation reads are constant as well: the expanded fixture must not cause
+        # repeated prefetches, and total work may only grow by a bounded setup read.
+        first_prefetch_queries = [sql for sql in first_queries if "assets_assettypefieldset" in sql.lower()]
+        second_prefetch_queries = [sql for sql in second_queries if "assets_assettypefieldset" in sql.lower()]
+        self.assertEqual(len(first_prefetch_queries), 1)
+        self.assertEqual(len(second_prefetch_queries), 1)
+        self.assertLessEqual(
+            len(second_queries),
+            len(first_queries) + 1,
+            "GraphQL authorization/read query cost grew with fixture cardinality",
+        )

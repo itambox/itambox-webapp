@@ -52,7 +52,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Parallel and serial lanes run sequentially in this job; the previous
+    # 60-minute budget cancelled the serial lane before the certification gates.
+    timeout-minutes: 90
     strategy:
       matrix:
         python-version: ["3.12"]
@@ -342,6 +344,10 @@ jobs:
             artifacts/node-ids.txt
             artifacts/coverage-parallel.json
             artifacts/coverage-serial-only.json
+            artifacts/.coverage.parallel
+            artifacts/.coverage.serial
+            artifacts/.coverage.combined
+          include-hidden-files: "true"
           if-no-files-found: error
           retention-days: 30
 
@@ -377,23 +383,165 @@ jobs:
             --expected-node-ids artifacts/node-ids.txt \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
+
+  # Runs after the lane job AND the qualification job so both reports can be
+  # produced without delaying either producer. The two coverage gates answer
+  # different questions and therefore read different reports:
+  #
+  # * `coverage-lanes.json` is the stable ordinary population -- the parallel
+  #   and serial lanes only. The global ratchet reads it, so whether the
+  #   optional qualification ran on this change set never moves the recorded
+  #   baseline.
+  # * `coverage-combined.json` is the union of this same checkout, including
+  #   the qualification coverage whenever the change set requires it. The
+  #   differential gate reads it.
+  coverage-gates:
+    name: Coverage gates
+    runs-on: ubuntu-latest
+    needs: [test, migration-qualification]
+    if: always()
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install system deps for python-ldap
+        run: |
+          set -Eeuo pipefail
+          if command -v apt-get >/dev/null; then
+            if [ "$(id -u)" -eq 0 ]; then
+              APT=(apt-get)
+            else
+              APT=(sudo apt-get)
+            fi
+            apt_options=(
+              -o Acquire::Retries=3
+              -o Acquire::http::Timeout=15
+              -o Acquire::https::Timeout=15
+            )
+            update_packages() {
+              timeout --kill-after=10s 180s "${APT[@]}" "${apt_options[@]}" update
+            }
+            if ! update_packages; then
+              echo "Azure Ubuntu mirror failed; retrying against archive.ubuntu.com." >&2
+            fi
+            "${APT[@]}" "${apt_options[@]}" install -y libldap2-dev libsasl2-dev
+          fi
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      # The ordinary report is rendered first, on purpose: `coverage combine`
+      # consumes -- and removes -- the `.coverage.combined` data file it reads.
+      - name: Download lane coverage
+        if: needs.test.result == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: coverage-and-durations-py3.12
+          path: artifacts
+
+      - name: Render the ordinary lane report
+        if: always() && needs.test.result == 'success'
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync coverage json \
+            --rcfile=../pyproject.toml \
+            --data-file=../artifacts/.coverage.combined \
+            -o ../artifacts/coverage-lanes.json
+
+      # Required means required: when the change set requires the qualification,
+      # its coverage artifact must arrive intact. A missing, empty, or
+      # unreadable file fails here instead of quietly degrading the differential
+      # measurement to the ordinary lanes.
+      - name: Download qualification coverage
+        if: always() && needs.migration-qualification.outputs.enabled == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: qualification-coverage
+          path: artifacts/qualification-coverage
+          if-no-files-found: error
+
+      - name: Verify the required qualification coverage
+        if: always() && needs.migration-qualification.outputs.enabled == 'true'
+        run: |
+          if [ ! -s artifacts/qualification-coverage/.coverage.qualification ]; then
+            echo "::error::the change set requires the migration/seed qualification, but its coverage artifact is missing or empty"
+            exit 1
+          fi
+
+      - name: Combine lane and qualification coverage
+        if: always() && needs.test.result == 'success'
+        working-directory: ./itambox
+        run: |
+          if [ "${{ needs.migration-qualification.outputs.enabled }}" = "true" ]; then
+            uv run --locked --no-sync coverage combine \
+              --rcfile=../pyproject.toml \
+              --data-file=../artifacts/.coverage.gates \
+              ../artifacts/.coverage.combined ../artifacts/qualification-coverage/.coverage.qualification
+            uv run --locked --no-sync coverage json \
+              --rcfile=../pyproject.toml \
+              --data-file=../artifacts/.coverage.gates \
+              -o ../artifacts/coverage-combined.json
+          else
+            # Legitimately not required: the union of this checkout is the
+            # ordinary lanes, already rendered above.
+            cp ../artifacts/coverage-lanes.json ../artifacts/coverage-combined.json
+          fi
+
+      # The global ratchet holds the ordinary lanes against the reviewed
+      # baseline. Qualification coverage is deliberately excluded here: its
+      # presence depends on the change set, and a baseline that moved with it
+      # would compare two different test populations from run to run.
       - name: Check the global coverage ratchet
-        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
+        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-lanes.json') != ''
         run: |
           python scripts/check_coverage_baseline.py \
-            --coverage-json artifacts/coverage-combined.json \
+            --coverage-json artifacts/coverage-lanes.json \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
       # Pull requests only: on a push to a protected branch there is no
       # meaningful "changed code" range to hold to the differential target.
+      # Reads the union of this checkout, so qualification coverage counts for
+      # the changed lines it exercises.
       - name: Check differential coverage for changed production code
-        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success' && github.event_name == 'pull_request'
+        if: always() && needs.test.result == 'success' && hashFiles('artifacts/coverage-combined.json') != '' && github.event_name == 'pull_request'
         run: |
           python scripts/check_diff_coverage.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
             --head-ref HEAD \
             --coverage-json artifacts/coverage-combined.json \
             --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the ordinary lane report
+        if: always() && hashFiles('artifacts/coverage-lanes.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-lanes-json
+          path: artifacts/coverage-lanes.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload the differential union report
+        if: always() && hashFiles('artifacts/coverage-combined.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-combined-json
+          path: artifacts/coverage-combined.json
+          if-no-files-found: error
+          retention-days: 30
 
   lint:
     runs-on: ubuntu-latest
@@ -615,3 +763,181 @@ jobs:
       - name: Lint (ESLint)
         working-directory: ./itambox
         run: npx eslint static/src
+
+  # Historical migration rehearsals and the full demo-seed qualification were
+  # moved out of the ordinary serial_only lane (scripts/qualification/). They
+  # remain explicitly runnable and execute here only when migration files, the
+  # seed implementation, or the qualification area itself change, plus on
+  # workflow_dispatch (release qualification).
+  migration-qualification:
+    name: Migration & seed qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # The relevance decision is published so the downstream coverage gates can
+    # tell "this change set requires qualification coverage" from "this change
+    # set legitimately does not", instead of inferring it from a possibly
+    # missing artifact.
+    outputs:
+      enabled: ${{ steps.relevance.outputs.enabled }}
+      reason: ${{ steps.relevance.outputs.reason }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: itambox_ci
+          POSTGRES_USER: itambox_ci
+          POSTGRES_PASSWORD: itambox_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=2s
+          --health-timeout=2s
+          --health-retries=30
+
+    env:
+      ITAMBOX_ENV: dev
+      ITAMBOX_DB_NAME: itambox_ci
+      ITAMBOX_DB_USER: itambox_ci
+      ITAMBOX_DB_PASSWORD: itambox_ci
+      ITAMBOX_DB_HOST: localhost
+      ITAMBOX_DB_PORT: "5432"
+      ITAMBOX_DB_SSLMODE: disable
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Determine relevance
+        id: relevance
+        run: |
+          # Always on for explicit dispatches (release qualification). On pull
+          # requests the rehearsals run when the full change set touches
+          # Django migrations, the seed implementation, the migration harness,
+          # or the qualification area itself; their coverage then feeds the
+          # combined differential measurement.
+          #
+          # When the qualification is required, its coverage is part of the
+          # differential measurement, so this decision fails closed: an
+          # unresolvable base or an uncomputable change set fails the job
+          # instead of defaulting the change to "irrelevant".
+          set -Eeuo pipefail
+          emit() {
+            echo "enabled=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+          }
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            emit true "explicit dispatch: release qualification always runs"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            emit false "no changed-code range to qualify outside pull requests"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          git fetch --no-tags origin "$base" >/dev/null 2>&1 || true
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "::error::cannot resolve the pull-request base $base; the relevance of the migration/seed qualification cannot be decided"
+            exit 1
+          fi
+          if ! changed="$(git diff --name-only "$base...HEAD")"; then
+            echo "::error::cannot compute the pull-request change set against $base"
+            exit 1
+          fi
+          if printf '%s\n' "$changed" \
+              | grep -Eq '^(itambox/.+migrations/|itambox/core/management/commands/_seed/|itambox/core/management/commands/seed_data.py|itambox/core/tests/migration_harness.py|scripts/qualification/)'; then
+            emit true "the change set touches migrations, the seed implementation, the migration harness, or the qualification area"
+          else
+            emit false "the change set touches no qualification-relevant path"
+          fi
+
+      - name: Set up Python 3.12
+        if: steps.relevance.outputs.enabled == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        if: steps.relevance.outputs.enabled == 'true'
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install system deps for python-ldap
+        if: steps.relevance.outputs.enabled == 'true'
+        run: |
+          set -Eeuo pipefail
+          if command -v apt-get >/dev/null; then
+            if [ "$(id -u)" -eq 0 ]; then
+              APT=(apt-get)
+            else
+              APT=(sudo apt-get)
+            fi
+            apt_options=(
+              -o Acquire::Retries=3
+              -o Acquire::http::Timeout=15
+              -o Acquire::https::Timeout=15
+            )
+            update_packages() {
+              timeout --kill-after=10s 180s "${APT[@]}" "${apt_options[@]}" update
+            }
+            if ! update_packages; then
+              echo "Azure Ubuntu mirror failed; retrying against archive.ubuntu.com." >&2
+            fi
+            "${APT[@]}" "${apt_options[@]}" install -y libldap2-dev libsasl2-dev
+          fi
+
+      - name: Install dependencies
+        if: steps.relevance.outputs.enabled == 'true'
+        run: uv sync --locked --group dev
+
+      - name: Run migration rehearsals
+        if: steps.relevance.outputs.enabled == 'true'
+        working-directory: ./itambox
+        run: |
+          PYTHONPATH=. uv run --locked --no-sync python -m pytest ../scripts/qualification/migrations/ -q \
+            --cov=. --cov-fail-under=0 --cov-config=../pyproject.toml \
+            --cov-report=json:../artifacts/coverage-qualification.json
+        env:
+          COVERAGE_FILE: ../artifacts/.coverage.qualification
+
+      - name: Run full demo-seed qualification
+        if: steps.relevance.outputs.enabled == 'true'
+        working-directory: ./itambox
+        run: |
+          PYTHONPATH=. uv run --locked --no-sync python -m pytest ../scripts/qualification/seed/ -q \
+            --cov=. --cov-append --cov-fail-under=0 --cov-config=../pyproject.toml \
+            --cov-report=json:../artifacts/coverage-qualification.json
+        env:
+          COVERAGE_FILE: ../artifacts/.coverage.qualification
+
+      - name: Upload qualification coverage
+        if: steps.relevance.outputs.enabled == 'true'
+        run: |
+          # The suites write COVERAGE_FILE relative to ./itambox (../artifacts),
+          # which resolves to the repository root; move the real data file into
+          # the workspace-relative directory the artifact upload expects.
+          #
+          # A required qualification that wrote no coverage data is an error:
+          # publishing an empty placeholder would silently drop qualification
+          # coverage from the differential measurement instead of failing closed.
+          mkdir -p artifacts
+          if [ ! -s ../artifacts/.coverage.qualification ]; then
+            echo "::error::the change set requires the migration/seed qualification, but it wrote no coverage data"
+            exit 1
+          fi
+          cp ../artifacts/.coverage.qualification artifacts/.coverage.qualification
+        working-directory: ./itambox
+
+      - name: Upload qualification coverage artifact
+        if: steps.relevance.outputs.enabled == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qualification-coverage
+          path: itambox/artifacts/.coverage.qualification
+          include-hidden-files: "true"
+          if-no-files-found: error
+          retention-days: 30

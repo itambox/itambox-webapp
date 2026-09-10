@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% block title %}{{ form_title }} - ITAMbox{% endblock %}
+{% block page_header %}<h2 class="page-title">{{ form_title }}</h2>{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      {% if definition %}<p class="text-muted">{% translate "Definition" %}: <code>{{ definition.namespace|default:definition.choice_set.namespace }}/{{ definition.slug|default:definition.choice_set.slug }}</code></p>{% endif %}
+      <p class="text-warning">{% translate "Retirement is checked against current dependencies and the submitted resource revision." %}</p>
+      <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% for field in form.visible_fields %}
+          <div class="mb-3">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+        {% endfor %}
+        <button type="submit" class="btn btn-warning">{% translate "Retire" %}</button>
+      </form>
+    </div>
+  </div>
+{% endblock content %}

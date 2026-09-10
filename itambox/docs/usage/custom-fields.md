@@ -1,9 +1,12 @@
 # Custom Fields
 
 Custom fields allow you to extend ITAMbox models with user-defined attributes
-without modifying the database schema or source code. They are the primary
-mechanism for capturing organisation-specific data — anything from per-device
+without modifying the database schema or source code. They capture organisation-specific data, from per-device
 SIM card numbers and warranty tiers to department-specific approval flags.
+
+Asset Types and Assets use **specifications**: an explicitly selected, ordered
+composition of Fieldsets. A Field's target says where it is applicable; it does
+not automatically add that Field or its Fieldset to every Asset Type.
 
 Unlike hard-coded model fields which require a developer, custom fields are
 created and managed entirely through the UI by administrators.
@@ -20,54 +23,53 @@ has a core set of attributes:
 | **Field Name** | Database-safe slug identifier (e.g. `sim_card_number`). Lowercase, no spaces. Used in templates and API queries. |
 | **Display Label** | Human-friendly label shown in forms, list headers, and filters. |
 | **Field Type** | Data type the field stores. Controls input widget and validation. |
-| **Choices** | Newline-separated list of allowed values — only applicable for Selection list fields. |
-| **Required** | If checked, validation requires a non-empty value when saving an object. |
+| **Choice Set** | Relational set of ordered allowed choices for Single Select and Multi Select fields. Choice labels are managed separately from stable keys. |
+| **Required** | Requires a present, type-valid value when the Field is active in the specification being written. It does not activate the Field or make every native-only edit a specification write. |
 
 ### Field Types
 
 | Type | Slug | Input Widget | Example Use |
 |------|------|-------------|-------------|
 | Text | `text` | Single-line text input | Asset tag aliases, notes |
-| Number | `number` | Number input | CPU core count, rack unit position |
+| Integer | `integer` | Number input | CPU core count, rack unit position |
+| Decimal | `decimal` | Number input with configured scale | Power draw, capacity, temperature |
 | Date | `date` | Date picker | Warranty end, inspection date |
-| Boolean | `boolean` | Checkbox / toggle | "Under support contract", "Hazardous material" |
-| Select / Dropdown | `select` | Dropdown list | Tier level, department, site code |
+| Boolean | `boolean` | Checkbox / Yes-No selector | "Under support contract", "Hazardous material" |
+| Single Select | `single-select` | Dropdown | Tier level, department, site code |
+| Multi Select | `multi-select` | Multi-select dropdown | Supported protocols, capabilities |
 
 ### Configuring Choices
 
-When the field type is **Select / Dropdown**, use the **Choices** field to
-define the allowed values. Enter one choice per line:
+When the field type is **Single Select** or **Multi Select**, select a
+**Choice Set** containing the allowed choices. Choice keys are stable machine
+identifiers; labels may be changed, but a key must never be reused for a new
+meaning. Removed choices remain as deprecated tombstones so existing stored
+values cannot silently change meaning.
 
-```
-Platinum
-Gold
-Silver
-Bronze
-```
-
-The first value is not treated as a default — the dropdown will render an
-empty option unless the field is marked **Required**.
+The first active choice is not treated as a default — forms render an empty
+option for Single Select unless the field is marked **Required**.
 
 > [!IMPORTANT]
-> Changing the choices list after data has been entered does **not** migrate
-> existing values. If you remove a choice that is currently assigned to an
-> object, that value is preserved in the database but the field will display
-> as a plain text value rather than a dropdown selection on the next edit.
+> Choice labels are presentation data; changing a label does not change the
+> stored key. Removing a choice deprecates its key and preserves existing JSON
+> values. The key remains reserved and cannot be assigned to a later unrelated
+> choice.
 
 ---
 
 ## Binding to Object Types
 
 Custom fields must be associated with one or more **object types**
-(ContentTypes — the Django model classes in ITAMbox). This controls which
-forms display the field and which objects store its values.
+(ContentTypes — the Django model classes in ITAMbox). This describes where a Field may apply. For Asset Types and Assets,
+applicability and activation are separate: the Type's selected Fieldsets determine
+which composed specifications are active.
 
 ### Supported Models
 
 | Model | Content Type | What the field represents |
 |-------|-------------|--------------------------|
 | **Asset** | `assets.asset` | Per-device attributes (SIM number, desk location, cost centre) |
-| **Asset Type** | `assets.assettype` | Hardware specifications shared by all assets of that type (form factor, TDP, PoE support) |
+| **Asset Type** | `assets.assettype` | Catalogue/model specifications (form factor, TDP, PoE support); not copied into per-device values |
 | **Tenant** | `organization.tenant` | Tenant-level configuration (region, billing code) |
 | **Location** | `organization.location` | Site-level attributes (floor, building access code) |
 | **Component** | `inventory.component` | Per-component specs (firmware version, slot position) |
@@ -79,7 +81,8 @@ forms display the field and which objects store its values.
 
 > [!TIP]
 > Binding a field to **Asset Type** creates a **hardware specification** —
-> a property shared by all assets of that type (e.g. "RAM Slots: 4").
+> a model-level property (e.g. "RAM Slots: 4"). That value is stored on the Type,
+> not inherited as an observed value by its Assets.
 > Binding to **Asset** creates a **per-device detail** (e.g. "Installed RAM
 > modules: SK-Hynix 16GB"). Choose the binding that matches what you are
 > describing.
@@ -95,22 +98,25 @@ The **Required** checkbox on each custom field controls server-side validation:
 
 | Setting | Behaviour |
 |---------|-----------|
-| **Required** (checked) | The field must be populated before the object can be saved. The form shows an asterisk and validates on submit. |
+| **Required** (checked) | An active Field must contain a present, type-valid value when its specification is written or a Type/composition change activates it. Empty text (`""`), an empty multi-select (`[]`), an empty single-select, and `null` do not satisfy Required. Numeric zero and Boolean `false` are valid values. A required Boolean uses an explicit Yes/No input. |
 | **Optional** (unchecked) | The field can be left blank. |
 
-> [!WARNING]
-> Required custom fields are enforced at the **model validation level**.
-> This means objects can only be created or modified through the UI or REST
-> API if the required custom fields are satisfied. Bulk imports and API
-> clients must supply values for all required fields.
+> [!IMPORTANT]
+> For Asset Types and Assets, specification validation belongs to the explicit
+> specification write or Type/composition change. A native-only update does not
+> replace specification values or silently fill newly required Fields.
+> Only active Fields participate in current required-value checks. Values outside
+> the active composition are retained as history, not made required merely by
+> their target binding. Supported imports and API specification writes use the
+> same validation rules.
 
 ---
 
 ## Custom Fieldsets
 
-Custom fieldsets let you group related custom fields into logical sections on
-object forms. Without fieldsets, all custom fields render together in a single
-panel — fine for a handful of fields, but unwieldy when you have dozens.
+Custom Fieldsets group related Fields into ordered sections. For Asset Types
+and Assets, select the intended Fieldsets on the Type; applicability alone is
+not selection. Both the order of Fieldsets and the order of their members matter.
 
 ### Creating a Fieldset
 
@@ -121,15 +127,24 @@ Navigate to **Extras → Custom Fieldsets** and click **Add**:
 | **Fieldset Name** | Section heading displayed in the form (e.g. "Network Configuration", "Financial Details") |
 | **Custom Fields** | The fields to include in this group |
 
-### Assigning Fieldsets to Model Types
+### Selecting an Asset Type composition
 
-Custom fieldsets are automatically rendered on forms based on their member
-fields' object type bindings. When a fieldset contains fields bound to
-`assets.asset`, the fieldset appears on the Asset edit form. Fields bound to
-multiple object types appear in the corresponding fieldsets on each form.
+Add the Fieldsets that belong to the Type, in the intended order. A Fieldset
+appears in that composition because it was selected, not because one of its
+Fields targets Assets. Applicable active members form the specification. If a
+Field occurs in more than one selected Fieldset, its first placement determines
+where it appears; repeated membership does not create a second value.
 
-Fields that are **not** assigned to any fieldset still render — they appear
-in a default "Custom Fields" panel at the bottom of the form.
+When creating a Type, omitting the composition uses the selected Category's
+defaults. Selecting an explicit empty composition means no Fieldsets; it does
+not request defaults. The copied composition is independent of later changes to
+Category defaults.
+
+Removing a Fieldset or changing an Asset's Type does not erase observed values
+that stop being active. Those values remain history. Model-level Type values
+are not copied into the Asset. Review the proposed composition before saving;
+if its definition or the object changed since preview, refresh and review the
+new state instead of replaying stale revisions.
 
 ### Example
 
@@ -140,8 +155,9 @@ Fieldset: "Network Details"
   └─ PoE Enabled (Boolean, bound to Asset Type)
 ```
 
-On an Asset form, the first two fields render in a "Network Details" panel.
-On an Asset Type form, only "PoE Enabled" appears in that panel.
+If the Type explicitly includes this Fieldset, its Asset-targeted Fields
+contribute to the Asset specification and its Type-targeted Fields contribute
+to the Type specification. Merely creating the Fieldset activates neither.
 
 ---
 
@@ -173,19 +189,117 @@ Export Template), custom field values are included.
 
 ### REST API
 
-Custom field values are accessible via the REST API under the `custom_fields`
-attribute on each object. Use the **Field Name** (slug) as the key:
+Asset and Asset Type specification reads use the read-only `specifications`
+map, with stable Field keys, plus specification-state and revision metadata.
+They do not accept the retired `custom_field_data` write alias. Other generic
+custom-field models may still expose a read-only `custom_field_data` map.
+
+For an Asset, a read-value example is:
 
 ```json
 {
   "id": 42,
   "asset_tag": "IT-00042",
-  "custom_fields": {
-    "sim_card_number": "8944100030001234567",
-    "support_tier": "Gold"
+  "specifications": {
+    "sim_card_number": "example-sim",
+    "support_tier": "gold"
   }
 }
 ```
+
+Writes use the separate `specification_patch` envelope. `set` contains values
+keyed by Field Name and `clear` contains the names to remove:
+
+```json
+{
+  "specification_patch": {
+    "set": {"support_tier": "platinum"},
+    "clear": ["sim_card_number"]
+  }
+}
+```
+
+The examples show the value maps only: Asset/Type writes must also supply the
+required object/definition preconditions, and Asset operations require an
+explicit authorized scope. Use Choice keys, not display labels.
+
+`custom_field_data` is not a write target. Values that are no longer represented
+by an active field definition remain readable and are preserved by ordinary
+updates; they can only be changed through a valid explicit patch while their
+field definition is writable. A field literally named `set` or `clear` is
+addressed inside the `set`/`clear` operation, for example
+`{"specification_patch": {"set": {"set": "value"}}}`.
+
+---
+
+For a GraphQL composition change, obtain the prospective preconditions from
+`POST /api/assets/asset-types/{id}/composition-preview/`, submitting the intended
+`fieldsets` and `specification_patch`. Pass its `expected_resource_revision` and
+`expected_definition_revision` to `setAssetTypeComposition`. A revision from the
+current definition query describes the old composition, not the proposed one.
+The preview is read-only; the mutation still rechecks both submitted revisions.
+
+## Type Libraries
+
+Open **Asset Management > Type Libraries** to review installed global Library
+identities and immutable release history. **Import Library** opens the JSON
+upload and preview workflow. Library management requires the global
+`extras.manage_specification_library` capability together with the model
+permissions required by the operation; permission to view a Library alone
+never permits applying one.
+
+1. Upload a UTF-8 JSON Library document of at most 10 MiB. Validation and preview
+   do not apply changes.
+2. Review the proposed paths and global catalogue impact. For each blocking
+   conflict, choose **Keep local**, **Take upstream**, or **Abort import**, then
+   review the resulting preview. Apply remains disabled while conflicts remain.
+3. Choose **Apply Library** explicitly. A stale preview is rejected without
+   applying its changes; the page retains the uploaded draft and offers a new
+   preview to review. Revoked permissions are also checked again when applying.
+4. Open the Library detail page to export its **Original release**, an
+   **Effective snapshot**, or a fork into a new namespace. Original release
+   data remains immutable. An effective snapshot contains the current local
+   definition state separately from the accepted upstream source. A fork needs
+   a distinct namespace. Acknowledge retained historical definitions when the
+   selected export requires it.
+
+Keeping a local value during an upstream update does not rewrite the original
+source. Reimporting the already accepted document is a no-op: it does not erase
+local overrides or create another release. Library documents never include
+Tenant Asset observations, assignments, audit/policy state, or installation
+policy.
+
+The corresponding REST entry points are:
+
+| Operation | Endpoint |
+|---|---|
+| Validate and preview | `POST /api/assets/type-libraries/preview/` |
+| Apply the signed preview | `POST /api/assets/type-libraries/apply/` |
+| Export | `POST /api/assets/type-libraries/export/` |
+
+Use the generated API schema for request/response fields, export modes, and
+required preconditions. REST and the browser workflow use the same Library
+commands and authorization rules.
+
+### Source-qualified specification consumers
+
+Asset observations and model-level Asset Type values are separate sources.
+Saved specification columns identify both source and stable Field key, for
+example `asset.spec.support_tier` and `asset_type.spec.support_tier`.
+Changing a display label does not change those identities.
+
+The **Specification filters** field accepts an explicit filter document. For a
+Field named `support_tier`, an Asset-value equality filter is:
+
+```json
+{"filters": [{"source": "asset", "field_key": "support_tier", "operator": "eq", "value": "gold"}]}
+```
+
+Use `asset_type` as the source to test the model-level value instead. Current
+values are selected by default; missing, null, empty, historical, invalid, and
+unknown states are not interchangeable. Reports and exports retain the selected
+source and apply authorized Tenant scope before filtering. Saved label-based or
+unresolved references are not silently redirected to another Field.
 
 ---
 
@@ -196,21 +310,43 @@ attribute on each object. Use the **Field Name** (slug) as the key:
   viewing. Check the field's configuration — it may be bound to `Asset Type`
   when you expected it on `Asset` (or vice versa).
 
-**Required field prevents saving but is hidden**
-: A custom field bound to the model and marked Required is not rendered
-  because it was removed from the form template. Check whether any template
-  overrides are hiding the custom fields panel. The field must be either
-  populated or set to Optional.
+**A specification change reports a missing required value**
+: Check the proposed active composition and Field target. Supply a valid value
+  for the activated Field or review the intended composition. Do not make a
+  Field optional merely to bypass validation, and do not delete retained history.
+  If the definition changed after preview, refresh before submitting again.
 
 **Dropdown shows no choices**
-: The field type is Select / Dropdown but the **Choices** field is empty.
-  Add one choice per line in the field's Choices textarea.
+: The field type is Single Select / Multi Select but no active Choice Set is
+  assigned, or the assigned Choice Set has no active choices. A deleted or
+  deprecated Choice Set is also not valid for new values. Assign an active
+  Choice Set and add active choices through the Choice Set management surface.
 
 **Custom field value is missing from exports**
 : Ensure the custom field column is toggled on in the export column selector.
   Also verify the field is bound to the model type being exported.
 
-**Fieldset not appearing on forms**
-: Fieldsets render only when at least one of their member fields is bound to
-  the current object's model type. If none of the fields in the fieldset match
-  the form's ContentType, the fieldset is skipped.
+**Fieldset not appearing in an Asset specification**
+: Check the Asset's Type and its explicit Fieldset selection first, then the
+  members' targets, activation and lifecycle. Target binding alone does not
+  select a Fieldset. An explicitly empty composition remains empty.
+
+### GraphQL retained-history export confirmation
+
+`exportLibrary(namespace: String!, mode: LibraryExportMode!, acknowledgeRetainedHistory: Boolean = false)`
+uses the same authorization and export validation as REST. For an effective snapshot that
+contains retained history, pass `acknowledgeRetainedHistory: true` explicitly. Omission,
+`false`, and `null` do not consent and return `RETAINED_HISTORY_ACK_REQUIRED`.
+Selecting `EFFECTIVE_SNAPSHOT` alone is not consent. Confirmation does not bypass
+permissions or make unknown or structurally invalid historical content exportable.
+Exports that do not require confirmation keep their existing behavior.
+
+```graphql
+mutation {
+  exportLibrary(namespace: "example", mode: EFFECTIVE_SNAPSHOT, acknowledgeRetainedHistory: true) {
+    documentText
+    semanticDigest
+    userErrors { code path }
+  }
+}
+```
