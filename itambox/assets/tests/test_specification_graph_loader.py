@@ -8,7 +8,12 @@ from types import SimpleNamespace
 import pytest
 
 from assets.services.specifications import loader
-from assets.services.specifications.contracts import AssetTypeId, FieldKey, SpecificationGraphLoadRequest
+from assets.services.specifications.contracts import (
+    AssetTypeId,
+    FieldKey,
+    QualifiedIdentity,
+    SpecificationGraphLoadRequest,
+)
 
 
 class _QueryTracker:
@@ -377,3 +382,135 @@ def test_loader_query_evaluations_are_chunked_and_repeated_ids_are_deduplicated(
     # One global phase plus three exact-key history chunks; no query is made
     # per historical Field or per repeated Type ID.
     assert tracker.evaluations["custom_fields"] == 4
+
+
+# ---------------------------------------------------------------------------
+# Batch E: transport-independent request shape, batching bounds and the
+# ordinal/enum/identity helpers used while mapping rows into DTOs.
+# ---------------------------------------------------------------------------
+
+
+def test_type_ids_must_be_a_tuple_of_positive_integers():
+    assert loader._validate_type_ids((3, 1, 3)) == (1, 3)
+
+    with pytest.raises(TypeError):
+        loader._validate_type_ids([1, 2])
+
+    for bad in (0, -1, "1", True, None):
+        with pytest.raises(ValueError):
+            loader._validate_type_ids((bad,))
+
+
+def test_target_kinds_must_be_a_frozenset_of_supported_strings():
+    assert loader._validate_target_kinds(frozenset({"asset", "asset_type"})) == ("asset", "asset_type")
+
+    with pytest.raises(TypeError):
+        loader._validate_target_kinds(("asset",))
+
+    with pytest.raises(ValueError):
+        loader._validate_target_kinds(frozenset({1}))
+
+    with pytest.raises(ValueError):
+        loader._validate_target_kinds(frozenset({"inventory"}))
+
+
+def test_field_keys_must_be_a_frozenset_of_non_empty_strings():
+    assert loader._validate_field_keys(frozenset({"memory_capacity"})) == ("memory_capacity",)
+
+    with pytest.raises(TypeError):
+        loader._validate_field_keys(["memory_capacity"])
+
+    with pytest.raises(ValueError):
+        loader._validate_field_keys(frozenset({""}))
+
+
+def test_fieldset_identities_must_be_qualified_and_unique():
+    assert loader._validate_fieldset_identities(("itambox/storage",)) == ("itambox/storage",)
+
+    with pytest.raises(TypeError):
+        loader._validate_fieldset_identities(["itambox/storage"])
+
+    with pytest.raises(ValueError):
+        loader._validate_fieldset_identities(("itambox",))
+
+    with pytest.raises(ValueError):
+        loader._validate_fieldset_identities(("itambox/",))
+
+    with pytest.raises(ValueError):
+        loader._validate_fieldset_identities(("itambox/storage", "itambox/storage"))
+
+
+def test_validate_request_rejects_foreign_requests_and_normalises_fields():
+    request = SpecificationGraphLoadRequest(
+        asset_type_ids=(2, 1),
+        requested_target_kinds=frozenset({"asset_type"}),
+        requested_field_keys=frozenset({"memory_capacity"}),
+    )
+
+    assert loader._validate_request(request) == ((1, 2), ("asset_type",), ("memory_capacity",))
+
+    with pytest.raises(TypeError):
+        loader._validate_request(SimpleNamespace(asset_type_ids=(1,)))
+
+
+def test_chunks_reject_non_positive_sizes_and_partition_evenly():
+    assert list(loader._chunks([1, 2, 3], 2)) == [(1, 2), (3,)]
+    assert list(loader._chunks((), 2)) == []
+    assert list(loader._chunks(range(2))) == [(0, 1)]
+
+    with pytest.raises(ValueError):
+        list(loader._chunks([1], 0))
+
+
+def test_safe_attr_and_relation_rows_are_null_tolerant():
+    class _Raising:
+        @property
+        def broken(self):
+            raise AttributeError("missing")
+
+    class _Manager:
+        def all(self):
+            return [1, 2]
+
+    assert loader._safe_attr(SimpleNamespace(value=3), "value") == 3
+    assert loader._safe_attr(SimpleNamespace(), "value", "fallback") == "fallback"
+    assert loader._safe_attr(_Raising(), "broken") is None
+    assert loader._relation_rows(SimpleNamespace(rows=None), "rows") == ()
+    assert loader._relation_rows(SimpleNamespace(rows=_Manager()), "rows") == (1, 2)
+    assert loader._relation_rows(SimpleNamespace(rows=[3]), "rows") == (3,)
+
+
+def test_ordinal_lifecycle_activation_and_field_type_helpers():
+    assert loader._positive_ordinal(2, "Position") == 2
+    assert loader._lifecycle("active", "Field") == "active"
+    assert loader._activation("global") == "global"
+    assert loader._field_type("single-select") == "single_select"
+    assert loader._field_type("multi_select") == "multi_select"
+
+    with pytest.raises(ValueError):
+        loader._positive_ordinal(0, "Position")
+
+    with pytest.raises(ValueError):
+        loader._positive_ordinal(True, "Position")
+
+    with pytest.raises(ValueError):
+        loader._lifecycle("retired", "Field")
+
+    with pytest.raises(ValueError):
+        loader._activation("composed_extra")
+
+    with pytest.raises(ValueError):
+        loader._field_type("unsupported")
+
+
+def test_qualified_identity_requires_both_components():
+    assert loader._qualified_identity("itambox", "memory", "Field") == QualifiedIdentity("itambox/memory")
+
+    with pytest.raises(ValueError):
+        loader._qualified_identity("", "memory", "Field")
+
+    with pytest.raises(ValueError):
+        loader._qualified_identity("itambox", "", "Field")
+
+    with pytest.raises(ValueError):
+        loader._qualified_identity(None, "memory", "Field")
