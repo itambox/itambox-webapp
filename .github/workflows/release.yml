@@ -123,7 +123,7 @@ jobs:
             echo "sarif=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Retain release-image results in Code Scanning
+      - name: Retain draft-image results in Code Scanning
         if: >-
           always() && steps.image-gate.outputs.sarif == 'true' &&
           github.actor != 'dependabot[bot]' &&
@@ -131,7 +131,12 @@ jobs:
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: ${{ runner.temp }}/trivy-image.sarif
-          category: trivy-release-image
+          # Both image uploads in this workflow share one code scanning
+          # configuration: the category that already exists on the default branch.
+          # Code scanning compares tool+category, so a second category for the same
+          # image makes it report "configuration not found" instead of comparing
+          # alerts.
+          category: trivy-draft-image
 
       - name: Enforce release-image gate
         if: always()
@@ -263,14 +268,15 @@ jobs:
             echo "sarif=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Retain reviewed image results in Code Scanning
+      - name: Retain draft-image results in Code Scanning
         if: always() && steps.draft-image-gate.outputs.sarif == 'true'
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: ${{ runner.temp }}/trivy-image.sarif
-          # Same conceptual scan as the rehearsal, so it shares the analysis
-          # identity instead of opening a second, never-populated configuration.
-          category: trivy-release-image
+          # Same configuration as the rehearsal upload: code scanning compares the
+          # pull request against the default branch per tool+category, and this
+          # upload only keeps that single configuration up to date.
+          category: trivy-draft-image
 
       - name: Enforce draft-image gate
         if: always()
