@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 import pytest
+from django.test import SimpleTestCase
 
 from assets.services.type_library_validation.errors import LibraryValidationError
 from assets.services.type_library_validation.limits import ValidationLimits
@@ -233,3 +234,111 @@ class TestDtos:
             semantic_digest="sha256:" + "0" * 64,
         )
         assert doc.digest == doc.semantic_digest
+
+
+class TestIdentityGuards(SimpleTestCase):
+    def test_owned_identity_rejects_foreign_namespace(self):
+        from assets.services.type_library_validation.validation import _owned_identity
+
+        self.assertEqual(_owned_identity("acme/local", ("x",), "acme"), "acme/local")
+        self.assertEqual(_owned_identity("acme/local", ("x",), frozenset({"acme", "corp"})), "acme/local")
+        with self.assertRaises(LibraryValidationError):
+            _owned_identity("corp/local", ("x",), "acme")
+        with self.assertRaises(LibraryValidationError):
+            _owned_identity("catalog/local", ("x",), None)
+
+    def test_catalog_identity_enforces_namespace(self):
+        from assets.services.type_library_validation.validation import _catalog_identity
+
+        self.assertEqual(_catalog_identity("catalog/local", ("x",)), "catalog/local")
+        with self.assertRaises(LibraryValidationError):
+            _catalog_identity("acme/local", ("x",))
+
+    def test_safe_regex_rejections(self):
+        from assets.services.type_library_validation.validation import _validate_safe_regex
+
+        _validate_safe_regex(r"^[a-z]+$", ("x",))
+        for bad in ("a" * 257, "(?i:abc)", r"\1", r"(?P=name)", r"*ab*cd*", "((("):
+            with self.assertRaises(LibraryValidationError):
+                _validate_safe_regex(bad, ("x",))
+
+    def test_decimal_bound_rejections(self):
+        from assets.services.type_library_validation.validation import _decimal
+
+        self.assertEqual(_decimal("1.25", ("x",)), Decimal("1.25"))
+        for bad in ("-0", "-0.000000", "1.2345678", "abc", "1e3"):
+            with self.assertRaises(LibraryValidationError):
+                _decimal(bad, ("x",))
+
+    def test_multi_value_shape_rejections(self):
+        from assets.services.type_library_validation.validation import _validate_multi_value_shape
+
+        _validate_multi_value_shape(["a", "b"], ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_multi_value_shape(["a"] * 65, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_multi_value_shape(["a", 5], ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_multi_value_shape(["a", "a"], ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_multi_value_shape(["a-b"], ("x",))
+
+    def test_generic_value_limits(self):
+        from assets.services.type_library_validation.validation import _check_generic_value
+
+        _check_generic_value("x" * 4096, ("x",), None)
+        _check_generic_value(5, ("x",), None)
+        _check_generic_value(True, ("x",), None)
+        _check_generic_value(None, ("x",), None)
+        _check_generic_value(["a"], ("x",), None)
+        with self.assertRaises(LibraryValidationError):
+            _check_generic_value("x" * 4097, ("x",), None)
+        with self.assertRaises(LibraryValidationError):
+            _check_generic_value(9007199254740992, ("x",), None)
+        with self.assertRaises(LibraryValidationError):
+            _check_generic_value({"nested": 1}, ("x",), None)
+
+    def test_field_identity_prefix_enforcement(self):
+        from assets.services.type_library_validation.validation import _validate_field_identity
+
+        _validate_field_identity({"key": "itambox_core", "namespace": "itambox"}, ("x",), None)
+        _validate_field_identity({"key": "acme__serial", "namespace": "acme"}, ("x",), "acme")
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_identity({"key": "acme__serial", "namespace": "corp"}, ("x",), "acme")
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_identity({"key": "serial", "namespace": "acme"}, ("x",), None)
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_identity({"key": "acme__", "namespace": "acme"}, ("x",), None)
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_identity({"key": "x", "namespace": "catalog"}, ("x",), None)
+
+    def test_field_surface_rejections(self):
+        from assets.services.type_library_validation.validation import _validate_field_surface
+
+        base = dict(
+            label="Serial",
+            help_text="",
+            targets=["asset"],
+            activation="composed",
+            field_type="text",
+            required=False,
+            nullable=True,
+            lifecycle="active",
+        )
+        self.assertEqual(_validate_field_surface(base, ("x",)), "text")
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "label": "L" * 201}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "help_text": "h" * 4097}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "targets": []}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "targets": ["asset", "asset_type", "asset"]}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "activation": "active"}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "field_type": "blob"}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "required": "yes"}, ("x",))
+        with self.assertRaises(LibraryValidationError):
+            _validate_field_surface({**base, "lifecycle": "ghost"}, ("x",))
