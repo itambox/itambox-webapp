@@ -1,10 +1,16 @@
 """DB-free constructor contracts for definition input DTOs."""
 
 from decimal import Decimal
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
+from django.core.exceptions import ValidationError
 
+from extras.definition_contract import (
+    custom_field_definition_contract_errors,
+    validate_custom_field_definition_contract,
+    validate_custom_field_regex,
+)
 from extras.services.definition_command_contracts import (
     CustomFieldChoiceCreateInputDTO,
     CustomFieldChoiceSetCreateInputDTO,
@@ -426,3 +432,272 @@ def test_mapping_rejects_non_string_keys_recursively(updating):
             CustomFieldUpdateInputDTO(mappings=(source,))
         else:
             _field_create_input(mappings=(source,))
+
+
+# ---------------------------------------------------------------------------
+# Batch E: the canonical definition contract - basic metadata, numeric and
+# text limits, regex safety, validation rules, quantity metadata, choice
+# constraints, applicability and mapping shape.
+# ---------------------------------------------------------------------------
+
+
+def _contract_errors(**overrides):
+    values = {"field_type": "text"}
+    values.update(overrides)
+    return {key: str(value) for key, value in custom_field_definition_contract_errors(**values).items()}
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"^\d{2}$",
+        r"^a{,x}$",
+        r"^[\\d]+$",
+        r"^((ab)+c)$",
+        r"^(ab)+c$",
+        r"^a(b+)c$",
+        r"^(a|b)c$",
+        r"^a|b$",
+        r"^\d+$",
+        r"^a{2,}$",
+    ],
+)
+def test_safe_regex_patterns_pass_the_contract(pattern):
+    assert validate_custom_field_regex(pattern) == pattern
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [r"^(a|b)*c$", r"(?i)^abc$", r"^(\w+)\1$", r"\b(\w+)\s+\1\b", r"(a+)+$", r"^\d+.*x*$"],
+    ids=[
+        "nested_alternation",
+        "inline_flags",
+        "numeric_backreference",
+        "word_backreference",
+        "nested_repetition",
+        "two_unbounded",
+    ],
+)
+def test_unsafe_regex_patterns_are_rejected(pattern):
+    with pytest.raises(ValidationError) as excinfo:
+        validate_custom_field_regex(pattern)
+
+    assert excinfo.value.code == "INVALID_REGEX"
+
+
+@pytest.mark.parametrize("pattern", [123, b"^a$", None, "a" * 257], ids=["int", "bytes", "none", "too_long"])
+def test_regex_contract_rejects_non_text_or_oversized_input(pattern):
+    with pytest.raises(ValidationError) as excinfo:
+        validate_custom_field_regex(pattern)
+
+    assert excinfo.value.code == "INVALID_REGEX"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        ({"field_type": "unsupported"}, {"field_type": "Unsupported custom field type."}),
+        ({"activation": "sometimes"}, {"activation": "Unsupported custom field activation."}),
+        ({"management_kind": "vendor"}, {"management_kind": "Unsupported management kind."}),
+        ({"lifecycle": "retired"}, {"lifecycle": "Unsupported lifecycle."}),
+        (
+            {"field_type": "integer", "minimum_value": 10, "maximum_value": 5},
+            {"maximum_value": "The maximum must not be below the minimum."},
+        ),
+    ],
+)
+def test_basic_definition_metadata_errors(overrides, expected):
+    assert _contract_errors(**overrides) == expected
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        (
+            {"field_type": "decimal", "decimal_scale": 7},
+            {"decimal_scale": "Decimal fields require a scale from 0 to 6."},
+        ),
+        (
+            {"field_type": "decimal", "decimal_scale": True},
+            {"decimal_scale": "Decimal fields require a scale from 0 to 6."},
+        ),
+        ({"field_type": "text", "decimal_scale": 2}, {"decimal_scale": "Only decimal fields may define a scale."}),
+        ({"field_type": "text", "text_max_length": 0}, {"text_max_length": "Text length must be between 1 and 4096."}),
+        (
+            {"field_type": "integer", "text_max_length": 8},
+            {"text_max_length": "Only text fields may define a text length."},
+        ),
+        ({"field_type": "text", "minimum_value": 1}, {"minimum_value": "Only numeric fields may define a minimum."}),
+        ({"field_type": "text", "maximum_value": 9}, {"maximum_value": "Only numeric fields may define a maximum."}),
+    ],
+)
+def test_numeric_and_text_metadata_errors(overrides, expected):
+    assert _contract_errors(**overrides) == expected
+
+
+@pytest.mark.parametrize("field_type", ["integer", "boolean", "date", "multi-select"])
+def test_regex_is_only_allowed_on_text_fields(field_type):
+    errors = _contract_errors(
+        field_type=field_type, regex=r"^\d+$", max_values=1 if field_type == "multi-select" else None
+    )
+
+    assert errors["regex"] == "Only text fields may define a regular expression."
+
+
+def test_regex_validation_failures_surface_on_the_definition():
+    errors = _contract_errors(field_type="text", regex="(?i)^abc$")
+
+    assert set(errors) == {"regex"}
+    assert "Inline regular-expression flags" in errors["regex"]
+
+
+def test_safe_regex_is_accepted_by_the_full_definition_contract():
+    assert validate_custom_field_definition_contract(field_type="text", regex=r"^\d{2}$") is None
+
+
+def test_unparseable_regex_surfaces_the_compiler_error():
+    errors = _contract_errors(field_type="text", regex="^[unterminated$")
+
+    assert set(errors) == {"regex"}
+    assert errors["regex"] == "The regular expression is invalid."
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        ({"validation_rule": "positive"}, {"validation_rule": "Unsupported validation rule."}),
+        (
+            {"validation_rule": "temperature_max_gte_min"},
+            {"validation_rule": "The validation rule does not match the field type."},
+        ),
+        (
+            {
+                "field_type": "text",
+                "validation_rule": "rfc1123_hostname",
+                "name": "host",
+                "namespace": "itambox",
+                "management_kind": "core",
+            },
+            {},
+        ),
+    ],
+)
+def test_validation_rule_errors(overrides, expected):
+    assert _contract_errors(**overrides) == expected
+
+
+def test_cross_field_rule_is_reserved_for_its_registered_core_definition():
+    errors = _contract_errors(
+        field_type="decimal",
+        decimal_scale=2,
+        validation_rule="temperature_max_gte_min",
+        name="operating_temperature_min",
+        namespace="itambox",
+        management_kind="core",
+    )
+
+    assert errors == {"validation_rule": "This cross-field rule is reserved for its registered Core definition."}
+
+
+def test_registered_core_definition_may_use_the_cross_field_rule():
+    assert (
+        validate_custom_field_definition_contract(
+            field_type="decimal",
+            decimal_scale=2,
+            validation_rule="temperature_max_gte_min",
+            name="operating_temperature_max",
+            namespace="itambox",
+            management_kind="core",
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        (
+            {"field_type": "decimal", "decimal_scale": 1, "quantity_kind": "capacity"},
+            {"quantity_kind": "Unsupported quantity kind."},
+        ),
+        (
+            {
+                "field_type": "decimal",
+                "decimal_scale": 1,
+                "quantity_kind": "digital_information",
+                "canonical_unit": "MB",
+            },
+            {"canonical_unit": "The unit is not valid for this quantity kind."},
+        ),
+        (
+            {"field_type": "decimal", "decimal_scale": 1, "canonical_unit": "GiB"},
+            {"quantity_kind": "A canonical unit requires a quantity kind."},
+        ),
+        (
+            {"field_type": "text", "quantity_kind": "digital_information", "canonical_unit": "GiB"},
+            {"quantity_kind": "Only numeric fields may define quantity metadata."},
+        ),
+        (
+            {
+                "field_type": "decimal",
+                "decimal_scale": 1,
+                "quantity_kind": "digital_information",
+                "canonical_unit": "GiB",
+            },
+            {},
+        ),
+    ],
+)
+def test_quantity_metadata_errors(overrides, expected):
+    assert _contract_errors(**overrides) == expected
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        (
+            {"field_type": "single-select"},
+            {
+                "choice_set": "Select fields require a Choice Set.",
+                "max_values": "Single-select fields must limit values to exactly one.",
+            },
+        ),
+        ({"field_type": "single-select", "choice_set": "active-set", "max_values": 1}, {}),
+        (
+            {"field_type": "multi-select", "choice_set": "active-set"},
+            {"max_values": "Multi-select fields require a maximum value count."},
+        ),
+        (
+            {"field_type": "text", "choice_set": "active-set", "max_values": 2},
+            {
+                "choice_set": "Only select fields may reference a Choice Set.",
+                "max_values": "Only select fields may define a maximum value count.",
+            },
+        ),
+        (
+            {"field_type": "multi-select", "choice_set": "active-set", "max_values": 65},
+            {"max_values": "The maximum value count must be between 1 and 64."},
+        ),
+        (
+            {"field_type": "single-select", "choice_set": SimpleNamespace(lifecycle="deprecated"), "max_values": 1},
+            {"choice_set": "Choice Sets must be active."},
+        ),
+    ],
+)
+def test_choice_metadata_errors(overrides, expected):
+    assert _contract_errors(**overrides) == expected
+
+
+def test_applicability_and_mapping_shape_errors():
+    assert _contract_errors(object_types=[]) == {"object_types": "Select at least one applicable model."}
+    assert _contract_errors(mappings={"source": "target"}) == {"mappings": "Mappings must be a list."}
+    assert _contract_errors(object_types=["assets.asset", "assets.assettype"]) == {}
+    assert _contract_errors() == {}
+    assert custom_field_definition_contract_errors(field_type="text") == {}
+
+
+def test_definition_contract_validation_raises_with_per_field_errors():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_custom_field_definition_contract(field_type="multi-select")
+
+    assert set(excinfo.value.message_dict) == {"choice_set", "max_values"}
