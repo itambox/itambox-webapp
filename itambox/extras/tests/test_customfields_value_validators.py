@@ -227,11 +227,15 @@ def _choice_set(*choices, lifecycle="active"):
 
 
 class _FakeFormField:
+    __slots__ = ("disabled",)
+
     def __init__(self, disabled=False):
         self.disabled = disabled
 
 
 class _FakeForm:
+    __slots__ = ("errors", "fields")
+
     def __init__(self, keys=(), disabled_keys=()):
         self.fields = {key: _FakeFormField(disabled=key in disabled_keys) for key in keys}
         self.errors = {}
