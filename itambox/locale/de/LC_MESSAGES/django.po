@@ -9384,6 +9384,12 @@ msgstr "Verlängerungskosten:"
 msgid "Est. Annual Cost:"
 msgstr "Gesch. Jahreskosten:"
 
+msgid "Annualized Cost:"
+msgstr "Jahreskosten (annualisiert):"
+
+msgid "One-Time Cost:"
+msgstr "Einmalkosten:"
+
 msgid "Licensed Qty:"
 msgstr "Lizenzierte Menge:"
 

@@ -18,6 +18,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- Subscription annual cost now annualizes multi-year terms over their length and one-time purchases are labeled as a one-time cost instead of occupying the annual slot; zero-cost subscriptions display `0.00` instead of an omitted row or "Not set" (issue #501).
 - Component Allocation create and asset quick-add are now explicitly target-only, reject silently ignored source locations, return observable HTMX success/errors, count source-backed Component checkouts only once in availability, and keep component/source/destination immutable on update (issue #393).
 - Tenant-scoped pages purge pre-existing HTMX session history snapshots and no longer save new ones, preventing stale asset actions from targeting objects outside the current server-side scope or retaining tenant DOM after a workspace switch (issue #419).
 - Asset list pagination now limits assignee resolution and tenant-scoped related-manager work to the rendered page instead of evaluating every asset in the active scope (issue #416).
