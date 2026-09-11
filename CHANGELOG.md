@@ -29,6 +29,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Security
 
+- Secret-scan suppressions are now keyed to a commit-independent file/rule/line identity, so squash, rebase, or cherry-pick integrations no longer invalidate reviewed suppressions; the previously ungoverned historical placeholder findings in the pre-rename tree are governed as well (issue #510).
 - Upgraded `sqlparse` to 0.6.0 to address CVE-2026-54284, CVE-2026-59893, CVE-2026-59894, and CVE-2026-71491.
 
 ## [1.0.0-beta.1] - 2026-08-16

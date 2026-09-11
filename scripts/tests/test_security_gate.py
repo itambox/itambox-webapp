@@ -74,6 +74,24 @@ class SuppressionPolicyTests(unittest.TestCase):
                 with self.assertRaisesRegex(SecurityGateError, message):
                     load_suppressions(self.write_manifest(root, entries))
 
+    def test_gitleaks_scope_rejects_wildcards_and_invalid_lines(self):
+        cases = {
+            "wildcard path": ({"path": "src/*.py", "rule": "rule", "line": 42}, "broad gitleaks scope"),
+            "wildcard rule": ({"path": "src/app.py", "rule": "rule*", "line": 42}, "broad gitleaks scope"),
+            "zero line": ({"path": "src/app.py", "rule": "rule", "line": 0}, "positive integer"),
+            "string line": ({"path": "src/app.py", "rule": "rule", "line": "42"}, "positive integer"),
+            "boolean line": ({"path": "src/app.py", "rule": "rule", "line": True}, "positive integer"),
+            "missing line": ({"path": "src/app.py", "rule": "rule"}, "exactly"),
+            "extra field": ({"path": "src/app.py", "rule": "rule", "line": 42, "fingerprint": "x"}, "exactly"),
+            "empty path": ({"path": "", "rule": "rule", "line": 42}, "non-empty"),
+            "integer path": ({"path": 7, "rule": "rule", "line": 42}, "non-empty"),
+        }
+        for label, (scope, message) in cases.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as root:
+                entry = suppression(tool="gitleaks", finding="rule", scope=scope)
+                with self.assertRaisesRegex(SecurityGateError, message):
+                    load_suppressions(self.write_manifest(root, [entry]))
+
 
 class FindingPolicyTests(unittest.TestCase):
     def test_trivy_blocks_unsuppressed_high_and_emits_sarif(self):
@@ -192,18 +210,67 @@ class FindingPolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(SecurityGateError, "unexpected Trivy targets"):
                 evaluate_trivy([report], [], sarif, expected_targets={"uv.lock"})
 
-    def test_gitleaks_requires_exact_fingerprint_path_and_rule_suppression(self):
-        finding = {"Fingerprint": "abc:src/app.py:rule", "File": "src/app.py", "RuleID": "rule"}
+    def test_gitleaks_requires_exact_path_rule_and_line_suppression(self):
+        finding = {
+            "RuleID": "rule",
+            "File": "src/app.py",
+            "StartLine": 42,
+            "Fingerprint": "abc:src/app.py:rule:42",
+        }
         self.assertFalse(evaluate_gitleaks([finding], []).passed)
-        entry = suppression(
+        exact = suppression(
             tool="gitleaks",
             finding="rule",
-            scope={"fingerprint": "abc:src/app.py:rule", "path": "src/app.py", "rule": "rule"},
+            scope={"path": "src/app.py", "rule": "rule", "line": 42},
         )
+        near_misses = {
+            "line": {**exact, "scope": {"path": "src/app.py", "rule": "rule", "line": 43}},
+            "path": {**exact, "scope": {"path": "src/other.py", "rule": "rule", "line": 42}},
+            "rule": {
+                **exact,
+                "finding": "other-rule",
+                "scope": {"path": "src/app.py", "rule": "other-rule", "line": 42},
+            },
+        }
+        for label, entry in near_misses.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as root:
+                manifest = Path(root) / "suppressions.json"
+                manifest.write_text(json.dumps({"version": 1, "suppressions": [entry]}), encoding="utf-8")
+                self.assertFalse(evaluate_gitleaks([finding], load_suppressions(manifest)).passed)
+        with tempfile.TemporaryDirectory() as root:
+            manifest = Path(root) / "suppressions.json"
+            manifest.write_text(json.dumps({"version": 1, "suppressions": [exact]}), encoding="utf-8")
+            self.assertTrue(evaluate_gitleaks([finding], load_suppressions(manifest)).passed)
+
+    def test_gitleaks_suppression_survives_the_introducing_commit(self):
+        # Regression for issue 510: a squash, rebase, or cherry-pick integration
+        # re-attributes the finding to a new commit. The reviewed identity is the
+        # file/rule/line tuple, so the suppression must keep matching.
+        entry = suppression(
+            tool="gitleaks",
+            finding="generic-api-key",
+            scope={"path": "scripts/fixtures/vocabulary.json", "rule": "generic-api-key", "line": 42},
+        )
+        before = {
+            "RuleID": "generic-api-key",
+            "File": "scripts/fixtures/vocabulary.json",
+            "StartLine": 42,
+            "Commit": "oldcommit0",
+            "Fingerprint": "oldcommit0:scripts/fixtures/vocabulary.json:generic-api-key:42",
+        }
+        after = {
+            **before,
+            "Commit": "newcommit1",
+            "Fingerprint": "newcommit1:scripts/fixtures/vocabulary.json:generic-api-key:42",
+        }
         with tempfile.TemporaryDirectory() as root:
             manifest = Path(root) / "suppressions.json"
             manifest.write_text(json.dumps({"version": 1, "suppressions": [entry]}), encoding="utf-8")
-            self.assertTrue(evaluate_gitleaks([finding], load_suppressions(manifest)).passed)
+            suppressions = load_suppressions(manifest)
+            for finding in (before, after):
+                result = evaluate_gitleaks([finding], suppressions)
+                self.assertTrue(result.passed)
+                self.assertEqual(result.suppressed, 1)
 
 
 class SecurityAutomationContractTests(unittest.TestCase):
