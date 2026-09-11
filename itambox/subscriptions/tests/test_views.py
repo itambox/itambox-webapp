@@ -1,3 +1,6 @@
+import re
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection
@@ -59,6 +62,84 @@ class SubscriptionViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         seat_queries = [query for query in queries.captured_queries if "licenseseatassignment" in query["sql"].lower()]
         self.assertEqual(len(seat_queries), 1, queries.captured_queries)
+
+    def _detail_content(self, sub):
+        url = reverse("subscriptions:subscription_detail", kwargs={"pk": sub.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode()
+
+    def _row_value(self, content, label):
+        """Return the <dd> body rendered after the given labeled <dt>."""
+        match = re.search(re.escape(label) + r"\s*</dt>\s*<dd[^>]*>(.*?)</dd>", content, re.S)
+        self.assertIsNotNone(match, f"no rendered row for label {label!r}")
+        return match.group(1)
+
+    def test_detail_labels_one_time_cost_and_omits_annual_row(self):
+        """Issue #501: a one-time payment must not read as a yearly cost."""
+        sub = Subscription.objects.create(
+            name="Perpetual Software",
+            provider=self.provider,
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_cost=Decimal("500.00"),
+            currency="EUR",
+            billing_cycle=BillingCycleChoices.ONETIME,
+        )
+        content = self._detail_content(sub)
+
+        self.assertIn("One-Time Cost:", content)
+        self.assertIn("500.00 EUR", self._row_value(content, "One-Time Cost:"))
+        self.assertNotIn("Renewal Cost:", content)
+        self.assertNotIn("Est. Annual Cost:", content)
+        self.assertNotIn("Annualized Cost:", content)
+
+    def test_detail_labels_multi_year_annual_cost_as_annualized(self):
+        """Issue #501: the multi-year figure in the annual slot is the annualized value."""
+        sub = Subscription.objects.create(
+            name="Three-Year Contract",
+            provider=self.provider,
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_cost=Decimal("3600.00"),
+            currency="EUR",
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=36,
+        )
+        content = self._detail_content(sub)
+
+        self.assertIn("3600.00 EUR", self._row_value(content, "Renewal Cost:"))
+        self.assertIn("1200.00 EUR", self._row_value(content, "Annualized Cost:"))
+        self.assertNotIn("Est. Annual Cost:", content)
+
+    def test_detail_omits_annual_row_for_multi_year_without_term(self):
+        """Issue #501 fallback: no yearly figure when the term is unknown."""
+        sub = Subscription.objects.create(
+            name="Termless Multi-Year",
+            provider=self.provider,
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_cost=Decimal("3600.00"),
+            currency="EUR",
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+        )
+        content = self._detail_content(sub)
+
+        self.assertIn("3600.00 EUR", self._row_value(content, "Renewal Cost:"))
+        self.assertNotIn("Annualized Cost:", content)
+        self.assertNotIn("Est. Annual Cost:", content)
+
+    def test_detail_renders_zero_cost_as_zero(self):
+        """Issue #501: a zero-cost row shows 0.00 instead of being dropped or showing Not set."""
+        sub = Subscription.objects.create(
+            name="Free Annual Plan",
+            provider=self.provider,
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_cost=Decimal("0.00"),
+            currency="EUR",
+            billing_cycle=BillingCycleChoices.ANNUAL,
+        )
+        content = self._detail_content(sub)
+
+        self.assertIn("0.00 EUR", self._row_value(content, "Renewal Cost:"))
+        self.assertIn("0.00 EUR", self._row_value(content, "Est. Annual Cost:"))
 
     def test_create_view_get(self):
         url = reverse("subscriptions:subscription_create")

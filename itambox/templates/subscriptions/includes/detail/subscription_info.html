@@ -84,16 +84,28 @@
       {% if object.cost_center.code %}{{ object.cost_center.code }}:&nbsp;{% endif %}{{ object.cost_center.name }}
     </dd>
   {% endif %}
-  <dt class="col-sm-3">{% translate "Renewal Cost:" %}</dt>
+  <dt class="col-sm-3">
+    {% if object.billing_cycle == "onetime" %}
+      {% translate "One-Time Cost:" %}
+    {% else %}
+      {% translate "Renewal Cost:" %}
+    {% endif %}
+  </dt>
   <dd class="col-sm-9">
-    {% if object.renewal_cost %}
+    {% if object.renewal_cost is not None %}
       <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
     {% else %}
       {% translate "Not set" %}
     {% endif %}
   </dd>
-  {% if object.annual_cost %}
-    <dt class="col-sm-3">{% translate "Est. Annual Cost:" %}</dt>
+  {% if object.annual_cost is not None %}
+    <dt class="col-sm-3">
+      {% if object.billing_cycle == "multi_year" %}
+        {% translate "Annualized Cost:" %}
+      {% else %}
+        {% translate "Est. Annual Cost:" %}
+      {% endif %}
+    </dt>
     <dd class="col-sm-9">
       <strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong>
     </dd>

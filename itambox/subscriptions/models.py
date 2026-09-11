@@ -1,3 +1,5 @@
+from decimal import ROUND_HALF_UP, Decimal
+
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -400,7 +402,17 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
 
     @property
     def annual_cost(self):
-        """Estimated annual cost based on billing cycle."""
+        """Estimated annual cost for the billing cycle (issue #501).
+
+        Monthly, quarterly, biannual, and annual cycles scale the per-period
+        cost to a year. A multi-year term is annualized as
+        ``renewal_cost * 12 / term_months``; without ``term_months`` no yearly
+        figure can be derived and ``None`` is returned instead of a misleading
+        one. A one-time cost never recurs, so it is not placed in the annual
+        slot either (``None``); the detail page labels the amount as the
+        one-time cost. A recorded zero stays a real 0.00 (free), distinct from
+        ``None`` (no cost recorded).
+        """
         if self.renewal_cost is None:
             return None
         if self.billing_cycle == BillingCycleChoices.MONTHLY:
@@ -409,6 +421,16 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
             return self.renewal_cost * 4
         elif self.billing_cycle == BillingCycleChoices.BIANNUAL:
             return self.renewal_cost * 2
+        elif self.billing_cycle == BillingCycleChoices.MULTI_YEAR:
+            if not self.term_months:
+                return None
+            # An unrefreshed instance can still carry a raw assigned int/float;
+            # normalize via str() so the money math sees the intended decimal
+            # value rather than the binary float expansion.
+            cost = self.renewal_cost if isinstance(self.renewal_cost, Decimal) else Decimal(str(self.renewal_cost))
+            return (cost * 12 / self.term_months).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        elif self.billing_cycle == BillingCycleChoices.ONETIME:
+            return None
         return self.renewal_cost
 
     @property

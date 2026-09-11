@@ -1,5 +1,6 @@
 import datetime
 import threading
+from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -12,7 +13,7 @@ from django.utils import timezone
 from model_bakery import baker
 
 from assets.models import Asset
-from core.managers import set_current_tenant
+from core.managers import set_current_all_accessible, set_current_tenant, set_current_tenant_group
 from core.models import Notification
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, CostCenter, Location, Site, Tenant, TenantGroup
@@ -247,6 +248,129 @@ class SubscriptionModelTests(TestCase):
             provider=self.provider,
         )
         self.assertIsNone(sub.annual_cost)
+
+    def test_subscription_annual_cost_multi_year_two_year_term(self):
+        sub = Subscription.objects.create(
+            name="Two-Year Contract",
+            provider=self.provider,
+            renewal_cost=Decimal("2400.00"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=24,
+        )
+        self.assertEqual(sub.annual_cost, Decimal("1200.00"))
+
+    def test_subscription_annual_cost_multi_year_three_year_term(self):
+        # Issue #501 scenario: 3600 over 36 months is 1200 per year, not 3600.
+        sub = Subscription.objects.create(
+            name="Three-Year Contract",
+            provider=self.provider,
+            renewal_cost=Decimal("3600.00"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=36,
+        )
+        sub.refresh_from_db()
+        self.assertEqual(sub.annual_cost, Decimal("1200.00"))
+
+    def test_subscription_annual_cost_multi_year_five_year_term(self):
+        sub = Subscription.objects.create(
+            name="Five-Year Contract",
+            provider=self.provider,
+            renewal_cost=Decimal("3000.00"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=60,
+        )
+        self.assertEqual(sub.annual_cost, Decimal("600.00"))
+
+    def test_subscription_annual_cost_multi_year_rounds_half_up(self):
+        sub = Subscription.objects.create(
+            name="Rounded Multi-Year",
+            provider=self.provider,
+            renewal_cost=Decimal("1000.55"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=36,
+        )
+        # 1000.55 * 12 / 36 = 333.5166... -> 333.52 at two decimal places.
+        self.assertEqual(sub.annual_cost, Decimal("333.52"))
+
+    def test_subscription_annual_cost_multi_year_without_term_is_none(self):
+        """Defined fallback: no yearly figure when the term is unknown."""
+        sub = Subscription.objects.create(
+            name="Termless Multi-Year",
+            provider=self.provider,
+            renewal_cost=Decimal("3600.00"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+        )
+        self.assertIsNone(sub.annual_cost)
+
+    def test_subscription_annual_cost_one_time_is_not_annualized(self):
+        sub = Subscription.objects.create(
+            name="Perpetual Software",
+            provider=self.provider,
+            renewal_cost=Decimal("500.00"),
+            billing_cycle=BillingCycleChoices.ONETIME,
+        )
+        self.assertIsNone(sub.annual_cost)
+
+    def test_subscription_annual_cost_one_time_with_term_stays_out_of_annual_slot(self):
+        sub = Subscription.objects.create(
+            name="One-Time With Term",
+            provider=self.provider,
+            renewal_cost=Decimal("500.00"),
+            billing_cycle=BillingCycleChoices.ONETIME,
+            term_months=12,
+        )
+        self.assertIsNone(sub.annual_cost)
+
+    def test_subscription_annual_cost_zero_cost_stays_zero(self):
+        """A recorded 0 is a real figure (free), not a missing value."""
+        zero_monthly = Subscription.objects.create(
+            name="Free Monthly Plan",
+            provider=self.provider,
+            renewal_cost=Decimal("0.00"),
+            billing_cycle=BillingCycleChoices.MONTHLY,
+        )
+        zero_multi_year = Subscription.objects.create(
+            name="Free Multi-Year Plan",
+            provider=self.provider,
+            renewal_cost=Decimal("0.00"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=36,
+        )
+        self.assertEqual(zero_monthly.annual_cost, Decimal("0.00"))
+        self.assertEqual(zero_multi_year.annual_cost, Decimal("0.00"))
+
+    def test_subscription_annual_cost_is_scope_independent(self):
+        """Issue #501: the figure derives from instance fields only.
+
+        Single-tenant, tenant-group, and All-accessible scopes must not change
+        the displayed annual cost.
+        """
+        sub = Subscription.objects.create(
+            name="Scoped Multi-Year",
+            provider=self.provider,
+            renewal_cost=Decimal("3600.00"),
+            billing_cycle=BillingCycleChoices.MULTI_YEAR,
+            term_months=36,
+        )
+        group = TenantGroup.objects.create(name="Scope Group", slug="scope-group")
+        tenant = Tenant.objects.create(name="Scope Tenant", slug="scope-tenant", group=group)
+        expected = Decimal("1200.00")
+
+        for tenant_value, group_value, all_accessible in (
+            (None, None, False),
+            (tenant, None, False),
+            (None, group, False),
+            (None, None, True),
+        ):
+            set_current_tenant(tenant_value)
+            set_current_tenant_group(group_value)
+            set_current_all_accessible(all_accessible)
+            try:
+                self.assertEqual(sub.annual_cost, expected)
+            finally:
+                set_current_tenant(None)
+                set_current_tenant_group(None)
+                set_current_all_accessible(False)
 
     def test_subscription_days_until_renewal_none(self):
         sub = Subscription.objects.create(
