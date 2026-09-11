@@ -5,272 +5,374 @@
       "id": "SEC-479-GITLEAKS-001",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
+      "reason": "Intermediate revision of the seeded power-supply efficiency vocabulary, reachable only through the retained issue-479 branches; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3114",
-        "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/services/specifications/core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1489
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-002",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
+      "reason": "Intermediate revision of the seeded power-supply efficiency vocabulary, reachable only through the retained issue-479 branches; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3135",
-        "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/services/specifications/core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1504
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-003",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
+      "reason": "Intermediate revision of the seeded power-supply efficiency vocabulary, reachable only through the retained issue-479 branches; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/canonical-target.json:generic-api-key:3142",
-        "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/services/specifications/core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1509
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-004",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
+      "reason": "Seeded power-supply efficiency Choice key in the adopted public vocabulary definition; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2473",
-        "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/services/specifications/core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1549
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-005",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
+      "reason": "Seeded power-supply efficiency Choice key in the adopted public vocabulary definition; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2494",
-        "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/services/specifications/core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1553
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-006",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The scanner match is an immutable Choice key from the adopted public vocabulary, not a credential. This exception applies only to the exact historical commit/path/rule/line fingerprint; revalidate on the scheduled review date.",
+      "reason": "Seeded power-supply efficiency Choice key in the adopted public vocabulary definition; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "7c8d7ebdc168cbfbff39ee5a662bac0bd8ddf32a:scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json:generic-api-key:2501",
-        "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/services/specifications/core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1560
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-007",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The historical match is the literal library definition identifier t07-protected-definition in a PostgreSQL hard-delete protection regression fixture, not a credential or authentication token. The exception is restricted to this exact historical commit/path/rule/line fingerprint; no rule or file is globally excluded.",
+      "reason": "Seeded power-supply efficiency Choice key in the T11 core-vocabulary data migration; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "ce854c66e4c0d0ce69742b9309be8d0695868f43:itambox/extras/tests/test_t07_provenance.py:generic-api-key:236",
-        "path": "itambox/extras/tests/test_t07_provenance.py",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/migrations/_t11_core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1485
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-008",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Seeded power-supply efficiency Choice key in the T11 core-vocabulary data migration; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "a247bbaed64a6b9f70004c6464ea037eb88b0500:itambox/assets/services/specifications/core_vocabulary.py:generic-api-key:1549",
-        "path": "itambox/assets/services/specifications/core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/migrations/_t11_core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1500
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-009",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Seeded power-supply efficiency Choice key in the T11 core-vocabulary data migration; verified non-secret, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "a247bbaed64a6b9f70004c6464ea037eb88b0500:itambox/assets/services/specifications/core_vocabulary.py:generic-api-key:1553",
-        "path": "itambox/assets/services/specifications/core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "itambox/assets/migrations/_t11_core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1505
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-010",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Intermediate revision of the t07 hard-delete protection regression fixture on the retained issue-479 branches; not a credential or authentication token. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "a247bbaed64a6b9f70004c6464ea037eb88b0500:itambox/assets/services/specifications/core_vocabulary.py:generic-api-key:1560",
-        "path": "itambox/assets/services/specifications/core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "itambox/extras/tests/test_t07_provenance.py",
+        "rule": "generic-api-key",
+        "line": 236
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-011",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Literal library definition identifier in a PostgreSQL hard-delete protection regression fixture; not a credential or authentication token. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "571265b37530de901f76b49fc2d5808af0cfb8d1:itambox/assets/migrations/_t11_core_vocabulary.py:generic-api-key:1485",
-        "path": "itambox/assets/migrations/_t11_core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "itambox/extras/tests/test_t07_provenance.py",
+        "rule": "generic-api-key",
+        "line": 239
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-012",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in a reviewed test fixture; the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "571265b37530de901f76b49fc2d5808af0cfb8d1:itambox/assets/migrations/_t11_core_vocabulary.py:generic-api-key:1500",
-        "path": "itambox/assets/migrations/_t11_core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
+        "rule": "generic-api-key",
+        "line": 3114
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-013",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in a reviewed test fixture; the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "571265b37530de901f76b49fc2d5808af0cfb8d1:itambox/assets/migrations/_t11_core_vocabulary.py:generic-api-key:1505",
-        "path": "itambox/assets/migrations/_t11_core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
+        "rule": "generic-api-key",
+        "line": 3135
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-014",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in a reviewed test fixture; the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b23112019a1732dc0409d81286c18d1f461f4150:itambox/assets/services/specifications/core_vocabulary.py:generic-api-key:1489",
-        "path": "itambox/assets/services/specifications/core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "scripts/tests/fixtures/specification_vocabulary/canonical-target.json",
+        "rule": "generic-api-key",
+        "line": 3142
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-015",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in a reviewed test fixture; the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b23112019a1732dc0409d81286c18d1f461f4150:itambox/assets/services/specifications/core_vocabulary.py:generic-api-key:1504",
-        "path": "itambox/assets/services/specifications/core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
+        "rule": "generic-api-key",
+        "line": 2473
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     },
     {
       "id": "SEC-479-GITLEAKS-016",
       "tool": "gitleaks",
       "finding": "generic-api-key",
-      "reason": "The match is a seeded power-supply efficiency Choice key, verified against the retained canonical vocabulary fixture at the scanned commit. It is not a credential. Scope is limited to this exact historical commit/path/rule/line fingerprint.",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in a reviewed test fixture; the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
       "owner": "@itambox",
       "scope": {
-        "fingerprint": "b23112019a1732dc0409d81286c18d1f461f4150:itambox/assets/services/specifications/core_vocabulary.py:generic-api-key:1509",
-        "path": "itambox/assets/services/specifications/core_vocabulary.py",
-        "rule": "generic-api-key"
+        "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
+        "rule": "generic-api-key",
+        "line": 2494
       },
-      "review_on": "2026-09-12",
-      "expires_on": "2026-10-05",
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
       "references": [
-        "https://github.com/itambox/itambox-webapp/issues/479"
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-017",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in a reviewed test fixture; the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "scripts/tests/fixtures/specification_vocabulary/foundation-baseline.json",
+        "rule": "generic-api-key",
+        "line": 2501
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-LEGACY-GITLEAKS-001",
+      "tool": "gitleaks",
+      "finding": "slack-webhook-url",
+      "reason": "Historical Slack webhook placeholder with a zeroed workspace path and an X-filled secret in the pre-rename assetbox seed command; not a live webhook. Brought under suppression governance by issue 510 so main-bound Security scans are green.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "assetbox/core/management/commands/seed_data.py",
+        "rule": "slack-webhook-url",
+        "line": 1624
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-LEGACY-GITLEAKS-002",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "Historical sample license key placeholder in the pre-rename assetbox license test module; not a credential. Brought under suppression governance by issue 510 so main-bound Security scans are green.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "assetbox/licenses/tests.py",
+        "rule": "generic-api-key",
+        "line": 72
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-LEGACY-GITLEAKS-003",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "Historical sample license key placeholder in the pre-rename assetbox license model tests; not a credential. Brought under suppression governance by issue 510 so main-bound Security scans are green.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "assetbox/licenses/tests/test_models.py",
+        "rule": "generic-api-key",
+        "line": 31
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-LEGACY-GITLEAKS-004",
+      "tool": "gitleaks",
+      "finding": "curl-auth-header",
+      "reason": "Documentation example token in the API-tokens usage guide request sample; a placeholder, not a credential. Brought under suppression governance by issue 510 so main-bound Security scans are green.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "itambox/docs/usage/api-tokens-and-scim.md",
+        "rule": "curl-auth-header",
+        "line": 116
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/510"
       ]
     }
   ]

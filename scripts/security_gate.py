@@ -118,13 +118,37 @@ def _validate_governance_dates(entry_id: str, entry: dict[str, Any], today: date
 def _validate_scope(entry_id: str, tool: str, scope: Any) -> None:
     if not isinstance(scope, dict):
         raise SecurityGateError(f"{entry_id}: scope must be an object")
-    required = {"target", "package", "version"} if tool == "trivy" else {"fingerprint", "path", "rule"}
+    if tool == "trivy":
+        _validate_trivy_scope(entry_id, scope)
+    else:
+        _validate_gitleaks_scope(entry_id, scope)
+
+
+def _validate_trivy_scope(entry_id: str, scope: dict[str, Any]) -> None:
+    required = {"target", "package", "version"}
     if set(scope) != required:
         raise SecurityGateError(f"{entry_id}: scope must contain exactly {sorted(required)}")
     if any(not isinstance(scope[field], str) or not scope[field] for field in required):
         raise SecurityGateError(f"{entry_id}: scope values must be non-empty")
-    if tool == "gitleaks" and any("*" in scope[field] for field in required):
-        raise SecurityGateError(f"{entry_id}: broad gitleaks scope is forbidden")
+
+
+def _validate_gitleaks_scope(entry_id: str, scope: dict[str, Any]) -> None:
+    # A gitleaks finding is identified by the commit-independent (path, rule,
+    # line) tuple. The commit that introduced a finding is not a stable identity:
+    # a squash, rebase, or cherry-pick integration re-attributes every finding
+    # and must not invalidate a reviewed suppression.
+    required = {"path", "rule", "line"}
+    if set(scope) != required:
+        raise SecurityGateError(f"{entry_id}: scope must contain exactly {sorted(required)}")
+    for field in ("path", "rule"):
+        value = scope[field]
+        if not isinstance(value, str) or not value:
+            raise SecurityGateError(f"{entry_id}: scope values must be non-empty")
+        if "*" in value:
+            raise SecurityGateError(f"{entry_id}: broad gitleaks scope is forbidden")
+    line = scope["line"]
+    if isinstance(line, bool) or not isinstance(line, int) or line < 1:
+        raise SecurityGateError(f"{entry_id}: scope line must be a positive integer")
 
 
 def _trivy_suppressed(finding: dict[str, Any], entries: list[dict[str, Any]]) -> bool:
@@ -142,13 +166,12 @@ def _trivy_suppressed(finding: dict[str, Any], entries: list[dict[str, Any]]) ->
 
 
 def _gitleaks_suppressed(finding: dict[str, Any], entries: list[dict[str, Any]]) -> bool:
-    scope = {
-        "fingerprint": finding.get("Fingerprint", ""),
-        "path": finding.get("File", ""),
-        "rule": finding.get("RuleID", ""),
-    }
     return any(
-        entry["tool"] == "gitleaks" and entry["finding"] == scope["rule"] and entry["scope"] == scope
+        entry["tool"] == "gitleaks"
+        and entry["finding"] == finding.get("RuleID", "")
+        and finding.get("File") == entry["scope"]["path"]
+        and finding.get("RuleID") == entry["scope"]["rule"]
+        and finding.get("StartLine") == entry["scope"]["line"]
         for entry in entries
     )
 
