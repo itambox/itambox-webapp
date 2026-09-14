@@ -710,12 +710,16 @@ class AssetRequestTable(BaseTable):
         status_classes = {
             "pending": "bg-warning text-warning-fg",
             "approved": "bg-info text-info-fg",
-            "fulfilled": "bg-success text-success-fg",
+            "fulfilled": "bg-secondary text-secondary-fg",
             "denied": "bg-danger text-danger-fg",
             "cancelled": "bg-secondary text-secondary-fg",
         }
         badge_class = status_classes.get(value, "bg-secondary text-secondary-fg")
-        display = record.get_status_display()
+        display = getattr(self, "fulfillment_labels", {}).get(record.pk)
+        if display is None:
+            display = (
+                _("Fulfilled — Handover evidence not verified") if value == "fulfilled" else record.get_status_display()
+            )
         return format_html('<span class="badge {}">{}</span>', badge_class, display)
 
 

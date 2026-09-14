@@ -8,6 +8,11 @@ from django_q.tasks import async_task
 
 from assets.choices import RequestStatusChoices
 from assets.models import AssetAssignment, AssetRequest, StatusLabel
+from assets.services.request_fulfillment import (
+    checkout_transaction_reference,
+    claim_target_request_id,
+    complete_request_from_checkout,
+)
 from extras.services.events import dispatch_event
 
 logger = logging.getLogger(__name__)
@@ -79,14 +84,18 @@ def _pick_fulfillment_unit(units, asset_pk, assignee_pk, assignee_user_id):
     return eligible[0] if eligible else None
 
 
-def _mark_request_fulfilled(req, instance, now, asset=None):
-    if asset is not None:
-        req.asset = asset
-    req.status = RequestStatusChoices.FULFILLED
-    req.responded_by = instance.checked_out_by
-    req.response_date = now
-    req.response_notes = f"Automatically fulfilled via assignment checkout transaction ID: {instance.pk}."
-    req.save()
+def _mark_request_fulfilled(req, instance, asset=None):
+    complete_request_from_checkout(
+        req,
+        actor=instance.checked_out_by,
+        transactions=[checkout_transaction_reference(instance)],
+        asset=asset,
+    )
+
+
+def _append_response_note(existing, note):
+    existing = (existing or "").strip()
+    return f"{existing}\n{note}".strip() if existing else note
 
 
 @receiver(post_save, sender=AssetAssignment)
@@ -100,40 +109,59 @@ def auto_fulfill_asset_requests(sender, instance, created, **kwargs):
     """
     if created and instance.is_active:
         from django.db import models
-        from django.utils import timezone
 
         from organization.models import AssetHolder
 
-        asset = instance.asset
-        assignee = instance.assigned_user
-        if not isinstance(assignee, AssetHolder):
-            return
+        with transaction.atomic():
+            asset = instance.asset
+            assignee = instance.assigned_user
+            if not isinstance(assignee, AssetHolder):
+                return
 
-        units = (
-            AssetRequest.objects.filter(
-                status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED],
-                tenant=asset.tenant,
+            units = (
+                AssetRequest.objects.filter(
+                    status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED],
+                    tenant=asset.tenant,
+                )
+                .filter(models.Q(asset=asset) | models.Q(asset_type=asset.asset_type, asset__isnull=True))
+                .exclude(is_group=True)
+                .order_by("request_date", "pk")
             )
-            .filter(models.Q(asset=asset) | models.Q(asset_type=asset.asset_type, asset__isnull=True))
-            .exclude(is_group=True)
-            .order_by("request_date", "pk")
-        )
+            intended_request_pk = claim_target_request_id()
+            if intended_request_pk is not None:
+                units = units.filter(pk=intended_request_pk)
 
-        unit = _pick_fulfillment_unit(units, asset.pk, assignee.pk, assignee.user_id)
-        if unit is None:
-            return
+            unit = _pick_fulfillment_unit(units, asset.pk, assignee.pk, assignee.user_id)
+            if unit is None:
+                return
 
-        now = timezone.now()
-        _mark_request_fulfilled(unit, instance, now, asset=asset)
+            _mark_request_fulfilled(unit, instance, asset=asset)
 
-        if unit.parent_id:
-            parent = unit.parent
-            open_units_exist = parent.sub_requests.exclude(
-                status__in=[
-                    RequestStatusChoices.FULFILLED,
-                    RequestStatusChoices.DENIED,
-                    RequestStatusChoices.CANCELLED,
-                ]
-            ).exists()
-            if not open_units_exist:
-                _mark_request_fulfilled(parent, instance, now)
+            if unit.parent_id:
+                parent = AssetRequest._base_manager.select_for_update().get(
+                    pk=unit.parent_id,
+                    tenant_id=asset.tenant_id,
+                    deleted_at__isnull=True,
+                )
+                open_units_exist = (
+                    parent.sub_requests.filter(
+                        deleted_at__isnull=True,
+                    )
+                    .exclude(
+                        status__in=[
+                            RequestStatusChoices.FULFILLED,
+                            RequestStatusChoices.DENIED,
+                            RequestStatusChoices.CANCELLED,
+                        ]
+                    )
+                    .exists()
+                )
+                if not open_units_exist and parent.status == RequestStatusChoices.APPROVED:
+                    parent.status = RequestStatusChoices.FULFILLED
+                    parent.responded_by = instance.checked_out_by
+                    parent.response_date = instance.checked_out_at
+                    parent.response_notes = _append_response_note(
+                        parent.response_notes,
+                        f"Child request unit fulfilled via assignment #{instance.pk}; no group handover booked.",
+                    )
+                    parent.save(update_fields=["status", "responded_by", "response_date", "response_notes"])

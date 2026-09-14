@@ -276,12 +276,6 @@
     {
       "path": "itambox/assets/signals.py",
       "context": "FunctionDef:auto_fulfill_asset_requests",
-      "statement": "from django.utils import timezone",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/signals.py",
-      "context": "FunctionDef:auto_fulfill_asset_requests",
       "statement": "from organization.models import AssetHolder",
       "count": 1
     },
@@ -547,12 +541,6 @@
       "path": "itambox/assets/views/request_views.py",
       "context": "ClassDef:RequestBulkReceiveView/FunctionDef:post",
       "statement": "from django.contrib import messages",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestClaimView/FunctionDef:perform_action",
-      "statement": "from assets.services import checkout_asset",
       "count": 1
     },
     {

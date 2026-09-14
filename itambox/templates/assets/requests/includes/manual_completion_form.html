@@ -1,0 +1,46 @@
+{% load i18n %}
+<form method="post"
+      action="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
+      {% if request.htmx and not request.htmx.boosted %} hx-post="{% url 'assets:request_mark_fulfilled' pk=object.pk %}" hx-target="#modal-placeholder" hx-swap="innerHTML" {% else %} hx-boost="false" {% endif %}>
+  {% csrf_token %}
+  <div class="modal-header">
+    <h5 class="modal-title">{% translate "Manually complete asset request" %}</h5>
+    {% if request.htmx and not request.htmx.boosted %}
+      <button type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="{% translate 'Close' %}"></button>
+    {% endif %}
+  </div>
+  <div class="modal-body">
+    <div class="alert alert-warning">
+      {% translate "This records Fulfilled without creating an assignment or stock booking. Use only for a deliberate exception." %}
+    </div>
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+    {% endif %}
+    <div class="mb-3">
+      <label class="form-label fw-bold" for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+      {{ form.reason }}
+      <div class="form-text">{{ form.reason.help_text }}</div>
+      {% if form.reason.errors %}<div class="invalid-feedback d-block">{{ form.reason.errors|join:", " }}</div>{% endif %}
+    </div>
+    <div class="form-check">
+      {{ form.confirmed_no_handover }}
+      <label class="form-check-label"
+             for="{{ form.confirmed_no_handover.id_for_label }}">{{ form.confirmed_no_handover.label }}</label>
+      {% if form.confirmed_no_handover.errors %}<div class="invalid-feedback d-block">{{ form.confirmed_no_handover.errors|join:", " }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="modal-footer">
+    {% if request.htmx and not request.htmx.boosted %}
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+    {% else %}
+      <a class="btn btn-secondary"
+         href="{% url 'assets:assetrequest_detail' pk=object.pk %}">{% translate "Cancel" %}</a>
+    {% endif %}
+    <button type="submit" class="btn btn-warning">{% translate "Complete manually" %}</button>
+  </div>
+</form>

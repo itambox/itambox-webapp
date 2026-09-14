@@ -11,8 +11,10 @@ every reservation is collision-proof at the database level.
 
 An **Asset Request** is a self-service request. Users browse the
 catalogue and submit requests for specific assets, asset types, components,
-accessories, or consumables. Managers approve or deny them; fulfilment creates
-the corresponding assignments and stock deductions.
+accessories, or consumables. Managers approve or deny them. Receiving stock and
+handing it over are separate operations: receipt allocates stock to a request;
+claim or checkout records the assignment or inventory issue. A manual completion
+is an explicit exception and creates neither an assignment nor a stock booking.
 
 ### Creating a Request
 
@@ -50,7 +52,7 @@ When creating a request, ITAMbox enforces several rules:
 
 ### Approval Workflow
 
-Requests follow a strict state machine with database-enforced transitions:
+Requests follow a state machine validated by the application. The supported workflow paths are:
 
 ```mermaid
 stateDiagram-v2
@@ -59,12 +61,12 @@ stateDiagram-v2
     Pending --> Denied : Approver denies
     Pending --> Cancelled : Requester cancels
     Pending --> Fulfilled : Direct fulfilment (auto)
-    Approved --> Fulfilled : Item assigned / delivered
+    Approved --> Fulfilled : Claim / checkout, or explicit manual completion
+    Approved --> Approved : Bulk receipt allocates stock; handover pending
     Approved --> Cancelled : Requester or approver cancels
     Approved --> Procurement : Item needs purchasing
-    Procurement --> Fulfilled : Purchase received & assigned
     Procurement --> Cancelled : Cancelled
-    Procurement --> Approved : Return to approval
+    Procurement --> Approved : PO receipt allocates stock; handover pending
     Denied --> [*]
     Fulfilled --> [*]
     Cancelled --> [*]
@@ -77,11 +79,41 @@ stateDiagram-v2
 | Status | Meaning | Next Steps |
 |---|---|---|
 | **Pending** | Submitted, awaiting review | Approve, deny, or cancel |
-| **Approved** | Cleared for fulfilment | Assign stock, or move to Procurement |
-| **Procurement** | Needs purchasing (not in stock) | Create Purchase Order; fulfil when received |
+| **Approved** | Cleared for fulfilment; an allocated item may still await handover | Allocate stock, claim/check out, or move an unallocated request to Procurement |
+| **Procurement** | Needs purchasing (not in stock) | Receive against a Purchase Order, then hand over the allocated items |
 | **Denied** | Rejected by approver | Terminal — no further action |
-| **Fulfilled** | Delivered and assigned | Terminal — the item is now in use |
+| **Fulfilled** | Request closed; the completion label distinguishes a recorded handover, a manual exception, or unverified historical evidence | Terminal — inspect the completion evidence, not the status alone |
 | **Cancelled** | Withdrawn by requester or approver | Terminal |
+
+#### Completion paths and evidence
+
+| Path | Resulting request status | Assignment / stock effects | What the operator sees |
+|---|---|---|---|
+| Claim | Fulfilled | Books an asset checkout or an inventory issue for the requested units | Handover recorded |
+| Asset checkout with automatic reconciliation | Fulfilled for one matching open unit | The new assignment is the recorded handover; a group remains open while units remain open | Handover recorded for that unit |
+| Complete manually | Fulfilled | **No assignment and no stock booking** | Manually completed — no handover booked, with the required reason |
+| Bulk stock receipt | Approved | Creates and allocates an asset; does not check it out | Allocated, awaiting handover |
+| Purchase Order receipt | Approved for received/allocated request units | Creates assets or adds inventory stock; does not hand it over | Approved, awaiting handover; linked Purchase Order remains visible |
+
+To use the manual exception, open an approved request and choose **Complete
+manually...**. Supply a reason and explicitly confirm that no assignment or stock
+booking will be generated. Use this only for a deliberate exception, such as work
+completed outside ITAMbox. A request closure is not a substitute for an inventory
+transaction or a custody record. The reason, acting user and completion time are
+auditable; existing decision notes are retained.
+
+List and detail labels distinguish the completion paths. Older records without
+verifiable completion metadata show **Handover evidence not verified**. This does
+not prove that a delivery never happened; it means ITAMbox cannot establish that
+request's completion path from the available evidence. Editing a note or finding
+an asset currently assigned to someone does not establish the original handover.
+A later return does not undo evidence of a recorded historical handover.
+
+For groups, inspect the unit-level outcomes: some units can have recorded
+handovers while others were manually completed, cancelled, denied, or remain open.
+A group summary does not imply that every originally requested unit was delivered.
+These meanings do not change between single-tenant, tenant-group and
+All-accessible views.
 
 #### Auto-Approval for Low-Risk Items
 
@@ -143,7 +175,7 @@ or webhooks. Common event hooks:
 | Request created (status = pending) | Notify the approval queue |
 | Request approved | Notify the requester — "Your request is approved" |
 | Request denied | Notify the requester with `response_notes` |
-| Request fulfilled | Notify the requester — "Your item is ready" |
+| Request fulfilled | Notify that the request was closed; distinguish recorded handover from manual completion before claiming delivery |
 | Request moved to procurement | Notify the procurement team |
 
 The `responded_by` and `response_notes` fields are populated when an
