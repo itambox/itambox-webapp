@@ -115,6 +115,14 @@ class TagBulkDeleteView(ObjectBulkDeleteView):
 
 
 # Custom Fields
+class ManagedDefinitionDetailView(ObjectDetailView):
+    def _build_mutation_context(self, obj, app_label, model_name):
+        context = super()._build_mutation_context(obj, app_label, model_name)
+        if is_managed_definition(obj):
+            context.update(can_change=False, can_delete=False, edit_url=None, delete_url=None)
+        return context
+
+
 class CustomFieldListView(ObjectListView):
     queryset = CustomField.objects.all()
     filterset = CustomFieldFilterSet
@@ -123,7 +131,7 @@ class CustomFieldListView(ObjectListView):
     action_buttons = ("add",)
 
 
-class CustomFieldDetailView(ObjectDetailView):
+class CustomFieldDetailView(ManagedDefinitionDetailView):
     queryset = CustomField.objects.all()
 
     layout = (((Panel("info", _("Custom Field Details")),),),)
@@ -161,19 +169,13 @@ class CustomFieldsetListView(ObjectListView):
     action_buttons = ("add",)
 
 
-class CustomFieldsetDetailView(ObjectDetailView):
+class CustomFieldsetDetailView(ManagedDefinitionDetailView):
     queryset = CustomFieldset.objects.all().prefetch_related("fields", "asset_type_memberships")
 
     layout = (((Panel("info", _("Custom Field Set Details")),),),)
 
     def get_object_display(self, obj):
         return obj.label or obj.slug
-
-    def _build_mutation_context(self, obj, app_label, model_name):
-        context = super()._build_mutation_context(obj, app_label, model_name)
-        if is_managed_definition(obj):
-            context.update(can_change=False, can_delete=False, edit_url=None, delete_url=None)
-        return context
 
 
 class CustomFieldsetEditView(ObjectEditView):

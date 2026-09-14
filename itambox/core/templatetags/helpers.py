@@ -127,7 +127,14 @@ def bulk_action_context(context, table):
         result["can_change"] = request.user.has_perm(f"{app_label}.change_{model_name}")
         result["return_url"] = request.get_full_path()
 
-    return result
+    return _apply_bulk_edit_policy(result, table)
+
+
+def _apply_bulk_edit_policy(context, table):
+    if not getattr(table, "bulk_edit_enabled", True):
+        context["bulk_edit_url"] = None
+        context["can_change"] = False
+    return context
 
 
 # Add other helpers from NetBox as needed later.

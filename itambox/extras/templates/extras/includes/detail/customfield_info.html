@@ -8,6 +8,13 @@
   <dd class="col-sm-9">
     <strong>{{ object.label }}</strong>
   </dd>
+  <dt class="col-sm-3">{% translate "Management" %}</dt>
+  <dd class="col-sm-9">
+    {{ object.get_management_kind_display }}
+    {% if object.management_kind == "core" or object.management_kind == "library" %}
+      <p class="small text-muted mb-0">{% translate "Managed definitions are read-only." %}</p>
+    {% endif %}
+  </dd>
   <dt class="col-sm-3">{% translate "Field Type:" %}</dt>
   <dd class="col-sm-9">
     <span class="badge bg-blue-lt px-2.5 py-1 text-uppercase">{{ object.get_field_type_display }}</span>

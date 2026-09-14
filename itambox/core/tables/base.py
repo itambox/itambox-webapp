@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 class BaseTable(tables.Table):
     exempt_columns = ("pk", "actions")
+    # Presentation opt-out; server-side bulk authorization remains authoritative.
+    bulk_edit_enabled = True
 
     # Universal detail-link column, hidden by default. Sits immediately after
     # the checkbox as the first data column when shown. Tables with no natural

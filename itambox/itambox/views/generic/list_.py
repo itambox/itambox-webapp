@@ -234,6 +234,8 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         context["bulk_delete_url"] = self._bulk_action_url(model, "bulk_delete", "bulk_delete")
         context["bulk_edit_url"] = self._bulk_action_url(model, "bulk_edit", "bulk_edit")
+        if not getattr(context.get("table"), "bulk_edit_enabled", True):
+            context["bulk_edit_url"] = None
         if not mutation_allowed:
             context["bulk_delete_url"] = None
             context["bulk_edit_url"] = None

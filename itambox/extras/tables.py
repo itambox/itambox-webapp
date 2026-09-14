@@ -193,26 +193,7 @@ class TagTable(BaseTable):
         return TABLE_EMPTY_VALUE
 
 
-class CustomFieldTable(BaseTable):
-    pk = ToggleColumn(accessor="pk")
-    name = tables.LinkColumn("extras:customfield_detail", args=[A("pk")], verbose_name=_("Name"))
-    label = tables.Column(verbose_name=_("Label"))
-    field_type = tables.Column(verbose_name=_("Field Type"))
-    required = tables.BooleanColumn(verbose_name=_("Required"))
-    object_types = tables.ManyToManyColumn(
-        verbose_name=_("Applies To"),
-        transform=lambda ct: ct.model_class()._meta.verbose_name.title() if ct.model_class() else ct.model,
-        orderable=False,
-    )
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = CustomField
-        fields = ("pk", "name", "label", "field_type", "required", "object_types", "actions")
-        default_columns = ("pk", "name", "label", "field_type", "required", "object_types", "actions")
-
-
-class CustomFieldsetActionsColumn(ActionsColumn):
+class ManagedDefinitionActionsColumn(ActionsColumn):
     def render(self, record, table, **kwargs):
         if is_managed_definition(record):
             return format_html(
@@ -225,7 +206,38 @@ class CustomFieldsetActionsColumn(ActionsColumn):
         return super().render(record, table, **kwargs)
 
 
+class CustomFieldTable(BaseTable):
+    bulk_edit_enabled = False
+    pk = ToggleColumn(accessor="pk")
+    name = tables.LinkColumn("extras:customfield_detail", args=[A("pk")], verbose_name=_("Name"))
+    label = tables.Column(verbose_name=_("Label"))
+    management_kind = tables.Column(verbose_name=_("Management"))
+    field_type = tables.Column(verbose_name=_("Field Type"))
+    required = tables.BooleanColumn(verbose_name=_("Required"))
+    object_types = tables.ManyToManyColumn(
+        verbose_name=_("Applies To"),
+        transform=lambda ct: ct.model_class()._meta.verbose_name.title() if ct.model_class() else ct.model,
+        orderable=False,
+    )
+    actions = ManagedDefinitionActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = CustomField
+        fields = ("pk", "name", "label", "management_kind", "field_type", "required", "object_types", "actions")
+        default_columns = (
+            "pk",
+            "name",
+            "label",
+            "management_kind",
+            "field_type",
+            "required",
+            "object_types",
+            "actions",
+        )
+
+
 class CustomFieldsetTable(BaseTable):
+    bulk_edit_enabled = False
     pk = ToggleColumn(accessor="pk")
     name = tables.LinkColumn(
         "extras:customfieldset_detail",
@@ -238,7 +250,7 @@ class CustomFieldsetTable(BaseTable):
     )
     management_kind = tables.Column(verbose_name=_("Management"))
     fields_count = tables.Column(verbose_name=_("Fields Count"), orderable=False)
-    actions = CustomFieldsetActionsColumn()
+    actions = ManagedDefinitionActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = CustomFieldset
