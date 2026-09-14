@@ -15,6 +15,7 @@ from core.html_styles import color_chip_class, safe_hex_color
 from core.tables import ActionsColumn, BaseTable, BooleanColumn, ToggleColumn
 from core.tables.constants import TABLE_EMPTY_VALUE
 from core.templatetags.utility_tags import localize_journal_comment
+from itambox.views.generic.mixins import is_managed_definition
 
 from .models import (
     AlertLog,
@@ -211,16 +212,38 @@ class CustomFieldTable(BaseTable):
         default_columns = ("pk", "name", "label", "field_type", "required", "object_types", "actions")
 
 
+class CustomFieldsetActionsColumn(ActionsColumn):
+    def render(self, record, table, **kwargs):
+        if is_managed_definition(record):
+            return format_html(
+                '<a class="btn btn-sm btn-action" href="{}?tab=changelog" title="{}" aria-label="{}">'
+                '<i class="mdi mdi-history"></i></a>',
+                record.get_absolute_url(),
+                _("Changelog"),
+                _("Changelog"),
+            )
+        return super().render(record, table, **kwargs)
+
+
 class CustomFieldsetTable(BaseTable):
     pk = ToggleColumn(accessor="pk")
-    name = tables.LinkColumn("extras:customfieldset_detail", args=[A("pk")], verbose_name=_("Name"))
+    name = tables.LinkColumn(
+        "extras:customfieldset_detail",
+        args=[A("pk")],
+        accessor="label",
+        text=lambda record: record.label or record.slug,
+        empty_values=(),
+        order_by=("label",),
+        verbose_name=_("Name"),
+    )
+    management_kind = tables.Column(verbose_name=_("Management"))
     fields_count = tables.Column(verbose_name=_("Fields Count"), orderable=False)
-    actions = ActionsColumn()
+    actions = CustomFieldsetActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = CustomFieldset
-        fields = ("pk", "name", "fields_count", "actions")
-        default_columns = ("pk", "name", "fields_count", "actions")
+        fields = ("pk", "name", "management_kind", "fields_count", "actions")
+        default_columns = ("pk", "name", "management_kind", "fields_count", "actions")
 
     def render_fields_count(self, value, record=None):
         return value or 0

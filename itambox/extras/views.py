@@ -36,7 +36,7 @@ from itambox.views.generic import (
     ObjectEditView,
     ObjectListView,
 )
-from itambox.views.generic.mixins import CapabilityRequiredMixin
+from itambox.views.generic.mixins import CapabilityRequiredMixin, is_managed_definition
 from itambox.views.generic.utils import safe_return_url
 from users.models import UserPreference  # Import UserPreference
 
@@ -165,6 +165,15 @@ class CustomFieldsetDetailView(ObjectDetailView):
     queryset = CustomFieldset.objects.all().prefetch_related("fields", "asset_type_memberships")
 
     layout = (((Panel("info", _("Custom Field Set Details")),),),)
+
+    def get_object_display(self, obj):
+        return obj.label or obj.slug
+
+    def _build_mutation_context(self, obj, app_label, model_name):
+        context = super()._build_mutation_context(obj, app_label, model_name)
+        if is_managed_definition(obj):
+            context.update(can_change=False, can_delete=False, edit_url=None, delete_url=None)
+        return context
 
 
 class CustomFieldsetEditView(ObjectEditView):

@@ -2,7 +2,14 @@
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Fieldset Name:" %}</dt>
   <dd class="col-sm-9">
-    <strong>{{ object.name }}</strong>
+    <strong>{{ object.label|default:object.slug }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Management" %}</dt>
+  <dd class="col-sm-9">
+    {{ object.get_management_kind_display }}
+    {% if object.management_kind == "core" or object.management_kind == "library" %}
+      <p class="small text-muted mb-0">{% translate "Managed definitions are read-only." %}</p>
+    {% endif %}
   </dd>
   <dt class="col-sm-3">{% blocktranslate with count=object.fields.count %}Custom Fields ({{ count }}):{% endblocktranslate %}</dt>
   <dd class="col-sm-9">
