@@ -1390,7 +1390,7 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
             "No 'Deployed' Status Label exists. Configure one first.",
             "Choose either a Tenant or a Tenant Group for this template, not both.",
             "Label generation job '%(job)s' queued. Track its progress in real time.",
-            "Stock received; requests fulfilled.",
+            "Stock received and allocated; awaiting handover.",
             "The system archives the asset and creates a permanent disposal record for audit.",
             "The system archives each asset and freezes its book value. It skips assets already marked as disposed.",
             "Dispose of 0 assets?",

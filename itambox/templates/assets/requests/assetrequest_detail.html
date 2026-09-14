@@ -139,7 +139,7 @@
                   {% if fulfillment_label %}
                     {{ fulfillment_label }}
                   {% elif object.status == 'fulfilled' %}
-                    {% translate "Fulfilled — Handover evidence not verified" %}
+                    {% translate "Fulfilled: Handover evidence not verified" %}
                   {% else %}
                     {% translate "Pending pickup/checkout" %}
                   {% endif %}

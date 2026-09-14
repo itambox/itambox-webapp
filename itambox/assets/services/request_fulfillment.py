@@ -449,48 +449,48 @@ def request_fulfillment_label(
     """Return the honest operational label shown by lists and detail pages."""
     if request_instance.is_group:
         if request_instance.status == RequestStatusChoices.APPROVED:
-            return _("Approved — request units awaiting handover")
+            return _("Approved: request units awaiting handover")
         if request_instance.status != RequestStatusChoices.FULFILLED:
             return str(request_instance.get_status_display())
         return _group_fulfillment_label(request_instance, child_evidence, child_requests)
 
     if request_instance.status == RequestStatusChoices.APPROVED and request_instance.asset_id:
-        return _("Approved — allocated, awaiting handover")
+        return _("Approved: allocated, awaiting handover")
     if request_instance.status == RequestStatusChoices.APPROVED:
-        return _("Approved — awaiting handover")
+        return _("Approved: awaiting handover")
     if request_instance.status != RequestStatusChoices.FULFILLED:
         return str(request_instance.get_status_display())
     if evidence is _MISSING_EVIDENCE:
         evidence = get_request_fulfillment_evidence(request_instance)
     if not evidence:
-        return _("Fulfilled — Handover evidence not verified")
+        return _("Fulfilled: Handover evidence not verified")
     if evidence.get("method") == FULFILLMENT_METHOD_MANUAL:
-        return _("Fulfilled — Manually completed — no handover booked")
-    return _("Fulfilled — handover recorded")
+        return _("Fulfilled: Manually completed; no handover booked")
+    return _("Fulfilled: handover recorded")
 
 
 def _group_fulfillment_label(request_instance, child_evidence, child_requests):
     children = list(child_requests) if child_requests is not None else list(request_instance.sub_requests.all())
     if not children:
-        return _("Fulfilled — Handover evidence not verified")
+        return _("Fulfilled: Handover evidence not verified")
     open_children = [child for child in children if child.status not in _TERMINAL_STATUSES]
     fulfilled_children = [child for child in children if child.status == RequestStatusChoices.FULFILLED]
     if open_children:
-        return _("Partial — request units still open")
+        return _("Partial: request units still open")
     if not fulfilled_children:
-        return _("Terminal request units — no handover booked")
+        return _("Terminal request units: no handover booked")
     evidence_by_pk = child_evidence or {}
     methods = {(evidence_by_pk.get(child.pk) or {}).get("method") for child in fulfilled_children}
     if any(not evidence_by_pk.get(child.pk) for child in fulfilled_children):
-        return _("Fulfilled — Handover evidence not verified")
+        return _("Fulfilled: Handover evidence not verified")
     if methods == {FULFILLMENT_METHOD_CHECKOUT}:
-        label = _("Fulfilled — all handovers recorded")
+        label = _("Fulfilled: all handovers recorded")
     elif methods == {FULFILLMENT_METHOD_MANUAL}:
-        label = _("Fulfilled — Manually completed — no handover booked")
+        label = _("Fulfilled: Manually completed; no handover booked")
     else:
-        label = _("Fulfilled — mixed manual and verified handover")
+        label = _("Fulfilled: mixed manual and verified handover")
     if any(child.status in {RequestStatusChoices.DENIED, RequestStatusChoices.CANCELLED} for child in children):
-        return _("Partial — terminal units remain; ") + label
+        return _("Partial: terminal units remain; ") + label
     return label
 
 

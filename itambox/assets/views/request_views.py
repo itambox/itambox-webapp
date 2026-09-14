@@ -512,7 +512,7 @@ class RequestMarkFulfilledView(GenericTransactionView):
     model_form = AssetRequestManualCompletionForm
     template_name = "assets/requests/assetrequest_mark_fulfilled.html"
     service_callable = manually_complete_request
-    success_message = _("Request manually completed — no handover booked.")
+    success_message = _("Request manually completed: no handover booked.")
     hx_redirect_on_success = True
 
     def get_form_kwargs(self):

@@ -718,7 +718,7 @@ class AssetRequestTable(BaseTable):
         display = getattr(self, "fulfillment_labels", {}).get(record.pk)
         if display is None:
             display = (
-                _("Fulfilled — Handover evidence not verified") if value == "fulfilled" else record.get_status_display()
+                _("Fulfilled: Handover evidence not verified") if value == "fulfilled" else record.get_status_display()
             )
         return format_html('<span class="badge {}">{}</span>', badge_class, display)
 

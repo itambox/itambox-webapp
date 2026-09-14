@@ -8,8 +8,10 @@ from django.template import Context
 from django.template.loader import get_template
 from django.template.loader_tags import BlockNode
 from django.test import RequestFactory
+from django.utils.translation import override
 
 from assets.forms.request_forms import AssetRequestManualCompletionForm
+from assets.services.request_fulfillment import request_fulfillment_label
 from assets.tables import AssetRequestTable
 
 
@@ -37,9 +39,9 @@ def test_table_unknown_completion_is_not_a_plain_success_badge():
 @pytest.mark.parametrize(
     "label",
     [
-        "Fulfilled — Manually completed — no handover booked",
-        "Fulfilled — handover recorded",
-        "Fulfilled — mixed manual and recorded handover",
+        "Fulfilled: Manually completed; no handover booked",
+        "Fulfilled: handover recorded",
+        "Fulfilled: mixed manual and recorded handover",
     ],
 )
 def test_table_uses_batched_operational_label(label):
@@ -53,7 +55,7 @@ def test_detail_exposes_manual_reason_without_rendering_html():
     html = render_detail_block(
         "details_tab",
         object=request_record(),
-        fulfillment_label="Fulfilled — Manually completed — no handover booked",
+        fulfillment_label="Fulfilled: Manually completed; no handover booked",
         fulfillment_method="manual",
         fulfillment_evidence={"method": "manual", "reason": "Delivered externally <script>alert(1)</script>"},
     )
@@ -67,7 +69,7 @@ def test_detail_allocated_request_explicitly_awaits_handover():
     html = render_detail_block(
         "details_tab",
         object=request_record(status="approved"),
-        fulfillment_label="Approved — allocated, awaiting handover",
+        fulfillment_label="Approved: allocated, awaiting handover",
     )
     assert "allocated, awaiting handover" in html
 
@@ -103,3 +105,18 @@ def test_manual_form_has_real_post_fallback_and_disclosure():
     assert 'name="reason"' in html
     assert 'name="confirmed_no_handover"' in html
     assert "without creating an assignment or stock booking" in html
+
+
+@pytest.mark.parametrize(
+    "method,expected",
+    [
+        ("manual", "Erfüllt: manuell abgeschlossen; keine Übergabe gebucht"),
+        ("checkout", "Erfüllt: Übergabe gebucht"),
+        (None, "Erfüllt: Übergabenachweis nicht verifiziert"),
+    ],
+)
+def test_german_completion_labels_use_compiled_catalog(method, expected):
+    record = request_record(is_group=False, asset_id=None)
+    evidence = {"method": method} if method else {}
+    with override("de"):
+        assert str(request_fulfillment_label(record, evidence=evidence)) == expected

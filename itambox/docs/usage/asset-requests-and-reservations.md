@@ -91,7 +91,7 @@ stateDiagram-v2
 |---|---|---|---|
 | Claim | Fulfilled | Books an asset checkout or an inventory issue for the requested units | Handover recorded |
 | Asset checkout with automatic reconciliation | Fulfilled for one matching open unit | The new assignment is the recorded handover; a group remains open while units remain open | Handover recorded for that unit |
-| Complete manually | Fulfilled | **No assignment and no stock booking** | Manually completed — no handover booked, with the required reason |
+| Complete manually | Fulfilled | **No assignment and no stock booking** | Manually completed; no handover booked, with the required reason |
 | Bulk stock receipt | Approved | Creates and allocates an asset; does not check it out | Allocated, awaiting handover |
 | Purchase Order receipt | Approved for received/allocated request units | Creates assets or adds inventory stock; does not hand it over | Approved, awaiting handover; linked Purchase Order remains visible |
 
