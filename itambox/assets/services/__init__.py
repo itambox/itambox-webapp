@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import datetime
 import logging
+from collections.abc import Mapping
+from functools import partial
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -25,6 +27,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from compliance.models import CustodyReceipt
+from core.context import get_current_membership, get_current_tenant, override_current_tenant_scope
 from inventory.services import checkout_inventory_item, validate_checkout_targets
 from licenses.models import LicenseSeatAssignment
 
@@ -138,7 +141,7 @@ def checkout_asset(
             assignment_kwargs["assigned_asset"] = asset_target
 
         if checkout_date:
-            assignment_kwargs["checked_out_at"] = checkout_date
+            assignment_kwargs["checked_out_at"] = _normalized_checkout_datetime(checkout_date)
 
         AssetAssignment.objects.create(**assignment_kwargs)
 
@@ -181,7 +184,12 @@ def checkout_asset(
                 }
                 receipt = CustodyReceipt.objects.create(**receipt_kwargs)
 
-                # Send email signature request link if configured
+                # Send email signature request link if configured. The
+                # provider hand-off and the outgoing mail are external side
+                # effects: they are scheduled for the OUTERMOST commit, so a
+                # checkout that later rolls back (any failing sibling in a kit)
+                # never sends. A mandatory holder address still rejects the
+                # checkout itself and stays inside the transaction.
                 if resolved_template.email_signature_request and request:
                     try:
                         from core.models import EmailSettings
@@ -194,30 +202,18 @@ def checkout_asset(
                             from compliance.registry import signature_providers
 
                             provider = signature_providers.get(receipt.signature_provider or "local")
-                            sign_url = provider.initiate_signature(receipt, request)
-                            send_mail(
-                                subject=_("Asset Acceptance Required: %(name)s (%(tag)s)")
-                                % {
-                                    "name": asset.name,
-                                    "tag": asset.asset_tag,
-                                },
-                                message=_(
-                                    "Custody has been assigned to you:\n\n"
-                                    "  Asset: %(name)s\n"
-                                    "  Asset Tag: %(tag)s\n"
-                                    "  Serial: %(serial)s\n\n"
-                                    "Accept custody using this link:\n%(url)s\n\n"
-                                    "This link expires in 7 days."
+                            transaction.on_commit(
+                                partial(
+                                    _run_scoped_custody_notification,
+                                    get_current_tenant(),
+                                    get_current_membership(),
+                                    provider,
+                                    asset,
+                                    receipt,
+                                    recipient,
+                                    email_config.from_address,
+                                    request,
                                 )
-                                % {
-                                    "name": asset.name,
-                                    "tag": asset.asset_tag,
-                                    "serial": asset.serial_number or "N/A",
-                                    "url": sign_url,
-                                },
-                                from_email=email_config.from_address,
-                                recipient_list=[recipient],
-                                fail_silently=False,
                             )
                     except ValidationError:
                         raise
@@ -234,6 +230,76 @@ def checkout_asset(
                         )
 
     return target
+
+
+def _normalized_checkout_datetime(value):
+    """Bind an operator-supplied date to an aware midnight (check-in convention).
+
+    The UI posts ``<input type="date">`` values; ``checked_out_at`` is a
+    ``DateTimeField``. Reuse the exact convention ``checkin_asset`` applies to
+    its ``checkin_date`` so both directions persist the same instant shape.
+    """
+    if isinstance(value, datetime.datetime):
+        return value
+    return timezone.make_aware(datetime.datetime.combine(value, datetime.time.min))
+
+
+def _run_scoped_custody_notification(tenant, membership, provider, asset, receipt, recipient, from_address, request):
+    """Run a scheduled custody notification under the scope it was scheduled in.
+
+    ``transaction.on_commit`` callbacks can run after the caller restored its
+    request context (in tests, after the capturing context exits), so the tenant
+    scope active when the checkout was registered is re-entered around the
+    callback — the notification must never observe a different tenant (or none).
+    """
+    with override_current_tenant_scope(tenant, membership):
+        _send_custody_signature_request(provider, asset, receipt, recipient, from_address, request)
+
+
+def _send_custody_signature_request(provider, asset, receipt, recipient, from_address, request):
+    """Send one custody signature request; runs only after the outermost commit.
+
+    Kept as a module-level seam so single-asset and kit checkouts share the
+    exact same notification path. The boundary is inform-and-log: once the
+    assignment is durable, a notification failure must never surface as a
+    checkout failure, no matter which caller committed it.
+    """
+    try:
+        sign_url = provider.initiate_signature(receipt, request)
+        send_mail(
+            subject=_("Asset Acceptance Required: %(name)s (%(tag)s)")
+            % {
+                "name": asset.name,
+                "tag": asset.asset_tag,
+            },
+            message=_(
+                "Custody has been assigned to you:\n\n"
+                "  Asset: %(name)s\n"
+                "  Asset Tag: %(tag)s\n"
+                "  Serial: %(serial)s\n\n"
+                "Accept custody using this link:\n%(url)s\n\n"
+                "This link expires in 7 days."
+            )
+            % {
+                "name": asset.name,
+                "tag": asset.asset_tag,
+                "serial": asset.serial_number or "N/A",
+                "url": sign_url,
+            },
+            from_email=from_address,
+            recipient_list=[recipient],
+            fail_silently=False,
+        )
+    # broad except: boundary-isolation: custody notification failure must not surface after commit
+    except Exception as exc:
+        logger.error(
+            "Custody notification failed for asset_id=%s receipt_id=%s tenant_id=%s actor_id=%s exception_type=%s",
+            asset.pk,
+            receipt.pk,
+            asset.tenant_id,
+            getattr(getattr(request, "user", None), "pk", None),
+            type(exc).__name__,
+        )
 
 
 def checkin_asset(
@@ -404,6 +470,115 @@ def dispose_asset(
     return disposal
 
 
+def _kit_hardware_selection(kit_items, selected_assets):
+    """Validate the operator's explicit device selection per hardware row.
+
+    ``selected_assets`` maps ``KitItem.pk`` to ``Asset.pk`` and must cover
+    every hardware row of this kit exactly once; stock-only kits pass an empty
+    or omitted mapping. Returns a normalized ``{item_pk: asset_pk}`` mapping.
+    Malformed payloads (non-mapping, or keys/values that are not plain ints)
+    are rejected.
+    """
+    if selected_assets is None:
+        selected_assets = {}
+    if not isinstance(selected_assets, Mapping):
+        raise ValidationError(_("The kit hardware selection is invalid."))
+
+    selections = {}
+    for key, value in selected_assets.items():
+        if isinstance(key, bool) or isinstance(value, bool):
+            raise ValidationError(_("The kit hardware selection is invalid."))
+        if not isinstance(key, int) or not isinstance(value, int):
+            raise ValidationError(_("The kit hardware selection is invalid."))
+        selections[key] = value
+
+    hardware_pks = {item.pk for item in kit_items if item.asset_type}
+    if set(selections) - hardware_pks:
+        raise ValidationError(_("The kit hardware selection contains entries that are not hardware rows."))
+    for item in kit_items:
+        if item.asset_type and item.pk not in selections:
+            raise ValidationError(_("Select an asset for hardware item '%(item)s'.") % {"item": item})
+    if len(set(selections.values())) != len(selections):
+        raise ValidationError(_("Each hardware item must use a different device."))
+    return selections
+
+
+def _check_kit_hardware_eligibility(asset, item, target_tenant_id):
+    """Reject a selected device that no longer matches the operator's pick."""
+    if asset.asset_type_id != item.asset_type_id:
+        raise ValidationError(_("The selected asset does not match hardware item '%(item)s'.") % {"item": item})
+    if target_tenant_id is not None and asset.tenant_id != target_tenant_id:
+        raise ValidationError(_("The selected asset belongs to another tenant than the checkout target."))
+    if asset.active_assignment:
+        raise ValidationError(_("The selected asset is already assigned and cannot be selected."))
+    if not asset.status or asset.status.type != StatusTypeChoices.DEPLOYABLE:
+        raise ValidationError(_("The selected asset is not in a deployable state."))
+
+
+def _lock_kit_hardware(kit_items, selections, target_tenant_id):
+    """Lock every selected device and revalidate it under the row locks.
+
+    Locks are taken in a deterministic pk order. A device that went away, was
+    retargeted, reassigned or left the deployable state between form render and
+    submit is rejected here — never silently substituted, and never silently
+    auto-checked-in from its current assignment.
+    """
+    locked = {}
+    for asset_pk in sorted(set(selections.values())):
+        try:
+            locked[asset_pk] = Asset.objects.select_for_update().get(pk=asset_pk)
+        except Asset.DoesNotExist:
+            raise ValidationError(_("The selected asset is no longer available.")) from None
+
+    resolved = {}
+    for item in kit_items:
+        if item.asset_type:
+            asset = locked[selections[item.pk]]
+            _check_kit_hardware_eligibility(asset, item, target_tenant_id)
+            resolved[item.pk] = asset
+    return resolved
+
+
+def _lock_kit_license_pools(kit_items):
+    """Lock each kit license pool once and confirm a seat is still free.
+
+    Repeated license rows of one kit resolve to the same seat target (the
+    holder or the first selected device), and a target holds at most one seat
+    per license (unique-target constraint) — so the kit's demand per pool is
+    exactly one seat. Checking each row against the pool in isolation treated
+    repeated rows as separate demand, which overallocated a single-seat pool
+    and drove one duplicate seat insert per repeated row into the constraint.
+    """
+    seen = set()
+    for item in kit_items:
+        if item.license and item.license_id not in seen:
+            seen.add(item.license_id)
+            lic = item.license.__class__.objects.select_for_update().get(pk=item.license_id)
+            if lic.available_seats < 1:
+                raise ValidationError(_("No available seats for software license '%(lic)s'.") % {"lic": lic})
+
+
+def _assign_kit_license_once(item, holder, first_asset, notes, assigned):
+    """Assign one seat per license pool, however often the kit lists it."""
+    if item.license_id in assigned:
+        return
+    assigned.add(item.license_id)
+    _assign_kit_license_seat(item, holder, first_asset, notes)
+
+
+def _assign_kit_license_seat(item, holder, first_asset, notes):
+    """Assign one kit license seat to the holder, or to the first kit device."""
+    if holder:
+        LicenseSeatAssignment.objects.create(license=item.license, assigned_holder=holder, notes=notes)
+    elif first_asset:
+        LicenseSeatAssignment.objects.create(license=item.license, asset=first_asset, notes=notes)
+    else:
+        raise ValidationError(
+            _("License seat for '%(name)s' must be assigned to either a Holder or an Asset.")
+            % {"name": item.license.name}
+        )
+
+
 def checkout_kit(
     kit,
     holder=None,
@@ -413,29 +588,49 @@ def checkout_kit(
     source_location=None,
     request=None,
     system_authorizations=None,
+    selected_assets=None,
+    expected_checkin=None,
+    checkout_date=None,
+    status=None,
+    is_loan=False,
+    due_date=None,
     **kwargs,
 ):
+    """Check out a whole kit, composing the individual fulfilment operations.
+
+    Hardware rows are fulfilled by ``checkout_asset`` for the explicitly
+    selected device (``selected_assets`` maps ``KitItem.pk`` to ``Asset.pk``,
+    one distinct device per hardware row); stock families keep using the
+    inventory services. Everything runs in one transaction: any component
+    failure rolls back assignments, stock, license seats, custody receipts and
+    audit rows together, and the scheduled custody notifications are discarded.
+    """
     if not holder and not location:
         raise ValidationError(_("Either holder or location must be specified."))
-    validate_checkout_targets(holder, location, None)
+    holder, location, _asset_target = validate_checkout_targets(holder, location, None)
     system_authorizations = system_authorizations or {}
 
-    in_use_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
+    if is_loan and not due_date:
+        raise ValidationError(_("A loan assignment requires a due date."))
+    if status is not None and status.type != StatusTypeChoices.DEPLOYED:
+        raise ValidationError(_("Status '%(status)s' is not a deployed status label.") % {"status": status})
+
+    in_use_status = status or StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
     if not in_use_status:
         raise ValidationError(_("No 'Deployed' Status Label exists. Configure one first."))
 
-    with transaction.atomic():
-        allocated_assets = []
-        item_assets_map = {}
+    target_tenant_id = (holder or location).tenant_id
 
+    with transaction.atomic():
         # Materialize the kit's items exactly once, under a row lock, and reuse that
-        # snapshot for both passes below. Re-reading kit.items for the allocation pass
-        # reopened the very TOCTOU window the locking pass exists to close: a kit item
-        # added, retargeted or removed by a concurrent transaction between the two
-        # SELECTs was allocated without ever being planned (an unplanned asset_type
-        # item raised KeyError; an unplanned license item consumed an unchecked seat).
-        # of=("self",) locks the kit item rows only: every target FK is nullable, and
-        # PostgreSQL rejects FOR UPDATE against the nullable side of an outer join.
+        # snapshot for both selection validation and the allocation pass. Re-reading
+        # kit.items for the allocation pass reopened the very TOCTOU window the
+        # locking pass exists to close: a kit item added, retargeted or removed by a
+        # concurrent transaction between the two SELECTs was allocated without ever
+        # being planned (an unplanned asset_type item raised KeyError; an unplanned
+        # license item consumed an unchecked seat). of=("self",) locks the kit item
+        # rows only: every target FK is nullable, and PostgreSQL rejects FOR UPDATE
+        # against the nullable side of an outer join.
         kit_items = list(
             kit.items.select_related(
                 "asset_type",
@@ -448,52 +643,36 @@ def checkout_kit(
             .order_by("pk")
         )
 
-        # 1. Lock all resources first to prevent race conditions (TOCTOU)
-        for item in kit_items:
-            if item.asset_type:
-                # Lock a deployable asset immediately
-                asset = (
-                    Asset.objects.filter(asset_type=item.asset_type, status__type=StatusTypeChoices.DEPLOYABLE)
-                    .select_for_update()
-                    .first()
-                )
-                if not asset:
-                    raise ValidationError(
-                        _("No available assets of type '%(type)s' in stock.") % {"type": item.asset_type}
-                    )
-                allocated_assets.append(asset)
-                item_assets_map[item.pk] = asset
-            elif item.license:
-                # Lock license seat pool
-                lic = item.license.__class__.objects.select_for_update().get(pk=item.license.pk)
-                rem = lic.available_seats
-                if rem < 1:
-                    raise ValidationError(_("No available seats for software license '%(lic)s'.") % {"lic": lic})
+        # 1. Lock all resources first to prevent race conditions (TOCTOU): the
+        # selected devices (revalidated under their row locks) and every license
+        # pool the kit consumes.
+        selections = _kit_hardware_selection(kit_items, selected_assets)
+        selected_hardware = _lock_kit_hardware(kit_items, selections, target_tenant_id)
+        _lock_kit_license_pools(kit_items)
 
         # 2. Perform allocations safely under active locks
+        kit_notes = f"Checked out via Kit {kit.name!r}. {notes}"
+        first_selected_asset = next(iter(selected_hardware.values()), None)
+        license_seats_assigned = set()
+
         for item in kit_items:
             if item.asset_type:
-                asset = item_assets_map[item.pk]
-                asset.status = in_use_status
-                # Person assignments retain each kit asset's base location.
-                if not holder:
-                    asset.location = location
-
-                asset._changelog_action = "checkout"
-                asset._changelog_message = f"Checked out via Kit {kit.name!r}. {notes}"
-                asset.save(update_fields=["status", "location"])
-
-                assignment_kwargs = {
-                    "asset": asset,
-                    "checked_out_by": user,
-                    "notes": f"Checked out via Kit {kit.name!r}. {notes}",
-                }
-                if holder:
-                    assignment_kwargs["assigned_user"] = holder
-                elif location:
-                    assignment_kwargs["assigned_location"] = location
-
-                AssetAssignment.objects.create(**assignment_kwargs)
+                # The individual-asset operation owns custody, reservations,
+                # lifecycle and loan semantics; the kit only decides which
+                # device is allocated.
+                checkout_asset(
+                    selected_hardware[item.pk],
+                    holder=holder,
+                    location=location,
+                    user=user,
+                    request=request,
+                    expected_checkin=expected_checkin,
+                    notes=kit_notes,
+                    checkout_date=checkout_date,
+                    status=in_use_status,
+                    is_loan=is_loan,
+                    due_date=due_date,
+                )
 
             elif item.accessory or item.consumable or item.component:
                 stock_item = item.accessory or item.consumable or item.component
@@ -509,22 +688,8 @@ def checkout_kit(
                     location=location,
                     source_location=source_location,
                     user=user,
-                    notes=f"Checked out via Kit {kit.name!r}. {notes}",
+                    notes=kit_notes,
                     system_authorization=system_authorizations.get(permission),
                 )
             elif item.license:
-                if holder:
-                    LicenseSeatAssignment.objects.create(
-                        license=item.license, assigned_holder=holder, notes=f"Checked out via Kit {kit.name!r}. {notes}"
-                    )
-                elif allocated_assets:
-                    LicenseSeatAssignment.objects.create(
-                        license=item.license,
-                        asset=allocated_assets[0],
-                        notes=f"Checked out via Kit {kit.name!r}. {notes}",
-                    )
-                else:
-                    raise ValidationError(
-                        _("License seat for '%(name)s' must be assigned to either a Holder or an Asset.")
-                        % {"name": item.license.name}
-                    )
+                _assign_kit_license_once(item, holder, first_selected_asset, kit_notes, license_seats_assigned)

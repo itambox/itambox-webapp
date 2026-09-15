@@ -332,6 +332,7 @@ class KitCheckoutItemSnapshotTests(TestCase):
         return injected
 
     def test_kit_item_added_mid_checkout_is_not_allocated(self):
+        hardware_item = self.kit.items.get(asset_type=self.asset_type)
         injected = self._inject_kit_item_during_locking_pass()
 
         from assets.services import checkout_kit
@@ -346,6 +347,7 @@ class KitCheckoutItemSnapshotTests(TestCase):
                 self.kit,
                 holder=self.holder,
                 source_location=self.location,
+                selected_assets={hardware_item.pk: self.asset.pk},
                 system_authorizations={
                     "inventory.add_consumableassignment": authorization,
                 },
@@ -367,9 +369,15 @@ class KitCheckoutItemSnapshotTests(TestCase):
     def test_kit_items_are_read_once_under_a_row_lock(self):
         from assets.services import checkout_kit
 
+        hardware_item = self.kit.items.get(asset_type=self.asset_type)
         with TaskContext(tenant_id=self.tenant.pk, user_id=None):
             with CaptureQueriesContext(connection) as captured:
-                checkout_kit(self.kit, holder=self.holder, source_location=self.location)
+                checkout_kit(
+                    self.kit,
+                    holder=self.holder,
+                    source_location=self.location,
+                    selected_assets={hardware_item.pk: self.asset.pk},
+                )
 
         item_table = KitItem._meta.db_table
         quoted_item_table = connection.ops.quote_name(item_table)

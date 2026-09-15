@@ -1086,12 +1086,15 @@ msgid "No 'Deployed' Status Label exists. Configure one first."
 msgstr "Kein Status-Label vom Typ „Deployed“ vorhanden. Konfigurieren Sie eines."
 
 #, python-format
-msgid "No available assets of type '%(type)s' in stock."
-msgstr "Keine verfügbaren Assets vom Typ '%(type)s' auf Lager."
-
-#, python-format
 msgid "No available seats for software license '%(lic)s'."
 msgstr "Keine verfügbaren Plätze für Softwarelizenz '%(lic)s'."
+
+msgid "A loan assignment requires a due date."
+msgstr "Eine Leihgabe erfordert ein Fälligkeitsdatum."
+
+#, python-format
+msgid "Status '%(status)s' is not a deployed status label."
+msgstr "Status „%(status)s“ ist kein Status-Label vom Typ „Deployed“."
 
 #, python-format
 msgid ""
@@ -15035,3 +15038,44 @@ msgstr "Basis-/Lagerstandort:"
 #: itambox/templates/assets/includes/detail/asset_assignment.html
 msgid "Preserved on person assignment; changed by explicit location moves. Not a live position."
 msgstr "Bleibt bei Personenzuweisung erhalten und wird durch ausdrückliche Standortänderungen aktualisiert. Kein Echtzeitstandort."
+
+msgid "Device for %(item)s"
+msgstr "Gerät für %(item)s"
+
+msgid "Each hardware item must use a different device."
+msgstr "Jede Hardware-Position muss ein anderes Gerät verwenden."
+
+msgid "Loan"
+msgstr "Leihgabe"
+
+msgid "Select a device"
+msgstr "Gerät auswählen"
+
+#, python-format
+msgid "Select an asset for hardware item '%(item)s'."
+msgstr "Wählen Sie ein Asset für die Hardware-Position '%(item)s' aus."
+
+msgid "Select one device per hardware item."
+msgstr "Wählen Sie ein Gerät pro Hardware-Position."
+
+msgid "The kit hardware selection contains entries that are not hardware rows."
+msgstr "Die Hardware-Auswahl des Kits enthält Einträge, die keine Hardware-Positionen sind."
+
+msgid "The kit hardware selection is invalid."
+msgstr "Die Hardware-Auswahl des Kits ist ungültig."
+
+msgid "The selected asset belongs to another tenant than the checkout target."
+msgstr "Das ausgewählte Asset gehört zu einem anderen Tenant als das Ziel der Herausgabe."
+
+#, python-format
+msgid "The selected asset does not match hardware item '%(item)s'."
+msgstr "Das ausgewählte Asset passt nicht zur Hardware-Position '%(item)s'."
+
+msgid "The selected asset is already assigned and cannot be selected."
+msgstr "Das ausgewählte Asset ist bereits zugewiesen und kann nicht ausgewählt werden."
+
+msgid "The selected asset is no longer available."
+msgstr "Das ausgewählte Asset ist nicht mehr verfügbar."
+
+msgid "The selected asset is not in a deployable state."
+msgstr "Das ausgewählte Asset ist nicht in einem einsatzbereiten Zustand."

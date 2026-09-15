@@ -1,10 +1,15 @@
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.db.models.functions import Coalesce
+from django.shortcuts import render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from assets.choices import StatusTypeChoices
 from assets.models import Asset
 from assets.services import checkout_kit
+from core.context import override_current_tenant_scope
+from core.tenant_access import active_membership
 from itambox.panels import Panel
 from itambox.views.generic import (
     ObjectCloneView,
@@ -13,9 +18,11 @@ from itambox.views.generic import (
     ObjectEditView,
     ObjectListView,
 )
+from itambox.views.generic.htmx_responses import is_htmx_request
 from itambox.views.generic.service_views import GenericTransactionView
 
 from .. import filters, forms, tables
+from ..forms.kit_forms import kit_target_tenant, kit_target_tenant_queryset
 from ..models import Accessory, Consumable, Kit, KitItem
 
 
@@ -47,13 +54,16 @@ class KitDetailView(ObjectDetailView):
         license_ids = [i.license_id for i in items if i.license_id]
         consumable_ids = [i.consumable_id for i in items if i.consumable_id]
 
-        # 1. Batch Asset Availability Count
+        # 1. Batch Asset Availability Count. The checkout contract is the
+        # deployable status TYPE (the service and the per-row device picker use
+        # it too), not one hard-coded "available" slug: custom deployable
+        # labels must not hide a valid checkout affordance.
         asset_counts = {}
         if asset_type_ids:
             from django.db.models import Count
 
             counts = (
-                Asset.objects.filter(asset_type_id__in=asset_type_ids, status__slug="available")
+                Asset.objects.filter(asset_type_id__in=asset_type_ids, status__type=StatusTypeChoices.DEPLOYABLE)
                 .values("asset_type_id")
                 .annotate(count=Count("id"))
             )
@@ -243,4 +253,70 @@ class KitCheckoutView(GenericTransactionView):
         kwargs = super().get_form_kwargs()
         del kwargs["instance"]
         kwargs["kit"] = self.get_object()
+        kwargs["request"] = self.request
+        tenant_param = self.request.GET.get("tenant")
+        if tenant_param:
+            initial = dict(kwargs.get("initial") or {})
+            initial.setdefault("tenant", tenant_param)
+            kwargs["initial"] = initial
         return kwargs
+
+    def has_permission(self):
+        """Retained object guard, plus a per-tenant gate for global kits.
+
+        A global kit has no tenant to anchor the object check on; in that case
+        the permission must be proven for the target tenant (the submitted
+        candidate for POST, any offered candidate for the open modal).
+        """
+        if self.get_object().tenant_id is None:
+            return self._global_kit_permission()
+        return super().has_permission()
+
+    def _global_kit_permission(self):
+        permission = self.permission_required[0]
+        raw_value = self.request.POST.get("tenant") if self.request.method == "POST" else self.request.GET.get("tenant")
+        target = kit_target_tenant(self.request, self.get_object(), raw_value)
+        if target is not None:
+            return self.request.user.has_perm(permission, obj=target)
+        return any(
+            self.request.user.has_perm(permission, obj=tenant)
+            for tenant in kit_target_tenant_queryset(self.request, self.get_object())
+        )
+
+    def post(self, request, *args, **kwargs):
+        """Re-render the modal form when the target-tenant choice changes."""
+        if is_htmx_request(request) and "_reload" in request.POST:
+            self.object = self.get_object()
+            form = self.get_form()
+            return render(request, self.error_partial, self.get_context_data(form=form))
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        """Bind the service call to the re-read target tenant and its scope.
+
+        The tenant re-read here is the authority for the whole transaction and
+        every scheduled on_commit callback; the previous runtime scope state is
+        restored as soon as the operation completed.
+        """
+        target_tenant = form.cleaned_data.get("target_tenant")
+        if target_tenant is None or not self.request.user.has_perm(self.permission_required[0], obj=target_tenant):
+            message = str(_("You do not have permission to perform this action."))
+            if is_htmx_request(self.request):
+                response = self._htmx_error_response(message)
+                response.status_code = 403
+                return response
+            raise PermissionDenied(message)
+        with override_current_tenant_scope(target_tenant, active_membership(self.request.user, target_tenant.pk)):
+            return super().form_valid(form)
+
+    def get_service_kwargs(self, form):
+        service_kwargs = super().get_service_kwargs(form)
+        # Per-row device fields are input widgets: the service consumes only
+        # the validated ``selected_assets`` mapping. The target-tenant pick is
+        # consumed by the view's scope binding — never forwarded as a service
+        # keyword.
+        for item in getattr(form, "hardware_items", ()):
+            service_kwargs.pop(f"asset_{item.pk}", None)
+        service_kwargs.pop("tenant", None)
+        service_kwargs.pop("target_tenant", None)
+        return service_kwargs

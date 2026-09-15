@@ -122,8 +122,8 @@ class BaseLocationTests(TenantTestMixin, TestCase):
     def test_kit_checkout_to_location_updates_location(self):
         destination = baker.make(Location, tenant=self.tenant)
         kit = baker.make(Kit, tenant=self.tenant)
-        baker.make(KitItem, kit=kit, asset_type=self.asset.asset_type, qty=1)
-        checkout_kit(kit, location=destination, user=self.tenant_user)
+        item = baker.make(KitItem, kit=kit, asset_type=self.asset.asset_type, qty=1)
+        checkout_kit(kit, location=destination, user=self.tenant_user, selected_assets={item.pk: self.asset.pk})
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.location_id, destination.pk)
 
@@ -135,8 +135,8 @@ class BaseLocationTests(TenantTestMixin, TestCase):
 
     def test_kit_person_checkout_preserves_base_location(self):
         kit = baker.make(Kit, tenant=self.tenant)
-        baker.make(KitItem, kit=kit, asset_type=self.asset.asset_type, qty=1)
-        checkout_kit(kit, holder=self.holder, user=self.tenant_user)
+        item = baker.make(KitItem, kit=kit, asset_type=self.asset.asset_type, qty=1)
+        checkout_kit(kit, holder=self.holder, user=self.tenant_user, selected_assets={item.pk: self.asset.pk})
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.location_id, self.base.pk)
         self.assertEqual(self.asset.active_assignment.assigned_user_id, self.holder.pk)
