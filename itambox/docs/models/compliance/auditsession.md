@@ -28,7 +28,7 @@ An **Audit Session** represents a physical inventory reconciliation campaign —
 ### Expected Assets
 
 The `compliance.audit_services.expected_assets_queryset(session, user=...)` service operation determines which assets this session expects to audit. The actor is required explicitly; global sessions are limited to the actor's currently authorized tenants:
-- When a **location** is set, only assets physically assigned to that location are in scope.
+- When a **location** is set, assets with that recorded base/storage location are in scope, including assets assigned to a person. This does not establish their current physical position.
 - When **global** (no location), all deployable, pending, and deployed assets (excluding archived) are in scope.
 - Tenant-scoped sessions additionally filter by the session's tenant.
 
@@ -48,6 +48,15 @@ The `compliance.audit_services.expected_assets_queryset(session, user=...)` serv
 | **Status** | The **observed** physical status label of the asset at scan time. | Foreign Key | Yes |
 | **Notes** | Free-text observations or findings from the auditor. | Text | No |
 | **Verification Method** | How the asset was verified: `Barcode Scan`, `RFID Reader`, `Manual Input`, or `Agent API Handshake`. | Choice | Yes |
+
+### Location-based expected assets
+
+For a location-scoped session, the expected set uses each asset's recorded base
+or storage location. Assigning an asset to an employee does not remove it from
+that set. This is an expectation of where equipment belongs, not proof that it
+is physically present: the scan records the observed location separately.
+The same location restriction applies in single-tenant and All-accessible
+scopes, and only assets in the auditor's authorized tenants are eligible.
 
 ### Constraints & Behaviour
 

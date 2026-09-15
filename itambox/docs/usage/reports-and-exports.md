@@ -126,7 +126,7 @@ model. Supported values are:
 - `{{ asset.asset_tag }}` — the unique asset tag (encoded in the barcode)
 - `{{ asset.name }}` — asset display name
 - `{{ asset.serial_number }}` — manufacturer serial number
-- `{{ asset.location }}` — current location name
+- `{{ asset.location }}` — recorded base/storage location name, not a live position
 - `{{ asset.status }}` — current status name
 - `{{ barcode_data_uri }}` — the internally generated barcode image URI
 - `{{ barcode_img }}` — the internally generated barcode image element
