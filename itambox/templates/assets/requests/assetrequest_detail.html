@@ -1,5 +1,5 @@
 {% extends 'generic/object_detail.html' %}
-{% load i18n %}
+{% load i18n utility_tags %}
 {% block title %}
   {% translate "Request Details - ITAMbox" %}
 {% endblock %}
@@ -42,6 +42,18 @@
         <i class="mdi mdi-export"></i>
         {% translate "Check-out &amp; Fulfill..." %}
       </button>
+    {% endif %}
+    {% if object.status == 'approved' %}
+      {% if request.user.is_staff or perms.assets.fulfill_assetrequest %}
+        <a href="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
+           class="btn btn-outline-warning"
+           hx-get="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
+           hx-target="#modal-placeholder"
+           hx-swap="innerHTML">
+          <i class="mdi mdi-check-outline"></i>
+          {% translate "Complete manually..." %}
+        </a>
+      {% endif %}
     {% endif %}
     {% if object.status == 'pending' or object.status == 'approved' %}
       {% if object.requester == request.user or request.user.is_staff %}
@@ -122,14 +134,12 @@
             <!-- Step 4: Fulfilled -->
             {% if object.status != 'denied' and object.status != 'cancelled' %}
               <li class="step-item {% if object.status == 'fulfilled' %}active{% endif %}">
-                <div class="step-title">{% translate "Fulfilled" %}</div>
+                <div class="step-title">{% translate "Completion" %}</div>
                 <div class="step-description">
-                  {% if object.status == 'fulfilled' %}
-                    {% if object.asset %}
-                      <a href="{{ object.asset.get_absolute_url }}" class="fw-bold">{{ object.asset.asset_tag }}</a>
-                    {% else %}
-                      {% translate "Fulfill completed" %}
-                    {% endif %}
+                  {% if fulfillment_label %}
+                    {{ fulfillment_label }}
+                  {% elif object.status == 'fulfilled' %}
+                    {% translate "Fulfilled: Handover evidence not verified" %}
                   {% else %}
                     {% translate "Pending pickup/checkout" %}
                   {% endif %}
@@ -224,17 +234,7 @@
             <div class="datagrid-item">
               <div class="datagrid-title">{% translate "Status" %}</div>
               <div class="datagrid-content">
-                {% if object.status == 'pending' %}
-                  <span class="badge bg-warning text-warning-fg">{% translate "Pending" %}</span>
-                {% elif object.status == 'approved' %}
-                  <span class="badge bg-info text-info-fg">{% translate "Approved" %}</span>
-                {% elif object.status == 'fulfilled' %}
-                  <span class="badge bg-success text-success-fg">{% translate "Fulfilled" %}</span>
-                {% elif object.status == 'denied' %}
-                  <span class="badge bg-danger text-danger-fg">{% translate "Denied" %}</span>
-                {% elif object.status == 'cancelled' %}
-                  <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
-                {% endif %}
+                {% include "assets/requests/includes/fulfillment_status.html" with record=object label=fulfillment_label only %}
               </div>
             </div>
             <div class="datagrid-item">
@@ -271,21 +271,13 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for child in object.sub_requests.all %}
+                  {% for child in asset_request_children %}
                     <tr>
                       <td><a href="{% url 'assets:assetrequest_detail' child.pk %}">{{ child.pk }}</a></td>
                       <td>
-                        {% if child.status == 'pending' %}
-                          <span class="badge bg-warning text-warning-fg">{% translate "Pending" %}</span>
-                        {% elif child.status == 'approved' %}
-                          <span class="badge bg-info text-info-fg">{% translate "Approved" %}</span>
-                        {% elif child.status == 'fulfilled' %}
-                          <span class="badge bg-success text-success-fg">{% translate "Fulfilled" %}</span>
-                        {% elif child.status == 'denied' %}
-                          <span class="badge bg-danger text-danger-fg">{% translate "Denied" %}</span>
-                        {% elif child.status == 'cancelled' %}
-                          <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
-                        {% endif %}
+                        {% with child_label=asset_request_fulfillment_labels|lookup:child.pk %}
+                          {% include "assets/requests/includes/fulfillment_status.html" with record=child label=child_label only %}
+                        {% endwith %}
                       </td>
                       <td>{% if child.assigned_target %}{{ child.assigned_target }}{% else %}{% translate "Not set" %}{% endif %}</td>
                       <td>
@@ -326,6 +318,12 @@
                 <div class="datagrid-content">{% if object.response_date %}{{ object.response_date|date:"Y-m-d H:i" }}{% else %}{% translate "Not set" %}{% endif %}</div>
               </div>
             </div>
+            {% if fulfillment_method == 'manual' and fulfillment_evidence.reason %}
+              <div class="alert alert-warning">
+                <div class="fw-bold">{% translate "Manual completion reason" %}</div>
+                <p class="mb-0">{{ fulfillment_evidence.reason|linebreaksbr }}</p>
+              </div>
+            {% endif %}
             {% if object.response_notes %}
               <div class="mt-2">
                 <div class="text-muted small fw-bold">{% translate "Decision Notes" %}</div>

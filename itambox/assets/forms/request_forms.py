@@ -339,6 +339,20 @@ class AssetRequestActionForm(forms.Form):
         return cleaned_data
 
 
+class AssetRequestManualCompletionForm(forms.Form):
+    reason = forms.CharField(
+        label=_("Reason for manual completion"),
+        required=True,
+        widget=forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+        help_text=_("Explain why no assignment or stock booking will be generated."),
+    )
+    confirmed_no_handover = forms.BooleanField(
+        label=_("I confirm that no assignment or stock booking will be generated."),
+        required=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+
 class AssetRequestResponseForm(forms.ModelForm):
     class Meta:
         model = AssetRequest

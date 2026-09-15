@@ -1336,12 +1336,6 @@ msgstr ""
 msgid "Only approved requests can be marked fulfilled."
 msgstr "Nur genehmigte Anforderungen können als erfüllt markiert werden."
 
-msgid "Request marked as fulfilled (no checkout generated)."
-msgstr "Anforderung als erfüllt markiert (keine Herausgabe erstellt)."
-
-msgid "Stock received; requests fulfilled."
-msgstr "Bestand eingebucht und Anforderungen erfolgreich erfüllt."
-
 #, python-format
 msgid "Error processing bulk receipt: %(error)s"
 msgstr "Fehler bei der Verarbeitung der Sammeleinbuchung: %(error)s"
@@ -7630,9 +7624,6 @@ msgstr "Bestellerstellung ausstehend"
 
 msgid "Not Required (Stock)"
 msgstr "Nicht erforderlich (Lagerbestand)"
-
-msgid "Fulfill completed"
-msgstr "Erfüllung abgeschlossen"
 
 msgid "Pending pickup/checkout"
 msgstr "Abholung/Herausgabe ausstehend"
@@ -14817,3 +14808,224 @@ msgstr "Validieren und Vorschau anzeigen"
 #: itambox/templates/assets/type_library/detail.html
 msgid "You have read-only access to this Library."
 msgstr "Für diese Bibliothek besteht ausschließlich Lesezugriff."
+
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "A denied or cancelled request cannot be fulfilled."
+msgstr "Eine abgelehnte oder stornierte Anforderung kann nicht erfüllt werden."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "A non-whitespace reason is required for manual completion."
+msgstr "Für den manuellen Abschluss ist eine Begründung erforderlich, die nicht nur aus Leerzeichen besteht."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "A reason is required for manual completion."
+msgstr "Für den manuellen Abschluss ist eine Begründung erforderlich."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "A request unit already has conflicting completion evidence."
+msgstr "Für eine Einzelanforderung liegt bereits ein widersprüchlicher Abschlussnachweis vor."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "An actor is required for manual completion."
+msgstr "Für den manuellen Abschluss muss ein handelnder Benutzer angegeben werden."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Approved: allocated, awaiting handover"
+msgstr "Genehmigt: zugeteilt, Übergabe ausstehend"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Approved: awaiting handover"
+msgstr "Genehmigt: Übergabe ausstehend"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Approved: request units awaiting handover"
+msgstr "Genehmigt: Übergabe für Einzelanforderungen ausstehend"
+
+#: itambox/assets/views/request_views.py
+msgid "Checkout did not return a recorded handover."
+msgstr "Die Ausgabe hat keine gebuchte Übergabe zurückgegeben."
+
+#: itambox/assets/views/request_views.py
+msgid "Checkout did not return a unique recorded handover."
+msgstr "Die Ausgabe hat keine eindeutig zuordenbare gebuchte Übergabe zurückgegeben."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout did not return an allowed persisted transaction."
+msgstr "Die Ausgabe hat keine zulässige gespeicherte Transaktion zurückgegeben."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout evidence does not match a live handover for this request."
+msgstr "Der Ausgabenachweis passt zu keiner aktiven Übergabe für diese Anforderung."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout evidence does not match the existing completion proof."
+msgstr "Der Ausgabenachweis stimmt nicht mit dem vorhandenen Abschlussnachweis überein."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout evidence does not match the requested inventory quantity."
+msgstr "Der Ausgabenachweis stimmt nicht mit der angeforderten Bestandsmenge überein."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout evidence is incomplete."
+msgstr "Der Ausgabenachweis ist unvollständig."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout transaction does not match the requested item."
+msgstr "Die Ausgabetransaktion passt nicht zum angeforderten Artikel."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout transaction has an invalid quantity."
+msgstr "Die Ausgabetransaktion enthält eine ungültige Menge."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Checkout transaction quantity does not match the request."
+msgstr "Die Menge der Ausgabetransaktion stimmt nicht mit der Anforderung überein."
+
+#: itambox/templates/assets/requests/includes/manual_completion_form.html
+msgid "Complete manually"
+msgstr "Manuell abschließen"
+
+#: itambox/templates/assets/requests/assetrequest_detail.html
+msgid "Complete manually..."
+msgstr "Manuell abschließen..."
+
+#: itambox/templates/assets/requests/assetrequest_detail.html
+msgid "Completion"
+msgstr "Abschluss"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Confirm that no assignment or stock booking will be generated."
+msgstr "Bestätigen Sie, dass keine Zuweisung oder Bestandsbuchung erzeugt wird."
+
+#: itambox/assets/views/request_views.py
+msgid "Every open request unit must be approved before claiming."
+msgstr "Vor der Abholung muss jede offene Einzelanforderung genehmigt sein."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Every open request unit must be approved before completion."
+msgstr "Vor dem Abschluss muss jede offene Einzelanforderung genehmigt sein."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Exactly one recorded checkout transaction is required per request unit."
+msgstr "Pro Einzelanforderung ist genau eine gebuchte Ausgabetransaktion erforderlich."
+
+#: itambox/assets/forms/request_forms.py
+msgid "Explain why no assignment or stock booking will be generated."
+msgstr "Begründen Sie, warum keine Zuweisung oder Bestandsbuchung erzeugt wird."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Fulfilled request is missing valid checkout evidence."
+msgstr "Für die erfüllte Anforderung fehlt ein gültiger Ausgabenachweis."
+
+#: itambox/assets/services/request_fulfillment.py itambox/assets/tables.py itambox/templates/assets/requests/assetrequest_detail.html itambox/templates/assets/requests/includes/fulfillment_status.html
+msgid "Fulfilled: Handover evidence not verified"
+msgstr "Erfüllt: Übergabenachweis nicht verifiziert"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Fulfilled: Manually completed; no handover booked"
+msgstr "Erfüllt: manuell abgeschlossen; keine Übergabe gebucht"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Fulfilled: all handovers recorded"
+msgstr "Erfüllt: alle Übergaben gebucht"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Fulfilled: handover recorded"
+msgstr "Erfüllt: Übergabe gebucht"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Fulfilled: mixed manual and verified handover"
+msgstr "Erfüllt: teils manuell abgeschlossen, teils mit nachgewiesener Übergabe"
+
+#: itambox/assets/forms/request_forms.py
+msgid "I confirm that no assignment or stock booking will be generated."
+msgstr "Ich bestätige, dass keine Zuweisung oder Bestandsbuchung erzeugt wird."
+
+#: itambox/templates/assets/requests/assetrequest_detail.html
+msgid "Manual completion reason"
+msgstr "Begründung des manuellen Abschlusses"
+
+#: itambox/templates/assets/requests/assetrequest_mark_fulfilled_page.html
+msgid "Manual request completion"
+msgstr "Manueller Abschluss einer Anforderung"
+
+#: itambox/templates/assets/requests/includes/manual_completion_form.html
+msgid "Manually complete asset request"
+msgstr "Asset-Anforderung manuell abschließen"
+
+#: itambox/assets/views/request_views.py
+msgid "No open request unit is available to claim."
+msgstr "Es ist keine offene Einzelanforderung zur Abholung verfügbar."
+
+#: itambox/assets/views/request_views.py
+msgid "Only approved requests can be received."
+msgstr "Wareneingänge können nur für genehmigte Anforderungen erfasst werden."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Partial: request units still open"
+msgstr "Teilweise abgeschlossen: Einzelanforderungen noch offen"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Partial: terminal units remain; "
+msgstr "Teilweise erfüllt: endgültig abgeschlossene Einzelanforderungen vorhanden; "
+
+#: itambox/assets/forms/request_forms.py
+msgid "Reason for manual completion"
+msgstr "Begründung für den manuellen Abschluss"
+
+#: itambox/assets/views/request_views.py
+msgid "Receive each group request unit separately; a group is not an allocatable asset."
+msgstr "Erfassen Sie den Wareneingang für jede Einzelanforderung der Gruppe separat; einer Gruppe selbst kann kein Asset zugeteilt werden."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Receive procurement stock before recording handover."
+msgstr "Erfassen Sie den Wareneingang der Beschaffung, bevor Sie die Übergabe buchen."
+
+#: itambox/assets/views/request_views.py
+msgid "Request manually completed: no handover booked."
+msgstr "Anforderung manuell abgeschlossen: keine Übergabe gebucht."
+
+#: itambox/assets/views/request_views.py
+msgid "Stock received and allocated; awaiting handover."
+msgstr "Wareneingang erfasst und Bestand zugeteilt; Übergabe ausstehend."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Terminal request units: no handover booked"
+msgstr "Endgültig abgeschlossene Einzelanforderungen: keine Übergabe gebucht"
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "The request group has no approved request unit to complete."
+msgstr "Die Anforderungsgruppe enthält keine genehmigte Einzelanforderung zum Abschließen."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "The request group has no request units and cannot be completed."
+msgstr "Die Anforderungsgruppe enthält keine Einzelanforderungen und kann nicht abgeschlossen werden."
+
+#: itambox/assets/views/request_views.py
+msgid "The selected location belongs to another tenant."
+msgstr "Der ausgewählte Standort gehört zu einem anderen Mandanten."
+
+#: itambox/assets/views/request_views.py
+msgid "The selected supplier belongs to another tenant."
+msgstr "Der ausgewählte Lieferant gehört zu einem anderen Mandanten."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "This checkout already completed another request unit."
+msgstr "Diese Ausgabe hat bereits eine andere Einzelanforderung erfüllt."
+
+#: itambox/templates/assets/requests/includes/manual_completion_form.html
+msgid "This records Fulfilled without creating an assignment or stock booking. Use only for a deliberate exception."
+msgstr "Dadurch wird der Status Erfüllt gesetzt, ohne eine Zuweisung oder Bestandsbuchung zu erzeugen. Verwenden Sie diese Funktion nur für eine bewusste Ausnahme."
+
+#: itambox/assets/views/request_views.py
+msgid "This request already has an allocated asset."
+msgstr "Dieser Anforderung ist bereits ein Asset zugeteilt."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "This request already has completion evidence."
+msgstr "Für diese Anforderung liegt bereits ein Abschlussnachweis vor."
+
+#: itambox/assets/services/request_fulfillment.py
+msgid "Unknown request fulfilment method."
+msgstr "Unbekannte Erfüllungsmethode für die Anforderung."

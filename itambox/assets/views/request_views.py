@@ -10,8 +10,21 @@ from django.views import View
 
 from assets import filters, tables
 from assets.choices import RequestStatusChoices
-from assets.forms.request_forms import AssetRequestActionForm, AssetRequestForm
-from assets.models import Asset, AssetRequest, StatusLabel
+from assets.forms.request_forms import (
+    AssetRequestActionForm,
+    AssetRequestForm,
+    AssetRequestManualCompletionForm,
+)
+from assets.models import Asset, AssetAssignment, AssetRequest, StatusLabel
+from assets.services import checkout_asset
+from assets.services.request_fulfillment import (
+    checkout_transaction_reference,
+    claim_fulfillment_scope,
+    complete_request_from_checkout,
+    get_request_fulfillment_evidence,
+    manually_complete_request,
+    request_fulfillment_labels,
+)
 from inventory.services import checkout_inventory_item
 from itambox.capabilities import registry
 from itambox.panels import Panel
@@ -133,6 +146,11 @@ class RequestListView(ObjectListView):
             return qs.filter(requester=self.request.user)
         return qs
 
+    def get_table(self):
+        table = super().get_table()
+        table.fulfillment_labels = request_fulfillment_labels([row.record for row in table.paginated_rows])
+        return table
+
 
 class RequestDetailView(ObjectDetailView):
     queryset = AssetRequest.objects.select_related("requester", "asset_type", "asset", "responded_by")
@@ -147,16 +165,25 @@ class RequestDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         context["asset_request_procurement_enabled"] = registry.is_active("procurement.requisition_seam")
         if self.object.is_group:
-            children = self.object.sub_requests.prefetch_related(
-                "fulfillment_links__purchase_order_line__purchase_order"
+            children = list(
+                self.object.sub_requests.prefetch_related("fulfillment_links__purchase_order_line__purchase_order")
             )
+            context["asset_request_children"] = children
             context["asset_request_fulfillment_links"] = [
                 link for child in children for link in child.fulfillment_links.all()
             ]
+            labels = request_fulfillment_labels([self.object, *children])
         else:
+            context["asset_request_children"] = []
             context["asset_request_fulfillment_links"] = list(
                 self.object.fulfillment_links.select_related("purchase_order_line__purchase_order")
             )
+            labels = request_fulfillment_labels([self.object])
+        context["fulfillment_label"] = labels[self.object.pk]
+        context["asset_request_fulfillment_labels"] = labels
+        evidence = get_request_fulfillment_evidence(self.object)
+        context["fulfillment_evidence"] = evidence
+        context["fulfillment_method"] = evidence.get("method") if evidence else None
         return context
 
     def get_queryset(self):
@@ -303,6 +330,116 @@ class RequestClaimView(SimplePostView):
     permission_required = ()
     queryset = AssetRequest.objects.all()
 
+    def _claim_units(self, obj):
+        if obj.is_group:
+            all_children = list(
+                AssetRequest.objects.select_for_update()
+                .filter(
+                    parent_id=obj.pk,
+                    tenant_id=obj.tenant_id,
+                    deleted_at__isnull=True,
+                )
+                .order_by("pk")
+            )
+            open_children = [
+                child
+                for child in all_children
+                if child.status
+                not in {
+                    RequestStatusChoices.FULFILLED,
+                    RequestStatusChoices.DENIED,
+                    RequestStatusChoices.CANCELLED,
+                }
+            ]
+            if any(child.status != RequestStatusChoices.APPROVED for child in open_children):
+                raise ValidationError(_("Every open request unit must be approved before claiming."))
+            requests_to_claim = [child for child in open_children if child.status == RequestStatusChoices.APPROVED]
+            if not requests_to_claim:
+                raise ValidationError(_("No open request unit is available to claim."))
+        else:
+            requests_to_claim = [obj]
+
+        return requests_to_claim
+
+    def _checkout_unit(self, req, request):
+        holder = req.assigned_user
+        location = req.assigned_location
+        asset_target = req.assigned_asset
+
+        if not holder and not location and not asset_target:
+            holder = req.requester.asset_holder_profiles.filter(tenant=req.tenant).first()
+            if not holder:
+                raise ValidationError(
+                    _("Requester does not have an active Asset Holder profile to assign the asset to.")
+                )
+
+        inventory_item = req.component or req.accessory or req.consumable
+        with claim_fulfillment_scope(req.pk):
+            if inventory_item:
+                checkout_result = checkout_inventory_item(
+                    inventory_item,
+                    req.qty,
+                    holder=holder,
+                    location=location,
+                    asset=asset_target,
+                    source_location=req.source_location,
+                    user=request.user,
+                    request=request,
+                    notes=f"Self-service claim for approved Request #{req.pk}",
+                )
+                transaction_ref = checkout_transaction_reference(
+                    checkout_result,
+                    quantity=req.qty,
+                    expected_item=inventory_item,
+                )
+                completed_asset = None
+            else:
+                transaction_ref = self._checkout_asset_unit(req, request, holder, location, asset_target)
+                completed_asset = req.asset
+
+            complete_request_from_checkout(
+                req,
+                actor=request.user,
+                transactions=[transaction_ref],
+                request=request,
+                asset=completed_asset,
+            )
+
+    def _checkout_asset_unit(self, req, request, holder, location, asset_target):
+        existing_assignment_ids = set(
+            AssetAssignment.objects.filter(
+                asset_id=req.asset_id,
+                is_active=True,
+            ).values_list("pk", flat=True)
+        )
+        checkout_result = checkout_asset(
+            asset=req.asset,
+            holder=holder,
+            location=location,
+            asset_target=asset_target,
+            user=request.user,
+            request=request,
+            notes=f"Self-service claim for approved Request #{req.pk}",
+        )
+        if checkout_result is None:
+            raise ValidationError(_("Checkout did not return a recorded handover."))
+        assignments = AssetAssignment.objects.filter(
+            asset_id=req.asset_id,
+            is_active=True,
+            checked_out_by_id=request.user.pk,
+        ).exclude(pk__in=existing_assignment_ids)
+        if holder is not None:
+            assignments = assignments.filter(assigned_user_id=holder.pk)
+        if location is not None:
+            assignments = assignments.filter(assigned_location_id=location.pk)
+        if asset_target is not None:
+            assignments = assignments.filter(assigned_asset_id=asset_target.pk)
+        if assignments.count() != 1:
+            raise ValidationError(_("Checkout did not return a unique recorded handover."))
+        assignment = assignments.get()
+        transaction_ref = checkout_transaction_reference(assignment)
+        return transaction_ref
+
     def perform_action(self, obj, request):
         is_requester = obj.requester_id == request.user.id
         is_assigned_user = obj.assigned_user and obj.assigned_user.user_id == request.user.id
@@ -314,67 +451,47 @@ class RequestClaimView(SimplePostView):
             raise PermissionDenied(_("You do not have permission to claim this asset."))
 
         with transaction.atomic():
-            obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
+            obj = AssetRequest.objects.select_for_update().get(
+                pk=obj.pk,
+                tenant_id=obj.tenant_id,
+                deleted_at__isnull=True,
+            )
 
             if obj.status != RequestStatusChoices.APPROVED:
                 raise ValidationError(_("Only approved requests can be claimed."))
 
-            requests_to_claim = [obj] if not obj.is_group else list(obj.sub_requests.all())
+            requests_to_claim = self._claim_units(obj)
 
-            # First validate all have assets
+            # First validate all units before creating any checkout side effect.
             for req in requests_to_claim:
                 is_inventory = req.component or req.accessory or req.consumable
                 if not is_inventory and not req.asset:
                     raise ValidationError(_("No asset has been allocated to this request."))
 
-            from assets.services import checkout_asset
-
             for req in requests_to_claim:
-                holder = req.assigned_user
-                location = req.assigned_location
-                asset_target = req.assigned_asset
+                self._checkout_unit(req, request)
 
-                if not holder and not location and not asset_target:
-                    holder = req.requester.asset_holder_profiles.filter(tenant=req.tenant).first()
-                    if not holder:
-                        raise ValidationError(
-                            _("Requester does not have an active Asset Holder profile to assign the asset to.")
-                        )
-
-                inventory_item = req.component or req.accessory or req.consumable
-                if inventory_item:
-                    checkout_inventory_item(
-                        inventory_item,
-                        req.qty,
-                        holder=holder,
-                        location=location,
-                        asset=asset_target,
-                        source_location=req.source_location,
-                        user=request.user,
-                        request=request,
-                        notes=f"Self-service claim for approved Request #{req.pk}",
-                    )
-                else:
-                    checkout_asset(
-                        asset=req.asset,
-                        holder=holder,
-                        location=location,
-                        asset_target=asset_target,
-                        user=request.user,
-                        request=request,
-                        notes=f"Self-service claim for approved Request #{req.pk}",
-                    )
-
-                req.status = RequestStatusChoices.FULFILLED
-                req.response_date = timezone.now()
-                req.responded_by = request.user
-                req.save(update_fields=["status", "response_date", "responded_by"])
-
-            if obj.is_group:
+            if (
+                obj.is_group
+                and not obj.sub_requests.filter(
+                    deleted_at__isnull=True,
+                )
+                .exclude(
+                    status__in=[
+                        RequestStatusChoices.FULFILLED,
+                        RequestStatusChoices.DENIED,
+                        RequestStatusChoices.CANCELLED,
+                    ]
+                )
+                .exists()
+            ):
                 obj.status = RequestStatusChoices.FULFILLED
                 obj.response_date = timezone.now()
                 obj.responded_by = request.user
-                obj.save(update_fields=["status", "response_date", "responded_by"])
+                obj.response_notes = (
+                    f"{(obj.response_notes or '').strip()}\nGroup fulfilled from request-unit handovers.".strip()
+                )
+                obj.save(update_fields=["status", "response_date", "responded_by", "response_notes"])
 
         count = len(requests_to_claim)
         return {
@@ -387,41 +504,32 @@ class RequestClaimView(SimplePostView):
         }
 
 
-class RequestMarkFulfilledView(SimplePostView):
+class RequestMarkFulfilledView(GenericTransactionView):
     # Self-authorizing: requires staff/fulfill_assetrequest, checked in
     # perform_action. Opt out of the static permission gate (fail-closed base).
     permission_required = ()
     queryset = AssetRequest.objects.all()
+    model_form = AssetRequestManualCompletionForm
+    template_name = "assets/requests/assetrequest_mark_fulfilled.html"
+    service_callable = manually_complete_request
+    success_message = _("Request manually completed: no handover booked.")
+    hx_redirect_on_success = True
 
-    def perform_action(self, obj, request):
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.pop("instance", None)
+        return kwargs
+
+    def get_service_kwargs(self, form):
+        return {
+            "reason": form.cleaned_data["reason"],
+            "confirmed_no_handover": form.cleaned_data["confirmed_no_handover"],
+        }
+
+    def dispatch(self, request, *args, **kwargs):
         if not (request.user.is_staff or request.user.has_perm("assets.fulfill_assetrequest")):
             raise PermissionDenied(_("You do not have permission to mark this request as fulfilled."))
-
-        with transaction.atomic():
-            obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
-
-            if obj.status != RequestStatusChoices.APPROVED:
-                raise ValidationError(_("Only approved requests can be marked fulfilled."))
-
-            requests_to_mark = [obj] if not obj.is_group else list(obj.sub_requests.all())
-
-            for req in requests_to_mark:
-                is_inventory = req.component or req.accessory or req.consumable
-                if not is_inventory and not req.asset:
-                    raise ValidationError(_("No asset has been allocated to this request."))
-
-                req.status = RequestStatusChoices.FULFILLED
-                req.response_date = timezone.now()
-                req.responded_by = request.user
-                req.save(update_fields=["status", "response_date", "responded_by"])
-
-            if obj.is_group:
-                obj.status = RequestStatusChoices.FULFILLED
-                obj.response_date = timezone.now()
-                obj.responded_by = request.user
-                obj.save(update_fields=["status", "response_date", "responded_by"])
-
-        return {"message": _("Request marked as fulfilled (no checkout generated).")}
+        return super().dispatch(request, *args, **kwargs)
 
 
 class RequestBulkReceiveView(PermissionRequiredMixin, View):
@@ -429,6 +537,21 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         return redirect("assets:request_list")
+
+    def _validate_receipt(self, req, form):
+        if req.status != RequestStatusChoices.APPROVED:
+            raise ValidationError(_("Only approved requests can be received."))
+        if req.is_group:
+            raise ValidationError(_("Receive each group request unit separately; a group is not an allocatable asset."))
+        if req.asset_id:
+            raise ValidationError(_("This request already has an allocated asset."))
+        location = form.cleaned_data["location"]
+        supplier = form.cleaned_data["supplier"]
+        if location and location.tenant_id != req.tenant_id:
+            raise ValidationError(_("The selected location belongs to another tenant."))
+        supplier_tenant_id = getattr(supplier, "tenant_id", None)
+        if supplier_tenant_id is not None and supplier_tenant_id != req.tenant_id:
+            raise ValidationError(_("The selected supplier belongs to another tenant."))
 
     def post(self, request, *args, **kwargs):
         from django.contrib import messages
@@ -442,7 +565,11 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                     with transaction.atomic():
                         for form in formset:
                             request_id = form.cleaned_data["request_id"]
-                            req = AssetRequest.objects.select_for_update().get(pk=request_id)
+                            req = AssetRequest.objects.select_for_update().get(
+                                pk=request_id,
+                                deleted_at__isnull=True,
+                            )
+                            self._validate_receipt(req, form)
 
                             # Create Asset using form details
                             asset = Asset.objects.create(
@@ -461,12 +588,12 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                             )
 
                             req.asset = asset
-                            req.status = RequestStatusChoices.FULFILLED
+                            req.status = RequestStatusChoices.APPROVED
                             req.responded_by = request.user
                             req.response_date = timezone.now()
                             req.save()
 
-                        messages.success(request, _("Stock received; requests fulfilled."))
+                        messages.success(request, _("Stock received and allocated; awaiting handover."))
                         return redirect("assets:request_list")
                 except Exception as e:
                     messages.error(request, _("Error processing bulk receipt: %(error)s") % {"error": e})
@@ -475,7 +602,10 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
             for form in formset:
                 try:
                     req_id = form["request_id"].value()
-                    req = AssetRequest.objects.get(pk=int(req_id))
+                    req = AssetRequest.objects.filter(
+                        pk=int(req_id),
+                        deleted_at__isnull=True,
+                    ).first()
                     requests_data.append((req, form))
                 except Exception:
                     requests_data.append((None, form))
@@ -496,10 +626,27 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                 messages.warning(request, _("No requests selected for bulk receipt."))
                 return redirect("assets:request_list")
 
-            requests_qs = AssetRequest.objects.filter(pk__in=pks, status=RequestStatusChoices.APPROVED).select_related(
-                "asset_type", "requester"
+            selected_requests = list(
+                AssetRequest.objects.filter(
+                    pk__in=pks,
+                    status=RequestStatusChoices.APPROVED,
+                    deleted_at__isnull=True,
+                ).select_related("asset_type", "requester")
             )
-            if not requests_qs.exists():
+            selected_ids = {req.pk for req in selected_requests}
+            group_ids = [req.pk for req in selected_requests if req.is_group]
+            child_requests = list(
+                AssetRequest.objects.filter(
+                    parent_id__in=group_ids,
+                    status=RequestStatusChoices.APPROVED,
+                    is_group=False,
+                    deleted_at__isnull=True,
+                ).select_related("asset_type", "requester")
+            )
+            requests_qs = [req for req in selected_requests if not req.is_group] + [
+                req for req in child_requests if req.pk not in selected_ids
+            ]
+            if not requests_qs:
                 messages.warning(request, _("None of the selected requests are in Approved status."))
                 return redirect("assets:request_list")
 

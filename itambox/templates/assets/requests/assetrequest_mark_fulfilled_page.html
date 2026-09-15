@@ -1,0 +1,10 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% block title %}
+  {% translate "Manual request completion" %}
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="card-body">{% include "assets/requests/includes/manual_completion_form.html" %}</div>
+  </div>
+{% endblock content %}
