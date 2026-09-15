@@ -108,8 +108,10 @@ def checkout_asset(
         if resolved_status:
             asset.status = resolved_status
 
+        update_fields = ["status", "location"]
         if holder:
-            asset.location = None
+            # A person assignment changes responsibility, not the base location.
+            update_fields = ["status"]
         elif location:
             asset.location = location
         elif asset_target:
@@ -117,7 +119,7 @@ def checkout_asset(
 
         asset._changelog_action = "checkout"
         asset._changelog_message = f"Checked out to {target}"
-        asset.save(update_fields=["status", "location"])
+        asset.save(update_fields=update_fields)
 
         assignment_kwargs = {
             "asset": asset,
@@ -275,7 +277,7 @@ def checkin_asset(
             if revert_status:
                 asset.status = revert_status
             # Only overwrite location when a destination was provided; a blank
-            # location preserves where the asset is rather than wiping it to NULL.
+            # location preserves the recorded base/storage location rather than clearing it.
             if location is not None:
                 asset.location = location
             asset._changelog_action = "checkin"
@@ -473,9 +475,8 @@ def checkout_kit(
             if item.asset_type:
                 asset = item_assets_map[item.pk]
                 asset.status = in_use_status
-                if holder:
-                    asset.location = None
-                else:
+                # Person assignments retain each kit asset's base location.
+                if not holder:
                     asset.location = location
 
                 asset._changelog_action = "checkout"

@@ -42,7 +42,7 @@
       </dd>
     {% endif %}
   {% endif %}
-  <dt class="col-sm-4">{% translate "Physical Location:" %}</dt>
+  <dt class="col-sm-4">{% translate "Base / Storage Location:" %}</dt>
   <dd class="col-sm-8">
     {% if object.location %}
       <a href="{% url 'organization:location_detail' pk=object.location.pk %}"
@@ -53,6 +53,9 @@
     {% else %}
       <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}
+    <div class="text-muted small mt-1">
+      {% translate "Preserved on person assignment; changed by explicit location moves. Not a live position." %}
+    </div>
   </dd>
   {% if can_view_custody_receipts and assignment and assignment.assigned_to and assignment.assigned_to_type == 'assetholder' %}
     <dt class="col-sm-4">{% translate "Custody Status:" %}</dt>

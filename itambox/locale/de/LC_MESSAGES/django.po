@@ -7202,9 +7202,6 @@ msgstr "von"
 msgid "Expected Return:"
 msgstr "Erwartete Rückgabe:"
 
-msgid "Physical Location:"
-msgstr "Physischer Lagerort:"
-
 msgid "Custody Status:"
 msgstr "Verwahrungsstatus:"
 
@@ -15029,3 +15026,12 @@ msgstr "Für diese Anforderung liegt bereits ein Abschlussnachweis vor."
 #: itambox/assets/services/request_fulfillment.py
 msgid "Unknown request fulfilment method."
 msgstr "Unbekannte Erfüllungsmethode für die Anforderung."
+
+
+#: itambox/templates/assets/includes/detail/asset_assignment.html
+msgid "Base / Storage Location:"
+msgstr "Basis-/Lagerstandort:"
+
+#: itambox/templates/assets/includes/detail/asset_assignment.html
+msgid "Preserved on person assignment; changed by explicit location moves. Not a live position."
+msgstr "Bleibt bei Personenzuweisung erhalten und wird durch ausdrückliche Standortänderungen aktualisiert. Kein Echtzeitstandort."

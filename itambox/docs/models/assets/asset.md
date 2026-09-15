@@ -38,7 +38,7 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | **In Service Date** | Depreciation starts here; falls back to purchase date. | Date | No |
 | **Last Audited** | The timestamp when the asset was last verified during an audit session. | DateTime | No (Auto) |
 | **Last Audited By** | The user account of the auditor who last scanned the asset. | Foreign Key | No (Auto) |
-| **Location** | The physical Site / Location room where the asset resides. | Foreign Key | No |
+| **Location** | Organizational base or recorded storage location. Preserved when assigned to a person; not a live position. | Foreign Key | No |
 | **Name** | A recognizable name for the asset (e.g. `Jane's Workstation`). | String | Yes |
 | **Notes** | The notes of the asset. | Text | No |
 | **Order Number** | The purchase order reference number associated with this procurement. | String | No |
@@ -59,6 +59,28 @@ Assets can be checked out polymorphicly to:
 1. **Asset Holder**: An employee or contractor profile.
 2. **Location**: Staged physically in a room, shelf, or building.
 3. **Asset**: Modular nesting (e.g., checking out a GPU or RAM card to a parent server system).
+
+#### Responsibility and base location
+
+The asset detail panel separates **Assigned To** (responsibility or deployment
+recipient) from **Base / Storage Location** (where the asset belongs or was
+explicitly placed in storage). A monitor can belong to Office 203 while being
+assigned to an employee. A laptop can keep the same base while temporarily used
+elsewhere; the base is not a claim about its current physical position.
+
+| Operation | Effect on the recorded location |
+| --- | --- |
+| Checkout to a person, including kit checkout | Preserve the asset's existing base location |
+| Checkout to a location, including kit checkout | Set the selected destination location |
+| Checkout to a parent asset | Copy the parent asset's recorded location, including an unset location |
+| Check-in without a destination | Preserve the existing location |
+| Check-in with a destination | Set the selected destination location |
+
+An unset base remains unset; it is not inferred from the holder's office.
+Existing records whose location was previously cleared are not repaired
+retroactively. Location filters and reports continue to use the recorded base,
+including employee-assigned assets. An audit's observed scan location is a
+separate observation, not continuous tracking.
 
 ### 2. Checkin (Return)
 When an asset is returned, the checkout assignment is closed. The administrator can determine if the asset returns to `Available` stock or is marked as `Pending Repair` for maintenance triage.
