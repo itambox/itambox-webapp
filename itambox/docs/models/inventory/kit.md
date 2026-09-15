@@ -17,10 +17,23 @@ A **Kit** represents a preconfigured template bundle containing hardware models 
 
 ## Kit Checkout Workflow
 
-Checking out a Kit to a recipient (an **AssetHolder** or a **Location**) triggers the `checkout_to_holder` service:
+Checking out a Kit to an **AssetHolder** or a **Location** runs the kit checkout service.
+In tenant-group and All-accessible scopes, choose the required **Target tenant** first;
+the form refreshes its device, holder and source-location choices for that tenant.
+In a concrete tenant scope, the current tenant is authoritative.
 
-1. **Stock validation**: All items inside the kit are checked for availability at the source location.
-2. **Atomic fulfilment**: Each kit item is processed in a single database transaction — accessory allocations are created, consumable stocks are decremented, and software licenses are reserved.
-3. **Rollback on failure**: If any item fails (out of stock, license exhausted), the entire checkout is rolled back.
+1. **Explicit device selection**: Each hardware row must name the concrete device to hand
+   out (asset tag / serial), one distinct device per row. A device that is reserved for
+   another holder today, already assigned, of the wrong type, or no longer deployable is rejected
+   — never silently substituted.
+2. **Stock validation**: Stock items are checked at the selected source location; selected
+   hardware is validated by device identity, not inferred from that stock location.
+3. **Atomic fulfilment**: Each kit item is processed in a single database transaction — hardware
+   rows are checked out through the individual-asset operation (custody receipt and signature
+   request, reservation and lifecycle guards, loan fields), accessory allocations are created,
+   consumable stocks are decremented, and software licenses are reserved.
+4. **Rollback on failure**: If any item fails (selection no longer valid, device reserved,
+   out of stock, license exhausted), the entire checkout is rolled back — including created
+   custody receipts — and scheduled custody notification e-mails are discarded.
 
 Kits can be tenant-scoped (private to one tenant) or global (shared template visible across all tenants).

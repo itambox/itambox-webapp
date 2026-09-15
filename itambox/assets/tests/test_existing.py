@@ -1172,24 +1172,28 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
             "notes": "Onboarding René",
         }
 
+        # Issue #495: hardware rows require an explicit device pick. Without a
+        # selection the form fails validation and nothing is allocated.
         response = self.client.post(
             reverse("inventory:kit_checkout_modal", kwargs={"pk": kit.pk}), data=checkout_data, HTTP_HX_REQUEST="true"
         )
         # Validation failures on HTMX form posts answer 422 with the re-rendered
         # form fragment (swapped back into the modal body by the client).
         self.assertEqual(response.status_code, 422)
-        self.assertContains(response, "No available assets of type", status_code=422)
+        self.assertContains(response, "This field is required.", status_code=422)
 
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 0)
         self.assertEqual(license_obj.assignments.count(), 0)
 
-        Asset.objects.create(
+        macbook = Asset.objects.create(
             name="René MacBook Pro 16",
             asset_tag="LT-PRO-001",
             asset_type=laptop_type,
             status=self.available_status,
             tenant=tenant,
         )
+        hardware_item = kit.items.get(asset_type=laptop_type)
+        checkout_data[f"asset_{hardware_item.pk}"] = macbook.pk
 
         response = self.client.post(
             reverse("inventory:kit_checkout_modal", kwargs={"pk": kit.pk}), data=checkout_data, HTTP_HX_REQUEST="true"

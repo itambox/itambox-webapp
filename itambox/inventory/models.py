@@ -707,6 +707,12 @@ class Kit(
         user=None,
         *,
         system_authorizations=None,
+        selected_assets=None,
+        expected_checkin=None,
+        checkout_date=None,
+        status=None,
+        is_loan=False,
+        due_date=None,
     ):
         return checkout_kit(
             self,
@@ -714,6 +720,12 @@ class Kit(
             source_location=source_location,
             user=user,
             system_authorizations=system_authorizations,
+            selected_assets=selected_assets,
+            expected_checkin=expected_checkin,
+            checkout_date=checkout_date,
+            status=status,
+            is_loan=is_loan,
+            due_date=due_date,
         )
 
 

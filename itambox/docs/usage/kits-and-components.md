@@ -35,7 +35,7 @@ target types:
 | **Accessory** | `Dell Wired Keyboard KB216` | Yes |
 | **Consumable** | `Thermal Paste MX-4` | Yes |
 | **Component** | `16 GB DDR4 SODIMM` | Yes |
-| **License** | `Microsoft 365 Business Premium` | No (one seat per slot) |
+| **License** | `Microsoft 365 Business Premium` | No (one seat per distinct license for the recipient) |
 
 Each kit item must declare **exactly one** target — a database constraint
 (`chk_kit_item_single_target`) prevents a single slot from referencing both
@@ -80,16 +80,16 @@ sequenceDiagram
     participant DB as Database
 
     Admin->>UI: Check out "Dev Kit" to Jane Doe
-    UI->>Service: checkout_kit(kit, holder, location)
+    UI->>Service: checkout_kit(kit, holder, selected_assets, ...)
     Service->>DB: BEGIN TRANSACTION
-    Service->>DB: Validate stock for all items
-    alt Stock insufficient
+    Service->>DB: Validate the selected device per hardware slot
+    alt Selection or stock insufficient
         DB-->>Service: ValidationError
         Service->>DB: ROLLBACK
         Service-->>UI: "Insufficient stock: 2x USB-C Cable"
         UI-->>Admin: Show error with details
     else All in stock
-        Service->>DB: Check out Asset Type → Asset
+        Service->>DB: Check out selected device → AssetAssignment + custody receipt
         Service->>DB: Assign Accessory → deduct stock
         Service->>DB: Consume Consumable → deduct stock
         Service->>DB: Assign License seat
@@ -99,22 +99,50 @@ sequenceDiagram
     end
 ```
 
+In a tenant-group or **All accessible tenants** scope, first select the required
+**Target tenant**. The existing checkout form refreshes its holder, source-location
+and device choices for that tenant. No allocation occurs during this refresh.
+Only accessible tenants within the active group and, for a tenant-owned kit, its
+own tenant are eligible. In a concrete tenant scope, that tenant is authoritative
+and no additional tenant selector is shown.
+
+Select each hardware device explicitly, then optionally set a shared checkout
+status and dates. Selecting **Loan** makes **Due Date** mandatory. These hardware
+options do not change the quantities of stock items.
+
 Key properties of kit checkout:
 
-- **All-or-nothing**: If any item in the kit lacks sufficient stock, the entire
-  checkout is rolled back. No partial fulfilment.
+- **All-or-nothing**: If any item in the kit lacks sufficient stock — or any selected
+  device fails its eligibility checks — the entire checkout is rolled back. No partial
+  fulfilment: assignments, stock deductions, license seats, custody receipts and audit
+  rows roll back together, and scheduled custody notifications are discarded.
+- **Explicit device selection**: Every hardware slot must name the concrete device
+  (asset tag / serial) that is handed out. One distinct device per slot; a device that
+  is reserved for another holder today, already assigned, repointed to another type or no longer deployable is
+  rejected — never silently substituted.
 - **Stock deduction**: Accessory and consumable quantities are deducted from
   the source location's stock pool automatically.
-- **License assignment**: License slots in the kit attempt to assign an
-  available seat. If no seat is available, the checkout fails.
-- **Asset checkout**: Asset type slots trigger a checkout of the next available
-  asset matching that type.
+- **License assignment**: Each distinct license assigns one available seat to the
+  holder, or to the first selected hardware device for a location checkout.
+  Repeated rows of the same license do not assign duplicate seats to that same
+  recipient. If no seat is available, the checkout fails.
+- **Asset checkout**: Hardware slots run through the same individual-asset checkout
+  operation: custody receipt and signature request (per the custody template), the
+  reservation guard, the lifecycle guard, and the shared loan fields (checkout date,
+  expected check-in, due date) all apply to every selected device. Reservation
+  checks follow the individual checkout's current-date rule, not a future loan-window
+  guarantee.
+- **Signature notifications**: Signature-provider handoff and email start only after
+  the complete checkout commits. A required missing holder email address rejects
+  checkout before commit. A provider or mail failure after commit is logged; the
+  completed assignment and its custody receipt remain recorded, but notification
+  delivery must not be assumed successful.
 
 > [!IMPORTANT]
 > Kit checkout uses the `checkout_kit` service function (in
-> `assets/services.py`), which wraps everything in `transaction.atomic()`.
+> `assets/services/__init__.py`), which wraps everything in `transaction.atomic()`.
 > Concurrent kit checkouts are safe — database locks prevent double-allocation
-> of the same stock.
+> of the same stock, and the devices are re-validated under their row locks.
 
 ### Assigning Kits to Users / Locations
 

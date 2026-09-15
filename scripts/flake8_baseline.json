@@ -493,14 +493,6 @@
     },
     {
       "path": "itambox/assets/services/__init__.py",
-      "code": "C901",
-      "message": "'checkout_kit' is too complex (17)",
-      "source": "def checkout_kit(",
-      "context": "Module:body/FunctionDef:checkout_kit:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services/__init__.py",
       "code": "F401",
       "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
       "source": "from django.contrib.contenttypes.models import ContentType",

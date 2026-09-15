@@ -20,6 +20,12 @@ class KitCheckoutProvider(Protocol):
         source_location: object | None = None,
         request: object | None = None,
         system_authorizations: Mapping[str, SystemAuthorizationContext] | None = None,
+        selected_assets: Mapping[int, int] | None = None,
+        expected_checkin: object | None = None,
+        checkout_date: object | None = None,
+        status: object | None = None,
+        is_loan: bool = False,
+        due_date: object | None = None,
         **kwargs: object,
     ) -> object:
         pass
@@ -48,6 +54,12 @@ def checkout_kit(
     source_location: object | None = None,
     request: object | None = None,
     system_authorizations: Mapping[str, SystemAuthorizationContext] | None = None,
+    selected_assets: Mapping[int, int] | None = None,
+    expected_checkin: object | None = None,
+    checkout_date: object | None = None,
+    status: object | None = None,
+    is_loan: bool = False,
+    due_date: object | None = None,
     **kwargs: object,
 ) -> object:
     """Invoke the registered assets-owned kit checkout implementation."""
@@ -60,5 +72,11 @@ def checkout_kit(
         source_location=source_location,
         request=request,
         system_authorizations=system_authorizations,
+        selected_assets=selected_assets,
+        expected_checkin=expected_checkin,
+        checkout_date=checkout_date,
+        status=status,
+        is_loan=is_loan,
+        due_date=due_date,
         **kwargs,
     )

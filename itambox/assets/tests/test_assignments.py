@@ -129,11 +129,15 @@ class AssetAssignmentTestCase(TestCase):
         with (
             patch("core.models.EmailSettings.load", return_value=email_config),
             patch("compliance.registry.signature_providers.get", return_value=provider),
-            patch("assets.services.send_mail", side_effect=RuntimeError("mail backend offline")),
+            patch("assets.services.send_mail", side_effect=RuntimeError("mail backend offline")) as send_mail,
             self.assertLogs("assets.services", level="ERROR") as logs,
+            # The notification runs after the outermost commit now; execute the
+            # captured callback to observe the boundary behaviour.
+            self.captureOnCommitCallbacks(execute=True),
         ):
             target = checkout_asset(asset=asset, holder=holder, user=self.user, request=request)
 
+        send_mail.assert_called_once()
         self.assertEqual(target, holder)
         self.assertTrue(AssetAssignment.objects.filter(asset=asset, is_active=True).exists())
         receipt = CustodyReceipt.objects.get(asset=asset, holder=holder)
