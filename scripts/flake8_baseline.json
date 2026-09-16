@@ -5692,22 +5692,6 @@
       "count": 1
     },
     {
-      "path": "itambox/inventory/views/kit_views.py",
-      "code": "C901",
-      "message": "'KitDetailView.get_context_data' is too complex (17)",
-      "source": "    def get_context_data(self, **kwargs):",
-      "context": "Module:body/ClassDef:KitDetailView:body/FunctionDef:get_context_data:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/kit_views.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "            for l in licenses:",
-      "context": "Module:body/ClassDef:KitDetailView:body/FunctionDef:get_context_data:body/If:Name(id='license_ids', ctx=Load()):body/For:Name(id='l', ctx=Store()):Name(id='licenses', ctx=Load()):self",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/base.py",
       "code": "F401",
       "message": "'itambox.api.exceptions.SerializerNotFound' imported but unused",

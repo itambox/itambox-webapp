@@ -1,13 +1,17 @@
+from collections import Counter
 from typing import Any, Optional, Tuple
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 
+from assets.choices import StatusTypeChoices
+from assets.models import Asset, AssetAssignment
 from core.context import get_current_user
 from core.managers import get_current_tenant
+from licenses.models import License
 from organization.access import authorize_tenant_operation, resolve_stock_access, resolved_shared_stock_ids
 from organization.models import Location, Tenant, TenantResourceGrant
 
@@ -504,3 +508,179 @@ def _authorized_return_assignment(assignment_model, assignment_pk, user, perm, *
     if user is None or not user.has_perm(perm, obj=active_tenant):
         raise PermissionDenied
     return assignment
+
+
+# ---------------------------------------------------------------------------
+# Kit availability read model (owner-scoped)
+# ---------------------------------------------------------------------------
+# A kit belongs to exactly one tenant, so its availability is measured against
+# THAT tenant's devices and stock pools. The aggregate scopes (all-accessible,
+# tenant group) must never turn a kit's availability into a total across the
+# tenants the scope happens to contain, and another tenant's pool must not be
+# counted just because the operator can see it.
+
+
+def kit_availability_tenant(kit, active_tenant=None):
+    """The tenant a kit's availability is measured against, or ``None``.
+
+    A tenant-scoped kit is always measured against its OWNING tenant. A global
+    (tenantless) template has no owner to measure, so it falls back to the
+    concrete active tenant and fails closed (``None``) in an aggregate scope.
+    """
+    if kit is not None and kit.tenant_id:
+        return kit.tenant
+    return active_tenant
+
+
+def kit_availability(items, tenant):
+    """``(rows, state)`` for a kit's items, scoped to one owner tenant.
+
+    ``state`` is a tri-state and never claims more than is verified:
+    ``"available"`` only when every required resource is KNOWN available,
+    ``"out_of_stock"`` when at least one is KNOWN unavailable, and ``"unknown"``
+    when nothing is known unavailable but at least one resource cannot be
+    verified (a foreign/global license pool, or a tenantless template whose
+    target tenant has not been chosen). ``tenant is None`` therefore yields
+    all-unknown rows instead of an aggregate claim; unknown rows do not by
+    themselves block the checkout affordance, which keeps the explicit target
+    selection of a legacy template working, while the checkout service stays the
+    authority at submit time.
+    """
+    items = list(items)
+    if tenant is None:
+        return [_unknown_availability(item, needs_target=True) for item in items], "unknown"
+    pools = _kit_availability_pools(items, tenant)
+    demands = Counter(item.asset_type_id for item in items if item.asset_type_id)
+    rows = [_availability_row(item, pools, demands) for item in items]
+    return rows, _availability_state(rows)
+
+
+def _availability_state(rows):
+    """Tri-state kit verdict; a KNOWN shortage outranks unverifiable resources."""
+    if any(row["is_available"] is False for row in rows):
+        return "out_of_stock"
+    if any(row["unknown"] for row in rows):
+        return "unknown"
+    return "available"
+
+
+def _unknown_availability(item, needs_target):
+    return {"item": item, "available_count": None, "is_available": None, "unknown": True, "needs_target": needs_target}
+
+
+def _known_availability(item, available_count, required):
+    return {
+        "item": item,
+        "available_count": available_count,
+        "is_available": available_count >= required,
+        "unknown": False,
+        "needs_target": False,
+    }
+
+
+def _item_ids(items, field_name):
+    return {getattr(item, field_name) for item in items if getattr(item, field_name)}
+
+
+def _kit_availability_pools(items, tenant):
+    """Owner-tenant pool balances per item family, keyed by the item's pk."""
+    return {
+        "asset": _asset_pools(items, tenant),
+        "accessory": _stock_pools(
+            AccessoryStock, AccessoryAssignment, "accessory", _item_ids(items, "accessory_id"), tenant
+        ),
+        "consumable": _stock_pools(
+            ConsumableStock, ConsumableAssignment, "consumable", _item_ids(items, "consumable_id"), tenant
+        ),
+        "component": _stock_pools(
+            ComponentStock, ComponentAllocation, "component", _item_ids(items, "component_id"), tenant
+        ),
+        "license": _license_pools(_item_ids(items, "license_id"), tenant),
+    }
+
+
+def _asset_pools(items, tenant):
+    """Deployable, unassigned devices OF THE OWNER per asset type.
+
+    Same predicate as the checkout's per-row device chooser, so the displayed
+    number and the offered devices agree.
+    """
+    type_ids = _item_ids(items, "asset_type_id")
+    if not type_ids:
+        return {}
+    assigned_ids = AssetAssignment.objects.filter(is_active=True).values("asset_id")
+    rows = (
+        Asset.objects.filter(tenant=tenant, asset_type_id__in=type_ids, status__type=StatusTypeChoices.DEPLOYABLE)
+        .exclude(pk__in=assigned_ids)
+        .values("asset_type_id")
+        .order_by()
+        .annotate(count=Count("id"))
+    )
+    return {row["asset_type_id"]: row["count"] for row in rows}
+
+
+def _stock_pools(stock_model, assignment_model, item_field, item_ids, tenant):
+    """Owner pool balance: owner stock rows minus the owner's open commitments.
+
+    Pool ownership is the PERSISTED stock row's tenant (derived from its
+    location), never the catalogue item's tenant. The deduction is likewise
+    scoped by the persisted assignment DESTINATION tenant (``target_tenant``):
+    a global or shared catalogue item carries no tenant to scope by, and a
+    commitment targeting another tenant must not reduce the owner's pool.
+    """
+    if not item_ids:
+        return {}
+    key = f"{item_field}_id"
+    stock_rows = (
+        stock_model._base_manager.filter(tenant=tenant, **{f"{key}__in": item_ids})
+        .values(key)
+        .order_by()
+        .annotate(total=Sum("qty"))
+    )
+    committed_rows = (
+        assignment_model._base_manager.filter(
+            from_location__isnull=True,
+            deleted_at__isnull=True,
+            target_tenant=tenant,
+            **{f"{key}__in": item_ids},
+        )
+        .values(key)
+        .order_by()
+        .annotate(total=Sum("qty"))
+    )
+    totals = {row[key]: row["total"] for row in stock_rows}
+    committed = {row[key]: row["total"] for row in committed_rows}
+    return {item_id: max(0, totals.get(item_id, 0) - committed.get(item_id, 0)) for item_id in item_ids}
+
+
+def _license_pools(license_ids, tenant):
+    """Free seats of the OWNER's licenses; any other license stays unknown.
+
+    A license pool owned by another tenant (or a tenantless global one, whose
+    seats are deliberately never exposed cross-tenant) must not be presented as
+    this kit's availability.
+    """
+    if not license_ids:
+        return {}
+    rows = (
+        License.all_objects.filter(pk__in=license_ids, tenant=tenant, deleted_at__isnull=True)
+        .with_counts()
+        .values("id", "seats", "assigned_count")
+    )
+    return {row["id"]: max(0, row["seats"] - (row["assigned_count"] or 0)) for row in rows}
+
+
+def _availability_row(item, pools, demands):
+    """One availability row; hardware needs one DISTINCT device per kit row."""
+    if item.asset_type_id:
+        return _known_availability(item, pools["asset"].get(item.asset_type_id, 0), demands[item.asset_type_id])
+    for family in ("accessory", "consumable", "component"):
+        stock_item_id = getattr(item, f"{family}_id")
+        if stock_item_id:
+            return _known_availability(item, pools[family].get(stock_item_id, 0), item.qty)
+    if item.license_id:
+        seats = pools["license"].get(item.license_id)
+        if seats is None:
+            return _unknown_availability(item, needs_target=False)
+        return _known_availability(item, seats, 1)
+    return _known_availability(item, 0, item.qty)

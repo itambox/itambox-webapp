@@ -190,6 +190,45 @@ stateDiagram-v2
 
 ---
 
+### Kit Availability and Owner Scope
+
+A kit belongs to exactly one tenant, and its **In-Stock / Available** column is
+measured against that owning tenant only, never against a total across all the
+tenants your current scope can see:
+
+- **Hardware rows** count the owning tenant's deployable, unassigned devices of
+  that row's asset type. Each hardware row needs its own distinct device, so a
+  kit with two rows of one type needs two free devices of that type.
+- **Accessory, consumable and component rows** count the owning tenant's stock
+  pools across its own stock locations, minus the open commitments that target
+  the owning tenant. A global catalogue item is still stocked per tenant, so its
+  pools are counted per owner as well.
+- **License rows** count the owning tenant's own license pool. A license owned
+  by another tenant, or a tenantless global license, is shown as **Unknown**
+  rather than as a number, because that seat pool cannot be attributed to this
+  kit's owner.
+
+Opening a kit's checkout from the **All Tenants** view or a tenant-group scope
+preselects the kit's owning tenant for you. Kit availability stays owner-only on
+purpose here: a cross-tenant catalogue overview may show different numbers
+because it answers a different question.
+
+The header action reflects the same three states, and never claims more than is
+verified:
+
+| State | Header action |
+|---|---|
+| Every required resource verified available | **Deploy / Checkout Kit** (green) |
+| A required resource is known to be missing | **Kit Unavailable (Out of Stock)** (no checkout control) |
+| A required resource cannot be verified (Unknown) | Neutral **Deploy / Checkout Kit** with an *Unknown* note |
+
+Unknown is not an availability claim and never a fabricated zero. A tenantless
+(global) kit in an all-tenants scope additionally asks you to **select a target
+tenant first**. Whichever action the header offers, the checkout re-validates
+every resource inside the transaction, so a shortage still fails closed.
+
+---
+
 ## Components
 
 A **Component** is a modular hardware sub-assembly tracked in the inventory

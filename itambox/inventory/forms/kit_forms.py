@@ -181,6 +181,13 @@ def kit_target_tenant(request, kit, raw_value=None):
         return None
 
 
+def kit_owner_tenant(kit):
+    """Owning tenant of a tenant-scoped kit; ``None`` for a global template."""
+    if kit is None or not kit.tenant_id:
+        return None
+    return kit.tenant
+
+
 class KitCheckoutForm(BaseCheckoutForm):
     source_location = forms.ModelChoiceField(
         queryset=Location.objects.all().order_by("name"),
@@ -219,6 +226,7 @@ class KitCheckoutForm(BaseCheckoutForm):
         self.kit = kwargs.pop("kit", None)
         self.request = kwargs.pop("request", None)
         tenant = self.kit.tenant if self.kit else None
+        kwargs["initial"] = self._initial_with_owner_tenant(kwargs.get("initial"))
         super().__init__(*args, tenant=tenant, **kwargs)
         self.aggregate_scope = self._is_aggregate_scope()
         self.target_tenant = self._resolve_target_tenant()
@@ -258,6 +266,23 @@ class KitCheckoutForm(BaseCheckoutForm):
         if self.request is None:
             return False
         return getattr(self.request, "active_tenant", None) is None
+
+    def _initial_with_owner_tenant(self, initial):
+        """Open a tenant-owned kit's checkout on its OWNING tenant.
+
+        The owner is the only admissible target of a tenant-owned kit, so the
+        modal must not require a needless tenant change before its dependent
+        choices appear -- and a forged or stale ``?tenant=`` must not displace
+        it. A submitted candidate that resolves stays authoritative for a
+        tenantless template, whose target really is an explicit choice.
+        """
+        resolved = dict(initial or {})
+        owner = kit_owner_tenant(self.kit)
+        if owner is None:
+            return resolved
+        if kit_target_tenant(self.request, self.kit, resolved.get("tenant")) is None:
+            resolved["tenant"] = owner.pk
+        return resolved
 
     def _resolve_target_tenant(self):
         if self.kit is None:
