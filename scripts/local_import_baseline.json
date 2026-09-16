@@ -1750,36 +1750,6 @@
       "count": 1
     },
     {
-      "path": "itambox/inventory/views/kit_views.py",
-      "context": "ClassDef:KitDetailView/FunctionDef:get_context_data",
-      "statement": "from ..models import AccessoryAssignment, AccessoryStock",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/kit_views.py",
-      "context": "ClassDef:KitDetailView/FunctionDef:get_context_data",
-      "statement": "from ..models import ConsumableAssignment, ConsumableStock",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/kit_views.py",
-      "context": "ClassDef:KitDetailView/FunctionDef:get_context_data",
-      "statement": "from django.db.models import Count",
-      "count": 2
-    },
-    {
-      "path": "itambox/inventory/views/kit_views.py",
-      "context": "ClassDef:KitDetailView/FunctionDef:get_context_data",
-      "statement": "from django.db.models import IntegerField, OuterRef, Subquery, Sum",
-      "count": 2
-    },
-    {
-      "path": "itambox/inventory/views/kit_views.py",
-      "context": "ClassDef:KitDetailView/FunctionDef:get_context_data",
-      "statement": "from licenses.models import License",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/fields.py",
       "context": "FunctionDef:validate_gfk_target_tenant",
       "statement": "from core.managers import get_current_tenant",

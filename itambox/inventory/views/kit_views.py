@@ -1,14 +1,12 @@
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count
-from django.db.models.functions import Coalesce
 from django.shortcuts import render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
-from assets.choices import StatusTypeChoices
-from assets.models import Asset
 from assets.services import checkout_kit
 from core.context import override_current_tenant_scope
+from core.tables.constants import TABLE_EMPTY_VALUE
 from core.tenant_access import active_membership
 from itambox.panels import Panel
 from itambox.views.generic import (
@@ -23,7 +21,8 @@ from itambox.views.generic.service_views import GenericTransactionView
 
 from .. import filters, forms, tables
 from ..forms.kit_forms import kit_target_tenant, kit_target_tenant_queryset
-from ..models import Accessory, Consumable, Kit, KitItem
+from ..models import Kit, KitItem
+from ..services import kit_availability, kit_availability_tenant
 
 
 class KitListView(ObjectListView):
@@ -44,144 +43,23 @@ class KitDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Check availability of each kit item
-        items_with_availability = []
-        all_available = True
-
+        # Availability is measured against the kit's OWNING tenant only: the
+        # aggregate scopes (all-accessible, tenant group) must never add other
+        # tenants' devices or stock pools to a kit they do not own, and a
+        # tenantless template has no owner to measure -- unknown, never a total.
         items = list(self.object.items.all())
-        asset_type_ids = [i.asset_type_id for i in items if i.asset_type_id]
-        accessory_ids = [i.accessory_id for i in items if i.accessory_id]
-        license_ids = [i.license_id for i in items if i.license_id]
-        consumable_ids = [i.consumable_id for i in items if i.consumable_id]
-
-        # 1. Batch Asset Availability Count. The checkout contract is the
-        # deployable status TYPE (the service and the per-row device picker use
-        # it too), not one hard-coded "available" slug: custom deployable
-        # labels must not hide a valid checkout affordance.
-        asset_counts = {}
-        if asset_type_ids:
-            from django.db.models import Count
-
-            counts = (
-                Asset.objects.filter(asset_type_id__in=asset_type_ids, status__type=StatusTypeChoices.DEPLOYABLE)
-                .values("asset_type_id")
-                .annotate(count=Count("id"))
-            )
-            asset_counts = {c["asset_type_id"]: c["count"] for c in counts}
-
-        # 2. Batch Accessory Available Qty
-        accessory_avail = {}
-        if accessory_ids:
-            from django.db.models import IntegerField, OuterRef, Subquery, Sum
-
-            from ..models import AccessoryAssignment, AccessoryStock
-
-            # Independent Subqueries per reverse relation: summing stocks and
-            # assignments in one .annotate() would cross-join them and inflate
-            # both totals (|stocks| x |assignments| fan-out).
-            stock_sub = (
-                AccessoryStock.objects.filter(accessory=OuterRef("pk"))
-                .order_by()
-                .values("accessory")
-                .annotate(total=Sum("qty"))
-                .values("total")
-            )
-            undeducted_sub = (
-                AccessoryAssignment.objects.filter(accessory=OuterRef("pk"), from_location__isnull=True)
-                .order_by()
-                .values("accessory")
-                .annotate(total=Sum("qty"))
-                .values("total")
-            )
-            stocks = (
-                Accessory.objects.filter(id__in=accessory_ids)
-                .annotate(
-                    total_qty=Coalesce(Subquery(stock_sub, output_field=IntegerField()), 0),
-                    undeducted_qty=Coalesce(Subquery(undeducted_sub, output_field=IntegerField()), 0),
-                )
-                .values("id", "total_qty", "undeducted_qty")
-            )
-            for s in stocks:
-                accessory_avail[s["id"]] = max(0, s["total_qty"] - s["undeducted_qty"])
-
-        # 3. Batch License Available Seats
-        license_avail = {}
-        if license_ids:
-            from django.db.models import Count
-
-            from licenses.models import License
-
-            licenses = (
-                License.objects.filter(id__in=license_ids)
-                .annotate(assigned_count=Count("assignments"))
-                .values("id", "seats", "assigned_count")
-            )
-            for l in licenses:
-                license_avail[l["id"]] = max(0, l["seats"] - l["assigned_count"])
-
-        # 4. Batch Consumable Available Qty
-        consumable_avail = {}
-        if consumable_ids:
-            from django.db.models import IntegerField, OuterRef, Subquery, Sum
-
-            from ..models import ConsumableAssignment, ConsumableStock
-
-            # Independent Subqueries per reverse relation (see accessory block):
-            # avoids the stocks x consumptions cartesian-product double-count.
-            stock_sub = (
-                ConsumableStock.objects.filter(consumable=OuterRef("pk"))
-                .order_by()
-                .values("consumable")
-                .annotate(total=Sum("qty"))
-                .values("total")
-            )
-            undeducted_sub = (
-                ConsumableAssignment.objects.filter(consumable=OuterRef("pk"), from_location__isnull=True)
-                .order_by()
-                .values("consumable")
-                .annotate(total=Sum("qty"))
-                .values("total")
-            )
-            stocks = (
-                Consumable.objects.filter(id__in=consumable_ids)
-                .annotate(
-                    total_qty=Coalesce(Subquery(stock_sub, output_field=IntegerField()), 0),
-                    undeducted_qty=Coalesce(Subquery(undeducted_sub, output_field=IntegerField()), 0),
-                )
-                .values("id", "total_qty", "undeducted_qty")
-            )
-            for s in stocks:
-                consumable_avail[s["id"]] = max(0, s["total_qty"] - s["undeducted_qty"])
-
-        for item in items:
-            avail = 0
-            if item.asset_type_id:
-                avail = asset_counts.get(item.asset_type_id, 0)
-                if avail < 1:
-                    all_available = False
-            elif item.accessory_id:
-                avail = accessory_avail.get(item.accessory_id, 0)
-                if avail < item.qty:
-                    all_available = False
-            elif item.license_id:
-                avail = license_avail.get(item.license_id, 0)
-                if avail < 1:
-                    all_available = False
-            elif item.consumable_id:
-                avail = consumable_avail.get(item.consumable_id, 0)
-                if avail < item.qty:
-                    all_available = False
-
-            items_with_availability.append(
-                {
-                    "item": item,
-                    "available_count": avail,
-                    "is_available": (avail >= (item.qty if (item.accessory or item.consumable) else 1)),
-                }
-            )
-
-        context["items_with_availability"] = items_with_availability
-        context["all_available"] = all_available
+        rows, state = kit_availability(
+            items,
+            kit_availability_tenant(self.object, getattr(self.request, "active_tenant", None)),
+        )
+        context["items_with_availability"] = rows
+        # Tri-state, never a certification of an unverified resource: the page
+        # must not render a verified-available affordance for a kit whose
+        # required resource could not be attributed to its owning tenant.
+        context["availability_state"] = state
+        context["availability_needs_target"] = any(row["needs_target"] for row in rows)
+        context["all_available"] = state == "available"
+        context["table_empty_value"] = TABLE_EMPTY_VALUE
         return context
 
 
@@ -287,9 +165,24 @@ class KitCheckoutView(GenericTransactionView):
         """Re-render the modal form when the target-tenant choice changes."""
         if is_htmx_request(request) and "_reload" in request.POST:
             self.object = self.get_object()
-            form = self.get_form()
+            form = self._refreshed_form()
             return render(request, self.error_partial, self.get_context_data(form=form))
         return super().post(request, *args, **kwargs)
+
+    def _refreshed_form(self):
+        """Refresh the dependent choices without validating untouched fields.
+
+        Picking a target tenant is a presentation step, not a submission: the
+        refreshed form keeps the values the new target still allows and shows
+        its scoped choices. Reporting "this field is required" or "you must
+        select a target" here blamed the operator for fields they had simply
+        not reached yet; validation stays with the final submit.
+        """
+        kwargs = self.get_form_kwargs()
+        kwargs.pop("data", None)
+        kwargs.pop("files", None)
+        kwargs["initial"] = {**self.request.POST.dict(), **(kwargs.get("initial") or {})}
+        return self.get_form_class()(**kwargs)
 
     def form_valid(self, form):
         """Bind the service call to the re-read target tenant and its scope.

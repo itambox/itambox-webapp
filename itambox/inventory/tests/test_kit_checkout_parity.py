@@ -1218,9 +1218,9 @@ class KitCheckoutTenantScopeTests(KitCheckoutRouteTests):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_all_accessible_modal_lists_tenant_choices_but_no_unscoped_data(self):
+    def test_all_accessible_modal_preselects_the_owner_and_scopes_its_choices(self):
         item = self.add_hardware_item()
-        self.make_asset("KP-SCOPE-MODAL")
+        device = self.make_asset("KP-SCOPE-MODAL")
         self._login()
         self._activate_all_accessible()
 
@@ -1233,8 +1233,13 @@ class KitCheckoutTenantScopeTests(KitCheckoutRouteTests):
         self.assertIn("tenant", form.fields)
         self.assertTrue(form.fields["tenant"].required)
         self.assertEqual(set(form.fields["tenant"].queryset), {self.tenant})
-        self.assertEqual(list(form.fields["assigned_holder"].queryset), [])
-        self.assertEqual(set(form.fields[f"asset_{item.pk}"].queryset), set())
+        # Issue #495/#523 follow-up: the modal opens ON the kit's owning tenant,
+        # so the dependent choices are the OWNER's -- not empty, and never
+        # unscoped. (ModelChoiceField.queryset re-applies the tenant scope on
+        # access, so these reads are the ambient-scope projection of the
+        # owner-scoped querysets the modal rendered.)
+        self.assertEqual(list(form.fields["assigned_holder"].queryset), [self.holder])
+        self.assertEqual(set(form.fields[f"asset_{item.pk}"].queryset), {device})
 
     def test_htmx_reload_scopes_choices_to_the_chosen_tenant(self):
         item = self.add_hardware_item()

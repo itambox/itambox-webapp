@@ -8,7 +8,7 @@
   <div class="text-muted mt-1">{{ object.description }}</div>
 {% endblock %}
 {% block page_actions %}
-  {% if all_available %}
+  {% if availability_state == 'available' %}
     <button type="button"
             class="btn btn-success"
             hx-get="{% url 'inventory:kit_checkout_modal' pk=object.pk %}"
@@ -17,7 +17,7 @@
       <i class="mdi mdi-check-circle-outline"></i>
       {% translate "Deploy / Checkout Kit" %}
     </button>
-  {% else %}
+  {% elif availability_state == 'out_of_stock' %}
     <button type="button"
             class="btn btn-secondary"
             disabled
@@ -25,6 +25,23 @@
       <i class="mdi mdi-alert-circle-outline"></i>
       {% translate "Kit Unavailable (Out of Stock)" %}
     </button>
+  {% else %}
+    {# Unknown is not an availability claim: keep the action open and neutral, the checkout re-validates on submit. #}
+    <button type="button"
+            class="btn btn-outline-secondary"
+            hx-get="{% url 'inventory:kit_checkout_modal' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML">
+      <i class="mdi mdi-alert-circle-outline"></i>
+      {% translate "Deploy / Checkout Kit" %}
+    </button>
+    <span class="text-muted ms-2">
+      {% if availability_needs_target %}
+        {% translate "Select a target tenant first." %}
+      {% else %}
+        {% translate "Unknown" %}
+      {% endif %}
+    </span>
   {% endif %}
   <a href="{% url 'inventory:kititem_create' %}?kit={{ object.pk }}"
      class="btn btn-outline-primary ms-2">
@@ -63,6 +80,10 @@
                   <span class="badge bg-green-lt">{% translate "Accessory" %}</span>
                 {% elif item_info.item.license %}
                   <span class="badge bg-purple-lt">{% translate "License" %}</span>
+                {% elif item_info.item.consumable %}
+                  <span class="badge bg-cyan-lt">{% translate "Consumable" %}</span>
+                {% elif item_info.item.component %}
+                  <span class="badge bg-orange-lt">{% translate "Component" %}</span>
                 {% endif %}
               </td>
               <td>
@@ -72,12 +93,24 @@
                   <a href="{{ item_info.item.accessory.get_absolute_url }}">{{ item_info.item.accessory }}</a>
                 {% elif item_info.item.license %}
                   <a href="{{ item_info.item.license.get_absolute_url }}">{{ item_info.item.license.software.name }} - {{ item_info.item.license.name }}</a>
+                {% elif item_info.item.consumable %}
+                  <a href="{{ item_info.item.consumable.get_absolute_url }}">{{ item_info.item.consumable }}</a>
+                {% elif item_info.item.component %}
+                  <a href="{{ item_info.item.component.get_absolute_url }}">{{ item_info.item.component }}</a>
                 {% endif %}
               </td>
               <td>{{ item_info.item.qty }}</td>
-              <td>{{ item_info.available_count }}</td>
+              <td>{% if item_info.available_count is None %}{{ table_empty_value }}{% else %}{{ item_info.available_count }}{% endif %}</td>
               <td>
-                {% if item_info.is_available %}
+                {% if item_info.unknown %}
+                  <span class="badge bg-secondary-lt">
+                    {% if item_info.needs_target %}
+                      {% translate "Select a target tenant first." %}
+                    {% else %}
+                      {% translate "Unknown" %}
+                    {% endif %}
+                  </span>
+                {% elif item_info.is_available %}
                   <span class="badge bg-success-lt">{% translate "Available" %}</span>
                 {% else %}
                   <span class="badge bg-danger-lt">{% translate "Unavailable" %}</span>
