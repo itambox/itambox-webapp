@@ -33,12 +33,22 @@
       <span class="text-muted"><i>{% translate "Not linked" %}</i></span>
     {% endif %}
   </dd>
-  <dt class="col-sm-4">{% translate "Estimated value (indicative):" %}</dt>
+  {% if object.active_disposal %}
+    <dt class="col-sm-4">{% translate "Disposal value:" %}</dt>
+  {% elif object.disposed_at %}
+    <dt class="col-sm-4">{% translate "Archival book value:" %}</dt>
+  {% else %}
+    <dt class="col-sm-4">{% translate "Estimated book value:" %}</dt>
+  {% endif %}
   <dd class="col-sm-8">
-    {% if object.disposed_at %}
+    {% if object.active_disposal %}
       <span class="h3 font-weight-bold text-secondary">{{ object.disposal_value|money:object }}</span>
       <br>
-      <small class="text-muted">{% blocktranslate with d=object.disposed_at|date:"Y-m-d" %}Sign-off value (frozen at {{ d }}){% endblocktranslate %}</small>
+      <small class="text-muted">{% blocktranslate with d=object.disposed_at|date:"Y-m-d" %}Disposal sign-off value (frozen at {{ d }}){% endblocktranslate %}</small>
+    {% elif object.disposed_at %}
+      <span class="h3 font-weight-bold text-secondary">{{ object.disposal_value|money:object }}</span>
+      <br>
+      <small class="text-muted">{% blocktranslate with d=object.disposed_at|date:"Y-m-d" %}Archival freeze value, no disposal recorded (frozen at {{ d }}){% endblocktranslate %}</small>
     {% elif object.current_value is not None %}
       <span class="h3 font-weight-bold text-success">{{ object.current_value|money:object }}</span>
       {% if resolved_depreciation_policy %}
@@ -57,8 +67,10 @@
     {% else %}
       <span class="text-muted"><i>{% translate "N/A (No Purchase Cost)" %}</i></span>
     {% endif %}
-    <br>
-    <small class="text-muted fst-italic">{% translate "This estimate supports IT asset management and budgeting. It does not replace your accounting system." %}</small>
+    {% if not object.active_disposal and not object.disposed_at %}
+      <br>
+      <small class="text-muted fst-italic">{% translate "This estimate supports IT asset management and budgeting. It does not replace your accounting system." %}</small>
+    {% endif %}
   </dd>
   <dt class="col-sm-4">{% translate "In-Service Date:" %}</dt>
   <dd class="col-sm-8 text-secondary">

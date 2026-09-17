@@ -34,6 +34,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0115_issue479_t07_provenance_bridge",
     "assets.0116_assettypeimagestage",
     "assets.0117_issue479_final_core_vocabulary",
+    "assets.0118_assetdisposal_cancellation_reason_and_more",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",

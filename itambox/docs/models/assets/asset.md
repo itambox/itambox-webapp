@@ -14,10 +14,29 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | **Deployed** | Item is currently checked out to a user, location, or parent asset. | **No** |
 | **Pending** | Item is awaiting prep, staging, OS installation, or audit. | **No** |
 | **Undeployable** | Item is broken, lost, or undergoing heavy diagnostic repair. | **No** |
-| **Archived** | Item is decommissioned, sold, recycled, or disposed of. | **No** |
+| **Archived** | Item is out of operation (taken out of service, retired). Archiving alone records **no** disposal. | **No** |
 
 !!! warning "State Synchronization Gating"
     ITAMbox enforces database-level constraints preventing split-state anomalies. An asset's status cannot be set to a status of type `deployed` unless there is an active `AssetAssignment` record linked to it. Similarly, checking in an asset deletes the active assignment and returns the asset to a `deployable` or `pending` status.
+
+### Archival, disposal and deletion are different things
+
+| Lifecycle action | What it means | Evidence | Can be undone |
+| --- | --- | --- | --- |
+| **Archival** | The item is taken out of operation; `Disposed At` / `Disposal Value` are stamped as an **archival freeze** of the book value. | none | yes, through the ordinary `archived -> pending` transition |
+| **Disposal** | The item is end-of-life. One atomic operation creates the `AssetDisposal` record, stamps `Disposed At` / `Disposal Value`, archives the asset and closes an active assignment. | `AssetDisposal` record (method, sanitization, WEEE, recipient) | only by cancelling the disposal with a mandatory reason; the record stays visible |
+| **Deletion** | The asset row is soft-deleted (recycle bin) and keeps its status and stamps. A hard delete is blocked while a disposal record exists (`PROTECT`). | none | yes, restore from the recycle bin |
+
+While an **active** disposal record exists the asset cannot be requested, checked
+out or assigned, and it cannot leave the `archived` state through an ordinary
+status edit. A cancelled record no longer blocks the asset. Ordinary lifecycle
+actions and cancellations neither delete nor hide the record; the only exception is
+the separately authorised purge described in [AssetDisposal](assetdisposal.md).
+
+!!! info "Financial panel wording"
+    An archived asset **without** a disposal record shows `Archival freeze value,
+    no disposal recorded`; only an active disposal record shows the disposal
+    sign-off value.
 
 ---
 
@@ -33,8 +52,8 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | **Current Book Value** | Materialized current financial value computed via straight-line depreciation. | Decimal | No (Auto) |
 | **Depreciation Override** | Override depreciation policy — leave empty to use the tenant default or asset-type schedule. | Foreign Key | No |
 | **Depreciation Updated At** | The depreciation updated at of the asset. | Date Time | No |
-| **Disposal Value** | The sign-off value of the asset. | Decimal | No |
-| **Disposed At** | The disposed at of the asset. | Date Time | No |
+| **Disposal Value** | Frozen value written by the disposal operation (proceeds if given, otherwise the depreciated residual). On an archived asset without a disposal record this is the archival book-value freeze. | Decimal | No |
+| **Disposed At** | Timestamp of the freeze: the moment the disposal operation ran (not `Disposal Date`) or the archive transition. | Date Time | No |
 | **In Service Date** | Depreciation starts here; falls back to purchase date. | Date | No |
 | **Last Audited** | The timestamp when the asset was last verified during an audit session. | DateTime | No (Auto) |
 | **Last Audited By** | The user account of the auditor who last scanned the asset. | Foreign Key | No (Auto) |

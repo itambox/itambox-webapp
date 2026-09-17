@@ -59,7 +59,9 @@ def _dispose_item(
     try:
         asset = Asset.objects.get(pk=pk)
 
-        already_disposed = asset.disposed_at is not None or AssetDisposal.all_objects.filter(asset=asset).exists()
+        # #496: an ACTIVE record is what makes an asset disposed; an archived asset
+        # without a record is not (its stamp is the archival freeze) and stays eligible.
+        already_disposed = AssetDisposal.all_objects.filter(asset=asset, cancelled_at__isnull=True).exists()
         if already_disposed:
             return "skipped"
 

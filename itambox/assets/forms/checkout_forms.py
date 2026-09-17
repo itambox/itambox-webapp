@@ -33,9 +33,11 @@ class AssetCheckOutForm(forms.Form):
         label=_("Location"),
     )
     asset_target = forms.ModelChoiceField(
-        queryset=Asset.objects.exclude(status__type__in=["undeployable", "in_repair", "on_order", "archived"]).order_by(
-            "name"
-        ),
+        # #496: an active disposal record disqualifies a candidate regardless of
+        # its current status label.
+        queryset=Asset.exclude_disposed(
+            Asset.objects.exclude(status__type__in=["undeployable", "in_repair", "on_order", "archived"])
+        ).order_by("name"),
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
         label=_("Parent Asset"),
@@ -81,11 +83,11 @@ class AssetCheckOutForm(forms.Form):
         asset = kwargs.pop("asset", None)
         super().__init__(*args, **kwargs)
         if asset:
-            self.fields["asset_target"].queryset = (
-                Asset.objects.exclude(pk=asset.pk)
-                .exclude(status__type__in=["undeployable", "in_repair", "on_order", "archived"])
-                .order_by("name")
-            )
+            self.fields["asset_target"].queryset = Asset.exclude_disposed(
+                Asset.objects.exclude(pk=asset.pk).exclude(
+                    status__type__in=["undeployable", "in_repair", "on_order", "archived"]
+                )
+            ).order_by("name")
             if asset.tenant:
                 self.fields["asset_holder"].queryset = AssetHolder.objects.filter(tenant=asset.tenant).order_by(
                     "last_name", "first_name"

@@ -31,6 +31,10 @@ export interface paths {
     delete: operations["assets_asset_disposals_destroy"];
     patch: operations["assets_asset_disposals_partial_update"];
   };
+  "/api/assets/asset-disposals/{id}/cancel/": {
+    /** @description Cancel an erroneous disposal, preserving the record as evidence (#496). */
+    post: operations["assets_asset_disposals_cancel_create"];
+  };
   "/api/assets/asset-requests/": {
     get: operations["assets_asset_requests_list"];
     put: operations["assets_asset_requests_update_bulk"];
@@ -2016,6 +2020,7 @@ export interface components {
     AssetDisposal: {
       id: number;
       asset: components["schemas"]["NestedAsset"];
+      is_active: boolean;
       disposal_method?: components["schemas"]["DisposalMethodEnum"];
       disposal_method_display: string;
       /** Format: date */
@@ -2067,9 +2072,22 @@ export interface components {
       weee_compliant?: boolean;
       notes?: string;
       /** Format: date-time */
+      cancelled_at: string;
+      cancelled_by_name: string;
+      cancellation_reason: string;
+      /** Format: date-time */
       created_at: string;
       /** Format: date-time */
       updated_at: string;
+    };
+    /**
+     * @description Reason-only payload for cancelling a disposal (#496).
+     *
+     * Cancellation state itself is never writable: ``cancel_asset_disposal`` owns
+     * the actor, the timestamp and the reason validation.
+     */
+    AssetDisposalCancelRequest: {
+      reason: string;
     };
     AssetDisposalRequest: {
       asset_id: number;
@@ -8143,6 +8161,59 @@ export interface operations {
       };
       /** @description The request could not be completed. */
       403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Cancel an erroneous disposal, preserving the record as evidence (#496). */
+  assets_asset_disposals_cancel_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Disposal. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssetDisposalCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AssetDisposalCancelRequest"];
+        "multipart/form-data": components["schemas"]["AssetDisposalCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["AssetDisposal"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
         content: {
           "application/json": components["schemas"]["APIError"];
         };

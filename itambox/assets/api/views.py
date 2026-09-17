@@ -1,9 +1,13 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
 from django.db.models import Prefetch
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from assets.filters import (
@@ -37,7 +41,14 @@ from assets.models import (
     Supplier,
     Warranty,
 )
-from assets.services import checkin_asset, checkout_asset
+from assets.services import (
+    cancel_asset_disposal,
+    checkin_asset,
+    checkout_asset,
+    disposal_service_payload,
+    dispose_asset,
+    update_asset_disposal,
+)
 from assets.services.specifications._command_support import issue, lock_relevant_libraries, resource_revision_for_owner
 from assets.services.specifications.commands import (
     apply_category_defaults,
@@ -63,6 +74,7 @@ from .serializers import (
     AssetAssignmentSerializer,
     AssetCheckInAPISerializer,
     AssetCheckOutAPISerializer,
+    AssetDisposalCancelSerializer,
     AssetDisposalSerializer,
     AssetRequestSerializer,
     AssetReservationSerializer,
@@ -736,10 +748,66 @@ class AssetDisposalViewSet(ITAMBoxModelViewSet):
         "asset",
         "asset__asset_type__manufacturer",
         "asset__tenant",
+        "cancelled_by",
     )
     serializer_class = AssetDisposalSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ["asset_id", "disposal_method", "data_sanitization_method", "weee_compliant"]
+
+    # #496: creating a record IS the lifecycle operation, amending it is a
+    # controlled update, and deleting evidence is never allowed. Cancellation is
+    # the only way to retire a disposal.
+
+    def perform_create(self, serializer):
+        data = serializer.validated_data
+        try:
+            serializer.instance = dispose_asset(
+                asset=data["asset"],
+                user=self.request.user,
+                **disposal_service_payload(data),
+            )
+        except DjangoValidationError as exc:
+            raise DRFValidationError(getattr(exc, "messages", [str(exc)])) from None
+
+    def perform_update(self, serializer):
+        try:
+            serializer.instance = update_asset_disposal(
+                serializer.instance,
+                user=self.request.user,
+                data=serializer.validated_data,
+                request=self.request,
+            )
+        except DjangoValidationError as exc:
+            raise DRFValidationError(getattr(exc, "messages", [str(exc)])) from None
+
+    def perform_destroy(self, instance):
+        raise DRFValidationError(
+            _("Disposal records are lifecycle evidence and cannot be deleted. Cancel the disposal instead.")
+        )
+
+    @extend_schema(request=AssetDisposalCancelSerializer, responses={200: AssetDisposalSerializer})
+    @action(detail=True, methods=["post"], serializer_class=AssetDisposalCancelSerializer)
+    def cancel(self, request, pk=None):
+        """Cancel an erroneous disposal, preserving the record as evidence (#496)."""
+        disposal = self.get_object()
+        # Reuse the existing disposal authority on the record's own asset; no
+        # staff/superuser shortcut.
+        if not request.user.has_perm("assets.dispose_asset", obj=disposal.asset):
+            raise PermissionDenied(_("You do not have permission to cancel a disposal."))
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            cancel_asset_disposal(
+                disposal,
+                user=request.user,
+                reason=serializer.validated_data["reason"],
+                request=request,
+            )
+        except DjangoValidationError as exc:
+            raise DRFValidationError(getattr(exc, "messages", [str(exc)])) from None
+        disposal.refresh_from_db()
+        return Response(AssetDisposalSerializer(disposal, context=self.get_serializer_context()).data)
 
 
 class WarrantyViewSet(ITAMBoxModelViewSet):

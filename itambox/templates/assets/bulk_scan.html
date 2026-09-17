@@ -123,7 +123,7 @@
                 <div class="alert alert-warning d-flex align-items-center mt-2 mb-0">
                   <i class="mdi mdi-alert-outline me-2 fs-3"></i>
                   <div class="small">
-                    {% translate "The system archives each asset and freezes its book value. It skips assets already marked as disposed." %}
+                    {% translate "The system marks each asset as out of service and records the disposal. A submitted proceeds amount becomes the disposal value; without proceeds the book value is frozen instead. Assets with an active disposal record are skipped." %}
                   </div>
                 </div>
               {% endif %}
@@ -255,7 +255,7 @@
           </div>
           <div class="modal-body">
             <p id="scan-basket-dispose-confirm-text">{% blocktranslate count count=0 %}Dispose of {{ count }} asset?{% plural %}Dispose of {{ count }} assets?{% endblocktranslate %}</p>
-            <p class="text-muted mb-0">{% translate "The system checks in each asset if needed, archives it, and records the disposal. Reversing this is difficult." %}</p>
+            <p class="text-muted mb-0">{% translate "The system checks in each asset if needed, marks it as out of service and records the disposal. A submitted proceeds amount becomes the disposal value; without proceeds the book value is frozen instead. A mistaken disposal can be cancelled afterwards: the record stays in the history and the asset is moved to a pending status." %}</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>

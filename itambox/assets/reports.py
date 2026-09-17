@@ -651,6 +651,7 @@ class AssetDisposalEolReportProvider(ReportDefinition):
         "disposal_asset",
         "disposal_date",
         "disposal_method",
+        "disposal_status",
         "disposal_sanitization_method",
         "disposal_weee_compliant",
         "disposal_proceeds",
@@ -658,6 +659,14 @@ class AssetDisposalEolReportProvider(ReportDefinition):
 
     cells = {
         "disposal_asset": lambda disposal, request: str(disposal.asset) if disposal.asset else "-",
+        # #496: cancelled records stay in the evidence list, visibly distinct from
+        # the disposals that still own their asset.
+        "disposal_status": lambda disposal, request: _("Cancelled") if disposal.is_cancelled else _("Disposed"),
+        "disposal_cancelled_at": lambda disposal, request: (
+            disposal.cancelled_at.strftime("%Y-%m-%d") if disposal.cancelled_at else "-"
+        ),
+        "disposal_cancelled_by": lambda disposal, request: str(disposal.cancelled_by) if disposal.cancelled_by else "-",
+        "disposal_cancellation_reason": lambda disposal, request: disposal.cancellation_reason or "-",
         "disposal_date": lambda disposal, request: (
             disposal.disposal_date.strftime("%Y-%m-%d") if disposal.disposal_date else "-"
         ),
@@ -675,6 +684,10 @@ class AssetDisposalEolReportProvider(ReportDefinition):
 
     sample_cells = {
         "disposal_asset": "ASSET-MOCK-001 (Mock)",
+        "disposal_status": _("Disposed"),
+        "disposal_cancelled_at": "-",
+        "disposal_cancelled_by": "-",
+        "disposal_cancellation_reason": "-",
         "disposal_date": "2026-06-01",
         "disposal_method": "Recycle / WEEE",
         "disposal_sanitization_method": "NIST Purge (cryptographic or ATA Secure Erase)",
@@ -701,7 +714,9 @@ class AssetDisposalEolReportProvider(ReportDefinition):
     }
 
     def get_queryset(self, request: ReportRequest):
-        queryset = AssetDisposal.objects.filter(deleted_at__isnull=True).select_related("asset", "asset__tenant")
+        # #496 repair14: an uncancelled tombstone is still ACTIVE, so the effective cards and
+        # the chart must see it. Tenant scoping stays in scope_to_tenants.
+        queryset = AssetDisposal.all_objects.select_related("asset", "asset__tenant")
         return self.scope_to_tenants(queryset, request)
 
     def build_rows(self, records, request: ReportRequest):
@@ -711,42 +726,48 @@ class AssetDisposalEolReportProvider(ReportDefinition):
         if not request.template.include_summary_cards:
             return []
 
+        # #496: historical rows (including cancelled ones) stay in the report, but the
+        # effective cards may only reflect records that still own their asset. Cancelled
+        # proceeds are not proceeds.
+        active = queryset.filter(cancelled_at__isnull=True)
         proceeds_by_currency = {}
-        for disposal in queryset:
+        for disposal in active:
             if disposal.proceeds is not None:
                 code = _record_currency(getattr(disposal, "currency", None), request.active_tenant)
                 proceeds_by_currency[code] = proceeds_by_currency.get(code, 0) + disposal.proceeds
 
         return [
-            {"label": _("Total Disposals"), "value": str(queryset.count())},
-            {"label": _("WEEE Compliant"), "value": str(queryset.filter(weee_compliant=True).count())},
-            {"label": _("Total Proceeds"), "value": _format_per_currency(proceeds_by_currency)},
+            {"label": _("Active Disposals"), "value": str(active.count())},
+            {"label": _("Active WEEE-compliant disposals"), "value": str(active.filter(weee_compliant=True).count())},
+            {"label": _("Proceeds from active disposals"), "value": _format_per_currency(proceeds_by_currency)},
         ]
 
     def build_chart(self, queryset, records, request: ReportRequest):
         if not request.template.include_distribution_chart:
             return ""
         method_counts = {}
-        for disposal in records:
+        # #496: the distribution describes what is still disposed; cancelled records are
+        # history and stay in the rows, not in the chart inputs.
+        for disposal in [record for record in records if not record.is_cancelled]:
             label = disposal.get_disposal_method_display()
             method_counts[label] = method_counts.get(label, 0) + 1
         chart_data = [{"label": label, "value": count} for label, count in method_counts.items()]
-        return generate_doughnut_chart(chart_data, title=_("Disposal Method Distribution"))
+        return generate_doughnut_chart(chart_data, title=_("Active Disposal Method Distribution"))
 
     def build_sample_summary(self, request: ReportRequest):
         if not request.template.include_summary_cards:
             return []
         return [
-            {"label": _("Total Disposals"), "value": "1 (Mock)"},
-            {"label": _("WEEE Compliant"), "value": "1 (Mock)"},
-            {"label": _("Total Proceeds"), "value": "150,00\xa0€"},
+            {"label": _("Active Disposals"), "value": "1 (Mock)"},
+            {"label": _("Active WEEE-compliant disposals"), "value": "1 (Mock)"},
+            {"label": _("Proceeds from active disposals"), "value": "150,00\xa0€"},
         ]
 
     def build_sample_chart(self, request: ReportRequest):
         if not request.template.include_distribution_chart:
             return ""
         return generate_doughnut_chart(
-            [{"label": "Recycle / WEEE", "value": 1}], title=_("Disposal Method Distribution")
+            [{"label": "Recycle / WEEE", "value": 1}], title=_("Active Disposal Method Distribution")
         )
 
 

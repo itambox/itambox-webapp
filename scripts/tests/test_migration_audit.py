@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 52)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 53)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -569,6 +569,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "assets.0115_issue479_t07_provenance_bridge",
                 "assets.0116_assettypeimagestage",
                 "assets.0117_issue479_final_core_vocabulary",
+                "assets.0118_assetdisposal_cancellation_reason_and_more",
                 "compliance.0101_alter_custodyreceipt_signed_at",
                 "compliance.0102_clear_unsigned_receipt_timestamps",
                 "compliance.0103_alter_custodyreceipt_options",
@@ -645,7 +646,7 @@ class MigrationAuditTests(unittest.TestCase):
         )
         self.assertEqual(
             len(inventory["special_users_bootstrap"]["swappable_dependents"]),
-            58,
+            59,
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["required_fresh"],

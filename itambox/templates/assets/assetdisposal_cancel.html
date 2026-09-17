@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+{% block title %}
+  {% translate "Cancel disposal" %} - ITAMbox
+{% endblock title %}
+{% block page_header %}
+  <h2 class="page-title">{% translate "Cancel disposal" %}</h2>
+{% endblock page_header %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-8 col-lg-10 col-md-12">
+      <div class="card">
+        <div class="card-body">
+          {% if disposal.deleted_at %}
+            <p class="mb-2">
+              <span class="badge bg-secondary-lt">{% translate "Previously deleted (recycle bin)" %}</span>
+              {% translate "The record remains in the recycle bin; the original evidence is preserved." %}
+            </p>
+          {% endif %}
+          <dl class="row mb-3">
+            <dt class="col-sm-4">{% translate "Record:" %}</dt>
+            <dd class="col-sm-8">
+              #{{ disposal.pk }}
+            </dd>
+            <dt class="col-sm-4">{% translate "Disposal date:" %}</dt>
+            <dd class="col-sm-8">
+              {{ disposal.disposal_date|date:"Y-m-d" }}
+            </dd>
+            <dt class="col-sm-4">{% translate "Disposal method:" %}</dt>
+            <dd class="col-sm-8">
+              {{ disposal.get_disposal_method_display }}
+            </dd>
+          </dl>
+          <p class="text-muted">
+            {% blocktranslate with asset=disposal.asset %}Cancelling the disposal of {{ asset }} preserves this record as history and returns the asset to a pending status. The record is not deleted, and nothing is re-deployed automatically.{% endblocktranslate %}
+          </p>
+          <form method="post"
+                action="{% url 'assets:assetdisposal_cancel' pk=disposal.pk %}">
+            {% csrf_token %}
+            {% crispy form %}
+            <div class="mt-3">
+              <button type="submit" class="btn btn-danger">{% translate "Cancel disposal" %}</button>
+              <a href="{{ disposal.get_absolute_url }}"
+                 class="btn btn-outline-secondary ms-2">{% translate "Back" %}</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}

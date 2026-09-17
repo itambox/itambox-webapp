@@ -1,0 +1,35 @@
+{% load i18n %}
+<div class="card-body">
+  {% if object.is_cancelled %}
+    <dl class="row mb-0">
+      <dt class="col-sm-4">{% translate "Status:" %}</dt>
+      <dd class="col-sm-8">
+        <span class="badge bg-warning-lt px-2 py-1">{% translate "Cancelled" %}</span>
+      </dd>
+      <dt class="col-sm-4">{% translate "Cancelled at:" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.cancelled_at|date:"Y-m-d H:i" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "Cancelled by:" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.cancelled_by|default:"-" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "Reason:" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.cancellation_reason }}
+      </dd>
+    </dl>
+  {% else %}
+    {% if object.deleted_at %}
+      <p class="mb-2">
+        <span class="badge bg-secondary-lt">{% translate "Previously deleted (recycle bin)" %}</span>
+        {% translate "The record remains in the recycle bin; the original evidence is preserved." %}
+      </p>
+    {% endif %}
+    <p class="text-muted mb-0">
+      {% translate "This disposal is active. Cancelling it records who cancelled the disposal, when and why, clears the disposal freeze and moves the asset to a pending status." %}
+    </p>
+    <a href="{% url 'assets:assetdisposal_cancel' pk=object.pk %}"
+       class="btn btn-sm btn-outline-danger mt-3">{% translate "Cancel this disposal" %}</a>
+  {% endif %}
+</div>

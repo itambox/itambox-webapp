@@ -220,7 +220,7 @@
        aria-label="{% translate 'Disposal' %}"
        title="{% translate 'Disposal' %}">
       <i class="mdi mdi-recycle me-1 text-secondary" aria-hidden="true"></i>
-      {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{% if disposal_obj %}1{% else %}0{% endif %}</span>
+      {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{{ disposal_history|length }}</span>
     </a>
   </li>
 {% endblock extra_tabs %}
@@ -478,6 +478,11 @@
       </div>
       {% if disposal_obj %}
         <div class="card-body">
+          {% if disposal_obj.deleted_at %}
+            <p class="mb-2">
+              <span class="badge bg-secondary-lt">{% translate "Previously deleted (recycle bin)" %}</span>
+            </p>
+          {% endif %}
           <dl class="row mb-0">
             <dt class="col-sm-4">{% translate "Method:" %}</dt>
             <dd class="col-sm-8">
@@ -493,11 +498,62 @@
             </dd>
           </dl>
           <a href="{{ disposal_obj.get_absolute_url }}"
-             class="btn btn-sm btn-outline-secondary mt-3">{% translate "View / Edit Disposal" %}</a>
+             class="btn btn-sm btn-outline-secondary mt-3">
+            {% if disposal_obj.deleted_at %}
+              {% translate "View Disposal" %}
+            {% else %}
+              {% translate "View / Edit Disposal" %}
+            {% endif %}
+          </a>
+          <a href="{% url 'assets:assetdisposal_cancel' pk=disposal_obj.pk %}"
+             class="btn btn-sm btn-outline-danger mt-3 ms-2">{% translate "Cancel Disposal" %}</a>
         </div>
       {% else %}
         <div class="card-body py-5 text-muted text-center">
-          <p class="mb-0">{% translate "No disposal record for this asset." %}</p>
+          <p class="mb-0">{% translate "No active disposal record for this asset." %}</p>
+          {% if object.status and object.status.type == 'archived' %}
+            <p class="mb-0 mt-2">
+              <span class="badge bg-secondary-lt">{% translate "Archived, not disposed" %}</span>
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if disposal_history %}
+        <div class="card-footer border-0 bg-transparent">
+          <h4 class="card-title">{% translate "Disposal history" %}</h4>
+          <div class="table-responsive">
+            <table class="table table-sm table-vcenter">
+              <thead>
+                <tr>
+                  <th>{% translate "Date" %}</th>
+                  <th>{% translate "Method" %}</th>
+                  <th>{% translate "Status" %}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for disposal in disposal_history %}
+                  <tr>
+                    <td>{{ disposal.disposal_date|date:"Y-m-d" }}</td>
+                    <td>{{ disposal.get_disposal_method_display }}</td>
+                    <td>
+                      {% if disposal.is_cancelled %}
+                        <span class="badge bg-warning-lt">{% translate "Cancelled" %}</span>
+                      {% else %}
+                        <span class="badge bg-danger-lt">{% translate "Disposed" %}</span>
+                      {% endif %}
+                      {% if disposal.deleted_at %}
+                        <span class="badge bg-secondary-lt">{% translate "Previously deleted (recycle bin)" %}</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <a href="{{ disposal.get_absolute_url }}">{% translate "View" %}</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       {% endif %}
     </div>

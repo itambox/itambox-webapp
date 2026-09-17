@@ -87,8 +87,11 @@ class AssetRequestForm(forms.ModelForm):
         # Only allow requestable objects
         self.fields["asset_type"].queryset = AssetType.objects.filter(requestable=True)
         # Only allow requestable and deployable assets
-        self.fields["asset"].queryset = Asset.objects.filter(
-            Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True), status__type="deployable"
+        self.fields["asset"].queryset = Asset.exclude_disposed(
+            Asset.objects.filter(
+                Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True),
+                status__type="deployable",
+            )
         )
         self.fields["component"].queryset = Component.objects.all().order_by("name")
         self.fields["accessory"].queryset = Accessory.objects.all().order_by("name")
@@ -295,7 +298,7 @@ class AssetRequestActionForm(forms.Form):
         if self.request_instance:
             target_type = self.request_instance.asset_type
             # Populate allocated_asset
-            asset_qs = Asset.objects.filter(status__type="deployable")
+            asset_qs = Asset.exclude_disposed(Asset.objects.filter(status__type="deployable"))
             if tenant:
                 asset_qs = asset_qs.filter(tenant=tenant)
 

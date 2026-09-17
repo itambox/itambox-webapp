@@ -610,7 +610,13 @@ def _asset_pools(items, tenant):
         return {}
     assigned_ids = AssetAssignment.objects.filter(is_active=True).values("asset_id")
     rows = (
-        Asset.objects.filter(tenant=tenant, asset_type_id__in=type_ids, status__type=StatusTypeChoices.DEPLOYABLE)
+        # #496: reuse the canonical helper. A raw
+        # ``.exclude(disposals__cancelled_at__isnull=True)`` renders as a LEFT OUTER JOIN
+        # inside a NOT EXISTS subquery and would drop every device that has no disposal
+        # record at all (the joined NULL row satisfies ``cancelled_at IS NULL``).
+        Asset.exclude_disposed(
+            Asset.objects.filter(tenant=tenant, asset_type_id__in=type_ids, status__type=StatusTypeChoices.DEPLOYABLE)
+        )
         .exclude(pk__in=assigned_ids)
         .values("asset_type_id")
         .order_by()
