@@ -275,7 +275,19 @@ class AssetDetailView(ObjectDetailView):
         # `logger = ...`, which is pre-existing E402 debt. Hoist it with that cleanup.
         from assets.models import AssetDisposal
 
-        context["disposal_obj"] = AssetDisposal.objects.filter(asset=asset).first()
+        # #496: disposal is a history, not a single one-to-one record. The active
+        # record owns the life cycle state; cancelled records stay visible.
+        # #496 repair12: a soft-deleted record that was never cancelled still owns the
+        # lifecycle, so the history must include tombstones through the tenant-safe
+        # manager (``all_objects``) - otherwise the UI claims "no record" and offers a
+        # disposal the service then rejects.
+        disposal_history = list(
+            AssetDisposal.all_objects.filter(asset=asset)
+            .select_related("cancelled_by")
+            .order_by("-disposal_date", "-pk")
+        )
+        context["disposal_history"] = disposal_history
+        context["disposal_obj"] = next((disposal for disposal in disposal_history if disposal.is_active), None)
 
         return context
 

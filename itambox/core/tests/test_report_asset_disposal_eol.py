@@ -163,17 +163,17 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
         _, _rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
 
         card_labels = [c["label"] for c in summary_cards]
-        self.assertIn("Total Disposals", card_labels)
-        self.assertIn("WEEE Compliant", card_labels)
-        self.assertIn("Total Proceeds", card_labels)
+        self.assertIn("Active Disposals", card_labels)
+        self.assertIn("Active WEEE-compliant disposals", card_labels)
+        self.assertIn("Proceeds from active disposals", card_labels)
 
-        total_card = next(c for c in summary_cards if c["label"] == "Total Disposals")
+        total_card = next(c for c in summary_cards if c["label"] == "Active Disposals")
         self.assertEqual(total_card["value"], "2")
 
-        weee_card = next(c for c in summary_cards if c["label"] == "WEEE Compliant")
+        weee_card = next(c for c in summary_cards if c["label"] == "Active WEEE-compliant disposals")
         self.assertEqual(weee_card["value"], "1")
 
-        proceeds_card = next(c for c in summary_cards if c["label"] == "Total Proceeds")
+        proceeds_card = next(c for c in summary_cards if c["label"] == "Proceeds from active disposals")
         # Should contain EUR symbol, not '$'
         self.assertIn("€", proceeds_card["value"])
         self.assertFalse(proceeds_card["value"].startswith("$"))
@@ -200,5 +200,5 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
             any("Lenovo ThinkPad X1" in cell for cell in asset_cells),
             f"Tenant-A asset 'Lenovo ThinkPad X1' must not appear in tenant-B report, got: {asset_cells}",
         )
-        total_card = next(c for c in summary_cards if c["label"] == "Total Disposals")
+        total_card = next(c for c in summary_cards if c["label"] == "Active Disposals")
         self.assertEqual(total_card["value"], "1")

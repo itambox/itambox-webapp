@@ -12,14 +12,12 @@ if TYPE_CHECKING:
 
     from organization.models import AssetHolder, Location
 
-    from ..models import AssetDisposal
-
 from decimal import Decimal
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -27,12 +25,14 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from compliance.models import CustodyReceipt
+from core.choices import ObjectChangeActionChoices
 from core.context import get_current_membership, get_current_tenant, override_current_tenant_scope
 from inventory.services import checkout_inventory_item, validate_checkout_targets
 from licenses.models import LicenseSeatAssignment
 
 from ..choices import StatusTypeChoices
-from ..models import Asset, AssetAssignment, StatusLabel
+from ..depreciation import compute_book_value
+from ..models import Asset, AssetAssignment, AssetDisposal, StatusLabel
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,11 @@ def checkout_asset(
             raise ValidationError(
                 _("Cannot check out an asset that is %(status)s.") % {"status": asset.status.get_type_display()}
             )
+
+        # Disposal guard (#496): the disposal RECORD owns the state, not the
+        # status label. A record whose asset status drifted (or a soft-deleted
+        # evidence row) must still make the asset unassignable.
+        _assert_no_active_disposal(asset)
 
         # Reservation guard: if the asset is reserved for a *different* holder during
         # the checkout window, block the checkout to preserve the reservation.
@@ -369,6 +374,136 @@ def checkin_asset(
         return None
 
 
+#: Editable metadata of a disposal record. ``asset`` is deliberately absent: a
+#: record's asset identity is immutable (issue #496).
+DISPOSAL_METADATA_FIELDS = (
+    "disposal_method",
+    "disposal_date",
+    "data_sanitization_method",
+    "sanitization_certificate",
+    "sanitized_by",
+    "recipient",
+    "proceeds",
+    "currency",
+    "weee_compliant",
+    "notes",
+)
+
+
+def disposal_service_payload(data: Mapping) -> dict:
+    """Map submitted record values onto the disposal service's keyword arguments.
+
+    One shared mapping keeps the dedicated action, the quick-add/edit form, the
+    REST API and the admin from each inventing their own defaults (#496).
+    """
+    return {
+        "disposal_method": data["disposal_method"],
+        "disposal_date": data["disposal_date"],
+        "data_sanitization_method": data.get("data_sanitization_method") or "none",
+        "sanitization_certificate": data.get("sanitization_certificate") or "",
+        "sanitized_by": data.get("sanitized_by") or "",
+        "recipient": data.get("recipient") or "",
+        "proceeds": data.get("proceeds"),
+        "currency": data.get("currency") or "",
+        "weee_compliant": data.get("weee_compliant") or False,
+        "notes": data.get("notes") or "",
+    }
+
+
+def _active_disposal_error(asset: Asset) -> ValidationError | None:
+    """The clean rejection for an asset that already owns an active disposal (#496)."""
+    if not AssetDisposal.all_objects.filter(asset=asset, cancelled_at__isnull=True).exists():
+        return None
+    return ValidationError(
+        _("Asset '%(asset)s' already has an active disposal record. Cancel that disposal before recording a new one.")
+        % {"asset": asset}
+    )
+
+
+def _assert_no_active_disposal(asset: Asset) -> None:
+    """Reject an asset whose disposal lifecycle is owned by a record (#496).
+
+    Kept as a helper so ``checkout_asset`` does not grow another decision branch
+    (it is at the Flake8 C901 ceiling).
+    """
+    if _active_disposal_error(asset) is not None:
+        raise ValidationError(_("Cannot check out an asset that has an active disposal record."))
+
+
+def _validate_disposal_proceeds(asset: Asset, proceeds, currency: str) -> None:
+    """Proceeds must be non-negative and in the asset's own currency.
+
+    There is no FX source, so a foreign-currency or negative proceeds would
+    corrupt the frozen sign-off value / TCO it flows into.
+    """
+    if proceeds is not None and proceeds < 0:
+        raise ValidationError(_("Disposal proceeds cannot be negative."))
+    if proceeds is not None and currency and getattr(asset, "currency", None) and currency != asset.currency:
+        raise ValidationError(
+            _("Disposal proceeds currency must match the asset's currency (no conversion is applied).")
+        )
+
+
+def _disposal_snapshot_value(asset: Asset, disposal: "AssetDisposal"):
+    """The asset-side sign-off value of an ACTIVE disposal record (#496).
+
+    Existing semantics, deliberately unchanged (book-value computation stays out
+    of scope for #496): recorded proceeds win, otherwise the depreciated residual
+    at the disposal date is frozen. Callers must clear ``disposed_at`` /
+    ``disposal_value`` first, because compute_book_value() short-circuits to an
+    already-frozen value.
+    """
+    if disposal.proceeds is not None:
+        return disposal.proceeds
+    return compute_book_value(asset, on_date=disposal.disposal_date) or Decimal("0.00")
+
+
+def update_asset_disposal(
+    disposal: "AssetDisposal",
+    user,
+    data: Mapping,
+    request: HttpRequest | None = None,
+) -> "AssetDisposal":
+    """Amend the metadata of a disposal record through the one controlled path (#496).
+
+    The asset identity is immutable, cancellation state is never writable here
+    (that is ``cancel_asset_disposal``), and the audit trail is retained: the
+    record keeps its pk, its evidence and its history.
+
+    While the record is ACTIVE the asset-side snapshot is re-applied with the same
+    rule a fresh disposal uses, so the asset cannot silently drift away from its
+    own evidence. A cancelled record is history and never touches the asset.
+    """
+    changes = {name: data[name] for name in DISPOSAL_METADATA_FIELDS if name in data}
+    if not changes:
+        raise ValidationError(_("No disposal fields were submitted."))
+
+    with transaction.atomic():
+        asset = Asset._base_manager.select_for_update().get(pk=disposal.asset_id)
+        locked = AssetDisposal.all_objects.select_for_update().get(pk=disposal.pk)
+
+        previous_stamp = asset.disposed_at
+        locked.snapshot()
+        for name, value in changes.items():
+            setattr(locked, name, value)
+        _validate_disposal_proceeds(asset, locked.proceeds, locked.currency)
+        locked.full_clean()
+        locked._changelog_action = ObjectChangeActionChoices.ACTION_UPDATE
+        locked._changelog_message = "Disposal metadata amended"
+        locked.save(update_fields=[*changes, "updated_at"])
+
+        if locked.is_active:
+            asset.disposed_at = None
+            asset.disposal_value = None
+            asset.disposal_value = _disposal_snapshot_value(asset, locked)
+            asset.disposed_at = previous_stamp or timezone.now()
+            asset._changelog_action = ObjectChangeActionChoices.ACTION_UPDATE
+            asset._changelog_message = f"Disposal metadata amended (record {locked.pk})"
+            asset.save(update_fields=["disposal_value", "disposed_at", "updated_at"])
+
+    return locked
+
+
 def dispose_asset(
     asset: Asset,
     disposal_method: str,
@@ -385,36 +520,43 @@ def dispose_asset(
 ) -> "AssetDisposal":
     """Record the end-of-life disposal of an asset.
 
-    Creates (or replaces) an ``AssetDisposal`` record, stamps ``disposed_at``
-    and ``disposal_value`` on the ``Asset``, and transitions the asset to an
-    *archived* ``StatusLabel``.  If no archived label exists the asset status
-    is left unchanged and a warning is returned alongside the record.
+    Creates the ``AssetDisposal`` record, stamps ``disposed_at`` and
+    ``disposal_value`` on the ``Asset``, and transitions the asset to an
+    *archived* ``StatusLabel``. The archived transition is required: when no
+    archived label is configured the call raises a translated ``ValidationError``
+    **before** any mutation (no record, no stamp, no auto check-in) - the status
+    is never silently left unchanged and no label is created automatically.
+
+    An asset that already owns an ACTIVE disposal record is rejected (#496): a
+    record is evidence and is never replaced. Correcting a mistake is an
+    explicit cancellation (``cancel_asset_disposal``).
 
     The whole operation is wrapped in a database transaction; either
     everything succeeds or nothing is written.
     """
-    from assets.depreciation import compute_book_value
-    from assets.models import AssetDisposal  # local import avoids circular at module load
-
     with transaction.atomic():
         # Lock the asset row to prevent concurrent mutations
         asset = Asset._base_manager.select_for_update().get(pk=asset.pk)
+
+        # Reject a second disposal while an ACTIVE record exists (#496) BEFORE any
+        # side effect: the predecessor implementation hard-deleted that record and
+        # replaced it, which silently destroyed GDPR/WEEE/SOC2 evidence. Cancelled
+        # records are history and do not block a new disposal.
+        duplicate_error = _active_disposal_error(asset)
+        if duplicate_error is not None:
+            raise duplicate_error
+
+        # The archived transition is REQUIRED, not optional (#496 language review): abort
+        # atomically before the auto check-in, the record and the asset stamp when the
+        # estate has no archived status. Status labels are never created automatically.
+        archived_label = StatusLabel.objects.filter(type=StatusTypeChoices.ARCHIVED).first()
+        if archived_label is None:
+            raise ValidationError(_("No archived status is configured, so the disposal cannot be recorded."))
 
         # Auto-checkin any active assignment before disposal
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes="Auto-checkin for disposal")
             asset.refresh_from_db()
-
-        # Transition to an archived status label (first one found)
-        archived_label = StatusLabel.objects.filter(type=StatusTypeChoices.ARCHIVED).first()
-
-        # Remove any existing disposal record for this asset (idempotent re-run).
-        # asset is a OneToOne, so the row must be HARD-deleted to free the unique
-        # slot (a soft-delete tombstone would still occupy asset_id). force_hard_delete
-        # is now change-logged by ChangeLoggingMixin, so destroying this
-        # GDPR/WEEE/SOC2 disposal evidence is captured in the audit trail.
-        for existing_disposal in AssetDisposal.all_objects.filter(asset=asset):
-            existing_disposal.delete(force_hard_delete=True)
 
         disposal = AssetDisposal(
             asset=asset,
@@ -430,34 +572,37 @@ def dispose_asset(
             notes=notes,
         )
         disposal.full_clean()
-        disposal.save()
+        try:
+            disposal.save()
+        except IntegrityError as exc:
+            # A concurrent disposal can win the race between the existence check
+            # above and this insert. The conditional unique constraint is the
+            # authority for "one active record per asset", so a lost race becomes
+            # the same clean rejection — never a database error surfaced to the
+            # operator and never a replaced record (#496).
+            error = _active_disposal_error(asset)
+            if error is None:
+                # Some other integrity failure: keep it visible as such.
+                raise
+            raise error from exc
 
-        # Clear any prior disposal stamp before recomputing. On an idempotent
-        # re-run the old record above is deleted, but disposed_at/disposal_value
-        # are still set on the asset row — and compute_book_value() short-circuits
-        # to the STALE frozen disposal_value while disposed_at is non-null. Reset
-        # both so the residual is recomputed fresh. (First disposal: both already
-        # None, so this is a no-op and first-disposal behavior is unchanged.)
+        # Clear any prior ARCHIVE freeze before recomputing: an asset may still
+        # carry the freeze stamped by an earlier archive transition (or by a
+        # cancelled disposal), and compute_book_value() short-circuits to that
+        # stale frozen value while disposed_at is non-null. Reset both so the
+        # residual is recomputed fresh for this disposal date.
         asset.disposed_at = None
         asset.disposal_value = None
 
         # Proceeds must be non-negative and in the asset's own currency: there is no FX
-        # source, so a foreign-currency or negative proceeds would corrupt the frozen
-        # book value / TCO it flows into.
-        if proceeds is not None and proceeds < 0:
-            raise ValidationError(_("Disposal proceeds cannot be negative."))
-        if proceeds is not None and currency and getattr(asset, "currency", None) and currency != asset.currency:
-            raise ValidationError(
-                _("Disposal proceeds currency must match the asset's currency (no conversion is applied).")
-            )
+        _validate_disposal_proceeds(asset, proceeds, currency)
 
-        # Update the asset: stamp disposal fields and transition status
-        if proceeds is not None:
-            asset.disposal_value = proceeds
-        else:
-            # Freeze the depreciated residual at the disposal date BEFORE setting
-            # disposed_at (compute_book_value short-circuits once disposed_at is set).
-            asset.disposal_value = compute_book_value(asset, on_date=disposal_date) or Decimal("0.00")
+        # Update the asset: stamp disposal fields and transition status. The
+        # snapshot rule lives in exactly one place (``_disposal_snapshot_value``)
+        # so an amended record cannot drift away from a fresh disposal.
+        # Ordering matters: the residual must be computed BEFORE disposed_at is
+        # set, because compute_book_value() short-circuits once it is.
+        asset.disposal_value = _disposal_snapshot_value(asset, disposal)
         asset.disposed_at = timezone.now()
 
         if archived_label:
@@ -468,6 +613,75 @@ def dispose_asset(
         asset.save(update_fields=["disposed_at", "disposal_value", "status"])
 
     return disposal
+
+
+def cancel_asset_disposal(
+    disposal: "AssetDisposal",
+    user,
+    reason: str,
+    request: HttpRequest | None = None,
+) -> "AssetDisposal":
+    """Cancel an erroneous disposal while preserving its evidence (#496).
+
+    The record keeps its identity, its data-sanitization evidence and its place
+    in the disposal history; it gains who cancelled it, when, and why. Nothing is
+    hard- or soft-deleted, so the audit trail keeps both the original disposal and
+    the correction.
+
+    The asset returns to a *pending* status with the disposal/archival freeze
+    cleared, so depreciation re-evaluates through the existing semantics. It is
+    never auto-deployed, and no prior assignment or requestability is restored —
+    that takes a deliberate follow-up workflow.
+
+    Lock order is asset first, then the disposal row, matching ``dispose_asset``
+    so a cancellation and a concurrent disposal serialize instead of racing.
+    """
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError(_("A cancellation reason is required."))
+    if user is None:
+        raise ValidationError(_("A cancellation must record who cancelled it."))
+
+    with transaction.atomic():
+        asset = Asset._base_manager.select_for_update().get(pk=disposal.asset_id)
+        locked = AssetDisposal.all_objects.select_for_update().get(pk=disposal.pk)
+
+        if locked.asset_id != asset.pk:
+            # Never mutate a record through the wrong asset's lifecycle.
+            raise ValidationError(_("The disposal record does not belong to this asset."))
+        if locked.cancelled_at is not None:
+            raise ValidationError(_("This disposal has already been cancelled."))
+
+        # Leaving the archived state needs the pending label (#496 language review): abort
+        # before the record, the asset and the audit trail are touched. Never create it.
+        pending_label = StatusLabel.objects.filter(type=StatusTypeChoices.PENDING).first()
+        if pending_label is None:
+            raise ValidationError(_("No pending status is configured, so the disposal cannot be cancelled."))
+
+        locked.snapshot()
+        locked.cancelled_at = timezone.now()
+        locked.cancelled_by = user
+        locked.cancellation_reason = reason
+        locked._changelog_action = ObjectChangeActionChoices.ACTION_UPDATE
+        locked._changelog_message = f"Disposal cancelled: {reason}"
+        locked.save(update_fields=["cancelled_at", "cancelled_by", "cancellation_reason", "updated_at"])
+
+        # Order matters: the record is cancelled FIRST, because Asset.clean()
+        # refuses to move an asset out of `archived` while an active record exists
+        # (#496).
+        asset.disposed_at = None
+        asset.disposal_value = None
+        update_fields = ["disposed_at", "disposal_value", "updated_at"]
+        if pending_label is not None and asset.status_id != pending_label.pk:
+            # Existing semantics: archiving is left through archived -> pending
+            # only. Never jump straight back to a deployable status.
+            asset.status = pending_label
+            update_fields.append("status")
+        asset._changelog_action = ObjectChangeActionChoices.ACTION_UPDATE
+        asset._changelog_message = f"Disposal cancelled (record {locked.pk}): {reason}"
+        asset.save(update_fields=update_fields)
+
+    return locked
 
 
 def _kit_hardware_selection(kit_items, selected_assets):

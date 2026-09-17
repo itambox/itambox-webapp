@@ -202,26 +202,34 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         self.asset.refresh_from_db()
         self.assertIsNone(self.asset.active_assignment)
 
-    def test_dispose_is_idempotent(self):
-        """Calling dispose_asset twice replaces the disposal record (no duplicate)."""
-        dispose_asset(
+    def test_second_disposal_while_active_record_exists_is_rejected(self):
+        """A second disposal with an ACTIVE record must be rejected, never replace evidence.
+
+        #496: the predecessor implementation hard-deleted the existing record and
+        inserted a replacement, silently destroying disposal evidence.
+        """
+        first = dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RECYCLE,
             disposal_date="2025-06-10",
+            sanitization_certificate="CERT-ORIGINAL",
             user=self.user,
         )
-        dispose_asset(
-            asset=self.asset,
-            disposal_method=DisposalMethodChoices.DONATION,
-            disposal_date="2025-07-01",
-            user=self.user,
-        )
+        with self.assertRaises(ValidationError):
+            dispose_asset(
+                asset=self.asset,
+                disposal_method=DisposalMethodChoices.DONATION,
+                disposal_date="2025-07-01",
+                user=self.user,
+            )
+
         self.asset.refresh_from_db()
-        # Only one disposal record should exist
-        count = AssetDisposal.all_objects.filter(asset=self.asset).count()
-        self.assertEqual(count, 1)
-        disposal = AssetDisposal.all_objects.get(asset=self.asset)
-        self.assertEqual(disposal.disposal_method, DisposalMethodChoices.DONATION)
+        records = AssetDisposal.all_objects.filter(asset=self.asset)
+        self.assertEqual(records.count(), 1)
+        survivor = records.get()
+        self.assertEqual(survivor.pk, first.pk)
+        self.assertEqual(survivor.disposal_method, DisposalMethodChoices.RECYCLE)
+        self.assertEqual(survivor.sanitization_certificate, "CERT-ORIGINAL")
 
     def test_currency_stored_on_disposal_record(self):
         disposal = dispose_asset(

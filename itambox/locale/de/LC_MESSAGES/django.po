@@ -7238,13 +7238,6 @@ msgstr "Asset-Etikett drucken"
 msgid "Salvage Value:"
 msgstr "Restwert:"
 
-msgid "Estimated value (indicative):"
-msgstr "Geschätzter Buchwert (indikativ):"
-
-#, python-format
-msgid "Sign-off value (frozen at %(d)s)"
-msgstr "Restbuchwert bei Abgang (eingefroren am %(d)s)"
-
 msgid "asset override"
 msgstr "Asset-Überschreibung"
 
@@ -9921,13 +9914,6 @@ msgstr "Herausgabe-Optionen"
 msgid "Disposal details"
 msgstr "Entsorgungsdetails"
 
-msgid ""
-"The system archives each asset and freezes its book value. It skips assets "
-"already marked as disposed."
-msgstr ""
-"Die Entsorgung archiviert jedes Asset und friert seinen Buchwert ein. "
-"Bereits entsorgte Assets werden übersprungen."
-
 msgid "In basket:"
 msgstr "Im Korb:"
 
@@ -9960,13 +9946,6 @@ msgid "Dispose of %(count)s asset?"
 msgid_plural "Dispose of %(count)s assets?"
 msgstr[0] "%(count)s Asset entsorgen?"
 msgstr[1] "%(count)s Assets entsorgen?"
-
-msgid ""
-"The system checks in each asset if needed, archives it, and records the "
-"disposal. Reversing this is difficult."
-msgstr ""
-"Jedes Asset wird (falls nötig) eingebucht, archiviert und mit einem "
-"Entsorgungseintrag erfasst. Dies ist schwer rückgängig zu machen."
 
 msgid "Dispose"
 msgstr "Entsorgen"
@@ -10016,9 +9995,6 @@ msgid "Custody Declined"
 msgstr "Verwahrung abgelehnt"
 
 #: assets/reports.py:665 assets/reports.py:680
-msgid "Disposal Method Distribution"
-msgstr "Verteilung der Entsorgungsmethoden"
-
 #: assets/forms/asset_form.py:196
 msgid "End date cannot be before the start date."
 msgstr "Das Enddatum darf nicht vor dem Startdatum liegen."
@@ -10041,9 +10017,6 @@ msgid "No active tag sequence found for this scope."
 msgstr "Keine aktive Tag-Sequenz für diesen Geltungsbereich gefunden."
 
 #: templates/assets/assets/asset_detail.html:468
-msgid "No disposal record for this asset."
-msgstr "Kein Entsorgungseintrag für dieses Asset."
-
 #: templates/assets/assets/asset_detail.html:427
 msgid "No reservations for this asset."
 msgstr "Keine Reservierungen für dieses Asset."
@@ -10244,12 +10217,6 @@ msgstr "Garantien gesamt"
 
 msgid "Already Expired"
 msgstr "Bereits abgelaufen"
-
-msgid "Total Disposals"
-msgstr "Entsorgungen gesamt"
-
-msgid "Total Proceeds"
-msgstr "Erlöse gesamt"
 
 msgid "Total Receipts"
 msgstr "Belege gesamt"
@@ -12160,7 +12127,7 @@ msgid "Tenant owning the source stock/location at assignment time."
 msgstr "Mandant, dem der Quellbestand oder Quell-Lagerort zum Zeitpunkt der Zuweisung gehört."
 
 msgid "The grant that authorized a cross-tenant assignment. Stays as history after the grant is revoked."
-msgstr "Die Freigabe, die eine mandantenübergreifende Zuweisung autorisiert hat. Sie bleibt nach dem Widerruf als Verlauf erhalten."
+msgstr "Die Freigabe, die eine mandantenübergreifende Zuweisung autorisiert hat. Sie bleibt nach dem Widerruf in der Historie erhalten."
 
 #, python-format
 msgid "The referenced resource grant does not authorize this assignment: %(problems)s"
@@ -15079,3 +15046,183 @@ msgstr "Das ausgewählte Asset ist nicht mehr verfügbar."
 
 msgid "The selected asset is not in a deployable state."
 msgstr "Das ausgewählte Asset ist nicht in einem einsatzbereiten Zustand."
+
+msgid "A cancellation must record who cancelled it."
+msgstr "Bei einer Stornierung muss erfasst werden, wer sie durchgeführt hat."
+
+msgid "A cancellation reason is required."
+msgstr "Ein Stornierungsgrund ist erforderlich."
+
+msgid "A cancelled disposal must record who cancelled it."
+msgstr "Bei einer stornierten Entsorgung muss erfasst sein, wer sie storniert hat."
+
+#, python-format
+msgid "Archival freeze value, no disposal recorded (frozen at %(d)s)"
+msgstr "Archivierter Buchwert, keine Entsorgung erfasst (eingefroren am %(d)s)"
+
+msgid "Archived, not disposed"
+msgstr "Archiviert, nicht entsorgt"
+
+#, python-format
+msgid "Asset '%(asset)s' already has an active disposal record. Cancel that disposal before recording a new one."
+msgstr "Für das Asset '%(asset)s' ist bereits eine aktive Entsorgung erfasst. Stornieren Sie diese Entsorgung, bevor Sie eine neue erfassen."
+
+msgid "Cancel Disposal"
+msgstr "Entsorgung stornieren"
+
+msgid "Cancel disposal"
+msgstr "Entsorgung stornieren"
+
+msgid "Cancellation"
+msgstr "Stornierung"
+
+msgid "Cancellation fields can only be set by cancelling the disposal."
+msgstr "Stornierungsfelder können nur durch das Stornieren der Entsorgung gesetzt werden."
+
+msgid "Cancellation reason"
+msgstr "Stornierungsgrund"
+
+msgid "Cancelled at"
+msgstr "Storniert am"
+
+msgid "Cancelled by"
+msgstr "Storniert von"
+
+msgid "Cancelled disposal records are preserved history and cannot be restored."
+msgstr "Stornierte Entsorgungen bleiben in der Historie erhalten und können nicht wiederhergestellt werden."
+
+msgid "Cannot check out an asset that has an active disposal record."
+msgstr "Ein Asset mit einer aktiven Entsorgung kann nicht herausgegeben werden."
+
+msgid "Disposal cancelled. The record is preserved and the asset is pending."
+msgstr "Entsorgung storniert. Der Datensatz bleibt in der Historie erhalten und das Asset wird in den Status „Pending“ versetzt."
+
+#, python-format
+msgid "Disposal for '%(asset)s' saved."
+msgstr "Entsorgung für '%(asset)s' gespeichert."
+
+msgid "Disposal history"
+msgstr "Entsorgungsverlauf"
+
+msgid "Disposal records are lifecycle evidence and cannot be deleted. Cancel the disposal instead."
+msgstr "Entsorgungsdatensätze sind Lebenszyklus-Nachweise und können nicht gelöscht werden. Stornieren Sie stattdessen die Entsorgung."
+
+#, python-format
+msgid "Disposal sign-off value (frozen at %(d)s)"
+msgstr "Abgangswert der Entsorgung (eingefroren am %(d)s)"
+
+msgid "Disposed"
+msgstr "Entsorgt"
+
+msgid "No disposal fields were submitted."
+msgstr "Es wurden keine Entsorgungsfelder übermittelt."
+
+msgid "Restoring this record would leave two active disposals for the same asset."
+msgstr "Beim Wiederherstellen dieses Datensatzes gäbe es zwei aktive Entsorgungen für dasselbe Asset."
+
+msgid "The asset of a disposal record cannot be changed."
+msgstr "Das Asset eines Entsorgungsdatensatzes kann nicht geändert werden."
+
+msgid "The disposal record does not belong to this asset."
+msgstr "Der Entsorgungsdatensatz gehört nicht zu diesem Asset."
+
+msgid "This asset has an active disposal record. Cancel the disposal before moving it out of the archived state."
+msgstr "Für dieses Asset ist eine aktive Entsorgung erfasst. Stornieren Sie die Entsorgung, bevor Sie es aus dem archivierten Zustand herausnehmen."
+
+msgid "This disposal has already been cancelled."
+msgstr "Diese Entsorgung wurde bereits storniert."
+
+msgid "Why was this disposal recorded in error? It is stored on the record and in the audit trail."
+msgstr "Warum wurde diese Entsorgung fälschlich erfasst? Der Grund wird am Datensatz und im Änderungsprotokoll gespeichert."
+
+msgid "You do not have permission to cancel a disposal."
+msgstr "Sie haben keine Berechtigung, eine Entsorgung zu stornieren."
+
+msgid "Cancel this disposal"
+msgstr "Diese Entsorgung stornieren"
+
+msgid "Cancelled at:"
+msgstr "Storniert am:"
+
+msgid "Cancelled by:"
+msgstr "Storniert von:"
+
+#, python-format
+msgid "Cancelling the disposal of %(asset)s preserves this record as history and returns the asset to a pending status. The record is not deleted, and nothing is re-deployed automatically."
+msgstr "Das Stornieren der Entsorgung von %(asset)s erhält diesen Datensatz in der Historie und versetzt das Asset in den Status „Pending“. Der Datensatz wird nicht gelöscht und nichts wird automatisch erneut bereitgestellt."
+
+msgid "Reason:"
+msgstr "Grund:"
+
+#, python-format
+msgid "The asset '%(asset)s' is disposed and cannot be requested."
+msgstr "Das Asset '%(asset)s' ist entsorgt und kann nicht angefragt werden."
+
+msgid "Active Disposal Method Distribution"
+msgstr "Verteilung der aktiven Entsorgungsmethoden"
+
+msgid "Active Disposals"
+msgstr "Aktive Entsorgungen"
+
+msgid "Archival book value:"
+msgstr "Festgeschriebener Buchwert (Archiv):"
+
+msgid "Cancelled At"
+msgstr "Storniert am"
+
+msgid "Cancelled By"
+msgstr "Storniert von"
+
+msgid "Disposal Status"
+msgstr "Entsorgungsstatus"
+
+msgid "Disposal date:"
+msgstr "Entsorgungsdatum:"
+
+msgid "Disposal method:"
+msgstr "Entsorgungsmethode:"
+
+msgid "Disposal value:"
+msgstr "Entsorgungswert:"
+
+msgid "Estimated book value:"
+msgstr "Geschätzter Buchwert:"
+
+msgid "No active disposal record for this asset."
+msgstr "Für dieses Asset liegt kein aktiver Entsorgungsnachweis vor."
+
+msgid "No archived status is configured, so the disposal cannot be recorded."
+msgstr "Es ist kein Status „Archiviert“ konfiguriert, daher kann die Entsorgung nicht erfasst werden."
+
+msgid "No pending status is configured, so the disposal cannot be cancelled."
+msgstr "Es ist kein Status „Pending“ konfiguriert, daher kann die Stornierung nicht durchgeführt werden."
+
+msgid "Record:"
+msgstr "Datensatz:"
+
+msgid "The system checks in each asset if needed, marks it as out of service and records the disposal. A submitted proceeds amount becomes the disposal value; without proceeds the book value is frozen instead. A mistaken disposal can be cancelled afterwards: the record stays in the history and the asset is moved to a pending status."
+msgstr "Das System checkt jedes Asset bei Bedarf ein, setzt es außer Betrieb und erfasst die Entsorgung. Ein angegebener Erlös wird zum Entsorgungswert; ohne Erlös wird stattdessen der Buchwert festgeschrieben. Eine versehentliche Entsorgung kann anschließend storniert werden: Der Nachweis bleibt in der Historie und das Asset wird in den Status „Pending“ versetzt."
+
+msgid "The system marks each asset as out of service and records the disposal. A submitted proceeds amount becomes the disposal value; without proceeds the book value is frozen instead. Assets with an active disposal record are skipped."
+msgstr "Das System setzt jedes Asset außer Betrieb und erfasst die Entsorgung. Ein angegebener Erlös wird zum Entsorgungswert; ohne Erlös wird stattdessen der Buchwert festgeschrieben. Assets mit aktivem Entsorgungsnachweis werden übersprungen."
+
+msgid "Disposal cancellation reason"
+msgstr "Stornogrund der Entsorgung"
+
+msgid "Active WEEE-compliant disposals"
+msgstr "Aktive WEEE-konforme Entsorgungen"
+
+msgid "Previously deleted (recycle bin)"
+msgstr "Zuvor gelöscht (Papierkorb)"
+
+msgid "Proceeds from active disposals"
+msgstr "Erlöse aus aktiven Entsorgungen"
+
+msgid "This disposal is active. Cancelling it records who cancelled the disposal, when and why, clears the disposal freeze and moves the asset to a pending status."
+msgstr "Diese Entsorgung ist aktiv. Beim Stornieren wird festgehalten, wer die Entsorgung wann und aus welchem Grund storniert hat; die Wertfestschreibung der Entsorgung wird aufgehoben und das Asset wird in den Status „Pending“ versetzt."
+
+msgid "The record remains in the recycle bin; the original evidence is preserved."
+msgstr "Der Datensatz verbleibt im Papierkorb; der ursprüngliche Nachweis bleibt erhalten."
+
+msgid "View Disposal"
+msgstr "Entsorgung ansehen"

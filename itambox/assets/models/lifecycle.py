@@ -40,16 +40,26 @@ class DateRange(Func):
 class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     """End-of-Life / Disposal record with data-sanitization evidence.
 
-    One record per asset (OneToOne). Tenant-scoped through the parent asset so
-    multi-tenant boundary checks flow through the same ``tenant_lookup`` pattern
-    as AssetMaintenance and AssetAssignment.
+    A disposal record IS the evidence. It is never replaced and never deleted by
+    a lifecycle operation: correcting a mistaken disposal is an explicit
+    cancellation (``cancel_asset_disposal``) that keeps this row visible and
+    auditable, and a later disposal creates a NEW row — hence
+    ``related_name="disposals"`` (a history), not a one-to-one.
+
+    Tenant-scoped through the parent asset so multi-tenant boundary checks flow
+    through the same ``tenant_lookup`` pattern as AssetMaintenance and
+    AssetAssignment.
 
     on_delete=PROTECT is used on the asset FK. Rationale: a disposal record is
     evidence for GDPR Art. 17 / WEEE / SOC 2 audit purposes — deleting the
     linked asset (which itself requires a vault-grade soft-delete) should not
     silently cascade and destroy disposal proof. The operator must explicitly
-    delete or nullify the disposal record first, making the destruction of
-    evidence a deliberate, auditable action.
+    cancel the disposal, making the change a deliberate, auditable action.
+
+    Lifecycle ownership: at most ONE row per asset may be active
+    (``cancelled_at IS NULL``), enforced by a conditional unique constraint that
+    deliberately INCLUDES soft-deleted rows — a tombstone must not silently
+    release the asset's disposal state.
     """
 
     tenant_lookup = "asset__tenant"
@@ -60,10 +70,10 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
     def tenant(self):
         return self.asset.tenant if self.asset_id else None
 
-    asset = models.OneToOneField(
+    asset = models.ForeignKey(
         "assets.Asset",
         on_delete=models.PROTECT,
-        related_name="disposal",
+        related_name="disposals",
         verbose_name=_("Asset"),
     )
     disposal_method = models.CharField(
@@ -120,6 +130,22 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
     )
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
 
+    # Cancellation (issue #496): an erroneous disposal is CORRECTED, never erased.
+    # The record keeps its identity and stays in the disposal history; these
+    # fields are owned exclusively by ``cancel_asset_disposal`` (non-editable, so
+    # no ordinary form, serializer or admin field can set them).
+    cancelled_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Cancelled at"))
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="cancelled_asset_disposals",
+        verbose_name=_("Cancelled by"),
+    )
+    cancellation_reason = models.TextField(blank=True, editable=False, verbose_name=_("Cancellation reason"))
+
     class Meta:
         ordering = ["-disposal_date"]
         verbose_name = _("Asset Disposal")
@@ -127,12 +153,92 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
         permissions = [
             ("dispose_asset", _("Can record asset disposal / end-of-life")),
         ]
+        constraints = [
+            # One lifecycle-owning record per asset. The condition is deliberately
+            # only ``cancelled_at IS NULL``: soft-deleted rows keep occupying the
+            # slot so a tombstone cannot silently re-open the asset (their
+            # evidence must be resolved visibly, by cancellation).
+            models.UniqueConstraint(
+                fields=["asset"],
+                condition=models.Q(cancelled_at__isnull=True),
+                name="uniq_active_disposal_per_asset",
+            ),
+            # Cancellation state is coherent: a cancelled row names actor and
+            # reason, an active row has neither.
+            models.CheckConstraint(
+                check=(
+                    (
+                        models.Q(cancelled_at__isnull=False, cancelled_by__isnull=False)
+                        & ~models.Q(cancellation_reason="")
+                    )
+                    | models.Q(cancelled_at__isnull=True, cancelled_by__isnull=True, cancellation_reason="")
+                ),
+                name="disposal_cancellation_coherent",
+            ),
+        ]
 
     def __str__(self):
         return f"Disposal of {self.asset} ({self.get_disposal_method_display()}, {self.disposal_date})"
 
     def get_absolute_url(self):
         return reverse("assets:assetdisposal_detail", kwargs={"pk": self.pk})
+
+    @property
+    def is_active(self) -> bool:
+        """True while this record owns the asset's disposal lifecycle.
+
+        A soft-deleted but uncancelled record still owns it: hiding evidence in
+        the recycle bin must not release the disposed state.
+        """
+        return self.cancelled_at is None
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.cancelled_at is not None
+
+    def clean(self):
+        super().clean()
+        reason = (self.cancellation_reason or "").strip()
+        if self.cancelled_at is not None:
+            errors = {}
+            if self.cancelled_by is None:
+                errors["cancelled_by"] = _("A cancelled disposal must record who cancelled it.")
+            if not reason:
+                errors["cancellation_reason"] = _("A cancellation reason is required.")
+            if errors:
+                raise ValidationError(errors)
+        elif self.cancelled_by is not None or reason:
+            raise ValidationError(
+                {"cancellation_reason": _("Cancellation fields can only be set by cancelling the disposal.")}
+            )
+
+    def delete(self, *args, force_hard_delete=False, **kwargs):
+        """Disposal records are evidence: no ordinary delete, only cancellation.
+
+        ``force_hard_delete=True`` stays available for the explicitly authorized,
+        separately permissioned purge path; a plain soft/hard delete would be a
+        hidden cancellation or a hidden loss of evidence (#496).
+        """
+        forced = bool(force_hard_delete) or getattr(self, "_force_hard_delete", False)
+        if not forced:
+            raise ValidationError(
+                _("Disposal records are lifecycle evidence and cannot be deleted. Cancel the disposal instead.")
+            )
+        return super().delete(*args, force_hard_delete=True, **kwargs)
+
+    def restore(self):
+        """Cancelled rows are preserved history; restoring must not create a second active row."""
+        if self.cancelled_at is not None:
+            raise ValidationError(_("Cancelled disposal records are preserved history and cannot be restored."))
+        # ``_base_manager`` on purpose: the clash check must not depend on the
+        # ambient tenant/soft-delete lens of whoever clicks restore.
+        cls = type(self)
+        if (
+            self.pk
+            and cls._base_manager.filter(asset_id=self.asset_id, cancelled_at__isnull=True).exclude(pk=self.pk).exists()
+        ):
+            raise ValidationError(_("Restoring this record would leave two active disposals for the same asset."))
+        return super().restore()
 
 
 class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):

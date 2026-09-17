@@ -6901,6 +6901,46 @@
     },
     {
       "dependencies": [
+        "assets.0117_issue479_final_core_vocabulary",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0118_assetdisposal_cancellation_reason_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0118_assetdisposal_cancellation_reason_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": true,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -19090,6 +19130,7 @@
     "assets.0115_issue479_t07_provenance_bridge",
     "assets.0116_assettypeimagestage",
     "assets.0117_issue479_final_core_vocabulary",
+    "assets.0118_assetdisposal_cancellation_reason_and_more",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -19256,6 +19297,7 @@
       "assets.0052_remove_assetreservation_assetreservation_no_overlap_and_more",
       "assets.0053_alter_asset_asset_role_alter_asset_asset_tag_and_more",
       "assets.0056_remove_assetassignment_unique_active_assignment_per_asset_and_more",
+      "assets.0118_assetdisposal_cancellation_reason_and_more",
       "compliance.0009_auditsession_assetaudit",
       "compliance.0016_alter_assetaudit_asset_alter_assetaudit_auditor_and_more",
       "compliance.0105_custodyhandoffdelivery",
@@ -19417,7 +19459,7 @@
         ]
       }
     },
-    "post_transition_migrations": 52,
+    "post_transition_migrations": 53,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

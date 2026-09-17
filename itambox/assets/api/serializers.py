@@ -696,6 +696,20 @@ class AssetDisposalSerializer(BaseModelSerializer):
     data_sanitization_method_display = serializers.CharField(
         source="get_data_sanitization_method_display", read_only=True
     )
+    # Cancellation is owned by the service: read-only over the API (#496).
+    is_active = serializers.BooleanField(read_only=True)
+    cancelled_at = serializers.DateTimeField(read_only=True)
+    cancelled_by_name = serializers.SerializerMethodField()
+    cancellation_reason = serializers.CharField(read_only=True)
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_cancelled_by_name(self, obj: AssetDisposal) -> str | None:
+        return str(obj.cancelled_by) if obj.cancelled_by_id else None
+
+    def validate(self, attrs):
+        if self.instance is not None and "asset" in attrs and attrs["asset"] != self.instance.asset:
+            raise serializers.ValidationError({"asset_id": _("The asset of a disposal record cannot be changed.")})
+        return attrs
 
     class Meta:
         model = AssetDisposal
@@ -703,6 +717,7 @@ class AssetDisposalSerializer(BaseModelSerializer):
             "id",
             "asset",
             "asset_id",
+            "is_active",
             "disposal_method",
             "disposal_method_display",
             "disposal_date",
@@ -715,10 +730,28 @@ class AssetDisposalSerializer(BaseModelSerializer):
             "currency",
             "weee_compliant",
             "notes",
+            "cancelled_at",
+            "cancelled_by_name",
+            "cancellation_reason",
             "created_at",
             "updated_at",
         ]
-        brief_fields = ["id", "asset", "disposal_method", "disposal_date"]
+        brief_fields = ["id", "asset", "disposal_method", "disposal_date", "is_active"]
+
+
+class AssetDisposalCancelSerializer(serializers.Serializer):
+    """Reason-only payload for cancelling a disposal (#496).
+
+    Cancellation state itself is never writable: ``cancel_asset_disposal`` owns
+    the actor, the timestamp and the reason validation.
+    """
+
+    reason = serializers.CharField(trim_whitespace=True)
+
+    def validate_reason(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError(_("A cancellation reason is required."))
+        return value.strip()
 
 
 class WarrantySerializer(BaseModelSerializer):

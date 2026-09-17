@@ -1116,7 +1116,10 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
 
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": asset_mid.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Estimated value (indicative)")
+        # #496: the panel now distinguishes the estimated book value from a real
+        # disposal value and from an archival freeze; this asset is neither disposed
+        # nor frozen, so the rendered heading is the estimate one.
+        self.assertContains(response, "Estimated book value:")
 
     def test_atomic_kit_checkout_flow(self):
         from inventory.models import AccessoryStock

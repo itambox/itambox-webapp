@@ -173,12 +173,6 @@
     },
     {
       "path": "itambox/assets/models/requests.py",
-      "context": "ClassDef:AssetRequest/FunctionDef:clean",
-      "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/models/requests.py",
       "context": "ClassDef:AssetRequest/FunctionDef:save",
       "statement": "from core.managers import get_current_tenant",
       "count": 1
@@ -253,18 +247,6 @@
       "path": "itambox/assets/services/__init__.py",
       "context": "FunctionDef:checkout_asset",
       "statement": "from django.conf import settings",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services/__init__.py",
-      "context": "FunctionDef:dispose_asset",
-      "statement": "from assets.depreciation import compute_book_value",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services/__init__.py",
-      "context": "FunctionDef:dispose_asset",
-      "statement": "from assets.models import AssetDisposal",
       "count": 1
     },
     {
@@ -463,18 +445,6 @@
       "path": "itambox/assets/views/depreciation_views.py",
       "context": "ClassDef:DepreciationDetailView/FunctionDef:get_context_data",
       "statement": "from itambox.utils import get_paginate_count",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/disposal_views.py",
-      "context": "ClassDef:AssetDisposeActionView/FunctionDef:form_valid",
-      "statement": "from assets.services import dispose_asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/disposal_views.py",
-      "context": "ClassDef:AssetDisposeActionView/FunctionDef:form_valid",
-      "statement": "from django.core.exceptions import ValidationError as DjangoValidationError",
       "count": 1
     },
     {

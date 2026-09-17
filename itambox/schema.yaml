@@ -1144,6 +1144,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/assets/asset-disposals/{id}/cancel/:
+    post:
+      operationId: assets_asset_disposals_cancel_create
+      description: Cancel an erroneous disposal, preserving the record as evidence
+        (#496).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Disposal.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalCancelRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalCancelRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalCancelRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDisposal'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/assets/asset-requests/:
     get:
       operationId: assets_asset_requests_list
@@ -40013,6 +40080,9 @@ components:
           allOf:
           - $ref: '#/components/schemas/NestedAsset'
           readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
         disposal_method:
           $ref: '#/components/schemas/DisposalMethodEnum'
         disposal_method_display:
@@ -40081,6 +40151,16 @@ components:
           description: Disposal was carried out by an authorised WEEE recycler.
         notes:
           type: string
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+        cancelled_by_name:
+          type: string
+          readOnly: true
+        cancellation_reason:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -40091,12 +40171,29 @@ components:
           readOnly: true
       required:
       - asset
+      - cancellation_reason
+      - cancelled_at
+      - cancelled_by_name
       - created_at
       - data_sanitization_method_display
       - disposal_date
       - disposal_method_display
       - id
+      - is_active
       - updated_at
+    AssetDisposalCancelRequest:
+      type: object
+      description: |-
+        Reason-only payload for cancelling a disposal (#496).
+
+        Cancellation state itself is never writable: ``cancel_asset_disposal`` owns
+        the actor, the timestamp and the reason validation.
+      properties:
+        reason:
+          type: string
+          minLength: 1
+      required:
+      - reason
     AssetDisposalRequest:
       type: object
       properties:

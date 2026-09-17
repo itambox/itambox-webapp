@@ -58,7 +58,9 @@ def asset_action_payload(asset, mode):
     book_value = None
 
     if mode == "dispose":
-        if asset.disposed_at is not None or AssetDisposal.all_objects.filter(asset=asset).exists():
+        # #496: only an ACTIVE record means disposed. An archived asset without a
+        # record is archived (book-value freeze), not disposed, so it stays eligible.
+        if AssetDisposal.all_objects.filter(asset=asset, cancelled_at__isnull=True).exists():
             eligible = False
             warning = str(_("Already disposed; this asset will be skipped."))
         bv = compute_book_value(asset)

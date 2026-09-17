@@ -881,6 +881,89 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
         mock_async.assert_called_once()
         self.assertEqual(mock_async.call_args[0][4], self.tenant.pk)
 
+    @patch("django_q.tasks.async_task")
+    def test_all_accessible_disposal_submit_uses_selected_tenant(self, mock_async):
+        """Aggregate scope: a disposal submitted for the selected tenant reaches the task."""
+        self.tenant_role.permissions = ["assets.view_asset", "assets.add_assetdisposal"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_dispose"),
+            {"tenant": self.tenant.pk, "pk": [self.asset.pk], "disposal_date": "2026-08-18"},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        job = Job.objects.filter(name__contains="Bulk Disposal").first()
+        self.assertIsNotNone(job)
+        self.assertEqual(job.tenant_id, self.tenant.pk)
+        mock_async.assert_called_once()
+
+    @patch("django_q.tasks.async_task")
+    def test_all_accessible_disposal_never_submits_a_foreign_tenant_asset(self, mock_async):
+        """Aggregate scope: an asset of a tenant with read-only access is not disposed (#496)."""
+        other = Tenant.objects.create(name="Other disposal", slug="dispose-other")
+        other_role = self.tenant_role.__class__.objects.create(
+            tenant=other,
+            name="Read-only",
+            permissions=["assets.view_asset"],
+        )
+        self.grant(self.tenant_user, other, other_role)
+        foreign_asset = Asset.objects.create(
+            name="Foreign disposal asset",
+            asset_tag="FOREIGN-496",
+            status=self.asset.status,
+            asset_type=self.asset.asset_type,
+            tenant=other,
+        )
+        self.tenant_role.permissions = ["assets.view_asset", "assets.add_assetdisposal"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_dispose"),
+            {
+                "tenant": self.tenant.pk,
+                "pk": [self.asset.pk, foreign_asset.pk],
+                "disposal_date": "2026-08-18",
+            },
+        )
+
+        self.assertIn(resp.status_code, (302,))
+        self.assertFalse(
+            Job.objects.filter(
+                name__contains="Bulk Disposal",
+            )
+            .exclude(tenant_id=self.tenant.pk)
+            .exists()
+        )
+
+        def _flatten(value):
+            if isinstance(value, (list, tuple)):
+                for item in value:
+                    yield from _flatten(item)
+            elif isinstance(value, dict):
+                for item in value.values():
+                    yield from _flatten(item)
+            else:
+                yield value
+
+        submitted = list(_flatten(mock_async.call_args[0])) if mock_async.called else []
+        if submitted:
+            self.assertIn(self.asset.pk, submitted)
+            self.assertNotIn(foreign_asset.pk, submitted)
+        foreign_asset.refresh_from_db()
+        self.assertIsNone(foreign_asset.disposed_at)
+        self.assertFalse(AssetDisposal.all_objects.filter(asset_id=foreign_asset.pk).exists())
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Bulk check-out

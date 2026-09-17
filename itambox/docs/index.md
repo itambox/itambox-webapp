@@ -50,10 +50,22 @@ stateDiagram-v2
     Available --> PendingRepair: Maintenance Needed
     PendingRepair --> Available: Repaired
     InUse --> Available: Checked In
-    InUse --> Archived: Decommissioned/Sold
-    Available --> Archived: Scrapped
-    Archived --> [*]
+    InUse --> Archived: Taken out of service
+    Available --> Archived: taken out of service
+    Archived --> Pending: Reactivated (archived, not disposed)
+    Archived --> Disposed: Disposal recorded
+    Disposed --> Pending: Disposal cancelled (record kept)
+    Disposed --> [*]
 ```
+
+**Archived is not the same as disposed.** `Archived` is an operational state: the
+item is out of service and its book value is frozen, but no disposal evidence
+exists and the item may be reactivated through the ordinary `archived -> pending`
+transition. A **disposal** is recorded as an `AssetDisposal` record (method,
+data sanitization, WEEE, recipient) and always stamps the asset, archives it and
+closes any active assignment in one operation. An erroneous disposal is
+**cancelled** with a mandatory reason: the record stays visible as history and
+the asset returns to `pending`.
 
 ### Context-Sensitive Help
 Every list, detail, and editing view in ITAMbox features an embedded help icon (`mdi-help-circle`) on the breadcrumb header. Clicking it opens a context-specific static page explaining that specific model's fields, business logic rules, and import/export layouts.

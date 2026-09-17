@@ -6,6 +6,7 @@ import datetime
 from datetime import timedelta
 from decimal import Decimal
 
+from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -312,6 +313,49 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         return active.assigned_target if active else None
 
     @property
+    def active_disposal(self):
+        """The disposal record that owns this asset's lifecycle, or None (#496).
+
+        Mirrors ``active_assignment``: an explicitly prefetched list wins, so
+        list views can avoid a per-row query.
+        """
+        prefetched = getattr(self, "prefetched_active_disposals", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+        # Canonical definition (matches the DB constraint and active_disposal_filter): an
+        # UNCANCELLED record owns the lifecycle even when it sits in the recycle bin, so the
+        # default soft-delete-filtering reverse manager must not be used here. The model is
+        # resolved through the app registry: no import edge, no claimed cycle.
+        disposal_model = apps.get_model("assets", "AssetDisposal")
+        return disposal_model.all_objects.filter(asset_id=self.pk, cancelled_at__isnull=True).first()
+
+    @property
+    def is_disposed(self) -> bool:
+        """True while an active disposal record owns this asset."""
+        return self.active_disposal is not None
+
+    @staticmethod
+    def active_disposal_filter(prefix: str = "") -> models.Q:
+        """Q matching assets whose disposal is owned by a record (#496).
+
+        Cancelled records are preserved history and never satisfy it. A
+        soft-deleted but uncancelled record still does: hiding evidence in the
+        recycle bin must not release the disposed state.
+
+        ``disposals__isnull=False`` is required: an ``exclude()`` over a
+        nullable relation is rendered as a LEFT OUTER JOIN inside a NOT EXISTS
+        subquery, and without the existence guard the joined NULL row makes the
+        ``cancelled_at IS NULL`` predicate true for assets that have no disposal
+        record at all (which would drop every asset from the candidate set).
+        """
+        return models.Q(**{f"{prefix}disposals__isnull": False, f"{prefix}disposals__cancelled_at__isnull": True})
+
+    @classmethod
+    def exclude_disposed(cls, queryset, prefix: str = ""):
+        """Drop assets with an active disposal record from a candidate queryset."""
+        return queryset.exclude(cls.active_disposal_filter(prefix))
+
+    @property
     def category(self):
         return self.asset_type.category if self.asset_type else None
 
@@ -369,6 +413,24 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
                 AssetStateMachine.validate_transition(
                     old_asset.status.type, self.status.type, self.assignments.filter(is_active=True).exists()
                 )
+                # #496: a disposal RECORD owns the out-of-operation state. Leaving
+                # ``archived`` while an active record exists (an ordinary status
+                # edit, an import, an admin change) is a hidden reactivation — it
+                # must go through cancel_asset_disposal instead.
+                if (
+                    old_asset.status.type == "archived"
+                    and self.status.type != "archived"
+                    # ``all_objects`` on purpose: a soft-deleted but uncancelled
+                    # record still owns the asset, so a tombstone must not release
+                    # the guard (the default related manager hides deleted rows).
+                    and self.disposals(manager="all_objects").filter(cancelled_at__isnull=True).exists()
+                ):
+                    raise ValidationError(
+                        _(
+                            "This asset has an active disposal record. Cancel the disposal "
+                            "before moving it out of the archived state."
+                        )
+                    )
 
     def _prepare_asset_tag(self, update_fields):
         # A specification-only save must not reserve or change unrelated tags.

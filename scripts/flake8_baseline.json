@@ -349,14 +349,6 @@
     },
     {
       "path": "itambox/assets/forms/disposal_form.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Fieldset(\n                _(\"Disposal Details\"),\n                Div(\n                    Div(\"asset\", css_class=\"col-md-6\"),\n                    Div(\"disposal_date\", css_class=\"col-md-6\"),\n                    css_class=\"row\",\n                ),\n                Div(\n                    Div(\"disposal_method\", css_class=\"col-md-6\"),\n                    Div(\"recipient\", css_class=\"col-md-6\"),\n                    css_class=\"row\",\n                ),\n            ),\n            Fieldset(\n                _(\"Data Sanitization & Compliance\"),\n                Div(\n                    Div(\"data_sanitization_method\", css_class=\"col-md-4\"),\n                    Div(\"sanitized_by\", css_class=\"col-md-4\"),\n                    Div(\"sanitization_certificate\", css_class=\"col-md-4\"),\n                    css_class=\"row\",\n                ),\n                Div(\n                    Div(\"weee_compliant\", css_class=\"col-md-4 d-flex align-items-end pb-2\"),\n                    css_class=\"row\",\n                ),\n            ),\n            Fieldset(\n                _(\"Financial\"),\n                Div(\n                    Div(\"proceeds\", css_class=\"col-md-4\"),\n                    Div(\"currency\", css_class=\"col-md-4\"),\n                    css_class=\"row\",\n                ),\n            ),\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-danger\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:AssetDisposalForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/disposal_form.py",
       "code": "F401",
       "message": "'crispy_forms.layout.Row' imported but unused",
       "source": "from crispy_forms.layout import HTML, Div, Fieldset, Layout, Row, Submit",
@@ -681,14 +673,6 @@
       "message": "assertRaises-type context should not contain more than one top-level statement.",
       "source": "        with self.assertRaises(IntegrityError):",
       "context": "Module:body/ClassDef:AssetDisposalModelTest:body/FunctionDef:test_one_disposal_per_asset_enforced:body/With:[(\"Call(func=Attribute(value=Name(id='self', ctx=Load()), attr='assertRaises', ctx=Load()), args=[Name(id='IntegrityError', ctx=Load())], keywords=[])\", None)]:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_disposal.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.ValidationError' imported but unused",
-      "source": "from django.core.exceptions import ValidationError",
-      "context": "Module:body",
       "count": 1
     },
     {

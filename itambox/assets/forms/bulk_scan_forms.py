@@ -228,7 +228,10 @@ def _tenant_holders():
 
 
 def _tenant_target_assets():
-    qs = Asset.objects.exclude(status__type__in=["undeployable", "in_repair", "on_order", "archived"]).order_by("name")
+    # #496: a disposed asset is never a valid target, whatever its status says.
+    qs = Asset.exclude_disposed(
+        Asset.objects.exclude(status__type__in=["undeployable", "in_repair", "on_order", "archived"])
+    ).order_by("name")
     tenant = get_current_tenant()
     if tenant:
         qs = qs.filter(tenant=tenant)

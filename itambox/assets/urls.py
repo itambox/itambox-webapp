@@ -3,6 +3,7 @@ from django.views.generic import RedirectView
 
 from . import views
 from .views import library_views, request_views
+from .views.disposal_views import AssetDisposalCancelView
 
 app_name = "assets"
 
@@ -138,6 +139,8 @@ urlpatterns += [
     path("disposals/<int:pk>/", views.AssetDisposalDetailView.as_view(), name="assetdisposal_detail"),
     path("disposals/<int:pk>/edit/", views.AssetDisposalEditView.as_view(), name="assetdisposal_update"),
     path("disposals/<int:pk>/delete/", views.AssetDisposalDeleteView.as_view(), name="assetdisposal_delete"),
+    # Cancel an erroneous disposal while preserving the record as evidence (#496)
+    path("disposals/<int:pk>/cancel/", AssetDisposalCancelView.as_view(), name="assetdisposal_cancel"),
     # Asset-specific dispose action (pre-fills asset, calls dispose_asset service)
     path("assets/<int:pk>/dispose/", views.AssetDisposeActionView.as_view(), name="asset_dispose"),
 ]
