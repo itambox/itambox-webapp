@@ -25,6 +25,7 @@ class DisposalReportEffectiveTotalsTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(name="Report Tenant", slug="report-tenant")
         self.other_tenant = Tenant.objects.create(name="Report Other", slug="report-other")
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED)
+        baker.make(StatusLabel, type=StatusLabel.TYPE_PENDING, name="Pending")
         self.set_active_tenant(self.tenant)
         self.template = baker.make(
             ReportTemplate,

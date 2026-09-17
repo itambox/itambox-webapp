@@ -130,6 +130,7 @@ class DisposalReportGermanHeaderTests(TenantTestMixin, TestCase):
     def test_rendered_report_header_uses_the_disposal_specific_label(self):
         self.setup_tenant_context(name="DE Report Tenant", slug="de-report-tenant")
         status = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED)
+        baker.make(StatusLabel, type=StatusLabel.TYPE_PENDING, name="Pending")
         self.set_active_tenant(self.tenant)
         asset = baker.make(Asset, name="DE report asset", asset_tag="DE-RPT", tenant=self.tenant, status=status)
         record = AssetDisposal.objects.create(

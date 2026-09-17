@@ -32,6 +32,9 @@ class DisposalEvidenceGuardTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(permissions=DISPOSAL_PERMS)
         self.set_active_tenant(self.tenant)
         self.deployable = baker.make(StatusLabel, type="deployable", name="Deployable")
+        # Own lifecycle prerequisites; another test may have flushed migration seeds.
+        baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED, name="Archived")
+        baker.make(StatusLabel, type=StatusLabel.TYPE_PENDING, name="Pending")
         self.asset = baker.make(Asset, name="Rollback Laptop", status=self.deployable, tenant=self.tenant)
 
     def _state(self):

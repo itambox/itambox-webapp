@@ -38,6 +38,7 @@ class KitDisposalAvailabilityTests(TenantTestMixin, TestCase):
         self.set_active_tenant(self.tenant)
         self.deployable = baker.make(StatusLabel, type="deployable", name="Deployable")
         self.archived = baker.make(StatusLabel, type="archived", name="Archived")
+        baker.make(StatusLabel, type=StatusLabel.TYPE_PENDING, name="Pending")
         manufacturer = baker.make(Manufacturer, name=f"Kit maker {self.tenant.pk}")
         self.asset_type = baker.make(AssetType, manufacturer=manufacturer, model="Kit laptop")
         self.kit = baker.make(Kit, name="Repair kit", tenant=self.tenant)

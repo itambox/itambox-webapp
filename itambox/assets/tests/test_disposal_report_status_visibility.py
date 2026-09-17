@@ -28,6 +28,7 @@ class DisposalReportStatusVisibilityTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(name="Status Tenant", slug="status-tenant")
         self.other_tenant = Tenant.objects.create(name="Status Other", slug="status-other")
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED)
+        baker.make(StatusLabel, type=StatusLabel.TYPE_PENDING, name="Pending")
         self.set_active_tenant(self.tenant)
         self.template = baker.make(
             ReportTemplate,
