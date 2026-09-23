@@ -115,7 +115,9 @@ class AssetHolderDetailView(ObjectDetailView):
         # Gated by the view permission this detail view already enforces
         # (staff / a documented per-tenant permission); the report itself is
         # computed per concrete holder, so a person only ever sees their own.
-        offboarding_report = get_offboarding_report(assetholder)
+        # Custody items additionally require the receipt permission checked
+        # above, exactly like the custody tab on this page.
+        offboarding_report = get_offboarding_report(assetholder, include_custody=can_view_receipts)
         context["offboarding_report"] = offboarding_report
         context["offboarding_obligation_count"] = len(offboarding_report.items)
 

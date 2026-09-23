@@ -207,6 +207,27 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
                 response, reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt.pk})
             )
 
+    def test_holder_offboarding_tab_requires_receipt_permission_for_custody_items(self):
+        holder_url = reverse("organization:assetholder_detail", kwargs={"pk": self.holder.pk})
+
+        # The receipt permission makes the pending receipt part of the
+        # offboarding readiness report on this holder's page.
+        response = self.client.get(holder_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Unaccepted custody receipt for:")
+        self.assertContains(response, reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt.pk}))
+
+        # Without it, the offboarding report hides custody items exactly like
+        # the embedded custody surfaces on this page.
+        self._login_with_permissions(
+            "organization.view_assetholder",
+            "compliance.view_custodytemplate",
+        )
+        response = self.client.get(holder_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Unaccepted custody receipt for:")
+        self.assertNotContains(response, reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt.pk}))
+
 
 class CustodyPermissionPolicyTests(TestCase):
     @override_settings(ITAMBOX_BASE_URL="https://public.example.test/")

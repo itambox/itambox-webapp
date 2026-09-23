@@ -37,6 +37,7 @@ from assets.models import (
 )
 from assets.models.choices import ReservationStatusChoices
 from compliance.models import CustodyReceipt, CustodyTemplate
+from core.tests.mixins import TenantTestMixin
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -252,6 +253,23 @@ class OffboardingReportTests(TestCase):
         receipt.save()
         report = get_offboarding_report(self.holder)
         assert report.is_clear
+
+    def test_custody_items_hidden_for_viewers_without_receipt_permission(self):
+        template = self._make_custody_template("c")
+        CustodyReceipt.objects.create(
+            asset=self.asset,
+            holder=self.holder,
+            custody_template=template,
+            eula_text="OB custody c terms.",
+        )
+        # The view passes the viewer's compliance.view_custodyreceipt result;
+        # without it the custody items are hidden exactly like the custody
+        # surfaces on the same page, while the full report keeps them.
+        restricted = get_offboarding_report(self.holder, include_custody=False)
+        assert restricted.for_kind("custody_receipt") == []
+        assert restricted.is_clear
+        full = get_offboarding_report(self.holder)
+        assert len(full.for_kind("custody_receipt")) == 1
 
     # ------------------------------------------------------------- asset request
     def test_includes_open_request_as_requester(self):
@@ -491,3 +509,62 @@ class OffboardingReportTests(TestCase):
         AssetAssignment.objects.create(asset=self.asset, assigned_user=other_holder, is_active=True)
         report = get_offboarding_report(self.holder)
         assert report.is_clear
+
+
+class OffboardingReportTenantScopingTests(TenantTestMixin, TestCase):
+    """Tenant scoping: a report never composes another tenant's obligations.
+
+    The surrounding detail view runs inside the active tenant context; the
+    report inherits that scoping from the tenant-scoped managers (the same
+    contextvar the view set), so obligations that belong to another tenant
+    are never surfaced, and the active tenant's own obligations are listed
+    in full.
+    """
+
+    def setUp(self):
+        self.setup_tenant_context(name="OB Alpha", slug="ob-alpha")
+        self.tenant_b = Tenant.objects.create(name="OB Beta", slug="ob-beta")
+
+        self.status = StatusLabel.objects.create(name="OB TS Deployed", slug="ob-ts-deployed", type="deployable")
+        self.asset_a = Asset.objects.create(
+            name="OB Alpha Asset", asset_tag="OB-ALPHA-1", status=self.status, tenant=self.tenant
+        )
+        self.holder_a = AssetHolder.objects.create(
+            first_name="Alpha", last_name="Holder", upn="alpha.holder@ob.example.com", tenant=self.tenant
+        )
+        self.assignment_a = AssetAssignment.objects.create(
+            asset=self.asset_a, assigned_user=self.holder_a, is_active=True
+        )
+
+        self.asset_b = Asset.objects.create(
+            name="OB Beta Asset", asset_tag="OB-BETA-1", status=self.status, tenant=self.tenant_b
+        )
+        self.holder_b = AssetHolder.objects.create(
+            first_name="Beta", last_name="Holder", upn="beta.holder@ob.example.com", tenant=self.tenant_b
+        )
+        self.assignment_b = AssetAssignment.objects.create(
+            asset=self.asset_b, assigned_user=self.holder_b, is_active=True
+        )
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    def test_single_tenant_scope_lists_all_of_this_tenants_obligations(self):
+        self.set_active_tenant(self.tenant)
+        report = get_offboarding_report(self.holder_a)
+        items = report.for_kind("asset_assignment")
+        assert len(items) == 1
+        assert items[0].object_pk == self.assignment_a.pk
+        assert not report.is_clear
+
+    def test_other_tenants_obligations_do_not_leak_into_the_report(self):
+        self.set_active_tenant(self.tenant)
+        report = get_offboarding_report(self.holder_b)
+        assert report.for_kind("asset_assignment") == []
+
+    def test_each_tenant_context_sees_only_its_own_holders_obligations(self):
+        self.set_active_tenant(self.tenant_b)
+        report = get_offboarding_report(self.holder_b)
+        items = report.for_kind("asset_assignment")
+        assert len(items) == 1
+        assert items[0].object_pk == self.assignment_b.pk

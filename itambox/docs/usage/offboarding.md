@@ -41,7 +41,9 @@ deliberate operator actions, taken from the links the report provides.
 
 The tab inherits the Asset Holder detail view's permission gate: staff or a documented
 per-tenant permission can see it, and the report is computed server-side for the concrete
-holder, so a person only ever sees their own obligations.
+holder, so a person only ever sees their own obligations. Unaccepted custody receipts
+additionally require the custody receipt view permission, exactly like the custody tab
+on the same page.
 
 ## Why there is no script anymore
 

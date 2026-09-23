@@ -312,13 +312,19 @@ def _membership_items(holder: AssetHolder) -> list[ObligationItem]:
     ]
 
 
-def get_offboarding_report(holder: AssetHolder) -> OffboardingReport:
+def get_offboarding_report(holder: AssetHolder, *, include_custody: bool = True) -> OffboardingReport:
     """Compose the outstanding-obligations report for ``holder``.
 
     Read-only: no writes, no side effects. Tenant scoping is inherited from the
     current tenant context (the same contextvar the active view already set),
     so each class is limited to the active tenant exactly as the surrounding
     list/detail views are.
+
+    :param include_custody: whether unaccepted custody receipts are part of the
+        report. Callers pass the viewer's ``compliance.view_custodyreceipt``
+        result: ``False`` hides the items exactly like the custody surfaces on
+        the same page do, and the default keeps the full report for
+        management/CLI use.
     """
     items: list[ObligationItem] = []
     items += _asset_assignment_items(holder)
@@ -326,7 +332,8 @@ def get_offboarding_report(holder: AssetHolder) -> OffboardingReport:
     items += _component_items(holder)
     items += _consumable_items(holder)
     items += _license_items(holder)
-    items += _custody_items(holder)
+    if include_custody:
+        items += _custody_items(holder)
     items += _request_items(holder)
     items += _reservation_items(holder)
     items += _subscription_items(holder)
