@@ -749,3 +749,104 @@ class LabelBulkScopeTests(TestCase):
         response = self.client.get(reverse("job_detail", kwargs={"pk": self.outside_job.pk}))
 
         self.assertEqual(response.status_code, 404)
+
+
+class BulkMutationTenantVisibilityTests(TestCase):
+    """Issue #499: the bulk confirm surfaces name each object's tenant whenever
+    the active scope does not pin a single tenant.
+
+    The all-accessible scope refuses ambient change/delete permissions by
+    design, so the member-facing aggregate case is the tenant-group scope and
+    the global view case belongs to the superuser.
+    """
+
+    def setUp(self):
+        self.group = TenantGroup.objects.create(name="Visibility Group", slug="visibility-group")
+        self.tenant_a = Tenant.objects.create(name="Visibility Tenant A", slug="visibility-tenant-a", group=self.group)
+        self.tenant_b = Tenant.objects.create(name="Visibility Tenant B", slug="visibility-tenant-b", group=self.group)
+        self.superuser = User.objects.create_superuser(
+            username="visibility-su",
+            email="visibility-su@example.com",
+            password="pw",
+        )
+        self.user = User.objects.create_user(username="visibility-scope-user", password="pw")
+        for tenant in (self.tenant_a, self.tenant_b):
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Visibility editor {tenant.pk}",
+                permissions=["assets.view_asset", "assets.change_asset", "assets.delete_asset"],
+            )
+            grant(self.user, tenant, role)
+        status = StatusLabel.objects.create(name="Available visibility", slug="available-visibility", type="deployable")
+        self.asset_a = Asset.objects.create(name="Visibility A", asset_tag="VIS-A", status=status, tenant=self.tenant_a)
+        self.asset_b = Asset.objects.create(name="Visibility B", asset_tag="VIS-B", status=status, tenant=self.tenant_b)
+        self.delete_url = reverse("assets:asset_bulk_delete")
+        self.edit_url = reverse("assets:asset_bulk_edit")
+
+    def _login(self, *, superuser=False, group=None, tenant=None):
+        self.client.force_login(self.superuser if superuser else self.user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session.pop("active_tenant_group_id", None)
+        session.pop("active_all_accessible", None)
+        if group is not None:
+            session["active_tenant_group_id"] = group.pk
+        elif tenant is not None:
+            session["active_tenant_id"] = tenant.pk
+        session.save()
+
+    def test_bulk_delete_confirm_names_each_tenant_in_group_scope(self):
+        self._login(group=self.group)
+
+        response = self.client.post(self.delete_url, {"pk": [self.asset_a.pk, self.asset_b.pk]})
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(f"(Tenant: {self.tenant_a.name})", content)
+        self.assertIn(f"(Tenant: {self.tenant_b.name})", content)
+
+    def test_bulk_delete_confirm_names_each_tenant_in_global_view(self):
+        self._login(superuser=True)
+
+        response = self.client.post(self.delete_url, {"pk": [self.asset_a.pk, self.asset_b.pk]})
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(f"(Tenant: {self.tenant_a.name})", content)
+        self.assertIn(f"(Tenant: {self.tenant_b.name})", content)
+
+    def test_bulk_delete_confirm_hides_tenant_in_single_tenant_scope(self):
+        self._login(tenant=self.tenant_a)
+
+        response = self.client.post(self.delete_url, {"pk": [self.asset_a.pk]})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(f"(Tenant: {self.tenant_a.name})", response.content.decode())
+
+    def test_bulk_edit_names_each_tenant_in_group_scope(self):
+        self._login(group=self.group)
+
+        response = self.client.post(self.edit_url, {"pk": [self.asset_a.pk, self.asset_b.pk]})
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(f"(Tenant: {self.tenant_a.name})", content)
+        self.assertIn(f"(Tenant: {self.tenant_b.name})", content)
+
+    def test_bulk_edit_names_each_tenant_in_global_view(self):
+        self._login(superuser=True)
+
+        response = self.client.post(self.edit_url, {"pk": [self.asset_a.pk, self.asset_b.pk]})
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(f"(Tenant: {self.tenant_a.name})", content)
+        self.assertIn(f"(Tenant: {self.tenant_b.name})", content)
+
+    def test_bulk_edit_hides_tenant_in_single_tenant_scope(self):
+        self._login(tenant=self.tenant_a)
+
+        response = self.client.post(self.edit_url, {"pk": [self.asset_a.pk]})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(f"(Tenant: {self.tenant_a.name})", response.content.decode())

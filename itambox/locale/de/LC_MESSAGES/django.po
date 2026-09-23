@@ -15283,3 +15283,14 @@ msgstr "Öffnen"
 #: itambox/templates/organization/assetholders/includes/offboarding_tab.html:51
 msgid "No outstanding obligations found for this person."
 msgstr "Keine offenen Verpflichtungen für diese Person gefunden."
+
+#: itambox/templates/global_includes/_tenant_switcher_list.html:10
+#: itambox/templates/global_includes/_topbar.html:60
+#: itambox/templates/global_includes/_topbar.html:69
+#: itambox/templates/layout.html:150
+msgid "Global View"
+msgstr "Globale Ansicht"
+
+#: itambox/itambox/middleware.py:294
+msgid "The tenant filter was reset because the selected scope defines which tenants are shown."
+msgstr "Der Mandantenfilter wurde zurückgesetzt, da der gewählte Geltungsbereich festlegt, welche Mandanten angezeigt werden."

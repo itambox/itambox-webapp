@@ -228,8 +228,31 @@ class BulkViewMixin:
                 return model
         return None
 
-    def _get_queryset(self, pks):
-        qs = self.queryset if getattr(self, "queryset", None) is not None else self._get_model().objects.all()
+    def _get_queryset(self, pks, *, with_tenant=False):
+        """Return the scoped queryset for ``pks``.
+
+        ``with_tenant`` prefetches the owning tenant for the read-only bulk
+        confirm surfaces.
+        """
+        model = self._get_model()
+        qs = self.queryset if getattr(self, "queryset", None) is not None else model.objects.all()
         if hasattr(qs, "filter_by_tenant"):
             qs = qs.filter_by_tenant()
-        return qs.filter(pk__in=pks)
+        qs = qs.filter(pk__in=pks)
+        return self._with_tenant_prefetch(qs, model, with_tenant)
+
+    @staticmethod
+    def _with_tenant_prefetch(qs, model, with_tenant):
+        """Prefetch the owning tenant for the read-only bulk confirm surfaces.
+
+        A row-locked queryset cannot carry the nullable tenant FK join, so the
+        prefetch is skipped there instead of failing at the database level, and
+        models without a tenant relation are returned unchanged.
+        """
+        if not with_tenant or model is None:
+            return qs
+        if not any(field.name == "tenant" for field in model._meta.fields):
+            return qs
+        if getattr(qs.query, "select_for_update", False):
+            return qs
+        return qs.select_related("tenant")

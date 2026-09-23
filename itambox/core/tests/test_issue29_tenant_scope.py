@@ -15,13 +15,15 @@ Two related defects on the tenant selector for authenticated non-superusers:
    never equivalent to the superuser/global scope.
 """
 
+import re
 from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase
-from django.utils import timezone
+from django.urls import reverse
+from django.utils import timezone, translation
 
 import organization.rbac as rbac
 from core.managers import (
@@ -950,9 +952,10 @@ class AllAccessibleMiddlewareTests(TestCase):
 
 
 class AllAccessibleSelectorUITests(TestCase):
-    """The workspace switcher offers non-superusers an "All accessible tenants"
-    entry, marks it active under the scope, and never shows it to superusers (who
-    keep the distinct global entry) or to users with no accessible tenants."""
+    """The workspace switcher offers non-superusers an "All Tenants" entry for
+    the all-accessible scope, marks it active under the scope, and never shows it
+    to superusers (who keep the distinct "Global View" entry) or to users with no
+    accessible tenants."""
 
     def setUp(self):
         set_current_tenant(None)
@@ -995,15 +998,22 @@ class AllAccessibleSelectorUITests(TestCase):
 
     @staticmethod
     def _all_accessible_line(html):
-        for line in html.splitlines():
+        """Return the all-accessible link's opening tag, joining wrapped lines."""
+        lines = html.splitlines()
+        for index, line in enumerate(lines):
             if "switch_all_accessible" in line:
-                return line
+                parts = [line]
+                while ">" not in parts[-1] and index + 1 < len(lines):
+                    index += 1
+                    parts.append(lines[index])
+                return " ".join(part.strip() for part in parts)
         return None
 
     def test_non_superuser_sees_all_accessible_link(self):
         html = self._render(self.member)
         self.assertIsNotNone(self._all_accessible_line(html))
         self.assertIn("All Tenants", html)
+        self.assertNotIn("Global View", html)
 
     def test_all_accessible_link_marked_active_under_scope(self):
         line = self._all_accessible_line(
@@ -1024,12 +1034,46 @@ class AllAccessibleSelectorUITests(TestCase):
         # Superusers keep the distinct global entry, never the member scope link.
         self.assertIsNone(self._all_accessible_line(html))
 
-    def test_superuser_global_entry_uses_all_tenants_label(self):
+    def test_superuser_global_entry_uses_global_view_label(self):
         html = self._render(self.superuser)
-        self.assertIn("All Tenants", html)
-        self.assertNotIn("All Tenants (Global)", html)
+        # Issue #499: the platform-wide scope has its own label; the member
+        # label stays reserved for the accessible-tenant scope.
+        self.assertIn("Global View", html)
+        self.assertNotIn("All Tenants", html)
         self.assertIn("switch_tenant=", html)
+
+    def test_superuser_global_view_label_is_translated(self):
+        with translation.override("de"):
+            html = self._render(self.superuser)
+        self.assertIn("Globale Ansicht", html)
 
     def test_user_without_access_has_no_all_accessible_link(self):
         html = self._render(self.no_access)
         self.assertIsNone(self._all_accessible_line(html))
+
+
+class GroupScopeLabelTests(TestCase):
+    """Issue #499: a tenant-group scope names the group in the visible label and
+    in the visually hidden label that screen readers and automation consume."""
+
+    def setUp(self):
+        self.group = TenantGroup.objects.create(name="Label Group", slug="label-group")
+        self.superuser = User.objects.create_superuser(
+            username="i499-label-su",
+            email="i499-label-su@example.com",
+            password="pw",
+        )
+
+    def test_group_scope_labels_the_group_in_both_labels(self):
+        self.client.force_login(self.superuser)
+        session = self.client.session
+        session["active_tenant_group_id"] = self.group.pk
+        session.save()
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        hidden = re.search(r'data-testid="active-tenant"[^>]*>(.*?)</span>', response.content.decode(), re.S)
+        self.assertIsNotNone(hidden)
+        self.assertIn("Label Group", hidden.group(1))
+        self.assertNotIn("Global View", hidden.group(1))

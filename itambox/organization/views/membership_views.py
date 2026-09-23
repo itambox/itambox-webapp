@@ -506,9 +506,10 @@ class MembershipBulkEditView(ObjectBulkEditView):
     queryset = Membership.objects.all()
     form_class = MembershipBulkRoleForm
 
-    def _get_queryset(self, pks):
+    def _get_queryset(self, pks, *, with_tenant=False):
         qs = Membership.objects.filter(pk__in=pks)
-        return visible_to_containers(self.request.user, qs, "organization.change_membership")
+        qs = visible_to_containers(self.request.user, qs, "organization.change_membership")
+        return self._with_tenant_prefetch(qs, self._get_model(), with_tenant)
 
     @staticmethod
     def _add_own_scope(membership, role, actor, reason="", valid_until=None):
@@ -669,6 +670,7 @@ class MembershipBulkEditView(ObjectBulkEditView):
 class MembershipBulkDeleteView(ObjectBulkDeleteView):
     queryset = Membership.objects.all()
 
-    def _get_queryset(self, pks):
+    def _get_queryset(self, pks, *, with_tenant=False):
         qs = Membership.objects.filter(pk__in=pks)
-        return visible_to_containers(self.request.user, qs, "organization.delete_membership")
+        qs = visible_to_containers(self.request.user, qs, "organization.delete_membership")
+        return self._with_tenant_prefetch(qs, self._get_model(), with_tenant)

@@ -5,7 +5,9 @@ import uuid
 from typing import Any
 
 from django.apps import apps
+from django.contrib import messages
 from django.http import HttpRequest
+from django.utils.translation import gettext as _
 
 from core.authorization_cache import begin_authorization_request, end_authorization_request
 
@@ -279,6 +281,39 @@ class TenantMiddleware:
         return session_tenant_id, session_group_id, session_all_accessible
 
     @staticmethod
+    def _scope_signature(tenant_id, group_id, all_accessible):
+        """Return a comparable signature of a resolved scope.
+
+        Session ids are integers while switch parameters arrive as strings, so
+        the raw values cannot be compared directly.
+        """
+        return (
+            None if tenant_id in (None, "") else str(tenant_id),
+            None if group_id in (None, "") else str(group_id),
+            bool(all_accessible),
+        )
+
+    @staticmethod
+    def _apply_scope_notice(request: HttpRequest) -> None:
+        """Surface a scope-switch filter reset as a visible message.
+
+        The switcher drops a tenant filter that the new tenant/group scope
+        already defines; the notice marker keeps that reset from being silent.
+        Callers only reach this after a switch that changed the resolved scope,
+        so reloading a switch URL does not replay the message.
+        """
+        if request.GET.get("scope_notice") != "filters":
+            return
+        if "tenant" in request.GET:
+            # The target scope keeps the tenant filter: nothing was reset.
+            return
+        if not any(key in request.GET for key in ("switch_tenant", "switch_tenant_group", "switch_all_accessible")):
+            return
+        messages.info(
+            request, _("The tenant filter was reset because the selected scope defines which tenants are shown.")
+        )
+
+    @staticmethod
     def _resolve_all_accessible(request, accessible, session_all_accessible):
         """Fail closed: the all-accessible scope is only honoured for a member
         who actually reaches at least one tenant. With none, the scope is
@@ -473,12 +508,15 @@ class TenantMiddleware:
         session_tenant_id = request.session.get("active_tenant_id")
         session_group_id = request.session.get("active_tenant_group_id")
         session_all_accessible = bool(request.session.get("active_all_accessible"))
+        previous_scope = self._scope_signature(session_tenant_id, session_group_id, session_all_accessible)
         session_tenant_id, session_group_id, session_all_accessible = self._resolve_switch_params(
             request,
             session_tenant_id,
             session_group_id,
             session_all_accessible,
         )
+        if self._scope_signature(session_tenant_id, session_group_id, session_all_accessible) != previous_scope:
+            self._apply_scope_notice(request)
         tenant_model = apps.get_model("organization", "Tenant")
         tenant_group_model = apps.get_model("organization", "TenantGroup")
 
