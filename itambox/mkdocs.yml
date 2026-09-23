@@ -83,6 +83,7 @@ nav:
           - Cost Centers & Regions: 'usage/cost-centers-and-regions.md'
           - SSO & MFA: 'usage/sso-and-mfa.md'
           - API Tokens & SCIM: 'usage/api-tokens-and-scim.md'
+          - Offboarding: 'usage/offboarding.md'
       - Model Reference:
           - Organization & Tenancy:
               - Sites: 'models/organization/site.md'

@@ -15226,3 +15226,35 @@ msgstr "Der Datensatz verbleibt im Papierkorb; der ursprüngliche Nachweis bleib
 
 msgid "View Disposal"
 msgstr "Entsorgung ansehen"
+
+#: itambox/templates/organization/assetholders/assetholder_detail.html:84
+msgid "Offboarding"
+msgstr "Offboarding"
+
+#: itambox/templates/organization/assetholders/assetholder_detail.html:88
+#: itambox/templates/organization/assetholders/includes/offboarding_tab.html:50
+msgid "clear"
+msgstr "frei"
+
+#: itambox/templates/organization/assetholders/includes/offboarding_tab.html:19
+msgid "Outstanding Obligations"
+msgstr "Offene Verpflichtungen"
+
+#: itambox/templates/organization/assetholders/includes/offboarding_tab.html:25
+#, python-format
+msgid "There is %(count)s outstanding obligation for this person."
+msgid_plural "There are %(count)s outstanding obligations for this person."
+msgstr[0] "Diese Person hat noch %(count)s offene Verpflichtung."
+msgstr[1] "Diese Person hat noch %(count)s offene Verpflichtungen."
+
+#: itambox/templates/organization/assetholders/includes/offboarding_tab.html:30
+msgid "This view only lists obligations. It does not check anything in."
+msgstr "Diese Ansicht listet nur Verpflichtungen auf. Es wird nichts eingebucht."
+
+#: itambox/templates/organization/assetholders/includes/offboarding_tab.html:41
+msgid "Open"
+msgstr "Öffnen"
+
+#: itambox/templates/organization/assetholders/includes/offboarding_tab.html:51
+msgid "No outstanding obligations found for this person."
+msgstr "Keine offenen Verpflichtungen für diese Person gefunden."

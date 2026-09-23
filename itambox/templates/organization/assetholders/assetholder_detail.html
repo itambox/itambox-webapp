@@ -72,6 +72,23 @@
       </a>
     </li>
   {% endif %}
+  <li class="nav-item" role="presentation">
+    <a href="?tab=offboarding"
+       class="nav-link {% if request.GET.tab == 'offboarding' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       data-bs-target="#offboarding"
+       role="tab"
+       aria-selected="{% if request.GET.tab == 'offboarding' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-logout-variant me-1 text-red"></i>
+      {% translate "Offboarding" %}
+      {% if offboarding_obligation_count %}
+        <span class="badge bg-red-lt ms-2">{{ offboarding_obligation_count }}</span>
+      {% else %}
+        <span class="badge bg-green-lt ms-2">{% translate "clear" %}</span>
+      {% endif %}
+    </a>
+  </li>
 {% endblock extra_tabs %}
 {# Object details rendered via panel layout #}
 {# Leave related_objects empty for the sidebar #}
@@ -101,4 +118,6 @@
     {% translate "No electronic custody receipts logged for this holder." as e_custody %}
     {% include 'generic/includes/related_table_tab.html' with tab="custody" table=custody_receipts_table title=t_custody empty=e_custody %}
   {% endif %}
+  {# Offboarding Tab Pane: read-only roll-up of outstanding obligations. #}
+  {% include 'organization/assetholders/includes/offboarding_tab.html' with tab="offboarding" report=offboarding_report offboarding_obligation_count=offboarding_obligation_count %}
 {% endblock extra_tab_panes %}

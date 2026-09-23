@@ -4356,14 +4356,6 @@
       "count": 1
     },
     {
-      "path": "itambox/docs/integration/offboard_user.py",
-      "code": "B907",
-      "message": "'user_id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "print(f\"Error: user_id must be a numeric value, got '{user_id}'\", file=sys.stderr)",
-      "context": "Module:body/FunctionDef:main:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='user_id', ctx=Load()), attr='isdigit', ctx=Load()), args=[], keywords=[])):body",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/dashboard/forms.py",
       "code": "F401",
       "message": "'extras.dashboard.widgets.WidgetConfigForm' imported but unused",

@@ -22,6 +22,7 @@ from itambox.views.generic import (
     ObjectImportView,
     ObjectListView,
 )
+from organization.services.offboarding import get_offboarding_report
 
 from ..filters import AssetHolderFilterSet
 from ..forms import AssetHolderFilterForm, AssetHolderForm, ContactAssignmentForm
@@ -108,6 +109,17 @@ class AssetHolderDetailView(ObjectDetailView):
             custody_receipts_table = CustodyReceiptTable(custody_receipts_qs, request=self.request)
             custody_receipts_table.configure(self.request)
             context["custody_receipts_table"] = custody_receipts_table
+
+        # Offboarding readiness: a read-only roll-up of every outstanding
+        # obligation for this person, composed from existing capabilities.
+        # Gated by the view permission this detail view already enforces
+        # (staff / a documented per-tenant permission); the report itself is
+        # computed per concrete holder, so a person only ever sees their own.
+        # Custody items additionally require the receipt permission checked
+        # above, exactly like the custody tab on this page.
+        offboarding_report = get_offboarding_report(assetholder, include_custody=can_view_receipts)
+        context["offboarding_report"] = offboarding_report
+        context["offboarding_obligation_count"] = len(offboarding_report.items)
 
         related_objects_list = []
         asset_count = assetholder.checked_out_assets.count()
