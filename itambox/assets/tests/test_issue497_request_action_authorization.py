@@ -337,3 +337,68 @@ class Issue497RequestActionAuthorizationTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 302)
         req.refresh_from_db()
         self.assertIsNotNone(req.asset_id)
+
+    def test_bulk_receive_toolbar_is_available_for_a_target_scoped_fulfiller_in_all_accessible_scope(self):
+        """The toolbar flag must follow the endpoint: no objectless permission check."""
+        self._make_request(status=RequestStatusChoices.APPROVED)
+
+        self._login_all_accessible(self.approve_only)
+        denied = self.client.get(reverse("assets:request_list"))
+        self.assertFalse(denied.context["asset_request_bulk_receive_available"])
+
+        self._login_all_accessible(self.fulfill_only)
+        allowed = self.client.get(reverse("assets:request_list"))
+        self.assertTrue(allowed.context["asset_request_bulk_receive_available"])
+
+    def test_bulk_receive_toolbar_is_available_for_an_approved_group_with_approved_units(self):
+        """The endpoint expands groups, so a group-only page must offer the action."""
+        group = self._make_request(status=RequestStatusChoices.APPROVED)
+        group.is_group = True
+        group.save(update_fields=["is_group"])
+        unit = AssetRequest(
+            tenant=self.tenant,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            parent=group,
+            status=RequestStatusChoices.APPROVED,
+        )
+        unit._skip_duplicate_check = True
+        unit.save()
+
+        self.client_login_to_tenant(self.fulfill_only, self.tenant)
+        response = self.client.get(reverse("assets:request_list"))
+        self.assertEqual([row.pk for row in response.context["object_list"]], [group.pk])
+        self.assertTrue(response.context["asset_request_bulk_receive_available"])
+
+    def test_bulk_receive_toolbar_stays_hidden_for_a_group_without_approved_units(self):
+        group = self._make_request(status=RequestStatusChoices.APPROVED)
+        group.is_group = True
+        group.save(update_fields=["is_group"])
+        unit = AssetRequest(
+            tenant=self.tenant,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            parent=group,
+            status=RequestStatusChoices.PENDING,
+        )
+        unit._skip_duplicate_check = True
+        unit.save()
+
+        self.client_login_to_tenant(self.fulfill_only, self.tenant)
+        response = self.client.get(reverse("assets:request_list"))
+        self.assertEqual([row.pk for row in response.context["object_list"]], [group.pk])
+        self.assertFalse(response.context["asset_request_bulk_receive_available"])
+
+    def test_bulk_receive_selection_errors_are_visible_messages_not_a_403_page(self):
+        """Malformed or repeated selections are input errors, not authorization failures."""
+        self.client_login_to_tenant(self.fulfill_only, self.tenant)
+        url = reverse("assets:request_bulk_receive")
+
+        invalid = self.client.post(url, {"pk": ["not-a-number"]}, follow=True)
+        self.assertEqual(invalid.status_code, 200)
+        self.assertContains(invalid, "One or more selected requests are invalid.")
+
+        req = self._make_request(status=RequestStatusChoices.APPROVED)
+        repeated = self.client.post(url, {"pk": [str(req.pk), str(req.pk)]}, follow=True)
+        self.assertEqual(repeated.status_code, 200)
+        self.assertContains(repeated, "A request can appear only once in a bulk receipt.")

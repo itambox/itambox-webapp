@@ -26,6 +26,11 @@ def _is_self_service_action(user: Any, asset_request: AssetRequest, action: str)
     return False
 
 
+def is_self_service_claim(user: Any, asset_request: AssetRequest) -> bool:
+    """Whether this actor claims their own requested or assigned request."""
+    return _is_self_service_action(user, asset_request, "claim")
+
+
 def _has_staff_bypass(user: Any, action: str) -> bool:
     # Django's is_staff is the global flag, not the RBAC "Staff" badge (managed reach).
     return action in STAFF_BYPASS_ACTIONS and bool(getattr(user, "is_staff", False))

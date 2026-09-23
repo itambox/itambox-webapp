@@ -44,9 +44,13 @@
       {% csrf_token %}
       <button type="submit"
               class="btn btn-soft-success"
-              data-confirm="Are you sure you want to claim this asset and confirm pickup?">
+              data-confirm="{% translate 'Are you sure you want to claim this asset and confirm pickup?' %}">
         <i class="mdi mdi-package-down"></i>
-        {% translate "Claim &amp; Confirm Pickup" %}
+        {% if claim_is_self_service %}
+          {% translate "Claim &amp; Confirm Pickup" %}
+        {% else %}
+          {% translate "Record Handover &amp; Fulfill" %}
+        {% endif %}
       </button>
     </form>
   {% endif %}

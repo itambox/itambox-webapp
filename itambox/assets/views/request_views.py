@@ -20,7 +20,7 @@ from assets.forms.request_forms import (
 )
 from assets.models import Asset, AssetAssignment, AssetRequest, AssetTagSequence, StatusLabel
 from assets.services import checkout_asset
-from assets.services.request_authorization import can_asset_request_action
+from assets.services.request_authorization import can_asset_request_action, is_self_service_claim
 from assets.services.request_fulfillment import (
     checkout_transaction_reference,
     claim_fulfillment_scope,
@@ -40,6 +40,17 @@ from itambox.views.generic import (
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
 from organization.rbac import build_accessible_tenant_permissions_map
+
+
+def _claim_handover_note(actor, req) -> str:
+    """Audit note for a recorded claim handover.
+
+    A self-service actor claims their own request; a scoped fulfilment actor
+    records the handover on the target's behalf.
+    """
+    if is_self_service_claim(actor, req):
+        return f"Self-service claim for approved Request #{req.pk}"
+    return f"Fulfillment handover for approved Request #{req.pk}"
 
 
 def _request_action_tenant_ids(user):
@@ -174,16 +185,43 @@ class RequestListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         page_requests = [row.record for row in context["table"].paginated_rows]
-        context["asset_request_bulk_receive_available"] = self.request.user.has_perm(
-            "assets.fulfill_assetrequest"
-        ) and any(
-            req.status == RequestStatusChoices.APPROVED
-            and not req.is_group
-            and req.asset_id is None
-            and can_asset_request_action(self.request.user, req, "bulk_receive")
-            for req in page_requests
-        )
+        context["asset_request_bulk_receive_available"] = self._bulk_receive_available(page_requests)
         return context
+
+    def _bulk_receive_available(self, page_requests):
+        """Toolbar availability from the per-target decision only.
+
+        An objectless ``has_perm("assets.fulfill_assetrequest")`` fails closed in
+        the All-accessible scope, where the aggregate scope rejects ambient
+        transaction permissions, even though the endpoint accepts the target.
+        Approved groups stay selectable because the endpoint expands them into
+        their approved request units.
+        """
+        candidates = [req for req in page_requests if req.status == RequestStatusChoices.APPROVED]
+        group_ids = [req.pk for req in candidates if req.is_group]
+        group_units = {}
+        if group_ids:
+            units = AssetRequest.objects.filter(
+                parent_id__in=group_ids,
+                status=RequestStatusChoices.APPROVED,
+                is_group=False,
+                deleted_at__isnull=True,
+            )
+            for unit in units:
+                group_units.setdefault(unit.parent_id, []).append(unit)
+        for req in candidates:
+            if not can_asset_request_action(self.request.user, req, "bulk_receive"):
+                continue
+            if not req.is_group:
+                if req.asset_id is None:
+                    return True
+                continue
+            if any(
+                can_asset_request_action(self.request.user, unit, "bulk_receive")
+                for unit in group_units.get(req.pk, [])
+            ):
+                return True
+        return False
 
 
 class RequestDetailView(ObjectDetailView):
@@ -206,6 +244,7 @@ class RequestDetailView(ObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["asset_request_procurement_enabled"] = registry.is_active("procurement.requisition_seam")
+        context["claim_is_self_service"] = is_self_service_claim(self.request.user, self.object)
         if self.object.is_group:
             children = list(
                 self.object.sub_requests.prefetch_related("fulfillment_links__purchase_order_line__purchase_order")
@@ -422,7 +461,7 @@ class RequestClaimView(SimplePostView):
                     source_location=req.source_location,
                     user=request.user,
                     request=request,
-                    notes=f"Self-service claim for approved Request #{req.pk}",
+                    notes=_claim_handover_note(request.user, req),
                 )
                 transaction_ref = checkout_transaction_reference(
                     checkout_result,
@@ -456,7 +495,7 @@ class RequestClaimView(SimplePostView):
             asset_target=asset_target,
             user=request.user,
             request=request,
-            notes=f"Self-service claim for approved Request #{req.pk}",
+            notes=_claim_handover_note(request.user, req),
         )
         if checkout_result is None:
             raise ValidationError(_("Checkout did not return a recorded handover."))
@@ -576,16 +615,20 @@ class RequestBulkReceiveView(LoginRequiredMixin, View):
     def _require_bulk_receive_permission(self, requests):
         for req in requests:
             if not can_asset_request_action(self.request.user, req, "bulk_receive"):
-                raise PermissionDenied(_("You do not have permission to receive one or more selected requests."))
+                raise PermissionDenied(
+                    _("You do not have permission to receive stock for one or more selected requests.")
+                )
 
     @staticmethod
     def _validated_request_ids(request_ids):
+        # Malformed or repeated selections are input errors, not authorization
+        # failures: they surface as a visible message instead of a 403 page.
         try:
             ids = [int(request_id) for request_id in request_ids]
         except (TypeError, ValueError):
-            raise PermissionDenied(_("One or more selected requests are invalid.")) from None
+            raise ValidationError(_("One or more selected requests are invalid.")) from None
         if len(set(ids)) != len(ids):
-            raise PermissionDenied(_("A request cannot be received more than once in a batch."))
+            raise ValidationError(_("A request can appear only once in a bulk receipt."))
         return ids
 
     def _get_authorized_requests(self, request_ids, *, lock=False):
@@ -754,7 +797,11 @@ class RequestBulkReceiveView(LoginRequiredMixin, View):
             messages.warning(request, _("No requests selected for bulk receipt."))
             return redirect("assets:request_list")
 
-        requests_qs = self._get_requests_for_receipt(request_ids)
+        try:
+            requests_qs = self._get_requests_for_receipt(request_ids)
+        except ValidationError as error:
+            messages.error(request, "; ".join(str(message) for message in error.messages))
+            return redirect("assets:request_list")
         if not requests_qs:
             messages.warning(request, _("None of the selected requests are in Approved status."))
             return redirect("assets:request_list")

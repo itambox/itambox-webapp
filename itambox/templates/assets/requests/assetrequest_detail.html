@@ -45,6 +45,26 @@
         {% translate "Check-out &amp; Fulfill..." %}
       </button>
     {% endif %}
+    {% can_asset_request_action request.user object "claim" as can_claim %}
+    {% if can_claim and object.status == 'approved' %}
+      {% if object.asset or object.is_group or object.component or object.accessory or object.consumable %}
+        <form method="post"
+              action="{% url 'assets:request_claim' pk=object.pk %}"
+              class="d-inline">
+          {% csrf_token %}
+          <button type="submit"
+                  class="btn btn-primary"
+                  data-confirm="{% translate 'Are you sure you want to record this handover?' %}">
+            <i class="mdi mdi-package-down"></i>
+            {% if claim_is_self_service %}
+              {% translate "Claim &amp; Confirm Pickup" %}
+            {% else %}
+              {% translate "Record Handover &amp; Fulfill" %}
+            {% endif %}
+          </button>
+        </form>
+      {% endif %}
+    {% endif %}
     {% can_asset_request_action request.user object "mark_fulfilled" as can_mark_fulfilled %}
     {% if can_mark_fulfilled and object.status == 'approved' %}
       <a href="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"

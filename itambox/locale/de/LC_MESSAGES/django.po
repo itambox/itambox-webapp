@@ -1341,20 +1341,20 @@ msgstr "Nur genehmigte Anforderungen können als erfüllt markiert werden."
 
 #, python-format
 msgid "Error processing bulk receipt: %(error)s"
-msgstr "Fehler bei der Verarbeitung der Sammeleinbuchung: %(error)s"
+msgstr "Fehler bei der Verarbeitung des Sammel-Wareneingangs: %(error)s"
 
 msgid "Bulk Stock Receipt & Allocation"
-msgstr "Sammeleinbuchung & Zuweisung von Bestand"
+msgstr "Sammel-Wareneingang & Zuweisung"
 
 msgid "No requests selected for bulk receipt."
-msgstr "Keine Anforderungen für die Sammeleinbuchung ausgewählt."
+msgstr "Keine Anforderungen für den Sammel-Wareneingang ausgewählt."
 
 msgid "None of the selected requests are in Approved status."
 msgstr ""
 "Keine der ausgewählten Anforderungen befindet sich im Status „Genehmigt“."
 
-msgid "A request cannot be received more than once in a batch."
-msgstr "Eine Anforderung kann in einer Sammeleinbuchung nicht mehrfach eingebucht werden."
+msgid "A request can appear only once in a bulk receipt."
+msgstr "Eine Anforderung darf in einem Sammel-Wareneingang nur einmal enthalten sein."
 
 msgid "One or more selected requests are invalid."
 msgstr "Eine oder mehrere ausgewählte Anforderungen sind ungültig."
@@ -1362,8 +1362,8 @@ msgstr "Eine oder mehrere ausgewählte Anforderungen sind ungültig."
 msgid "You do not have access to one or more selected requests."
 msgstr "Sie haben keinen Zugriff auf eine oder mehrere ausgewählte Anforderungen."
 
-msgid "You do not have permission to receive one or more selected requests."
-msgstr "Sie sind nicht berechtigt, eine oder mehrere ausgewählte Anforderungen einzubuchen."
+msgid "You do not have permission to receive stock for one or more selected requests."
+msgstr "Sie sind nicht berechtigt, den Wareneingang für eine oder mehrere ausgewählte Anforderungen zu erfassen."
 
 msgid "Reservation Details"
 msgstr "Reservierungsdetails"
@@ -6894,6 +6894,19 @@ msgstr "Einbuchen..."
 
 msgid "Claim &amp; Confirm Pickup"
 msgstr "Übernehmen &amp; Abholung bestätigen"
+
+#: itambox/templates/assets/assets/asset_detail.html
+msgid "Are you sure you want to claim this asset and confirm pickup?"
+msgstr "Möchten Sie dieses Asset übernehmen und die Abholung bestätigen?"
+
+#: itambox/templates/assets/requests/assetrequest_detail.html
+msgid "Are you sure you want to record this handover?"
+msgstr "Möchten Sie diese Übergabe wirklich erfassen?"
+
+#: itambox/templates/assets/assets/asset_detail.html
+#: itambox/templates/assets/requests/assetrequest_detail.html
+msgid "Record Handover &amp; Fulfill"
+msgstr "Übergabe erfassen und Anforderung erfüllen"
 
 msgid "Audits"
 msgstr "Prüfungen"

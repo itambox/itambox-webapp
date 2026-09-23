@@ -81,9 +81,12 @@ class AssetDetailClaimVisibilityTests(TenantTestMixin, TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["approved_request"].pk, self.asset_request.pk)
-        self.assertContains(response, "Claim &amp; Confirm Pickup")
         claim_url = reverse("assets:request_claim", kwargs={"pk": self.asset_request.pk})
         self.assertContains(response, 'action="' + claim_url + '"')
+        # An unrelated fulfilment actor records a handover; the self-service
+        # wording would be wrong for them.
+        self.assertContains(response, "Record Handover &amp; Fulfill")
+        self.assertNotContains(response, "Claim &amp; Confirm Pickup")
 
     def test_requester_and_assigned_user_keep_claim_affordance(self):
         for actor in (self.requester, self.assignee):
@@ -100,6 +103,40 @@ class AssetDetailClaimVisibilityTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["approved_request"])
         self.assertNotContains(response, "Claim &amp; Confirm Pickup")
+
+    def test_claim_label_stays_self_service_wording_for_requester_and_assignee(self):
+        for actor in (self.requester, self.assignee):
+            with self.subTest(username=actor.username):
+                response = self._asset_detail(actor)
+
+                self.assertContains(response, "Claim &amp; Confirm Pickup")
+                self.assertNotContains(response, "Record Handover &amp; Fulfill")
+
+    def test_claim_copy_renders_in_german(self):
+        self.client_login_to_tenant(self.fulfiller, self.tenant)
+        response = self.client.get(
+            reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}),
+            headers={"accept-language": "de"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Übergabe erfassen und Anforderung erfüllen")
+        self.assertContains(response, "Möchten Sie dieses Asset übernehmen und die Abholung bestätigen?")
+
+    def test_request_detail_offers_handover_to_the_scoped_fulfiller(self):
+        self.client_login_to_tenant(self.fulfiller, self.tenant)
+        response = self.client.get(reverse("assets:request_detail", kwargs={"pk": self.asset_request.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        claim_url = reverse("assets:request_claim", kwargs={"pk": self.asset_request.pk})
+        self.assertContains(response, 'action="' + claim_url + '"')
+        self.assertContains(response, "Record Handover &amp; Fulfill")
+
+    def test_request_detail_hides_handover_from_a_user_without_a_qualifying_grant(self):
+        self.client_login_to_tenant(self.unrelated_user, self.tenant)
+        response = self.client.get(reverse("assets:request_detail", kwargs={"pk": self.asset_request.pk}))
+
+        self.assertIn(response.status_code, (403, 404))
 
 
 def _render_asset_request_toolbar(**extra_context):
