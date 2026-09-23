@@ -812,9 +812,6 @@ msgstr "Asset-Entsorgungen"
 msgid "Can record asset disposal / end-of-life"
 msgstr "Kann Asset-Entsorgung / End-of-Life erfassen"
 
-msgid "e.g. \"Dell ProSupport Plus\""
-msgstr "z. B. \"Dell ProSupport Plus\""
-
 msgid "Cost"
 msgstr "Kosten"
 
@@ -6663,6 +6660,9 @@ msgstr "Konto-ID"
 msgid "Optional customer account number with the provider"
 msgstr "Optionale Kundennummer beim Anbieter"
 
+msgid "Optional link to the shared Supplier catalogue."
+msgstr "Optionale Verknüpfung mit dem gemeinsamen Lieferantenkatalog."
+
 msgid "Admin Portal URL"
 msgstr "URL des Admin-Portals"
 
@@ -6677,6 +6677,13 @@ msgstr "Optionale interne administrative Notizen"
 
 msgid "Deactivate to hide from selection lists without deleting"
 msgstr "Deaktivieren, um ohne Löschen aus Auswahllisten auszublenden"
+
+msgid ""
+"Required unless a Supplier is selected. A new provider with a blank name "
+"uses the supplier name."
+msgstr ""
+"Erforderlich, sofern kein Lieferant ausgewählt ist. Ein neuer Anbieter mit "
+"leerem Namen übernimmt den Namen des Lieferanten."
 
 msgid ""
 "The tenant owning this provider. Null represents system-wide/global "
@@ -6706,17 +6713,43 @@ msgstr "Laufzeit (Monate)"
 msgid "Duration of the subscription term in months"
 msgstr "Dauer der Abonnementlaufzeit in Monaten"
 
-msgid "Licensed Quantity"
-msgstr "Lizenzierte Menge"
+msgid "Agreement Entitled Quantity"
+msgstr "Vertraglich berechtigte Menge"
 
-msgid "Number of seats/users/devices covered (for SaaS/support)"
-msgstr "Anzahl der abgedeckten Plätze/Benutzer/Geräte (für SaaS/Support)"
+msgid ""
+"Number of seats, users, or devices entitled by the vendor agreement. This "
+"value is independent of linked License seats."
+msgstr ""
+"Anzahl der laut Anbietervertrag berechtigten Plätze, Benutzer oder Geräte. "
+"Dieser Wert ist unabhängig von verknüpften Lizenzplätzen."
 
 msgid "Contract Reference"
 msgstr "Vertragsreferenz"
 
 msgid "Contract number, PO reference, or quote ID"
 msgstr "Vertragsnummer, Bestellreferenz oder Angebots-ID"
+
+msgid ""
+"External vendor, PO, or agreement reference. It does not link a Procurement "
+"Contract and must not be used to justify duplicating the same agreement."
+msgstr ""
+"Externe Anbieter-, Bestell- oder Vereinbarungsreferenz. Sie verknüpft keinen "
+"Beschaffungsvertrag und darf nicht dazu dienen, dieselbe Vereinbarung "
+"doppelt zu erfassen."
+
+msgid ""
+"Record one agreement in one module only. SaaS and cloud entitlement: record "
+"as Subscription. Support, maintenance, lease, warranty, SLA, or asset-covered "
+"service: record as Contract. Other recurring entitlement without asset/SLA "
+"coverage: record as Subscription. Other legal/commercial agreement: record "
+"as Contract."
+msgstr ""
+"Erfassen Sie jede Vereinbarung nur in einem Modul. SaaS- und "
+"Cloud-Berechtigung: als Abonnement erfassen. Support, Wartung, Leasing, "
+"Garantie, SLA oder assetbezogene Dienstleistung: als Vertrag erfassen. "
+"Sonstige wiederkehrende Berechtigung ohne Asset-/SLA-Abdeckung: als "
+"Abonnement erfassen. Sonstige rechtliche oder kommerzielle Vereinbarung: "
+"als Vertrag erfassen."
 
 msgid "Financial cost center responsible for this subscription"
 msgstr "Für dieses Abonnement zuständige Kostenstelle"
@@ -9399,8 +9432,8 @@ msgstr "Jahreskosten (annualisiert):"
 msgid "One-Time Cost:"
 msgstr "Einmalkosten:"
 
-msgid "Licensed Qty:"
-msgstr "Lizenzierte Menge:"
+msgid "Agreement Entitled Quantity:"
+msgstr "Vertraglich berechtigte Menge:"
 
 msgid "Cancel Subscription:"
 msgstr "Abonnement kündigen:"
@@ -10120,8 +10153,8 @@ msgid "Warranty End Date"
 msgstr "Garantie-Enddatum"
 
 #: assets/forms/asset_form.py:82
-msgid "Warranty Provider"
-msgstr "Garantieanbieter"
+msgid "Warranty Supplier"
+msgstr "Garantielieferant"
 
 #: assets/forms/asset_form.py:91
 msgid "Warranty Start Date"
@@ -13172,8 +13205,8 @@ msgstr "Mandanten im Geltungsbereich"
 msgid "Scopes"
 msgstr "Geltungsbereiche"
 
-msgid "Seat Usage:"
-msgstr "Platznutzung:"
+msgid "Linked License Seats:"
+msgstr "Verknüpfte Lizenzplätze:"
 
 msgid "Select all on this page"
 msgstr "Alle auf dieser Seite auswählen"

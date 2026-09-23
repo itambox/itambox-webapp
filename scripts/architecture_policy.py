@@ -254,6 +254,7 @@ CROSS_DOMAIN_MODEL_EDGES = frozenset(
         ("licenses", "organization"),
         ("licenses", "software"),
         ("software", "extras"),
+        ("subscriptions", "assets"),
         ("subscriptions", "extras"),
     }
 )

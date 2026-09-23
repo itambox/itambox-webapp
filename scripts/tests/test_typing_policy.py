@@ -1332,7 +1332,6 @@ class CommittedRecordTests(unittest.TestCase):
                     "symbols",
                     [
                         "ContractSerializer",
-                        "NestedSupplierSerializer",
                         "PurchaseOrderLineSerializer",
                         "PurchaseOrderReceiveSerializer",
                         "PurchaseOrderSerializer",
