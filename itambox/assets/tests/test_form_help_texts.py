@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 
 from django.template.loader import render_to_string
@@ -126,6 +127,68 @@ class VisibleFormHelpTextTests(SimpleTestCase):
         self.assertIn("1 Tag überfällig", overdue_singular)
         self.assertNotIn("1 Tage überfällig", overdue_singular)
         self.assertIn("2 Tage überfällig", overdue_plural)
+
+    def _detail_row(self, content, label):
+        """Return the <dd> body rendered after the given labeled <dt>, if any."""
+        match = re.search(re.escape(label) + r"\s*</dt>\s*<dd[^>]*>(.*?)</dd>", content, re.S)
+        return match.group(1) if match else None
+
+    def test_subscription_detail_renders_zero_entitlement_and_hides_unset(self):
+        """Issue #500: zero entitlement renders; an unset one hides the row."""
+        values = {
+            "provider": None,
+            "type": "saas",
+            "status": "active",
+            "get_type_display": lambda: "SaaS",
+            "get_status_display": lambda: "Active",
+            "vendor_contract_auto_renews": False,
+            "tenant": None,
+            "owner": None,
+            "start_date": None,
+            "term_months": None,
+            "billing_cycle": None,
+            "renewal_date": None,
+            "cancellation_date": None,
+            "contract_reference": None,
+            "cost_center": None,
+            "renewal_cost": None,
+            "annual_cost": None,
+            "licensed_quantity": None,
+            "currency": "EUR",
+            "days_until_renewal": None,
+        }
+
+        # The seat totals are context variables provided by the detail view.
+        seat_context = {"assigned_seats": 0, "total_seats": 0, "available_seats": 0}
+        unset = render_to_string(
+            "subscriptions/includes/detail/subscription_info.html",
+            {"object": SimpleNamespace(**values), **seat_context},
+        )
+        values["licensed_quantity"] = 0
+        zero = render_to_string(
+            "subscriptions/includes/detail/subscription_info.html",
+            {"object": SimpleNamespace(**values), **seat_context},
+        )
+        values["licensed_quantity"] = 120
+        entitled = render_to_string(
+            "subscriptions/includes/detail/subscription_info.html",
+            {"object": SimpleNamespace(**values), **seat_context},
+        )
+
+        self.assertNotIn("Agreement Entitled Quantity:", unset)
+        unset_linked = self._detail_row(unset, "Linked License Seats:")
+        self.assertIsNotNone(unset_linked)
+        self.assertIn("<strong>0</strong> / 0", unset_linked)
+
+        zero_row = self._detail_row(zero, "Agreement Entitled Quantity:")
+        self.assertIsNotNone(zero_row)
+        self.assertIn("<strong>0</strong>", zero_row)
+        self.assertIsNotNone(self._detail_row(zero, "Linked License Seats:"))
+
+        entitled_row = self._detail_row(entitled, "Agreement Entitled Quantity:")
+        self.assertIsNotNone(entitled_row)
+        self.assertIn("<strong>120</strong>", entitled_row)
+        self.assertIsNotNone(self._detail_row(entitled, "Linked License Seats:"))
 
 
 class StablePresentationContractTests(SimpleTestCase):

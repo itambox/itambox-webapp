@@ -182,7 +182,7 @@ class TestHardwareImporter(TenantTestMixin):
         assert asset.custom_field_data == {"snipeit_id": "42", "cpu_model": "Intel i7"}
         assert warranty.start_date.isoformat() == "2023-01-15"
         assert warranty.end_date.isoformat() == "2026-01-15"
-        assert warranty.provider == self.supplier.name
+        assert warranty.supplier_id == self.supplier.pk
 
     def test_match_order_snipeit_id_wins_over_serial_and_asset_tag(self):
         by_id = Asset.objects.create(
@@ -240,7 +240,7 @@ class TestHardwareImporter(TenantTestMixin):
         assert asset.purchase_cost == Decimal("999.50")
         assert asset.notes == "Updated notes"
         assert warranty.end_date.isoformat() == "2025-02-01"
-        assert warranty.provider == ""
+        assert warranty.supplier is None
 
     def test_rerun_is_idempotent_for_persistence_and_warranty(self):
         row = self._row(source_id=9)

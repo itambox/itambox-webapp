@@ -21,7 +21,7 @@ from extras.models import CustomField
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
-from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel, Warranty
+from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel, Supplier, Warranty
 from ..models.choices import WarrantyTypeChoices
 from ..services.specifications.commands import update_asset_specifications
 from ..services.specifications.contracts import DestinationAssetTypeSelectionDTO
@@ -108,8 +108,11 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
     # Optional inline warranty (non-model fields). When the dates are filled in,
     # the view creates a Warranty for this asset via create_inline_warranty().
-    warranty_provider = forms.CharField(
-        label=_("Warranty Provider"), required=False, widget=forms.TextInput(attrs={"class": "form-control"})
+    warranty_supplier = forms.ModelChoiceField(
+        label=_("Warranty Supplier"),
+        required=False,
+        queryset=Supplier.objects.all(),
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     warranty_type = forms.ChoiceField(
         label=_("Warranty Type"),
@@ -216,7 +219,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 cleaned_data.pop(key, None)
         self._apply_t15_presence(cleaned_data)
         warranty_fields = (
-            "warranty_provider",
+            "warranty_supplier",
             "warranty_type",
             "warranty_start_date",
             "warranty_end_date",
@@ -259,7 +262,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             asset=asset,
             start_date=start,
             end_date=end,
-            provider=cd.get("warranty_provider") or "",
+            supplier=cd.get("warranty_supplier"),
             cost=cd.get("warranty_cost"),
         )
         wt = cd.get("warranty_type")
@@ -774,7 +777,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     )
                 ),
                 Div(
-                    Div("warranty_provider", css_class="col-md-6"),
+                    Div("warranty_supplier", css_class="col-md-6"),
                     Div("warranty_type", css_class="col-md-6"),
                     css_class="row",
                 ),

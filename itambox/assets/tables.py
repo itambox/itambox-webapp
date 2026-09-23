@@ -775,7 +775,9 @@ class WarrantyTable(BaseTable):
     id = IDColumn(visible=True)
     asset = tables.LinkColumn("assets:asset_detail", args=[A("asset__pk")], accessor="asset", verbose_name=_("Asset"))
     warranty_type = tables.Column(verbose_name=_("Type"))
-    provider = tables.Column(verbose_name=_("Provider"))
+    supplier = tables.LinkColumn(
+        "assets:supplier_detail", args=[A("supplier_id")], accessor="supplier.name", verbose_name=_("Supplier")
+    )
     start_date = tables.DateColumn(format="Y-m-d", verbose_name=_("Start Date"))
     end_date = tables.DateColumn(format="Y-m-d", verbose_name=_("End Date"))
     cost = tables.Column(verbose_name=_("Cost"))
@@ -789,7 +791,7 @@ class WarrantyTable(BaseTable):
             "id",
             "asset",
             "warranty_type",
-            "provider",
+            "supplier",
             "start_date",
             "end_date",
             "cost",
@@ -801,7 +803,7 @@ class WarrantyTable(BaseTable):
             "id",
             "asset",
             "warranty_type",
-            "provider",
+            "supplier",
             "start_date",
             "end_date",
             "cost",

@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel, Supplier, Warranty
 from core.tests.mixins import grant
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant
@@ -297,3 +297,41 @@ class ITAMBoxAPITestCase(APITestCase):
         self.assertFalse(assignment.is_active)
         self.assertEqual(assignment.checked_in_at.date().isoformat(), checkin_date)
         self.assertIn("Check in asset A with custom status and location via API", assignment.notes)
+
+    def test_warranty_supplier_link_round_trips_through_the_api(self):
+        self.client.force_authenticate(user=self.superuser)
+
+        supplier = Supplier.objects.create(name="CDW Deutschland", slug="cdw-deutschland")
+        import datetime
+
+        today = datetime.date.today()
+        warranty_url = reverse("api:assets_api:warranty-list")
+
+        response = self.client.post(
+            warranty_url,
+            data={
+                "asset_id": self.asset_a.pk,
+                "warranty_type": "hardware",
+                "start_date": today.isoformat(),
+                "end_date": (today + datetime.timedelta(days=365)).isoformat(),
+                "supplier_id": supplier.pk,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        # The nested supplier is read-only and named, the write side is supplier_id.
+        self.assertEqual(response.data["supplier"], "CDW Deutschland")
+        self.assertNotIn("provider", response.data)
+
+        detail_url = reverse("api:assets_api:warranty-detail", kwargs={"pk": response.data["id"]})
+        detail = self.client.get(detail_url)
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data["supplier"], "CDW Deutschland")
+
+        cleared = self.client.patch(detail_url, data={"supplier_id": None}, format="json", HTTP_IF_MATCH=detail["ETag"])
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK, cleared.data)
+        self.assertIsNone(cleared.data["supplier"])
+
+        warranty = Warranty.objects.get(pk=response.data["id"])
+        self.assertIsNone(warranty.supplier_id)

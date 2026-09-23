@@ -821,6 +821,7 @@ class WarrantyViewSet(ITAMBoxModelViewSet):
         "asset",
         "asset__asset_type__manufacturer",
         "asset__tenant",
+        "supplier",
     )
     serializer_class = WarrantySerializer
     filter_backends = (DjangoFilterBackend,)

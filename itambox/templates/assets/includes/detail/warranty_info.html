@@ -21,10 +21,10 @@
       <span class="badge bg-secondary-lt text-secondary">{% translate "Expired/Inactive" %}</span>
     {% endif %}
   </dd>
-  <dt class="col-sm-4">{% translate "Provider:" %}</dt>
+  <dt class="col-sm-4">{% translate "Supplier:" %}</dt>
   <dd class="col-sm-8">
-    {% if object.provider %}
-      {{ object.provider }}
+    {% if object.supplier %}
+      <a href="{% url 'assets:supplier_detail' pk=object.supplier.pk %}"><strong>{{ object.supplier.name }}</strong></a>
     {% else %}
       <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
     {% endif %}

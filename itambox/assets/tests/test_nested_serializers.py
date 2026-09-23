@@ -7,8 +7,9 @@ from assets.api.nested_serializers import (
     NestedAssetSerializer,
     NestedAssetTypeSerializer,
     NestedManufacturerSerializer,
+    NestedSupplierSerializer,
 )
-from assets.models import Asset, AssetRole, AssetType, Manufacturer
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, Supplier
 
 
 class NestedAssetSerializerContractTests(SimpleTestCase):
@@ -28,6 +29,10 @@ class NestedAssetSerializerContractTests(SimpleTestCase):
         self.assertIs(NestedAssetSerializer.Meta.model, Asset)
         self.assertEqual(NestedAssetSerializer.Meta.fields, ["id", "name", "asset_tag"])
         self.assertEqual(NestedAssetSerializer.Meta.brief_fields, ["id", "name"])
+
+        self.assertIs(NestedSupplierSerializer.Meta.model, Supplier)
+        self.assertEqual(NestedSupplierSerializer.Meta.fields, ["id", "name", "slug"])
+        self.assertEqual(NestedSupplierSerializer.Meta.brief_fields, ["id", "name", "slug"])
 
     def test_nested_type_representation_keeps_manufacturer_shape(self):
         manufacturer = Manufacturer(name="Acme")
