@@ -8,6 +8,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Linked scoped SaaS providers and asset warranties to the shared Supplier catalogue, documented when to use Contracts versus Subscriptions, and distinguished agreement entitlement quantities from linked-license seat counts in subscription details and reports (issue #500).
 - Added the read-only `migration_baseline_preflight` release gate and checked manifest. The current migration layout remains transitional; the gate recognizes complete replacement history, rejects old/partial/mixed states before a cleanup attempt, and documents restore-first handling for interrupted non-atomic migrations.
 
 - Tightened the first organization/membership English copy: role-form guidance, the assign-users explanation, member-selection help, role presets, and user-group help are shorter and more direct; the role assignment page and the permissions-matrix help now render reviewed German translations (part of issue #386).

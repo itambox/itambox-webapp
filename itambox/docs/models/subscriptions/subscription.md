@@ -4,7 +4,7 @@
     The Subscriptions module is Beta. Core functionality is stable; reporting and renewal
     automation features are still evolving.
 
-A **SaaS Subscription** represents a recurring subscription contract for SaaS platforms, tools, or cloud resources (e.g. `Figma Professional Plan`, `GitHub Enterprise Cloud`, `AWS Organization Account`).
+A **SaaS Subscription** represents a recurring subscription contract for SaaS platforms, tools, or cloud resources (e.g. `Figma Professional Plan`, `GitHub Enterprise Cloud`, `AWS Organization Account`). Use the exclusive mapping in [Commercial Vocabulary](../../usage/commercial-vocabulary.md) to decide whether an agreement belongs here or in Contracts.
 
 ## Attributes
 
@@ -17,7 +17,7 @@ A **SaaS Subscription** represents a recurring subscription contract for SaaS pl
 | **Cost Center** | Budget tracking/accounting code for cost allocations. | String | No |
 | **Currency** | Currency code for payment (e.g. `USD`, `EUR`). | String | No |
 | **Description** | Optional text detailing coverage or terms. | Text | No |
-| **Licensed Quantity** | Number of user seats or licenses covered under this subscription. | Integer | No |
+| **Licensed Quantity** | Agreement Entitled Quantity: number of seats, users, or devices entitled by the vendor agreement. Independent of linked License seats. | Integer | No |
 | **Name** | A clear name identifying the contract plan (e.g. `Dev DevOps Github Plan`). | String | Yes |
 | **Notes** | Internal notes concerning renewal logic or terms. | Text | No |
 | **Owner** | Person responsible for managing this subscription. | Foreign Key | No |
@@ -33,6 +33,10 @@ A **SaaS Subscription** represents a recurring subscription contract for SaaS pl
 
 ## Allocations
 SaaS subscriptions support a polymorphic generic relation allowing them to be assigned to `Asset Holders` (users) or departments (`Tenants`), enabling clear contract utilization audits.
+
+## Quantity metrics
+
+**Agreement Entitled Quantity** is the entitlement recorded by the vendor agreement. **Linked License Seats** are computed from the Licenses linked to this subscription and are shown separately; they never change the agreement entitlement.
 
 ## Lifecycle
 

@@ -14,4 +14,4 @@ A **Supplier** represents a sales vendor, reseller, distributor, or procurement 
 | **Website** | Supplier's homepage link. | URL | No |
 
 ## Use Cases
-Suppliers are associated with assets, accessories, and licenses to track warranties, purchase channels, support SLA escalations, and total cost of ownership (TCO) across different vendors.
+Suppliers are associated with assets, accessories, licenses, contracts, maintenance records, warranties, and subscription provider profiles to track warranties, purchase channels, support SLA escalations, and total cost of ownership (TCO) across different vendors. See [Commercial Vocabulary](../../usage/commercial-vocabulary.md) for how Suppliers relate to Providers and warranty vendors.

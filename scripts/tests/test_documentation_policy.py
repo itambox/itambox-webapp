@@ -34,6 +34,7 @@ SETTINGS_PROD = REPOSITORY_ROOT / "itambox" / "core" / "settings" / "prod.py"
 PRUNE_CHANGELOG = REPOSITORY_ROOT / "itambox" / "core" / "management" / "commands" / "prune_changelog.py"
 DATA_RETENTION = DOCS_ROOT / "operations" / "data-retention.md"
 INSTALLATION = DOCS_ROOT / "operations" / "installation.md"
+COMMERCIAL_VOCABULARY = DOCS_ROOT / "usage" / "commercial-vocabulary.md"
 
 #: Private/internal reference patterns. These never belong in a public surface.
 INTERNAL_REFERENCE_PATTERNS = (
@@ -257,6 +258,46 @@ class OIDCBindingRolloutDocumentationPolicyTest(unittest.TestCase):
     def test_sso_document_links_the_binding_rollout_runbook(self):
         sso = (DOCS_ROOT / "usage" / "sso-and-mfa.md").read_text(encoding="utf-8")
         self.assertIn("../operations/upgrades.md", sso)
+
+
+class CommercialVocabularyDocumentationPolicyTest(unittest.TestCase):
+    """The commercial vocabulary contract stays consistent between docs and source."""
+
+    def test_page_publishes_the_exclusive_agreement_mapping(self):
+        page = COMMERCIAL_VOCABULARY.read_text(encoding="utf-8")
+        required = (
+            "SaaS and cloud entitlement",
+            "record as Subscription",
+            "Support, maintenance, lease, warranty, SLA, or asset-covered service",
+            "record as Contract",
+            "Other recurring entitlement without asset/SLA coverage",
+            "Other legal or commercial agreement",
+            "Record one agreement in one module only",
+        )
+        for phrase in required:
+            self.assertIn(phrase, page)
+
+    def test_page_publishes_the_seat_metric_labels(self):
+        page = COMMERCIAL_VOCABULARY.read_text(encoding="utf-8")
+        self.assertIn("Agreement Entitled Quantity", page)
+        self.assertIn("Linked License Seats", page)
+        self.assertIn("This value is independent of linked License seats", page)
+
+    def test_subscription_source_matches_the_documented_labels(self):
+        models_source = (REPOSITORY_ROOT / "itambox" / "subscriptions" / "models.py").read_text(encoding="utf-8")
+        template_source = (
+            REPOSITORY_ROOT
+            / "itambox"
+            / "templates"
+            / "subscriptions"
+            / "includes"
+            / "detail"
+            / "subscription_info.html"
+        ).read_text(encoding="utf-8")
+        forms_source = (REPOSITORY_ROOT / "itambox" / "subscriptions" / "forms.py").read_text(encoding="utf-8")
+        self.assertIn("Agreement Entitled Quantity", models_source)
+        self.assertIn("Linked License Seats", template_source)
+        self.assertIn("Record one agreement in one module only", forms_source)
 
 
 if __name__ == "__main__":

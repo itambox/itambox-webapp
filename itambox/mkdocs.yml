@@ -80,6 +80,7 @@ nav:
           - Reports & Exports: 'usage/reports-and-exports.md'
           - Webhooks & Automation: 'usage/webhooks-and-automation.md'
           - Contracts & Purchase Orders: 'usage/contracts-and-purchase-orders.md'
+          - Commercial Vocabulary: 'usage/commercial-vocabulary.md'
           - Cost Centers & Regions: 'usage/cost-centers-and-regions.md'
           - SSO & MFA: 'usage/sso-and-mfa.md'
           - API Tokens & SCIM: 'usage/api-tokens-and-scim.md'

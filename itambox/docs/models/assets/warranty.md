@@ -1,6 +1,6 @@
 # Warranties
 
-A **Warranty** represents a manufacturer or third-party warranty agreement covering one or more physical assets. It defines coverage dates, supplier references, and terms of service.
+A **Warranty** represents a manufacturer or third-party warranty agreement covering one or more physical assets. It defines coverage dates, the linked Supplier, and terms of service. The vendor is a Supplier link; there is no free-text vendor field. See [Commercial Vocabulary](../../usage/commercial-vocabulary.md).
 
 ## Attributes
 
@@ -11,7 +11,7 @@ A **Warranty** represents a manufacturer or third-party warranty agreement cover
 | **Currency** | ISO 4217 code. Leave blank to use the tenant default currency. | Choice | No |
 | **End Date** | The date the warranty coverage expires. | Date | Yes |
 | **Notes** | Optional comments or details on terms. | Text | No |
-| **Provider** | e.g. "Dell ProSupport Plus" | String | No |
+| **Supplier** | The vendor providing the warranty, linked to the shared Supplier catalogue. | Foreign Key | No |
 | **Reference** | Claim number, policy reference, or contract ID. | String | No |
 | **Start Date** | The date the warranty coverage begins. | Date | Yes |
 | **Terms** | The terms of the warranty. | Text | No |
