@@ -14,6 +14,14 @@ const compiled = transformSync(source, {
   target: 'es2020',
 }).code;
 
+// Read one report type's selectable column list straight from the designer
+// source; the lists mirror the server-side published column keys.
+function columnListFor(reportType) {
+  const match = new RegExp(`'${reportType}':\\s*\\[([\\s\\S]*?)\\]`).exec(source);
+  assert.ok(match, `columnsByReportType must declare '${reportType}'`);
+  return [...match[1].matchAll(/'([^']+)'/g)].map((entry) => entry[1]);
+}
+
 class FakeNode {
   constructor(tagName, id = '') {
     this.tagName = tagName.toUpperCase();
@@ -112,4 +120,23 @@ test('report preview remains available inside the report template editor', () =>
 
   assert.equal(submitParent.children.length, 2, 'report editor receives one preview button');
   assert.equal(submitParent.children[1].id, 'btn-preview-report');
+});
+
+test('report designer offers the agreement entitlement without license seat keys', () => {
+  const subscriptionColumns = columnListFor('subscription_renewals');
+
+  assert.ok(
+    subscriptionColumns.includes('agreement_entitled_quantity'),
+    'subscription columns must expose the agreement entitlement',
+  );
+  for (const seatKey of ['seats', 'assigned_seats', 'available_seats']) {
+    assert.ok(!subscriptionColumns.includes(seatKey), `${seatKey} belongs to the license utilization report`);
+  }
+});
+
+test('report designer omits the removed warranty provider column', () => {
+  const warrantyColumns = columnListFor('warranty_expiration');
+
+  assert.ok(warrantyColumns.includes('warranty_supplier'), 'warranty columns must expose the supplier');
+  assert.ok(!warrantyColumns.includes('warranty_provider'), 'the removed provider column must not stay selectable');
 });

@@ -1059,6 +1059,7 @@ class ReportTemplateForm(forms.ModelForm):
         # Subscription Renewals Columns
         ("subscription_name", _("Subscription Name")),
         ("provider", _("Provider")),
+        ("agreement_entitled_quantity", _("Agreement Entitled Quantity")),
         ("billing_cycle", _("Billing Cycle")),
         ("cost", _("Cost")),
         ("end_date", _("End Date")),
@@ -1100,7 +1101,7 @@ class ReportTemplateForm(forms.ModelForm):
         # Warranty Expiration Columns
         ("warranty_asset", _("Asset")),
         ("warranty_type", _("Warranty Type")),
-        ("warranty_provider", _("Provider")),
+        ("warranty_supplier", _("Supplier")),
         ("warranty_start_date", _("Start Date")),
         ("warranty_end_date", _("End Date")),
         ("warranty_days_remaining", _("Days Remaining")),

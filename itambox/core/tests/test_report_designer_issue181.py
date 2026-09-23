@@ -67,6 +67,19 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
                 included_columns=["asset_tag", "not_published"],
             ).clean()
 
+    def test_removed_warranty_provider_key_is_rejected_with_machine_key(self):
+        """The replaced warranty_provider key fails validation like any unknown key.
+
+        The removal is deliberate and has no compatibility shim, so the machine
+        key is reported back to the author instead of being silently mapped.
+        """
+        with pytest.raises(ValidationError, match="warranty_provider"):
+            ReportTemplate(
+                name="removed warranty column",
+                report_type=ReportTemplate.REPORT_TYPE_WARRANTY_EXPIRATION,
+                included_columns=["warranty_asset", "warranty_provider"],
+            ).clean()
+
     def test_custom_jinja_context_does_not_expose_request_or_runtime_objects(self):
         template = SimpleNamespace(
             name="safe",
@@ -184,7 +197,10 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
 class ReportDesignerIssue181CoverageTests(SimpleTestCase):
     def test_columns_resolve_only_canonical_keys(self):
         assert label_for("asset_tag") == "Asset Tag"
+        assert label_for("warranty_supplier") == "Supplier"
+        assert label_for("agreement_entitled_quantity") == "Agreement Entitled Quantity"
         assert headers_for(["asset_tag", "not_published", "name"]) == ["Asset Tag", "Asset Name"]
+        assert headers_for(["warranty_provider"]) == []
 
     def test_custom_context_sanitizes_supported_values_and_drops_runtime_objects(self):
         runtime_object = object()
