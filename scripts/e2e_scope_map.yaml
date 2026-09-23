@@ -144,6 +144,11 @@
       "path": "spec/regressions",
       "kind": "qualification",
       "owner": "german-bulk-basket"
+    },
+    "regression:scope-switcher-context": {
+      "path": "spec/regressions/scope-switcher-context.spec.ts",
+      "kind": "qualification",
+      "owner": "scope-switcher-context"
     }
   },
   "rules": [
@@ -568,6 +573,16 @@
       ],
       "scopes": [
         "regression:aggregate-bulk-basket"
+      ]
+    },
+    {
+      "id": "scope-switcher-context-regression-owner",
+      "decision": "selected",
+      "patterns": [
+        "itambox/tests/e2e/spec/regressions/scope-switcher-context.spec.ts"
+      ],
+      "scopes": [
+        "regression:scope-switcher-context"
       ]
     },
     {

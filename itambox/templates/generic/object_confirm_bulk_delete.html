@@ -28,7 +28,7 @@
             <p>{% translate "Are you sure you want to delete the selected objects?" %}</p>
             <ul class="list-group list-group-flush">
               {% for obj in objects %}
-                <li class="list-group-item">{{ obj }}</li>
+                <li class="list-group-item">{{ obj }}{% if show_object_tenant and obj.tenant %} <span class="text-muted">({% translate "Tenant" %}: {{ obj.tenant }})</span>{% endif %}</li>
               {% endfor %}
             </ul>
             {# Optional: Display dependent objects check later if needed #}

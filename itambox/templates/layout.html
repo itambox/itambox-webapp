@@ -147,7 +147,7 @@
                   <span class="d-flex align-items-center gap-2 text-truncate">
                     <i class="mdi mdi-briefcase-outline fs-3"></i>
                     <span class="text-truncate">
-                      {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% translate "(Group)" %}{% else %}{% translate "All Tenants" %}{% endif %}
+                      {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% translate "(Group)" %}{% elif request.user.is_superuser %}{% translate "Global View" %}{% else %}{% translate "All Tenants" %}{% endif %}
                     </span>
                   </span>
                   <i class="mdi mdi-unfold-more-horizontal text-muted"></i>

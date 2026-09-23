@@ -122,7 +122,9 @@ class ObjectBulkEditView(
 
         # Per-row change-perm enforcement (see filter_permitted_rows): the
         # dispatch gate alone is too coarse inside a multi-tenant group scope.
-        queryset, skipped = filter_permitted_rows(request.user, self._get_queryset(pks), model, "change")
+        queryset, skipped = filter_permitted_rows(
+            request.user, self._get_queryset(pks, with_tenant=True), model, "change"
+        )
         if skipped:
             messages.warning(
                 request,
@@ -165,6 +167,7 @@ class ObjectBulkEditView(
                                 "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
                                 "objects": queryset,
                                 "object_pks": pks,
+                                "show_object_tenant": getattr(request, "active_tenant", None) is None,
                                 "return_url": return_url,
                                 "selected_fields": selected_fields,
                                 "verbose_name": model._meta.verbose_name,
@@ -232,6 +235,7 @@ class ObjectBulkEditView(
             "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
             "objects": queryset,
             "object_pks": pks,
+            "show_object_tenant": getattr(request, "active_tenant", None) is None,
             "return_url": return_url,
             "selected_fields": selected_fields,
             "verbose_name": model._meta.verbose_name,
@@ -323,7 +327,7 @@ class ObjectBulkDeleteView(
         # dispatch gate alone is too coarse inside a multi-tenant group scope.
         objects_to_delete, skipped = filter_permitted_rows(
             request.user,
-            self._get_queryset(pks),
+            self._get_queryset(pks, with_tenant=True),
             model,
             "delete",
         )
@@ -349,6 +353,7 @@ class ObjectBulkDeleteView(
             "model_verbose_name_plural": model._meta.verbose_name_plural,
             "objects": objects_to_delete,
             "object_pks": pks,
+            "show_object_tenant": getattr(request, "active_tenant", None) is None,
             "return_url": return_url,
             "title": _("Confirm Bulk Deletion"),
             "breadcrumbs": [

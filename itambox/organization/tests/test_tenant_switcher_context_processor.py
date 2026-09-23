@@ -20,6 +20,7 @@ SWITCHER_KEYS = {
     "grouped_tenants_switcher",
     "own_tenants_switcher",
     "grouped_managed_tenants_switcher",
+    "scope_switch",
 }
 
 
@@ -32,7 +33,7 @@ class TenantSwitcherContextProcessorTests(TestCase):
         context = tenant_switcher_processor(_request(AnonymousUser()))
 
         self.assertEqual(set(context), SWITCHER_KEYS)
-        self.assertEqual(context, {key: [] for key in SWITCHER_KEYS})
+        self.assertEqual(context, {key: [] for key in SWITCHER_KEYS - {"scope_switch"}} | {"scope_switch": {}})
 
     def test_authenticated_values_are_lazy_and_processor_is_zero_query(self):
         user = User.objects.create_user(username="lazy-switcher-user")
@@ -170,5 +171,5 @@ class TenantSwitcherLazyEvaluationTests(TestCase):
 
         context = tenant_switcher_processor(_request(user))
 
-        for key in SWITCHER_KEYS:
+        for key in SWITCHER_KEYS - {"scope_switch"}:
             self.assertEqual(list(context[key]), [])

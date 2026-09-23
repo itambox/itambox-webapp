@@ -551,8 +551,8 @@ class UserBulkEditView(ObjectBulkEditView):
     def _get_bulk_edit_form(self, data=None, model=None):
         return self.form_class(data, model=model, request_user=self.request.user)
 
-    def _get_queryset(self, pks):
-        qs = super()._get_queryset(pks)
+    def _get_queryset(self, pks, *, with_tenant=False):
+        qs = super()._get_queryset(pks, with_tenant=with_tenant)
         if self.request.user.is_superuser:
             return qs
         return qs.filter(memberships__tenant__in=_user_scope_tenant_ids(self.request.user)).distinct()
@@ -845,8 +845,8 @@ class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
     group_permission = "users.delete_usergroup"
     queryset = UserGroup.objects.all()
 
-    def _get_queryset(self, pks):
-        return self.scope_group_queryset(super()._get_queryset(pks))
+    def _get_queryset(self, pks, *, with_tenant=False):
+        return self.scope_group_queryset(super()._get_queryset(pks, with_tenant=with_tenant))
 
     def post(self, request, *args, **kwargs):
         from django.http import HttpResponseRedirect
