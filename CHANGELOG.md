@@ -27,6 +27,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tenant creation now exposes only object-authorized live provider tenants to eligible non-superusers, requires an explicit provider when one is available, and uses the same onboarding projection for normal and managed-tenant routes (issue #405).
 - Asset reservation quick-add now preserves a native POST fallback from asset detail pages instead of submitting a GET request (issue #390).
 - List page refreshes no longer emit an HTMX `htmx:oobErrorNoTarget` console error when the applied-filter count badge is updated: the filter-toggle badge now carries the `filters-applied-count` target id that the list refresh out-of-band swap expects, so applying, clearing, loading, or saving list filters update the visible count cleanly (issue #421).
+- Non-staff users with tenant-scoped asset request permissions can now see and use their authorized actions consistently in tenant, tenant group, and All-accessible scopes (issue #497).
 
 ### Security
 

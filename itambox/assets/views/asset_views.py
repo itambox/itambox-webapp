@@ -18,6 +18,7 @@ from django_tables2 import RequestConfig
 
 from assets.choices import RequestStatusChoices
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
+from assets.services.request_authorization import can_asset_request_action
 from assets.tasks.labels import _default_label_card, generate_base64_barcode, render_labels_pdf
 from compliance.audit_services import audit_asset_from_form
 from compliance.models import CustodyReceipt
@@ -247,16 +248,14 @@ class AssetDetailView(ObjectDetailView):
             )
             context["related_objects_list"].sort(key=lambda item: item["label"])
 
-        # Check if current user has an approved request for this asset
+        # Check if current user can claim an approved request for this asset
         approved_request = None
         if self.request.user.is_authenticated:
             from assets.models import AssetRequest
 
             approved_request_qs = AssetRequest.objects.filter(asset=asset, status=RequestStatusChoices.APPROVED)
             for req in approved_request_qs:
-                is_requester = req.requester == self.request.user
-                is_assigned = req.assigned_user and req.assigned_user.user == self.request.user
-                if is_requester or is_assigned or self.request.user.is_staff:
+                if can_asset_request_action(self.request.user, req, "claim"):
                     approved_request = req
                     break
         context["approved_request"] = approved_request

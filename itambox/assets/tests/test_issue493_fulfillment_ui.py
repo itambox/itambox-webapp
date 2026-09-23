@@ -19,14 +19,24 @@ def render_detail_block(name, **values):
     template = get_template("assets/requests/assetrequest_detail.html").template
     block = next(node for node in template.nodelist.get_nodes_by_type(BlockNode) if node.name == name)
     request = RequestFactory().get("/extras/")
-    request.user = SimpleNamespace(is_staff=True)
+    # The shared request-action predicate reads these attributes on a real user;
+    # the stub mirrors that contract so the fail-closed check is exercised, not bypassed.
+    request.user = SimpleNamespace(pk=1, is_staff=True, is_authenticated=True, is_active=True)
     context = Context({"request": request, **values})
     with context.bind_template(template):
         return block.render(context)
 
 
 def request_record(status="fulfilled", **values):
-    return SimpleNamespace(pk=7, status=status, get_status_display=lambda: status.title(), **values)
+    return SimpleNamespace(
+        pk=7,
+        status=status,
+        requester_id=None,
+        tenant_id=None,
+        assigned_user=None,
+        get_status_display=lambda: status.title(),
+        **values,
+    )
 
 
 def test_table_unknown_completion_is_not_a_plain_success_badge():

@@ -212,6 +212,7 @@
     { trigger: '.btn-bulk-restore', form: '.bulk-restore-form' },
     { trigger: '.btn-bulk-acknowledge', form: '.bulk-acknowledge-form' },
     { trigger: '.btn-bulk-resolve', form: '.bulk-resolve-form' },
+    { trigger: '.btn-bulk-receive', form: '.bulk-receive-form' },
     {
       trigger: '.btn-bulk-purge',
       form: '.bulk-purge-form',

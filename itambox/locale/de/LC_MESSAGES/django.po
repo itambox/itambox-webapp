@@ -1353,6 +1353,18 @@ msgid "None of the selected requests are in Approved status."
 msgstr ""
 "Keine der ausgewählten Anforderungen befindet sich im Status „Genehmigt“."
 
+msgid "A request cannot be received more than once in a batch."
+msgstr "Eine Anforderung kann in einer Sammeleinbuchung nicht mehrfach eingebucht werden."
+
+msgid "One or more selected requests are invalid."
+msgstr "Eine oder mehrere ausgewählte Anforderungen sind ungültig."
+
+msgid "You do not have access to one or more selected requests."
+msgstr "Sie haben keinen Zugriff auf eine oder mehrere ausgewählte Anforderungen."
+
+msgid "You do not have permission to receive one or more selected requests."
+msgstr "Sie sind nicht berechtigt, eine oder mehrere ausgewählte Anforderungen einzubuchen."
+
 msgid "Reservation Details"
 msgstr "Reservierungsdetails"
 

@@ -192,6 +192,8 @@ denied it and why.
 | `assets.fulfill_assetrequest` | Fulfilment / IT operations staff |
 | `assets.view_assetrequest` | Anyone who should see the request queue |
 
+Request actions follow the effective permission for each request's tenant. Non-staff users with `assets.approve_assetrequest` can see and use approval, denial, and cancellation actions for covered requests; users with `assets.fulfill_assetrequest` can see and use fulfilment actions. Requesters can still cancel their own requests, and requesters or assigned users can still claim them. Either action permission also allows access to the request list and detail pages for the tenants it covers.
+
 ---
 
 ## Asset Reservations

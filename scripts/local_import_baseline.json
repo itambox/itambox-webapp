@@ -496,24 +496,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestBulkReceiveView/FunctionDef:post",
-      "statement": "from assets.forms.request_forms import AssetReceiveFormSet",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestBulkReceiveView/FunctionDef:post",
-      "statement": "from assets.models import AssetTagSequence",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestBulkReceiveView/FunctionDef:post",
-      "statement": "from django.contrib import messages",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/views/supplier_views.py",
       "context": "ClassDef:SupplierDetailView/FunctionDef:get_context_data",
       "statement": "from assets.models import AssetMaintenance",

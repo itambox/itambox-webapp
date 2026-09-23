@@ -84,22 +84,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/views/request_views.py",
-      "scope": "ClassDef:RequestBulkReceiveView/FunctionDef:post",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "5d79cd98182e3674f79ea6a0b599469d936bef66eea7377bec6b65fdc4d429c0",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "scope": "ClassDef:RequestBulkReceiveView/FunctionDef:post",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "eb1463d9ccd72ee810b48ad52d3940dfd94bdb052acab8c589e646c57493325f",
-      "count": 1
-    },
-    {
       "path": "itambox/core/apps.py",
       "scope": "ClassDef:CoreConfig/FunctionDef:ready/FunctionDef:scoped_baseform_init",
       "handler_type": "Exception",
