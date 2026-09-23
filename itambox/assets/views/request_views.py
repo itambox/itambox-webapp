@@ -1,6 +1,8 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -11,12 +13,14 @@ from django.views import View
 from assets import filters, tables
 from assets.choices import RequestStatusChoices
 from assets.forms.request_forms import (
+    AssetReceiveFormSet,
     AssetRequestActionForm,
     AssetRequestForm,
     AssetRequestManualCompletionForm,
 )
-from assets.models import Asset, AssetAssignment, AssetRequest, StatusLabel
+from assets.models import Asset, AssetAssignment, AssetRequest, AssetTagSequence, StatusLabel
 from assets.services import checkout_asset
+from assets.services.request_authorization import can_asset_request_action, is_self_service_claim
 from assets.services.request_fulfillment import (
     checkout_transaction_reference,
     claim_fulfillment_scope,
@@ -35,6 +39,33 @@ from itambox.views.generic import (
     ObjectListView,
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
+from organization.rbac import build_accessible_tenant_permissions_map
+
+
+def _claim_handover_note(actor, req) -> str:
+    """Audit note for a recorded claim handover.
+
+    A self-service actor claims their own request; a scoped fulfilment actor
+    records the handover on the target's behalf.
+    """
+    if is_self_service_claim(actor, req):
+        return f"Self-service claim for approved Request #{req.pk}"
+    return f"Fulfillment handover for approved Request #{req.pk}"
+
+
+def _request_action_tenant_ids(user):
+    """Return tenants where the user may approve or fulfill asset requests."""
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
+        return set()
+
+    permission_map = build_accessible_tenant_permissions_map(user)
+    request_permissions = {"assets.approve_assetrequest", "assets.fulfill_assetrequest"}
+    return {
+        tenant_id
+        for tenant_id, (permissions, _valid_until) in permission_map.items()
+        if request_permissions.intersection(permissions)
+    }
+
 
 # --- Service Layer Callables defined inside the View boundaries ---
 
@@ -135,21 +166,62 @@ class RequestListView(ObjectListView):
     template_name = "assets/requests/assetrequest_list.html"
     action_buttons = ("add",)
 
+    def has_permission(self):
+        self._has_model_view_permission = super().has_permission()
+        return self._has_model_view_permission or bool(_request_action_tenant_ids(self.request.user))
+
     def get_queryset(self):
         qs = super().get_queryset().filter(parent__isnull=True)
-        # Non-privileged users can only view their own requests
-        if (
-            not self.request.user.is_staff
-            and not self.request.user.has_perm("assets.approve_assetrequest")
-            and not self.request.user.has_perm("assets.fulfill_assetrequest")
-        ):
-            return qs.filter(requester=self.request.user)
-        return qs
+        user = self.request.user
+        if user.is_staff and getattr(self, "_has_model_view_permission", False):
+            return qs
+        return qs.filter(Q(requester_id=user.pk) | Q(tenant_id__in=_request_action_tenant_ids(user)))
 
     def get_table(self):
         table = super().get_table()
         table.fulfillment_labels = request_fulfillment_labels([row.record for row in table.paginated_rows])
         return table
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        page_requests = [row.record for row in context["table"].paginated_rows]
+        context["asset_request_bulk_receive_available"] = self._bulk_receive_available(page_requests)
+        return context
+
+    def _bulk_receive_available(self, page_requests):
+        """Toolbar availability from the per-target decision only.
+
+        An objectless ``has_perm("assets.fulfill_assetrequest")`` fails closed in
+        the All-accessible scope, where the aggregate scope rejects ambient
+        transaction permissions, even though the endpoint accepts the target.
+        Approved groups stay selectable because the endpoint expands them into
+        their approved request units.
+        """
+        candidates = [req for req in page_requests if req.status == RequestStatusChoices.APPROVED]
+        group_ids = [req.pk for req in candidates if req.is_group]
+        group_units = {}
+        if group_ids:
+            units = AssetRequest.objects.filter(
+                parent_id__in=group_ids,
+                status=RequestStatusChoices.APPROVED,
+                is_group=False,
+                deleted_at__isnull=True,
+            )
+            for unit in units:
+                group_units.setdefault(unit.parent_id, []).append(unit)
+        for req in candidates:
+            if not can_asset_request_action(self.request.user, req, "bulk_receive"):
+                continue
+            if not req.is_group:
+                if req.asset_id is None:
+                    return True
+                continue
+            if any(
+                can_asset_request_action(self.request.user, unit, "bulk_receive")
+                for unit in group_units.get(req.pk, [])
+            ):
+                return True
+        return False
 
 
 class RequestDetailView(ObjectDetailView):
@@ -161,9 +233,18 @@ class RequestDetailView(ObjectDetailView):
         Panel("Requester Notes", ["notes"], position="right"),
     ]
 
+    def has_permission(self):
+        if super().has_permission():
+            return True
+        request_obj = self.get_object()
+        return can_asset_request_action(self.request.user, request_obj, "approve") or can_asset_request_action(
+            self.request.user, request_obj, "fulfill"
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["asset_request_procurement_enabled"] = registry.is_active("procurement.requisition_seam")
+        context["claim_is_self_service"] = is_self_service_claim(self.request.user, self.object)
         if self.object.is_group:
             children = list(
                 self.object.sub_requests.prefetch_related("fulfillment_links__purchase_order_line__purchase_order")
@@ -188,13 +269,10 @@ class RequestDetailView(ObjectDetailView):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if (
-            not self.request.user.is_staff
-            and not self.request.user.has_perm("assets.approve_assetrequest")
-            and not self.request.user.has_perm("assets.fulfill_assetrequest")
-        ):
-            return qs.filter(requester=self.request.user)
-        return qs
+        user = self.request.user
+        if user.is_staff:
+            return qs
+        return qs.filter(Q(requester_id=user.pk) | Q(tenant_id__in=_request_action_tenant_ids(user)))
 
 
 class RequestCreateView(ObjectEditView):
@@ -289,9 +367,7 @@ class RequestCancelView(SimplePostView):
     queryset = AssetRequest.objects.all()
 
     def perform_action(self, obj, request):
-        if obj.requester != request.user and not (
-            request.user.is_staff or request.user.has_perm("assets.approve_assetrequest")
-        ):
+        if not can_asset_request_action(request.user, obj, "cancel"):
             raise PermissionDenied(_("You do not have permission to cancel this request."))
 
         with transaction.atomic():
@@ -385,7 +461,7 @@ class RequestClaimView(SimplePostView):
                     source_location=req.source_location,
                     user=request.user,
                     request=request,
-                    notes=f"Self-service claim for approved Request #{req.pk}",
+                    notes=_claim_handover_note(request.user, req),
                 )
                 transaction_ref = checkout_transaction_reference(
                     checkout_result,
@@ -419,7 +495,7 @@ class RequestClaimView(SimplePostView):
             asset_target=asset_target,
             user=request.user,
             request=request,
-            notes=f"Self-service claim for approved Request #{req.pk}",
+            notes=_claim_handover_note(request.user, req),
         )
         if checkout_result is None:
             raise ValidationError(_("Checkout did not return a recorded handover."))
@@ -441,13 +517,7 @@ class RequestClaimView(SimplePostView):
         return transaction_ref
 
     def perform_action(self, obj, request):
-        is_requester = obj.requester_id == request.user.id
-        is_assigned_user = obj.assigned_user and obj.assigned_user.user_id == request.user.id
-        if (
-            not is_requester
-            and not is_assigned_user
-            and not (request.user.is_staff or request.user.has_perm("assets.fulfill_assetrequest"))
-        ):
+        if not can_asset_request_action(request.user, obj, "claim"):
             raise PermissionDenied(_("You do not have permission to claim this asset."))
 
         with transaction.atomic():
@@ -527,16 +597,64 @@ class RequestMarkFulfilledView(GenericTransactionView):
         }
 
     def dispatch(self, request, *args, **kwargs):
-        if not (request.user.is_staff or request.user.has_perm("assets.fulfill_assetrequest")):
+        request_obj = self.get_object()
+        if not can_asset_request_action(request.user, request_obj, "mark_fulfilled"):
             raise PermissionDenied(_("You do not have permission to mark this request as fulfilled."))
         return super().dispatch(request, *args, **kwargs)
 
 
-class RequestBulkReceiveView(PermissionRequiredMixin, View):
-    permission_required = "assets.fulfill_assetrequest"
-
+class RequestBulkReceiveView(LoginRequiredMixin, View):
+    # No ambient ``assets.fulfill_assetrequest`` guard: an objectless transaction
+    # permission is rejected in the All-accessible scope, which made this endpoint
+    # unreachable there. Authorization now rests on the per-target
+    # ``bulk_receive`` decision (fail-closed) for every selected request and every
+    # expanded child, matching the cancel/claim/mark-fulfilled views.
     def get(self, request, *args, **kwargs):
         return redirect("assets:request_list")
+
+    def _require_bulk_receive_permission(self, requests):
+        for req in requests:
+            if not can_asset_request_action(self.request.user, req, "bulk_receive"):
+                raise PermissionDenied(
+                    _("You do not have permission to receive stock for one or more selected requests.")
+                )
+
+    @staticmethod
+    def _validated_request_ids(request_ids):
+        # Malformed or repeated selections are input errors, not authorization
+        # failures: they surface as a visible message instead of a 403 page.
+        try:
+            ids = [int(request_id) for request_id in request_ids]
+        except (TypeError, ValueError):
+            raise ValidationError(_("One or more selected requests are invalid.")) from None
+        if len(set(ids)) != len(ids):
+            raise ValidationError(_("A request can appear only once in a bulk receipt."))
+        return ids
+
+    def _get_authorized_requests(self, request_ids, *, lock=False):
+        ids = self._validated_request_ids(request_ids)
+        queryset = AssetRequest.objects.filter(pk__in=ids, deleted_at__isnull=True)
+        if lock:
+            # No select_related() here: the nullable FKs would turn into outer joins,
+            # and PostgreSQL rejects FOR UPDATE over the nullable side of an outer
+            # join. Related rows are loaded on access inside the transaction.
+            requests = list(queryset.select_for_update())
+        else:
+            requests = list(
+                queryset.select_related(
+                    "asset_type",
+                    "requester",
+                    "asset",
+                    "assigned_location",
+                    "source_location",
+                )
+            )
+        if len(requests) != len(ids):
+            raise PermissionDenied(_("You do not have access to one or more selected requests."))
+        requests_by_id = {req.pk: req for req in requests}
+        ordered_requests = [requests_by_id[request_id] for request_id in ids]
+        self._require_bulk_receive_permission(ordered_requests)
+        return ordered_requests
 
     def _validate_receipt(self, req, form):
         if req.status != RequestStatusChoices.APPROVED:
@@ -553,141 +671,138 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
         if supplier_tenant_id is not None and supplier_tenant_id != req.tenant_id:
             raise ValidationError(_("The selected supplier belongs to another tenant."))
 
+    def _get_requests_for_receipt(self, request_ids):
+        selected_requests = self._get_authorized_requests(request_ids)
+        approved_requests = [req for req in selected_requests if req.status == RequestStatusChoices.APPROVED]
+        selected_ids = {req.pk for req in selected_requests}
+        group_ids = [req.pk for req in approved_requests if req.is_group]
+        child_requests = list(
+            AssetRequest.objects.filter(parent_id__in=group_ids, deleted_at__isnull=True).select_related(
+                "asset_type",
+                "requester",
+                "asset",
+                "assigned_location",
+                "source_location",
+            )
+        )
+        self._require_bulk_receive_permission(child_requests)
+        return [req for req in approved_requests if not req.is_group] + [
+            req
+            for req in child_requests
+            if req.status == RequestStatusChoices.APPROVED and not req.is_group and req.pk not in selected_ids
+        ]
+
+    def _render_formset(self, request, formset, requests_data):
+        context = {
+            "title": _("Bulk Stock Receipt & Allocation"),
+            "formset": formset,
+            "requests_data": requests_data,
+        }
+        return render(request, "assets/requests/bulk_receive.html", context)
+
+    def _render_formset_errors(self, request, formset):
+        requests_data = []
+        for form in formset:
+            try:
+                request_id = int(form["request_id"].value())
+                req = AssetRequest.objects.filter(pk=request_id, deleted_at__isnull=True).first()
+            except (TypeError, ValueError):
+                req = None
+            requests_data.append((req, form))
+        return self._render_formset(request, formset, requests_data)
+
+    def _render_initial_formset(self, request, requests_qs):
+        initial_data = []
+        type_tag_seqs = {}
+        for req in requests_qs:
+            if not req.asset_type:
+                continue
+            dummy_asset = Asset(tenant=req.tenant, asset_type=req.asset_type)
+            seq = AssetTagSequence.resolve_sequence_for_asset(dummy_asset)
+            next_tag = ""
+            if seq:
+                if seq.pk not in type_tag_seqs:
+                    type_tag_seqs[seq.pk] = (seq, seq.next_value)
+                seq_obj, current_val = type_tag_seqs[seq.pk]
+                next_tag = f"{seq_obj.prefix}{current_val:0{seq_obj.zero_padding}d}"
+                type_tag_seqs[seq.pk] = (seq_obj, current_val + 1)
+
+            deployable_status = StatusLabel.objects.filter(type="deployable").first()
+            initial_data.append(
+                {
+                    "request_id": req.pk,
+                    "asset_tag": next_tag,
+                    "name": str(req.asset_type),
+                    "status": deployable_status.pk if deployable_status else None,
+                    "location": req.assigned_location.pk
+                    if req.assigned_location
+                    else (req.source_location.pk if req.source_location else None),
+                }
+            )
+
+        formset = AssetReceiveFormSet(initial=initial_data)
+        # strict=False: a request without an asset type intentionally produces no
+        # formset row, so the two sequences may legitimately differ in length.
+        return self._render_formset(request, formset, list(zip(requests_qs, formset, strict=False)))
+
+    def _allocate_receipt_asset(self, req, form, user):
+        asset = Asset.objects.create(
+            name=form.cleaned_data["name"].strip(),
+            asset_type=req.asset_type,
+            asset_role=req.asset_type.asset_role if req.asset_type else None,
+            serial_number=form.cleaned_data["serial_number"].strip() or "",
+            asset_tag=form.cleaned_data["asset_tag"].strip() or "",
+            status=form.cleaned_data["status"],
+            location=form.cleaned_data["location"],
+            supplier=form.cleaned_data["supplier"],
+            order_number=form.cleaned_data["order_number"].strip() or "",
+            purchase_cost=form.cleaned_data["purchase_cost"],
+            purchase_date=form.cleaned_data["purchase_date"] or timezone.now().date(),
+            tenant=req.tenant,
+        )
+        req.asset = asset
+        req.status = RequestStatusChoices.APPROVED
+        req.responded_by = user
+        req.response_date = timezone.now()
+        req.save()
+
+    def _process_valid_formset(self, request, formset):
+        try:
+            with transaction.atomic():
+                request_ids = [form.cleaned_data["request_id"] for form in formset]
+                receipt_requests = self._get_authorized_requests(request_ids, lock=True)
+                for req, form in zip(receipt_requests, formset, strict=True):
+                    self._validate_receipt(req, form)
+                for req, form in zip(receipt_requests, formset, strict=True):
+                    self._allocate_receipt_asset(req, form, request.user)
+                messages.success(request, _("Stock received and allocated; awaiting handover."))
+
+            return redirect("assets:request_list")
+        except PermissionDenied:
+            raise
+        # broad except: render-degrade: report a failed receipt batch instead of failing the page
+        except Exception as error:
+            messages.error(request, _("Error processing bulk receipt: %(error)s") % {"error": error})
+            return self._render_formset_errors(request, formset)
+
     def post(self, request, *args, **kwargs):
-        from django.contrib import messages
-
-        from assets.forms.request_forms import AssetReceiveFormSet
-
         if "form-TOTAL_FORMS" in request.POST:
             formset = AssetReceiveFormSet(request.POST)
             if formset.is_valid():
-                try:
-                    with transaction.atomic():
-                        for form in formset:
-                            request_id = form.cleaned_data["request_id"]
-                            req = AssetRequest.objects.select_for_update().get(
-                                pk=request_id,
-                                deleted_at__isnull=True,
-                            )
-                            self._validate_receipt(req, form)
+                return self._process_valid_formset(request, formset)
+            return self._render_formset_errors(request, formset)
 
-                            # Create Asset using form details
-                            asset = Asset.objects.create(
-                                name=form.cleaned_data["name"].strip(),
-                                asset_type=req.asset_type,
-                                asset_role=req.asset_type.asset_role if req.asset_type else None,
-                                serial_number=form.cleaned_data["serial_number"].strip() or "",
-                                asset_tag=form.cleaned_data["asset_tag"].strip() or "",
-                                status=form.cleaned_data["status"],
-                                location=form.cleaned_data["location"],
-                                supplier=form.cleaned_data["supplier"],
-                                order_number=form.cleaned_data["order_number"].strip() or "",
-                                purchase_cost=form.cleaned_data["purchase_cost"],
-                                purchase_date=form.cleaned_data["purchase_date"] or timezone.now().date(),
-                                tenant=req.tenant,
-                            )
+        request_ids = request.POST.getlist("pk") or request.GET.getlist("pk")
+        if not request_ids:
+            messages.warning(request, _("No requests selected for bulk receipt."))
+            return redirect("assets:request_list")
 
-                            req.asset = asset
-                            req.status = RequestStatusChoices.APPROVED
-                            req.responded_by = request.user
-                            req.response_date = timezone.now()
-                            req.save()
-
-                        messages.success(request, _("Stock received and allocated; awaiting handover."))
-                        return redirect("assets:request_list")
-                except Exception as e:
-                    messages.error(request, _("Error processing bulk receipt: %(error)s") % {"error": e})
-
-            requests_data = []
-            for form in formset:
-                try:
-                    req_id = form["request_id"].value()
-                    req = AssetRequest.objects.filter(
-                        pk=int(req_id),
-                        deleted_at__isnull=True,
-                    ).first()
-                    requests_data.append((req, form))
-                except Exception:
-                    requests_data.append((None, form))
-
-            context = {
-                "title": _("Bulk Stock Receipt & Allocation"),
-                "formset": formset,
-                "requests_data": requests_data,
-            }
-            return render(request, "assets/requests/bulk_receive.html", context)
-
-        else:
-            pks = request.POST.getlist("pk")
-            if not pks:
-                pks = request.GET.getlist("pk")
-
-            if not pks:
-                messages.warning(request, _("No requests selected for bulk receipt."))
-                return redirect("assets:request_list")
-
-            selected_requests = list(
-                AssetRequest.objects.filter(
-                    pk__in=pks,
-                    status=RequestStatusChoices.APPROVED,
-                    deleted_at__isnull=True,
-                ).select_related("asset_type", "requester")
-            )
-            selected_ids = {req.pk for req in selected_requests}
-            group_ids = [req.pk for req in selected_requests if req.is_group]
-            child_requests = list(
-                AssetRequest.objects.filter(
-                    parent_id__in=group_ids,
-                    status=RequestStatusChoices.APPROVED,
-                    is_group=False,
-                    deleted_at__isnull=True,
-                ).select_related("asset_type", "requester")
-            )
-            requests_qs = [req for req in selected_requests if not req.is_group] + [
-                req for req in child_requests if req.pk not in selected_ids
-            ]
-            if not requests_qs:
-                messages.warning(request, _("None of the selected requests are in Approved status."))
-                return redirect("assets:request_list")
-
-            initial_data = []
-            type_tag_seqs = {}
-
-            for req in requests_qs:
-                if req.asset_type:
-                    dummy_asset = Asset(tenant=req.tenant, asset_type=req.asset_type)
-                    from assets.models import AssetTagSequence
-
-                    seq = AssetTagSequence.resolve_sequence_for_asset(dummy_asset)
-
-                    next_tag = ""
-                    if seq:
-                        if seq.pk not in type_tag_seqs:
-                            type_tag_seqs[seq.pk] = (seq, seq.next_value)
-
-                        seq_obj, current_val = type_tag_seqs[seq.pk]
-                        next_tag = f"{seq_obj.prefix}{current_val:0{seq_obj.zero_padding}d}"
-                        type_tag_seqs[seq.pk] = (seq_obj, current_val + 1)
-
-                    deployable_status = StatusLabel.objects.filter(type="deployable").first()
-
-                    initial_row = {
-                        "request_id": req.pk,
-                        "asset_tag": next_tag,
-                        "name": str(req.asset_type),
-                        "status": deployable_status.pk if deployable_status else None,
-                        "location": req.assigned_location.pk
-                        if req.assigned_location
-                        else (req.source_location.pk if req.source_location else None),
-                    }
-                    initial_data.append(initial_row)
-
-            formset = AssetReceiveFormSet(initial=initial_data)
-            requests_data = list(zip(requests_qs, formset))
-
-            context = {
-                "title": _("Bulk Stock Receipt & Allocation"),
-                "formset": formset,
-                "requests_data": requests_data,
-            }
-            return render(request, "assets/requests/bulk_receive.html", context)
+        try:
+            requests_qs = self._get_requests_for_receipt(request_ids)
+        except ValidationError as error:
+            messages.error(request, "; ".join(str(message) for message in error.messages))
+            return redirect("assets:request_list")
+        if not requests_qs:
+            messages.warning(request, _("None of the selected requests are in Approved status."))
+            return redirect("assets:request_list")
+        return self._render_initial_formset(request, requests_qs)

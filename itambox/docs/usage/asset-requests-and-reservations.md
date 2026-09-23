@@ -192,6 +192,8 @@ denied it and why.
 | `assets.fulfill_assetrequest` | Fulfilment / IT operations staff |
 | `assets.view_assetrequest` | Anyone who should see the request queue |
 
+Request actions follow the effective permission for each request's tenant. Non-staff users with `assets.approve_assetrequest` can see and use approval, denial, and cancellation actions for covered requests; users with `assets.fulfill_assetrequest` can see and use fulfilment actions, including recording the handover of an allocated asset or request unit from the request detail page. The claim wording stays self-service for the requester or the assigned user and reads as a handover for everyone else. Requesters can still cancel their own requests, and requesters or assigned users can still claim them. Bulk receipt is offered when the page holds a receivable request, including an approved group whose request units are approved; malformed or repeated selections report a message on the request list instead of an access-denied page. Either action permission also allows access to the request list and detail pages for the tenants it covers.
+
 ---
 
 ## Asset Reservations

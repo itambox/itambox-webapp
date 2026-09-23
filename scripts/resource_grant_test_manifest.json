@@ -1,7 +1,14 @@
 {
-  "base_commit": "27f82ca4398d933b9017c2a2abdbd9d43ebf7284",
+  "base_commit": "89f04a3dd5c4ff8450728cfa2cad5af2027c52cc",
   "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest.",
   "changed_tests": [
+    "itambox/assets/tests/test_issue493_fulfillment_ui.py",
+    "itambox/assets/tests/test_issue497_claim_and_bulk_ui.py",
+    "itambox/assets/tests/test_issue497_request_action_authorization.py",
+    "itambox/assets/tests/test_issue497_request_action_scopes.py",
+    "itambox/assets/tests/test_issue497_request_action_ui.py"
+  ],
+  "baseline_tests": [
     "itambox/assets/api/tests/test_error_boundary_disclosure.py",
     "itambox/assets/api/tests/test_t09c_specification_adapters.py",
     "itambox/assets/api/tests/test_t09c_specification_http_races.py",
@@ -47,7 +54,6 @@
     "itambox/assets/tests/test_issue479_foundation_migrations.py",
     "itambox/assets/tests/test_issue492_fulfillment.py",
     "itambox/assets/tests/test_issue493_fulfillment_semantics.py",
-    "itambox/assets/tests/test_issue493_fulfillment_ui.py",
     "itambox/assets/tests/test_issue494_base_location.py",
     "itambox/assets/tests/test_missing_status_reference_data.py",
     "itambox/assets/tests/test_phase0_disposal.py",
@@ -195,6 +201,7 @@
     "itambox/inventory/tests/test_kit_owner_scope.py",
     "itambox/inventory/tests/test_kits.py",
     "itambox/inventory/tests/test_stock.py",
+    "itambox/inventory/tests/test_stock_action_permissions.py",
     "itambox/inventory/tests/test_stock_fanout.py",
     "itambox/itambox/tests/test_capability_surfaces.py",
     "itambox/itambox/tests/test_generic_cbv.py",
@@ -241,9 +248,6 @@
     "scripts/tests/test_select_e2e_scopes.py",
     "scripts/tests/test_specification_vocabulary_contract.py",
     "scripts/tests/test_typing_policy.py"
-  ],
-  "baseline_tests": [
-    "itambox/inventory/tests/test_stock_action_permissions.py"
   ],
   "mandatory_tests": [
     "itambox/assets/api/tests/test_error_boundary_disclosure.py",
@@ -293,6 +297,10 @@
     "itambox/assets/tests/test_issue493_fulfillment_semantics.py",
     "itambox/assets/tests/test_issue493_fulfillment_ui.py",
     "itambox/assets/tests/test_issue494_base_location.py",
+    "itambox/assets/tests/test_issue497_claim_and_bulk_ui.py",
+    "itambox/assets/tests/test_issue497_request_action_authorization.py",
+    "itambox/assets/tests/test_issue497_request_action_scopes.py",
+    "itambox/assets/tests/test_issue497_request_action_ui.py",
     "itambox/assets/tests/test_missing_status_reference_data.py",
     "itambox/assets/tests/test_phase0_disposal.py",
     "itambox/assets/tests/test_phase3_state_machine.py",

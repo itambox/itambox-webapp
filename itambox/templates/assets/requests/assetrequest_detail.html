@@ -1,5 +1,5 @@
 {% extends 'generic/object_detail.html' %}
-{% load i18n utility_tags %}
+{% load i18n utility_tags request_actions %}
 {% block title %}
   {% translate "Request Details - ITAMbox" %}
 {% endblock %}
@@ -8,7 +8,8 @@
 {% endblock %}
 {% block page_actions %}
   <div class="btn-list">
-    {% if request.user.is_staff and object.status == 'pending' %}
+    {% can_asset_request_action request.user object "approve" as can_approve %}
+    {% if can_approve and object.status == 'pending' %}
       <button type="button"
               class="btn btn-success"
               hx-get="{% url 'assets:request_approve' pk=object.pk %}"
@@ -26,7 +27,8 @@
         {% translate "Deny..." %}
       </button>
     {% endif %}
-    {% if asset_request_procurement_enabled and perms.procurement.add_purchaseorder and perms.assets.fulfill_assetrequest and object.status == 'approved' and not object.asset and not object.parent_id %}
+    {% can_asset_request_action request.user object "fulfill" as can_fulfill %}
+    {% if asset_request_procurement_enabled and perms.procurement.add_purchaseorder and can_fulfill and object.status == 'approved' and not object.asset and not object.parent_id %}
       <a href="{% url 'procurement:purchaseorder_create' %}?from_request={{ object.pk }}"
          class="btn btn-warning">
         <i class="mdi mdi-cart-plus"></i>
@@ -43,20 +45,40 @@
         {% translate "Check-out &amp; Fulfill..." %}
       </button>
     {% endif %}
-    {% if object.status == 'approved' %}
-      {% if request.user.is_staff or perms.assets.fulfill_assetrequest %}
-        <a href="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
-           class="btn btn-outline-warning"
-           hx-get="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
-           hx-target="#modal-placeholder"
-           hx-swap="innerHTML">
-          <i class="mdi mdi-check-outline"></i>
-          {% translate "Complete manually..." %}
-        </a>
+    {% can_asset_request_action request.user object "claim" as can_claim %}
+    {% if can_claim and object.status == 'approved' %}
+      {% if object.asset or object.is_group or object.component or object.accessory or object.consumable %}
+        <form method="post"
+              action="{% url 'assets:request_claim' pk=object.pk %}"
+              class="d-inline">
+          {% csrf_token %}
+          <button type="submit"
+                  class="btn btn-primary"
+                  data-confirm="{% translate 'Are you sure you want to record this handover?' %}">
+            <i class="mdi mdi-package-down"></i>
+            {% if claim_is_self_service %}
+              {% translate "Claim &amp; Confirm Pickup" %}
+            {% else %}
+              {% translate "Record Handover &amp; Fulfill" %}
+            {% endif %}
+          </button>
+        </form>
       {% endif %}
     {% endif %}
-    {% if object.status == 'pending' or object.status == 'approved' %}
-      {% if object.requester == request.user or request.user.is_staff %}
+    {% can_asset_request_action request.user object "mark_fulfilled" as can_mark_fulfilled %}
+    {% if can_mark_fulfilled and object.status == 'approved' %}
+      <a href="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
+         class="btn btn-outline-warning"
+         hx-get="{% url 'assets:request_mark_fulfilled' pk=object.pk %}"
+         hx-target="#modal-placeholder"
+         hx-swap="innerHTML">
+        <i class="mdi mdi-check-outline"></i>
+        {% translate "Complete manually..." %}
+      </a>
+    {% endif %}
+    {% can_asset_request_action request.user object "cancel" as can_cancel %}
+    {% if can_cancel %}
+      {% if object.status == 'pending' or object.status == 'approved' or object.status == 'procurement' %}
         <form method="post"
               action="{% url 'assets:request_cancel' pk=object.pk %}"
               class="d-inline">

@@ -2069,34 +2069,10 @@
     },
     {
       "path": "itambox/assets/views/request_views.py",
-      "code": "B905",
-      "message": "`zip()` without an explicit `strict=` parameter.",
-      "source": "            requests_data = list(zip(requests_qs, formset))",
-      "context": "Module:body/ClassDef:RequestBulkReceiveView:body/FunctionDef:post:body/If:Compare(left=Constant(value='form-TOTAL_FORMS'), ops=[In()], comparators=[Attribute(value=Name(id='request', ctx=Load()), attr='POST', ctx=Load())]):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "code": "C901",
-      "message": "'RequestBulkReceiveView.post' is too complex (16)",
-      "source": "    def post(self, request, *args, **kwargs):",
-      "context": "Module:body/ClassDef:RequestBulkReceiveView:body/FunctionDef:post:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
       "code": "C901",
       "message": "'approve_asset_request' is too complex (14)",
       "source": "def approve_asset_request(request_instance, user, request=None, **kwargs):",
       "context": "Module:body/FunctionDef:approve_asset_request:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "code": "F401",
-      "message": "'django.contrib.auth.mixins.LoginRequiredMixin' imported but unused",
-      "source": "from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin",
-      "context": "Module:body",
       "count": 1
     },
     {
