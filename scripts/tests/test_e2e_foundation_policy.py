@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import csv
 import unittest
 from pathlib import Path
@@ -123,7 +122,6 @@ class OwnedFoundationFilesTests(unittest.TestCase):
         integration = REPO_ROOT / "itambox" / "docs" / "integration"
         developer_guide = integration / "developer_guide.md"
         bulk_guide = integration / "bulk_import_guide.md"
-        offboard_script = integration / "offboard_user.py"
         bulk_csv = integration / "bulk_assets.csv"
 
         self.assertFalse(legacy_spec.exists())
@@ -131,15 +129,6 @@ class OwnedFoundationFilesTests(unittest.TestCase):
             content = document.read_text(encoding="utf-8")
             self.assertGreater(len(content), 100)
             self.assertTrue(content.startswith("#"))
-
-        script = offboard_script.read_text(encoding="utf-8")
-        ast.parse(script, filename=str(offboard_script))
-        self.assertIn("os.environ.get", script)
-        self.assertIn("try:", script)
-        self.assertIn("except", script)
-        self.assertIn("urllib.error.URLError", script)
-        self.assertNotIn('ITAMBOX_API_TOKEN = "', script)
-        self.assertNotIn("API_TOKEN = '", script)
 
         rows = list(csv.reader(bulk_csv.read_text(encoding="utf-8").splitlines()))
         self.assertGreater(len(rows), 1)

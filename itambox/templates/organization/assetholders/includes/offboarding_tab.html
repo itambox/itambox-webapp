@@ -4,7 +4,8 @@ Offboarding readiness tab pane: a read-only roll-up of every outstanding
 obligation for this person. Composed from existing capabilities (assets,
 accessories, components, consumables, licenses, custody, requests,
 reservations, subscriptions, memberships, login state). It lists; it never
-mutates. Gated by the detail view's own view permission.
+mutates. Gated by the detail view's own view permission; custody items
+additionally require the receipt permission checked by that view.
 
 Params:
   tab      pane id / ?tab= value (required)   e.g. "offboarding"
@@ -21,12 +22,12 @@ Params:
       <div class="card-body">
         <div class="alert alert-info py-2" role="status">
           <i class="mdi mdi-information-outline"></i>
-          {% blocktranslate count count=offboarding_obligation_count %}
-          There is {{ count }} outstanding obligation for this person.
+          {% blocktranslate trimmed count count=offboarding_obligation_count %}
+            There is {{ count }} outstanding obligation for this person.
           {% plural %}
-          There are {{ count }} outstanding obligations for this person.
+            There are {{ count }} outstanding obligations for this person.
           {% endblocktranslate %}
-          This view only lists obligations — it does not check anything in.
+          {% translate "This view only lists obligations. It does not check anything in." %}
         </div>
         <ul class="list-group list-group-flush">
           {% for item in report.items %}
@@ -35,7 +36,8 @@ Params:
                 <span class="fw-bold text-indigo">{{ item.label }}:</span>
                 <span class="ms-1 text-body-secondary">{{ item.description }}</span>
               </div>
-              <a class="btn btn-sm btn-outline-primary text-nowrap ms-2" href="{{ item.url }}">
+              <a class="btn btn-sm btn-outline-primary text-nowrap ms-2"
+                 href="{{ item.url }}">
                 <i class="mdi mdi-open-in-new"></i> {% translate "Open" %}
               </a>
             </li>
@@ -45,7 +47,7 @@ Params:
     {% else %}
       <div class="card-body py-5 text-center">
         <i class="mdi mdi-check-circle-outline text-green text-2xl mb-2"></i>
-        <p class="mb-0 text-success fw-bold">{% translate "Clear" %}</p>
+        <p class="mb-0 text-success fw-bold">{% translate "clear" %}</p>
         <p class="mb-0 text-muted">{% translate "No outstanding obligations found for this person." %}</p>
       </div>
     {% endif %}
