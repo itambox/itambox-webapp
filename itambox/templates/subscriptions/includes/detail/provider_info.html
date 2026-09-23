@@ -29,6 +29,17 @@
       <a href="{{ object.portal_url }}" target="_blank" rel="noopener">{{ object.portal_url }}</a>
     </dd>
   {% endif %}
+  {% if object.supplier %}
+    <dt class="col-sm-3">{% translate "Supplier:" %}</dt>
+    <dd class="col-sm-9">
+      {% if object.supplier.deleted_at %}
+        {{ object.supplier.name }}
+        <span class="badge bg-secondary ms-1">{% translate "Deleted" %}</span>
+      {% else %}
+        <a href="{% url 'assets:supplier_detail' object.supplier.pk %}">{{ object.supplier.name }}</a>
+      {% endif %}
+    </dd>
+  {% endif %}
 </dl>
 {% if object.contact_email or object.contact_phone or object.support_contact %}
   <div class="card mt-4 border-0 shadow-sm">

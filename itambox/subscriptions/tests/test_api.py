@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from assets.models import Supplier
 from subscriptions.models import (
     BillingCycleChoices,
     Provider,
@@ -197,3 +198,65 @@ class SubscriptionAPITests(APITestCase):
         detail_url = reverse("api:subscriptions_api:subscription-detail", kwargs={"pk": new_pk})
         response = self.client.delete(detail_url, HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_provider_supplier_link_round_trip(self):
+        self._login_as_staff()
+        supplier = Supplier.objects.create(name="Dell Reseller API", slug="dell-reseller-api")
+        replacement = Supplier.objects.create(name="Ingram Micro API", slug="ingram-micro-api")
+        list_url = reverse("api:subscriptions_api:provider-list")
+
+        response = self.client.post(
+            list_url,
+            data={"name": "Supplier Linked Provider", "supplier_id": supplier.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["supplier"],
+            {"id": supplier.pk, "name": "Dell Reseller API", "slug": "dell-reseller-api"},
+        )
+        self.assertNotIn("supplier_id", response.data)
+        self.assertEqual(response.data["tenant"]["id"], self.tenant.pk)
+        provider_pk = response.data["id"]
+
+        detail_url = reverse("api:subscriptions_api:provider-detail", kwargs={"pk": provider_pk})
+        response = self.client.patch(
+            detail_url, data={"supplier_id": replacement.pk}, format="json", HTTP_IF_MATCH=response["ETag"]
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["supplier"]["id"], replacement.pk)
+        self.assertNotIn("supplier_id", response.data)
+        self.assertEqual(response.data["tenant"]["id"], self.tenant.pk)
+
+        response = self.client.patch(
+            detail_url, data={"supplier_id": None}, format="json", HTTP_IF_MATCH=response["ETag"]
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["supplier"])
+
+    def test_provider_supplier_id_rejects_unknown_and_soft_deleted_rows(self):
+        self._login_as_staff()
+        list_url = reverse("api:subscriptions_api:provider-list")
+
+        response = self.client.post(
+            list_url, data={"name": "Ghost Supplier Probe", "supplier_id": 999999999}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("supplier_id", response.data)
+
+        deleted = Supplier.objects.create(name="Soft Deleted API Supplier", slug="soft-deleted-api-supplier")
+        deleted.delete()
+        response = self.client.post(
+            list_url, data={"name": "Deleted Supplier Probe", "supplier_id": deleted.pk}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("supplier_id", response.data)
+
+    def test_provider_name_stays_required_in_the_api(self):
+        self._login_as_staff()
+        list_url = reverse("api:subscriptions_api:provider-list")
+
+        response = self.client.post(list_url, data={"account_id": "nameless-account"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("name", response.data)

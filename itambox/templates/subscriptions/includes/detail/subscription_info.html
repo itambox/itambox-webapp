@@ -110,13 +110,13 @@
       <strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong>
     </dd>
   {% endif %}
-  {% if object.licensed_quantity %}
-    <dt class="col-sm-3">{% translate "Licensed Qty:" %}</dt>
+  {% if object.licensed_quantity is not None %}
+    <dt class="col-sm-3">{% translate "Agreement Entitled Quantity:" %}</dt>
     <dd class="col-sm-9">
       <strong>{{ object.licensed_quantity }}</strong>
     </dd>
   {% endif %}
-  <dt class="col-sm-3">{% translate "Seat Usage:" %}</dt>
+  <dt class="col-sm-3">{% translate "Linked License Seats:" %}</dt>
   <dd class="col-sm-9">
     <strong>{{ assigned_seats }}</strong> / {{ total_seats }}
     <span class="text-muted ms-1">({{ available_seats }} {% translate "available" %})</span>

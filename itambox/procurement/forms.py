@@ -9,6 +9,16 @@ from core.forms import FilterForm, scope_tenant_field
 from .filters import ContractFilterSet, PurchaseOrderFilterSet
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
 
+# The exclusive Contract/Subscription ownership mapping (issue #500): the same
+# text ships on the Subscription type field, so one agreement is recorded in one
+# module only. Kept as one constant so the Contract form cannot drift.
+AGREEMENT_OWNERSHIP_HELP = _(
+    "Record one agreement in one module only. SaaS and cloud entitlement: record as Subscription. "
+    "Support, maintenance, lease, warranty, SLA, or asset-covered service: record as Contract. "
+    "Other recurring entitlement without asset/SLA coverage: record as Subscription. "
+    "Other legal/commercial agreement: record as Contract."
+)
+
 
 class PurchaseOrderFilterForm(FilterForm):
     filterset_class = PurchaseOrderFilterSet
@@ -224,6 +234,9 @@ class ContractForm(forms.ModelForm):
             "status": forms.Select(attrs={"class": "form-select"}),
             "billing_cycle": forms.Select(attrs={"class": "form-select"}),
             "assets": forms.SelectMultiple(attrs={"data-tom-select": ""}),
+        }
+        help_texts = {
+            "contract_type": AGREEMENT_OWNERSHIP_HELP,
         }
 
     def __init__(self, *args, **kwargs):

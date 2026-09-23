@@ -17,6 +17,16 @@ from organization.models import AssetHolder, CostCenter, Location, Tenant, Tenan
 from .filters import ProviderFilterSet, SubscriptionFilterSet
 from .models import Provider, Subscription, SubscriptionAssignment
 
+# The exclusive Contract/Subscription ownership mapping (issue #500): the same
+# text ships on the Contract type field, so one agreement is recorded in one
+# module only. Kept as one constant so both shipped surfaces cannot drift.
+AGREEMENT_OWNERSHIP_HELP = _(
+    "Record one agreement in one module only. SaaS and cloud entitlement: record as Subscription. "
+    "Support, maintenance, lease, warranty, SLA, or asset-covered service: record as Contract. "
+    "Other recurring entitlement without asset/SLA coverage: record as Subscription. "
+    "Other legal/commercial agreement: record as Contract."
+)
+
 
 @register_import_form
 class SubscriptionBulkImportForm(BulkImportForm):
@@ -88,6 +98,7 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
             "tenant_group",
             "account_id",
             "portal_url",
+            "supplier",
             "admin_notes",
             "is_active",
             "tags",
@@ -97,11 +108,16 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
             "slug": forms.TextInput(attrs={"class": "form-control", "data-slug-help": ""}),
             "account_id": forms.TextInput(attrs={"class": "form-control"}),
             "portal_url": forms.URLInput(attrs={"class": "form-control"}),
+            "supplier": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "admin_notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "tags": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         }
         help_texts = {
             "slug": _("Changing the slug may break existing import references that use it as a natural key."),
+            "name": _(
+                "Required unless a Supplier is selected. A new provider with a blank name uses the supplier name."
+            ),
+            "supplier": _("Optional link to the shared Supplier catalogue."),
         }
 
     def clean(self):
@@ -110,7 +126,26 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
         tenant_group = cleaned_data.get("tenant_group")
         if tenant and tenant_group:
             raise forms.ValidationError(_("A provider may be scoped to a Tenant or a Tenant Group, but not both."))
+        self._resolve_name(cleaned_data)
         return cleaned_data
+
+    def _resolve_name(self, cleaned_data):
+        """The name is optional only when a Supplier is selected (issue #500).
+
+        A new provider with a blank name takes the supplier's name, so vendor
+        data is not retyped. An existing provider keeps its stored name: the
+        form never renames a provider from its supplier. Without a supplier the
+        name stays required, matching the model.
+        """
+        if cleaned_data.get("name"):
+            return
+        supplier = cleaned_data.get("supplier")
+        if supplier is None:
+            self.add_error("name", self.fields["name"].error_messages["required"])
+        elif self.instance.pk:
+            cleaned_data["name"] = self.instance.name
+        else:
+            cleaned_data["name"] = supplier.name
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -122,6 +157,11 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
         # patch (core/apps.py) already skips forms that also declare `tenant_group`;
         # this explicit reset is the load-bearing guard for the XOR clean().
         self.fields["tenant"].required = False
+        # `name` is conditionally required: clean() demands it unless a Supplier
+        # is selected (the conditional check cannot run at field level).
+        self.fields["name"].required = False
+        # `supplier` is global reference data (no tenant scoping): the default
+        # ModelChoiceField queryset already lists every active Supplier.
 
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse("subscriptions:provider_list")
 
@@ -134,7 +174,8 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
                     css_class="row",
                 ),
                 Div(
-                    Div("portal_url", css_class="col-md-12"),
+                    Div("supplier", css_class="col-md-6"),
+                    Div("portal_url", css_class="col-md-6"),
                     css_class="row",
                 ),
             ),
@@ -218,7 +259,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "currency": forms.TextInput(attrs={"class": "form-control", "maxlength": 3}),
             "billing_cycle": forms.Select(attrs={"class": "form-select"}),
             "term_months": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
-            "licensed_quantity": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "licensed_quantity": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "contract_reference": forms.TextInput(attrs={"class": "form-control"}),
             "owner": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
@@ -227,6 +268,11 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         }
         help_texts = {
             "slug": _("Changing the slug may break existing import references that use it as a natural key."),
+            "type": AGREEMENT_OWNERSHIP_HELP,
+            "contract_reference": _(
+                "External vendor, PO, or agreement reference. It does not link a Procurement Contract and must "
+                "not be used to justify duplicating the same agreement."
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -238,6 +284,11 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )
+        # Rescope the tenant-owned `provider` FK per request (import-frozen
+        # unscoped — would expose/permit another tenant's provider). The manager
+        # resolves the active tenant, tenant group, or All-accessible scope and
+        # keeps global providers visible; inactive providers stay unselectable.
+        self.fields["provider"].queryset = Provider.objects.filter(is_active=True)
 
         cancel_url = (
             self.instance.get_absolute_url() if self.instance.pk else reverse("subscriptions:subscription_list")

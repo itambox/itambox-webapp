@@ -61,6 +61,15 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         verbose_name=_("Admin Portal URL"),
         help_text=_("URL for the provider's management/administration portal"),
     )
+    supplier = models.ForeignKey(
+        "assets.Supplier",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="providers",
+        verbose_name=_("Supplier"),
+        db_index=True,
+    )
     admin_notes = models.TextField(
         blank=True, verbose_name=_("Admin Notes"), help_text=_("Optional internal administrative notes")
     )
@@ -270,8 +279,11 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     licensed_quantity = models.PositiveIntegerField(
         blank=True,
         null=True,
-        verbose_name=_("Licensed Quantity"),
-        help_text=_("Number of seats/users/devices covered (for SaaS/support)"),
+        verbose_name=_("Agreement Entitled Quantity"),
+        help_text=_(
+            "Number of seats, users, or devices entitled by the vendor agreement. "
+            "This value is independent of linked License seats."
+        ),
     )
     contract_reference = models.CharField(
         max_length=100,

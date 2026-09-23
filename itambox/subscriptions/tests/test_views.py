@@ -7,10 +7,13 @@ from django.db import connection
 from django.test import Client, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from model_bakery import baker
 
-from assets.models import Asset
+from assets.models import Asset, Supplier
 from extras.models import JournalEntry
+from licenses.models import License
 from organization.models import Location, Site, Tenant, TenantGroup
+from software.models import Software
 from subscriptions.models import (
     BillingCycleChoices,
     Provider,
@@ -74,6 +77,19 @@ class SubscriptionViewTests(TestCase):
         match = re.search(re.escape(label) + r"\s*</dt>\s*<dd[^>]*>(.*?)</dd>", content, re.S)
         self.assertIsNotNone(match, f"no rendered row for label {label!r}")
         return match.group(1)
+
+    def _row_text(self, content, label):
+        """Tag-stripped text of the <dd> rendered after the given labeled <dt>."""
+        return re.sub(r"<[^>]+>", "", self._row_value(content, label)).strip()
+
+    def _seat_matrix_subscription(self, licensed_quantity):
+        return Subscription.objects.create(
+            name=f"Seat Matrix {licensed_quantity}",
+            provider=self.provider,
+            type=SubscriptionTypeChoices.SAAS,
+            status=SubscriptionStatusChoices.ACTIVE,
+            licensed_quantity=licensed_quantity,
+        )
 
     def test_detail_labels_one_time_cost_and_omits_annual_row(self):
         """Issue #501: a one-time payment must not read as a yearly cost."""
@@ -140,6 +156,68 @@ class SubscriptionViewTests(TestCase):
 
         self.assertIn("0.00 EUR", self._row_value(content, "Renewal Cost:"))
         self.assertIn("0.00 EUR", self._row_value(content, "Est. Annual Cost:"))
+
+    def test_detail_hides_unset_agreement_entitlement_and_shows_zero_linked_seats(self):
+        """Issue #500: an unset entitlement hides only the agreement row."""
+        sub = self._seat_matrix_subscription(None)
+        content = self._detail_content(sub)
+
+        self.assertNotIn("Agreement Entitled Quantity:", content)
+        self.assertIn("Linked License Seats:", content)
+        self.assertTrue(self._row_text(content, "Linked License Seats:").startswith("0 / 0"))
+
+    def test_detail_renders_zero_agreement_entitlement(self):
+        """Issue #500: zero is a real entitlement value and stays visible."""
+        sub = self._seat_matrix_subscription(0)
+        content = self._detail_content(sub)
+
+        self.assertEqual(self._row_text(content, "Agreement Entitled Quantity:"), "0")
+        self.assertTrue(self._row_text(content, "Linked License Seats:").startswith("0 / 0"))
+
+    def test_detail_renders_set_agreement_entitlement(self):
+        """Issue #500: a set entitlement renders on its own agreement row."""
+        sub = self._seat_matrix_subscription(120)
+        content = self._detail_content(sub)
+
+        self.assertEqual(self._row_text(content, "Agreement Entitled Quantity:"), "120")
+        self.assertTrue(self._row_text(content, "Linked License Seats:").startswith("0 / 0"))
+
+    def test_detail_keeps_agreement_entitlement_and_linked_license_seats_distinct(self):
+        """Issue #500: entitlement 120 next to 115 linked license seats never swaps."""
+        sub = self._seat_matrix_subscription(120)
+        software = baker.make(Software, manufacturer__name="Seat Co", manufacturer__slug="seat-co", tenant=None)
+        baker.make(License, software=software, subscription=sub, seats=100, tenant=None)
+        baker.make(License, software=software, subscription=sub, seats=15, tenant=None)
+
+        content = self._detail_content(sub)
+
+        entitlement = self._row_text(content, "Agreement Entitled Quantity:")
+        linked = self._row_text(content, "Linked License Seats:")
+        self.assertEqual(entitlement, "120")
+        self.assertNotIn("115", entitlement)
+        self.assertTrue(linked.startswith("0 / 115"), linked)
+        self.assertNotIn("120", linked)
+
+    def test_detail_keeps_linked_license_totals_with_unset_or_zero_entitlement(self):
+        """Issue #500: linked license totals render when the entitlement is unset or zero."""
+        software = baker.make(Software, manufacturer__name="Seat Co", manufacturer__slug="seat-co", tenant=None)
+        unset = self._seat_matrix_subscription(None)
+        zero = self._seat_matrix_subscription(0)
+        for sub in (unset, zero):
+            baker.make(License, software=software, subscription=sub, seats=100, tenant=None)
+            baker.make(License, software=software, subscription=sub, seats=15, tenant=None)
+
+        unset_content = self._detail_content(unset)
+        self.assertNotIn("Agreement Entitled Quantity:", unset_content)
+        unset_linked = self._row_text(unset_content, "Linked License Seats:")
+        self.assertTrue(unset_linked.startswith("0 / 115"), unset_linked)
+        self.assertIn("(115", unset_linked)
+
+        zero_content = self._detail_content(zero)
+        self.assertEqual(self._row_text(zero_content, "Agreement Entitled Quantity:"), "0")
+        zero_linked = self._row_text(zero_content, "Linked License Seats:")
+        self.assertTrue(zero_linked.startswith("0 / 115"), zero_linked)
+        self.assertIn("(115", zero_linked)
 
     def test_create_view_get(self):
         url = reverse("subscriptions:subscription_create")
@@ -236,6 +314,42 @@ class ProviderViewTests(TestCase):
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "AWS")
+
+    def _detail_content(self, provider):
+        url = reverse("subscriptions:provider_detail", kwargs={"pk": provider.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode()
+
+    def test_detail_links_the_supplier(self):
+        supplier = Supplier.objects.create(name="Dell Reseller", slug="dell-reseller")
+        self.provider.supplier = supplier
+        self.provider.save(update_fields=["supplier"])
+
+        content = self._detail_content(self.provider)
+
+        supplier_url = reverse("assets:supplier_detail", kwargs={"pk": supplier.pk})
+        self.assertIn("Supplier:</dt>", content)
+        self.assertIn('<a href="' + supplier_url + '">Dell Reseller</a>', content)
+        self.assertNotIn("Deleted</span>", content)
+
+    def test_detail_omits_supplier_row_when_unlinked(self):
+        content = self._detail_content(self.provider)
+
+        self.assertNotIn("Supplier:</dt>", content)
+
+    def test_detail_marks_soft_deleted_supplier_without_link(self):
+        supplier = Supplier.objects.create(name="Gone Reseller", slug="gone-reseller")
+        self.provider.supplier = supplier
+        self.provider.save(update_fields=["supplier"])
+        supplier.delete()
+
+        content = self._detail_content(self.provider)
+
+        supplier_url = reverse("assets:supplier_detail", kwargs={"pk": supplier.pk})
+        self.assertIn("Gone Reseller", content)
+        self.assertIn("Deleted</span>", content)
+        self.assertNotIn(supplier_url, content)
 
     def test_create_view_post(self):
         url = reverse("subscriptions:provider_create")

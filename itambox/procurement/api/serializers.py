@@ -2,7 +2,7 @@ import re
 
 from rest_framework import serializers
 
-from assets.api.nested_serializers import NestedAssetSerializer, NestedAssetTypeSerializer
+from assets.api.nested_serializers import NestedAssetSerializer, NestedAssetTypeSerializer, NestedSupplierSerializer
 from assets.models import Asset, AssetType, Supplier
 from inventory.api.serializers import (
     NestedAccessorySerializer,
@@ -15,15 +15,6 @@ from licenses.models import License
 from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
 from organization.models import CostCenter, Location, Tenant
 from procurement.models import Contract, PurchaseOrder, PurchaseOrderLine
-
-
-class NestedSupplierSerializer(BaseModelSerializer):
-    """Minimal nested representation of Supplier for read-only contract display."""
-
-    class Meta:
-        model = Supplier
-        fields = ["id", "name", "slug"]
-        brief_fields = ["id", "name", "slug"]
 
 
 class ContractSerializer(BaseModelSerializer):

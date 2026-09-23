@@ -124,6 +124,49 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.assertIn("Group Corp", names)
         self.assertIn("Global Corp", names)
 
+    def test_query_provider_exposes_linked_supplier(self):
+        supplier = Supplier.objects.create(name="Adobe Supplier", slug="adobe-supplier")
+        self.provider.supplier = supplier
+        self.provider.save(update_fields=["supplier"])
+
+        query = f"""
+        query {{
+            provider(id: {self.provider.id!r}) {{
+                supplier {{
+                    id
+                    name
+                    slug
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(query, context_value=context)
+
+        self.assertIsNone(result.errors)
+        supplier_data = result.data["provider"]["supplier"]
+        self.assertEqual(int(supplier_data["id"]), supplier.id)
+        self.assertEqual(supplier_data["name"], "Adobe Supplier")
+        self.assertEqual(supplier_data["slug"], "adobe-supplier")
+
+    def test_query_provider_omits_supplier_when_unlinked(self):
+        query = f"""
+        query {{
+            provider(id: {self.global_provider.id!r}) {{
+                supplier {{
+                    id
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(query, context_value=context)
+
+        self.assertIsNone(result.errors)
+        self.assertIsNone(result.data["provider"]["supplier"])
+
     def test_query_subscriptions(self):
         query = """
         query {
@@ -264,6 +307,114 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.assertEqual(provider_data["name"], "Global Microsoft")
         self.assertIsNone(provider_data["tenant"])
         self.assertIsNone(provider_data["tenantGroup"])
+
+    def test_create_provider_with_supplier_id(self):
+        supplier = Supplier.objects.create(name="Microsoft Supplier", slug="microsoft-supplier")
+        mutation = f"""
+        mutation {{
+            createProvider(name: "Microsoft", supplierId: {supplier.id}) {{
+                provider {{
+                    name
+                    supplier {{
+                        id
+                        name
+                    }}
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(mutation, context_value=context)
+
+        self.assertIsNone(result.errors)
+        provider_data = result.data["createProvider"]["provider"]
+        self.assertEqual(provider_data["name"], "Microsoft")
+        self.assertEqual(int(provider_data["supplier"]["id"]), supplier.id)
+        created = Provider.objects.get(name="Microsoft")
+        self.assertEqual(created.supplier, supplier)
+        self.assertEqual(created.tenant, self.tenant)
+
+    def test_update_provider_sets_and_clears_supplier_id(self):
+        supplier = Supplier.objects.create(name="Update Supplier", slug="update-supplier")
+        context = self.get_context(self.user, self.tenant)
+        set_current_tenant(self.tenant)
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                updateProvider(id: {self.provider.id}, supplierId: {supplier.id}) {{
+                    provider {{ supplier {{ id }} }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNone(result.errors)
+        self.assertEqual(int(result.data["updateProvider"]["provider"]["supplier"]["id"]), supplier.id)
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                updateProvider(id: {self.provider.id}, supplierId: null) {{
+                    provider {{ supplier {{ id }} }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNone(result.errors)
+        self.assertIsNone(result.data["updateProvider"]["provider"]["supplier"])
+        self.provider.refresh_from_db()
+        self.assertIsNone(self.provider.supplier)
+
+    def test_provider_supplier_mutations_deny_unknown_supplier_id(self):
+        unknown_supplier_id = 2147483000
+        context = self.get_context(self.user, self.tenant)
+        set_current_tenant(self.tenant)
+
+        create_result = schema.execute(
+            f"""
+            mutation {{
+                createProvider(name: "Ghost Linked Provider", supplierId: {unknown_supplier_id}) {{
+                    provider {{ name }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNotNone(create_result.errors)
+        self.assertIn("Permission denied.", create_result.errors[0].message)
+
+        update_result = schema.execute(
+            f"""
+            mutation {{
+                updateProvider(id: {self.provider.id}, supplierId: {unknown_supplier_id}) {{
+                    provider {{ name }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNotNone(update_result.errors)
+        self.assertIn("Permission denied.", update_result.errors[0].message)
+
+    def test_create_provider_keeps_name_required(self):
+        mutation = """
+        mutation {
+            createProvider(isActive: true) {
+                provider {
+                    name
+                }
+            }
+        }
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(mutation, context_value=context)
+
+        self.assertIsNotNone(result.errors)
+        self.assertIn("name", result.errors[0].message)
 
     def test_create_subscription(self):
         mutation = f"""
