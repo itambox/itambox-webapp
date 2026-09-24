@@ -158,6 +158,94 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.assertEqual(sub_data["name"], "Office 365")
         self.assertEqual(sub_data["supplier"]["name"], "Adobe")
 
+    def test_create_subscription_with_global_supplier(self):
+        supplier = Supplier.objects.create(name="Globex", slug="globex")
+
+        mutation = f"""
+        mutation {{
+            createSubscription(name: "Figma", supplierId: {supplier.id}, type: "saas", status: "active") {{
+                subscription {{
+                    name
+                    supplier {{
+                        name
+                    }}
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(mutation, context_value=context)
+
+        self.assertIsNone(result.errors)
+        sub_data = result.data["createSubscription"]["subscription"]
+        self.assertEqual(sub_data["supplier"]["name"], "Globex")
+
+    def test_create_subscription_with_group_scoped_supplier(self):
+        supplier = Supplier.objects.create(name="Group Vendor", slug="group-vendor", tenant_group=self.tenant_group)
+
+        mutation = f"""
+        mutation {{
+            createSubscription(name: "Canva", supplierId: {supplier.id}, type: "saas", status: "active") {{
+                subscription {{
+                    name
+                    supplier {{
+                        name
+                    }}
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(mutation, context_value=context)
+
+        self.assertIsNone(result.errors)
+        sub_data = result.data["createSubscription"]["subscription"]
+        self.assertEqual(sub_data["supplier"]["name"], "Group Vendor")
+
+    def test_create_subscription_rejects_supplier_from_foreign_group(self):
+        other_group = TenantGroup.objects.create(name="Other Group", slug="other-group")
+        supplier = Supplier.objects.create(name="Foreign Vendor", slug="foreign-vendor", tenant_group=other_group)
+
+        mutation = f"""
+        mutation {{
+            createSubscription(name: "Notion", supplierId: {supplier.id}, type: "saas", status: "active") {{
+                subscription {{
+                    name
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(mutation, context_value=context)
+
+        self.assertIsNotNone(result.errors)
+        self.assertIn("Permission denied", str(result.errors[0]))
+
+    def test_update_subscription_accepts_a_global_supplier(self):
+        supplier = Supplier.objects.create(name="Globex", slug="globex")
+
+        mutation = f"""
+        mutation {{
+            updateSubscription(id: {self.subscription.id}, supplierId: {supplier.id}) {{
+                subscription {{
+                    supplier {{
+                        name
+                    }}
+                }}
+            }}
+        }}
+        """
+        set_current_tenant(self.tenant)
+        context = self.get_context(self.user, self.tenant)
+        result = schema.execute(mutation, context_value=context)
+
+        self.assertIsNone(result.errors)
+        sub_data = result.data["updateSubscription"]["subscription"]
+        self.assertEqual(sub_data["supplier"]["name"], "Globex")
+
     def test_explicit_lifecycle_mutations_suspend_and_resume(self):
         context = self.get_context(self.user, self.tenant)
         set_current_tenant(self.tenant)
