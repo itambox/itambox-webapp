@@ -5,7 +5,6 @@ from django.test import TestCase
 from assets.models import Supplier
 from core.tests.mixins import TenantTestMixin
 from itambox.middleware import set_current_user
-from organization.models import Tenant
 from subscriptions.forms import AGREEMENT_OWNERSHIP_HELP, SubscriptionForm
 from subscriptions.models import SubscriptionTypeChoices
 

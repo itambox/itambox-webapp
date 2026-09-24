@@ -860,9 +860,7 @@ class SeedOrganizationsMixin:
         # SaaS catalogue rows are created after the intended scopes exist.
         scoped_tenant = self._tenants["northwind-internal-it"]
         scoped_group = next(iter(self._tgroups.values()))
-        self._saas_suppliers = _seed_saas_suppliers(
-            Supplier, self._saas_supplier_data, scoped_tenant, scoped_group
-        )
+        self._saas_suppliers = _seed_saas_suppliers(Supplier, self._saas_supplier_data, scoped_tenant, scoped_group)
 
         # Contacts: a primary customer contact per customer group/tenant + vendor reps
         self._contact_roles = {}

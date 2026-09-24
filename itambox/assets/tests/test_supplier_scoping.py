@@ -16,7 +16,9 @@ class SupplierScopingTests(TenantTestMixin, TestCase):
         self.group_supplier = Supplier.objects.create(
             name="Group Supplier", slug="group-supplier", tenant_group=self.group
         )
-        self.tenant_supplier = Supplier.objects.create(name="Tenant Supplier", slug="tenant-supplier", tenant=self.tenant)
+        self.tenant_supplier = Supplier.objects.create(
+            name="Tenant Supplier", slug="tenant-supplier", tenant=self.tenant
+        )
         self.other_supplier = Supplier.objects.create(
             name="Other Tenant Supplier", slug="other-tenant-supplier", tenant=self.other_tenant
         )

@@ -183,8 +183,7 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
 
         expected = self.expected
         subscriptions = {
-            label: Subscription.objects.get(pk=pk)
-            for label, pk in expected["provider_subscriptions"].items()
+            label: Subscription.objects.get(pk=pk) for label, pk in expected["provider_subscriptions"].items()
         }
         self.assertEqual(subscriptions["linked"].supplier_id, expected["linked_supplier"])
         self.assertEqual(subscriptions["matched"].supplier_id, expected["matched_supplier"])
@@ -193,9 +192,7 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         self.assertEqual(subscriptions["hidden"].supplier_id, expected["matched_supplier"])
         self.assertEqual(subscriptions["hidden"].deleted_at, expected["hidden_at"])
 
-        live_archive = Supplier.objects.get(
-            name=f"Archived Vendor {expected['suffix']}", deleted_at__isnull=True
-        )
+        live_archive = Supplier.objects.get(name=f"Archived Vendor {expected['suffix']}", deleted_at__isnull=True)
         self.assertEqual(subscriptions["live"].supplier_id, live_archive.pk)
         fresh_supplier = Supplier.objects.get(name=f"Fresh Vendor {expected['suffix']}")
         self.assertEqual(subscriptions["collision"].supplier_id, fresh_supplier.pk)

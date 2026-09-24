@@ -45,7 +45,9 @@ def _lifecycle_error_response(request, error):
 
 
 class SubscriptionListView(ObjectListView):
-    queryset = Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").prefetch_related("tags")
+    queryset = Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").prefetch_related(
+        "tags"
+    )
     filterset = filters.SubscriptionFilterSet
     filterset_form = forms.SubscriptionFilterForm
     table = tables.SubscriptionTable

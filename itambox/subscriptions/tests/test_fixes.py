@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from assets.models import Asset, Supplier
+from assets.models import Supplier
 from core.context import (
     _current_user,
     get_current_all_accessible,

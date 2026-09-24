@@ -216,7 +216,6 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(
             manifest["post_transition_leaf_ids"],
             [
-                "assets.0121_supplier_scoping_and_commercial_fields",
                 "compliance.0105_custodyhandoffdelivery",
                 "extras.0121_specification_library_permission",
                 "inventory.0101_alter_accessoryassignment_options_and_more",

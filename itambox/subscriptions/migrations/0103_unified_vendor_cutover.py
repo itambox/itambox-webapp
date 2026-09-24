@@ -206,6 +206,11 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunPython(forwards, migrations.RunPython.noop),
+        # The transplant updates assets.supplier rows, so PostgreSQL holds deferred
+        # FK trigger events on the supplier table until they are flushed. The
+        # AlterField below drops and recreates the supplier FK, which the pending
+        # events would block ("cannot ALTER TABLE ... pending trigger events").
+        migrations.RunSQL("SET CONSTRAINTS ALL IMMEDIATE", reverse_sql=migrations.RunSQL.noop),
         migrations.AlterField(
             model_name="subscription",
             name="supplier",
@@ -217,6 +222,9 @@ class Migration(migrations.Migration):
                 verbose_name="Supplier",
             ),
         ),
+        # Reversing the AlterField drops the supplier FK again; flush the reverse
+        # transaction's pending events before that happens.
+        migrations.RunSQL(migrations.RunSQL.noop, reverse_sql="SET CONSTRAINTS ALL IMMEDIATE"),
         migrations.RemoveField(
             model_name="subscription",
             name="provider",

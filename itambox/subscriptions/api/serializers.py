@@ -39,7 +39,7 @@ class SubscriptionSerializer(BaseModelSerializer):
     supplier_id: serializers.PrimaryKeyRelatedField[Supplier] = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.filter(is_active=True), source="supplier", write_only=True
     )
-    linked_contract = serializers.StringRelatedField(read_only=True)
+    linked_contract: serializers.StringRelatedField[Contract] = serializers.StringRelatedField(read_only=True)
     linked_contract_id: serializers.PrimaryKeyRelatedField[Contract] = serializers.PrimaryKeyRelatedField(
         queryset=Contract.objects, source="linked_contract", write_only=True, required=False, allow_null=True
     )
@@ -148,9 +148,7 @@ class SubscriptionSerializer(BaseModelSerializer):
         supplier = validated.get("supplier", self.instance.supplier if self.instance else None)
         if supplier and supplier.tenant_id is not None and supplier.tenant_id != tenant_id:
             raise serializers.ValidationError({"supplier_id": "Selected supplier belongs to a different tenant."})
-        linked_contract = validated.get(
-            "linked_contract", self.instance.linked_contract if self.instance else None
-        )
+        linked_contract = validated.get("linked_contract", self.instance.linked_contract if self.instance else None)
         if linked_contract and linked_contract.tenant_id is not None and linked_contract.tenant_id != tenant_id:
             raise serializers.ValidationError(
                 {"linked_contract_id": "Selected contract belongs to a different tenant."}

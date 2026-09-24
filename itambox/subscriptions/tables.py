@@ -124,3 +124,15 @@ class SubscriptionAssignmentTable(BaseTable):
         if obj is None:
             return TABLE_EMPTY_VALUE
         return str(obj)
+
+
+class SupplierSubscriptionTable(BaseTable):
+    """Subscriptions of one supplier (supplier detail tab, issue #508)."""
+
+    name = tables.LinkColumn("subscriptions:subscription_detail", args=[A("pk")], verbose_name=_("Name"))
+    status = tables.Column(verbose_name=_("Status"))
+    renewal_date = tables.DateColumn(format="Y-m-d", verbose_name=_("Next Renewal"))
+
+    class Meta(BaseTable.Meta):
+        model = Subscription
+        fields = ("name", "status", "renewal_date")

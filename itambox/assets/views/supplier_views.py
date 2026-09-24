@@ -1,9 +1,7 @@
-import django_tables2 as tables
 from django.db.models import Count
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
-from django_tables2.utils import A
 
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
@@ -78,16 +76,9 @@ class SupplierDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(licenses_table)
         context["licenses_table"] = licenses_table
 
-        # inline import: heavy-import: subscriptions.models for the supplier detail tab only
+        # inline imports: heavy-import: subscriptions.models and subscriptions.tables for the supplier detail tab only
         from subscriptions.models import Subscription
-
-        class SupplierSubscriptionTable(tables.Table):
-            name = tables.LinkColumn("subscriptions:subscription_detail", args=[A("pk")], verbose_name=_("Name"))
-            status = tables.Column(verbose_name=_("Status"))
-            renewal_date = tables.DateColumn(format="Y-m-d", verbose_name=_("Renewal Date"))
-
-            class Meta:
-                fields = ("name", "status", "renewal_date")
+        from subscriptions.tables import SupplierSubscriptionTable
 
         subscription_qs = Subscription.objects.filter(supplier=supplier)
         subscriptions_table = SupplierSubscriptionTable(subscription_qs, request=self.request)

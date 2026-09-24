@@ -33,7 +33,9 @@
     {% endif %}
   </dd>
   <dt class="col-sm-3">{% translate "Account ID:" %}</dt>
-  <dd class="col-sm-9 text-secondary">{{ object.account_id|default:not_set }}</dd>
+  <dd class="col-sm-9 text-secondary">
+    {{ object.account_id|default:not_set }}
+  </dd>
   <dt class="col-sm-3">{% translate "Scope:" %}</dt>
   <dd class="col-sm-9 text-secondary">
     {% if object.tenant %}

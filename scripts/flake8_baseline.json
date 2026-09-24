@@ -396,30 +396,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/supplier_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.helper.FormHelper' imported but unused",
-      "source": "from crispy_forms.helper import FormHelper",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/supplier_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.HTML' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Div, Layout, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/supplier_form.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Submit' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Div, Layout, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/tag_sequence_form.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -2550,7 +2526,7 @@
     {
       "path": "itambox/core/management/commands/_seed/catalog.py",
       "code": "C901",
-      "message": "'SeedCatalogMixin._seed_catalog' is too complex (18)",
+      "message": "'SeedCatalogMixin._seed_catalog' is too complex (17)",
       "source": "    def _seed_catalog(self):",
       "context": "Module:body/ClassDef:SeedCatalogMixin:body/FunctionDef:_seed_catalog:self",
       "count": 1
@@ -7806,14 +7782,6 @@
     {
       "path": "itambox/subscriptions/models.py",
       "code": "F401",
-      "message": "'core.managers.AllObjectsManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
       "message": "'core.mixins.CloneableMixin' imported but unused",
       "source": "from core.mixins import (",
       "context": "Module:body",
@@ -7848,54 +7816,6 @@
       "code": "F401",
       "message": "'core.mixins.JournalingMixin' imported but unused",
       "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
-      "message": "'core.mixins.TaggableMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "C901",
-      "message": "'CreateProvider.mutate' is too complex (11)",
-      "source": "    def mutate(self, info, **kwargs):",
-      "context": "Module:body/ClassDef:CreateProvider:body/FunctionDef:mutate:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "C901",
-      "message": "'UpdateProvider.mutate' is too complex (11)",
-      "source": "    def mutate(self, info, id, **kwargs):",
-      "context": "Module:body/ClassDef:UpdateProvider:body/FunctionDef:mutate:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tables.py",
-      "code": "F401",
-      "message": "'.models.SubscriptionStatusChoices' imported but unused",
-      "source": "from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tables.py",
-      "code": "F401",
-      "message": "'django.urls.reverse' imported but unused",
-      "source": "from django.urls import reverse",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_fixes.py",
-      "code": "F401",
-      "message": "'assets.models.Asset' imported but unused",
-      "source": "from assets.models import Asset",
       "context": "Module:body",
       "count": 1
     },
