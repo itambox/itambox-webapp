@@ -341,7 +341,7 @@ function initScanBasket(): void {
         } else if (err.message === 'ambiguous') {
           notify(
             interpolate(
-              gettext('EAN %(code)s matches multiple assets. Scan the asset tag instead.'),
+              gettext("EAN '%(code)s' matches multiple assets. Scan the asset tag instead."),
               { code: cleaned },
               true,
             ),
