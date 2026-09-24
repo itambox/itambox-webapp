@@ -11,10 +11,10 @@ from itambox.api.openapi import MATURITY_EXTENSION
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 from itambox.capabilities import STABLE
-from subscriptions.filters import ProviderFilterSet, SubscriptionAssignmentFilterSet, SubscriptionFilterSet
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
+from subscriptions.filters import SubscriptionAssignmentFilterSet, SubscriptionFilterSet
+from subscriptions.models import Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
-from .serializers import ProviderSerializer, SubscriptionAssignmentSerializer, SubscriptionSerializer
+from .serializers import SubscriptionAssignmentSerializer, SubscriptionSerializer
 
 
 class SubscriptionRenewSerializer(drf_serializers.Serializer):
@@ -51,25 +51,11 @@ class SubscriptionLifecyclePermissions(TokenPermissions):
         return super().has_object_permission(request, view, obj)
 
 
-class ProviderViewSet(ITAMBoxModelViewSet):
-    """API ViewSet for managing subscription Providers."""
-
-    permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = (
-        Provider.objects.select_related("supplier")
-        .prefetch_related("tags")
-        .annotate(subscription_count=Count("subscriptions", filter=Q(subscriptions__deleted_at__isnull=True)))
-    )
-    serializer_class = ProviderSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = ProviderFilterSet
-
-
 class SubscriptionViewSet(ITAMBoxModelViewSet):
     """API ViewSet for managing recurring Subscriptions."""
 
     permission_classes = [SubscriptionLifecyclePermissions, StrictTenantPermission]
-    queryset = Subscription.objects.select_related("provider").prefetch_related("tags").all()
+    queryset = Subscription.objects.select_related("supplier", "linked_contract").prefetch_related("tags").all()
     serializer_class = SubscriptionSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SubscriptionFilterSet
@@ -160,7 +146,7 @@ class SubscriptionAssignmentViewSet(ITAMBoxModelViewSet):
 
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = (
-        SubscriptionAssignment.objects.select_related("subscription__provider", "content_type")
+        SubscriptionAssignment.objects.select_related("subscription__supplier", "content_type")
         .prefetch_related("assigned_object")
         .all()
     )

@@ -6,7 +6,6 @@ from rest_framework.test import APITestCase
 from assets.models import Supplier
 from subscriptions.models import (
     BillingCycleChoices,
-    Provider,
     Subscription,
     SubscriptionStatusChoices,
     SubscriptionTypeChoices,
@@ -49,10 +48,10 @@ class SubscriptionAPITests(APITestCase):
         )
 
         # Base metadata
-        self.provider = Provider.objects.create(name="AWS API Provider", slug="aws-api-provider")
+        self.supplier = Supplier.objects.create(name="AWS API Supplier", slug="aws-api-supplier")
         self.subscription = Subscription.objects.create(
             name="Developer Support API",
-            provider=self.provider,
+            supplier=self.supplier,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=29.00,
@@ -67,10 +66,6 @@ class SubscriptionAPITests(APITestCase):
             tenant=self.tenant,
             name="Staff Role",
             permissions=[
-                "subscriptions.view_provider",
-                "subscriptions.add_provider",
-                "subscriptions.change_provider",
-                "subscriptions.delete_provider",
                 "subscriptions.view_subscription",
                 "subscriptions.add_subscription",
                 "subscriptions.change_subscription",
@@ -94,33 +89,6 @@ class SubscriptionAPITests(APITestCase):
         session["active_tenant_id"] = self.tenant.pk
         session.save()
 
-    def test_provider_api_crud(self):
-        self._login_as_staff()
-
-        # List
-        list_url = reverse("api:subscriptions_api:provider-list")
-        response = self.client.get(list_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(response.data["count"], 1)
-
-        # Create
-        post_data = {"name": "GCP API Provider", "account_id": "gcp-456"}
-        response = self.client.post(list_url, data=post_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        new_pk = response.data["id"]
-        etag = response["ETag"]
-
-        # Update
-        detail_url = reverse("api:subscriptions_api:provider-detail", kwargs={"pk": new_pk})
-        put_data = {"name": "Google Cloud Platform API Provider", "account_id": "gcp-999"}
-        response = self.client.put(detail_url, data=put_data, format="json", HTTP_IF_MATCH=etag)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["name"], "Google Cloud Platform API Provider")
-
-        # Delete
-        response = self.client.delete(detail_url, HTTP_IF_MATCH=response["ETag"])
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-
     def test_subscription_api_crud(self):
         self._login_as_staff()
 
@@ -133,7 +101,7 @@ class SubscriptionAPITests(APITestCase):
         # Create
         post_data = {
             "name": "Business Support API Sub",
-            "provider_id": self.provider.id,
+            "supplier_id": self.supplier.id,
             "type": SubscriptionTypeChoices.SAAS,
             "status": SubscriptionStatusChoices.ACTIVE,
             "renewal_cost": "100.00",
@@ -198,65 +166,3 @@ class SubscriptionAPITests(APITestCase):
         detail_url = reverse("api:subscriptions_api:subscription-detail", kwargs={"pk": new_pk})
         response = self.client.delete(detail_url, HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-
-    def test_provider_supplier_link_round_trip(self):
-        self._login_as_staff()
-        supplier = Supplier.objects.create(name="Dell Reseller API", slug="dell-reseller-api")
-        replacement = Supplier.objects.create(name="Ingram Micro API", slug="ingram-micro-api")
-        list_url = reverse("api:subscriptions_api:provider-list")
-
-        response = self.client.post(
-            list_url,
-            data={"name": "Supplier Linked Provider", "supplier_id": supplier.pk},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(
-            response.data["supplier"],
-            {"id": supplier.pk, "name": "Dell Reseller API", "slug": "dell-reseller-api"},
-        )
-        self.assertNotIn("supplier_id", response.data)
-        self.assertEqual(response.data["tenant"]["id"], self.tenant.pk)
-        provider_pk = response.data["id"]
-
-        detail_url = reverse("api:subscriptions_api:provider-detail", kwargs={"pk": provider_pk})
-        response = self.client.patch(
-            detail_url, data={"supplier_id": replacement.pk}, format="json", HTTP_IF_MATCH=response["ETag"]
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["supplier"]["id"], replacement.pk)
-        self.assertNotIn("supplier_id", response.data)
-        self.assertEqual(response.data["tenant"]["id"], self.tenant.pk)
-
-        response = self.client.patch(
-            detail_url, data={"supplier_id": None}, format="json", HTTP_IF_MATCH=response["ETag"]
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsNone(response.data["supplier"])
-
-    def test_provider_supplier_id_rejects_unknown_and_soft_deleted_rows(self):
-        self._login_as_staff()
-        list_url = reverse("api:subscriptions_api:provider-list")
-
-        response = self.client.post(
-            list_url, data={"name": "Ghost Supplier Probe", "supplier_id": 999999999}, format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("supplier_id", response.data)
-
-        deleted = Supplier.objects.create(name="Soft Deleted API Supplier", slug="soft-deleted-api-supplier")
-        deleted.delete()
-        response = self.client.post(
-            list_url, data={"name": "Deleted Supplier Probe", "supplier_id": deleted.pk}, format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("supplier_id", response.data)
-
-    def test_provider_name_stays_required_in_the_api(self):
-        self._login_as_staff()
-        list_url = reverse("api:subscriptions_api:provider-list")
-
-        response = self.client.post(list_url, data={"account_id": "nameless-account"}, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("name", response.data)

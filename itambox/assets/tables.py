@@ -586,13 +586,41 @@ class DepreciationTable(BaseTable):
 class SupplierTable(BaseTable):
     pk = ToggleColumn(accessor="pk")
     name = tables.LinkColumn("assets:supplier_detail", args=[A("pk")], verbose_name=_("Name"))
+    is_active = BooleanColumn(verbose_name=_("Active"))
+    account_id = tables.Column(verbose_name=_("Account ID"))
+    contact_email = tables.Column(accessor="primary_contact.email", verbose_name=_("Contact Email"))
+    subscription_count = CountLinkColumn(
+        "subscriptions:subscription_list",
+        "supplier",
+        accessor="subscription_count",
+        verbose_name=_("Subscriptions"),
+        orderable=False,
+    )
     tags = TagColumn(url_name="assets:supplier_list")
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Supplier
-        fields = ("pk", "name", "website", "address", "tags", "actions")
-        default_columns = ("pk", "name", "website", "tags", "actions")
+        fields = (
+            "pk",
+            "name",
+            "website",
+            "account_id",
+            "contact_email",
+            "is_active",
+            "subscription_count",
+            "tags",
+            "actions",
+        )
+        default_columns = (
+            "pk",
+            "name",
+            "website",
+            "account_id",
+            "is_active",
+            "subscription_count",
+            "actions",
+        )
 
 
 class CategoryTable(BaseTable):

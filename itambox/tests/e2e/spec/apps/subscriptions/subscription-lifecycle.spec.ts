@@ -12,9 +12,9 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     runId,
   }) => {
     const tenant = requireActiveTenant(activeTenant);
-    const providers = await getJsonRows(api, '/api/subscriptions/providers/?limit=100', 'subscription provider');
-    expect(providers, 'the seeded E2E database must provide a visible subscription provider').not.toHaveLength(0);
-    const providerId = String(providers[0].id);
+    const suppliers = await getJsonRows(api, '/api/assets/suppliers/?limit=100&is_active=true', 'active supplier');
+    expect(suppliers, 'the seeded E2E database must provide a visible active supplier').not.toHaveLength(0);
+    const supplierId = String(suppliers[0].id);
 
     const createPath = '/subscriptions/subscriptions/add/';
     const name = `E2E Subscription ${runId}`;
@@ -25,7 +25,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     await expect(createForm).toHaveCount(1);
     await createForm.getByLabel('Name').fill(name);
     await createForm.getByLabel('Slug').fill(slug);
-    await selectTomOption(createForm, 'provider', providerId);
+    await selectTomOption(createForm, 'supplier', supplierId);
     await selectTomOption(createForm, 'type', 'saas');
     await createForm.getByLabel('Renewal Cost').fill('120.00');
     await createForm.getByLabel('Currency').fill('USD');
@@ -78,7 +78,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
       currency: 'USD',
       billing_cycle: 'annual',
       licensed_quantity: 5,
-      provider: expect.objectContaining({ id: Number(providerId) }),
+      supplier: expect.objectContaining({ id: Number(supplierId) }),
       tenant: expect.objectContaining({ id: Number(tenant.id) }),
     });
 

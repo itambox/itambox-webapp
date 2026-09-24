@@ -5,15 +5,6 @@ from . import views
 app_name = "subscriptions"
 
 urlpatterns = [
-    # Providers
-    path("providers/", views.ProviderListView.as_view(), name="provider_list"),
-    path("providers/add/", views.ProviderEditView.as_view(), name="provider_create"),
-    path("providers/edit/", views.ProviderBulkEditView.as_view(), name="provider_bulk_edit"),
-    path("providers/delete/", views.ProviderBulkDeleteView.as_view(), name="provider_bulk_delete"),
-    path("providers/<int:pk>/", views.ProviderDetailView.as_view(), name="provider_detail"),
-    path("providers/<int:pk>/edit/", views.ProviderEditView.as_view(), name="provider_update"),
-    path("providers/<int:pk>/clone/", views.ProviderCloneView.as_view(), name="provider_clone"),
-    path("providers/<int:pk>/delete/", views.ProviderDeleteView.as_view(), name="provider_delete"),
     # Subscriptions
     path("subscriptions/", views.SubscriptionListView.as_view(), name="subscription_list"),
     path("subscriptions/add/", views.SubscriptionEditView.as_view(), name="subscription_create"),

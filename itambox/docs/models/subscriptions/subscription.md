@@ -14,6 +14,7 @@ A **SaaS Subscription** represents a recurring subscription contract for SaaS pl
 | **Billing Cycle** | Billing interval (e.g. Monthly, Annually). | Choice | Yes |
 | **Cancellation Date** | Timestamp when the subscription was cancelled. | Date | No |
 | **Contract Reference** | Contract, PO, or agreement tracking reference. | String | No |
+| **Linked Contract** | Optional operational link to a Procurement Contract. It does not combine the two modules or change which module records the agreement. | Foreign Key | No |
 | **Cost Center** | Budget tracking/accounting code for cost allocations. | String | No |
 | **Currency** | Currency code for payment (e.g. `USD`, `EUR`). | String | No |
 | **Description** | Optional text detailing coverage or terms. | Text | No |
@@ -21,7 +22,7 @@ A **SaaS Subscription** represents a recurring subscription contract for SaaS pl
 | **Name** | A clear name identifying the contract plan (e.g. `Dev DevOps Github Plan`). | String | Yes |
 | **Notes** | Internal notes concerning renewal logic or terms. | Text | No |
 | **Owner** | Person responsible for managing this subscription. | Foreign Key | No |
-| **Provider** | The SaaS Provider hosting the platform (e.g., `GitHub`). | Foreign Key | Yes |
+| **Supplier** | The commercial vendor of this subscription (e.g., `GitHub`). | Foreign Key | Yes |
 | **Renewal Cost** | Recurring pricing cost per period. | Decimal | No |
 | **Next Renewal Date** | The next upcoming billing renewal date. | Date | No |
 | **Slug** | URL-friendly identifier (auto-generated if blank). | Slug | Yes |
@@ -37,6 +38,14 @@ SaaS subscriptions support a polymorphic generic relation allowing them to be as
 ## Quantity metrics
 
 **Agreement Entitled Quantity** is the entitlement recorded by the vendor agreement. **Linked License Seats** are computed from the Licenses linked to this subscription and are shown separately; they never change the agreement entitlement.
+
+## Supplier and contract boundary
+
+Every Subscription requires a Supplier from the shared commercial catalogue. A
+Subscription may also link to a Procurement Contract through `linked_contract`
+when the records are operationally related. Record each agreement in one
+module only: the link does not merge Contracts and Subscriptions or duplicate
+an agreement across them.
 
 ## Lifecycle
 

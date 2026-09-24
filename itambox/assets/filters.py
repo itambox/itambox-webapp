@@ -328,13 +328,14 @@ class DepreciationFilterSet(BaseFilterSet):
 
 
 class SupplierFilterSet(BaseFilterSet):
+    is_active = django_filters.BooleanFilter(label=_("Active"))
     q = django_filters.CharFilter(
         method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name..."})
     )
 
     class Meta:
         model = Supplier
-        fields = ["name"]
+        fields = ["name", "is_active"]
 
     def search(self, queryset, name, value):
         if not value.strip():

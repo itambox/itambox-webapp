@@ -10,7 +10,12 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.choices import StatusTypeChoices
-from core.managers import AllObjectsManager, SoftDeleteManager
+from core.managers import (
+    AllObjectsManager,
+    SoftDeleteManager,
+    TenantScopingAllObjectsManager,
+    TenantScopingSoftDeleteManager,
+)
 from core.mixins import AutoSlugMixin, CustomFieldDataMixin, SoftDeleteMixin
 from core.models import BaseModel, StandardModel
 from extras.models import CustomFieldset, SpecificationLibrary
@@ -435,15 +440,53 @@ class AssetTypeFieldset(BaseModel):
 
 
 class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    changelog_global = True  # global reference data → changelog attributed to tenant=None
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    changelog_global = True  # Supplier tenant wins; only global suppliers use tenant=None.
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
     website = models.URLField(max_length=500, blank=True, verbose_name=_("Website"))
+    portal_url = models.URLField(
+        blank=True,
+        verbose_name=_("Admin Portal URL"),
+        help_text=_("URL for the supplier's management/administration portal"),
+    )
+    account_id = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Account ID"),
+        help_text=_("Optional customer account number with the supplier"),
+    )
     address = models.TextField(blank=True, verbose_name=_("Address"))
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Active"),
+        db_index=True,
+        help_text=_("Deactivate to hide from selection lists without deleting"),
+    )
     tags = models.ManyToManyField("extras.Tag", related_name="suppliers", blank=True, verbose_name=_("Tags"))
+    tenant = models.ForeignKey(
+        "organization.Tenant",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="suppliers",
+        db_index=True,
+        verbose_name=_("Tenant"),
+        help_text=_("The tenant owning this supplier. Null represents system-wide/global suppliers."),
+    )
+    tenant_group = models.ForeignKey(
+        "organization.TenantGroup",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="suppliers",
+        db_index=True,
+        verbose_name=_("Tenant Group"),
+        help_text=_("The tenant group owning this supplier."),
+    )
     contacts = GenericRelation("organization.ContactAssignment")
 
     @property
@@ -456,11 +499,47 @@ class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMix
         verbose_name = _("Supplier")
         verbose_name_plural = _("Suppliers")
         constraints = [
-            models.UniqueConstraint(
-                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_supplier_name_active"
+            models.CheckConstraint(
+                check=models.Q(tenant__isnull=True) | models.Q(tenant_group__isnull=True),
+                name="supplier_tenant_or_group",
             ),
             models.UniqueConstraint(
-                fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_supplier_slug_active"
+                fields=["tenant", "name"],
+                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
+                name="unique_tenant_supplier_name",
+            ),
+            models.UniqueConstraint(
+                fields=["tenant", "slug"],
+                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
+                name="unique_tenant_supplier_slug",
+            ),
+            models.UniqueConstraint(
+                fields=["tenant_group", "name"],
+                condition=models.Q(tenant_group__isnull=False) & models.Q(deleted_at__isnull=True),
+                name="unique_tenant_group_supplier_name",
+            ),
+            models.UniqueConstraint(
+                fields=["tenant_group", "slug"],
+                condition=models.Q(tenant_group__isnull=False) & models.Q(deleted_at__isnull=True),
+                name="unique_tenant_group_supplier_slug",
+            ),
+            models.UniqueConstraint(
+                fields=["name"],
+                condition=(
+                    models.Q(tenant__isnull=True)
+                    & models.Q(tenant_group__isnull=True)
+                    & models.Q(deleted_at__isnull=True)
+                ),
+                name="unique_global_supplier_name",
+            ),
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=(
+                    models.Q(tenant__isnull=True)
+                    & models.Q(tenant_group__isnull=True)
+                    & models.Q(deleted_at__isnull=True)
+                ),
+                name="unique_global_supplier_slug",
             ),
         ]
 

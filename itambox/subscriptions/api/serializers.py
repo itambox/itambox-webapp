@@ -8,13 +8,10 @@ from assets.models import Supplier
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import validate_gfk_target_tenant
-from organization.api.serializers import (
-    ContactAssignmentSerializer,
-    NestedTenantGroupSerializer,
-    NestedTenantSerializer,
-)
-from organization.models import CostCenter, Tenant, TenantGroup
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
+from organization.api.serializers import NestedTenantSerializer
+from organization.models import CostCenter, Tenant
+from procurement.models import Contract
+from subscriptions.models import Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 User = get_user_model()
 
@@ -36,60 +33,15 @@ def _tenant_member_user_queryset():
     return User.objects.filter(pk__in=member_ids)
 
 
-class ProviderSerializer(BaseModelSerializer):
-    tags: TagSerializer = TagSerializer(many=True, read_only=True)
-    subscription_count: serializers.IntegerField = serializers.IntegerField(read_only=True)
-    slug: serializers.SlugField = serializers.SlugField(required=False, allow_blank=True)
-    tenant: NestedTenantSerializer = NestedTenantSerializer(read_only=True)
-    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
-    )
-    tenant_group = NestedTenantGroupSerializer(read_only=True)
-    tenant_group_id: serializers.PrimaryKeyRelatedField[TenantGroup] = serializers.PrimaryKeyRelatedField(
-        queryset=TenantGroup.objects, source="tenant_group", write_only=True, required=False, allow_null=True
-    )
-    supplier = NestedSupplierSerializer(read_only=True)
-    supplier_id: serializers.PrimaryKeyRelatedField[Supplier] = serializers.PrimaryKeyRelatedField(
-        source="supplier",
-        write_only=True,
-        required=False,
-        allow_null=True,
-        queryset=Supplier.objects.all(),
-    )
-    contacts = ContactAssignmentSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Provider
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "tenant",
-            "tenant_id",
-            "tenant_group",
-            "tenant_group_id",
-            "account_id",
-            "portal_url",
-            "supplier",
-            "supplier_id",
-            "admin_notes",
-            "is_active",
-            "subscription_count",
-            "tags",
-            "contacts",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("created_at", "updated_at")
-        brief_fields = ("id", "name", "slug", "is_active", "subscription_count")
-        validators: list[object] = []
-
-
 class SubscriptionSerializer(BaseModelSerializer):
     auto_renewal = serializers.BooleanField(required=False)
-    provider = ProviderSerializer(read_only=True)
-    provider_id: serializers.PrimaryKeyRelatedField[Provider] = serializers.PrimaryKeyRelatedField(
-        queryset=Provider.objects, source="provider", write_only=True
+    supplier = NestedSupplierSerializer(read_only=True)
+    supplier_id: serializers.PrimaryKeyRelatedField[Supplier] = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.filter(is_active=True), source="supplier", write_only=True
+    )
+    linked_contract = serializers.StringRelatedField(read_only=True)
+    linked_contract_id: serializers.PrimaryKeyRelatedField[Contract] = serializers.PrimaryKeyRelatedField(
+        queryset=Contract.objects, source="linked_contract", write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
@@ -120,8 +72,8 @@ class SubscriptionSerializer(BaseModelSerializer):
             "id",
             "name",
             "slug",
-            "provider",
-            "provider_id",
+            "supplier",
+            "supplier_id",
             "type",
             "type_display",
             "status",
@@ -141,6 +93,8 @@ class SubscriptionSerializer(BaseModelSerializer):
             "auto_renewal",
             "licensed_quantity",
             "contract_reference",
+            "linked_contract",
+            "linked_contract_id",
             "cost_center",
             "cost_center_id",
             "cancellation_date",
@@ -160,10 +114,12 @@ class SubscriptionSerializer(BaseModelSerializer):
             "days_until_renewal",
             "annual_cost",
         )
-        brief_fields = ("id", "name", "slug", "provider", "status", "status_display", "days_until_renewal")
+        brief_fields = ("id", "name", "slug", "supplier", "status", "status_display", "days_until_renewal")
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
+        self.fields["supplier_id"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["linked_contract_id"].queryset = Contract.objects.all()
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()
 
@@ -186,7 +142,20 @@ class SubscriptionSerializer(BaseModelSerializer):
             if canonical_value is not serializers.empty and canonical_value != legacy_value:
                 raise serializers.ValidationError({"auto_renewal": "Conflicts with vendor_contract_auto_renews."})
             attrs["vendor_contract_auto_renews"] = legacy_value
-        return super().validate(attrs)
+        validated = super().validate(attrs)
+        tenant = validated.get("tenant", self.instance.tenant if self.instance else None)
+        tenant_id = tenant.pk if tenant else None
+        supplier = validated.get("supplier", self.instance.supplier if self.instance else None)
+        if supplier and supplier.tenant_id is not None and supplier.tenant_id != tenant_id:
+            raise serializers.ValidationError({"supplier_id": "Selected supplier belongs to a different tenant."})
+        linked_contract = validated.get(
+            "linked_contract", self.instance.linked_contract if self.instance else None
+        )
+        if linked_contract and linked_contract.tenant_id is not None and linked_contract.tenant_id != tenant_id:
+            raise serializers.ValidationError(
+                {"linked_contract_id": "Selected contract belongs to a different tenant."}
+            )
+        return validated
 
     def to_representation(self, instance: Subscription) -> dict[str, object]:
         data = super().to_representation(instance)

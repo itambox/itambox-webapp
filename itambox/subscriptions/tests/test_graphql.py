@@ -9,7 +9,7 @@ from core.schema import schema
 from core.tests.mixins import grant
 from itambox.middleware import set_current_tenant
 from organization.models import AssetHolder, Role, Tenant, TenantGroup
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
+from subscriptions.models import Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 
 class SubscriptionsGraphQLTestCase(TestCase):
@@ -39,10 +39,6 @@ class SubscriptionsGraphQLTestCase(TestCase):
             tenant=self.tenant,
             name="Test Role",
             permissions=[
-                "subscriptions.view_provider",
-                "subscriptions.add_provider",
-                "subscriptions.change_provider",
-                "subscriptions.delete_provider",
                 "subscriptions.view_subscription",
                 "subscriptions.add_subscription",
                 "subscriptions.change_subscription",
@@ -52,6 +48,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
                 "subscriptions.change_subscriptionassignment",
                 "subscriptions.delete_subscriptionassignment",
                 "assets.view_asset",
+                "assets.view_supplier",
                 "assets.add_asset",
             ],
         )
@@ -60,12 +57,10 @@ class SubscriptionsGraphQLTestCase(TestCase):
         # Set thread-local tenant context for models creation
         set_current_tenant(self.tenant)
 
-        self.provider = Provider.objects.create(name="Adobe", tenant=self.tenant)
-        self.group_provider = Provider.objects.create(name="Group Corp", tenant_group=self.tenant_group)
-        self.global_provider = Provider.objects.create(name="Global Corp", tenant=None)
+        self.supplier = Supplier.objects.create(name="Adobe", tenant=self.tenant)
 
         self.subscription = Subscription.objects.create(
-            name="Creative Cloud", provider=self.provider, tenant=self.tenant
+            name="Creative Cloud", supplier=self.supplier, tenant=self.tenant
         )
 
         # Status label needed for Asset
@@ -95,85 +90,13 @@ class SubscriptionsGraphQLTestCase(TestCase):
         request.active_tenant = tenant
         return request
 
-    def test_query_providers(self):
-        query = """
-        query {
-            providers {
-                id
-                name
-                tenant {
-                    id
-                }
-                tenantGroup {
-                    id
-                }
-            }
-        }
-        """
-        # Execute in context of tenant
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(query, context_value=context)
-
-        self.assertIsNone(result.errors)
-        providers_data = result.data["providers"]
-
-        # Should return the tenant-scoped provider, the group-scoped provider, and the global provider
-        names = {p["name"] for p in providers_data}
-        self.assertIn("Adobe", names)
-        self.assertIn("Group Corp", names)
-        self.assertIn("Global Corp", names)
-
-    def test_query_provider_exposes_linked_supplier(self):
-        supplier = Supplier.objects.create(name="Adobe Supplier", slug="adobe-supplier")
-        self.provider.supplier = supplier
-        self.provider.save(update_fields=["supplier"])
-
-        query = f"""
-        query {{
-            provider(id: {self.provider.id!r}) {{
-                supplier {{
-                    id
-                    name
-                    slug
-                }}
-            }}
-        }}
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(query, context_value=context)
-
-        self.assertIsNone(result.errors)
-        supplier_data = result.data["provider"]["supplier"]
-        self.assertEqual(int(supplier_data["id"]), supplier.id)
-        self.assertEqual(supplier_data["name"], "Adobe Supplier")
-        self.assertEqual(supplier_data["slug"], "adobe-supplier")
-
-    def test_query_provider_omits_supplier_when_unlinked(self):
-        query = f"""
-        query {{
-            provider(id: {self.global_provider.id!r}) {{
-                supplier {{
-                    id
-                }}
-            }}
-        }}
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(query, context_value=context)
-
-        self.assertIsNone(result.errors)
-        self.assertIsNone(result.data["provider"]["supplier"])
-
     def test_query_subscriptions(self):
         query = """
         query {
             subscriptions {
                 id
                 name
-                provider {
+                supplier {
                     name
                 }
             }
@@ -187,6 +110,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
         subscriptions_data = result.data["subscriptions"]
         self.assertEqual(len(subscriptions_data), 1)
         self.assertEqual(subscriptions_data[0]["name"], "Creative Cloud")
+        self.assertEqual(subscriptions_data[0]["supplier"]["name"], "Adobe")
 
     def test_query_subscription_assignments(self):
         query = """
@@ -212,217 +136,13 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.assertEqual(len(assignments_data), 1)
         self.assertEqual(int(assignments_data[0]["objectId"]), self.asset.id)
 
-    def test_create_provider_tenant_scoped(self):
-        mutation = """
-        mutation {
-            createProvider(name: "Microsoft", isActive: true) {
-                provider {
-                    name
-                    tenant {
-                        id
-                    }
-                    tenantGroup {
-                        id
-                    }
-                }
-            }
-        }
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(mutation, context_value=context)
-
-        self.assertIsNone(result.errors)
-        provider_data = result.data["createProvider"]["provider"]
-        self.assertEqual(provider_data["name"], "Microsoft")
-        self.assertEqual(int(provider_data["tenant"]["id"]), self.tenant.id)
-        self.assertIsNone(provider_data["tenantGroup"])
-
-    def test_create_provider_tenant_group_scoped(self):
-        tenant_group = TenantGroup.objects.create(name="Regional Group", slug="regional-group")
-        mutation = f"""
-        mutation {{
-            createProvider(name: "Regional Provider", tenantGroupId: {tenant_group.id}) {{
-                provider {{
-                    name
-                    tenantGroup {{
-                        id
-                    }}
-                    tenant {{
-                        id
-                    }}
-                }}
-            }}
-        }}
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(mutation, context_value=context)
-
-        self.assertIsNone(result.errors)
-        provider_data = result.data["createProvider"]["provider"]
-        self.assertEqual(provider_data["name"], "Regional Provider")
-        self.assertEqual(int(provider_data["tenantGroup"]["id"]), tenant_group.id)
-        self.assertIsNone(provider_data["tenant"])
-
-    def test_create_provider_global_denied_for_standard_user(self):
-        mutation = """
-        mutation {
-            createProvider(name: "Global Microsoft", tenantId: null, tenantGroupId: null) {
-                provider {
-                    name
-                }
-            }
-        }
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(mutation, context_value=context)
-
-        self.assertIsNotNone(result.errors)
-        self.assertIn("Only superusers can create global providers.", result.errors[0].message)
-
-    def test_create_provider_global_allowed_for_superuser(self):
-        mutation = """
-        mutation {
-            createProvider(name: "Global Microsoft", tenantId: null, tenantGroupId: null) {
-                provider {
-                    name
-                    tenant {
-                        id
-                    }
-                    tenantGroup {
-                        id
-                    }
-                }
-            }
-        }
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.superuser, self.tenant)
-        result = schema.execute(mutation, context_value=context)
-
-        self.assertIsNone(result.errors)
-        provider_data = result.data["createProvider"]["provider"]
-        self.assertEqual(provider_data["name"], "Global Microsoft")
-        self.assertIsNone(provider_data["tenant"])
-        self.assertIsNone(provider_data["tenantGroup"])
-
-    def test_create_provider_with_supplier_id(self):
-        supplier = Supplier.objects.create(name="Microsoft Supplier", slug="microsoft-supplier")
-        mutation = f"""
-        mutation {{
-            createProvider(name: "Microsoft", supplierId: {supplier.id}) {{
-                provider {{
-                    name
-                    supplier {{
-                        id
-                        name
-                    }}
-                }}
-            }}
-        }}
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(mutation, context_value=context)
-
-        self.assertIsNone(result.errors)
-        provider_data = result.data["createProvider"]["provider"]
-        self.assertEqual(provider_data["name"], "Microsoft")
-        self.assertEqual(int(provider_data["supplier"]["id"]), supplier.id)
-        created = Provider.objects.get(name="Microsoft")
-        self.assertEqual(created.supplier, supplier)
-        self.assertEqual(created.tenant, self.tenant)
-
-    def test_update_provider_sets_and_clears_supplier_id(self):
-        supplier = Supplier.objects.create(name="Update Supplier", slug="update-supplier")
-        context = self.get_context(self.user, self.tenant)
-        set_current_tenant(self.tenant)
-
-        result = schema.execute(
-            f"""
-            mutation {{
-                updateProvider(id: {self.provider.id}, supplierId: {supplier.id}) {{
-                    provider {{ supplier {{ id }} }}
-                }}
-            }}
-            """,
-            context_value=context,
-        )
-        self.assertIsNone(result.errors)
-        self.assertEqual(int(result.data["updateProvider"]["provider"]["supplier"]["id"]), supplier.id)
-
-        result = schema.execute(
-            f"""
-            mutation {{
-                updateProvider(id: {self.provider.id}, supplierId: null) {{
-                    provider {{ supplier {{ id }} }}
-                }}
-            }}
-            """,
-            context_value=context,
-        )
-        self.assertIsNone(result.errors)
-        self.assertIsNone(result.data["updateProvider"]["provider"]["supplier"])
-        self.provider.refresh_from_db()
-        self.assertIsNone(self.provider.supplier)
-
-    def test_provider_supplier_mutations_deny_unknown_supplier_id(self):
-        unknown_supplier_id = 2147483000
-        context = self.get_context(self.user, self.tenant)
-        set_current_tenant(self.tenant)
-
-        create_result = schema.execute(
-            f"""
-            mutation {{
-                createProvider(name: "Ghost Linked Provider", supplierId: {unknown_supplier_id}) {{
-                    provider {{ name }}
-                }}
-            }}
-            """,
-            context_value=context,
-        )
-        self.assertIsNotNone(create_result.errors)
-        self.assertIn("Permission denied.", create_result.errors[0].message)
-
-        update_result = schema.execute(
-            f"""
-            mutation {{
-                updateProvider(id: {self.provider.id}, supplierId: {unknown_supplier_id}) {{
-                    provider {{ name }}
-                }}
-            }}
-            """,
-            context_value=context,
-        )
-        self.assertIsNotNone(update_result.errors)
-        self.assertIn("Permission denied.", update_result.errors[0].message)
-
-    def test_create_provider_keeps_name_required(self):
-        mutation = """
-        mutation {
-            createProvider(isActive: true) {
-                provider {
-                    name
-                }
-            }
-        }
-        """
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(mutation, context_value=context)
-
-        self.assertIsNotNone(result.errors)
-        self.assertIn("name", result.errors[0].message)
-
     def test_create_subscription(self):
         mutation = f"""
         mutation {{
-            createSubscription(name: "Office 365", providerId: {self.provider.id}, type: "saas", status: "active") {{
+            createSubscription(name: "Office 365", supplierId: {self.supplier.id}, type: "saas", status: "active") {{
                 subscription {{
                     name
-                    provider {{
+                    supplier {{
                         name
                     }}
                 }}
@@ -436,7 +156,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.assertIsNone(result.errors)
         sub_data = result.data["createSubscription"]["subscription"]
         self.assertEqual(sub_data["name"], "Office 365")
-        self.assertEqual(sub_data["provider"]["name"], "Adobe")
+        self.assertEqual(sub_data["supplier"]["name"], "Adobe")
 
     def test_explicit_lifecycle_mutations_suspend_and_resume(self):
         context = self.get_context(self.user, self.tenant)
@@ -535,63 +255,3 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.assertIsNone(result.errors)
         assignment_data = result.data["createSubscriptionAssignment"]["subscriptionAssignment"]
         self.assertEqual(assignment_data["notes"], "Assigned to test node")
-
-    def test_query_provider_contacts(self):
-        from organization.models import Contact, ContactAssignment, ContactRole
-
-        # Fetch or create the role
-        role, _ = ContactRole.objects.get_or_create(
-            slug="primary-contact", defaults={"name": "Primary Contact", "description": "Primary Contact"}
-        )
-        # Create a contact
-        contact = Contact.objects.create(
-            name="Adobe Primary Agent",
-            phone="123456",
-            email="adobe-agent@example.com",
-            web_url="https://adobe.example.com",
-        )
-        # Assign contact to provider
-        ContactAssignment.objects.create(
-            contact=contact,
-            role=role,
-            content_type=ContentType.objects.get_for_model(Provider),
-            object_id=self.provider.id,
-            priority="primary",
-        )
-
-        query = (
-            """
-        query {
-            provider(id: "%s") {
-                contacts {
-                    priority
-                    contact {
-                        name
-                        phone
-                        email
-                        webUrl
-                    }
-                    role {
-                        name
-                        slug
-                    }
-                }
-            }
-        }
-        """
-            % self.provider.id
-        )
-
-        set_current_tenant(self.tenant)
-        context = self.get_context(self.user, self.tenant)
-        result = schema.execute(query, context_value=context)
-
-        self.assertIsNone(result.errors)
-        contacts_data = result.data["provider"]["contacts"]
-        self.assertEqual(len(contacts_data), 1)
-        self.assertEqual(contacts_data[0]["priority"], "PRIMARY")
-        self.assertEqual(contacts_data[0]["contact"]["name"], "Adobe Primary Agent")
-        self.assertEqual(contacts_data[0]["contact"]["phone"], "123456")
-        self.assertEqual(contacts_data[0]["contact"]["email"], "adobe-agent@example.com")
-        self.assertEqual(contacts_data[0]["contact"]["webUrl"], "https://adobe.example.com")
-        self.assertEqual(contacts_data[0]["role"]["slug"], "primary-contact")

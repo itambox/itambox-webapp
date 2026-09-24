@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from assets.models import Asset
+from assets.models import Asset, Supplier
 from core.context import (
     _current_user,
     get_current_all_accessible,
@@ -25,7 +25,6 @@ from core.tests.mixins import grant
 from organization.models import Location, Membership, Site, Tenant, TenantGroup
 from subscriptions.models import (
     BillingCycleChoices,
-    Provider,
     Subscription,
     SubscriptionAssignment,
     SubscriptionStatusChoices,
@@ -75,13 +74,13 @@ class SubscriptionFixesTests(TestCase):
         # a bare is_staff user with no membership is no longer notified.
         grant(self.super_user, self.tenant_a, self.role_a)
 
-        # Create providers and subscriptions
-        self.provider_a = Provider.objects.create(name="Provider A", tenant=self.tenant_a)
-        self.provider_b = Provider.objects.create(name="Provider B", tenant=self.tenant_b)
+        # Create suppliers and subscriptions
+        self.supplier_a = Supplier.objects.create(name="Supplier A", tenant=self.tenant_a)
+        self.supplier_b = Supplier.objects.create(name="Supplier B", tenant=self.tenant_b)
 
         self.sub_a = Subscription.objects.create(
             name="Subscription A",
-            provider=self.provider_a,
+            supplier=self.supplier_a,
             tenant=self.tenant_a,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=date.today() + timedelta(days=10),
@@ -91,7 +90,7 @@ class SubscriptionFixesTests(TestCase):
         )
         self.sub_b = Subscription.objects.create(
             name="Subscription B",
-            provider=self.provider_b,
+            supplier=self.supplier_b,
             tenant=self.tenant_b,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=date.today() + timedelta(days=10),
@@ -189,11 +188,11 @@ class SubscriptionFixesTests(TestCase):
         self.assertEqual(resp.status_code, 200)  # Form re-renders on error
         self.assertFormError(resp.context["form"], None, "This subscription is already assigned to this object.")
 
-    def _make_sub(self, name, provider, tenant, days, owner=None):
+    def _make_sub(self, name, supplier, tenant, days, owner=None):
         """Create an ACTIVE subscription renewing in ``days`` days (negative = past)."""
         sub = Subscription.objects.create(
             name=name,
-            provider=provider,
+            supplier=supplier,
             tenant=tenant,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=date.today() + timedelta(days=max(days, 10)),
@@ -226,12 +225,12 @@ class SubscriptionFixesTests(TestCase):
     def _seed_expiry_and_reminder_subscriptions(self):
         """Subscriptions in BOTH tenants, so a single-tenant scope cannot pass."""
         subs = {
-            "expired_a": self._make_sub("Expired Sub", self.provider_a, self.tenant_a, -1),
-            "expired_b": self._make_sub("Expired Sub B", self.provider_b, self.tenant_b, -1, owner=self.user_b),
-            "sub_30": self._make_sub("Sub 30", self.provider_a, self.tenant_a, 30),
-            "sub_14": self._make_sub("Sub 14", self.provider_a, self.tenant_a, 14),
-            "sub_7": self._make_sub("Sub 7", self.provider_a, self.tenant_a, 7),
-            "sub_30_b": self._make_sub("Sub 30 B", self.provider_b, self.tenant_b, 30, owner=self.user_b),
+            "expired_a": self._make_sub("Expired Sub", self.supplier_a, self.tenant_a, -1),
+            "expired_b": self._make_sub("Expired Sub B", self.supplier_b, self.tenant_b, -1, owner=self.user_b),
+            "sub_30": self._make_sub("Sub 30", self.supplier_a, self.tenant_a, 30),
+            "sub_14": self._make_sub("Sub 14", self.supplier_a, self.tenant_a, 14),
+            "sub_7": self._make_sub("Sub 7", self.supplier_a, self.tenant_a, 7),
+            "sub_30_b": self._make_sub("Sub 30 B", self.supplier_b, self.tenant_b, 30, owner=self.user_b),
         }
         subs["sub_7"].vendor_contract_auto_renews = False
         subs["sub_7"].save(update_fields=["vendor_contract_auto_renews"])
@@ -349,7 +348,7 @@ class SubscriptionFixesTests(TestCase):
     def test_background_task_skips_soft_deleted_subscriptions(self):
         """The bootstrap path is unscoped by tenant, never by soft delete."""
         subs = self._seed_expiry_and_reminder_subscriptions()
-        deleted = self._make_sub("Deleted Sub", self.provider_a, self.tenant_a, -1)
+        deleted = self._make_sub("Deleted Sub", self.supplier_a, self.tenant_a, -1)
         Subscription.objects.filter(pk=deleted.pk).update(deleted_at=timezone.now())
 
         self._clear_scope_context()

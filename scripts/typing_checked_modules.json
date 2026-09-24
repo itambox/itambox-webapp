@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 76,
-  "policy_sha256": "be95180f8df25cb306fcd02bfed823d35935f660b9ca5b2882b67c98e4c0566d",
+  "policy_sha256": "b55aae61246daa001ff2e677f27da1baf1c0c1225ff3a555fff94ea74ee80b83",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -702,7 +702,6 @@
       "note": "Slice 9 symbol admission: explicit subscription and subscription-assignment initialization, validation, representation, update, and assigned-object method signatures. Tenant scoping and lifecycle behavior remain unchanged; generated-schema validation remains owned by #98.",
       "scope": "symbols",
       "symbols": [
-        "ProviderSerializer",
         "SubscriptionAssignmentSerializer",
         "SubscriptionSerializer"
       ]

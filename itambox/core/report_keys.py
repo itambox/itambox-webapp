@@ -20,7 +20,7 @@ REPORT_COLUMN_KEYS = frozenset(
         "available_seats",
         "utilization_rate",
         "subscription_name",
-        "provider",
+        "supplier",
         "agreement_entitled_quantity",
         "billing_cycle",
         "cost",

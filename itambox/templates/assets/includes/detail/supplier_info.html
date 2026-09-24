@@ -24,6 +24,36 @@
       <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
     {% endif %}
   </dd>
+  <dt class="col-sm-3">{% translate "Admin Portal:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.portal_url %}
+      <a href="{{ object.portal_url }}" target="_blank" rel="noopener">{{ object.portal_url }}</a>
+    {% else %}
+      <span class="text-muted small"><i>{{ not_set }}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Account ID:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{{ object.account_id|default:not_set }}</dd>
+  <dt class="col-sm-3">{% translate "Scope:" %}</dt>
+  <dd class="col-sm-9 text-secondary">
+    {% if object.tenant %}
+      {% translate "Tenant:" %} {{ object.tenant.name }}
+    {% else %}
+      {% if object.tenant_group %}
+        {% translate "Tenant Group:" %} {{ object.tenant_group.name }}
+      {% else %}
+        {% translate "Global" %}
+      {% endif %}
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Status:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.is_active %}
+      <span class="badge bg-success">{% translate "Active" %}</span>
+    {% else %}
+      <span class="badge bg-secondary">{% translate "Inactive" %}</span>
+    {% endif %}
+  </dd>
   <dt class="col-sm-3">{% translate "Address:" %}</dt>
   <dd class="col-sm-9 text-secondary">
     {{ object.address|linebreaksbr|default:not_set }}

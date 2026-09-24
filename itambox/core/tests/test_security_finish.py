@@ -14,13 +14,13 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
-from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel, Supplier
 from core.tests.mixins import grant
 from inventory.models import Accessory
 from licenses.models import License
 from organization.models import Membership, Role, Site, Tenant
 from software.models import Software
-from subscriptions.models import Provider, Subscription
+from subscriptions.models import Subscription
 from users.models import Token
 
 User = get_user_model()
@@ -259,13 +259,13 @@ class RESTCrossTenantTests(TestCase):
         # Tenant A objects
         self.acc_a = Accessory.objects.create(name="Acc A", slug="acc-a", manufacturer=self.mfr, tenant=self.tenant_a)
         self.lic_a = License.objects.create(name="Lic A", software=sw, tenant=self.tenant_a, seats=5)
-        provider = Provider.objects.create(name="AWS", slug="aws")
-        self.sub_a = Subscription.objects.create(name="Sub A", provider=provider, tenant=self.tenant_a)
+        supplier = Supplier.objects.create(name="AWS", slug="aws")
+        self.sub_a = Subscription.objects.create(name="Sub A", supplier=supplier, tenant=self.tenant_a)
 
         # Tenant B objects
         self.acc_b = Accessory.objects.create(name="Acc B", slug="acc-b", manufacturer=self.mfr, tenant=self.tenant_b)
         self.lic_b = License.objects.create(name="Lic B", software=sw, tenant=self.tenant_b, seats=10)
-        self.sub_b = Subscription.objects.create(name="Sub B", provider=provider, tenant=self.tenant_b)
+        self.sub_b = Subscription.objects.create(name="Sub B", supplier=supplier, tenant=self.tenant_b)
 
     def _headers(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token_a.key}"}

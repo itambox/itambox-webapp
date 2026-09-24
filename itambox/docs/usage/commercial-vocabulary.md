@@ -1,19 +1,17 @@
 # Commercial Vocabulary
 
 This page fixes the commercial vocabulary used across ITAMbox so that Suppliers,
-Providers, Contracts, and Subscriptions mean the same thing in forms, detail
-pages, reports, and documentation.
+Contracts, and Subscriptions mean the same thing in forms, detail pages, reports,
+and documentation.
 
 ## Commercial party records
 
-- **Supplier** is the shared commercial vendor record: a sales vendor, reseller,
-  distributor, or procurement merchant. Assets, Contracts, Licenses, Maintenance
-  records, warranties, and subscription provider profiles can all point to the
-  same Supplier. See [Suppliers](../models/assets/supplier.md).
-- **Provider** is a scoped subscription profile: a cloud platform, software
-  vendor, or web application hosting a subscription service. A Provider can be
-  linked to a Supplier so both records reuse one vendor identity instead of
-  duplicating the name. See [SaaS Providers](../models/subscriptions/provider.md).
+- **Supplier** is the shared commercial vendor record for a sales vendor,
+  reseller, distributor, procurement merchant, or SaaS vendor. Procurement,
+  warranties, Licenses, inventory, and Subscriptions all reference this same
+  catalogue. Suppliers can be scoped to a tenant or tenant group; a Supplier
+  with neither scope is global. The catalogue also stores portal URL, account
+  ID, and active state. See [Suppliers](../models/assets/supplier.md).
 
 ## Where to record an agreement
 
@@ -31,8 +29,9 @@ Rules that keep the boundary intact:
 - Existing Subscriptions that use support, maintenance, or lease types remain
   valid; those values are not removed or migrated.
 - `Subscription.contract_reference` is an external vendor, PO, or agreement
-  reference. It does not link a Procurement Contract, and it must not be used
-  to justify duplicating the same agreement.
+  reference. `Subscription.linked_contract` is an optional operational link to
+  a Procurement Contract. The link does not combine the modules or justify
+  recording the same agreement in both.
 
 See [Contracts & Purchase Orders](contracts-and-purchase-orders.md) and
 [SaaS Subscriptions](../models/subscriptions/subscription.md).

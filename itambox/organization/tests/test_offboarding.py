@@ -34,6 +34,7 @@ from assets.models import (
     Category,
     Manufacturer,
     StatusLabel,
+    Supplier,
 )
 from assets.models.choices import ReservationStatusChoices
 from compliance.models import CustodyReceipt, CustodyTemplate
@@ -52,7 +53,6 @@ from organization.models import AssetHolder, Membership, Tenant
 from organization.services.offboarding import OffboardingReport, get_offboarding_report
 from subscriptions.models import (
     BillingCycleChoices,
-    Provider,
     Subscription,
     SubscriptionAssignment,
     SubscriptionStatusChoices,
@@ -341,10 +341,10 @@ class OffboardingReportTests(TestCase):
 
     # ------------------------------------------------------------- subscription
     def test_includes_subscription_assignment(self):
-        provider = Provider.objects.create(name="OB Provider", slug="ob-provider")
+        supplier = Supplier.objects.create(name="OB Supplier", slug="ob-supplier")
         subscription = Subscription.objects.create(
             name="OB Subscription",
-            provider=provider,
+            supplier=supplier,
             tenant=self.tenant,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
@@ -469,10 +469,10 @@ class OffboardingReportTests(TestCase):
             status=ReservationStatusChoices.ACTIVE,
         )
         # subscription assignment
-        provider = Provider.objects.create(name="CB Provider", slug="cb-provider")
+        supplier = Supplier.objects.create(name="CB Supplier", slug="cb-supplier")
         subscription = Subscription.objects.create(
             name="CB Subscription",
-            provider=provider,
+            supplier=supplier,
             tenant=self.tenant,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,

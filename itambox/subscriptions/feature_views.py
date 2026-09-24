@@ -27,7 +27,7 @@ class _SubscriptionsGenericPresentationProvider:
         assignments = SubscriptionAssignment.objects.filter(
             content_type=input.content_type,
             object_id=input.obj.pk,
-        ).select_related("subscription", "subscription__provider", "assigned_by")
+        ).select_related("subscription", "subscription__supplier", "assigned_by")
         table = SubscriptionAssignmentTable(assignments, request=input.request)
         table.exclude = ("content_type", "object_id", "assigned_object")
         RequestConfig(input.request, paginate=False).configure(table)

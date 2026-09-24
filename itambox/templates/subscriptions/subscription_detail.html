@@ -10,13 +10,13 @@
 {% block extra_cards_right %}
   {# Financial fields (renewal/annual cost, billing cycle, licensed/assigned qty) live #}
   {# in the info panel (subscription_info.html) — no duplicate Financial Details card here. #}
-  {% if object.provider.portal_url %}
-    <a href="{{ object.provider.portal_url }}"
+  {% if object.supplier.portal_url %}
+    <a href="{{ object.supplier.portal_url }}"
        class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3"
        target="_blank"
        rel="noopener">
       <i class="mdi mdi-open-in-new me-1"></i>
-      {% translate "Open Provider Portal" %}
+      {% translate "Open Supplier Portal" %}
     </a>
   {% endif %}
 {% endblock extra_cards_right %}

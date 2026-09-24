@@ -6,21 +6,22 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, close_old_connections, connection
+from django.db import IntegrityError, close_old_connections, connection, transaction
+from django.db.models.deletion import PROTECT, SET_NULL, ProtectedError
 from django.test import TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from model_bakery import baker
 
-from assets.models import Asset
+from assets.models import Asset, Supplier
 from core.managers import set_current_all_accessible, set_current_tenant, set_current_tenant_group
 from core.models import Notification
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, CostCenter, Location, Site, Tenant, TenantGroup
+from procurement.models import Contract
 from software.models import Software
 from subscriptions.models import (
     BillingCycleChoices,
-    Provider,
     Subscription,
     SubscriptionAssignment,
     SubscriptionStatusChoices,
@@ -103,20 +104,20 @@ class SubscriptionSeatRollupTests(TestCase):
         self.assertEqual(sub.assigned_seats, 0)
 
 
-class ProviderModelTests(TestCase):
+class SupplierModelTests(TestCase):
     def setUp(self):
-        self.provider = Provider.objects.create(
+        self.supplier = Supplier.objects.create(
             name="AWS",
             account_id="aws-12345",
             portal_url="https://aws.amazon.com/console",
             is_active=True,
         )
 
-    def test_provider_creation(self):
-        self.assertEqual(str(self.provider), "AWS")
-        self.assertTrue(self.provider.is_active)
+    def test_supplier_creation(self):
+        self.assertEqual(str(self.supplier), "AWS")
+        self.assertTrue(self.supplier.is_active)
 
-    def test_provider_contact_resolution(self):
+    def test_supplier_contact_resolution(self):
         from organization.models import Contact, ContactAssignment, ContactRole
 
         role, _ = ContactRole.objects.get_or_create(
@@ -128,34 +129,104 @@ class ProviderModelTests(TestCase):
         ContactAssignment.objects.create(
             contact=contact,
             role=role,
-            content_type=ContentType.objects.get_for_model(Provider),
-            object_id=self.provider.pk,
+            content_type=ContentType.objects.get_for_model(Supplier),
+            object_id=self.supplier.pk,
             priority="primary",
         )
-        self.assertEqual(self.provider.primary_contact, contact)
+        self.assertEqual(self.supplier.primary_contact, contact)
 
-    def test_provider_absolute_url(self):
-        url = self.provider.get_absolute_url()
-        self.assertIn(str(self.provider.pk), url)
+    def test_supplier_absolute_url(self):
+        url = self.supplier.get_absolute_url()
+        self.assertIn(str(self.supplier.pk), url)
 
-    def test_provider_slug_auto_generation(self):
-        provider = Provider.objects.create(name="Google Cloud Platform")
-        self.assertEqual(provider.slug, "google-cloud-platform")
+    def test_supplier_slug_auto_generation(self):
+        supplier = Supplier.objects.create(name="Google Cloud Platform")
+        self.assertEqual(supplier.slug, "google-cloud-platform")
 
-    def test_provider_inactive_does_not_filter_out(self):
-        provider = Provider.objects.create(name="Old Vendor", is_active=False)
-        self.assertFalse(Provider.objects.filter(is_active=True).filter(pk=provider.pk).exists())
+    def test_supplier_inactive_does_not_filter_out(self):
+        supplier = Supplier.objects.create(name="Old Vendor", is_active=False)
+        self.assertFalse(Supplier.objects.filter(is_active=True).filter(pk=supplier.pk).exists())
 
 
 class SubscriptionModelTests(TestCase):
     def setUp(self):
-        self.provider = Provider.objects.create(name="Adobe Inc.", account_id="adobe-001")
+        self.supplier = Supplier.objects.create(name="Adobe Inc.", account_id="adobe-001")
         self.today = timezone.now().date()
+
+    def _make_contract(self, tenant, contract_number):
+        return Contract.objects.create(
+            name=contract_number,
+            contract_number=contract_number,
+            start_date=self.today,
+            end_date=self.today + datetime.timedelta(days=365),
+            supplier=self.supplier,
+            tenant=tenant,
+        )
+
+    def test_supplier_is_required_and_protected(self):
+        supplier_field = Subscription._meta.get_field("supplier")
+        self.assertFalse(supplier_field.null)
+        self.assertFalse(supplier_field.blank)
+        self.assertIs(supplier_field.remote_field.on_delete, PROTECT)
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Subscription.objects.create(name="Missing Supplier", supplier=None)
+
+        Subscription.objects.create(name="Protected Supplier", supplier=self.supplier)
+        with self.assertRaises(ProtectedError):
+            self.supplier.delete(force_hard_delete=True)
+
+    def test_linked_contract_is_optional_and_set_null_on_delete(self):
+        contract_field = Subscription._meta.get_field("linked_contract")
+        self.assertTrue(contract_field.null)
+        self.assertTrue(contract_field.blank)
+        self.assertIs(contract_field.remote_field.on_delete, SET_NULL)
+
+        subscription = Subscription.objects.create(name="No Linked Contract", supplier=self.supplier)
+        self.assertIsNone(subscription.linked_contract_id)
+
+    def test_clean_rejects_a_supplier_owned_by_another_tenant(self):
+        tenant = baker.make(Tenant, name="Subscription Tenant", slug="subscription-tenant")
+        other_tenant = baker.make(Tenant, name="Supplier Tenant", slug="supplier-tenant")
+        supplier = Supplier.objects.create(name="Tenant Supplier", slug="tenant-supplier", tenant=other_tenant)
+        subscription = Subscription(name="Cross Tenant Supplier", supplier=supplier, tenant=tenant)
+
+        with self.assertRaises(ValidationError) as error:
+            subscription.clean()
+        self.assertIn("supplier", error.exception.message_dict)
+
+    def test_clean_accepts_same_tenant_and_global_contracts(self):
+        tenant = baker.make(Tenant, name="Linked Contract Tenant", slug="linked-contract-tenant")
+        local_contract = self._make_contract(tenant, "local-linked-contract")
+        global_contract = self._make_contract(None, "global-linked-contract")
+
+        for contract in (local_contract, global_contract):
+            with self.subTest(contract_tenant=contract.tenant_id):
+                subscription = Subscription(
+                    name=f"Linked Contract {contract.pk}",
+                    supplier=self.supplier,
+                    tenant=tenant,
+                    linked_contract=contract,
+                )
+                subscription.clean()
+
+    def test_clean_rejects_a_linked_contract_from_another_tenant(self):
+        tenant = baker.make(Tenant, name="Contract Owner Tenant", slug="contract-owner-tenant")
+        other_tenant = baker.make(Tenant, name="Other Contract Tenant", slug="other-contract-tenant")
+        contract = self._make_contract(other_tenant, "other-linked-contract")
+        subscription = Subscription(
+            name="Cross Tenant Contract", supplier=self.supplier, tenant=tenant, linked_contract=contract
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            subscription.clean()
+        self.assertIn("linked_contract", error.exception.message_dict)
 
     def test_subscription_creation(self):
         sub = Subscription.objects.create(
             name="Adobe Creative Cloud",
-            provider=self.provider,
+            supplier=self.supplier,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
             start_date=self.today - datetime.timedelta(days=90),
@@ -178,7 +249,7 @@ class SubscriptionModelTests(TestCase):
         """cost_center is a FK to organization.CostCenter; null is the default."""
         sub_no_cc = Subscription.objects.create(
             name="No Cost Center Sub",
-            provider=self.provider,
+            supplier=self.supplier,
         )
         self.assertIsNone(sub_no_cc.cost_center)
 
@@ -187,7 +258,7 @@ class SubscriptionModelTests(TestCase):
         cc = baker.make(CostCenter, name="Engineering", code="ENG-001", tenant=None)
         sub_with_cc = Subscription.objects.create(
             name="Engineering Tools",
-            provider=self.provider,
+            supplier=self.supplier,
             cost_center=cc,
         )
         self.assertEqual(sub_with_cc.cost_center, cc)
@@ -198,7 +269,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_expired(self):
         sub = Subscription.objects.create(
             name="Expired SaaS",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=self.today - datetime.timedelta(days=1),
             renewal_cost=100,
@@ -209,7 +280,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_renewing_today(self):
         sub = Subscription.objects.create(
             name="Renewing Today",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=self.today,
         )
@@ -218,7 +289,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_monthly(self):
         sub = Subscription.objects.create(
             name="Monthly Plan",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=49.99,
             billing_cycle=BillingCycleChoices.MONTHLY,
         )
@@ -227,7 +298,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_quarterly(self):
         sub = Subscription.objects.create(
             name="Quarterly Plan",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=299.99,
             billing_cycle=BillingCycleChoices.QUARTERLY,
         )
@@ -236,7 +307,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_biannual(self):
         sub = Subscription.objects.create(
             name="Biannual Plan",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=1199.99,
             billing_cycle=BillingCycleChoices.BIANNUAL,
         )
@@ -245,14 +316,14 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_none_when_no_cost(self):
         sub = Subscription.objects.create(
             name="Free Plan",
-            provider=self.provider,
+            supplier=self.supplier,
         )
         self.assertIsNone(sub.annual_cost)
 
     def test_subscription_annual_cost_multi_year_two_year_term(self):
         sub = Subscription.objects.create(
             name="Two-Year Contract",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("2400.00"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
             term_months=24,
@@ -263,7 +334,7 @@ class SubscriptionModelTests(TestCase):
         # Issue #501 scenario: 3600 over 36 months is 1200 per year, not 3600.
         sub = Subscription.objects.create(
             name="Three-Year Contract",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("3600.00"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
             term_months=36,
@@ -274,7 +345,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_multi_year_five_year_term(self):
         sub = Subscription.objects.create(
             name="Five-Year Contract",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("3000.00"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
             term_months=60,
@@ -284,7 +355,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_multi_year_rounds_half_up(self):
         sub = Subscription.objects.create(
             name="Rounded Multi-Year",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("1000.55"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
             term_months=36,
@@ -296,7 +367,7 @@ class SubscriptionModelTests(TestCase):
         """Defined fallback: no yearly figure when the term is unknown."""
         sub = Subscription.objects.create(
             name="Termless Multi-Year",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("3600.00"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
         )
@@ -305,7 +376,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_one_time_is_not_annualized(self):
         sub = Subscription.objects.create(
             name="Perpetual Software",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("500.00"),
             billing_cycle=BillingCycleChoices.ONETIME,
         )
@@ -314,7 +385,7 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_annual_cost_one_time_with_term_stays_out_of_annual_slot(self):
         sub = Subscription.objects.create(
             name="One-Time With Term",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("500.00"),
             billing_cycle=BillingCycleChoices.ONETIME,
             term_months=12,
@@ -325,13 +396,13 @@ class SubscriptionModelTests(TestCase):
         """A recorded 0 is a real figure (free), not a missing value."""
         zero_monthly = Subscription.objects.create(
             name="Free Monthly Plan",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("0.00"),
             billing_cycle=BillingCycleChoices.MONTHLY,
         )
         zero_multi_year = Subscription.objects.create(
             name="Free Multi-Year Plan",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("0.00"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
             term_months=36,
@@ -347,7 +418,7 @@ class SubscriptionModelTests(TestCase):
         """
         sub = Subscription.objects.create(
             name="Scoped Multi-Year",
-            provider=self.provider,
+            supplier=self.supplier,
             renewal_cost=Decimal("3600.00"),
             billing_cycle=BillingCycleChoices.MULTI_YEAR,
             term_months=36,
@@ -375,14 +446,14 @@ class SubscriptionModelTests(TestCase):
     def test_subscription_days_until_renewal_none(self):
         sub = Subscription.objects.create(
             name="No Renewal",
-            provider=self.provider,
+            supplier=self.supplier,
         )
         self.assertIsNone(sub.days_until_renewal)
 
     def test_subscription_slug_auto_generation(self):
         sub = Subscription.objects.create(
             name="Adobe Creative Cloud - All Apps",
-            provider=self.provider,
+            supplier=self.supplier,
         )
         self.assertEqual(sub.slug, "adobe-creative-cloud-all-apps")
 
@@ -399,7 +470,7 @@ class SubscriptionModelTests(TestCase):
 
         sub = Subscription.objects.create(
             name="Declarative Renewal Policy",
-            provider=self.provider,
+            supplier=self.supplier,
             vendor_contract_auto_renews=False,
         )
         self.assertIs(sub.vendor_contract_auto_renews, False)
@@ -411,7 +482,7 @@ class SubscriptionModelTests(TestCase):
     def test_cancelled_subscription_cannot_be_renewed_back_to_active(self):
         sub = Subscription.objects.create(
             name="Cancelled Contract",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.CANCELLED,
         )
 
@@ -422,7 +493,7 @@ class SubscriptionModelTests(TestCase):
         self.assertEqual(sub.status, SubscriptionStatusChoices.CANCELLED)
 
     def test_lifecycle_action_retries_are_idempotent(self):
-        sub = Subscription.objects.create(name="Retry Contract", provider=self.provider)
+        sub = Subscription.objects.create(name="Retry Contract", supplier=self.supplier)
         sub.suspend()
         suspended_at = sub.updated_at
         sub.suspend()
@@ -439,7 +510,7 @@ class SubscriptionModelTests(TestCase):
         self.assertEqual(sub.notes, notes)
 
     def test_clean_enforces_transition_matrix_but_allows_same_state_updates(self):
-        sub = Subscription.objects.create(name="Clean Contract", provider=self.provider)
+        sub = Subscription.objects.create(name="Clean Contract", supplier=self.supplier)
         sub.description = "Ordinary update"
         sub.full_clean()
 
@@ -476,7 +547,7 @@ class SubscriptionModelTests(TestCase):
             for target in SubscriptionStatusChoices.values:
                 with self.subTest(source=source, target=target):
                     sub = Subscription.objects.create(
-                        name=f"Matrix {source} {target}", provider=self.provider, status=source
+                        name=f"Matrix {source} {target}", supplier=self.supplier, status=source
                     )
                     sub.status = target
                     if target in allowed[source]:
@@ -490,7 +561,7 @@ class SubscriptionModelTests(TestCase):
         tenant_b = baker.make(Tenant, name="Lifecycle B", slug="lifecycle-b")
         sub = Subscription.objects.create(
             name="Ambient Contract",
-            provider=self.provider,
+            supplier=self.supplier,
             tenant=tenant_a,
             status=SubscriptionStatusChoices.CANCELLED,
         )
@@ -512,7 +583,7 @@ class SubscriptionModelTests(TestCase):
         tenant = Tenant.objects.create(name="Tenant Inc.", slug="tenant-inc", group=tg)
         sub = Subscription.objects.create(
             name="Tenant Sub",
-            provider=self.provider,
+            supplier=self.supplier,
             tenant=tenant,
         )
         self.assertEqual(sub.tenant, tenant)
@@ -520,10 +591,10 @@ class SubscriptionModelTests(TestCase):
 
 class SubscriptionAssignmentModelTests(TestCase):
     def setUp(self):
-        self.provider = Provider.objects.create(name="Microsoft", account_id="ms-001")
+        self.supplier = Supplier.objects.create(name="Microsoft", account_id="ms-001")
         self.subscription = Subscription.objects.create(
             name="M365 E5",
-            provider=self.provider,
+            supplier=self.supplier,
             licensed_quantity=100,
         )
         self.tg = TenantGroup.objects.create(name="G", slug="g")
@@ -631,13 +702,13 @@ class SubscriptionAssignmentModelTests(TestCase):
 
 class SubscriptionExplicitExpiryTests(TestCase):
     def setUp(self):
-        self.provider = Provider.objects.create(name="Test Provider")
+        self.supplier = Supplier.objects.create(name="Test Supplier")
         self.yesterday = timezone.now().date() - datetime.timedelta(days=1)
 
     def test_save_does_not_silently_expire_and_explicit_action_does(self):
         sub = Subscription.objects.create(
             name="Should Expire",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=self.yesterday,
         )
@@ -650,7 +721,7 @@ class SubscriptionExplicitExpiryTests(TestCase):
         future = timezone.now().date() + datetime.timedelta(days=30)
         sub = Subscription.objects.create(
             name="Future Renewal",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=future,
         )
@@ -665,9 +736,9 @@ class SubscriptionConcurrencyTests(TransactionTestCase):
         ContentType.objects.clear_cache()
 
     def test_stale_direct_writer_cannot_overwrite_a_terminal_cancellation(self):
-        provider = Provider.objects.create(name="Race Provider")
+        supplier = Supplier.objects.create(name="Race Supplier")
         subscription = Subscription.objects.create(
-            name="Race Contract", provider=provider, status=SubscriptionStatusChoices.ACTIVE
+            name="Race Contract", supplier=supplier, status=SubscriptionStatusChoices.ACTIVE
         )
         stale_loaded = threading.Event()
         allow_stale_save = threading.Event()
@@ -701,8 +772,8 @@ class SubscriptionConcurrencyTests(TransactionTestCase):
         self.assertEqual(subscription.status, SubscriptionStatusChoices.CANCELLED)
 
     def test_stale_retried_cancellation_cannot_replace_the_winning_effects(self):
-        provider = Provider.objects.create(name="Cancellation Race Provider")
-        subscription = Subscription.objects.create(name="Cancellation Race", provider=provider)
+        supplier = Supplier.objects.create(name="Cancellation Race Supplier")
+        subscription = Subscription.objects.create(name="Cancellation Race", supplier=supplier)
         stale_loaded = threading.Event()
         winner_committed = threading.Event()
         errors = []
@@ -736,8 +807,8 @@ class SubscriptionConcurrencyTests(TransactionTestCase):
         self.assertNotIn("loser", subscription.notes)
 
     def test_stale_direct_same_status_writer_cannot_replace_the_winning_effects(self):
-        provider = Provider.objects.create(name="Direct cancellation race provider")
-        subscription = Subscription.objects.create(name="Direct cancellation race", provider=provider)
+        supplier = Supplier.objects.create(name="Direct cancellation race supplier")
+        subscription = Subscription.objects.create(name="Direct cancellation race", supplier=supplier)
         loaded = threading.Event()
         allow_stale_save = threading.Event()
         errors = []
@@ -811,7 +882,7 @@ class SubscriptionConcurrencyTests(TransactionTestCase):
         today = timezone.localdate()
         subscription = Subscription.objects.create(
             name="Expiry race sub",
-            provider=Provider.objects.create(name="Expiry race provider"),
+            supplier=Supplier.objects.create(name="Expiry race supplier"),
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=today - datetime.timedelta(days=1),
         )

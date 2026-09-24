@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 
-from .models import Provider, Subscription, SubscriptionAssignment
+from .models import Subscription, SubscriptionAssignment
 
 
 class SubscriptionAssignmentInline(admin.TabularInline):
@@ -13,21 +13,11 @@ class SubscriptionAssignmentInline(admin.TabularInline):
     fields = ("content_type", "object_id", "assigned_date", "assigned_by", "notes")
 
 
-@admin.register(Provider)
-class ProviderAdmin(admin.ModelAdmin):
-    list_display = ("name", "supplier", "slug", "is_active", "account_id")
-    list_filter = ("is_active", "supplier", "tags")
-    search_fields = ("name", "supplier__name", "account_id", "admin_notes")
-    readonly_fields = ("created_at", "updated_at")
-    prepopulated_fields = {"slug": ("name",)}
-    filter_horizontal = ("tags",)
-
-
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
     list_display = (
         "name",
-        "provider",
+        "supplier",
         "tenant",
         "status",
         "type",
@@ -39,7 +29,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
     list_filter = (
         "status",
         "type",
-        "provider",
+        "supplier",
         "tenant",
         "vendor_contract_auto_renews",
         "tags",
@@ -47,7 +37,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
     )
     search_fields = (
         "name",
-        "provider__name",
+        "supplier__name",
         "contract_reference",
         "cost_center__name",
         "description",
@@ -62,14 +52,14 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "is_expired_display",
         "days_until_renewal_display",
     )
-    raw_id_fields = ("provider", "owner", "tenant", "cost_center")
+    raw_id_fields = ("supplier", "owner", "tenant", "cost_center")
     filter_horizontal = ("tags",)
     inlines = [SubscriptionAssignmentInline]
     date_hierarchy = "renewal_date"
     prepopulated_fields = {"slug": ("name",)}
 
     fieldsets = (
-        (_("Identity"), {"fields": ("name", "slug", "provider", "type", "status", "tenant")}),
+        (_("Identity"), {"fields": ("name", "slug", "supplier", "type", "status", "tenant")}),
         (
             _("Dates & Terms"),
             {
@@ -83,7 +73,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
             },
         ),
         (_("Costs"), {"fields": ("renewal_cost", "currency", "billing_cycle", "cost_center")}),
-        (_("Details"), {"fields": ("licensed_quantity", "contract_reference", "owner")}),
+        (_("Details"), {"fields": ("licensed_quantity", "contract_reference", "linked_contract", "owner")}),
         (_("Notes"), {"fields": ("description", "notes", "tags")}),
         (_("Computed"), {"fields": ("created_at", "updated_at", "is_expired_display", "days_until_renewal_display")}),
     )
@@ -142,7 +132,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
 @admin.register(SubscriptionAssignment)
 class SubscriptionAssignmentAdmin(admin.ModelAdmin):
     list_display = ("subscription", "content_type", "object_id", "assigned_date", "assigned_by")
-    list_filter = ("content_type", "subscription__provider", "subscription__status")
+    list_filter = ("content_type", "subscription__supplier", "subscription__status")
     search_fields = ("subscription__name", "notes")
     raw_id_fields = ("subscription", "assigned_by")
     readonly_fields = ("assigned_date",)

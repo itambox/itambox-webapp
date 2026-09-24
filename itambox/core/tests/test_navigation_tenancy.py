@@ -115,7 +115,6 @@ class TenantNavigationTests(TestCase):
                 "software:software_list",
                 "licenses:license_list",
                 "subscriptions:subscription_list",
-                "subscriptions:provider_list",
                 "procurement:purchaseorder_list",
                 "assets:request_list",
                 "assets:supplier_list",

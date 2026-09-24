@@ -108,7 +108,7 @@
             'available_seats', 'utilization_rate'
           ],
           'subscription_renewals': [
-            'subscription_name', 'provider', 'agreement_entitled_quantity', 'billing_cycle', 'cost', 'end_date'
+            'subscription_name', 'supplier', 'agreement_entitled_quantity', 'billing_cycle', 'cost', 'end_date'
           ],
           'asset_maintenance': [
             'maintenance_title', 'maintenance_asset', 'maintenance_type',

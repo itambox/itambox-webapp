@@ -3,10 +3,11 @@ from django import forms
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from assets.models import Supplier
 from core.filters import BaseFilterSet
 from organization.models import CostCenter, Tenant
 
-from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
+from .models import Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
 
 
 class SubscriptionFilterSet(BaseFilterSet):
@@ -38,10 +39,10 @@ class SubscriptionFilterSet(BaseFilterSet):
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(), widget=forms.Select(attrs={"class": "form-select"}), label=_("Tenant")
     )
-    provider = django_filters.ModelChoiceFilter(
-        queryset=Provider.objects.filter(is_active=True),
+    supplier = django_filters.ModelChoiceFilter(
+        queryset=Supplier.objects.filter(is_active=True),
         widget=forms.Select(attrs={"class": "form-select"}),
-        label=_("Provider"),
+        label=_("Supplier"),
     )
     cost_center = django_filters.ModelChoiceFilter(
         queryset=CostCenter.objects.filter(is_active=True),
@@ -62,12 +63,13 @@ class SubscriptionFilterSet(BaseFilterSet):
             "vendor_contract_auto_renews",
             "auto_renewal",
             "tenant",
-            "provider",
+            "supplier",
             "cost_center",
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.filters["supplier"].queryset = Supplier.objects.filter(is_active=True)
         self.filters["cost_center"].field.label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )
@@ -80,7 +82,7 @@ class SubscriptionFilterSet(BaseFilterSet):
             | Q(description__icontains=value)
             | Q(notes__icontains=value)
             | Q(contract_reference__icontains=value)
-            | Q(provider__name__icontains=value)
+            | Q(supplier__name__icontains=value)
         ).distinct()
 
     def filter_renewal_within(self, queryset, name, value):
@@ -90,31 +92,6 @@ class SubscriptionFilterSet(BaseFilterSet):
             cutoff = timezone.now().date() + timezone.timedelta(days=int(value))
             return queryset.filter(renewal_date__lte=cutoff, renewal_date__gte=timezone.now().date())
         return queryset
-
-
-class ProviderFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(
-        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Account ID..."})
-    )
-    is_active = django_filters.BooleanFilter(
-        method="filter_is_active", widget=forms.CheckboxInput(attrs={"class": "form-check-input"}), label=_("Active")
-    )
-
-    class Meta:
-        model = Provider
-        fields = []  # No auto-generated filters — all are custom
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) | Q(account_id__icontains=value) | Q(admin_notes__icontains=value)
-        ).distinct()
-
-    def filter_is_active(self, queryset, name, value):
-        if value:  # Only filter when checkbox is explicitly checked
-            return queryset.filter(is_active=True)
-        return queryset  # Unchecked = show all
 
 
 class SubscriptionAssignmentFilterSet(BaseFilterSet):

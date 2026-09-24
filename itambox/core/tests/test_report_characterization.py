@@ -12,13 +12,15 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import translation
 
-from assets.models import Manufacturer
+from assets.models import Manufacturer, Supplier
+from core.management.commands._seed.organizations import _seed_saas_suppliers
 from core.reports import build_report_context, get_report_provider
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from licenses.models import License, LicenseTypeChoices
+from organization.models import TenantGroup
 from software.models import Software
-from subscriptions.models import Provider, Subscription
+from subscriptions.models import Subscription
 
 REPORT_CHARACTERIZATIONS = {
     ReportTemplate.REPORT_TYPE_ASSET_SUMMARY: {
@@ -43,7 +45,7 @@ REPORT_CHARACTERIZATIONS = {
     ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS: {
         "columns": [
             "subscription_name",
-            "provider",
+            "supplier",
             "agreement_entitled_quantity",
             "billing_cycle",
             "cost",
@@ -51,7 +53,7 @@ REPORT_CHARACTERIZATIONS = {
         ],
         "headers": [
             "Subscription Name",
-            "Provider",
+            "Supplier",
             "Agreement Entitled Quantity",
             "Billing Cycle",
             "Cost",
@@ -202,6 +204,27 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(name="Report Characterization Tenant", slug="report-characterization")
         self.clear_tenant_context()
 
+    def test_seed_saas_supplier_scopes_and_commercial_fields(self):
+        group = TenantGroup.objects.create(name="Report Supplier Group", slug="report-supplier-group")
+        supplier_data = [
+            ("Amazon Web Services", "aws-org", "https://console.aws.amazon.com"),
+            ("Google Cloud Platform", "gcp-org", "https://console.cloud.google.com"),
+            ("Cloudflare", "cloudflare", "https://dash.cloudflare.com"),
+        ]
+
+        suppliers = _seed_saas_suppliers(Supplier, supplier_data, self.tenant, group)
+        repeated_suppliers = _seed_saas_suppliers(Supplier, supplier_data, self.tenant, group)
+
+        self.assertEqual(suppliers["Amazon Web Services"].tenant_id, None)
+        self.assertEqual(suppliers["Google Cloud Platform"].tenant, self.tenant)
+        self.assertEqual(suppliers["Cloudflare"].tenant_group, group)
+        self.assertEqual(suppliers["Cloudflare"].account_id, "cloudflare")
+        self.assertEqual(suppliers["Cloudflare"].portal_url, "https://dash.cloudflare.com")
+        self.assertEqual(
+            {name: supplier.pk for name, supplier in suppliers.items()},
+            {name: supplier.pk for name, supplier in repeated_suppliers.items()},
+        )
+
     def test_every_public_report_identifier_preserves_compiler_output_contract(self):
         self.assertEqual(
             set(REPORT_CHARACTERIZATIONS),
@@ -242,10 +265,10 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                 self.assertEqual(context_data["summary_cards"], summary_cards)
 
     def test_subscription_currency_summary_handles_real_rows(self):
-        provider = Provider.objects.create(name="Characterization Provider", tenant=self.tenant)
+        supplier = Supplier.objects.create(name="Characterization Supplier", tenant=self.tenant)
         Subscription.objects.create(
             name="Characterization Subscription",
-            provider=provider,
+            supplier=supplier,
             tenant=self.tenant,
             renewal_date=date.today(),
             renewal_cost=Decimal("120.00"),
@@ -270,10 +293,10 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
 
     def test_subscription_entitlement_reports_agreement_quantity_not_license_seats(self):
         """A 120 agreement entitlement reports 120 even when linked licenses total 115 seats."""
-        provider = Provider.objects.create(name="Entitlement Provider", tenant=self.tenant)
+        supplier = Supplier.objects.create(name="Entitlement Supplier", tenant=self.tenant)
         subscription = Subscription.objects.create(
             name="Entitlement Subscription",
-            provider=provider,
+            supplier=supplier,
             tenant=self.tenant,
             renewal_date=date.today(),
             renewal_cost=Decimal("120.00"),
@@ -306,7 +329,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
         self.assertEqual(subscription.total_seats, 115, "Fixture: linked licenses must total 115 seats")
         self.assertEqual(
             headers,
-            ["Subscription Name", "Provider", "Agreement Entitled Quantity", "Billing Cycle", "Cost", "End Date"],
+            ["Subscription Name", "Supplier", "Agreement Entitled Quantity", "Billing Cycle", "Cost", "End Date"],
         )
         self.assertEqual(rows[0]["Agreement Entitled Quantity"], "120")
 
@@ -318,10 +341,10 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
 
     def test_subscription_entitlement_renders_not_set_and_exact_zero(self):
         """Entitlement None renders 'Not set' and a set 0 renders '0', never the seat total."""
-        provider = Provider.objects.create(name="Fallback Provider", tenant=self.tenant)
+        supplier = Supplier.objects.create(name="Fallback Supplier", tenant=self.tenant)
         unset_subscription = Subscription.objects.create(
             name="Entitlement Unset",
-            provider=provider,
+            supplier=supplier,
             tenant=self.tenant,
             renewal_date=date.today(),
             renewal_cost=Decimal("10.00"),
@@ -330,7 +353,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
         )
         zero_subscription = Subscription.objects.create(
             name="Entitlement Zero",
-            provider=provider,
+            supplier=supplier,
             tenant=self.tenant,
             renewal_date=date.today(),
             renewal_cost=Decimal("10.00"),

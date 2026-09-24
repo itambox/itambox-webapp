@@ -279,7 +279,6 @@ SOFTWARE_MENU = Menu(
             label=_("SaaS"),
             items=(
                 get_model_item("subscriptions", "subscription", _("Subscriptions")),
-                get_model_item("subscriptions", "provider", _("Providers")),
             ),
         ),
     ),

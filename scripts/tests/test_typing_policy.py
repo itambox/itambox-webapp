@@ -1341,7 +1341,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/subscriptions/models_seat_usage.py": ("module", []),
                 "itambox/subscriptions/api/serializers.py": (
                     "symbols",
-                    ["ProviderSerializer", "SubscriptionAssignmentSerializer", "SubscriptionSerializer"],
+                    ["SubscriptionAssignmentSerializer", "SubscriptionSerializer"],
                 ),
                 "itambox/users/api/authentication.py": (
                     "symbols",

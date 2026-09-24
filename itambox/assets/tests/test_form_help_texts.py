@@ -84,7 +84,7 @@ class VisibleFormHelpTextTests(SimpleTestCase):
 
     def test_subscription_renewal_days_use_german_singular_and_plural(self):
         values = {
-            "provider": None,
+            "supplier": SimpleNamespace(pk=1, name="Test Supplier"),
             "type": "saas",
             "status": "active",
             "get_type_display": lambda: "SaaS",
@@ -136,7 +136,7 @@ class VisibleFormHelpTextTests(SimpleTestCase):
     def test_subscription_detail_renders_zero_entitlement_and_hides_unset(self):
         """Issue #500: zero entitlement renders; an unset one hides the row."""
         values = {
-            "provider": None,
+            "supplier": SimpleNamespace(pk=1, name="Test Supplier"),
             "type": "saas",
             "status": "active",
             "get_type_display": lambda: "SaaS",

@@ -110,12 +110,12 @@ def render_report_csv(template, headers, rows, summary_cards=None, grouped_data=
         writer.writerow(["Active Subscriptions", total_active])
         writer.writerow(["Est. Monthly Spend", monthly_spend_display])
         writer.writerow([])
-        writer.writerow(["Subscription", "Provider", "Billing Cycle", "Cost", "End Date"])
+        writer.writerow(["Subscription", "Supplier", "Billing Cycle", "Cost", "End Date"])
         for row in rows:
             writer.writerow(
                 [
                     csv_safe(row.get(_("Subscription Name"))),
-                    csv_safe(row.get(_("Provider"))),
+                    csv_safe(row.get(_("Supplier"))),
                     csv_safe(row.get(_("Billing Cycle"))),
                     row.get(_("Cost")),
                     row.get(_("End Date")),

@@ -2,13 +2,9 @@
 {% translate "Not set" as not_set %}
 {% load utility_tags %}
 <dl class="row mb-0">
-  <dt class="col-sm-3">{% translate "Provider:" %}</dt>
+  <dt class="col-sm-3">{% translate "Supplier:" %}</dt>
   <dd class="col-sm-9">
-    {% if object.provider %}
-      <a href="{% url 'subscriptions:provider_detail' object.provider.pk %}">{{ object.provider.name }}</a>
-    {% else %}
-      <span class="text-muted"><i>{% translate "None" %}</i></span>
-    {% endif %}
+    <a href="{% url 'assets:supplier_detail' object.supplier.pk %}">{{ object.supplier.name }}</a>
   </dd>
   <dt class="col-sm-3">{% translate "Type:" %}</dt>
   <dd class="col-sm-9">
@@ -76,6 +72,12 @@
     <dt class="col-sm-3">{% translate "Contract Ref:" %}</dt>
     <dd class="col-sm-9">
       <code>{{ object.contract_reference }}</code>
+    </dd>
+  {% endif %}
+  {% if object.linked_contract %}
+    <dt class="col-sm-3">{% translate "Linked Contract:" %}</dt>
+    <dd class="col-sm-9">
+      <a href="{% url 'procurement:contract_detail' object.linked_contract.pk %}">{{ object.linked_contract }}</a>
     </dd>
   {% endif %}
   {% if object.cost_center %}

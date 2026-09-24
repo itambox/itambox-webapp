@@ -153,15 +153,9 @@ ROLE_PERMISSION_PRESENTATION = {
         "group": _("Metadata & Settings"),
     },
     "supplier": {
-        "label": _("Suppliers (Hardware)"),
+        "label": _("Suppliers"),
         "app": "assets",
         "model_name": "supplier",
-        "group": _("Metadata & Settings"),
-    },
-    "provider_sub": {
-        "label": _("Providers (Subscription)"),
-        "app": "subscriptions",
-        "model_name": "provider",
         "group": _("Metadata & Settings"),
     },
     "statuslabel": {

@@ -41,6 +41,7 @@ from assets.models import (
     Category,
     Manufacturer,
     StatusLabel,
+    Supplier,
 )
 from core.managers import (
     set_current_all_accessible,
@@ -76,7 +77,7 @@ from organization.models import (
     TenantGroup,
 )
 from software.models import Software
-from subscriptions.models import Provider, Subscription
+from subscriptions.models import Subscription
 from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
@@ -136,8 +137,8 @@ def _make_catalog():
         type="deployable",
     )
     software = Software.objects.create(name="I133 Office", manufacturer=mfr)
-    provider = Provider.objects.create(name="I133 Provider", slug="i133-provider")
-    return mfr, asset_type, status, software, provider
+    supplier = Supplier.objects.create(name="I133 Supplier", slug="i133-supplier")
+    return mfr, asset_type, status, software, supplier
 
 
 class AllAccessibleWidgetTests(DashboardContextMixin, TestCase):
@@ -160,7 +161,7 @@ class AllAccessibleWidgetTests(DashboardContextMixin, TestCase):
             password="pw",
         )
 
-        self.mfr, self.asset_type, self.status, self.software, self.provider = _make_catalog()
+        self.mfr, self.asset_type, self.status, self.software, self.supplier = _make_catalog()
 
         self.assets = {}
         self._seed(self.tenant_a, key="a", display="AlphaAsset", cost=1000, maint=150, sub_cost=500, seats=10)
@@ -183,7 +184,7 @@ class AllAccessibleWidgetTests(DashboardContextMixin, TestCase):
         Subscription.objects.create(
             name=f"SaaS {key}",
             slug=f"i133-saas-{key}",
-            provider=self.provider,
+            supplier=self.supplier,
             status="active",
             start_date=date.today(),
             renewal_date=date.today() + timedelta(days=30),
@@ -438,7 +439,7 @@ class TenantSpendWidgetTests(DashboardContextMixin, TestCase):
             password="pw",
         )
 
-        self.mfr, self.asset_type, self.status, self.software, self.provider = _make_catalog()
+        self.mfr, self.asset_type, self.status, self.software, self.supplier = _make_catalog()
         self._asset(self.tenant_a, "a", 1000)
         self._asset(self.tenant_b, "b", 2000)
         self._asset(self.tenant_c, "c", 9999)
@@ -558,7 +559,7 @@ class GetScopedQuerysetScopeTests(DashboardContextMixin, TestCase):
             tenant=self.grouped,
         )
 
-        self.mfr, self.asset_type, self.status, self.software, self.provider_prov = _make_catalog()
+        self.mfr, self.asset_type, self.status, self.software, self.supplier = _make_catalog()
         self.assets = {
             slug: self._asset(tenant, slug)
             for slug, tenant in (
@@ -683,7 +684,7 @@ class DashboardViewAllAccessibleGetTests(TestCase):
             password="pw",
         )
 
-        self.mfr, self.asset_type, self.status, self.software, self.provider = _make_catalog()
+        self.mfr, self.asset_type, self.status, self.software, self.supplier = _make_catalog()
         for tenant, key, cost in (
             (self.tenant_a, "AlphaBoardAsset", 1000),
             (self.tenant_b, "BravoBoardAsset", 2000),

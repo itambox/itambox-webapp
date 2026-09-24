@@ -1,6 +1,9 @@
+import django_tables2 as tables
+from django.db.models import Count
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
+from django_tables2.utils import A
 
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
@@ -17,7 +20,7 @@ from ..models import Asset, Supplier
 
 
 class SupplierListView(ObjectListView):
-    queryset = Supplier.objects.prefetch_related("tags")
+    queryset = Supplier.objects.prefetch_related("tags").annotate(subscription_count=Count("subscriptions"))
     filterset = filters.SupplierFilterSet
     filterset_form = forms.SupplierFilterForm
     table = tables.SupplierTable
@@ -75,6 +78,24 @@ class SupplierDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(licenses_table)
         context["licenses_table"] = licenses_table
 
+        # inline import: heavy-import: subscriptions.models for the supplier detail tab only
+        from subscriptions.models import Subscription
+
+        class SupplierSubscriptionTable(tables.Table):
+            name = tables.LinkColumn("subscriptions:subscription_detail", args=[A("pk")], verbose_name=_("Name"))
+            status = tables.Column(verbose_name=_("Status"))
+            renewal_date = tables.DateColumn(format="Y-m-d", verbose_name=_("Renewal Date"))
+
+            class Meta:
+                fields = ("name", "status", "renewal_date")
+
+        subscription_qs = Subscription.objects.filter(supplier=supplier)
+        subscriptions_table = SupplierSubscriptionTable(subscription_qs, request=self.request)
+        RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
+            subscriptions_table
+        )
+        context["subscriptions_table"] = subscriptions_table
+
         related_objects_list = []
         asset_count = supplier_assets.count()
         if asset_count:
@@ -110,6 +131,15 @@ class SupplierDetailView(ObjectDetailView):
                     "label": "Licenses",
                     "count": license_count,
                     "url": f"{reverse('licenses:license_list')}?supplier={supplier.slug}",
+                }
+            )
+        subscription_count = subscription_qs.count()
+        if subscription_count:
+            related_objects_list.append(
+                {
+                    "label": "Subscriptions",
+                    "count": subscription_count,
+                    "url": f"{reverse('subscriptions:subscription_list')}?supplier={supplier.pk}",
                 }
             )
         context["related_objects_list"] = related_objects_list

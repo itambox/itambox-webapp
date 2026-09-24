@@ -12,8 +12,10 @@ Designed to be mixed into ``Command`` in seed_data.py:
 ``self._suppliers``, ``self._depreciations``, ``self._demo_depreciation_afa``,
 ``self._custom_fields``, the fieldset handles, ``self._categories``,
 ``self._asset_types``, ``self._components``, ``self._accessory_defs`` /
-``self._consumable_defs`` (consumed later by the stock phase), ``self._software``
-and ``self._providers``. It reads ``self._status_label_defs()`` from Command.
+``self._consumable_defs`` (consumed later by the stock phase), and ``self._software``.
+It stores the SaaS supplier definitions for ``_seed_organizations`` to create
+after tenant and tenant-group scopes are available. It reads
+``self._status_label_defs()`` from Command.
 """
 
 from decimal import Decimal
@@ -414,7 +416,6 @@ class SeedCatalogMixin:
         from assets.models import AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
         from inventory.models import Accessory, Component, Consumable
         from software.models import Software
-        from subscriptions.models import Provider
 
         self.stdout.write("--- Catalog: reference data ---")
 
@@ -1223,20 +1224,18 @@ class SeedCatalogMixin:
             obj, _ = Software.objects.get_or_create(name=name, defaults={"manufacturer": self._manufacturers[mfr]})
             self._software[name] = obj
 
-        # Cloud / SaaS providers
-        self._providers = {}
-        for name, acct, url in [
+        # SaaS suppliers are created after tenants and tenant groups are seeded.
+        self._saas_supplier_data = [
             ("Amazon Web Services", "aws-org", "https://console.aws.amazon.com"),
             ("Microsoft Azure", "azure-ea", "https://portal.azure.com"),
             ("Google Cloud Platform", "gcp-org", "https://console.cloud.google.com"),
             ("GitHub Enterprise", "github-ent", "https://github.com/enterprises"),
             ("Cloudflare", "cloudflare", "https://dash.cloudflare.com"),
             ("Datadog", "datadog", "https://app.datadoghq.eu"),
-        ]:
-            obj, _ = Provider.objects.get_or_create(name=name, defaults={"account_id": acct, "portal_url": url})
-            self._providers[name] = obj
+        ]
+        self._saas_suppliers = {}
 
         self.stdout.write(
             f"  {len(self._asset_types)} asset types, {len(self._components)} components, "
-            f"{len(self._software)} software products, {len(self._providers)} providers."
+            f"{len(self._software)} software products, {len(self._saas_supplier_data)} SaaS suppliers."
         )

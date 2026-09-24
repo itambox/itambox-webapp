@@ -9,7 +9,7 @@ from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 
-from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel, Supplier
 from core.forms import JournalEntryForm
 from core.models import Job, ObjectChange
 from core.tests.mixins import TenantTestMixin
@@ -19,7 +19,7 @@ from itambox.registry import DetailContextInput
 from itambox.views.generic.detail import ObjectDetailView
 from itambox.views.generic.extensions import build_detail_provider_context
 from subscriptions.feature_views import SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment
+from subscriptions.models import Subscription, SubscriptionAssignment
 from subscriptions.tables import SubscriptionAssignmentTable
 
 
@@ -80,8 +80,8 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         Bookmark.objects.create(user=self.tenant_user, model=self.content_type, object_id=self.asset.pk)
         ObjectWatch.objects.create(user=self.tenant_user, model=self.content_type, object_id=self.asset.pk)
 
-        provider = Provider.objects.create(name="Detail Provider", tenant=self.tenant)
-        subscription = Subscription.objects.create(name="Detail Subscription", provider=provider, tenant=self.tenant)
+        supplier = Supplier.objects.create(name="Detail Supplier", tenant=self.tenant)
+        subscription = Subscription.objects.create(name="Detail Subscription", supplier=supplier, tenant=self.tenant)
         self.assignment = SubscriptionAssignment.objects.create(
             subscription=subscription,
             content_type=self.content_type,
@@ -179,7 +179,7 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         assignment_queryset = context["subscription_assignments_table"].data.data
         self.assertEqual(
             assignment_queryset.query.select_related,
-            {"subscription": {"provider": {}}, "assigned_by": {}},
+            {"subscription": {"supplier": {}}, "assigned_by": {}},
         )
         self.assertEqual(list(assignment_queryset), [self.assignment])
 

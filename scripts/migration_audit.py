@@ -37,6 +37,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0118_assetdisposal_cancellation_reason_and_more",
     "assets.0119_warranty_supplier",
     "assets.0120_repair_episode",
+    "assets.0121_supplier_scoping_and_commercial_fields",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -70,6 +71,7 @@ POST_TRANSITION_MIGRATIONS = {
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "subscriptions.0102_commercial_vendor_and_terms",
+    "subscriptions.0103_unified_vendor_cutover",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
     "users.0102_token_updated_at",
     "users.0103_oidcidentity",
@@ -132,7 +134,18 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "upgrade-only",
-        "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states during 1.0 upgrade.",
+        (
+            "Transplants subscription provider profiles into the tenant-scoped supplier catalogue (explicit link, "
+            "scope-and-name match, or create), rebinds every subscription including soft-deleted ones, copies tag "
+            "links, and repoints generic contact assignments. The merge is lossy, so rollback is restore-first."
+        ),
+        {"subscriptions.0103_unified_vendor_cutover"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states during 1.0 upgrade."
+        ),
         {"subscriptions.0101_remove_subscription_auto_renewal_and_more"},
     ),
     **_dispositions(

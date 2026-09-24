@@ -61,7 +61,6 @@ class SubscriptionsConfig(AppConfig):
                 activation_probe=None,
                 activation_source=SOURCE_ALWAYS,
                 owns=(
-                    "subscriptions.Provider",
                     "subscriptions.Subscription",
                     "subscriptions.SubscriptionAssignment",
                 ),

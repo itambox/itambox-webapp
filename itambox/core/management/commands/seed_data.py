@@ -175,7 +175,6 @@ class Command(
             ("licenses", "License"),
             ("software", "Software"),
             ("subscriptions", "Subscription"),
-            ("subscriptions", "Provider"),
             ("organization", "RoleGrantScope"),
             ("organization", "RoleGrant"),
             ("organization", "Membership"),
