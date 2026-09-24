@@ -182,9 +182,9 @@ class AssetDisposalAdmin(admin.ModelAdmin):
 
 @admin.register(Warranty)
 class WarrantyAdmin(admin.ModelAdmin):
-    list_display = ("asset", "warranty_type", "provider", "start_date", "end_date", "reference")
+    list_display = ("asset", "warranty_type", "supplier", "start_date", "end_date", "reference")
     list_filter = ("warranty_type",)
-    search_fields = ("asset__name", "asset__asset_tag", "provider", "reference")
+    search_fields = ("asset__name", "asset__asset_tag", "supplier__name", "reference")
     date_hierarchy = "end_date"
     raw_id_fields = ("asset",)
 

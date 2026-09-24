@@ -1,6 +1,6 @@
 # Contracts
 
-A **Contract** represents a service agreement, hardware/software support agreement, SLA, lease, or warranty contract. It links commercial parameters with physical assets covered under the agreement.
+A **Contract** represents a service agreement, hardware/software support agreement, SLA, lease, or warranty contract. It links commercial parameters with physical assets covered under the agreement. Record one agreement in one module only; use [Commercial Vocabulary](../../usage/commercial-vocabulary.md) to decide between Contracts and Subscriptions.
 
 ## Attributes
 

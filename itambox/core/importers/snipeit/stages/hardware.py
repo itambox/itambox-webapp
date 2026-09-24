@@ -249,7 +249,7 @@ class HardwareImporter:
                 defaults={
                     "start_date": purchase_date,
                     "end_date": warranty_expiration,
-                    "provider": supplier.name if supplier else "",
+                    "supplier": supplier,
                 },
             )
 

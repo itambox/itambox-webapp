@@ -194,15 +194,17 @@ Report providers declare the model-level view permissions relevant to their doma
 |-------------|------|-----------------|
 | Asset Inventory Summary | `asset_summary` | Full asset inventory with status, location, financials |
 | License Utilization | `license_utilization` | License seats purchased vs assigned, compliance gaps |
-| Subscription Renewals | `subscription_renewals` | Upcoming subscription expirations, costs, renewal contacts |
+| Subscription Renewals | `subscription_renewals` | Upcoming subscription expirations, costs, renewal contacts, agreement entitled quantity |
 | Asset Maintenance & Repairs | `asset_maintenance` | Maintenance history, open repair tickets, costs |
 | Asset Depreciation Summary | `asset_depreciation` | Book values, depreciation schedules, GWG write-offs |
 | Software Catalog & Installations | `software_inventory` | Installed software, versions, licensing status |
 | Contract Renewals & Expirations | `contract_renewals` | Vendor contracts nearing expiry, value, auto-renewal flags |
-| Warranty Expiration | `warranty_expiration` | Assets with warranties expiring in configurable windows |
+| Warranty Expiration | `warranty_expiration` | Assets with warranties expiring in configurable windows, linked warranty Supplier |
 | Asset Disposal & End-of-Life | `asset_disposal_eol` | Disposed assets, WEEE compliance, data sanitization records |
 | Hardware Inventory | `hardware_inventory` | Accessories, consumables, components, stock levels |
 | Custody & EULA Compliance | `custody_compliance` | Asset custody sign-offs, EULA acceptance tracking |
+
+Warranty Expiration surfaces the linked warranty Supplier. Subscription Renewals surfaces the agreement entitled quantity; license seat totals remain exclusive to License Utilization.
 
 ### Style Presets
 

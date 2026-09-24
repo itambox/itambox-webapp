@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 
+from assets.models import Supplier
 from core.graphql_utils import check_permission, generate_slug, get_object_or_denied, paginate_queryset
 from organization.models import Contact, ContactAssignment, ContactRole, Tenant, TenantGroup
 
@@ -76,6 +77,7 @@ class ProviderNode(DjangoObjectType):
             "slug",
             "account_id",
             "portal_url",
+            "supplier",
             "admin_notes",
             "is_active",
             "tenant",
@@ -265,12 +267,25 @@ class Query(graphene.ObjectType):
 # Provider Mutations
 
 
+def _apply_provider_supplier(provider, kwargs, user):
+    """Apply an optional ``supplierId`` argument to a provider (issue #500).
+
+    Absent -> the link is left untouched; ``null``/empty -> it is cleared (the
+    FK is SET_NULL). Supplier is global reference data, so no tenant scoping
+    applies.
+    """
+    if "supplier_id" in kwargs:
+        supplier_id = kwargs.pop("supplier_id")
+        provider.supplier = get_object_or_denied(Supplier, supplier_id, user) if supplier_id else None
+
+
 class CreateProvider(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
         slug = graphene.String()
         account_id = graphene.String()
         portal_url = graphene.String()
+        supplier_id = graphene.ID()
         admin_notes = graphene.String()
         is_active = graphene.Boolean()
         tenant_id = graphene.ID()
@@ -310,6 +325,8 @@ class CreateProvider(graphene.Mutation):
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can create global providers."))
 
+        _apply_provider_supplier(provider, kwargs, user)
+
         ALLOWED_FIELDS = {"name", "slug", "account_id", "portal_url", "admin_notes", "is_active"}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
@@ -335,6 +352,7 @@ class UpdateProvider(graphene.Mutation):
         slug = graphene.String()
         account_id = graphene.String()
         portal_url = graphene.String()
+        supplier_id = graphene.ID()
         admin_notes = graphene.String()
         is_active = graphene.Boolean()
         tenant_id = graphene.ID()
@@ -372,6 +390,8 @@ class UpdateProvider(graphene.Mutation):
         # Double check post-update status
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can make providers global."))
+
+        _apply_provider_supplier(provider, kwargs, user)
 
         ALLOWED_FIELDS = {"name", "slug", "account_id", "portal_url", "admin_notes", "is_active"}
         for key, val in kwargs.items():

@@ -1,4 +1,4 @@
-from assets.models import Asset, AssetRole, AssetType, Manufacturer
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, Supplier
 from itambox.api.base import BaseModelSerializer
 
 
@@ -30,3 +30,12 @@ class NestedAssetSerializer(BaseModelSerializer):
         model = Asset
         fields = ["id", "name", "asset_tag"]
         brief_fields = ["id", "name"]
+
+
+class NestedSupplierSerializer(BaseModelSerializer):
+    """Minimal nested representation of Supplier for read-only displays."""
+
+    class Meta:
+        model = Supplier
+        fields = ["id", "name", "slug"]
+        brief_fields = ["id", "name", "slug"]

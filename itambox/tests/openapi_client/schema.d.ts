@@ -3985,13 +3985,13 @@ export interface components {
       name: string;
       slug: string;
     };
-    /** @description Minimal nested representation of Supplier for read-only contract display. */
+    /** @description Minimal nested representation of Supplier for read-only displays. */
     NestedSupplier: {
       id: number;
       name: string;
       slug: string;
     };
-    /** @description Minimal nested representation of Supplier for read-only contract display. */
+    /** @description Minimal nested representation of Supplier for read-only displays. */
     NestedSupplierRequest: {
       name: string;
       slug: string;
@@ -5904,6 +5904,7 @@ export interface components {
        * @description URL for the provider's management/administration portal
        */
       portal_url?: string;
+      supplier_id?: number | null;
       /** @description Optional internal administrative notes */
       admin_notes?: string;
       /**
@@ -6085,7 +6086,10 @@ export interface components {
       /** @description Records whether the vendor's contract renews automatically. ITAMbox does not renew subscriptions: a subscription past its renewal date is marked expired. */
       vendor_contract_auto_renews?: boolean;
       auto_renewal?: boolean;
-      /** @description Number of seats/users/devices covered (for SaaS/support) */
+      /**
+       * Agreement Entitled Quantity
+       * @description Number of seats, users, or devices entitled by the vendor agreement. This value is independent of linked License seats.
+       */
       licensed_quantity?: number | null;
       /** @description Contract number, PO reference, or quote ID */
       contract_reference?: string;
@@ -6142,8 +6146,7 @@ export interface components {
     PatchedWarrantyRequest: {
       asset_id?: number;
       warranty_type?: components["schemas"]["WarrantyTypeEnum"];
-      /** @description e.g. "Dell ProSupport Plus" */
-      provider?: string;
+      supplier_id?: number | null;
       /** Format: date */
       start_date?: string;
       /** Format: date */
@@ -6206,6 +6209,7 @@ export interface components {
        * @description URL for the provider's management/administration portal
        */
       portal_url?: string;
+      supplier: components["schemas"]["NestedSupplier"];
       /** @description Optional internal administrative notes */
       admin_notes?: string;
       /**
@@ -6235,6 +6239,7 @@ export interface components {
        * @description URL for the provider's management/administration portal
        */
       portal_url?: string;
+      supplier_id?: number | null;
       /** @description Optional internal administrative notes */
       admin_notes?: string;
       /**
@@ -6764,7 +6769,10 @@ export interface components {
       /** @description Records whether the vendor's contract renews automatically. ITAMbox does not renew subscriptions: a subscription past its renewal date is marked expired. */
       vendor_contract_auto_renews?: boolean;
       auto_renewal?: boolean;
-      /** @description Number of seats/users/devices covered (for SaaS/support) */
+      /**
+       * Agreement Entitled Quantity
+       * @description Number of seats, users, or devices entitled by the vendor agreement. This value is independent of linked License seats.
+       */
       licensed_quantity?: number | null;
       /** @description Contract number, PO reference, or quote ID */
       contract_reference?: string;
@@ -6866,7 +6874,10 @@ export interface components {
       /** @description Records whether the vendor's contract renews automatically. ITAMbox does not renew subscriptions: a subscription past its renewal date is marked expired. */
       vendor_contract_auto_renews?: boolean;
       auto_renewal?: boolean;
-      /** @description Number of seats/users/devices covered (for SaaS/support) */
+      /**
+       * Agreement Entitled Quantity
+       * @description Number of seats, users, or devices entitled by the vendor agreement. This value is independent of linked License seats.
+       */
       licensed_quantity?: number | null;
       /** @description Contract number, PO reference, or quote ID */
       contract_reference?: string;
@@ -7097,8 +7108,7 @@ export interface components {
       tenant: components["schemas"]["NestedTenant"];
       warranty_type?: components["schemas"]["WarrantyTypeEnum"];
       warranty_type_display: string;
-      /** @description e.g. "Dell ProSupport Plus" */
-      provider?: string;
+      supplier: string;
       /** Format: date */
       start_date: string;
       /** Format: date */
@@ -7133,8 +7143,7 @@ export interface components {
     WarrantyRequest: {
       asset_id: number;
       warranty_type?: components["schemas"]["WarrantyTypeEnum"];
-      /** @description e.g. "Dell ProSupport Plus" */
-      provider?: string;
+      supplier_id?: number | null;
       /** Format: date */
       start_date: string;
       /** Format: date */
@@ -14228,8 +14237,6 @@ export interface operations {
         limit?: number;
         /** @description The initial index from which to return the results. */
         offset?: number;
-        /** @description Provider */
-        provider?: string;
         /** @description Search */
         q?: string;
         /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
@@ -14238,6 +14245,8 @@ export interface operations {
         start_date_after?: string;
         /** @description Start Date */
         start_date_before?: string;
+        /** @description Supplier */
+        supplier?: number;
         /**
          * @description Warranty Type
          *

@@ -459,7 +459,7 @@ class WarrantyFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method="search",
         label=_("Search"),
-        widget=forms.TextInput(attrs={"placeholder": "Provider, Reference, Terms, Notes, Asset Name..."}),
+        widget=forms.TextInput(attrs={"placeholder": "Supplier, Reference, Terms, Notes, Asset Name..."}),
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(), label=_("Asset"), widget=forms.Select(attrs={"class": "form-select"})
@@ -469,8 +469,8 @@ class WarrantyFilterSet(BaseFilterSet):
         label=_("Warranty Type"),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    provider = django_filters.CharFilter(
-        lookup_expr="icontains", label=_("Provider"), widget=forms.TextInput(attrs={"class": "form-control"})
+    supplier = django_filters.ModelChoiceFilter(
+        queryset=Supplier.objects.all(), label=_("Supplier"), widget=forms.Select(attrs={"class": "form-select"})
     )
     start_date = django_filters.DateFromToRangeFilter(
         label=_("Start Date"),
@@ -482,13 +482,13 @@ class WarrantyFilterSet(BaseFilterSet):
 
     class Meta:
         model = Warranty
-        fields = ["asset", "warranty_type", "provider", "start_date", "end_date"]
+        fields = ["asset", "warranty_type", "supplier", "start_date", "end_date"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(provider__icontains=value)
+            Q(supplier__name__icontains=value)
             | Q(reference__icontains=value)
             | Q(terms__icontains=value)
             | Q(notes__icontains=value)

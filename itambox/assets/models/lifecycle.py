@@ -270,11 +270,13 @@ class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         verbose_name=_("Warranty Type"),
         db_index=True,
     )
-    provider = models.CharField(
-        max_length=255,
+    supplier = models.ForeignKey(
+        "assets.Supplier",
+        null=True,
         blank=True,
-        verbose_name=_("Provider"),
-        help_text=_('e.g. "Dell ProSupport Plus"'),
+        on_delete=models.SET_NULL,
+        related_name="warranties",
+        verbose_name=_("Supplier"),
     )
     start_date = models.DateField(verbose_name=_("Start Date"), db_index=True)
     end_date = models.DateField(verbose_name=_("End Date"), db_index=True)

@@ -46,8 +46,10 @@ def _lifecycle_error_response(request, error):
 
 
 class ProviderListView(ObjectListView):
-    queryset = Provider.objects.prefetch_related("tags").annotate(
-        subscription_count=Count("subscriptions", filter=Q(subscriptions__deleted_at__isnull=True))
+    queryset = (
+        Provider.objects.select_related("supplier")
+        .prefetch_related("tags")
+        .annotate(subscription_count=Count("subscriptions", filter=Q(subscriptions__deleted_at__isnull=True)))
     )
     filterset = filters.ProviderFilterSet
     filterset_form = forms.ProviderFilterForm
@@ -56,7 +58,7 @@ class ProviderListView(ObjectListView):
 
 
 class ProviderDetailView(ObjectDetailView):
-    queryset = Provider.objects.prefetch_related("subscriptions", "tags")
+    queryset = Provider.objects.select_related("supplier").prefetch_related("subscriptions", "tags")
     template_name = "subscriptions/provider_detail.html"
 
     layout = (((Panel("info", _("Provider Details")),),),)
@@ -120,6 +122,7 @@ class SubscriptionDetailView(ObjectDetailView):
         assigned_seats = subscription.assigned_seats
         total_seats = subscription.total_seats
         context["assigned_seats"] = assigned_seats
+        context["total_seats"] = total_seats
         context["available_seats"] = max(0, total_seats - assigned_seats)
 
         assignments_qs = subscription.assignments.select_related("assigned_by", "content_type")

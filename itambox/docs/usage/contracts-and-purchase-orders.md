@@ -83,6 +83,12 @@ stateDiagram-v2
 | `service` | Professional services | Managed firewall service |
 | `other` | Anything not covered above | Data centre colocation agreement |
 
+> [!TIP]
+> **Contracts vs Subscriptions.** Support, maintenance, lease, warranty, SLA,
+> and asset-covered service agreements belong here as Contracts. SaaS and cloud
+> entitlements belong in Subscriptions; record one agreement in one module only.
+> See [Commercial Vocabulary](commercial-vocabulary.md) for the full mapping.
+
 ### Key fields
 
 | Field | Description |

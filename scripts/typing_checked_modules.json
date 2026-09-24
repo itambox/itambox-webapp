@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 76,
-  "policy_sha256": "ea1961ce7e12a200c9c9388ad63d6ee980b68f028c7ee01da74a0f96b57778ff",
+  "policy_sha256": "be95180f8df25cb306fcd02bfed823d35935f660b9ca5b2882b67c98e4c0566d",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -676,11 +676,10 @@
       "path": "itambox/procurement/api/serializers.py",
       "module": "procurement.api.serializers",
       "issue": "#93",
-      "note": "Slice 9 symbol admission: explicit procurement display, validation, receive-payload, and action-boundary method signatures. Purchase-order lifecycle and quantity guards remain unchanged; generated-schema validation remains owned by #98.",
+      "note": "Slice 9 symbol admission: explicit procurement display, validation, receive-payload, and action-boundary method signatures. Purchase-order lifecycle and quantity guards remain unchanged; generated-schema validation remains owned by #98. The nested supplier serializer now lives in assets.api.nested_serializers (issue #500), so its symbol admission was dropped with the local definition.",
       "scope": "symbols",
       "symbols": [
         "ContractSerializer",
-        "NestedSupplierSerializer",
         "PurchaseOrderLineSerializer",
         "PurchaseOrderReceiveSerializer",
         "PurchaseOrderSerializer"

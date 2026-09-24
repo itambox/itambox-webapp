@@ -38,7 +38,7 @@ class SeedLifecycleMixin:
             self._engine = ChangeLogEngine(stdout=self.stdout, style=self.style)
 
     # ------------------------------------------------------------------ main entry
-    def _seed_lifecycle(self):
+    def _seed_lifecycle(self):  # noqa: C901  (complex-but-linear, keep together)
         """Create Warranty, AssetReservation, and AssetDisposal records with
         back-dated changelog entries so history looks naturally grown over ~2 years.
         """
@@ -71,33 +71,14 @@ class SeedLifecycleMixin:
         self._warranties = []
 
         # Supplemental coverage types we add on top of the basic HARDWARE warranty
-        # that _seed_assets already creates on every asset.
+        # that _seed_assets already creates on every asset. The warranty vendor is
+        # the Supplier link (issue #500), so each record keeps the asset's
+        # procurement supplier instead of a free-text vendor name.
         SUPPLEMENTAL_TYPES = [
-            (
-                WarrantyTypeChoices.ACCIDENTAL,
-                0.35,
-                ["Accidental Damage Protection", "SquareTrade AccidentGuard", "Dell Accidental Damage Service"],
-            ),
-            (
-                WarrantyTypeChoices.EXTENDED,
-                0.25,
-                [
-                    "Dell ProSupport Plus",
-                    "AppleCare+ for Enterprise",
-                    "Lenovo Premier Support Plus",
-                    "HP Care Pack Extended",
-                ],
-            ),
-            (
-                WarrantyTypeChoices.ONSITE,
-                0.20,
-                ["Dell ProSupport On-site", "HP On-site Care", "Lenovo On-site Next Business Day"],
-            ),
-            (
-                WarrantyTypeChoices.PARTS_LABOR,
-                0.15,
-                ["Dell Parts & Labour Cover", "HP Parts & Labour Service", "IBM ServiceElite"],
-            ),
+            (WarrantyTypeChoices.ACCIDENTAL, 0.35),
+            (WarrantyTypeChoices.EXTENDED, 0.25),
+            (WarrantyTypeChoices.ONSITE, 0.20),
+            (WarrantyTypeChoices.PARTS_LABOR, 0.15),
         ]
 
         # Candidate assets: laptops + servers first, then the rest.
@@ -123,16 +104,11 @@ class SeedLifecycleMixin:
                 if asset.purchase_date
                 else (TODAY - datetime.timedelta(days=random.randint(180, 700)))
             )
-            supplier_name = asset.supplier.name if asset.supplier_id and asset.supplier else ""
+            supplier = asset.supplier if asset.supplier_id and asset.supplier else None
 
-            for wtype, prob, providers in SUPPLEMENTAL_TYPES:
+            for wtype, prob in SUPPLEMENTAL_TYPES:
                 if random.random() > prob:
                     continue
-                provider = random.choice(providers)
-                if supplier_name:
-                    # Weight toward using the actual supplier name ~40 % of the time.
-                    if random.random() < 0.4:
-                        provider = supplier_name
 
                 # Duration: 1–3 years; add a small random offset from purchase_date.
                 offset_days = random.randint(0, 90)  # bought shortly after asset
@@ -166,7 +142,7 @@ class SeedLifecycleMixin:
                 warranty = Warranty.objects.create(
                     asset=asset,
                     warranty_type=wtype,
-                    provider=provider,
+                    supplier=supplier,
                     start_date=start,
                     end_date=end,
                     cost=cost,

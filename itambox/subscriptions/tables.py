@@ -16,6 +16,9 @@ from .models import Provider, Subscription, SubscriptionAssignment, Subscription
 class ProviderTable(BaseTable):
     pk = ToggleColumn(accessor="pk")
     name = tables.LinkColumn("subscriptions:provider_detail", args=[A("pk")], verbose_name=_("Name"))
+    supplier = tables.LinkColumn(
+        "assets:supplier_detail", args=[A("supplier_id")], accessor="supplier.name", verbose_name=_("Supplier")
+    )
     is_active = tables.BooleanColumn(verbose_name=_("Active"), yesno="✓,✗")
     contact_email = tables.Column(accessor="primary_contact.email", verbose_name=_("Contact Email"))
     subscription_count = CountLinkColumn(
@@ -30,7 +33,17 @@ class ProviderTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Provider
-        fields = ("pk", "name", "is_active", "account_id", "contact_email", "subscription_count", "tags", "actions")
+        fields = (
+            "pk",
+            "name",
+            "supplier",
+            "is_active",
+            "account_id",
+            "contact_email",
+            "subscription_count",
+            "tags",
+            "actions",
+        )
         default_columns = ("pk", "name", "is_active", "account_id", "subscription_count", "tags", "actions")
 
 

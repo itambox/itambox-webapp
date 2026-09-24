@@ -68,11 +68,21 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
 
     report_type = "subscription_renewals"
     permission = "subscriptions.view_subscription"
-    default_columns = ("subscription_name", "provider", "billing_cycle", "cost", "end_date")
+    default_columns = (
+        "subscription_name",
+        "provider",
+        "agreement_entitled_quantity",
+        "billing_cycle",
+        "cost",
+        "end_date",
+    )
 
     cells = {
         "subscription_name": lambda record, request: record.name or "-",
         "provider": lambda record, request: record.provider.name if record.provider else "-",
+        "agreement_entitled_quantity": lambda record, request: (
+            str(record.licensed_quantity) if record.licensed_quantity is not None else _("Not set")
+        ),
         "billing_cycle": lambda record, request: record.get_billing_cycle_display(),
         "cost": lambda record, request: _money(
             record.renewal_cost, getattr(record, "currency", None), request.active_tenant
@@ -83,6 +93,7 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
     sample_cells = {
         "subscription_name": "Office 365 E5",
         "provider": "Microsoft",
+        "agreement_entitled_quantity": "120",
         "billing_cycle": "Monthly",
         "cost": "$1,200.00",
         "end_date": "2026-12-31",

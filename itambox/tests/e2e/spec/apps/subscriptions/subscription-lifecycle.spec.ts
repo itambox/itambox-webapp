@@ -30,7 +30,7 @@ test.describe('subscriptions-owned lifecycle actions', { tag: '@pr' }, () => {
     await createForm.getByLabel('Renewal Cost').fill('120.00');
     await createForm.getByLabel('Currency').fill('USD');
     await selectTomOption(createForm, 'billing_cycle', 'annual');
-    await createForm.getByLabel('Licensed Quantity').fill('5');
+    await createForm.getByLabel('Agreement Entitled Quantity').fill('5');
     await createForm.getByLabel('Description').fill(`Owned subscription lifecycle ${runId}`);
     await selectTomOption(createForm, 'tenant', tenant.id);
 

@@ -436,14 +436,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/warranty_form.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Fieldset(\n                _(\"Warranty Details\"),\n                Div(\n                    Div(\"asset\", css_class=\"col-md-6\"),\n                    Div(\"warranty_type\", css_class=\"col-md-6\"),\n                    css_class=\"row\",\n                ),\n                Div(\n                    Div(\"provider\", css_class=\"col-md-6\"),\n                    Div(\"reference\", css_class=\"col-md-6\"),\n                    css_class=\"row\",\n                ),\n                Div(\n                    Div(\"start_date\", css_class=\"col-md-4\"),\n                    Div(\"end_date\", css_class=\"col-md-4\"),\n                    css_class=\"row\",\n                ),\n                \"terms\",\n            ),\n            Fieldset(\n                _(\"Financial\"),\n                Div(\n                    Div(\"cost\", css_class=\"col-md-4\"),\n                    Div(\"currency\", css_class=\"col-md-4\"),\n                    css_class=\"row\",\n                ),\n            ),\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:WarrantyForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/models/assignment.py",
       "code": "F401",
       "message": "'django.urls.reverse' imported but unused",
@@ -2673,14 +2665,6 @@
       "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
       "source": "        for slug, tenant in (getattr(self, \"_tenants\", None) or {}).items():",
       "context": "Module:body/ClassDef:SeedLifecycleMixin:body/FunctionDef:_seed_lifecycle:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=BoolOp(op=Or(), values=[Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='self', ctx=Load()), Constant(value='_tenants'), Constant(value=None)], keywords=[]), Dict(keys=[], values=[])]), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/lifecycle.py",
-      "code": "C901",
-      "message": "'SeedLifecycleMixin._seed_lifecycle' is too complex (42)",
-      "source": "    def _seed_lifecycle(self):",
-      "context": "Module:body/ClassDef:SeedLifecycleMixin:body/FunctionDef:_seed_lifecycle:self",
       "count": 1
     },
     {
@@ -7936,14 +7920,6 @@
       "code": "F401",
       "message": "'subscriptions.models.SubscriptionTypeChoices' imported but unused",
       "source": "from subscriptions.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'assets.models.Supplier' imported but unused",
-      "source": "from assets.models import Asset, StatusLabel, Supplier",
       "context": "Module:body",
       "count": 1
     },

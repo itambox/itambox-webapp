@@ -16,7 +16,7 @@ from itambox.views.generic import (
 
 
 class WarrantyListView(ObjectListView):
-    queryset = Warranty.objects.select_related("asset")
+    queryset = Warranty.objects.select_related("asset", "supplier")
     filterset = WarrantyFilterSet
     filterset_form = WarrantyFilterForm
     table = WarrantyTable
@@ -24,7 +24,7 @@ class WarrantyListView(ObjectListView):
 
 
 class WarrantyDetailView(ObjectDetailView):
-    queryset = Warranty.objects.select_related("asset")
+    queryset = Warranty.objects.select_related("asset", "supplier")
     template_name = "generic/object_detail.html"
 
     layout = (((Panel("info", _("Warranty Details")),),),)

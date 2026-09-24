@@ -3,6 +3,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from rest_framework import serializers
 
+from assets.api.nested_serializers import NestedSupplierSerializer
+from assets.models import Supplier
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import validate_gfk_target_tenant
@@ -46,6 +48,14 @@ class ProviderSerializer(BaseModelSerializer):
     tenant_group_id: serializers.PrimaryKeyRelatedField[TenantGroup] = serializers.PrimaryKeyRelatedField(
         queryset=TenantGroup.objects, source="tenant_group", write_only=True, required=False, allow_null=True
     )
+    supplier = NestedSupplierSerializer(read_only=True)
+    supplier_id: serializers.PrimaryKeyRelatedField[Supplier] = serializers.PrimaryKeyRelatedField(
+        source="supplier",
+        write_only=True,
+        required=False,
+        allow_null=True,
+        queryset=Supplier.objects.all(),
+    )
     contacts = ContactAssignmentSerializer(many=True, read_only=True)
 
     class Meta:
@@ -60,6 +70,8 @@ class ProviderSerializer(BaseModelSerializer):
             "tenant_group_id",
             "account_id",
             "portal_url",
+            "supplier",
+            "supplier_id",
             "admin_notes",
             "is_active",
             "subscription_count",

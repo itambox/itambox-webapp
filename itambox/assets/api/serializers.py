@@ -765,6 +765,10 @@ class WarrantySerializer(BaseModelSerializer):
     # read-only via the model property. There is deliberately no writable
     # tenant_id — the boundary follows asset.tenant.
     tenant = NestedTenantSerializer(read_only=True)
+    supplier: serializers.StringRelatedField[Supplier] = serializers.StringRelatedField(read_only=True)
+    supplier_id = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.all(), source="supplier", write_only=True, required=False, allow_null=True
+    )
     warranty_type_display = serializers.CharField(source="get_warranty_type_display", read_only=True)
     is_active = serializers.BooleanField(read_only=True)
 
@@ -777,7 +781,8 @@ class WarrantySerializer(BaseModelSerializer):
             "tenant",
             "warranty_type",
             "warranty_type_display",
-            "provider",
+            "supplier",
+            "supplier_id",
             "start_date",
             "end_date",
             "is_active",

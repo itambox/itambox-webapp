@@ -535,7 +535,7 @@ class WarrantyExpirationReportProvider(ReportDefinition):
     default_columns = (
         "warranty_asset",
         "warranty_type",
-        "warranty_provider",
+        "warranty_supplier",
         "warranty_end_date",
         "warranty_days_remaining",
         "warranty_status",
@@ -544,7 +544,7 @@ class WarrantyExpirationReportProvider(ReportDefinition):
     cells = {
         "warranty_asset": lambda warranty, request: warranty.asset.name if warranty.asset else "-",
         "warranty_type": lambda warranty, request: warranty.get_warranty_type_display(),
-        "warranty_provider": lambda warranty, request: warranty.provider or "-",
+        "warranty_supplier": lambda warranty, request: warranty.supplier.name if warranty.supplier else "-",
         "warranty_start_date": lambda warranty, request: (
             warranty.start_date.strftime("%Y-%m-%d") if warranty.start_date else "-"
         ),
@@ -562,7 +562,7 @@ class WarrantyExpirationReportProvider(ReportDefinition):
     sample_cells = {
         "warranty_asset": 'MacBook Pro 16" (Mock)',
         "warranty_type": "Hardware",
-        "warranty_provider": "Apple Care+",
+        "warranty_supplier": "Apple Care+",
         "warranty_start_date": "2024-01-15",
         "warranty_end_date": "2027-01-14",
         "warranty_days_remaining": "935",
@@ -584,7 +584,7 @@ class WarrantyExpirationReportProvider(ReportDefinition):
     }
 
     def get_queryset(self, request: ReportRequest):
-        queryset = Warranty.objects.filter(deleted_at__isnull=True).select_related("asset")
+        queryset = Warranty.objects.filter(deleted_at__isnull=True).select_related("asset", "supplier")
         return self.scope_to_tenants(queryset, request)
 
     def build_rows(self, records, request: ReportRequest):

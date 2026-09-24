@@ -12,9 +12,12 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import translation
 
-from core.reports import build_report_context
+from assets.models import Manufacturer
+from core.reports import build_report_context, get_report_provider
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
+from licenses.models import License, LicenseTypeChoices
+from software.models import Software
 from subscriptions.models import Provider, Subscription
 
 REPORT_CHARACTERIZATIONS = {
@@ -38,8 +41,22 @@ REPORT_CHARACTERIZATIONS = {
         "summary_values": ["1 (Mock)"],
     },
     ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS: {
-        "columns": ["subscription_name", "provider", "billing_cycle", "cost", "end_date"],
-        "headers": ["Subscription Name", "Provider", "Billing Cycle", "Cost", "End Date"],
+        "columns": [
+            "subscription_name",
+            "provider",
+            "agreement_entitled_quantity",
+            "billing_cycle",
+            "cost",
+            "end_date",
+        ],
+        "headers": [
+            "Subscription Name",
+            "Provider",
+            "Agreement Entitled Quantity",
+            "Billing Cycle",
+            "Cost",
+            "End Date",
+        ],
         "summary": ["Active Subscriptions", "Est. Monthly Spend"],
         "summary_values": ["1 (Mock)", "$1,200.00"],
     },
@@ -119,12 +136,12 @@ REPORT_CHARACTERIZATIONS = {
         "columns": [
             "warranty_asset",
             "warranty_type",
-            "warranty_provider",
+            "warranty_supplier",
             "warranty_end_date",
             "warranty_days_remaining",
             "warranty_status",
         ],
-        "headers": ["Asset", "Warranty Type", "Provider", "End Date", "Days Remaining", "Status"],
+        "headers": ["Asset", "Warranty Type", "Supplier", "End Date", "Days Remaining", "Status"],
         "summary": ["Total Warranties", "Expiring Within 30 Days", "Already Expired", "Total Warranty Cost"],
         "summary_values": ["1 (Mock)", "0 (Mock)", "0 (Mock)", "€299.00"],
     },
@@ -250,3 +267,102 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
 
         self.assertEqual(summary_cards[0]["value"], "1")
         self.assertIn("120", str(summary_cards[1]["value"]))
+
+    def test_subscription_entitlement_reports_agreement_quantity_not_license_seats(self):
+        """A 120 agreement entitlement reports 120 even when linked licenses total 115 seats."""
+        provider = Provider.objects.create(name="Entitlement Provider", tenant=self.tenant)
+        subscription = Subscription.objects.create(
+            name="Entitlement Subscription",
+            provider=provider,
+            tenant=self.tenant,
+            renewal_date=date.today(),
+            renewal_cost=Decimal("120.00"),
+            currency="EUR",
+            billing_cycle="monthly",
+            licensed_quantity=120,
+        )
+        manufacturer = Manufacturer.objects.create(name="Seat Vendor", slug="seat-vendor")
+        software = Software.objects.create(name="Seat Suite", manufacturer=manufacturer, tenant=self.tenant)
+        for license_name, seats in (("Seat block A", 100), ("Seat block B", 15)):
+            License.objects.create(
+                name=license_name,
+                software=software,
+                license_type=LicenseTypeChoices.SUBSCRIPTION_SEAT,
+                seats=seats,
+                tenant=self.tenant,
+                subscription=subscription,
+            )
+
+        template = ReportTemplate(
+            name="Entitlement characterization",
+            report_type=ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS,
+            included_columns=[],
+            include_summary_cards=False,
+            include_distribution_chart=False,
+        )
+        with self.tenant_context(self.tenant), translation.override("en"):
+            headers, rows, *_ = build_report_context(template, active_tenant=self.tenant)
+
+        self.assertEqual(subscription.total_seats, 115, "Fixture: linked licenses must total 115 seats")
+        self.assertEqual(
+            headers,
+            ["Subscription Name", "Provider", "Agreement Entitled Quantity", "Billing Cycle", "Cost", "End Date"],
+        )
+        self.assertEqual(rows[0]["Agreement Entitled Quantity"], "120")
+
+        seat_labels = {"Total Seats", "Assigned Seats", "Available Seats"}
+        self.assertFalse(seat_labels & set(rows[0]), "The subscription report must not expose license-seat columns")
+        provider_cells = get_report_provider(ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS).cells
+        self.assertIn("agreement_entitled_quantity", provider_cells)
+        self.assertEqual(set(provider_cells) & {"seats", "assigned_seats", "available_seats"}, set())
+
+    def test_subscription_entitlement_renders_not_set_and_exact_zero(self):
+        """Entitlement None renders 'Not set' and a set 0 renders '0', never the seat total."""
+        provider = Provider.objects.create(name="Fallback Provider", tenant=self.tenant)
+        unset_subscription = Subscription.objects.create(
+            name="Entitlement Unset",
+            provider=provider,
+            tenant=self.tenant,
+            renewal_date=date.today(),
+            renewal_cost=Decimal("10.00"),
+            currency="EUR",
+            billing_cycle="monthly",
+        )
+        zero_subscription = Subscription.objects.create(
+            name="Entitlement Zero",
+            provider=provider,
+            tenant=self.tenant,
+            renewal_date=date.today(),
+            renewal_cost=Decimal("10.00"),
+            currency="EUR",
+            billing_cycle="monthly",
+            licensed_quantity=0,
+        )
+        manufacturer = Manufacturer.objects.create(name="Fallback Vendor", slug="fallback-vendor")
+        software = Software.objects.create(name="Fallback Suite", manufacturer=manufacturer, tenant=self.tenant)
+        for subscription, label in ((unset_subscription, "Unset"), (zero_subscription, "Zero")):
+            for block, seats in (("A", 100), ("B", 15)):
+                License.objects.create(
+                    name=f"{label} seat block {block}",
+                    software=software,
+                    license_type=LicenseTypeChoices.SUBSCRIPTION_SEAT,
+                    seats=seats,
+                    tenant=self.tenant,
+                    subscription=subscription,
+                )
+
+        template = ReportTemplate(
+            name="Entitlement fallback characterization",
+            report_type=ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS,
+            included_columns=[],
+            include_summary_cards=False,
+            include_distribution_chart=False,
+        )
+        with self.tenant_context(self.tenant), translation.override("en"):
+            _headers, rows, *_ = build_report_context(template, active_tenant=self.tenant)
+
+        entitlement_by_name = {row["Subscription Name"]: row["Agreement Entitled Quantity"] for row in rows}
+        self.assertEqual(unset_subscription.total_seats, 115, "Fixture: linked licenses total 115 seats")
+        self.assertEqual(zero_subscription.total_seats, 115, "Fixture: linked licenses total 115 seats")
+        self.assertEqual(entitlement_by_name["Entitlement Unset"], "Not set")
+        self.assertEqual(entitlement_by_name["Entitlement Zero"], "0")

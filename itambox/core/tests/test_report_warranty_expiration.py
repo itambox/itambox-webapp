@@ -5,15 +5,18 @@ Covers:
   - Money cell is NOT '$'-prefixed when currency is EUR.
   - Summary cards: total, expiring-soon, expired counts correct.
   - Tenant scoping: a second-tenant warranty does not appear.
+  - Supplier column: linked supplier name, '-' without one, and the behavior
+    of a saved template that still references the removed warranty_provider key.
 """
 
 import datetime
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from model_bakery import baker
 
-from assets.models import Asset, StatusLabel
+from assets.models import Asset, StatusLabel, Supplier
 from assets.models.choices import WarrantyTypeChoices
 from assets.models.lifecycle import Warranty
 from core.reports import build_report_context
@@ -28,6 +31,9 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         self.set_active_tenant(self.tenant)
 
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
+        self.dell_supplier = Supplier.objects.create(name="Dell ProSupport", slug="dell-prosupport")
+        self.extended_supplier = Supplier.objects.create(name="ExtendedCo", slug="extendedco")
+        self.hp_supplier = Supplier.objects.create(name="HP Care", slug="hp-care")
         self.asset = baker.make(
             Asset,
             name="Dell XPS 15",
@@ -41,7 +47,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         self.warranty_active = Warranty.objects.create(
             asset=self.asset,
             warranty_type=WarrantyTypeChoices.HARDWARE,
-            provider="Dell ProSupport",
+            supplier=self.dell_supplier,
             start_date=today - datetime.timedelta(days=365),
             end_date=today + datetime.timedelta(days=400),
             cost=199.00,
@@ -52,18 +58,17 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         self.warranty_expiring = Warranty.objects.create(
             asset=self.asset,
             warranty_type=WarrantyTypeChoices.EXTENDED,
-            provider="ExtendedCo",
+            supplier=self.extended_supplier,
             start_date=today - datetime.timedelta(days=300),
             end_date=today + datetime.timedelta(days=15),
             cost=None,
             currency="EUR",
             reference="REF-002",
         )
-        # Expired warranty (end_date in the past).
+        # Expired warranty (end_date in the past) without a linked supplier.
         self.warranty_expired = Warranty.objects.create(
             asset=self.asset,
             warranty_type=WarrantyTypeChoices.PARTS_LABOR,
-            provider="OldVendor",
             start_date=today - datetime.timedelta(days=730),
             end_date=today - datetime.timedelta(days=10),
             cost=None,
@@ -83,7 +88,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         Warranty.objects.create(
             asset=self.asset_b,
             warranty_type=WarrantyTypeChoices.FULL,
-            provider="HP Care",
+            supplier=self.hp_supplier,
             start_date=today - datetime.timedelta(days=100),
             end_date=today + datetime.timedelta(days=200),
             cost=299.00,
@@ -97,7 +102,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
             included_columns=[
                 "warranty_asset",
                 "warranty_type",
-                "warranty_provider",
+                "warranty_supplier",
                 "warranty_end_date",
                 "warranty_days_remaining",
                 "warranty_status",
@@ -109,13 +114,13 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         )
 
     def test_row_content_and_non_usd_money(self):
-        """Active EUR warranty row is present and cost is not '$'-prefixed."""
+        """Active EUR warranty row is present with its supplier and a non-'$' cost."""
         self.clear_tenant_context()
         _, rows, summary_cards, _, chart_svg, _ = build_report_context(self.template, active_tenant=self.tenant)
 
         # Verify the active warranty row exists with correct fields.
-        active_rows = [r for r in rows if r.get("Provider") == "Dell ProSupport"]
-        self.assertEqual(len(active_rows), 1, "Expected exactly one row for Dell ProSupport warranty")
+        active_rows = [r for r in rows if r.get("Supplier") == "Dell ProSupport"]
+        self.assertEqual(len(active_rows), 1, "Expected exactly one row for the Dell ProSupport warranty")
         active_row = active_rows[0]
 
         self.assertEqual(active_row["Asset"], "Dell XPS 15")
@@ -149,8 +154,10 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         """Warranties belonging to a different tenant do not appear in the rows."""
         self.clear_tenant_context()
         _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
-        providers = [r.get("Provider") for r in rows]
-        self.assertNotIn("HP Care", providers, "Other-tenant warranty must not leak into report")
+        suppliers = [r.get("Supplier") for r in rows]
+        self.assertNotIn("HP Care", suppliers, "Other-tenant warranty must not leak into report")
+        references = [r.get("Reference") for r in rows]
+        self.assertNotIn("REF-B-001", references, "Other-tenant warranty must not leak into report")
 
         card_map = {c["label"]: c["value"] for c in summary_cards}
         self.assertEqual(card_map["Total Warranties"], "3")
@@ -159,17 +166,18 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         """The expiring-soon warranty row has Status == 'Expiring Soon'."""
         self.clear_tenant_context()
         _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
-        expiring_rows = [r for r in rows if r.get("Provider") == "ExtendedCo"]
+        expiring_rows = [r for r in rows if r.get("Supplier") == "ExtendedCo"]
         self.assertEqual(len(expiring_rows), 1)
         self.assertEqual(expiring_rows[0]["Status"], "Expiring Soon")
 
     def test_expired_row_status_and_negative_days(self):
-        """The expired warranty row has Status == 'Expired' and negative Days Remaining."""
+        """The expired warranty row has Status == 'Expired', negative Days Remaining, and no supplier."""
         self.clear_tenant_context()
         _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
-        expired_rows = [r for r in rows if r.get("Provider") == "OldVendor"]
+        expired_rows = [r for r in rows if r.get("Reference") == "REF-003"]
         self.assertEqual(len(expired_rows), 1)
         self.assertEqual(expired_rows[0]["Status"], "Expired")
+        self.assertEqual(expired_rows[0]["Supplier"], "-", "A warranty without a supplier renders a dash")
         days = int(expired_rows[0]["Days Remaining"])
         self.assertLess(days, 0)
 
@@ -178,3 +186,44 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         self.clear_tenant_context()
         _, _, _, _, chart_svg, _ = build_report_context(self.template, active_tenant=self.tenant)
         self.assertTrue(bool(chart_svg), "Expected a non-empty chart SVG")
+
+    def test_removed_warranty_provider_key_cannot_be_saved(self):
+        """The replaced warranty_provider key is rejected on write, with no compatibility shim.
+
+        ReportTemplate.clean() runs on the pre-save path, so saving a template
+        that still references the removed key raises the machine-key error and
+        nothing is persisted.
+        """
+        with self.assertRaises(ValidationError) as context:
+            ReportTemplate.objects.create(
+                name="Removed column template",
+                report_type=ReportTemplate.REPORT_TYPE_WARRANTY_EXPIRATION,
+                included_columns=["warranty_asset", "warranty_provider"],
+            )
+        self.assertIn("warranty_provider", str(context.exception))
+        self.assertFalse(ReportTemplate._base_manager.filter(name="Removed column template").exists())
+
+    def test_stale_saved_template_omits_the_removed_column(self):
+        """A template persisted before the removal renders without that column.
+
+        Only a row that bypassed save-time validation can still carry the key;
+        the bulk update reproduces exactly that, because persisted templates are
+        not migrated. The unknown key resolves to no label and no cell, so the
+        report renders its remaining columns only.
+        """
+        self.clear_tenant_context()
+        stale = ReportTemplate.objects.create(
+            name="Stale warranty template",
+            report_type=ReportTemplate.REPORT_TYPE_WARRANTY_EXPIRATION,
+            included_columns=["warranty_asset", "warranty_status"],
+            include_summary_cards=False,
+            include_distribution_chart=False,
+        )
+        ReportTemplate._base_manager.filter(pk=stale.pk).update(
+            included_columns=["warranty_asset", "warranty_provider", "warranty_status"]
+        )
+        stale = ReportTemplate._base_manager.get(pk=stale.pk)
+
+        headers, rows, *_ = build_report_context(stale, active_tenant=self.tenant)
+        self.assertEqual(headers, ["Asset", "Status"])
+        self.assertEqual(list(rows[0]), ["Asset", "Status", "_group_by"])

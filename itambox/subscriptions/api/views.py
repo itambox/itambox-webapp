@@ -55,8 +55,10 @@ class ProviderViewSet(ITAMBoxModelViewSet):
     """API ViewSet for managing subscription Providers."""
 
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Provider.objects.prefetch_related("tags").annotate(
-        subscription_count=Count("subscriptions", filter=Q(subscriptions__deleted_at__isnull=True))
+    queryset = (
+        Provider.objects.select_related("supplier")
+        .prefetch_related("tags")
+        .annotate(subscription_count=Count("subscriptions", filter=Q(subscriptions__deleted_at__isnull=True)))
     )
     serializer_class = ProviderSerializer
     filter_backends = (DjangoFilterBackend,)

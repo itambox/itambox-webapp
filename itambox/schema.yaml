@@ -8586,11 +8586,6 @@ paths:
         schema:
           type: integer
       - in: query
-        name: provider
-        schema:
-          type: string
-        description: Provider
-      - in: query
         name: q
         schema:
           type: string
@@ -8616,6 +8611,11 @@ paths:
           type: string
           format: date
         description: Start Date
+      - in: query
+        name: supplier
+        schema:
+          type: integer
+        description: Supplier
       - in: query
         name: warranty_type
         schema:
@@ -44884,8 +44884,7 @@ components:
       - slug
     NestedSupplier:
       type: object
-      description: Minimal nested representation of Supplier for read-only contract
-        display.
+      description: Minimal nested representation of Supplier for read-only displays.
       properties:
         id:
           type: integer
@@ -44903,8 +44902,7 @@ components:
       - slug
     NestedSupplierRequest:
       type: object
-      description: Minimal nested representation of Supplier for read-only contract
-        display.
+      description: Minimal nested representation of Supplier for read-only displays.
       properties:
         name:
           type: string
@@ -48494,6 +48492,10 @@ components:
           title: Admin Portal URL
           description: URL for the provider's management/administration portal
           maxLength: 200
+        supplier_id:
+          type: integer
+          writeOnly: true
+          nullable: true
         admin_notes:
           type: string
           description: Optional internal administrative notes
@@ -48842,7 +48844,9 @@ components:
           maximum: 2147483647
           minimum: 0
           nullable: true
-          description: Number of seats/users/devices covered (for SaaS/support)
+          title: Agreement Entitled Quantity
+          description: Number of seats, users, or devices entitled by the vendor agreement.
+            This value is independent of linked License seats.
         contract_reference:
           type: string
           description: Contract number, PO reference, or quote ID
@@ -48978,10 +48982,10 @@ components:
           writeOnly: true
         warranty_type:
           $ref: '#/components/schemas/WarrantyTypeEnum'
-        provider:
-          type: string
-          description: e.g. "Dell ProSupport Plus"
-          maxLength: 255
+        supplier_id:
+          type: integer
+          writeOnly: true
+          nullable: true
         start_date:
           type: string
           format: date
@@ -49090,6 +49094,10 @@ components:
           title: Admin Portal URL
           description: URL for the provider's management/administration portal
           maxLength: 200
+        supplier:
+          allOf:
+          - $ref: '#/components/schemas/NestedSupplier'
+          readOnly: true
         admin_notes:
           type: string
           description: Optional internal administrative notes
@@ -49124,6 +49132,7 @@ components:
       - id
       - name
       - subscription_count
+      - supplier
       - tags
       - tenant
       - tenant_group
@@ -49157,6 +49166,10 @@ components:
           title: Admin Portal URL
           description: URL for the provider's management/administration portal
           maxLength: 200
+        supplier_id:
+          type: integer
+          writeOnly: true
+          nullable: true
         admin_notes:
           type: string
           description: Optional internal administrative notes
@@ -50426,7 +50439,9 @@ components:
           maximum: 2147483647
           minimum: 0
           nullable: true
-          description: Number of seats/users/devices covered (for SaaS/support)
+          title: Agreement Entitled Quantity
+          description: Number of seats, users, or devices entitled by the vendor agreement.
+            This value is independent of linked License seats.
         contract_reference:
           type: string
           description: Contract number, PO reference, or quote ID
@@ -50655,7 +50670,9 @@ components:
           maximum: 2147483647
           minimum: 0
           nullable: true
-          description: Number of seats/users/devices covered (for SaaS/support)
+          title: Agreement Entitled Quantity
+          description: Number of seats, users, or devices entitled by the vendor agreement.
+            This value is independent of linked License seats.
         contract_reference:
           type: string
           description: Contract number, PO reference, or quote ID
@@ -51246,10 +51263,9 @@ components:
         warranty_type_display:
           type: string
           readOnly: true
-        provider:
+        supplier:
           type: string
-          description: e.g. "Dell ProSupport Plus"
-          maxLength: 255
+          readOnly: true
         start_date:
           type: string
           format: date
@@ -51303,6 +51319,7 @@ components:
       - id
       - is_active
       - start_date
+      - supplier
       - tenant
       - updated_at
       - warranty_type_display
@@ -51314,10 +51331,10 @@ components:
           writeOnly: true
         warranty_type:
           $ref: '#/components/schemas/WarrantyTypeEnum'
-        provider:
-          type: string
-          description: e.g. "Dell ProSupport Plus"
-          maxLength: 255
+        supplier_id:
+          type: integer
+          writeOnly: true
+          nullable: true
         start_date:
           type: string
           format: date

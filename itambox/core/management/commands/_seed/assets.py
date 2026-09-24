@@ -337,7 +337,7 @@ class SeedAssetsMixin:
             Warranty.objects.create(
                 asset=asset,
                 warranty_type=WarrantyTypeChoices.HARDWARE,
-                provider=asset.supplier.name if asset.supplier else "",
+                supplier=asset.supplier,
                 start_date=p_date,
                 end_date=warranty,
             )

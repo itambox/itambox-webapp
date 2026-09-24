@@ -22,7 +22,7 @@ class WarrantyForm(forms.ModelForm):
         fields = [
             "asset",
             "warranty_type",
-            "provider",
+            "supplier",
             "start_date",
             "end_date",
             "cost",
@@ -34,7 +34,7 @@ class WarrantyForm(forms.ModelForm):
         widgets = {
             "asset": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "warranty_type": forms.Select(attrs={"class": "form-select"}),
-            "provider": forms.TextInput(attrs={"class": "form-control"}),
+            "supplier": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "cost": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "currency": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "reference": forms.TextInput(attrs={"class": "form-control"}),
@@ -63,7 +63,7 @@ class WarrantyForm(forms.ModelForm):
                     css_class="row",
                 ),
                 Div(
-                    Div("provider", css_class="col-md-6"),
+                    Div("supplier", css_class="col-md-6"),
                     Div("reference", css_class="col-md-6"),
                     css_class="row",
                 ),
@@ -85,6 +85,6 @@ class WarrantyForm(forms.ModelForm):
             "notes",
             HTML('<div class="mt-3">'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href={cancel_url!r} class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML("</div>"),
         )
