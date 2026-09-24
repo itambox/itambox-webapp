@@ -353,11 +353,12 @@ class ChangeLoggingMixin:
             change_tenant = None
         if change_tenant is None and self.changelog_tenant_lookup:
             change_tenant = self._resolve_changelog_tenant(self.changelog_tenant_lookup)
-        # Global/shared models (changelog_global) record changes against
-        # tenant=None (system-wide, surfaced to all tenants via
-        # ObjectChange.allow_global_tenant); everything else falls back to the
-        # ambient request tenant.
-        if change_tenant is None and not self.changelog_global:
+        # Shared models (changelog_global) record changes against tenant=None
+        # (system-wide, surfaced to all tenants via ObjectChange.allow_global_tenant);
+        # everything else — including tenant-group-scoped rows, which are shared
+        # with a bounded audience rather than system-wide — falls back to the
+        # ambient request tenant so snapshots never leak across that audience.
+        if change_tenant is None and not self._logs_changes_globally():
             change_tenant = get_current_tenant()
 
         write_object_change(
@@ -369,6 +370,19 @@ class ChangeLoggingMixin:
             prechange_data=prechange_data,
             postchange_data=postchange_data,
         )
+
+    def _logs_changes_globally(self):
+        """True when this row's changes belong system-wide (tenant=None).
+
+        ``changelog_global`` models log without a tenant, but a tenant-group-scoped
+        row (tenant=None, tenant_group set) is shared with a bounded audience,
+        not system-wide: those attribute to the ambient request tenant so their
+        full pre/post snapshots never surface to every tenant through
+        ``ObjectChange.allow_global_tenant``.
+        """
+        if getattr(self, "tenant_group_id", None) is not None:
+            return False
+        return bool(self.changelog_global)
 
     def _resolve_changelog_tenant(self, lookup):
         # Follow a double-underscore ORM path (e.g. 'asset__tenant') on the

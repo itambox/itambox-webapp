@@ -8,6 +8,13 @@ Provider admin_notes become Supplier notes on newly created rows. Matched
 suppliers receive portal_url and account_id only when their fields are empty.
 Provider deleted_at values are preserved on newly created suppliers. This data
 cutover is one-way: rollback requires restoring from backup.
+
+Per-object references follow the merge: journal entries (with their
+denormalised tenant kept in step), bookmarks, watches, attachments, alert
+logs, and queued events are repointed to the matched supplier; bookmark,
+watch, and open-alert duplicates that would violate their uniqueness
+constraints on the supplier are dropped. Changelog history rows stay behind
+as historical records of the removed provider content type.
 """
 
 from django.db import migrations, models
@@ -110,9 +117,11 @@ def _copy_provider_tags(Provider, Supplier, provider_to_supplier):
     supplier_owner_attname = supplier_through._meta.get_field(supplier_tags.m2m_field_name()).attname
     supplier_tag_attname = supplier_through._meta.get_field(supplier_tags.m2m_reverse_field_name()).attname
     for provider_id, supplier_id in sorted(provider_to_supplier.items()):
-        tag_ids = provider_through.objects.filter(**{provider_owner_attname: provider_id}).order_by(
-            provider_tag_attname
-        ).values_list(provider_tag_attname, flat=True)
+        tag_ids = (
+            provider_through.objects.filter(**{provider_owner_attname: provider_id})
+            .order_by(provider_tag_attname)
+            .values_list(provider_tag_attname, flat=True)
+        )
         for tag_id in tag_ids:
             supplier_through.objects.get_or_create(
                 **{supplier_owner_attname: supplier_id, supplier_tag_attname: tag_id}
@@ -132,8 +141,7 @@ def _repoint_provider_contacts(ContactAssignment, ContentType, provider_to_suppl
         supplier_id = provider_to_supplier.get(assignment.object_id)
         if supplier_id is None:
             raise RuntimeError(
-                "ContactAssignment references a missing subscriptions.Provider row: "
-                f"{assignment.object_id}"
+                f"ContactAssignment references a missing subscriptions.Provider row: {assignment.object_id}"
             )
         duplicate = ContactAssignment.objects.filter(
             contact_id=assignment.contact_id,
@@ -148,6 +156,83 @@ def _repoint_provider_contacts(ContactAssignment, ContentType, provider_to_suppl
                 content_type_id=supplier_ct.pk,
                 object_id=supplier_id,
             )
+
+
+def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants):
+    """Move per-object references from provider rows to the matched suppliers.
+
+    Journal entries keep their denormalised tenant aligned with the supplier.
+    Bookmarks and watches carry a unique (user, content type, object) constraint,
+    so an equivalent row on the supplier makes the provider-era row a duplicate
+    and it is dropped. Open alert logs collide on (rule, content type, object)
+    while active/acknowledged; the supplier's existing alert wins. Attachments
+    and queued events move unconditionally.
+    """
+    provider_ct = ContentType.objects.filter(app_label="subscriptions", model="provider").first()
+    if provider_ct is None:
+        # Fresh installs never materialized a provider content type: nothing to repoint.
+        return
+    supplier_ct = ContentType.objects.filter(app_label="assets", model="supplier").first()
+    if supplier_ct is None:
+        supplier_ct = ContentType.objects.create(app_label="assets", model="supplier", name="supplier")
+
+    JournalEntry = apps.get_model("extras", "JournalEntry")
+    Bookmark = apps.get_model("extras", "Bookmark")
+    ObjectWatch = apps.get_model("extras", "ObjectWatch")
+    ImageAttachment = apps.get_model("extras", "ImageAttachment")
+    FileAttachment = apps.get_model("extras", "FileAttachment")
+    AlertLog = apps.get_model("extras", "AlertLog")
+    Event = apps.get_model("extras", "Event")
+
+    def _supplier_id(row):
+        supplier_id = provider_to_supplier.get(row.object_id)
+        if supplier_id is None:
+            raise RuntimeError(f"{type(row).__name__} references a missing subscriptions.Provider row: {row.object_id}")
+        return supplier_id
+
+    for entry in JournalEntry.objects.filter(model_id=provider_ct.pk).order_by("pk"):
+        supplier_id = _supplier_id(entry)
+        JournalEntry.objects.filter(pk=entry.pk).update(
+            model_id=supplier_ct.pk,
+            object_id=supplier_id,
+            tenant_id=supplier_tenants.get(supplier_id),
+        )
+
+    for model in (Bookmark, ObjectWatch):
+        for row in model.objects.filter(model_id=provider_ct.pk).order_by("pk"):
+            supplier_id = _supplier_id(row)
+            duplicate = model.objects.filter(
+                user_id=row.user_id,
+                model_id=supplier_ct.pk,
+                object_id=supplier_id,
+            ).exclude(pk=row.pk)
+            if duplicate.exists():
+                row.delete()
+            else:
+                model.objects.filter(pk=row.pk).update(model_id=supplier_ct.pk, object_id=supplier_id)
+
+    for model in (ImageAttachment, FileAttachment, Event):
+        for row in model.objects.filter(model_id=provider_ct.pk).order_by("pk"):
+            supplier_id = _supplier_id(row)
+            model.objects.filter(pk=row.pk).update(model_id=supplier_ct.pk, object_id=supplier_id)
+
+    for alert in AlertLog.objects.filter(content_type_id=provider_ct.pk).order_by("pk"):
+        supplier_id = _supplier_id(alert)
+        if alert.status in ("active", "acknowledged"):
+            duplicate = AlertLog.objects.filter(
+                rule_id=alert.rule_id,
+                content_type_id=supplier_ct.pk,
+                object_id=supplier_id,
+                status__in=["active", "acknowledged"],
+            ).exclude(pk=alert.pk)
+            if duplicate.exists():
+                alert.delete()
+                continue
+        AlertLog.objects.filter(pk=alert.pk).update(
+            content_type_id=supplier_ct.pk,
+            object_id=supplier_id,
+            tenant_id=supplier_tenants.get(supplier_id),
+        )
 
 
 def forwards(apps, schema_editor):
@@ -170,6 +255,10 @@ def forwards(apps, schema_editor):
 
     _copy_provider_tags(Provider, Supplier, provider_to_supplier)
     _repoint_provider_contacts(ContactAssignment, ContentType, provider_to_supplier)
+    supplier_tenants = dict(
+        Supplier.objects.filter(pk__in=provider_to_supplier.values()).values_list("pk", "tenant_id")
+    )
+    _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants)
 
 
 class Migration(migrations.Migration):

@@ -1,9 +1,14 @@
+from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.urls import reverse
 
 from assets.models import Supplier
+from core.models import ObjectChange
+from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
 from organization.models import Tenant, TenantGroup
+from subscriptions.models import Subscription
 
 
 class SupplierScopingTests(TenantTestMixin, TestCase):
@@ -99,3 +104,57 @@ class SupplierScopingTests(TenantTestMixin, TestCase):
                     self.assertNotIn(inactive_supplier, supplier_field.queryset)
                     self.assertIn(self.group_supplier, supplier_field.queryset)
                     self.assertNotIn(self.other_supplier, supplier_field.queryset)
+
+    def test_group_scoped_supplier_changes_are_attributed_to_the_active_tenant(self):
+        # A group-scoped row (tenant=None) is shared with a bounded audience, not
+        # system-wide: its audit snapshots must never become globally visible
+        # through ObjectChange.allow_global_tenant.
+        with TaskContext(tenant_id=self.tenant.pk, user_id=self.tenant_user.pk):
+            self.group_supplier.notes = "Group notes updated"
+            self.group_supplier.save()
+
+        with self.tenant_context(self.tenant):
+            change = ObjectChange.objects.get(
+                changed_object_type=ContentType.objects.get_for_model(Supplier),
+                changed_object_id=self.group_supplier.pk,
+            )
+        self.assertEqual(change.tenant_id, self.tenant.pk)
+
+    def test_global_supplier_changes_stay_system_wide(self):
+        with TaskContext(tenant_id=self.tenant.pk, user_id=self.tenant_user.pk):
+            self.global_supplier.notes = "Global notes updated"
+            self.global_supplier.save()
+
+        with self.tenant_context(self.tenant):
+            change = ObjectChange.objects.get(
+                changed_object_type=ContentType.objects.get_for_model(Supplier),
+                changed_object_id=self.global_supplier.pk,
+            )
+        self.assertIsNone(change.tenant_id)
+
+
+class SupplierListSubscriptionCountTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context(
+            name="Count Tenant",
+            slug="count-tenant",
+            permissions=["assets.view_supplier"],
+        )
+        self.supplier = Supplier.objects.create(name="Counted Vendor", slug="counted-vendor")
+        self.other_tenant = Tenant.objects.create(name="Count Other", slug="count-other")
+        Subscription.objects.create(name="Live subscription", supplier=self.supplier, tenant=self.tenant)
+        soft_deleted = Subscription.objects.create(
+            name="Soft-deleted subscription", supplier=self.supplier, tenant=self.tenant
+        )
+        soft_deleted.soft_delete()
+        # Global suppliers can be referenced from any tenant; the count must still
+        # show only the active tenant's live subscriptions.
+        Subscription.objects.create(name="Foreign subscription", supplier=self.supplier, tenant=self.other_tenant)
+
+    def test_list_count_matches_the_scoped_detail_tab(self):
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        response = self.client.get(reverse("assets:supplier_list"))
+
+        self.assertEqual(response.status_code, 200)
+        row = next(row for row in response.context["table"].data if row.pk == self.supplier.pk)
+        self.assertEqual(row.subscription_count, 1)

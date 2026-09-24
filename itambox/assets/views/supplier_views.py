@@ -1,8 +1,9 @@
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from core.managers import get_current_tenant
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -18,11 +19,21 @@ from ..models import Asset, Supplier
 
 
 class SupplierListView(ObjectListView):
-    queryset = Supplier.objects.prefetch_related("tags").annotate(subscription_count=Count("subscriptions"))
+    queryset = Supplier.objects.prefetch_related("tags")
     filterset = filters.SupplierFilterSet
     filterset_form = forms.SupplierFilterForm
     table = tables.SupplierTable
     action_buttons = ("add",)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Keep the list count in step with the detail tab's scoped
+        # Subscription.objects query: only the active tenant's live subscriptions.
+        subscription_filter = Q(subscriptions__deleted_at__isnull=True)
+        active_tenant = get_current_tenant()
+        if active_tenant is not None:
+            subscription_filter &= Q(subscriptions__tenant=active_tenant)
+        return queryset.annotate(subscription_count=Count("subscriptions", filter=subscription_filter))
 
 
 class SupplierDetailView(ObjectDetailView):

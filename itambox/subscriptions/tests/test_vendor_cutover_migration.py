@@ -25,9 +25,14 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         Subscription = old_apps.get_model("subscriptions", "Subscription")
         Supplier = old_apps.get_model("assets", "Supplier")
         Tag = old_apps.get_model("extras", "Tag")
+        JournalEntry = old_apps.get_model("extras", "JournalEntry")
+        FileAttachment = old_apps.get_model("extras", "FileAttachment")
+        Bookmark = old_apps.get_model("extras", "Bookmark")
+        Event = old_apps.get_model("extras", "Event")
         Contact = old_apps.get_model("organization", "Contact")
         ContactRole = old_apps.get_model("organization", "ContactRole")
         ContactAssignment = old_apps.get_model("organization", "ContactAssignment")
+        Tenant = old_apps.get_model("organization", "Tenant")
         ContentType = old_apps.get_model("contenttypes", "ContentType")
 
         suffix = uuid.uuid4().hex[:8]
@@ -131,6 +136,42 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             object_id=matched_provider.pk,
         )
 
+        # Per-object references that must follow the merge.
+        cutover_tenant = Tenant.objects.create(name=f"Cutover tenant {suffix}", slug=f"cutover-tenant-{suffix}")
+        journaled_provider = Provider.objects.create(
+            name=f"Journaled vendor {suffix}",
+            slug=f"journaled-vendor-{suffix}",
+            tenant=cutover_tenant,
+        )
+        journal_entry = JournalEntry.objects.create(
+            model=provider_ct,
+            object_id=journaled_provider.pk,
+            comment="Provider journal comment",
+            tenant=None,  # stale: the cutover must re-derive it from the supplier
+        )
+        attachment = FileAttachment.objects.create(
+            model=provider_ct,
+            object_id=matched_provider.pk,
+            file=f"attachments/files/{suffix}.txt",
+            name="Provider file",
+        )
+        event = Event.objects.create(model=provider_ct, object_id=matched_provider.pk, action="create")
+        # The users state pinned by this rehearsal predates later user columns
+        # (e.g. scim_id), so the historical User model cannot create a row here;
+        # insert the minimal bookmark owner directly.
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO users_user "
+                "(username, scim_id, password, is_superuser, first_name, last_name, email, "
+                "is_staff, is_active, can_login, date_joined) "
+                "VALUES (%s, %s, '', false, '', '', '', false, true, true, NOW()) "
+                "RETURNING id",
+                [f"cutover-bookmark-{suffix}", str(uuid.uuid4())],
+            )
+            bookmark_user_id = cursor.fetchone()[0]
+        Bookmark.objects.create(user_id=bookmark_user_id, model=supplier_ct, object_id=prelinked.pk)
+        Bookmark.objects.create(user_id=bookmark_user_id, model=provider_ct, object_id=linked_provider.pk)
+
         self.expected = {
             "linked_supplier": prelinked.pk,
             "matched_supplier": existing.pk,
@@ -145,6 +186,12 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             "moved_contact_id": moved_contact.pk,
             "role_id": role.pk,
             "slug_owner_id": slug_owner.pk,
+            "journal_entry_id": journal_entry.pk,
+            "journaled_provider_id": journaled_provider.pk,
+            "attachment_id": attachment.pk,
+            "event_id": event.pk,
+            "bookmark_user_id": bookmark_user_id,
+            "cutover_tenant_id": cutover_tenant.pk,
             "suffix": suffix,
         }
 
@@ -179,6 +226,10 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         Subscription = self.apps.get_model("subscriptions", "Subscription")
         Supplier = self.apps.get_model("assets", "Supplier")
         ContactAssignment = self.apps.get_model("organization", "ContactAssignment")
+        JournalEntry = self.apps.get_model("extras", "JournalEntry")
+        FileAttachment = self.apps.get_model("extras", "FileAttachment")
+        Bookmark = self.apps.get_model("extras", "Bookmark")
+        Event = self.apps.get_model("extras", "Event")
 
         expected = self.expected
         subscriptions = {
@@ -239,6 +290,28 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
                 object_id=expected["matched_supplier"],
             ).exists()
         )
+
+        journaled_supplier = Supplier.objects.get(name=f"Journaled vendor {expected['suffix']}")
+        journal = JournalEntry.objects.get(pk=expected["journal_entry_id"])
+        self.assertEqual(journal.model_id, expected["supplier_ct_id"])
+        self.assertEqual(journal.object_id, journaled_supplier.pk)
+        self.assertEqual(journal.tenant_id, expected["cutover_tenant_id"])
+
+        attachment = FileAttachment.objects.get(pk=expected["attachment_id"])
+        self.assertEqual(attachment.model_id, expected["supplier_ct_id"])
+        self.assertEqual(attachment.object_id, expected["matched_supplier"])
+
+        event = Event.objects.get(pk=expected["event_id"])
+        self.assertEqual(event.model_id, expected["supplier_ct_id"])
+        self.assertEqual(event.object_id, expected["matched_supplier"])
+
+        # The provider-era bookmark duplicates the pre-existing supplier bookmark
+        # and must be dropped, leaving exactly the supplier-owned row.
+        bookmarks = Bookmark.objects.filter(user_id=expected["bookmark_user_id"])
+        self.assertEqual(bookmarks.count(), 1)
+        surviving_bookmark = bookmarks.get()
+        self.assertEqual(surviving_bookmark.model_id, expected["supplier_ct_id"])
+        self.assertEqual(surviving_bookmark.object_id, expected["linked_supplier"])
 
         with self.assertRaises(LookupError):
             self.apps.get_model("subscriptions", "Provider")
