@@ -182,6 +182,7 @@ ASSETS_MENU = Menu(
                 get_model_item("assets", "assetmaintenance", _("Maintenances")),
                 get_model_item("assets", "assetreservation", _("Reservations")),
                 get_model_item("assets", "assetdisposal", _("Disposals")),
+                get_model_item("assets", "repairepisode", _("Repair Episodes")),
             ),
         ),
     ),

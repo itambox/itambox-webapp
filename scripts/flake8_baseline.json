@@ -388,14 +388,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/reservation_form.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Div(\n                Div(\"asset\", css_class=\"col-md-6\"),\n                Div(\"reserved_for\", css_class=\"col-md-6\"),\n                css_class=\"row\",\n            ),\n            Div(\n                Div(\"start_date\", css_class=\"col-md-4\"),\n                Div(\"end_date\", css_class=\"col-md-4\"),\n                Div(\"status\", css_class=\"col-md-4\"),\n                css_class=\"row\",\n            ),\n            \"purpose\",\n            \"notes\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:AssetReservationForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/statuslabel_form.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -2113,14 +2105,6 @@
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.helper.layout = Layout(\n            Row(\n                Column(\"tenant\", css_class=\"col-md-4\"),\n                Column(\"tenant_group\", css_class=\"col-md-4\"),\n                Column(\"name\", css_class=\"col-md-4\"),\n                css_class=\"row g-3\",\n            ),\n            Row(\n                Column(\"category\", css_class=\"col-md-6\"),\n                Column(\"signature_provider\", css_class=\"col-md-6\"),\n                css_class=\"row g-3\",\n            ),\n            Row(\n                Column(\"qms_reference\", css_class=\"col-md-6\"),\n                Column(\"is_active\", css_class=\"col-md-6 mt-2\"),\n                css_class=\"row g-3\",\n            ),\n            \"logo\",\n            Fieldset(\n                _(\"Content\"),\n                \"eula_text\",\n                \"disclaimer\",\n            ),\n            Row(\n                Column(\"require_acceptance\", css_class=\"col-md-6 mt-2\"),\n                Column(\"email_signature_request\", css_class=\"col-md-6 mt-2\"),\n                css_class=\"row g-3\",\n            ),\n            \"tags\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">{_(\"Cancel\")}</a>'),\n            HTML(\"</div>\"),\n        )",
       "context": "Module:body/ClassDef:CustodyTemplateForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/forms.py",
-      "code": "B907",
-      "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self.helper.layout = Layout(\n            Row(Column(\"asset\", css_class=\"col-md-12\")),\n            Row(Column(\"supplier\", css_class=\"col-md-6\"), Column(\"performed_by\", css_class=\"col-md-6\")),\n            Row(Column(\"maintenance_type\", css_class=\"col-md-6\"), Column(\"status\", css_class=\"col-md-6\")),\n            Row(\n                Column(\"cost\", css_class=\"col-md-6\"),\n                Column(\"currency\", css_class=\"col-md-6\"),\n            ),\n            Row(Column(\"start_date\", css_class=\"col-md-6\"), Column(\"completion_date\", css_class=\"col-md-6\")),\n            \"description\",\n            \"notes\",\n            \"tags\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">{_(\"Cancel\")}</a>'),\n            HTML(\"</div>\"),\n        )",
-      "context": "Module:body/ClassDef:AssetMaintenanceForm:body/FunctionDef:__init__:body",
       "count": 1
     },
     {

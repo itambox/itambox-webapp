@@ -34,6 +34,7 @@ from .models import (
     Category,
     Depreciation,
     Manufacturer,
+    RepairEpisode,
     StatusLabel,
     Supplier,
     Warranty,
@@ -858,4 +859,30 @@ class AssetReservationTable(BaseTable):
         return record.get_status_display()
 
     def render_reserved_for(self, value):
+        return value or TABLE_EMPTY_VALUE
+
+
+class RepairEpisodeTable(BaseTable):
+    pk = ToggleColumn(accessor="pk")
+    id = IDColumn(visible=True)
+    asset = tables.LinkColumn("assets:asset_detail", args=[A("asset__pk")], accessor="asset", verbose_name=_("Asset"))
+    substitute_asset = tables.LinkColumn(
+        "assets:asset_detail",
+        args=[A("substitute_asset__pk")],
+        accessor="substitute_asset",
+        verbose_name=_("Loaner / Substitute"),
+    )
+    episode_notes = tables.Column(accessor="notes", verbose_name=_("Notes"))
+    created_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_("Created"))
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = RepairEpisode
+        fields = ("pk", "id", "asset", "substitute_asset", "episode_notes", "created_at", "actions")
+        default_columns = ("pk", "id", "asset", "substitute_asset", "episode_notes", "created_at", "actions")
+
+    def render_substitute_asset(self, value):
+        return value or TABLE_EMPTY_VALUE
+
+    def render_episode_notes(self, value):
         return value or TABLE_EMPTY_VALUE

@@ -6,6 +6,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Repair/replacement stories can be reconstructed as episodes: link maintenance records, reservations, and disposals to a repair episode (an asset plus an optional loaner/substitute) and read the grouped story on the asset detail Timeline tab (issue #504).
+
 ### Changed
 
 - Linked scoped SaaS providers and asset warranties to the shared Supplier catalogue, documented when to use Contracts versus Subscriptions, and distinguished agreement entitlement quantities from linked-license seat counts in subscription details and reports (issue #500).

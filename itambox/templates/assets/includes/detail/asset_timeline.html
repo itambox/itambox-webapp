@@ -1,0 +1,51 @@
+{% load i18n %}
+{% if timeline.total %}
+  <div class="card-body p-0">
+    {% if timeline.has_episodes %}
+      {% for group in timeline.groups %}
+        <div class="border-bottom">
+          <div class="px-3 pt-3 pb-0">
+            <h4 class="mb-1">
+              <a href="{{ group.episode.get_absolute_url }}"
+                 class="fw-bold text-decoration-none">{{ group.episode }}</a>
+            </h4>
+            {% if group.episode.asset_id == object.pk %}
+              {% if group.episode.substitute_asset %}
+                <div class="text-secondary small">
+                  {% translate "Loaner / substitute:" %}
+                  <a href="{{ group.episode.substitute_asset.get_absolute_url }}">{{ group.episode.substitute_asset }}</a>
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="text-secondary small">
+                {% translate "This asset stood in for" %}
+                <a href="{{ group.episode.asset.get_absolute_url }}">{{ group.episode.asset }}</a>
+              </div>
+            {% endif %}
+          </div>
+          {% if group.events %}
+            <ul class="list-unstyled px-3 pb-2 mb-0">
+              {% include 'assets/includes/detail/asset_timeline_events.html' with events=group.events %}
+            </ul>
+          {% else %}
+            <div class="px-3 pb-3 text-muted small">{% translate "No records are linked to this episode yet." %}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% endif %}
+    {% if timeline.ungrouped %}
+      <div class="px-3 pt-3 pb-0">
+        {% if timeline.has_episodes %}
+          <h4 class="mb-1">{% translate "Other activity" %}</h4>
+        {% endif %}
+      </div>
+      <ul class="list-unstyled px-3 pb-2 mb-0">
+        {% include 'assets/includes/detail/asset_timeline_events.html' with events=timeline.ungrouped %}
+      </ul>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="card-body py-5 text-muted text-center">
+    <p class="mb-0">{% translate "No lifecycle records exist for this asset yet." %}</p>
+  </div>
+{% endif %}

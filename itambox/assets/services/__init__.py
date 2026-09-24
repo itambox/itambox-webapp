@@ -386,6 +386,7 @@ DISPOSAL_METADATA_FIELDS = (
     "proceeds",
     "currency",
     "weee_compliant",
+    "episode",
     "notes",
 )
 
@@ -406,6 +407,7 @@ def disposal_service_payload(data: Mapping) -> dict:
         "proceeds": data.get("proceeds"),
         "currency": data.get("currency") or "",
         "weee_compliant": data.get("weee_compliant") or False,
+        "episode": data.get("episode"),
         "notes": data.get("notes") or "",
     }
 
@@ -515,6 +517,7 @@ def dispose_asset(
     proceeds=None,
     currency: str = "",
     weee_compliant: bool = False,
+    episode=None,
     notes: str = "",
     user=None,
 ) -> "AssetDisposal":
@@ -569,6 +572,7 @@ def dispose_asset(
             proceeds=proceeds,
             currency=currency,
             weee_compliant=weee_compliant,
+            episode=episode,
             notes=notes,
         )
         disposal.full_clean()

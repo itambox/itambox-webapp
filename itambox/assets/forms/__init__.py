@@ -8,6 +8,7 @@ from .category_form import CategoryForm
 from .checkout_forms import *
 from .depreciation_form import DepreciationForm
 from .disposal_form import AssetDisposalForm
+from .episode_form import RepairEpisodeForm  # noqa: F401 -- re-exported form surface
 from .fields import StatusModelChoiceField
 from .filter_forms import *
 from .import_forms import *

@@ -77,6 +77,15 @@ class AssetMaintenance(
     completion_date = models.DateField(null=True, blank=True, verbose_name=_("Completion Date"), db_index=True)
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
     tags = models.ManyToManyField("extras.Tag", related_name="asset_maintenances", blank=True, verbose_name=_("Tags"))
+    episode = models.ForeignKey(
+        "assets.RepairEpisode",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="maintenances",
+        verbose_name=_("Repair Episode"),
+        help_text=_("Optional: the repair/replacement episode this record belongs to."),
+    )
 
     class Meta:
         ordering = ["-start_date"]

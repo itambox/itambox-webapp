@@ -15327,3 +15327,132 @@ msgstr "Globale Ansicht"
 #: itambox/itambox/middleware.py:294
 msgid "The tenant filter was reset because the selected scope defines which tenants are shown."
 msgstr "Der Mandantenfilter wurde zurückgesetzt, da der gewählte Geltungsbereich festlegt, welche Mandanten angezeigt werden."
+
+# --- Repair episodes (#504) ---
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "(no status)"
+msgstr "(kein Status)"
+
+#: itambox/itambox/templates/assets/assets/asset_detail.html
+msgid "Add Repair Episode"
+msgstr "Reparatur-Episode hinzufügen"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Asset: %(asset)s"
+msgstr "Asset: %(asset)s"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Completed %(date)s"
+msgstr "Abgeschlossen am %(date)s"
+
+#: itambox/itambox/assets/forms/episode_form.py
+msgid "Create Repair Episode"
+msgstr "Reparatur-Episode erstellen"
+
+#: itambox/itambox/assets/filters.py
+#: itambox/itambox/assets/models/episode.py
+#: itambox/itambox/assets/tables.py
+msgid "Loaner / Substitute"
+msgstr "Leihgerät / Ersatzgerät"
+
+#: itambox/itambox/templates/assets/includes/detail/repairepisode_info.html
+msgid "Loaner / Substitute:"
+msgstr "Leihgerät / Ersatzgerät:"
+
+#: itambox/itambox/templates/assets/includes/detail/asset_timeline.html
+msgid "Loaner / substitute:"
+msgstr "Leihgerät / Ersatzgerät:"
+
+#: itambox/itambox/templates/assets/includes/detail/asset_timeline.html
+msgid "No lifecycle records exist for this asset yet."
+msgstr "Für dieses Asset sind noch keine Einträge im Lebenszyklus vorhanden."
+
+#: itambox/itambox/templates/assets/includes/detail/asset_timeline.html
+msgid "No records are linked to this episode yet."
+msgstr "Mit dieser Episode sind noch keine Datensätze verknüpft."
+
+#: itambox/itambox/assets/models/lifecycle.py
+#: itambox/itambox/assets/models/maintenance.py
+msgid "Optional: the repair/replacement episode this record belongs to."
+msgstr "Optional: die Reparatur-/Ersatz-Episode, zu der dieser Datensatz gehört."
+
+#: itambox/itambox/templates/assets/includes/detail/asset_timeline.html
+msgid "Other activity"
+msgstr "Sonstige Aktivitäten"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Previous status: %(status)s"
+msgstr "Vorheriger Status: %(status)s"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Recipient: %(recipient)s"
+msgstr "Empfänger: %(recipient)s"
+
+#: itambox/itambox/templates/assets/includes/detail/repairepisode_info.html
+msgid "Records linked to this episode are grouped on the asset timeline."
+msgstr "Die mit dieser Episode verknüpften Datensätze werden in der Asset-Timeline gruppiert."
+
+#: itambox/itambox/templates/assets/assets/asset_detail.html
+msgid "Repair &amp; Lifecycle Timeline"
+msgstr "Reparatur- und Lebenszyklus-Timeline"
+
+#: itambox/itambox/assets/models/episode.py
+#: itambox/itambox/assets/models/lifecycle.py
+#: itambox/itambox/assets/models/maintenance.py
+#: itambox/itambox/assets/views/episode_views.py
+msgid "Repair Episode"
+msgstr "Reparatur-Episode"
+
+#: itambox/itambox/assets/models/episode.py
+#: itambox/itambox/core/navigation/menu.py
+msgid "Repair Episodes"
+msgstr "Reparatur-Episoden"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Reservation"
+msgstr "Reservierung"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Reserved for %(holder)s"
+msgstr "Reserviert für %(holder)s"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Status changed to %(status)s"
+msgstr "Status geändert: %(status)s"
+
+#: itambox/itambox/assets/models/episode.py
+msgid "The substitute cannot be the asset itself."
+msgstr "Das Ersatzgerät darf nicht das Asset selbst sein."
+
+#: itambox/itambox/assets/models/episode.py
+msgid "The substitute must belong to the same tenant as the asset."
+msgstr "Das Ersatzgerät muss zum selben Mandanten gehören wie das Asset."
+
+#: itambox/itambox/assets/models/episode.py
+msgid "The unit that stood in for the asset (temporary loan or permanent replacement)."
+msgstr "Das Gerät, das das Asset vertreten hat (temporäre Leihe oder dauerhafter Ersatz)."
+
+#: itambox/itambox/assets/models/episode.py
+msgid "The unit this repair or replacement episode is about."
+msgstr "Das Gerät, um das es in dieser Reparatur- oder Ersatz-Episode geht."
+
+#: itambox/itambox/templates/assets/includes/detail/asset_timeline.html
+msgid "This asset stood in for"
+msgstr "Dieses Asset war der Ersatz für"
+
+#: itambox/itambox/templates/assets/assets/asset_detail.html
+msgid "Timeline"
+msgstr "Timeline"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Unknown status"
+msgstr "Unbekannter Status"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Until %(date)s"
+msgstr "Bis %(date)s"
+
+#: itambox/itambox/assets/services/timeline.py
+msgid "Valid until %(date)s"
+msgstr "Gültig bis %(date)s"

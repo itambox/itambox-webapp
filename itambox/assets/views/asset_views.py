@@ -19,6 +19,7 @@ from django_tables2 import RequestConfig
 from assets.choices import RequestStatusChoices
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
 from assets.services.request_authorization import can_asset_request_action, is_self_service_claim
+from assets.services.timeline import build_asset_timeline
 from assets.tasks.labels import _default_label_card, generate_base64_barcode, render_labels_pdf
 from compliance.audit_services import audit_asset_from_form
 from compliance.models import CustodyReceipt
@@ -290,6 +291,10 @@ class AssetDetailView(ObjectDetailView):
         )
         context["disposal_history"] = disposal_history
         context["disposal_obj"] = next((disposal for disposal in disposal_history if disposal.is_active), None)
+
+        # #504: the repair/replacement timeline groups lifecycle records by episode
+        # when links exist and falls back to chronological order otherwise.
+        context["asset_timeline"] = build_asset_timeline(asset)
 
         return context
 

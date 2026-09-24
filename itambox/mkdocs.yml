@@ -73,6 +73,7 @@ nav:
           - Scanning Assets: 'usage/scanning.md'
           - Depreciation Guide: 'usage/depreciation.md'
           - Asset Requests & Reservations: 'usage/asset-requests-and-reservations.md'
+          - Repair Episodes: 'usage/repair-episodes.md'
           - Kits & Components: 'usage/kits-and-components.md'
           - Software Catalog & Maintenance: 'usage/software-catalog-and-maintenance.md'
           - Alerts & Notifications: 'usage/alerts-and-notifications.md'
@@ -119,6 +120,7 @@ nav:
               - Warranties: 'models/assets/warranty.md'
               - Asset Reservations: 'models/assets/assetreservation.md'
               - Asset Disposals: 'models/assets/assetdisposal.md'
+              - Repair Episodes: 'models/assets/repair-episode.md'
           - Hardware Components:
               - Components: 'models/components/component.md'
               - Component Stock: 'models/components/componentstock.md'

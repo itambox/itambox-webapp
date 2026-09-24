@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from software.models import InstalledSoftware
 
-from .models import Asset, AssetDisposal, AssetReservation, AssetRole, AssetType, Manufacturer, Warranty
+from .models import Asset, AssetDisposal, AssetReservation, AssetRole, AssetType, Manufacturer, RepairEpisode, Warranty
 from .services import (
     DISPOSAL_METADATA_FIELDS,
     disposal_service_payload,
@@ -199,3 +199,17 @@ class AssetReservationAdmin(admin.ModelAdmin):
 
 
 # Registrations for Site, Region, SiteGroup, Tenant, Tag, Location moved to organization/admin.py
+
+
+@admin.register(RepairEpisode)
+class RepairEpisodeAdmin(admin.ModelAdmin):
+    list_display = ("asset", "substitute_asset", "created_at")
+    search_fields = (
+        "asset__name",
+        "asset__asset_tag",
+        "substitute_asset__name",
+        "substitute_asset__asset_tag",
+        "notes",
+    )
+    date_hierarchy = "created_at"
+    raw_id_fields = ("asset", "substitute_asset")

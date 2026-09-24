@@ -74,6 +74,12 @@ from .disposal_views import (
     AssetDisposalListView,
     AssetDisposeActionView,
 )
+from .episode_views import (  # noqa: F401 -- re-exported for URL conf and templates
+    RepairEpisodeDeleteView,
+    RepairEpisodeDetailView,
+    RepairEpisodeEditView,
+    RepairEpisodeListView,
+)
 from .maintenance_views import (
     AssetMaintenanceCloneView,
     AssetMaintenanceDeleteView,

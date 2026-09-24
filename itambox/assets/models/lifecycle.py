@@ -129,6 +129,15 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
         help_text=_("Disposal was carried out by an authorised WEEE recycler."),
     )
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    episode = models.ForeignKey(
+        "assets.RepairEpisode",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="disposals",
+        verbose_name=_("Repair Episode"),
+        help_text=_("Optional: the repair/replacement episode this record belongs to."),
+    )
 
     # Cancellation (issue #496): an erroneous disposal is CORRECTED, never erased.
     # The record keeps its identity and stays in the disposal history; these
@@ -366,6 +375,15 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
     )
     purpose = models.CharField(max_length=255, blank=True, verbose_name=_("Purpose"))
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    episode = models.ForeignKey(
+        "assets.RepairEpisode",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reservations",
+        verbose_name=_("Repair Episode"),
+        help_text=_("Optional: the repair/replacement episode this record belongs to."),
+    )
 
     class Meta:
         ordering = ["start_date"]
