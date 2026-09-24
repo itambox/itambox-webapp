@@ -1,8 +1,10 @@
 {
   "base_commit": "b27d16f52d17ee4c469bddd5d5bd2a6a0933269b",
-  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest. Issue #499 scope-switcher link/label and bulk mutation-target visibility tests. Issue #500 commercial-vocabulary supplier/provider link and seat-metric tests.",
+  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest. Issue #499 scope-switcher link/label and bulk mutation-target visibility tests. Issue #500 commercial-vocabulary supplier/provider link and seat-metric tests. Issue #503 blank-asset-tag form acceptance and generated-tag tests.",
   "changed_tests": [
     "itambox/assets/tests/test_api.py",
+    "itambox/assets/tests/test_asset_form_initialization.py",
+    "itambox/assets/tests/test_assignments.py",
     "itambox/assets/tests/test_existing.py",
     "itambox/assets/tests/test_form_help_texts.py",
     "itambox/assets/tests/test_nested_serializers.py",
