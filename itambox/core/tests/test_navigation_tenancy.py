@@ -107,6 +107,7 @@ class TenantNavigationTests(TestCase):
                 "assets:assetmaintenance_list",
                 "assets:assetreservation_list",
                 "assets:assetdisposal_list",
+                "assets:repairepisode_list",
                 "inventory:component_list",
                 "inventory:accessory_list",
                 "inventory:consumable_list",
