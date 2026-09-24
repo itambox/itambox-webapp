@@ -72,7 +72,7 @@ class SubscriptionViewSet(ITAMBoxModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic(using=router.db_for_write(Subscription)):
-            locked = self.get_queryset().select_for_update().get(pk=subscription.pk)
+            locked = self.get_queryset().select_for_update(of=("self",)).get(pk=subscription.pk)
             self._validate_etag(request, locked)
             if serializer.validated_data["status"] != locked.status:
                 raise drf_serializers.ValidationError(
@@ -89,7 +89,7 @@ class SubscriptionViewSet(ITAMBoxModelViewSet):
         self._validate_etag(request, subscription)
 
         with transaction.atomic(using=router.db_for_write(Subscription)):
-            locked = self.get_queryset().select_for_update().get(pk=subscription.pk)
+            locked = self.get_queryset().select_for_update(of=("self",)).get(pk=subscription.pk)
             self._validate_etag(request, locked)
             try:
                 getattr(locked, method_name)(*args, **kwargs)

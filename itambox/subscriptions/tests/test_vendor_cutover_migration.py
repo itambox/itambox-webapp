@@ -106,7 +106,6 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
 
         tag = Tag.objects.create(name=f"Cutover tag {suffix}", slug=f"cutover-tag-{suffix}")
         matched_provider.tags.add(tag)
-        existing.tags.add(tag)
 
         provider_ct, _ = ContentType.objects.get_or_create(app_label="subscriptions", model="provider")
         supplier_ct, _ = ContentType.objects.get_or_create(app_label="assets", model="supplier")

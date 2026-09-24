@@ -15,7 +15,7 @@ class RestCollectionOptionsTests(APITestCase):
         ("Organization", "api:organization_api:site-list"),
         ("Procurement", "api:procurement_api:contract-list"),
         ("Software", "api:software_api:software-list"),
-        ("Subscriptions", "api:subscriptions_api:provider-list"),
+        ("Subscriptions", "api:subscriptions_api:subscription-list"),
         ("Users", "api:users_api:token-list"),
     )
 
