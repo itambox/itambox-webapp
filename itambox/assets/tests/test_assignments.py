@@ -405,7 +405,7 @@ class AssetTagSequenceTestCase(TestCase):
             with transaction.atomic():
                 Asset.objects.create(name="Asset Global 2", asset_tag="GLOBAL-TAG", status=self.status, tenant=None)
 
-    def test_form_requires_asset_tag_and_suggests_it(self):
+    def test_form_accepts_blank_asset_tag_and_generates_it(self):
         from assets.forms.asset_form import AssetForm
         from assets.models import AssetTagSequence
 
@@ -414,34 +414,40 @@ class AssetTagSequenceTestCase(TestCase):
             prefix="FORM-", category=self.category_laptop, next_value=1, zero_padding=3
         )
 
-        # Form validation fails if asset_tag is left blank (not allowed anymore!)
+        # A blank asset_tag is accepted and generated on save, matching the
+        # model contract and the PO receiving / bulk receive paths (#503).
         form_data_blank = {
             "name": "Test Asset",
-            "asset_tag": "",  # Leave blank!
+            "asset_tag": "",  # Leave blank -> generated
             "status": self.status.pk,
             "asset_type": self.asset_type_laptop.pk,
             "tenant": self.tenant_a.pk,
         }
         form_blank = AssetForm(data=form_data_blank, request=self.request)
-        self.assertFalse(form_blank.is_valid())
-        self.assertIn("asset_tag", form_blank.errors)
+        self.assertTrue(form_blank.is_valid(), form_blank.errors)
 
         # Check that the form has a help_text displaying the suggested next tag
         self.assertIn("FORM-001", form_blank.fields["asset_tag"].help_text)
 
-        # Submit the form with the suggestion:
-        form_data_valid = {
-            "name": "Test Asset 2",
-            "asset_tag": "FORM-001",
-            "status": self.status.pk,
-            "asset_type": self.asset_type_laptop.pk,
-            "tenant": self.tenant_a.pk,
-        }
-        form_valid = AssetForm(data=form_data_valid, request=self.request)
-        self.assertTrue(form_valid.is_valid(), form_valid.errors)
-        asset = form_valid.save()
+        asset = form_blank.save()
         self.assertEqual(asset.asset_tag, "FORM-001")
 
         # Verify that saving the asset incremented the sequence!
         seq.refresh_from_db()
         self.assertEqual(seq.next_value, 2)
+
+        # Submitting the next suggestion explicitly still reserves it.
+        form_data_suggested = {
+            "name": "Test Asset 2",
+            "asset_tag": "FORM-002",
+            "status": self.status.pk,
+            "asset_type": self.asset_type_laptop.pk,
+            "tenant": self.tenant_a.pk,
+        }
+        form_suggested = AssetForm(data=form_data_suggested, request=self.request)
+        self.assertTrue(form_suggested.is_valid(), form_suggested.errors)
+        asset_suggested = form_suggested.save()
+        self.assertEqual(asset_suggested.asset_tag, "FORM-002")
+
+        seq.refresh_from_db()
+        self.assertEqual(seq.next_value, 3)
