@@ -38,6 +38,10 @@ on:
       - "itambox/package-lock.json"
       - "itambox/schema.yaml"
       - "itambox/docs/plugins/api_reference.md"
+      # The MkDocs pages and their assets are the docs job's inputs, and the
+      # documentation-policy suite scans them; a docs-only change used to
+      # trigger no CI run because none of them matched a filter.
+      - "itambox/docs/**"
       - "itambox/mkdocs.yml"
       - "scripts/**/*.py"
       - "scripts/architecture_baseline.json"
