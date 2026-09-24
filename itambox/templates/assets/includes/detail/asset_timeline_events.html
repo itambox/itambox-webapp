@@ -1,0 +1,16 @@
+{% load i18n %}
+{% for event in events %}
+  <li class="d-flex align-items-start gap-2 py-2">
+    <span class="text-{{ event.color }} pt-1" aria-hidden="true"><i class="mdi {{ event.icon }}"></i></span>
+    <div class="flex-fill">
+      <div class="text-secondary small">{{ event.date|date:"Y-m-d" }}</div>
+      <div>
+        <a href="{{ event.url }}" class="fw-bold text-decoration-none">{{ event.title }}</a>
+      </div>
+      <div class="text-secondary small">
+        <span class="badge bg-{{ event.color }}-lt me-2">{{ event.label }}</span>
+        {% for part in event.parts %}<span class="me-2">{{ part }}</span>{% endfor %}
+      </div>
+    </div>
+  </li>
+{% endfor %}

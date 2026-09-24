@@ -3,7 +3,7 @@ the old flat assets/models.py module so all ~142 consumer sites keep working
 unchanged (import-preserving refactor).
 
 Import order: choices → catalog → asset → tagsequence → assignment → requests
-              → lifecycle → maintenance.
+              → episode → lifecycle → maintenance.
 
 Django registers models by app_label (inferred from the package path
 ``itambox/assets/models/``) — no explicit ``class Meta: app_label`` needed.
@@ -52,7 +52,10 @@ from assets.models.assignment import AssetAssignment
 # ── 6. Requests ──────────────────────────────────────────────────────────────
 from assets.models.requests import AssetRequest
 
-# ── 7. Lifecycle (disposal / warranty / reservation) ────────────────────────
+# ── 7. Repair episodes (#504) ────────────────────────────────────────────────
+from assets.models.episode import RepairEpisode
+
+# ── 8. Lifecycle (disposal / warranty / reservation) ────────────────────────
 from assets.models.lifecycle import (
     DateRange,
     AssetDisposal,
@@ -60,7 +63,7 @@ from assets.models.lifecycle import (
     AssetReservation,
 )
 
-# ── 8. Maintenance ───────────────────────────────────────────────────────────
+# ── 9. Maintenance ───────────────────────────────────────────────────────────
 from assets.models.maintenance import AssetMaintenance
 
 # isort: on
@@ -92,6 +95,8 @@ __all__ = [
     "AssetAssignment",
     # requests
     "AssetRequest",
+    # episode
+    "RepairEpisode",
     # lifecycle
     "DateRange",
     "AssetDisposal",

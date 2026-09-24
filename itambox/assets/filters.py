@@ -24,6 +24,7 @@ from .models import (
     Category,
     Depreciation,
     Manufacturer,
+    RepairEpisode,
     StatusLabel,
     Supplier,
     Warranty,
@@ -540,4 +541,35 @@ class AssetReservationFilterSet(BaseFilterSet):
             | Q(asset__name__icontains=value)
             | Q(reserved_for__first_name__icontains=value)
             | Q(reserved_for__last_name__icontains=value)
+        ).distinct()
+
+
+class RepairEpisodeFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method="search",
+        label=_("Search"),
+        widget=forms.TextInput(attrs={"placeholder": "Asset, Notes..."}),
+    )
+    asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(), label=_("Asset"), widget=forms.Select(attrs={"class": "form-select"})
+    )
+    substitute_asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        label=_("Loaner / Substitute"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    class Meta:
+        model = RepairEpisode
+        fields = ["asset", "substitute_asset"]
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(asset__name__icontains=value)
+            | Q(asset__asset_tag__icontains=value)
+            | Q(substitute_asset__name__icontains=value)
+            | Q(substitute_asset__asset_tag__icontains=value)
+            | Q(notes__icontains=value)
         ).distinct()

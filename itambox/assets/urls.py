@@ -162,3 +162,12 @@ urlpatterns += [
     path("reservations/<int:pk>/edit/", views.AssetReservationEditView.as_view(), name="assetreservation_update"),
     path("reservations/<int:pk>/delete/", views.AssetReservationDeleteView.as_view(), name="assetreservation_delete"),
 ]
+
+urlpatterns += [
+    # Repair episode CRUD (#504)
+    path("episodes/", views.RepairEpisodeListView.as_view(), name="repairepisode_list"),
+    path("episodes/add/", views.RepairEpisodeEditView.as_view(), name="repairepisode_create"),
+    path("episodes/<int:pk>/", views.RepairEpisodeDetailView.as_view(), name="repairepisode_detail"),
+    path("episodes/<int:pk>/edit/", views.RepairEpisodeEditView.as_view(), name="repairepisode_update"),
+    path("episodes/<int:pk>/delete/", views.RepairEpisodeDeleteView.as_view(), name="repairepisode_delete"),
+]

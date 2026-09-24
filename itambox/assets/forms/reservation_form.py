@@ -6,6 +6,8 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import AssetReservation
 
+from .fields import selectable_episodes
+
 
 class AssetReservationForm(forms.ModelForm):
     start_date = forms.DateField(
@@ -25,6 +27,7 @@ class AssetReservationForm(forms.ModelForm):
             "start_date",
             "end_date",
             "status",
+            "episode",
             "purpose",
             "notes",
         ]
@@ -32,12 +35,18 @@ class AssetReservationForm(forms.ModelForm):
             "asset": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "reserved_for": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "status": forms.Select(attrs={"class": "form-select"}),
+            "episode": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "purpose": forms.TextInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # #504: a linked (soft-deleted) episode stays selectable, so saving a
+        # reservation never silently drops the story link.
+        self.fields["episode"].queryset = selectable_episodes(
+            self.instance.episode_id if self.instance and self.instance.pk else None
+        )
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
@@ -60,11 +69,15 @@ class AssetReservationForm(forms.ModelForm):
                 Div("status", css_class="col-md-4"),
                 css_class="row",
             ),
+            Div(
+                Div("episode", css_class="col-md-12"),
+                css_class="row",
+            ),
             "purpose",
             "notes",
             HTML('<div class="mt-3">'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href={cancel_url!r} class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML("</div>"),
         )
 

@@ -1,0 +1,31 @@
+{% load i18n %}
+<dl class="row mb-0">
+  <dt class="col-sm-4">{% translate "Asset:" %}</dt>
+  <dd class="col-sm-8">
+    <a href="{{ object.asset.get_absolute_url }}"
+       class="fw-bold text-decoration-none">{{ object.asset.name }} ({{ object.asset.asset_tag }})</a>
+  </dd>
+  <dt class="col-sm-4">{% translate "Loaner / Substitute:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.substitute_asset %}
+      <a href="{{ object.substitute_asset.get_absolute_url }}"
+         class="fw-bold text-decoration-none">{{ object.substitute_asset.name }} ({{ object.substitute_asset.asset_tag }})</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Created:" %}</dt>
+  <dd class="col-sm-8 text-secondary">
+    {{ object.created_at|date:"Y-m-d H:i" }}
+  </dd>
+  <dt class="col-sm-4">{% translate "Updated:" %}</dt>
+  <dd class="col-sm-8 text-secondary">
+    {{ object.updated_at|date:"Y-m-d H:i" }}
+  </dd>
+</dl>
+{% if object.notes %}
+  <hr>
+  <p class="text-secondary mb-0">{{ object.notes|linebreaksbr }}</p>
+{% endif %}
+<hr>
+<p class="text-muted small mb-0">{% translate "Records linked to this episode are grouped on the asset timeline." %}</p>

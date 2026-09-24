@@ -4,6 +4,7 @@ from django import forms
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from assets.forms.fields import selectable_episodes
 from assets.models import Asset, AssetMaintenance, Category, Supplier
 from core.forms import FilterForm, scope_tenant_field, scope_tenant_group_field
 
@@ -57,6 +58,7 @@ class AssetMaintenanceForm(forms.ModelForm):
             "performed_by",
             "description",
             "notes",
+            "episode",
             "tags",
         ]
         widgets = {
@@ -65,6 +67,7 @@ class AssetMaintenanceForm(forms.ModelForm):
             "currency": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "episode": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "tags": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         }
 
@@ -74,6 +77,11 @@ class AssetMaintenanceForm(forms.ModelForm):
         # unscoped at import, so a maintenance record could otherwise reference (and
         # expose in the dropdown) another tenant's asset.
         self.fields["asset"].queryset = Asset.objects.all()
+        # #504: a linked (soft-deleted) episode stays selectable, so editing the
+        # record never silently drops the story link.
+        self.fields["episode"].queryset = selectable_episodes(
+            self.instance.episode_id if self.instance and self.instance.pk else None
+        )
 
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
@@ -93,10 +101,11 @@ class AssetMaintenanceForm(forms.ModelForm):
             Row(Column("start_date", css_class="col-md-6"), Column("completion_date", css_class="col-md-6")),
             "description",
             "notes",
+            Row(Column("episode", css_class="col-md-12")),
             "tags",
             HTML('<div class="mt-3">'),
             Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
+            HTML(f'<a href={cancel_url!r} class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML("</div>"),
         )
 

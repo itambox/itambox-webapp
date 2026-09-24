@@ -227,6 +227,19 @@
       {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{{ disposal_history|length }}</span>
     </a>
   </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=timeline"
+       data-bs-target="#timeline"
+       class="nav-link {% if request.GET.tab == 'timeline' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab"
+       aria-label="{% translate 'Timeline' %}"
+       title="{% translate 'Timeline' %}">
+      <i class="mdi mdi-timeline-outline me-1 text-teal" aria-hidden="true"></i>
+      {% translate "Timeline" %} <span class="badge bg-teal-lt ms-2">{{ asset_timeline.total }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
 {% block details_tab %}
   <div class="row g-3">
@@ -560,6 +573,22 @@
           </div>
         </div>
       {% endif %}
+    </div>
+  </div>
+  <div class="tab-pane fade {% if request.GET.tab == 'timeline' %}show active{% endif %}"
+       id="timeline"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Repair &amp; Lifecycle Timeline" %}</h3>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-get="{% url 'assets:repairepisode_create' %}?asset={{ object.pk }}&_quickadd=1"
+                hx-target="#modal-placeholder">
+          <i class="mdi mdi-plus"></i> {% translate "Add Repair Episode" %}
+        </button>
+      </div>
+      {% include 'assets/includes/detail/asset_timeline.html' with timeline=asset_timeline %}
     </div>
   </div>
 {% endblock extra_tab_panes %}
