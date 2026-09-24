@@ -10120,10 +10120,6 @@ msgstr "Das ausgewählte %(field)s gehört zu einem anderen Mandanten als das As
 msgid "Set on this asset"
 msgstr "Auf diesem Asset gesetzt"
 
-#: assets/forms/asset_form.py:379
-msgid "Suggested:"
-msgstr "Vorgeschlagen:"
-
 #: templates/assets/includes/detail/warranty_info.html:56
 msgid "Terms:"
 msgstr "Bedingungen:"
@@ -13553,6 +13549,10 @@ msgstr "Vom Asset-Typ übernehmen (Standard)"
 #: itambox/assets/forms/asset_form.py:137
 msgid "Leave blank to generate automatically"
 msgstr "Leer lassen, um automatisch zu generieren"
+
+#: itambox/assets/forms/asset_form.py:436
+msgid "Leave blank to generate automatically. Suggested:"
+msgstr "Leer lassen, um automatisch zu generieren. Vorgeschlagen:"
 
 #: itambox/subscriptions/filters.py:16
 msgid "Name, description, or contract reference"

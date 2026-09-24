@@ -61,10 +61,12 @@ def fieldset_legends(form):
 class AssetFormFieldConfigurationTests(TestCase):
     """Static field configuration applied on every construction."""
 
-    def test_asset_tag_is_required_even_though_the_model_allows_blank(self):
+    def test_asset_tag_is_optional_so_blank_tags_generate_on_save(self):
         form, _ = build_form_without_sequence()
 
-        self.assertTrue(form.fields["asset_tag"].required)
+        # The model contract (blank=True, save() generates from the sequence)
+        # applies to the form too (#503).
+        self.assertFalse(form.fields["asset_tag"].required)
 
     def test_quick_add_labels_target_the_modal_placeholder(self):
         form, _ = build_form_without_sequence()
@@ -307,6 +309,7 @@ class AssetFormAssetTagPreviewTests(TestCase):
         form = AssetForm(initial={"tenant": tenant.pk})
 
         help_text = str(form.fields["asset_tag"].help_text)
+        self.assertIn("Leave blank to generate automatically. Suggested:", help_text)
         self.assertIn("PRV-0007", help_text)
         self.assertIn('data-fill-target="id_asset_tag"', help_text)
         self.assertIn('data-fill-value="PRV-0007"', help_text)
@@ -580,7 +583,7 @@ class AssetFormRenderedEscapingTests(TestCase):
             form = AssetForm(initial={"tenant": tenant.pk})
 
         help_text = str(form.fields["asset_tag"].help_text)
-        self.assertIn(marked_translation("Suggested:"), help_text)
+        self.assertIn(marked_translation("Leave blank to generate automatically. Suggested:"), help_text)
         self.assertIn("TRN-000001", help_text)
         self.assertIn('<a href="#"', help_text)
 
