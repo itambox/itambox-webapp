@@ -14,6 +14,8 @@ import { AssetScanner } from './scanner';
 
 interface AuditScanPayload {
   found: boolean;
+  /** True on the 404 payload when the code is an EAN matching several assets. */
+  ambiguous?: boolean;
   pk: number;
   label: string;
   asset_tag: string;
@@ -175,10 +177,18 @@ function initAuditBasket(): void {
 
     const url = `${validateUrl}?code=${encodeURIComponent(cleaned)}`;
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then((res) => {
+      .then(async (res) => {
         if (res.status === 403) throw new Error('forbidden');
-        if (!res.ok) throw new Error('not_found');
-        return res.json();
+        // Read the JSON body even on a 404: the resolver marks an EAN that
+        // matches several assets (ambiguous) distinctly from a genuine miss,
+        // and that distinction must reach the operator's message below.
+        const body = (await res.json().catch(() => null)) as AuditScanPayload | null;
+        if (!res.ok) {
+          if (body?.ambiguous) throw new Error('ambiguous');
+          throw new Error('not_found');
+        }
+        if (!body) throw new Error('not_found');
+        return body;
       })
       .then((data: AuditScanPayload) => {
         if (!isCurrentCameraAction(sessionGeneration)) return;
@@ -210,6 +220,15 @@ function initAuditBasket(): void {
         beepFail();
         if (err.message === 'forbidden') {
           notify(gettext('You do not have permission to do this.'), 'fail');
+        } else if (err.message === 'ambiguous') {
+          notify(
+            interpolate(
+              gettext("EAN '%(code)s' matches multiple assets. Scan the asset tag instead."),
+              { code: cleaned },
+              true,
+            ),
+            'fail',
+          );
         } else {
           notify(interpolate(gettext('No asset matches: %(code)s'), { code: cleaned }, true), 'fail');
         }

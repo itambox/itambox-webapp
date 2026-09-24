@@ -28,6 +28,12 @@ on:
       - "itambox/static/src/**/*.css"
       - "itambox/static/src/**/*.scss"
       - "itambox/.stylelintrc.json"
+      # TypeScript sources and the JS unit tests are the frontend job's inputs,
+      # and the catalogs feed the localization gates; a frontend-only change
+      # used to trigger no CI run because none of them matched a filter.
+      - "itambox/static/src/**/*.ts"
+      - "itambox/tests/js/**"
+      - "itambox/locale/**"
       - "itambox/package.json"
       - "itambox/package-lock.json"
       - "itambox/schema.yaml"
