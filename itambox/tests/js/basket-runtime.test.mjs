@@ -759,3 +759,60 @@ test('stale camera promise settlement cannot mutate the replacement bulk or audi
     globalThis.clearTimeout = originalTimers.clearTimeout;
   }
 });
+
+test('ambiguous EAN scans report the ambiguity instead of a plain miss', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  const bundleNames = { audit: 'audit-basket.mjs', bulk: 'scan-basket.mjs' };
+
+  try {
+    for (const kind of ['audit', 'bulk']) {
+      const dom = makeDom(kind);
+      const readers = [];
+      const pending = [];
+      installGlobals(dom, readers, (url) => new Promise((resolvePromise) => pending.push({ url, resolvePromise })));
+      const bundleUrl = pathToFileURL(resolve(itamboxRoot, `tests/js/.build/${bundleNames[kind]}`)).href;
+      await import(`${bundleUrl}?ambiguous=${kind}-${Date.now()}`);
+      dom.document.dispatchEvent({ type: 'DOMContentLoaded' });
+      if (kind === 'bulk') {
+        dom.tenantField.value = '11';
+        dom.tenantField.dispatchEvent({ type: 'change', target: dom.tenantField });
+      }
+
+      const input = dom.document.getElementById(dom.ids.inputId);
+      const feedback = dom.document.getElementById(dom.ids.feedbackId);
+
+      // The resolver reports an EAN mapping to several assets distinctly from a
+      // genuine miss; both travel as 404 with a JSON body.
+      input.value = 'EAN-AMBIGUOUS';
+      input.listeners.get('keydown')({ key: 'Enter', preventDefault() {} });
+      assert.equal(pending.length, 1, `${kind} ambiguous scan starts one resolve`);
+      pending.splice(0).forEach(({ resolvePromise }) => resolvePromise({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ found: false, ambiguous: true }),
+      }));
+      await flush();
+      assert.match(feedback.textContent, /EAN-AMBIGUOUS/, `${kind} ambiguous feedback names the scanned code`);
+      assert.match(
+        feedback.textContent,
+        /matches multiple assets\. Scan the asset tag instead\./,
+        `${kind} ambiguous scan reports distinct EAN guidance`,
+      );
+      assert.doesNotMatch(feedback.textContent, /No asset matches/, `${kind} ambiguous scan is not a plain miss`);
+
+      input.value = 'TRULY-MISSING';
+      input.listeners.get('keydown')({ key: 'Enter', preventDefault() {} });
+      assert.equal(pending.length, 1, `${kind} miss scan starts one resolve`);
+      pending.splice(0).forEach(({ resolvePromise }) => resolvePromise({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ found: false }),
+      }));
+      await flush();
+      assert.match(feedback.textContent, /No asset matches: TRULY-MISSING/, `${kind} genuine miss keeps the current message`);
+    }
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
