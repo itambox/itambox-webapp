@@ -22,16 +22,18 @@ Navigate to **Operations → Procurement → Requests** and click **Create Asset
 
 | Field | Required | Description |
 |---|---|---|
-| **Requester** | Yes | The user submitting the request (pre-filled for self-service; can be delegated with the `add_delegated_assetrequest` permission) |
-| **Requested Item** | Yes | Choose ONE of: Asset, Asset Type, Component, Accessory, or Consumable |
-| **Quantity** | Yes | How many units (default 1). Must be > 0 |
-| **Assigned User** | No | Who the item is ultimately for (may differ from the requester) |
-| **Assigned Location** | No | Where the item should be deployed |
+| **Request Category** | No | Which item field the form shows: **Asset Type (General Model)** (default), **Specific Asset (by Tag)**, **Component**, **Accessory**, or **Consumable** |
+| **Asset Type**, **Asset**, **Component**, **Accessory**, or **Consumable** | Yes | The item you are requesting — exactly one per request, entered in the field selected by **Request Category** |
+| **Quantity** | No | How many units (default 1). Must be > 0; not shown for a **Specific Asset (by Tag)** request |
+| **Request For** | No | Who the request is for: **Myself** (default), **Asset Holder**, **Location**, or **Asset**. This field and the **Assigned ...** fields below are shown only for staff or users with the `add_delegated_assetrequest` permission |
+| **Assigned User** | No | The Asset Holder the item is requested for — shown and required when **Request For** is **Asset Holder** |
+| **Assigned Location** | No | The Location the item is requested for — shown and required when **Request For** is **Location** |
+| **Assigned Asset** | No | The parent Asset the item is requested for — shown and required when **Request For** is **Asset** |
 | **Notes** | No | Justification, urgency, or other context for the approver |
 
 > [!IMPORTANT]
-> You must select exactly one item category per request (asset, asset type,
-> component, accessory, or consumable). A database-level check constraint
+> You must select exactly one item per request (asset, asset type, component,
+> accessory, or consumable). A database-level check constraint
 > (`exactly_one_requested_category`) enforces this — combining a laptop AND a
 > monitor in one request is not possible. Submit a separate request for each item
 > you need; to request several units of one asset type as one tracked batch, see
@@ -160,9 +162,9 @@ the group automatically from the quantity:
    request per unit**, each with quantity 1 and the same **Request For**
    target and notes.
 4. Open the parent request to inspect its **Sub-Requests** card: every unit is
-   listed with its own **Status**, **Assigned To**, and **Allocated Asset**.
-   Units that still need a concrete item show **Not set** in the **Allocated
-   Asset** column.
+   listed with its own **Req #**, **Status**, **Assigned To**, and **Allocated
+   Asset**. Units that still need a concrete item show **Not set** in the
+   **Allocated Asset** column.
 
 The automatic split applies to **Asset Type** requests only. Component,
 accessory, and consumable requests stay a single request with the requested
@@ -174,6 +176,7 @@ approves only the children that received assets; the parent stays in
 **Procurement** until every child has an asset.
 
 Group requests are useful for:
+
 - **Department refresh**: request 20 laptops of a specific asset type, tracked
   as a batch.
 - **Onboarding wave**: request the standard laptop model for several new
