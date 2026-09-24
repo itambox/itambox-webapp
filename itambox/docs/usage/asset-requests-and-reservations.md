@@ -18,24 +18,26 @@ is an explicit exception and creates neither an assignment nor a stock booking.
 
 ### Creating a Request
 
-Navigate to **Assets → Requests** and click **Add Request**. Fill in:
+Navigate to **Operations → Procurement → Requests** and click **Create Asset Request**. Fill in:
 
 | Field | Required | Description |
 |---|---|---|
-| **Requester** | Yes | The user submitting the request (pre-filled for self-service; can be delegated with the `add_delegated_assetrequest` permission) |
-| **Requested Item** | Yes | Choose ONE of: Asset, Asset Type, Component, Accessory, or Consumable |
-| **Quantity** | Yes | How many units (default 1). Must be > 0 |
-| **Source Location** | No | Preferred warehouse or stock location to pull from |
-| **Assigned User** | No | Who the item is ultimately for (may differ from the requester) |
-| **Assigned Location** | No | Where the item should be deployed |
+| **Request Category** | No | Which item field the form shows: **Asset Type (General Model)** (default), **Specific Asset (by Tag)**, **Component**, **Accessory**, or **Consumable** |
+| **Asset Type**, **Asset**, **Component**, **Accessory**, or **Consumable** | Yes | The item you are requesting — exactly one per request, entered in the field selected by **Request Category** |
+| **Quantity** | No | How many units (default 1). Must be > 0; not shown for a **Specific Asset (by Tag)** request |
+| **Request For** | No | Who the request is for: **Myself** (default), **Asset Holder**, **Location**, or **Asset**. This field and the **Assigned ...** fields below are shown only for staff or users with the `add_delegated_assetrequest` permission |
+| **Assigned User** | No | The Asset Holder the item is requested for — shown and required when **Request For** is **Asset Holder** |
+| **Assigned Location** | No | The Location the item is requested for — shown and required when **Request For** is **Location** |
+| **Assigned Asset** | No | The parent Asset the item is requested for — shown and required when **Request For** is **Asset** |
 | **Notes** | No | Justification, urgency, or other context for the approver |
 
 > [!IMPORTANT]
-> You must select exactly one item category per request (asset, asset type,
-> component, accessory, or consumable). A database-level check constraint
+> You must select exactly one item per request (asset, asset type, component,
+> accessory, or consumable). A database-level check constraint
 > (`exactly_one_requested_category`) enforces this — combining a laptop AND a
-> monitor in one request is not possible. Use **bulk requests** (group requests)
-> for multi-item requests.
+> monitor in one request is not possible. Submit a separate request for each item
+> you need; to request several units of one asset type as one tracked batch, see
+> [Bulk Requests (Group Requests)](#bulk-requests-group-requests).
 
 ### Validation Gating
 
@@ -73,6 +75,11 @@ stateDiagram-v2
 
     note right of Procurement : Optional state for items\\nnot in stock — routes to\\nPurchase Order creation
 ```
+
+When approving a request, the approver picks the **Stock Location** the item
+will be pulled from (required for components, accessories, and consumables).
+ITAMbox records it as the request's **Source Stock Location** and uses it as
+the preferred source location for stock issued during fulfilment.
 
 #### Status Reference
 
@@ -143,14 +150,25 @@ startup deprecation warning.
 
 ### Bulk Requests (Group Requests)
 
-When you need multiple items at once, use **Group Requests**:
+To request several units of one asset type as a single tracked batch, use a
+**group request**. The request form has no "Is Group" field — ITAMbox creates
+the group automatically from the quantity:
 
-1. Create a parent request with **Is Group** = `true` (this request itself
-   doesn't specify an item — it acts as a container).
-2. Add child requests (`sub_requests`) under the parent, each with its own
-   item category, quantity, and assignee.
-3. The group tracks the **unallocated count** — how many child requests still
-   need concrete items assigned.
+1. Navigate to **Operations → Procurement → Requests** and click **Create
+   Asset Request**.
+2. Select an **Asset Type** and set **Quantity** to a value greater than 1.
+3. Submit the request. ITAMbox creates the **parent request** (marked as a
+   group; it keeps the asset type and the total quantity) and one **child
+   request per unit**, each with quantity 1 and the same **Request For**
+   target and notes.
+4. Open the parent request to inspect its **Sub-Requests** card: every unit is
+   listed with its own **Req #**, **Status**, **Assigned To**, and **Allocated
+   Asset**. Units that still need a concrete item show **Not set** in the
+   **Allocated Asset** column.
+
+The automatic split applies to **Asset Type** requests only. Component,
+accessory, and consumable requests stay a single request with the requested
+quantity, even when the quantity is greater than 1.
 
 For a multi-unit Asset Type sent to procurement, ITAMbox creates one Purchase
 Order Line and reserves each unit for its child request. A partial receipt
@@ -158,10 +176,11 @@ approves only the children that received assets; the parent stays in
 **Procurement** until every child has an asset.
 
 Group requests are useful for:
-- **New hire onboarding**: one group request with laptop, monitor, keyboard,
-  mouse, and headset as individual child requests.
+
 - **Department refresh**: request 20 laptops of a specific asset type, tracked
   as a batch.
+- **Onboarding wave**: request the standard laptop model for several new
+  starters as one batch.
 - **Event staging**: temporary equipment pools for conferences or training rooms.
 
 ### Notifications on Status Changes
