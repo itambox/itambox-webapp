@@ -1,9 +1,9 @@
-from django.db.models import Count, Q
+from django.db.models import Count, IntegerField, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
-from core.managers import get_current_tenant
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -27,13 +27,25 @@ class SupplierListView(ObjectListView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        # Keep the list count in step with the detail tab's scoped
-        # Subscription.objects query: only the active tenant's live subscriptions.
-        subscription_filter = Q(subscriptions__deleted_at__isnull=True)
-        active_tenant = get_current_tenant()
-        if active_tenant is not None:
-            subscription_filter &= Q(subscriptions__tenant=active_tenant)
-        return queryset.annotate(subscription_count=Count("subscriptions", filter=subscription_filter))
+        # Mirror the detail tab's scoped Subscription.objects query — the scoped
+        # manager resolves the active single-tenant/group/all-accessible scope and
+        # soft-deletes — so the count can neither disagree with the tab nor leak
+        # subscription counts from tenants outside the active scope.
+        # inline imports: heavy-import: subscriptions.models for the supplier subscription counts
+        from subscriptions.models import Subscription
+
+        live_subscriptions = (
+            Subscription.objects.filter(supplier=OuterRef("pk"))
+            .order_by()
+            .values("supplier")
+            .annotate(total=Count("pk"))
+        )
+        return queryset.annotate(
+            subscription_count=Coalesce(
+                Subquery(live_subscriptions.values("total"), output_field=IntegerField()),
+                0,
+            )
+        )
 
 
 class SupplierDetailView(ObjectDetailView):

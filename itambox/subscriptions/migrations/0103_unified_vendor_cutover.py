@@ -259,6 +259,31 @@ def forwards(apps, schema_editor):
         Supplier.objects.filter(pk__in=provider_to_supplier.values()).values_list("pk", "tenant_id")
     )
     _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants)
+    _rename_provider_permissions(apps)
+
+
+def _rename_provider_permissions(apps):
+    """Translate legacy ``subscriptions.*_provider`` grants to their Supplier equivalents.
+
+    Role permissions are persisted as literal "app_label.codename" strings in a
+    JSON field, so the policy rename (Provider retired, Supplier in ``assets``)
+    only changes what the UI offers — existing custom roles would keep the
+    retired strings and silently lose access. Rename in place, preserve order,
+    dedupe against roles that already carry the Supplier permission.
+    """
+    Role = apps.get_model("organization", "Role")
+    legacy_map = {
+        "subscriptions.view_provider": "assets.view_supplier",
+        "subscriptions.add_provider": "assets.add_supplier",
+        "subscriptions.change_provider": "assets.change_supplier",
+        "subscriptions.delete_provider": "assets.delete_supplier",
+    }
+    for role in Role.objects.all().only("pk", "permissions").iterator():
+        permissions = list(role.permissions or [])
+        deduped = list(dict.fromkeys(legacy_map.get(permission, permission) for permission in permissions))
+        if deduped != permissions:
+            role.permissions = deduped
+            role.save(update_fields=["permissions"])
 
 
 class Migration(migrations.Migration):

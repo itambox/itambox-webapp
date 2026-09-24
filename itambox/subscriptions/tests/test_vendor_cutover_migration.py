@@ -33,6 +33,7 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         ContactRole = old_apps.get_model("organization", "ContactRole")
         ContactAssignment = old_apps.get_model("organization", "ContactAssignment")
         Tenant = old_apps.get_model("organization", "Tenant")
+        Role = old_apps.get_model("organization", "Role")
         ContentType = old_apps.get_model("contenttypes", "ContentType")
 
         suffix = uuid.uuid4().hex[:8]
@@ -172,6 +173,23 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         Bookmark.objects.create(user_id=bookmark_user_id, model=supplier_ct, object_id=prelinked.pk)
         Bookmark.objects.create(user_id=bookmark_user_id, model=provider_ct, object_id=linked_provider.pk)
 
+        role_a = Role.objects.create(
+            tenant=cutover_tenant,
+            name=f"Legacy provider role A {suffix}",
+            slug=f"legacy-provider-role-a-{suffix}",
+            permissions=[
+                "subscriptions.view_provider",
+                "subscriptions.delete_provider",
+                "assets.view_asset",
+            ],
+        )
+        role_b = Role.objects.create(
+            tenant=cutover_tenant,
+            name=f"Legacy provider role B {suffix}",
+            slug=f"legacy-provider-role-b-{suffix}",
+            permissions=["subscriptions.add_provider", "assets.add_supplier"],
+        )
+
         self.expected = {
             "linked_supplier": prelinked.pk,
             "matched_supplier": existing.pk,
@@ -191,6 +209,8 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             "attachment_id": attachment.pk,
             "event_id": event.pk,
             "bookmark_user_id": bookmark_user_id,
+            "role_a_id": role_a.pk,
+            "role_b_id": role_b.pk,
             "cutover_tenant_id": cutover_tenant.pk,
             "suffix": suffix,
         }
@@ -230,6 +250,7 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         FileAttachment = self.apps.get_model("extras", "FileAttachment")
         Bookmark = self.apps.get_model("extras", "Bookmark")
         Event = self.apps.get_model("extras", "Event")
+        Role = self.apps.get_model("organization", "Role")
 
         expected = self.expected
         subscriptions = {
@@ -312,6 +333,17 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         surviving_bookmark = bookmarks.get()
         self.assertEqual(surviving_bookmark.model_id, expected["supplier_ct_id"])
         self.assertEqual(surviving_bookmark.object_id, expected["linked_supplier"])
+
+        # Custom roles keep working across the rename: legacy provider grants are
+        # translated in place (order preserved, duplicates deduped) instead of
+        # silently locking their holders out of the assets.view_supplier gate.
+        role_a = Role.objects.get(pk=expected["role_a_id"])
+        role_b = Role.objects.get(pk=expected["role_b_id"])
+        self.assertEqual(
+            role_a.permissions,
+            ["assets.view_supplier", "assets.delete_supplier", "assets.view_asset"],
+        )
+        self.assertEqual(role_b.permissions, ["assets.add_supplier"])
 
         with self.assertRaises(LookupError):
             self.apps.get_model("subscriptions", "Provider")

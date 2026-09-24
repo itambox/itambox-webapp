@@ -184,7 +184,7 @@ Always add `db_index=True` to ForeignKey fields. SQLite auto-indexes, but Postgr
 
 ### Models
 
-- `Provider` — Vendor/supplier (AWS, Azure, Adobe)
+- `Supplier` — Vendor/supplier (AWS, Azure, Adobe)
 - `Subscription` — Recurring agreement (SaaS, support, maintenance)
 - `SubscriptionAssignment` — GenericForeignKey linking subscriptions to Assets, AssetHolders, or Locations
 

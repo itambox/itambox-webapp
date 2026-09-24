@@ -1,12 +1,16 @@
+import uuid
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Supplier
+from core.managers import set_current_tenant, set_current_tenant_group
 from core.models import ObjectChange
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
+from itambox.middleware import _current_user, _request_id
 from organization.models import Tenant, TenantGroup
 from subscriptions.models import Subscription
 
@@ -120,6 +124,72 @@ class SupplierScopingTests(TenantTestMixin, TestCase):
             )
         self.assertEqual(change.tenant_id, self.tenant.pk)
 
+    def test_group_workspace_changes_fan_out_to_the_group_audience(self):
+        # In a tenant-group workspace no single tenant is active: the group-scoped
+        # row must still never produce a globally visible (tenant=None) snapshot.
+        # It fans out to the live tenants of the group's subtree — descendant
+        # groups included — and leaks to nobody else.
+        sibling = Tenant.objects.create(
+            name="Supplier Tenant Sibling", slug="supplier-tenant-sibling", group=self.group
+        )
+        child_group = TenantGroup.objects.create(
+            name="Supplier Child Group", slug="supplier-child-group", parent=self.group
+        )
+        child_tenant = Tenant.objects.create(
+            name="Supplier Tenant Child", slug="supplier-tenant-child", group=child_group
+        )
+
+        _current_user.set(self.tenant_user)
+        set_current_tenant(None)
+        set_current_tenant_group(self.group)
+        _request_id.set(uuid.uuid4())
+        try:
+            self.group_supplier.notes = "Group workspace update"
+            self.group_supplier.save()
+        finally:
+            _request_id.set(None)
+            _current_user.set(None)
+            set_current_tenant_group(None)
+            set_current_tenant(None)
+
+        changes = ObjectChange._base_manager.filter(
+            changed_object_type=ContentType.objects.get_for_model(Supplier),
+            changed_object_id=self.group_supplier.pk,
+        )
+        self.assertFalse(changes.filter(tenant__isnull=True).exists())
+        self.assertEqual(
+            set(changes.values_list("tenant_id", flat=True)),
+            {self.tenant.pk, sibling.pk, child_tenant.pk},
+        )
+
+        # A tenant inside the group still sees exactly its own row through the
+        # normal scoped manager; an unrelated tenant sees nothing at all.
+        set_current_tenant(sibling)
+        _current_user.set(self.tenant_user)
+        try:
+            visible = set(
+                ObjectChange.objects.filter(
+                    changed_object_type=ContentType.objects.get_for_model(Supplier),
+                    changed_object_id=self.group_supplier.pk,
+                ).values_list("tenant_id", flat=True)
+            )
+        finally:
+            set_current_tenant(None)
+            _current_user.set(None)
+        self.assertEqual(visible, {sibling.pk})
+
+        set_current_tenant(self.other_tenant)
+        _current_user.set(self.tenant_user)
+        try:
+            leaked = ObjectChange.objects.filter(
+                changed_object_type=ContentType.objects.get_for_model(Supplier),
+                changed_object_id=self.group_supplier.pk,
+            ).exists()
+        finally:
+            set_current_tenant(None)
+            _current_user.set(None)
+        self.assertFalse(leaked)
+
     def test_global_supplier_changes_stay_system_wide(self):
         with TaskContext(tenant_id=self.tenant.pk, user_id=self.tenant_user.pk):
             self.global_supplier.notes = "Global notes updated"
@@ -140,6 +210,9 @@ class SupplierListSubscriptionCountTests(TenantTestMixin, TestCase):
             slug="count-tenant",
             permissions=["assets.view_supplier"],
         )
+        self.group = TenantGroup.objects.create(name="Count Group", slug="count-group")
+        self.tenant.group = self.group
+        self.tenant.save(update_fields=["group"])
         self.supplier = Supplier.objects.create(name="Counted Vendor", slug="counted-vendor")
         self.other_tenant = Tenant.objects.create(name="Count Other", slug="count-other")
         Subscription.objects.create(name="Live subscription", supplier=self.supplier, tenant=self.tenant)
@@ -157,4 +230,19 @@ class SupplierListSubscriptionCountTests(TenantTestMixin, TestCase):
 
         self.assertEqual(response.status_code, 200)
         row = next(row for row in response.context["table"].data if row.pk == self.supplier.pk)
+        self.assertEqual(row.subscription_count, 1)
+
+    def test_group_workspace_count_matches_the_scoped_detail_tab(self):
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_tenant_group_id"] = self.group.pk
+        session.save()
+
+        response = self.client.get(reverse("assets:supplier_list"))
+
+        self.assertEqual(response.status_code, 200)
+        row = next(row for row in response.context["table"].data if row.pk == self.supplier.pk)
+        # The unrelated tenant sits outside the group; only the member tenant's
+        # live subscription counts — exactly what the scoped detail tab exposes.
         self.assertEqual(row.subscription_count, 1)

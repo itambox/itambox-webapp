@@ -440,7 +440,9 @@ class AssetTypeFieldset(BaseModel):
 
 
 class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    changelog_global = True  # Scoped rows follow their tenant; only global suppliers log system-wide changes.
+    # Tenant rows log to their tenant; group-scoped rows fan out to the group's
+    # tenants; only global suppliers log system-wide changes.
+    changelog_global = True
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
