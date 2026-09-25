@@ -151,9 +151,9 @@ def _repoint_provider_contacts(ContactAssignment, ContentType, provider_to_suppl
     for assignment in ContactAssignment.objects.filter(content_type_id=provider_ct.pk).order_by("pk"):
         supplier_id = provider_to_supplier.get(assignment.object_id)
         if supplier_id is None:
-            raise RuntimeError(
-                f"ContactAssignment references a missing subscriptions.Provider row: {assignment.object_id}"
-            )
+            # Dangling reference to a provider row that no longer exists
+            # (deleted provider, historical data): keep the row as-is.
+            continue
         duplicate = ContactAssignment.objects.filter(
             contact_id=assignment.contact_id,
             role_id=assignment.role_id,
@@ -196,13 +196,14 @@ def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier
     Event = apps.get_model("extras", "Event")
 
     def _supplier_id(row):
-        supplier_id = provider_to_supplier.get(row.object_id)
-        if supplier_id is None:
-            raise RuntimeError(f"{type(row).__name__} references a missing subscriptions.Provider row: {row.object_id}")
-        return supplier_id
+        # None for dangling references to provider rows that no longer exist
+        # (deleted providers, historical data): those rows are kept as-is.
+        return provider_to_supplier.get(row.object_id)
 
     for entry in JournalEntry.objects.filter(model_id=provider_ct.pk).order_by("pk"):
         supplier_id = _supplier_id(entry)
+        if supplier_id is None:
+            continue
         JournalEntry.objects.filter(pk=entry.pk).update(
             model_id=supplier_ct.pk,
             object_id=supplier_id,
@@ -213,6 +214,8 @@ def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier
     for model in (Bookmark, ObjectWatch):
         for row in model.objects.filter(model_id=provider_ct.pk).order_by("pk"):
             supplier_id = _supplier_id(row)
+            if supplier_id is None:
+                continue
             duplicate = model.objects.filter(
                 user_id=row.user_id,
                 model_id=supplier_ct.pk,
@@ -226,10 +229,14 @@ def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier
     for model in (ImageAttachment, FileAttachment):
         for row in model.objects.filter(model_id=provider_ct.pk).order_by("pk"):
             supplier_id = _supplier_id(row)
+            if supplier_id is None:
+                continue
             model.objects.filter(pk=row.pk).update(model_id=supplier_ct.pk, object_id=supplier_id)
 
     for event in Event.objects.filter(model_id=provider_ct.pk).order_by("pk"):
         supplier_id = _supplier_id(event)
+        if supplier_id is None:
+            continue
         update_kwargs = {"model_id": supplier_ct.pk, "object_id": supplier_id}
         data = dict(event.data or {})
         if data.get("app_label") == "subscriptions" and data.get("model_name") == "provider":
@@ -240,6 +247,8 @@ def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier
 
     for alert in AlertLog.objects.filter(content_type_id=provider_ct.pk).order_by("pk"):
         supplier_id = _supplier_id(alert)
+        if supplier_id is None:
+            continue
         if alert.status in ("active", "acknowledged"):
             duplicate = AlertLog.objects.filter(
                 rule_id=alert.rule_id,

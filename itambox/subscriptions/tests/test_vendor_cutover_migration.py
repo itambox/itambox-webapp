@@ -715,3 +715,103 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
 
         with self.assertRaises(LookupError):
             self.apps.get_model("subscriptions", "Provider")
+
+
+@pytest.mark.serial_only
+class UnifiedVendorCutoverDanglingReferenceTests(TransactionTestCase):
+    """Dangling provider references (deleted providers, historical rows) must
+    not abort the cutover: the affected rows are kept as-is."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(self._restore_leaf)
+        self.executor = self._scoped_executor()
+        self.executor.migrate([MIGRATE_FROM, ASSET_STATE])
+        old_apps = self.executor.loader.project_state([MIGRATE_FROM, ASSET_STATE]).apps
+
+        Provider = old_apps.get_model("subscriptions", "Provider")
+        JournalEntry = old_apps.get_model("extras", "JournalEntry")
+        Event = old_apps.get_model("extras", "Event")
+        Contact = old_apps.get_model("organization", "Contact")
+        ContactRole = old_apps.get_model("organization", "ContactRole")
+        ContactAssignment = old_apps.get_model("organization", "ContactAssignment")
+        ContentType = old_apps.get_model("contenttypes", "ContentType")
+
+        suffix = uuid.uuid4().hex[:8]
+        provider_ct, _ = ContentType.objects.get_or_create(app_label="subscriptions", model="provider")
+        live_provider = Provider.objects.create(
+            name=f"Dangling neighbour {suffix}", slug=f"dangling-neighbour-{suffix}"
+        )
+        missing_id = 999999
+
+        dangling_journal = JournalEntry.objects.create(
+            model=provider_ct,
+            object_id=missing_id,
+            comment="Dangling provider journal comment",
+        )
+        dangling_event = Event.objects.create(
+            model=provider_ct,
+            object_id=missing_id,
+            action="create",
+            data={"app_label": "subscriptions", "model_name": "provider"},
+        )
+        role = ContactRole.objects.create(name=f"Dangling role {suffix}", slug=f"dangling-role-{suffix}")
+        contact = Contact.objects.create(name=f"Dangling contact {suffix}")
+        dangling_assignment = ContactAssignment.objects.create(
+            contact=contact,
+            role=role,
+            content_type=provider_ct,
+            object_id=missing_id,
+        )
+
+        self.expected = {
+            "provider_ct_id": provider_ct.pk,
+            "live_provider_id": live_provider.pk,
+            "dangling_journal_id": dangling_journal.pk,
+            "dangling_event_id": dangling_event.pk,
+            "dangling_assignment_id": dangling_assignment.pk,
+            "missing_id": missing_id,
+        }
+
+        connection.commit()
+        connection.close()
+        self.executor = self._scoped_executor()
+        self.executor.migrate([MIGRATE_TO, ASSET_STATE])
+        self.apps = self.executor.loader.project_state([MIGRATE_TO, ASSET_STATE]).apps
+
+    @staticmethod
+    def _scoped_executor():
+        executor = MigrationExecutor(connection)
+        loader = executor.loader
+        allowed = set(loader.graph.forwards_plan(MIGRATE_TO))
+        graph = MigrationGraph()
+        for key in allowed:
+            graph.add_node(key, loader.disk_migrations[key])
+        for key in allowed:
+            migration = loader.disk_migrations[key]
+            for dependency in migration.dependencies:
+                if dependency in allowed:
+                    graph.add_dependency(migration, key, dependency)
+        loader.graph = graph
+        return executor
+
+    @staticmethod
+    def _restore_leaf():
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def test_cutover_tolerates_dangling_provider_references(self):
+        JournalEntry = self.apps.get_model("extras", "JournalEntry")
+        Event = self.apps.get_model("extras", "Event")
+        ContactAssignment = self.apps.get_model("organization", "ContactAssignment")
+
+        expected = self.expected
+        journal = JournalEntry.objects.get(pk=expected["dangling_journal_id"])
+        self.assertEqual(journal.model_id, expected["provider_ct_id"])
+        self.assertEqual(journal.object_id, expected["missing_id"])
+        event = Event.objects.get(pk=expected["dangling_event_id"])
+        self.assertEqual(event.model_id, expected["provider_ct_id"])
+        self.assertEqual(event.object_id, expected["missing_id"])
+        assignment = ContactAssignment.objects.get(pk=expected["dangling_assignment_id"])
+        self.assertEqual(assignment.content_type_id, expected["provider_ct_id"])
+        self.assertEqual(assignment.object_id, expected["missing_id"])
