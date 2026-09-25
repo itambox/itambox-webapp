@@ -124,16 +124,19 @@ class SubscriptionSerializer(BaseModelSerializer):
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()
 
-    def _effective_tenant(self, validated: dict[str, object]):
+    def _effective_tenant(self, validated: dict[str, object]) -> Tenant | None:
         if "tenant" in validated:
-            return validated["tenant"]
+            tenant = validated["tenant"]
+            return tenant if isinstance(tenant, Tenant) else None
         if self.instance is not None:
-            return self.instance.tenant
+            instance_tenant = self.instance.tenant
+            return instance_tenant if isinstance(instance_tenant, Tenant) else None
         # On create, the active tenant is injected after serializer validation
         # in perform_create(); the relation checks must already see it so the
         # tenant's own suppliers and contracts stay selectable when the
         # optional tenant_id is omitted.
-        return get_current_tenant()
+        current = get_current_tenant()
+        return current if isinstance(current, Tenant) else None
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         lifecycle_errors = {}
