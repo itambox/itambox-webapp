@@ -360,14 +360,24 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             email="invariant.holder@example.com",
             upn="invariant.holder@example.com",
         )
-        # The status labels are migration-seeded reference data (assets.0003), so
-        # fetch them by slug instead of creating them: re-creating them violates
-        # unique_statuslabel_name_active on any already-migrated database.
-        self.available = StatusLabel._base_manager.get(slug="available")
-        self.in_use = StatusLabel._base_manager.get(slug="in-use")
-        self.pending_repair = StatusLabel._base_manager.get(slug="pending-repair")
+        # The status labels are migration-seeded reference data (assets.0003), but a
+        # test database may legitimately not carry them: TransactionTestCase flushes
+        # leave only rows a fixture re-created, and a reused database from an older
+        # checkout can lack them entirely. get_or_create makes the fixture work in
+        # both worlds without tripping unique_statuslabel_name_active.
+        self.available = self._status_label("Available", "available", "deployable")
+        self.in_use = self._status_label("In Use", "in-use", "deployed")
+        self.pending_repair = self._status_label("Pending Repair", "pending-repair", "pending")
         self.requester = User.objects.create_user(username="requester@example.com", password="password")
         Membership._base_manager.create(user=self.requester, tenant=self.tenant, is_active=True)
+
+    @staticmethod
+    def _status_label(name, slug, status_type):
+        """Return the status label, creating it only when it is genuinely absent."""
+        existing = StatusLabel._base_manager.filter(slug=slug).first()
+        if existing is not None:
+            return existing
+        return StatusLabel._base_manager.create(name=name, slug=slug, type=status_type)
 
     def _asset(self, **kwargs):
         defaults = dict(
