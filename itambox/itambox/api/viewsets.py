@@ -174,10 +174,18 @@ class ITAMBoxModelViewSet(
 
     @staticmethod
     def _missing_create_tenant_rows(serializer):
+        # A row that explicitly carries a tenant group is already scoped:
+        # injecting the ambient tenant on top of it would violate the tenant
+        # XOR tenant-group constraint, so only rows that leave BOTH scope
+        # fields empty count as missing a tenant.
         validated = serializer.validated_data
         if getattr(serializer, "many", False):
-            return [row for row in validated if isinstance(row, dict) and row.get("tenant") is None]
-        if isinstance(validated, dict) and validated.get("tenant") is None:
+            return [
+                row
+                for row in validated
+                if isinstance(row, dict) and row.get("tenant") is None and row.get("tenant_group") is None
+            ]
+        if isinstance(validated, dict) and validated.get("tenant") is None and validated.get("tenant_group") is None:
             return [validated]
         return []
 

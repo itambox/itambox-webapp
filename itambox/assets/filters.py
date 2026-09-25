@@ -330,7 +330,7 @@ class DepreciationFilterSet(BaseFilterSet):
 class SupplierFilterSet(BaseFilterSet):
     is_active = django_filters.BooleanFilter(label=_("Active"))
     q = django_filters.CharFilter(
-        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name..."})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Account ID..."})
     )
 
     class Meta:
@@ -338,9 +338,16 @@ class SupplierFilterSet(BaseFilterSet):
         fields = ["name", "is_active"]
 
     def search(self, queryset, name, value):
+        # Search parity with the retired provider filter: account_id and notes
+        # were transplanted from Provider and must stay findable via ?q=.
         if not value.strip():
             return queryset
-        return queryset.filter(Q(name__icontains=value) | Q(website__icontains=value)).distinct()
+        return queryset.filter(
+            Q(name__icontains=value)
+            | Q(website__icontains=value)
+            | Q(account_id__icontains=value)
+            | Q(notes__icontains=value)
+        ).distinct()
 
 
 class CategoryFilterSet(BaseFilterSet):

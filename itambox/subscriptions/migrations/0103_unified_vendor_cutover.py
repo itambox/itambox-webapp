@@ -332,42 +332,80 @@ def _translate_provider_references(apps, ContentType, provider_to_supplier):
     _rewrite_provider_notification_urls(Notification, provider_to_supplier)
 
 
+_MAX_NAME_LENGTH = 255
+
+_SUPPLIER_TABLE_COLUMNS = frozenset(
+    {"pk", "name", "website", "account_id", "contact_email", "is_active", "subscription_count", "tags", "actions"}
+)
+
+
+def _collision_free_name(name, taken):
+    """Return ``name`` or a deterministic `` (Provider N)`` variant that is free.
+
+    Suffixes are applied after truncating the original name so the result
+    always honours the 255-character name limits.
+    """
+    if name not in taken:
+        return name
+    candidate = name
+    suffix = 0
+    while candidate in taken:
+        suffix += 1
+        marker = f" (Provider {suffix})"
+        candidate = f"{name[: _MAX_NAME_LENGTH - len(marker)]}{marker}"
+    return candidate
+
+
+def _translated_export_body(template_code):
+    """Retarget a stored Provider export body at the consolidated Supplier.
+
+    ``admin_notes`` folded into ``notes`` (attribute and bracket access), and
+    the old ``Provider.supplier`` relation collapses into the transplanted
+    supplier itself, so ``x.supplier.y`` becomes ``x.y``.
+    """
+    replacements = (
+        (".admin_notes", ".notes"),
+        ("['admin_notes']", "['notes']"),
+        ('["admin_notes"]', '["notes"]'),
+        (".supplier.", "."),
+    )
+    for old, new in replacements:
+        template_code = template_code.replace(old, new)
+    return template_code
+
+
 def _move_export_templates(ExportTemplate, provider_ct, supplier_ct):
     """Move Provider-bound export templates, renaming on unique-name clashes.
 
     The stored template body follows the model: Provider's ``admin_notes``
-    folded into Supplier's ``notes``, so bodies addressing it are retargeted.
+    folded into Supplier's ``notes`` and its ``supplier`` relation collapsed
+    into the transplanted object. Iteration is pinned to the primary key so
+    which row keeps a colliding name is deterministic.
     """
-    for template in ExportTemplate.objects.filter(content_type=provider_ct).iterator():
-        name = template.name
-        suffix = 0
-        while ExportTemplate.objects.filter(content_type=supplier_ct, name=name).exclude(pk=template.pk).exists():
-            suffix += 1
-            name = f"{template.name} (Provider {suffix})"
-        template.name = name
+    taken = set(ExportTemplate.objects.filter(content_type=supplier_ct).values_list("name", flat=True))
+    for template in ExportTemplate.objects.filter(content_type=provider_ct).order_by("pk").iterator():
+        template.name = _collision_free_name(template.name, taken)
+        taken.add(template.name)
         template.content_type = supplier_ct
-        template.template_code = template.template_code.replace(".admin_notes", ".notes")
+        template.template_code = _translated_export_body(template.template_code)
         template.save(update_fields=["name", "content_type", "template_code"])
 
 
 def _move_saved_filters(SavedFilter, provider_ct, supplier_ct):
-    """Move Provider-bound saved filters, renaming on live unique-name clashes."""
-    for saved_filter in SavedFilter.objects.filter(content_type=provider_ct).iterator():
-        name = saved_filter.name
-        suffix = 0
-        while (
-            SavedFilter.objects.filter(
-                content_type=supplier_ct,
-                tenant_id=saved_filter.tenant_id,
-                name=name,
-                deleted_at__isnull=True,
-            )
-            .exclude(pk=saved_filter.pk)
-            .exists()
-        ):
-            suffix += 1
-            name = f"{saved_filter.name} (Provider {suffix})"
-        saved_filter.name = name
+    """Move Provider-bound saved filters, renaming on live unique-name clashes.
+
+    Names only collide inside the same tenant scope (the partial unique
+    constraint treats null tenants as distinct); iteration is pinned to the
+    primary key so the outcome is deterministic.
+    """
+    taken = {}
+    live_supplier_filters = SavedFilter.objects.filter(content_type=supplier_ct, deleted_at__isnull=True)
+    for tenant_id, name in live_supplier_filters.values_list("tenant_id", "name"):
+        taken.setdefault(tenant_id, set()).add(name)
+    for saved_filter in SavedFilter.objects.filter(content_type=provider_ct).order_by("pk").iterator():
+        scope = taken.setdefault(saved_filter.tenant_id, set())
+        saved_filter.name = _collision_free_name(saved_filter.name, scope)
+        scope.add(saved_filter.name)
         saved_filter.content_type = supplier_ct
         saved_filter.save(update_fields=["name", "content_type"])
 
@@ -390,7 +428,12 @@ def _rename_saved_filter_parameters(SavedFilter, rewritable_filter_ids, provider
 
 
 def _rename_report_templates(ReportTemplate):
-    """Rename provider columns, grouping and quoted row lookups in stored templates."""
+    """Rename provider columns, grouping and quoted row lookups in stored templates.
+
+    The quoted-lookup substitution only runs for rows with provider /
+    subscription-report lineage; unrelated templates keep their executable
+    content byte-identical.
+    """
     replacements = (
         ('["Provider"]', '["Supplier"]'),
         ("['Provider']", "['Supplier']"),
@@ -399,21 +442,31 @@ def _rename_report_templates(ReportTemplate):
     )
     for template in ReportTemplate.objects.all().iterator():
         columns = list(template.included_columns or [])
+        group_by_field = template.group_by_field
+        references_provider = (
+            template.report_type == "subscription_renewals" or "provider" in columns or group_by_field == "provider"
+        )
         renamed_columns = ["supplier" if column == "provider" else column for column in columns]
-        group_by = "supplier" if template.group_by_field == "provider" else template.group_by_field
+        renamed_group = "supplier" if group_by_field == "provider" else group_by_field
         content = template.template_content or ""
         renamed_content = content
-        for old, new in replacements:
-            renamed_content = renamed_content.replace(old, new)
-        if renamed_columns != columns or group_by != template.group_by_field or renamed_content != content:
+        if references_provider:
+            for old, new in replacements:
+                renamed_content = renamed_content.replace(old, new)
+        if renamed_columns != columns or renamed_group != group_by_field or renamed_content != content:
             template.included_columns = renamed_columns
-            template.group_by_field = group_by
+            template.group_by_field = renamed_group
             template.template_content = renamed_content
             template.save(update_fields=["included_columns", "group_by_field", "template_content"])
 
 
 def _rewrite_user_table_preferences(UserPreference):
-    """Rename the persisted provider column in stored subscription table layouts."""
+    """Follow the table renames in stored user table layouts.
+
+    The subscription table's ``provider`` column becomes ``supplier``, and a
+    stored ``subscriptions.ProviderTable`` layout moves to the replacement
+    ``assets.SupplierTable``, dropping column keys the new table does not have.
+    """
     for preference in UserPreference.objects.all().iterator():
         data = preference.data
         if not isinstance(data, dict):
@@ -426,12 +479,24 @@ def _rewrite_user_table_preferences(UserPreference):
             if not isinstance(app_tables, dict):
                 continue
             table_config = app_tables.get("SubscriptionTable")
-            if not isinstance(table_config, dict):
-                continue
-            columns = table_config.get("columns")
-            if isinstance(columns, list) and "provider" in columns:
-                table_config["columns"] = ["supplier" if column == "provider" else column for column in columns]
-                changed = True
+            if isinstance(table_config, dict):
+                columns = table_config.get("columns")
+                if isinstance(columns, list) and "provider" in columns:
+                    table_config["columns"] = ["supplier" if column == "provider" else column for column in columns]
+                    changed = True
+        subscriptions_tables = tables.get("subscriptions")
+        if isinstance(subscriptions_tables, dict) and "ProviderTable" in subscriptions_tables:
+            provider_table = subscriptions_tables.pop("ProviderTable")
+            if isinstance(provider_table, dict):
+                columns = provider_table.get("columns")
+                if isinstance(columns, list):
+                    provider_table["columns"] = [column for column in columns if column in _SUPPLIER_TABLE_COLUMNS]
+            assets_tables = tables.get("assets")
+            if not isinstance(assets_tables, dict):
+                assets_tables = {}
+                tables["assets"] = assets_tables
+            assets_tables.setdefault("SupplierTable", provider_table)
+            changed = True
         if changed:
             preference.data = data
             preference.save(update_fields=["data"])

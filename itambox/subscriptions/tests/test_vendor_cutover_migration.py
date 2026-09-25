@@ -206,7 +206,10 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         export_template = ExportTemplate.objects.create(
             name=f"Provider export {suffix}",
             content_type=provider_content_type,
-            template_code="{{ queryset.first().admin_notes }}",
+            template_code=(
+                "{{ queryset.first().admin_notes }}|{{ queryset.first().supplier.name }}|"
+                "{{ queryset.first()['admin_notes'] }}"
+            ),
         )
         saved_filter = SavedFilter.objects.create(
             name=f"Provider subscription filter {suffix}",
@@ -219,6 +222,13 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             included_columns=["subscription_name", "provider", "cost"],
             group_by_field="provider",
             template_content="<p>{{ row['Provider'] }} / {{ row['Anbieter'] }}</p>",
+        )
+        unrelated_report_template = ReportTemplate.objects.create(
+            name=f"Asset report {suffix}",
+            report_type="asset_default",
+            included_columns=["name"],
+            group_by_field="name",
+            template_content="<p>{{ row['Provider'] }}</p>",
         )
 
         # Name collisions between Provider- and Supplier-bound rows are legal
@@ -235,6 +245,17 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             content_type=provider_content_type,
             template_code="colliding",
         )
+        long_name = f"Long {'x' * 250}"
+        supplier_long_template = ExportTemplate.objects.create(
+            name=long_name,
+            content_type=supplier_ct,
+            template_code="long-existing",
+        )
+        provider_long_template = ExportTemplate.objects.create(
+            name=long_name,
+            content_type=provider_content_type,
+            template_code="long-colliding",
+        )
         supplier_saved_filter = SavedFilter.objects.create(
             name=f"Collision filter {suffix}",
             content_type=supplier_ct,
@@ -247,6 +268,16 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             tenant=cutover_tenant,
             parameters={"provider": str(linked_provider.pk)},
         )
+        global_filter_one = SavedFilter.objects.create(
+            name=f"Global duplicate {suffix}",
+            content_type=provider_content_type,
+            parameters={},
+        )
+        global_filter_two = SavedFilter.objects.create(
+            name=f"Global duplicate {suffix}",
+            content_type=provider_content_type,
+            parameters={},
+        )
         tag_ct = ContentType.objects.get(app_label="extras", model="tag")
         tag_saved_filter = SavedFilter.objects.create(
             name=f"Tag filter {suffix}",
@@ -257,7 +288,14 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         Notification = old_apps.get_model("core", "Notification")
         user_preference = UserPreference.objects.create(
             user_id=bookmark_user_id,
-            data={"tables": {"subscriptions": {"SubscriptionTable": {"columns": ["name", "provider", "cost"]}}}},
+            data={
+                "tables": {
+                    "subscriptions": {
+                        "SubscriptionTable": {"columns": ["name", "provider", "cost"]},
+                        "ProviderTable": {"columns": ["pk", "name", "supplier", "is_active", "unknown_key"]},
+                    }
+                }
+            },
         )
         notification = Notification.objects.create(
             user_id=bookmark_user_id,
@@ -296,8 +334,15 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             "supplier_saved_filter_id": supplier_saved_filter.pk,
             "provider_saved_filter_id": provider_saved_filter.pk,
             "tag_saved_filter_id": tag_saved_filter.pk,
+            "tag_saved_filter_parameters": {"provider": str(linked_provider.pk), "q": "x"},
             "user_preference_id": user_preference.pk,
             "notification_id": notification.pk,
+            "long_name": long_name,
+            "supplier_long_template_id": supplier_long_template.pk,
+            "provider_long_template_id": provider_long_template.pk,
+            "global_filter_one_id": global_filter_one.pk,
+            "global_filter_two_id": global_filter_two.pk,
+            "unrelated_report_template_id": unrelated_report_template.pk,
             "cutover_tenant_id": cutover_tenant.pk,
             "suffix": suffix,
         }
@@ -467,8 +512,27 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         self.assertEqual(provider_saved_filter.name, f"Collision filter {expected['suffix']} (Provider 1)")
         self.assertEqual(provider_saved_filter.content_type_id, expected["supplier_ct_id"])
         tag_saved_filter = SavedFilter.objects.get(pk=expected["tag_saved_filter_id"])
-        self.assertEqual(tag_saved_filter.parameters.get("q"), "x")
-        self.assertIn("provider", tag_saved_filter.parameters)
+        self.assertEqual(tag_saved_filter.parameters, expected["tag_saved_filter_parameters"])
+        provider_long_template = ExportTemplate.objects.get(pk=expected["provider_long_template_id"])
+        self.assertEqual(
+            provider_long_template.name,
+            f"{expected['long_name'][: 255 - len(' (Provider 1)')]} (Provider 1)",
+        )
+        self.assertEqual(len(provider_long_template.name), 255)
+        supplier_long_template = ExportTemplate.objects.get(pk=expected["supplier_long_template_id"])
+        self.assertEqual(supplier_long_template.name, expected["long_name"])
+        lower_filter_id, higher_filter_id = sorted([expected["global_filter_one_id"], expected["global_filter_two_id"]])
+        self.assertEqual(
+            SavedFilter.objects.get(pk=lower_filter_id).name,
+            f"Global duplicate {expected['suffix']}",
+        )
+        self.assertEqual(
+            SavedFilter.objects.get(pk=higher_filter_id).name,
+            f"Global duplicate {expected['suffix']} (Provider 1)",
+        )
+        unrelated_report_template = ReportTemplate.objects.get(pk=expected["unrelated_report_template_id"])
+        self.assertEqual(unrelated_report_template.template_content, "<p>{{ row['Provider'] }}</p>")
+        self.assertEqual(unrelated_report_template.included_columns, ["name"])
         UserPreference = self.apps.get_model("users", "UserPreference")
         Notification = self.apps.get_model("core", "Notification")
         user_preference = UserPreference.objects.get(pk=expected["user_preference_id"])
@@ -476,9 +540,17 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             user_preference.data["tables"]["subscriptions"]["SubscriptionTable"]["columns"],
             ["name", "supplier", "cost"],
         )
+        self.assertEqual(
+            user_preference.data["tables"]["assets"]["SupplierTable"]["columns"],
+            ["pk", "name", "is_active"],
+        )
+        self.assertNotIn("ProviderTable", user_preference.data["tables"]["subscriptions"])
         notification = Notification.objects.get(pk=expected["notification_id"])
         self.assertEqual(notification.target_url, f"/assets/suppliers/{expected['linked_supplier']}/")
-        self.assertEqual(export_template.template_code, "{{ queryset.first().notes }}")
+        self.assertEqual(
+            export_template.template_code,
+            "{{ queryset.first().notes }}|{{ queryset.first().name }}|{{ queryset.first()['notes'] }}",
+        )
 
         with self.assertRaises(LookupError):
             self.apps.get_model("subscriptions", "Provider")

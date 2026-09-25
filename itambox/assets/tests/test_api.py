@@ -298,6 +298,73 @@ class ITAMBoxAPITestCase(APITestCase):
         self.assertEqual(assignment.checked_in_at.date().isoformat(), checkin_date)
         self.assertIn("Check in asset A with custom status and location via API", assignment.notes)
 
+    def test_non_superuser_group_scoped_supplier_create_is_not_double_scoped(self):
+        """tenant_group-only creates must not get an ambient tenant injected (no 500)."""
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Supplier Creator",
+            permissions=["assets.add_supplier"],
+        )
+        grant(self.staff, self.tenant_a, role)
+        tenant_group = TenantGroup.objects.create(name="API Scope Group", slug="api-scope-group")
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.staff_token.key}")
+        response = self.client.post(
+            reverse("api:assets_api:supplier-list"),
+            data={
+                "name": "Group Scoped Supplier",
+                "slug": "group-scoped-supplier",
+                "tenant_group_id": tenant_group.pk,
+            },
+            format="json",
+        )
+
+        # The tenant-bound actor is denied by the request-scoped object
+        # validation — the group-scoped supplier is not in their queryset —
+        # but the response is a clean 403 instead of the previous 500 from
+        # the ambient tenant injection colliding with the explicit group.
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.content)
+        self.assertFalse(Supplier.objects.filter(name="Group Scoped Supplier").exists())
+
+        # A superuser payload with only a tenant group stays legal (no injection).
+        self.client.force_authenticate(user=self.superuser)
+        superuser_response = self.client.post(
+            reverse("api:assets_api:supplier-list"),
+            data={
+                "name": "Super Group Supplier",
+                "slug": "super-group-supplier",
+                "tenant_group_id": tenant_group.pk,
+            },
+            format="json",
+        )
+        self.assertEqual(superuser_response.status_code, status.HTTP_201_CREATED, superuser_response.content)
+        group_supplier = Supplier.objects.get(name="Super Group Supplier")
+        self.assertIsNone(group_supplier.tenant_id)
+        self.assertEqual(group_supplier.tenant_group_id, tenant_group.pk)
+
+    def test_supplier_search_matches_transplanted_provider_fields(self):
+        """q must keep matching the account_id and notes transplanted from Provider."""
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Supplier Viewer",
+            permissions=["assets.view_supplier"],
+        )
+        grant(self.staff, self.tenant_a, role)
+        Supplier.objects.create(
+            name="Search Supplier",
+            account_id="ACCT-9042",
+            notes="legacy administrative note",
+            tenant=self.tenant_a,
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.staff_token.key}")
+        url = reverse("api:assets_api:supplier-list")
+        for query in ("ACCT-9042", "legacy administrative note"):
+            response = self.client.get(url, {"q": query})
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            rows = response.data["results"] if isinstance(response.data, dict) else response.data
+            self.assertEqual([row["name"] for row in rows], ["Search Supplier"])
+
     def test_supplier_scope_rejects_both_tenant_and_tenant_group(self):
         """The tenant XOR tenant_group constraint must surface as a 400, not a 500."""
         self.client.force_authenticate(user=self.superuser)
