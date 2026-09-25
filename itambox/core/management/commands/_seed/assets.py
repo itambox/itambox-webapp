@@ -27,6 +27,7 @@ import random
 
 from django.utils import timezone
 
+from assets.models import AssetAssignment
 from assets.services.specification_writers import apply_asset_specification_patch
 from core.management.commands._seed.engine import as_aware_datetime
 from core.tasks.context import TaskContext
@@ -145,8 +146,6 @@ class SeedAssetsMixin:
         during any repair window drawn after the purchase date — a lifecycle the
         product could never have produced.
         """
-        from assets.models import AssetAssignment
-
         prev = random.choice([h for h in holders if h.pk != current_holder.pk])
         p_date = asset.purchase_date or days_ago(400)
         # The prior loan must fit strictly between the purchase and the end of the
