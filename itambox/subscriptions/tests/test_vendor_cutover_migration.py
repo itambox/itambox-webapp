@@ -717,7 +717,6 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             self.apps.get_model("subscriptions", "Provider")
 
 
-
 @pytest.mark.serial_only
 class UnifiedVendorCutoverDanglingReferenceTests(TransactionTestCase):
     """Dangling provider references (deleted providers, historical rows) must
