@@ -35,6 +35,7 @@ from core.management.commands._seed.access import SeedAccessMixin, check_seed_ac
 from core.management.commands._seed.assets import SeedAssetsMixin
 from core.management.commands._seed.catalog import SeedCatalogMixin
 from core.management.commands._seed.compliance import SeedComplianceMixin
+from core.management.commands._seed.consistency import check_seed_operational_invariants
 from core.management.commands._seed.engine import ChangeLogEngine
 from core.management.commands._seed.finance import SeedFinanceMixin
 from core.management.commands._seed.history import SeedHistoryMixin
@@ -296,6 +297,10 @@ class Command(
             self._simulate_history()  # real 2-year change history (last)
             check_seed_access_invariants(self._users.values())
             check_seed_inventory_invariants()
+            # Operational-story coherence: a received PO line has its assets, a
+            # repair episode agrees with the assignment, maintenance belongs to the
+            # asset's timeline, and an approved request can actually be claimed.
+            check_seed_operational_invariants()
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (shared status-label defs used by both _seed_minimal and _seed_catalog)

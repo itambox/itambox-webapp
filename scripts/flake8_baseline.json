@@ -2676,14 +2676,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/procurement.py",
-      "code": "B007",
-      "message": "Loop control variable 'n' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "                    for n in range(min(received, 3)):",
-      "context": "Module:body/ClassDef:SeedProcurementMixin:body/FunctionDef:_seed_procurement:body/For:Tuple(elts=[Name(id='i', ctx=Store()), Name(id='slug', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='target_slugs', ctx=Load())], keywords=[]):body/For:Tuple(elts=[Name(id='kind', ctx=Store()), Name(id='key', ctx=Store()), Name(id='qty', ctx=Store())], ctx=Store()):Name(id='lines', ctx=Load()):body/If:BoolOp(op=And(), values=[Compare(left=Name(id='kind', ctx=Load()), ops=[Eq()], comparators=[Constant(value='asset_type')]), Name(id='received', ctx=Load())]):body/For:Name(id='n', ctx=Store()):Call(func=Name(id='range', ctx=Load()), args=[Call(func=Name(id='min', ctx=Load()), args=[Name(id='received', ctx=Load()), Constant(value=3)], keywords=[])], keywords=[]):self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/compile_locales.py",
       "code": "C901",
       "message": "'_compile_po' is too complex (28)",

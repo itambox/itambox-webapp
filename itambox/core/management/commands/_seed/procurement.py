@@ -17,6 +17,8 @@ Designed to be mixed into ``Command`` in seed_data.py:
 import datetime
 import random
 
+from django.core.management import CommandError
+
 TODAY = datetime.date.today()
 
 
@@ -26,6 +28,28 @@ def days_ago(n):
 
 class SeedProcurementMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
+
+    def _unique_serial(self, code: str) -> str:
+        """Return a serial number that is unused for this tenant's active assets.
+
+        ``(tenant, serial_number)`` is unique among non-deleted assets, and the PO
+        phase now materialises one asset per received unit, so a plain random draw
+        can collide and abort the seed. Probing the live table keeps the draw
+        collision-free without changing the deterministic random stream that later
+        phases depend on.
+        """
+        # inline import: app-registry: assets.Asset is queried inside the seed command,
+        # where the model import must not happen at module load.
+        from assets.models import Asset
+
+        for _ in range(1000):
+            candidate = f"{code}{random.randint(100000, 999999)}"
+            if not Asset._base_manager.filter(serial_number=candidate).exists():
+                return candidate
+        raise CommandError(
+            "Seed procurement invariant failed: could not draw a free serial number for tenant code "
+            f"{code} after 1000 attempts."
+        )
 
     def _seed_procurement(self):
         from assets.models import Asset
@@ -90,9 +114,16 @@ class SeedProcurementMixin:
                 # Received asset-type lines materialise into real Assets that point back
                 # to the originating PO line (Asset.purchase_order_line) — closes the
                 # order → inventory loop instead of leaving received qty abstract.
+                #
+                # Every received unit becomes an asset: a line received with qty 10 must
+                # show 10 assets, or the PO's receipt claim and the asset ledger
+                # contradict each other and total-cost reports sum units that do not
+                # exist (#506). The serial number is drawn collision-free because
+                # (tenant, serial_number) is unique among active rows and the received
+                # volume per tenant is far larger than before.
                 if kind == "asset_type" and received:
                     atype = self._asset_types[key]
-                    for n in range(min(received, 3)):
+                    for _n in range(received):
                         cost = round(float(line.unit_price or 0) * random.uniform(0.97, 1.03), 2)
                         a = Asset(
                             name=atype.model,
@@ -103,7 +134,7 @@ class SeedProcurementMixin:
                             location=locs[0],
                             tenant=tenant,
                             purchase_order_line=line,
-                            serial_number=f"{meta['code']}{random.randint(100000, 999999)}",
+                            serial_number=self._unique_serial(meta["code"]),
                             purchase_cost=cost,
                             salvage_value=round(cost * 0.1, 2),
                             purchase_date=order_date,

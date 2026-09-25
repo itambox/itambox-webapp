@@ -826,12 +826,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/maintenance.py",
-      "context": "ClassDef:SeedMaintenanceMixin/FunctionDef:_seed_maintenance",
-      "statement": "from assets.models import AssetMaintenance",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/operations.py",
       "context": "ClassDef:SeedOperationsMixin/FunctionDef:_seed_operations",
       "statement": "from assets.models import Asset, AssetRequest, AssetType",

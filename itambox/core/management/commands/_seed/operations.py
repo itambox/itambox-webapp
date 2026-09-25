@@ -18,6 +18,9 @@ import random
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
+
+from assets.choices import RequestStatusChoices
 
 User = get_user_model()
 
@@ -30,6 +33,56 @@ def days_ahead(n):
 
 class SeedOperationsMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
+
+    def _tenant_of_user(self, user):
+        """Return the tenant a seeded user belongs to, or ``None`` when it has none.
+
+        ``AssetRequest.save`` falls back to the ambient tenant context, which the
+        seed does not set, so the request's tenant has to be resolved from the
+        user's active membership — the same single-membership invariant the access
+        self-check enforces for every seeded person.
+        """
+        # inline import: app-registry: organization.Membership is read from the DB in a
+        # management command; loading it at module top would import the app's models
+        # before the app registry is populated.
+        from organization.models import Membership
+
+        membership = (
+            Membership._base_manager.filter(user_id=user.pk, is_active=True)
+            .select_related("tenant")
+            .order_by("pk")
+            .first()
+        )
+        return membership.tenant if membership else None
+
+    def _claimable_asset_for(self, request_instance):
+        """Return a free, claimable asset of the requested type in the request's tenant.
+
+        Applies exactly the constraints the product enforces when an approver
+        allocates a unit (``approve_asset_request``): the asset must live in the
+        request's tenant, be of the requested asset type, be in a deployable
+        status, carry no active assignment, and be requestable. ``is_requestable``
+        is a property (per-asset override, else the asset type's flag), so the
+        query filters the two underlying columns. Returns ``None`` when the tenant
+        has no spare unit, which the caller treats as "leave the request pending".
+        """
+        # inline import: app-registry: assets.Asset is queried inside the seed command,
+        # where the model import must not happen at module load.
+        from assets.models import Asset
+
+        if not request_instance.asset_type_id or not request_instance.tenant_id:
+            return None
+        candidates = Asset._base_manager.filter(
+            tenant_id=request_instance.tenant_id,
+            asset_type=request_instance.asset_type,
+            status__type="deployable",
+            deleted_at__isnull=True,
+        ).filter(Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True))
+        for asset in candidates.order_by("-in_service_date", "pk"):
+            if asset.assignments.filter(is_active=True).exists():
+                continue
+            return asset
+        return None
 
     def _seed_operations(self):
         from assets.models import Asset, AssetRequest, AssetType
@@ -225,11 +278,25 @@ class SeedOperationsMixin:
         customer_admin_users = [u for name, u in self._users.items() if name.startswith("admin@")]
         req_count = 0
         for user in customer_admin_users[:5]:
+            # An approved request is only claimable once a unit is allocated to it
+            # (RequestClaimView refuses a claim without ``request.asset``), so
+            # seeding "approved" without one produced a demo story that dead-ends on
+            # a validation error the prospect cannot clear (#506). Pick a free unit
+            # of the requested type from the requester's own tenant *before* the row
+            # exists: an approved request then always carries its allocation, and a
+            # tenant without a spare unit is seeded as pending — which is the state
+            # that still has a working approve path in the UI. Demoting an existing
+            # approved row to pending is not an option: the product's state machine
+            # refuses approved -> pending.
+            probe = AssetRequest(requester=user, asset_type=req_type)
+            probe.tenant = self._tenant_of_user(user)
+            allocated = self._claimable_asset_for(probe)
             AssetRequest.objects.create(
                 requester=user,
                 asset_type=req_type,
                 notes="A new employee joins next month and needs a standard laptop.",
-                status=random.choice(["pending", "approved"]),
+                status=RequestStatusChoices.APPROVED if allocated else RequestStatusChoices.PENDING,
+                asset=allocated,
             )
             req_count += 1
 
