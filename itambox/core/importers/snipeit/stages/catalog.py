@@ -185,9 +185,10 @@ class SupplierImporter:
             "website": (row.get("url") or "")[:200],
             "notes": row.get("notes") or "",
         }
-        obj = supplier_model.all_objects.filter(custom_field_data__snipeit_id=str(source_id)).first()
+        global_suppliers = supplier_model.all_objects.filter(tenant__isnull=True, tenant_group__isnull=True)
+        obj = global_suppliers.filter(custom_field_data__snipeit_id=str(source_id)).first()
         if not obj:
-            obj = supplier_model.all_objects.filter(name=name).first()
+            obj = global_suppliers.filter(name=name).first()
         if obj:
             if not self.context.update:
                 return obj, "skipped"

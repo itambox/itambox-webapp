@@ -29,7 +29,7 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
         label=_("Category"),
     )
     supplier = forms.ModelChoiceField(
-        queryset=Supplier.objects.all(),
+        queryset=Supplier.objects.filter(is_active=True),
         required=False,
         widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
         label=_("Supplier"),
@@ -73,6 +73,7 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True

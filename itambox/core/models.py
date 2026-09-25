@@ -7,6 +7,7 @@ from functools import reduce
 from operator import attrgetter, or_
 
 # Third-party / Django
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -44,6 +45,7 @@ from core.mixins import (
 )
 from core.oidc_identity import oidc_audit_excluded_fields, oidc_audit_object_repr
 from core.serialization import serialize_object
+from core.tenant_scope import get_descendant_tenant_group_ids
 from core.validators import validate_file_attachment, validate_image_attachment
 
 # Local application
@@ -353,15 +355,19 @@ class ChangeLoggingMixin:
             change_tenant = None
         if change_tenant is None and self.changelog_tenant_lookup:
             change_tenant = self._resolve_changelog_tenant(self.changelog_tenant_lookup)
-        # Global/shared models (changelog_global) record changes against
-        # tenant=None (system-wide, surfaced to all tenants via
-        # ObjectChange.allow_global_tenant); everything else falls back to the
-        # ambient request tenant.
-        if change_tenant is None and not self.changelog_global:
+        # Shared models (changelog_global) record changes against tenant=None
+        # (system-wide, surfaced to all tenants via ObjectChange.allow_global_tenant);
+        # everything else — including tenant-group-scoped rows, which are shared
+        # with a bounded audience rather than system-wide — falls back to the
+        # ambient request tenant so snapshots never leak across that audience.
+        if change_tenant is None and not self._logs_changes_globally():
             change_tenant = get_current_tenant()
 
-        write_object_change(
-            instance=self,
+        # Tenant-group-scoped rows edited with no single-tenant anchor (a group
+        # workspace, a background task) must not become tenant=None "global"
+        # rows either: fan the audit row out to every live tenant in the group's
+        # subtree so the snapshot stays visible to exactly that bounded audience.
+        self._write_audit_rows(
             action=action,
             user=user,
             request_id=request_id,
@@ -369,6 +375,49 @@ class ChangeLoggingMixin:
             prechange_data=prechange_data,
             postchange_data=postchange_data,
         )
+
+    def _write_audit_rows(self, *, action, user, request_id, change_tenant, prechange_data, postchange_data):
+        for audience_tenant in self._audit_row_tenants(change_tenant):
+            write_object_change(
+                instance=self,
+                action=action,
+                user=user,
+                request_id=request_id,
+                change_tenant=audience_tenant,
+                prechange_data=prechange_data,
+                postchange_data=postchange_data,
+            )
+
+    def _logs_changes_globally(self):
+        """True when this row's changes belong system-wide (tenant=None).
+
+        ``changelog_global`` models log without a tenant, but a tenant-group-scoped
+        row (tenant=None, tenant_group set) is shared with a bounded audience,
+        not system-wide: those attribute to the ambient request tenant so their
+        full pre/post snapshots never surface to every tenant through
+        ``ObjectChange.allow_global_tenant``.
+        """
+        if getattr(self, "tenant_group_id", None) is not None:
+            return False
+        return bool(self.changelog_global)
+
+    def _audit_row_tenants(self, change_tenant):
+        """The tenant(s) this change's audit row(s) are written against.
+
+        ``[None]`` (one system-wide row) only for genuine global/shared changes.
+        A tenant-group-scoped row that resolved to no single-tenant anchor fans
+        out to every live tenant of its group's subtree (descendant groups
+        included) — never a tenant=None row for a bounded-audience object.
+        """
+        if change_tenant is None and getattr(self, "tenant_group_id", None) is not None:
+            return list(self._tenant_group_audience())
+        return [change_tenant]
+
+    def _tenant_group_audience(self):
+        """Live tenants inside this row's tenant-group subtree."""
+        Tenant = apps.get_model("organization", "Tenant")
+        group_ids = get_descendant_tenant_group_ids(self.tenant_group_id)
+        return Tenant._base_manager.filter(group_id__in=group_ids, deleted_at__isnull=True)
 
     def _resolve_changelog_tenant(self, lookup):
         # Follow a double-underscore ORM path (e.g. 'asset__tenant') on the

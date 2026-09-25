@@ -1516,28 +1516,6 @@ export interface paths {
     /** @description API ViewSet for managing Subscription assignments to assets, locations, or users. */
     patch: operations["subscriptions_assignments_partial_update"];
   };
-  "/api/subscriptions/providers/": {
-    /** @description API ViewSet for managing subscription Providers. */
-    get: operations["subscriptions_providers_list"];
-    /** @description API ViewSet for managing subscription Providers. */
-    put: operations["subscriptions_providers_update_bulk"];
-    /** @description API ViewSet for managing subscription Providers. */
-    post: operations["subscriptions_providers_create"];
-    /** @description API ViewSet for managing subscription Providers. */
-    delete: operations["subscriptions_providers_destroy_bulk"];
-    /** @description API ViewSet for managing subscription Providers. */
-    patch: operations["subscriptions_providers_partial_update_bulk"];
-  };
-  "/api/subscriptions/providers/{id}/": {
-    /** @description API ViewSet for managing subscription Providers. */
-    get: operations["subscriptions_providers_retrieve"];
-    /** @description API ViewSet for managing subscription Providers. */
-    put: operations["subscriptions_providers_update"];
-    /** @description API ViewSet for managing subscription Providers. */
-    delete: operations["subscriptions_providers_destroy"];
-    /** @description API ViewSet for managing subscription Providers. */
-    patch: operations["subscriptions_providers_partial_update"];
-  };
   "/api/subscriptions/subscriptions/": {
     /** @description API ViewSet for managing recurring Subscriptions. */
     get: operations["subscriptions_subscriptions_list"];
@@ -4872,23 +4850,6 @@ export interface components {
       /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
       count_capped?: boolean;
     };
-    PaginatedProviderList: {
-      /** @example 123 */
-      count: number | null;
-      /**
-       * Format: uri
-       * @example http://api.example.org/accounts/?offset=400&limit=100
-       */
-      next?: string | null;
-      /**
-       * Format: uri
-       * @example http://api.example.org/accounts/?offset=200&limit=100
-       */
-      previous?: string | null;
-      results: components["schemas"]["Provider"][];
-      /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
-      count_capped?: boolean;
-    };
     PaginatedPurchaseOrderLineList: {
       /** @example 123 */
       count: number | null;
@@ -5890,29 +5851,6 @@ export interface components {
       /** @description Channel-specific config (SMTP settings, webhook URL, etc.) */
       config?: unknown;
     };
-    PatchedProviderRequest: {
-      /** @description Unique name of the provider (e.g., Adobe Inc.) */
-      name?: string;
-      slug?: string;
-      tenant_id?: number | null;
-      tenant_group_id?: number | null;
-      /** @description Optional customer account number with the provider */
-      account_id?: string;
-      /**
-       * Admin Portal URL
-       * Format: uri
-       * @description URL for the provider's management/administration portal
-       */
-      portal_url?: string;
-      supplier_id?: number | null;
-      /** @description Optional internal administrative notes */
-      admin_notes?: string;
-      /**
-       * Active
-       * @description Deactivate to hide from selection lists without deleting
-       */
-      is_active?: boolean;
-    };
     PatchedPurchaseOrderLineRequest: {
       tenant_id?: number | null;
       purchase_order_id?: number;
@@ -6045,7 +5983,7 @@ export interface components {
       name?: string;
       /** @description URL-friendly identifier (auto-generated from name if left blank) */
       slug?: string | null;
-      provider_id?: number;
+      supplier_id?: number;
       /** Subscription Type */
       type?: components["schemas"]["SubscriptionTypeEnum"];
       tenant_id?: number | null;
@@ -6093,6 +6031,7 @@ export interface components {
       licensed_quantity?: number | null;
       /** @description Contract number, PO reference, or quote ID */
       contract_reference?: string;
+      linked_contract_id?: number | null;
       cost_center_id?: number | null;
       /** @description Optional text detailing coverage or terms */
       description?: string;
@@ -6107,8 +6046,23 @@ export interface components {
       slug?: string;
       /** Format: uri */
       website?: string;
+      /**
+       * Admin Portal URL
+       * Format: uri
+       * @description URL for the supplier's management/administration portal
+       */
+      portal_url?: string;
+      /** @description Optional customer account number with the supplier */
+      account_id?: string;
       address?: string;
       notes?: string;
+      /**
+       * Active
+       * @description Deactivate to hide from selection lists without deleting
+       */
+      is_active?: boolean;
+      tenant_id?: number | null;
+      tenant_group_id?: number | null;
     };
     PatchedTagRequest: {
       name?: string;
@@ -6194,60 +6148,6 @@ export interface components {
      * @enum {string}
      */
     PriorityEnum: "primary" | "secondary" | "tertiary" | "inactive";
-    Provider: {
-      id: number;
-      /** @description Unique name of the provider (e.g., Adobe Inc.) */
-      name: string;
-      slug?: string;
-      tenant: components["schemas"]["NestedTenant"];
-      tenant_group: components["schemas"]["NestedTenantGroup"];
-      /** @description Optional customer account number with the provider */
-      account_id?: string;
-      /**
-       * Admin Portal URL
-       * Format: uri
-       * @description URL for the provider's management/administration portal
-       */
-      portal_url?: string;
-      supplier: components["schemas"]["NestedSupplier"];
-      /** @description Optional internal administrative notes */
-      admin_notes?: string;
-      /**
-       * Active
-       * @description Deactivate to hide from selection lists without deleting
-       */
-      is_active?: boolean;
-      subscription_count: number;
-      tags: readonly components["schemas"]["Tag"][];
-      contacts: readonly components["schemas"]["ContactAssignment"][];
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-    };
-    ProviderRequest: {
-      /** @description Unique name of the provider (e.g., Adobe Inc.) */
-      name: string;
-      slug?: string;
-      tenant_id?: number | null;
-      tenant_group_id?: number | null;
-      /** @description Optional customer account number with the provider */
-      account_id?: string;
-      /**
-       * Admin Portal URL
-       * Format: uri
-       * @description URL for the provider's management/administration portal
-       */
-      portal_url?: string;
-      supplier_id?: number | null;
-      /** @description Optional internal administrative notes */
-      admin_notes?: string;
-      /**
-       * Active
-       * @description Deactivate to hide from selection lists without deleting
-       */
-      is_active?: boolean;
-    };
     PurchaseOrder: {
       id: number;
       /** Format: uri */
@@ -6724,7 +6624,7 @@ export interface components {
       name: string;
       /** @description URL-friendly identifier (auto-generated from name if left blank) */
       slug?: string | null;
-      provider: components["schemas"]["Provider"];
+      supplier: components["schemas"]["NestedSupplier"];
       /** Subscription Type */
       type?: components["schemas"]["SubscriptionTypeEnum"];
       type_display: string;
@@ -6776,6 +6676,7 @@ export interface components {
       licensed_quantity?: number | null;
       /** @description Contract number, PO reference, or quote ID */
       contract_reference?: string;
+      linked_contract: string;
       cost_center: string;
       /** Format: date */
       cancellation_date: string | null;
@@ -6833,7 +6734,7 @@ export interface components {
       name: string;
       /** @description URL-friendly identifier (auto-generated from name if left blank) */
       slug?: string | null;
-      provider_id: number;
+      supplier_id: number;
       /** Subscription Type */
       type?: components["schemas"]["SubscriptionTypeEnum"];
       tenant_id?: number | null;
@@ -6881,6 +6782,7 @@ export interface components {
       licensed_quantity?: number | null;
       /** @description Contract number, PO reference, or quote ID */
       contract_reference?: string;
+      linked_contract_id?: number | null;
       cost_center_id?: number | null;
       /** @description Optional text detailing coverage or terms */
       description?: string;
@@ -6910,8 +6812,23 @@ export interface components {
       slug: string;
       /** Format: uri */
       website?: string;
+      /**
+       * Admin Portal URL
+       * Format: uri
+       * @description URL for the supplier's management/administration portal
+       */
+      portal_url?: string;
+      /** @description Optional customer account number with the supplier */
+      account_id?: string;
       address?: string;
       notes?: string;
+      /**
+       * Active
+       * @description Deactivate to hide from selection lists without deleting
+       */
+      is_active?: boolean;
+      tenant: components["schemas"]["NestedTenant"];
+      tenant_group: components["schemas"]["NestedTenantGroup"];
       tags: readonly components["schemas"]["Tag"][];
       contacts: readonly components["schemas"]["ContactAssignment"][];
       /** Format: date-time */
@@ -6924,8 +6841,23 @@ export interface components {
       slug: string;
       /** Format: uri */
       website?: string;
+      /**
+       * Admin Portal URL
+       * Format: uri
+       * @description URL for the supplier's management/administration portal
+       */
+      portal_url?: string;
+      /** @description Optional customer account number with the supplier */
+      account_id?: string;
       address?: string;
       notes?: string;
+      /**
+       * Active
+       * @description Deactivate to hide from selection lists without deleting
+       */
+      is_active?: boolean;
+      tenant_id?: number | null;
+      tenant_group_id?: number | null;
     };
     Tag: {
       id: number;
@@ -13605,6 +13537,8 @@ export interface operations {
   assets_suppliers_list: {
     parameters: {
       query?: {
+        /** @description Active */
+        is_active?: boolean;
         /** @description Number of results to return per page. */
         limit?: number;
         name?: string;
@@ -36530,467 +36464,6 @@ export interface operations {
       };
     };
   };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_list: {
-    parameters: {
-      query?: {
-        /** @description Active */
-        is_active?: boolean;
-        /** @description Number of results to return per page. */
-        limit?: number;
-        /** @description The initial index from which to return the results. */
-        offset?: number;
-        /** @description Search */
-        q?: string;
-        /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
-        start?: number;
-      };
-    };
-    responses: {
-      200: {
-        content: {
-          "application/json": components["schemas"]["PaginatedProviderList"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_update_bulk: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ProviderRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["ProviderRequest"];
-        "multipart/form-data": components["schemas"]["ProviderRequest"];
-      };
-    };
-    responses: {
-      200: {
-        content: {
-          "application/json": components["schemas"]["Provider"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      409: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_create: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ProviderRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["ProviderRequest"];
-        "multipart/form-data": components["schemas"]["ProviderRequest"];
-      };
-    };
-    responses: {
-      201: {
-        content: {
-          "application/json": components["schemas"]["Provider"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      409: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_destroy_bulk: {
-    responses: {
-      /** @description No response body */
-      204: {
-        content: never;
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_partial_update_bulk: {
-    requestBody?: {
-      content: {
-        "application/json": components["schemas"]["PatchedProviderRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["PatchedProviderRequest"];
-        "multipart/form-data": components["schemas"]["PatchedProviderRequest"];
-      };
-    };
-    responses: {
-      200: {
-        content: {
-          "application/json": components["schemas"]["Provider"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      409: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_retrieve: {
-    parameters: {
-      path: {
-        /** @description A unique integer value identifying this Provider. */
-        id: number;
-      };
-    };
-    responses: {
-      200: {
-        content: {
-          "application/json": components["schemas"]["Provider"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      404: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_update: {
-    parameters: {
-      path: {
-        /** @description A unique integer value identifying this Provider. */
-        id: number;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ProviderRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["ProviderRequest"];
-        "multipart/form-data": components["schemas"]["ProviderRequest"];
-      };
-    };
-    responses: {
-      200: {
-        content: {
-          "application/json": components["schemas"]["Provider"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      404: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      409: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_destroy: {
-    parameters: {
-      path: {
-        /** @description A unique integer value identifying this Provider. */
-        id: number;
-      };
-    };
-    responses: {
-      /** @description No response body */
-      204: {
-        content: never;
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      404: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
-  /** @description API ViewSet for managing subscription Providers. */
-  subscriptions_providers_partial_update: {
-    parameters: {
-      path: {
-        /** @description A unique integer value identifying this Provider. */
-        id: number;
-      };
-    };
-    requestBody?: {
-      content: {
-        "application/json": components["schemas"]["PatchedProviderRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["PatchedProviderRequest"];
-        "multipart/form-data": components["schemas"]["PatchedProviderRequest"];
-      };
-    };
-    responses: {
-      200: {
-        content: {
-          "application/json": components["schemas"]["Provider"];
-        };
-      };
-      /** @description The request could not be completed. */
-      400: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      401: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      403: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      404: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      409: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      412: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-      /** @description The request could not be completed. */
-      428: {
-        content: {
-          "application/json": components["schemas"]["APIError"];
-        };
-      };
-    };
-  };
   /** @description API ViewSet for managing recurring Subscriptions. */
   subscriptions_subscriptions_list: {
     parameters: {
@@ -37003,8 +36476,6 @@ export interface operations {
         limit?: number;
         /** @description The initial index from which to return the results. */
         offset?: number;
-        /** @description Provider */
-        provider?: number;
         /** @description Search */
         q?: string;
         /** @description Renews Within (Days) */
@@ -37020,6 +36491,8 @@ export interface operations {
          * * `expired` - Expired
          */
         status?: "active" | "cancelled" | "expired" | "suspended";
+        /** @description Supplier */
+        supplier?: number;
         /** @description Tenant */
         tenant?: number;
         /**

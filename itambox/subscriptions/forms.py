@@ -8,14 +8,14 @@ from django.db import models as db_models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
-from assets.models import Asset
-from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, scope_tenant_field, scope_tenant_group_field
+from assets.models import Asset, Supplier
+from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, scope_tenant_field
 from core.importers.bulk_forms import BulkImportForm, register_import_form
 from extras.customfields import CustomFieldModelFormMixin
-from organization.models import AssetHolder, CostCenter, Location, Tenant, TenantGroup
+from organization.models import AssetHolder, CostCenter, Location, Tenant
 
-from .filters import ProviderFilterSet, SubscriptionFilterSet
-from .models import Provider, Subscription, SubscriptionAssignment
+from .filters import SubscriptionFilterSet
+from .models import Subscription, SubscriptionAssignment
 
 # The exclusive Contract/Subscription ownership mapping (issue #500): the same
 # text ships on the Contract type field, so one agreement is recorded in one
@@ -31,7 +31,7 @@ AGREEMENT_OWNERSHIP_HELP = _(
 @register_import_form
 class SubscriptionBulkImportForm(BulkImportForm):
     model = Subscription
-    required_fields = ["name", "provider"]
+    required_fields = ["name", "supplier"]
     optional_fields = [
         "slug",
         "type",
@@ -45,6 +45,7 @@ class SubscriptionBulkImportForm(BulkImportForm):
         "auto_renewal",
         "licensed_quantity",
         "contract_reference",
+        "linked_contract",
         "cost_center",
         "owner",
         "description",
@@ -73,132 +74,6 @@ class SubscriptionBulkImportForm(BulkImportForm):
         if value is not None:
             mapped["vendor_contract_auto_renews"] = value
         return mapped
-
-
-class ProviderForm(CrispyFormMixin, forms.ModelForm):
-    tenant = forms.ModelChoiceField(
-        queryset=Tenant.objects.all(),
-        required=False,
-        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
-        label=_("Tenant"),
-    )
-    tenant_group = forms.ModelChoiceField(
-        queryset=TenantGroup.objects.all(),
-        required=False,
-        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
-        label=_("Tenant Group"),
-    )
-
-    class Meta:
-        model = Provider
-        fields = (
-            "name",
-            "slug",
-            "tenant",
-            "tenant_group",
-            "account_id",
-            "portal_url",
-            "supplier",
-            "admin_notes",
-            "is_active",
-            "tags",
-        )
-        widgets = {
-            "name": forms.TextInput(attrs={"class": "form-control"}),
-            "slug": forms.TextInput(attrs={"class": "form-control", "data-slug-help": ""}),
-            "account_id": forms.TextInput(attrs={"class": "form-control"}),
-            "portal_url": forms.URLInput(attrs={"class": "form-control"}),
-            "supplier": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
-            "admin_notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
-            "tags": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
-        }
-        help_texts = {
-            "slug": _("Changing the slug may break existing import references that use it as a natural key."),
-            "name": _(
-                "Required unless a Supplier is selected. A new provider with a blank name uses the supplier name."
-            ),
-            "supplier": _("Optional link to the shared Supplier catalogue."),
-        }
-
-    def clean(self):
-        cleaned_data = super().clean()
-        tenant = cleaned_data.get("tenant")
-        tenant_group = cleaned_data.get("tenant_group")
-        if tenant and tenant_group:
-            raise forms.ValidationError(_("A provider may be scoped to a Tenant or a Tenant Group, but not both."))
-        self._resolve_name(cleaned_data)
-        return cleaned_data
-
-    def _resolve_name(self, cleaned_data):
-        """The name is optional only when a Supplier is selected (issue #500).
-
-        A new provider with a blank name takes the supplier's name, so vendor
-        data is not retyped. An existing provider keeps its stored name: the
-        form never renames a provider from its supplier. Without a supplier the
-        name stays required, matching the model.
-        """
-        if cleaned_data.get("name"):
-            return
-        supplier = cleaned_data.get("supplier")
-        if supplier is None:
-            self.add_error("name", self.fields["name"].error_messages["required"])
-        elif self.instance.pk:
-            cleaned_data["name"] = self.instance.name
-        else:
-            cleaned_data["name"] = supplier.name
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # autoset_when_single=False: Provider scopes to a tenant OR a tenant group
-        # (or global) — auto-setting the tenant would break the XOR clean().
-        scope_tenant_field(self, autoset_when_single=False)
-        scope_tenant_group_field(self)
-        # Keep `tenant` optional (tenant XOR group, or global). The global BaseForm
-        # patch (core/apps.py) already skips forms that also declare `tenant_group`;
-        # this explicit reset is the load-bearing guard for the XOR clean().
-        self.fields["tenant"].required = False
-        # `name` is conditionally required: clean() demands it unless a Supplier
-        # is selected (the conditional check cannot run at field level).
-        self.fields["name"].required = False
-        # `supplier` is global reference data (no tenant scoping): the default
-        # ModelChoiceField queryset already lists every active Supplier.
-
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse("subscriptions:provider_list")
-
-        self.helper.layout = Layout(
-            Fieldset(
-                _("Identity"),
-                Div(
-                    Div("name", css_class="col-md-6"),
-                    Div("slug", css_class="col-md-6"),
-                    css_class="row",
-                ),
-                Div(
-                    Div("supplier", css_class="col-md-6"),
-                    Div("portal_url", css_class="col-md-6"),
-                    css_class="row",
-                ),
-            ),
-            Fieldset(
-                _("Scope"),
-                Div(
-                    Div("account_id", css_class="col-md-4"),
-                    Div("tenant", css_class="col-md-4"),
-                    Div("tenant_group", css_class="col-md-4"),
-                    css_class="row",
-                ),
-                Div(
-                    Div("is_active", css_class="col-md-4"),
-                    css_class="row",
-                ),
-            ),
-            Fieldset(
-                _("Notes & Tags"),
-                "admin_notes",
-                "tags",
-            ),
-            *self.action_buttons(cancel_url),
-        )
 
 
 class SubscriptionBulkEditForm(BulkEditForm):
@@ -230,7 +105,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         fields = (
             "name",
             "slug",
-            "provider",
+            "supplier",
             "type",
             "start_date",
             "renewal_date",
@@ -240,6 +115,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "billing_cycle",
             "licensed_quantity",
             "contract_reference",
+            "linked_contract",
             "cost_center",
             "owner",
             "vendor_contract_auto_renews",
@@ -251,7 +127,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "slug": forms.TextInput(attrs={"class": "form-control"}),
-            "provider": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "supplier": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "type": forms.Select(attrs={"class": "form-select"}),
             "start_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "renewal_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
@@ -261,6 +137,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "term_months": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
             "licensed_quantity": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "contract_reference": forms.TextInput(attrs={"class": "form-control"}),
+            "linked_contract": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "owner": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
@@ -284,11 +161,10 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )
-        # Rescope the tenant-owned `provider` FK per request (import-frozen
-        # unscoped — would expose/permit another tenant's provider). The manager
-        # resolves the active tenant, tenant group, or All-accessible scope and
-        # keeps global providers visible; inactive providers stay unselectable.
-        self.fields["provider"].queryset = Provider.objects.filter(is_active=True)
+        contract_model = self.fields["linked_contract"].queryset.model
+        self.fields["linked_contract"].queryset = contract_model.objects.all()
+        # Keep active suppliers from the current tenant or group and globals selectable.
+        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
 
         cancel_url = (
             self.instance.get_absolute_url() if self.instance.pk else reverse("subscriptions:subscription_list")
@@ -303,7 +179,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
                     css_class="row",
                 ),
                 Div(
-                    Div("provider", css_class="col-md-6"),
+                    Div("supplier", css_class="col-md-6"),
                     Div("type", css_class="col-md-6"),
                     css_class="row",
                 ),
@@ -331,6 +207,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
                     Div("cost_center", css_class="col-md-4"),
                     css_class="row",
                 ),
+                "linked_contract",
             ),
             Fieldset(
                 _("Policy"),
@@ -356,10 +233,6 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             *self.action_buttons(cancel_url),
         )
         self.append_custom_fields_to_layout()
-
-
-class ProviderFilterForm(FilterForm):
-    filterset_class = ProviderFilterSet
 
 
 class SubscriptionFilterForm(FilterForm):

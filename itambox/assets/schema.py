@@ -201,7 +201,21 @@ class AssetTypeNode(DjangoObjectType):
 class SupplierNode(DjangoObjectType):
     class Meta:
         model = Supplier
-        fields = ("id", "name", "slug", "website", "address", "notes", "created_at", "updated_at")
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "website",
+            "portal_url",
+            "account_id",
+            "address",
+            "notes",
+            "is_active",
+            "tenant",
+            "tenant_group",
+            "created_at",
+            "updated_at",
+        )
 
 
 class CategoryNode(DjangoObjectType):

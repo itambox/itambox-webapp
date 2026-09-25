@@ -16,11 +16,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
+from assets.models import Supplier
 from core.models import ObjectChange
 from extras.models import ReportTemplate, ScheduledReport
 from extras.tasks.reports import generate_scheduled_report_task
 from subscriptions.models import (
-    Provider,
     Subscription,
     SubscriptionStatusChoices,
 )
@@ -80,7 +80,7 @@ class SubscriptionExpiryTaskAuditTests(TransactionTestCase):
     to its tenant)."""
 
     def test_expiry_marks_subscription_and_logs_change(self):
-        provider = Provider.objects.create(name="Phase3 Audit Vendor")
+        supplier = Supplier.objects.create(name="Phase3 Audit Vendor")
         today = timezone.now().date()
         future = today + datetime.timedelta(days=30)
         past = today - datetime.timedelta(days=1)
@@ -89,7 +89,7 @@ class SubscriptionExpiryTaskAuditTests(TransactionTestCase):
         # auto-expiry signal leaves it ACTIVE...
         sub = Subscription.objects.create(
             name="Phase3 Audit Subscription",
-            provider=provider,
+            supplier=supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=future,
         )

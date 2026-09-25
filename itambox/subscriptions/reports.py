@@ -30,37 +30,37 @@ def _monthly_cost(subscription):
 
 
 def _monthly_spend(queryset, request: ReportRequest):
-    """Monthly spend bucketed by currency, and again by (provider, currency).
+    """Monthly spend bucketed by currency, and again by (supplier, currency).
 
     Subscriptions can carry differing ISO currencies and there is no FX source,
     so nothing here is ever summed across currencies: the cards render one
-    figure per currency and the chart draws one bar per (provider, currency).
+    figure per currency and the chart draws one bar per (supplier, currency).
     """
     by_currency = {}
-    by_provider = {}
+    by_supplier = {}
     for subscription in queryset:
         if subscription.renewal_cost is None:
             continue
         monthly = _monthly_cost(subscription)
         currency = _record_currency(subscription.currency, subscription.tenant)
         by_currency[currency] = by_currency.get(currency, 0.0) + monthly
-        provider_name = subscription.provider.name if subscription.provider else _("Generic")
-        by_provider[(provider_name, currency)] = by_provider.get((provider_name, currency), 0.0) + monthly
-    return by_currency, by_provider
+        supplier_name = subscription.supplier.name if subscription.supplier else _("Generic")
+        by_supplier[(supplier_name, currency)] = by_supplier.get((supplier_name, currency), 0.0) + monthly
+    return by_currency, by_supplier
 
 
-def _spend_chart(by_provider, request: ReportRequest):
-    """One bar per (provider, currency), ISO-qualified when currencies differ."""
-    multi_currency = len({currency for _provider, currency in by_provider}) > 1
+def _spend_chart(by_supplier, request: ReportRequest):
+    """One bar per (supplier, currency), ISO-qualified when currencies differ."""
+    multi_currency = len({currency for _supplier, currency in by_supplier}) > 1
     chart_data = [
         {
-            "label": f"{provider_name} ({currency})" if multi_currency else provider_name,
+            "label": f"{supplier_name} ({currency})" if multi_currency else supplier_name,
             "value": amount,
             "display": _money(amount, currency, request.active_tenant),
         }
-        for (provider_name, currency), amount in by_provider.items()
+        for (supplier_name, currency), amount in by_supplier.items()
     ]
-    return generate_bar_chart(chart_data, title=_("Monthly Spend by Provider"))
+    return generate_bar_chart(chart_data, title=_("Monthly Spend by Supplier"))
 
 
 class SubscriptionRenewalsReportProvider(ReportDefinition):
@@ -70,7 +70,7 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
     permission = "subscriptions.view_subscription"
     default_columns = (
         "subscription_name",
-        "provider",
+        "supplier",
         "agreement_entitled_quantity",
         "billing_cycle",
         "cost",
@@ -79,7 +79,7 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
 
     cells = {
         "subscription_name": lambda record, request: record.name or "-",
-        "provider": lambda record, request: record.provider.name if record.provider else "-",
+        "supplier": lambda record, request: record.supplier.name if record.supplier else "-",
         "agreement_entitled_quantity": lambda record, request: (
             str(record.licensed_quantity) if record.licensed_quantity is not None else _("Not set")
         ),
@@ -92,7 +92,7 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
 
     sample_cells = {
         "subscription_name": "Office 365 E5",
-        "provider": "Microsoft",
+        "supplier": "Microsoft",
         "agreement_entitled_quantity": "120",
         "billing_cycle": "Monthly",
         "cost": "$1,200.00",
@@ -100,16 +100,16 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
     }
 
     group_resolvers = {
-        "provider": lambda record, request: record.provider.name if record.provider else DEFAULT_GROUP,
+        "supplier": lambda record, request: record.supplier.name if record.supplier else DEFAULT_GROUP,
     }
 
-    sample_group_keys = {"provider": "Microsoft"}
+    sample_group_keys = {"supplier": "Microsoft"}
 
     def get_queryset(self, request: ReportRequest):
         # 'tenant' is select_related because the currency of a blank-currency
         # subscription is resolved from its own tenant — without it that is N+1.
         queryset = Subscription.objects.filter(deleted_at__isnull=True, status="active").select_related(
-            "provider", "tenant"
+            "supplier", "tenant"
         )
         return self.scope_to_tenants(queryset, request)
 
@@ -122,8 +122,8 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
             {"label": _("Est. Monthly Spend"), "value": _format_per_currency(by_currency)},
         ]
 
-    def _chart_from_spend(self, by_provider, request: ReportRequest):
-        return _spend_chart(by_provider, request)
+    def _chart_from_spend(self, by_supplier, request: ReportRequest):
+        return _spend_chart(by_supplier, request)
 
     def build(self, request: ReportRequest) -> ReportResult:
         queryset = self.get_queryset(request)
@@ -145,14 +145,14 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
     def build_summary(self, queryset, request: ReportRequest):
         if not request.template.include_summary_cards:
             return []
-        by_currency, _by_provider = _monthly_spend(queryset, request)
+        by_currency, _by_supplier = _monthly_spend(queryset, request)
         return self._summary_from_spend(queryset, by_currency)
 
     def build_chart(self, queryset, records, request: ReportRequest):
         if not request.template.include_distribution_chart:
             return ""
-        _by_currency, by_provider = _monthly_spend(queryset, request)
-        return self._chart_from_spend(by_provider, request)
+        _by_currency, by_supplier = _monthly_spend(queryset, request)
+        return self._chart_from_spend(by_supplier, request)
 
     def build_sample_summary(self, request: ReportRequest):
         if not request.template.include_summary_cards:

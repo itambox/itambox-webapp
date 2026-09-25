@@ -1023,7 +1023,7 @@ class RenewalsWidget(DashboardWidget):
                 renewal_date__lte=cutoff,
                 renewal_date__gte=today,
             )
-            .select_related("provider", "tenant")
+            .select_related("supplier", "tenant")
             .order_by("renewal_date")[:limit]
         )
 
@@ -1033,7 +1033,7 @@ class RenewalsWidget(DashboardWidget):
                 {
                     "pk": sub.pk,
                     "name": sub.name,
-                    "provider": sub.provider,
+                    "supplier": sub.supplier,
                     "days_until_renewal": (sub.renewal_date - today).days,
                     "renewal_cost": sub.renewal_cost,
                     "currency": sub.currency,

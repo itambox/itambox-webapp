@@ -33,11 +33,18 @@ class BaseFilterSet(django_filters.FilterSet):
                     if model.__name__ == "Tenant":
                         filtered_qs = queryset.filter(pk=current_tenant.pk)
 
-                    # 2. If model has tenant field, filter by active tenant
+                    # 2. Supplier is tenant-scoped with allow_global_tenant: the scoping
+                    #    manager already limits choices to the active scope plus global
+                    #    suppliers, so the generic tenant-field narrowing below must not
+                    #    apply (issue #508).
+                    elif model.__name__ == "Supplier":
+                        filtered_qs = queryset
+
+                    # 3. If model has tenant field, filter by active tenant
                     elif hasattr(model, "tenant") or any(f.name == "tenant" for f in model._meta.fields):
                         filtered_qs = queryset.filter(tenant=current_tenant)
 
-                    # 3. If global models, filter by relation to tenant-owned objects
+                    # 4. If global models, filter by relation to tenant-owned objects
                     elif model.__name__ == "Manufacturer":
                         filtered_qs = queryset.filter(
                             Q(asset_types__assets__tenant=current_tenant)
@@ -46,10 +53,6 @@ class BaseFilterSet(django_filters.FilterSet):
                         ).distinct()
                     elif model.__name__ == "AssetType":
                         filtered_qs = queryset.filter(assets__tenant=current_tenant).distinct()
-                    elif model.__name__ == "Supplier":
-                        filtered_qs = queryset.filter(
-                            Q(assets__tenant=current_tenant) | Q(supplier_accessories__tenant=current_tenant)
-                        ).distinct()
                     elif model.__name__ == "Category":
                         filtered_qs = queryset.filter(
                             Q(asset_types__assets__tenant=current_tenant)

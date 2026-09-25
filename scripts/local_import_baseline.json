@@ -766,12 +766,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
-      "statement": "from subscriptions.models import Provider",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/compliance.py",
       "context": "ClassDef:SeedComplianceMixin/FunctionDef:_seed_compliance",
       "statement": "from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices",
@@ -865,12 +859,6 @@
       "path": "itambox/core/management/commands/_seed/organizations.py",
       "context": "ClassDef:SeedOrganizationsMixin/FunctionDef:_make_holders",
       "statement": "from organization.models import AssetHolder",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/organizations.py",
-      "context": "ClassDef:SeedOrganizationsMixin/FunctionDef:_seed_organizations",
-      "statement": "from organization.models import AssetHolder, Contact, ContactAssignment, ContactRole, Location, Region, Site, SiteGroup, Tenant, TenantGroup",
       "count": 1
     },
     {

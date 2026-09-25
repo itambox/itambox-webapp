@@ -2568,9 +2568,6 @@ msgstr "SaaS"
 msgid "Subscriptions"
 msgstr "Abonnements"
 
-msgid "Providers"
-msgstr "Anbieter"
-
 msgid "Operations"
 msgstr "Betrieb"
 
@@ -2772,8 +2769,8 @@ msgstr "Aktive Abonnements"
 msgid "Est. Monthly Spend"
 msgstr "Gesch. monatliche Ausgaben"
 
-msgid "Monthly Spend by Provider"
-msgstr "Monatliche Ausgaben nach Anbieter"
+msgid "Monthly Spend by Supplier"
+msgstr "Monatliche Ausgaben nach Lieferant"
 
 msgid "Total Maintenances"
 msgstr "Wartungen gesamt"
@@ -3733,6 +3730,14 @@ msgid ""
 msgstr ""
 "Denormalisierter besitzender Mandant, beim Speichern aus dem journalierten "
 "Objekt abgeleitet. Null = System-/globales Objekt."
+
+msgid ""
+"Denormalised owning tenant group, derived from the journaled object on "
+"save. Null = the object is tenant-scoped or system/global."
+msgstr ""
+"Denormalisierte besitzende Mandantengruppe, beim Speichern aus dem "
+"journalierten Objekt abgeleitet. Null = das Objekt ist mandanten- oder "
+"system-/global gebunden."
 
 msgid "Journal Entry"
 msgstr "Journaleintrag"
@@ -5553,6 +5558,11 @@ msgstr ""
 "Ein Lizenzplatz muss entweder einem Asset oder einem Asset-Inhaber "
 "zugewiesen werden."
 
+msgid "A supplier is scoped to a tenant or a tenant group, not both."
+msgstr ""
+"Ein Lieferant ist entweder einem Mandanten oder einer Mandantengruppe "
+"zugeordnet, nicht beidem."
+
 msgid ""
 "An install link can only be set on asset-assigned seats, not on holder-"
 "assigned seats."
@@ -5676,12 +5686,6 @@ msgstr "Rollen & Berechtigungen"
 
 msgid "Metadata & Settings"
 msgstr "Metadaten & Einstellungen"
-
-msgid "Suppliers (Hardware)"
-msgstr "Lieferanten (Hardware)"
-
-msgid "Providers (Subscription)"
-msgstr "Anbieter (Abonnement)"
 
 msgid "Depreciation Schedules"
 msgstr "Abschreibungspläne"
@@ -6613,9 +6617,9 @@ msgstr ""
 "Eine Änderung des Slugs kann bestehende Import-Referenzen beschädigen, die "
 "ihn als natürlichen Schlüssel verwenden."
 
-msgid "A provider may be scoped to a Tenant or a Tenant Group, but not both."
+msgid "A supplier may be scoped to a Tenant or a Tenant Group, but not both."
 msgstr ""
-"Ein Anbieter kann einem Mandanten oder einer Mandantengruppe zugeordnet "
+"Ein Lieferant kann einem Mandanten oder einer Mandantengruppe zugeordnet "
 "werden, aber nicht beiden zugleich."
 
 msgid "Dates & Term"
@@ -6646,9 +6650,6 @@ msgstr "Optionale Begründungsnotizen, die am Abonnement protokolliert werden."
 msgid "This subscription is already assigned to %(target)s."
 msgstr "Dieses Abonnement ist %(target)s bereits zugewiesen."
 
-msgid "Unique name of the provider (e.g., Adobe Inc.)"
-msgstr "Eindeutiger Name des Anbieters (z. B. Adobe Inc.)"
-
 msgid "URL-friendly identifier (auto-generated from name if left blank)"
 msgstr ""
 "URL-freundliche Kennung (wird bei leerem Feld automatisch aus dem Namen "
@@ -6657,43 +6658,27 @@ msgstr ""
 msgid "Account ID"
 msgstr "Konto-ID"
 
-msgid "Optional customer account number with the provider"
-msgstr "Optionale Kundennummer beim Anbieter"
-
-msgid "Optional link to the shared Supplier catalogue."
-msgstr "Optionale Verknüpfung mit dem gemeinsamen Lieferantenkatalog."
+msgid "Optional customer account number with the supplier"
+msgstr "Optionale Kundennummer beim Lieferanten"
 
 msgid "Admin Portal URL"
 msgstr "URL des Admin-Portals"
 
-msgid "URL for the provider's management/administration portal"
-msgstr "URL des Verwaltungs-/Administrationsportals des Anbieters"
-
-msgid "Admin Notes"
-msgstr "Admin-Notizen"
-
-msgid "Optional internal administrative notes"
-msgstr "Optionale interne administrative Notizen"
+msgid "URL for the supplier's management/administration portal"
+msgstr "URL des Verwaltungs-/Administrationsportals des Lieferanten"
 
 msgid "Deactivate to hide from selection lists without deleting"
 msgstr "Deaktivieren, um ohne Löschen aus Auswahllisten auszublenden"
 
 msgid ""
-"Required unless a Supplier is selected. A new provider with a blank name "
-"uses the supplier name."
+"The tenant owning this supplier. Null represents system-wide/global "
+"suppliers."
 msgstr ""
-"Erforderlich, sofern kein Lieferant ausgewählt ist. Ein neuer Anbieter mit "
-"leerem Namen übernimmt den Namen des Lieferanten."
+"Der Mandant, dem dieser Lieferant gehört. Null steht für systemweite/globale "
+"Lieferanten."
 
-msgid ""
-"The tenant owning this provider. Null represents system-wide/global "
-"providers."
-msgstr ""
-"Der Mandant, dem dieser Anbieter gehört. Null steht für systemweite/globale "
-"Anbieter."
-
-msgid "The tenant group owning this provider."
-msgstr "Die Mandantengruppe, der dieser Anbieter gehört."
+msgid "The tenant group owning this supplier."
+msgstr "Die Mandantengruppe, der dieser Lieferant gehört."
 
 msgid "Suspended"
 msgstr "Ausgesetzt"
@@ -6775,18 +6760,6 @@ msgstr "Abonnementszuweisung"
 msgid "Owner must be a member of the active tenant."
 msgstr "Der Eigentümer muss Mitglied des aktiven Mandanten sein."
 
-msgid "Only superusers can create global providers."
-msgstr "Nur Superuser können globale Anbieter erstellen."
-
-msgid "Only superusers can modify global providers."
-msgstr "Nur Superuser können globale Anbieter ändern."
-
-msgid "Only superusers can make providers global."
-msgstr "Nur Superuser können Anbieter global machen."
-
-msgid "Only superusers can delete global providers."
-msgstr "Nur Superuser können globale Anbieter löschen."
-
 msgid "CostCenter model is not yet available."
 msgstr "Das CostCenter-Modell ist noch nicht verfügbar."
 
@@ -6814,10 +6787,10 @@ msgstr "Abonnement abgelaufen: %(name)s"
 
 #, python-format
 msgid ""
-"The subscription '%(name)s' from provider '%(provider)s' has expired as of "
+"The subscription '%(name)s' from supplier '%(supplier)s' has expired as of "
 "%(date)s."
 msgstr ""
-"Das Abonnement '%(name)s' vom Anbieter '%(provider)s' ist zum %(date)s "
+"Das Abonnement '%(name)s' vom Lieferanten '%(supplier)s' ist zum %(date)s "
 "abgelaufen."
 
 #, python-format
@@ -6826,15 +6799,12 @@ msgstr "Warnung zur Abonnementverlängerung: %(name)s in %(days)s Tagen"
 
 #, python-format
 msgid ""
-"The subscription '%(name)s' from provider '%(provider)s' is due for renewal "
+"The subscription '%(name)s' from supplier '%(supplier)s' is due for renewal "
 "on %(date)s (%(days)s days remaining). Cost: %(cost)s %(currency)s."
 msgstr ""
-"Das Abonnement '%(name)s' vom Anbieter '%(provider)s' ist am %(date)s zur "
+"Das Abonnement '%(name)s' vom Lieferanten '%(supplier)s' ist am %(date)s zur "
 "Verlängerung fällig (%(days)s Tage verbleibend). Kosten: %(cost)s "
 "%(currency)s."
-
-msgid "Provider Details"
-msgstr "Anbieterdetails"
 
 msgid "Subscription Details"
 msgstr "Abonnementdetails"
@@ -8946,6 +8916,9 @@ msgstr "E-Mail-Adresse:"
 msgid "Tenant:"
 msgstr "Mandant:"
 
+msgid "Tenant Group:"
+msgstr "Mandantengruppe:"
+
 msgid "Linked User account:"
 msgstr "Verknüpftes Benutzerkonto:"
 
@@ -9387,15 +9360,6 @@ msgstr "Konto-ID:"
 msgid "Admin Portal:"
 msgstr "Admin-Portal:"
 
-msgid "Contact Information"
-msgstr "Kontaktinformationen"
-
-msgid "Support:"
-msgstr "Support:"
-
-msgid "Provider:"
-msgstr "Anbieter:"
-
 msgid "Type:"
 msgstr "Typ:"
 
@@ -9450,23 +9414,8 @@ msgstr "Abonnement verlängern:"
 msgid "Renew Subscription"
 msgstr "Abonnement verlängern"
 
-msgid "Subscriptions:"
-msgstr "Abonnements:"
-
-msgid "Active:"
-msgstr "Aktiv:"
-
-msgid "Open Admin Portal"
-msgstr "Admin-Portal öffnen"
-
-msgid "No subscriptions linked to this provider yet."
-msgstr "Mit diesem Anbieter sind noch keine Abonnements verknüpft."
-
-msgid "No contacts are assigned to this provider yet."
-msgstr "Diesem Anbieter sind noch keine Kontakte zugewiesen."
-
-msgid "Open Provider Portal"
-msgstr "Anbieterportal öffnen"
+msgid "Open Supplier Portal"
+msgstr "Lieferantenportal öffnen"
 
 msgid "Renew..."
 msgstr "Verlängern..."
@@ -13263,6 +13212,18 @@ msgstr "Bis"
 msgid "Vendor Contract Auto-Renews"
 msgstr "Lieferantenvertrag verlängert sich automatisch"
 
+msgid "Linked Contract"
+msgstr "Verknüpfter Vertrag"
+
+msgid "Linked Contract:"
+msgstr "Verknüpfter Vertrag:"
+
+msgid "Optional procurement contract this subscription relates to."
+msgstr "Optionaler Beschaffungsvertrag, auf den sich dieses Abonnement bezieht."
+
+msgid "The commercial vendor of this subscription."
+msgstr "Der kommerzielle Anbieter dieses Abonnements."
+
 #, python-format
 msgid "Via group %(group)s"
 msgstr "Über Gruppe %(group)s"
@@ -15033,6 +14994,12 @@ msgstr "Der ausgewählte Standort gehört zu einem anderen Mandanten."
 
 #: itambox/assets/views/request_views.py
 msgid "The selected supplier belongs to another tenant."
+msgstr "Der ausgewählte Lieferant gehört zu einem anderen Mandanten."
+
+msgid "Selected contract belongs to a different tenant."
+msgstr "Der ausgewählte Vertrag gehört zu einem anderen Mandanten."
+
+msgid "Selected supplier belongs to a different tenant."
 msgstr "Der ausgewählte Lieferant gehört zu einem anderen Mandanten."
 
 #: itambox/assets/services/request_fulfillment.py

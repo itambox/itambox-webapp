@@ -139,7 +139,6 @@ nav:
               - Software Licenses: 'models/licenses/license.md'
               - License Seat Assignments: 'models/licenses/licenseseatassignment.md'
               - SaaS Subscriptions: 'models/subscriptions/subscription.md'
-              - SaaS Providers: 'models/subscriptions/provider.md'
               - Subscription Assignments: 'models/subscriptions/subscriptionassignment.md'
           - Procurement:
               - Purchase Orders: 'models/procurement/purchaseorder.md'

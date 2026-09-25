@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -28,7 +27,7 @@ from itambox.views.generic.authorization import SecuredObjectActionMixin
 from itambox.views.generic.utils import safe_return_url
 
 from . import filters, forms, tables
-from .models import Provider, Subscription, SubscriptionAssignment
+from .models import Subscription, SubscriptionAssignment
 
 
 def _lifecycle_error_response(request, error):
@@ -41,63 +40,14 @@ def _lifecycle_error_response(request, error):
 
 
 # =============================================================================
-# Provider Views
-# =============================================================================
-
-
-class ProviderListView(ObjectListView):
-    queryset = (
-        Provider.objects.select_related("supplier")
-        .prefetch_related("tags")
-        .annotate(subscription_count=Count("subscriptions", filter=Q(subscriptions__deleted_at__isnull=True)))
-    )
-    filterset = filters.ProviderFilterSet
-    filterset_form = forms.ProviderFilterForm
-    table = tables.ProviderTable
-    action_buttons = ("add",)
-
-
-class ProviderDetailView(ObjectDetailView):
-    queryset = Provider.objects.select_related("supplier").prefetch_related("subscriptions", "tags")
-    template_name = "subscriptions/provider_detail.html"
-
-    layout = (((Panel("info", _("Provider Details")),),),)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        provider = self.get_object()
-
-        subscriptions_qs = provider.subscriptions.all()
-        context["subscriptions_table"] = tables.SubscriptionTable(subscriptions_qs, request=self.request)
-        context["subscriptions_table"].configure(self.request)
-        context["subscription_count"] = subscriptions_qs.count()
-        context["active_subscription_count"] = subscriptions_qs.filter(status="active").count()
-        return context
-
-
-class ProviderEditView(ObjectEditView):
-    queryset = Provider.objects.all()
-    model_form = forms.ProviderForm
-    template_name = "generic/object_edit.html"
-    default_return_url = "subscriptions:provider_list"
-
-
-class ProviderDeleteView(ObjectDeleteView):
-    queryset = Provider.objects.all()
-    default_return_url = "subscriptions:provider_list"
-
-
-class ProviderCloneView(ProviderEditView, ObjectCloneView):
-    model = Provider
-
-
-# =============================================================================
 # Subscription Views
 # =============================================================================
 
 
 class SubscriptionListView(ObjectListView):
-    queryset = Subscription.objects.select_related("provider", "tenant", "owner").prefetch_related("tags")
+    queryset = Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").prefetch_related(
+        "tags"
+    )
     filterset = filters.SubscriptionFilterSet
     filterset_form = forms.SubscriptionFilterForm
     table = tables.SubscriptionTable
@@ -105,7 +55,7 @@ class SubscriptionListView(ObjectListView):
 
 
 class SubscriptionDetailView(ObjectDetailView):
-    queryset = Subscription.objects.select_related("provider", "tenant", "owner").prefetch_related(
+    queryset = Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").prefetch_related(
         "tags", "assignments"
     )
     template_name = "subscriptions/subscription_detail.html"
@@ -118,7 +68,7 @@ class SubscriptionDetailView(ObjectDetailView):
 
         # Resolve seat usage once for the detail template. The template displays it
         # in both assigned and available values, so passing primitives prevents the
-        # model provider from being evaluated twice.
+        # seat usage hook from being evaluated twice.
         assigned_seats = subscription.assigned_seats
         total_seats = subscription.total_seats
         context["assigned_seats"] = assigned_seats
@@ -461,14 +411,6 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
                 "subscription": subscription,
             },
         )
-
-
-class ProviderBulkEditView(ObjectBulkEditView):
-    queryset = Provider.objects.all()
-
-
-class ProviderBulkDeleteView(ObjectBulkDeleteView):
-    queryset = Provider.objects.all()
 
 
 # =============================================================================

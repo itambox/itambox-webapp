@@ -274,7 +274,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             [
                 {
                     "Subscription Name": "Cloud",
-                    "Provider": "Acme",
+                    "Supplier": "Acme",
                     "Billing Cycle": "Monthly",
                     "Cost": 12,
                     "End Date": "2027-01-01",

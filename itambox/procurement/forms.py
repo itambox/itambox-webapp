@@ -4,6 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from assets.models import Supplier
 from core.forms import FilterForm, scope_tenant_field
 
 from .filters import ContractFilterSet, PurchaseOrderFilterSet
@@ -52,6 +53,7 @@ class PurchaseOrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
         scope_tenant_field(self)
         self.helper = FormHelper()
         self.helper.layout = Layout(
@@ -241,6 +243,7 @@ class ContractForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
         scope_tenant_field(self)
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name

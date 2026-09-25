@@ -1,7 +1,7 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -11,7 +11,6 @@ from django.utils.translation import gettext_lazy as _
 
 from core.currency import CurrencyField
 from core.managers import (
-    AllObjectsManager,
     SoftDeleteManager,
     TenantScopingAllObjectsManager,
     TenantScopingManager,
@@ -26,140 +25,10 @@ from core.mixins import (
     FileAttachmentMixin,
     ImageAttachmentMixin,
     JournalingMixin,
-    SoftDeleteMixin,
-    TaggableMixin,
 )
-from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
+from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from extras.models import Tag
 from subscriptions.models_seat_usage import get_assigned_seats
-
-
-class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
-    allow_global_tenant = True
-
-    """Represents the vendor/supplier of a subscription or service."""
-    name = models.CharField(
-        max_length=255, verbose_name=_("Name"), help_text=_("Unique name of the provider (e.g., Adobe Inc.)")
-    )
-    slug = models.SlugField(
-        max_length=255,
-        null=True,
-        blank=True,
-        verbose_name=_("Slug"),
-        help_text=_("URL-friendly identifier (auto-generated from name if left blank)"),
-    )
-    account_id = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("Account ID"),
-        help_text=_("Optional customer account number with the provider"),
-    )
-    portal_url = models.URLField(
-        blank=True,
-        verbose_name=_("Admin Portal URL"),
-        help_text=_("URL for the provider's management/administration portal"),
-    )
-    supplier = models.ForeignKey(
-        "assets.Supplier",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="providers",
-        verbose_name=_("Supplier"),
-        db_index=True,
-    )
-    admin_notes = models.TextField(
-        blank=True, verbose_name=_("Admin Notes"), help_text=_("Optional internal administrative notes")
-    )
-    is_active = models.BooleanField(
-        default=True,
-        verbose_name=_("Active"),
-        db_index=True,
-        help_text=_("Deactivate to hide from selection lists without deleting"),
-    )
-    tags = models.ManyToManyField(to=Tag, blank=True, related_name="subscription_providers", verbose_name=_("Tags"))
-    tenant = models.ForeignKey(
-        "organization.Tenant",
-        on_delete=models.PROTECT,
-        blank=True,
-        null=True,
-        related_name="subscription_providers",
-        db_index=True,
-        verbose_name=_("Tenant"),
-        help_text=_("The tenant owning this provider. Null represents system-wide/global providers."),
-    )
-    tenant_group = models.ForeignKey(
-        "organization.TenantGroup",
-        on_delete=models.PROTECT,
-        blank=True,
-        null=True,
-        related_name="subscription_providers",
-        db_index=True,
-        verbose_name=_("Tenant Group"),
-        help_text=_("The tenant group owning this provider."),
-    )
-    contacts = GenericRelation("organization.ContactAssignment")
-
-    @property
-    def primary_contact(self):
-        assignment = self.contacts.filter(priority="primary").first() or self.contacts.first()
-        return assignment.contact if assignment else None
-
-    class Meta:
-        ordering = ("name",)
-        verbose_name = _("Provider")
-        verbose_name_plural = _("Providers")
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(tenant__isnull=True) | models.Q(tenant_group__isnull=True),
-                name="provider_tenant_or_group",
-            ),
-            models.UniqueConstraint(
-                fields=["tenant", "name"],
-                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
-                name="unique_tenant_provider_name",
-            ),
-            models.UniqueConstraint(
-                fields=["tenant", "slug"],
-                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
-                name="unique_tenant_provider_slug",
-            ),
-            models.UniqueConstraint(
-                fields=["tenant_group", "name"],
-                condition=models.Q(tenant_group__isnull=False) & models.Q(deleted_at__isnull=True),
-                name="unique_tenant_group_provider_name",
-            ),
-            models.UniqueConstraint(
-                fields=["tenant_group", "slug"],
-                condition=models.Q(tenant_group__isnull=False) & models.Q(deleted_at__isnull=True),
-                name="unique_tenant_group_provider_slug",
-            ),
-            models.UniqueConstraint(
-                fields=["name"],
-                condition=models.Q(tenant__isnull=True)
-                & models.Q(tenant_group__isnull=True)
-                & models.Q(deleted_at__isnull=True),
-                name="unique_global_provider_name",
-            ),
-            models.UniqueConstraint(
-                fields=["slug"],
-                condition=models.Q(tenant__isnull=True)
-                & models.Q(tenant_group__isnull=True)
-                & models.Q(deleted_at__isnull=True),
-                name="unique_global_provider_slug",
-            ),
-        ]
-
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        try:
-            return reverse("subscriptions:provider_detail", kwargs={"pk": self.pk})
-        except NoReverseMatch:
-            return reverse("admin:subscriptions_provider_change", args=[self.pk])
 
 
 class SubscriptionTypeChoices(models.TextChoices):
@@ -217,8 +86,12 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         verbose_name=_("Slug"),
         help_text=_("URL-friendly identifier (auto-generated from name if left blank)"),
     )
-    provider = models.ForeignKey(
-        to=Provider, on_delete=models.PROTECT, related_name="subscriptions", verbose_name=_("Provider")
+    supplier = models.ForeignKey(
+        "assets.Supplier",
+        on_delete=models.PROTECT,
+        related_name="subscriptions",
+        verbose_name=_("Supplier"),
+        help_text=_("The commercial vendor of this subscription."),
     )
     type = models.CharField(
         max_length=50,
@@ -291,6 +164,15 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         verbose_name=_("Contract Reference"),
         help_text=_("Contract number, PO reference, or quote ID"),
     )
+    linked_contract = models.ForeignKey(
+        "procurement.Contract",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="linked_subscriptions",
+        verbose_name=_("Linked Contract"),
+        help_text=_("Optional procurement contract this subscription relates to."),
+    )
     cost_center = models.ForeignKey(
         "organization.CostCenter",
         on_delete=models.SET_NULL,
@@ -332,7 +214,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     )
 
     class Meta:
-        ordering = ("-renewal_date", "provider", "name")
+        ordering = ("-renewal_date", "supplier", "name")
         verbose_name = _("Subscription")
         verbose_name_plural = _("Subscriptions")
         constraints = [
@@ -364,7 +246,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         self._loaded_status = self.__dict__.get("status")
 
     def __str__(self):
-        return f"{self.provider} - {self.name}"
+        return f"{self.supplier} - {self.name}"
 
     @property
     def total_seats(self):
@@ -467,6 +349,14 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
 
     def clean(self):
         super().clean()
+        if self.supplier_id and self.supplier.tenant_id is not None and self.supplier.tenant_id != self.tenant_id:
+            raise ValidationError({"supplier": _("Selected supplier belongs to a different tenant.")})
+        if (
+            self.linked_contract_id
+            and self.linked_contract.tenant_id is not None
+            and self.linked_contract.tenant_id != self.tenant_id
+        ):
+            raise ValidationError({"linked_contract": _("Selected contract belongs to a different tenant.")})
         if not self.pk:
             return
         previous_status = type(self)._base_manager.filter(pk=self.pk).values_list("status", flat=True).first()

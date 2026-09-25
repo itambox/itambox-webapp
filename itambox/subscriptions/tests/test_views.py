@@ -16,7 +16,6 @@ from organization.models import Location, Site, Tenant, TenantGroup
 from software.models import Software
 from subscriptions.models import (
     BillingCycleChoices,
-    Provider,
     Subscription,
     SubscriptionAssignment,
     SubscriptionStatusChoices,
@@ -31,10 +30,10 @@ class SubscriptionViewTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", password="testpass", is_staff=True, is_superuser=True)
         self.client.login(username="testuser", password="testpass")
-        self.provider = Provider.objects.create(name="Test Provider")
+        self.supplier = Supplier.objects.create(name="Test Supplier")
         self.sub = Subscription.objects.create(
             name="Test Subscription",
-            provider=self.provider,
+            supplier=self.supplier,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=999.99,
@@ -56,6 +55,14 @@ class SubscriptionViewTests(TestCase):
         self.assertContains(resp, "Test Subscription")
         self.assertContains(resp, "999.99")
         self.assertContains(resp, "EUR")
+
+    def test_detail_links_to_the_supplier(self):
+        url = reverse("subscriptions:subscription_detail", kwargs={"pk": self.sub.pk})
+        response = self.client.get(url)
+        supplier_url = reverse("assets:supplier_detail", kwargs={"pk": self.supplier.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<a href="' + supplier_url + '">Test Supplier</a>', response.content.decode())
 
     def test_detail_renders_seat_usage_with_one_assignment_count_query(self):
         url = reverse("subscriptions:subscription_detail", kwargs={"pk": self.sub.pk})
@@ -85,7 +92,7 @@ class SubscriptionViewTests(TestCase):
     def _seat_matrix_subscription(self, licensed_quantity):
         return Subscription.objects.create(
             name=f"Seat Matrix {licensed_quantity}",
-            provider=self.provider,
+            supplier=self.supplier,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
             licensed_quantity=licensed_quantity,
@@ -95,7 +102,7 @@ class SubscriptionViewTests(TestCase):
         """Issue #501: a one-time payment must not read as a yearly cost."""
         sub = Subscription.objects.create(
             name="Perpetual Software",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=Decimal("500.00"),
             currency="EUR",
@@ -113,7 +120,7 @@ class SubscriptionViewTests(TestCase):
         """Issue #501: the multi-year figure in the annual slot is the annualized value."""
         sub = Subscription.objects.create(
             name="Three-Year Contract",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=Decimal("3600.00"),
             currency="EUR",
@@ -130,7 +137,7 @@ class SubscriptionViewTests(TestCase):
         """Issue #501 fallback: no yearly figure when the term is unknown."""
         sub = Subscription.objects.create(
             name="Termless Multi-Year",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=Decimal("3600.00"),
             currency="EUR",
@@ -146,7 +153,7 @@ class SubscriptionViewTests(TestCase):
         """Issue #501: a zero-cost row shows 0.00 instead of being dropped or showing Not set."""
         sub = Subscription.objects.create(
             name="Free Annual Plan",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=Decimal("0.00"),
             currency="EUR",
@@ -230,7 +237,7 @@ class SubscriptionViewTests(TestCase):
             url,
             {
                 "name": "New Subscription",
-                "provider": self.provider.pk,
+                "supplier": self.supplier.pk,
                 "type": SubscriptionTypeChoices.SAAS,
                 "status": SubscriptionStatusChoices.ACTIVE,
                 "renewal_cost": "499.00",
@@ -252,7 +259,7 @@ class SubscriptionViewTests(TestCase):
             url,
             {
                 "name": "Renamed Subscription",
-                "provider": self.provider.pk,
+                "supplier": self.supplier.pk,
                 "type": SubscriptionTypeChoices.SAAS,
                 "status": SubscriptionStatusChoices.ACTIVE,
                 "renewal_cost": "999.99",
@@ -276,122 +283,15 @@ class SubscriptionViewTests(TestCase):
         self.assertFalse(Subscription.objects.filter(pk=self.sub.pk).exists())
 
 
-class ProviderViewTests(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="testpass", is_staff=True, is_superuser=True)
-        self.client.login(username="testuser", password="testpass")
-        self.provider = Provider.objects.create(name="AWS", account_id="aws-001", is_active=True)
-
-    def test_list_view_status_200(self):
-        url = reverse("subscriptions:provider_list")
-        resp = self.client.get(url)
-        self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "AWS")
-
-    def test_list_view_renders_subscription_count_link(self):
-        # A provider WITH subscriptions exercises render_subscription_count,
-        # which builds a reverse() link to the filtered subscription list. The
-        # plain list test above uses a provider with zero subscriptions and so
-        # never hit this branch (regression: missing `reverse` import -> 500).
-        Subscription.objects.create(
-            name="AWS Sub",
-            provider=self.provider,
-            type=SubscriptionTypeChoices.SAAS,
-            status=SubscriptionStatusChoices.ACTIVE,
-            renewal_cost=10,
-            currency="EUR",
-            billing_cycle=BillingCycleChoices.ANNUAL,
-        )
-        url = reverse("subscriptions:provider_list")
-        resp = self.client.get(url)
-        self.assertEqual(resp.status_code, 200)
-        expected = f"{reverse('subscriptions:subscription_list')}?provider={self.provider.pk}"
-        self.assertContains(resp, expected)
-
-    def test_detail_view_status_200(self):
-        url = reverse("subscriptions:provider_detail", kwargs={"pk": self.provider.pk})
-        resp = self.client.get(url)
-        self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "AWS")
-
-    def _detail_content(self, provider):
-        url = reverse("subscriptions:provider_detail", kwargs={"pk": provider.pk})
-        resp = self.client.get(url)
-        self.assertEqual(resp.status_code, 200)
-        return resp.content.decode()
-
-    def test_detail_links_the_supplier(self):
-        supplier = Supplier.objects.create(name="Dell Reseller", slug="dell-reseller")
-        self.provider.supplier = supplier
-        self.provider.save(update_fields=["supplier"])
-
-        content = self._detail_content(self.provider)
-
-        supplier_url = reverse("assets:supplier_detail", kwargs={"pk": supplier.pk})
-        self.assertIn("Supplier:</dt>", content)
-        self.assertIn('<a href="' + supplier_url + '">Dell Reseller</a>', content)
-        self.assertNotIn("Deleted</span>", content)
-
-    def test_detail_omits_supplier_row_when_unlinked(self):
-        content = self._detail_content(self.provider)
-
-        self.assertNotIn("Supplier:</dt>", content)
-
-    def test_detail_marks_soft_deleted_supplier_without_link(self):
-        supplier = Supplier.objects.create(name="Gone Reseller", slug="gone-reseller")
-        self.provider.supplier = supplier
-        self.provider.save(update_fields=["supplier"])
-        supplier.delete()
-
-        content = self._detail_content(self.provider)
-
-        supplier_url = reverse("assets:supplier_detail", kwargs={"pk": supplier.pk})
-        self.assertIn("Gone Reseller", content)
-        self.assertIn("Deleted</span>", content)
-        self.assertNotIn(supplier_url, content)
-
-    def test_create_view_post(self):
-        url = reverse("subscriptions:provider_create")
-        resp = self.client.post(
-            url,
-            {
-                "name": "Google Cloud",
-                "account_id": "gcp-001",
-            },
-        )
-        self.assertEqual(resp.status_code, 302)
-        self.assertTrue(Provider.objects.filter(name="Google Cloud").exists())
-
-    def test_edit_view_post(self):
-        url = reverse("subscriptions:provider_update", kwargs={"pk": self.provider.pk})
-        resp = self.client.post(
-            url,
-            {
-                "name": "Amazon Web Services",
-                "account_id": "aws-001",
-            },
-        )
-        self.assertEqual(resp.status_code, 302)
-        self.provider.refresh_from_db()
-        self.assertEqual(self.provider.name, "Amazon Web Services")
-
-    def test_delete_view_post(self):
-        url = reverse("subscriptions:provider_delete", kwargs={"pk": self.provider.pk})
-        resp = self.client.post(url)
-        self.assertEqual(resp.status_code, 302)
-        self.assertFalse(Provider.objects.filter(pk=self.provider.pk).exists())
-
-
 class SubscriptionAssignmentViewTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", password="testpass", is_staff=True, is_superuser=True)
         self.client.login(username="testuser", password="testpass")
-        self.provider = Provider.objects.create(name="AWS", is_active=True)
+        self.supplier = Supplier.objects.create(name="AWS", is_active=True)
         self.subscription = Subscription.objects.create(
             name="AWS Business Support",
-            provider=self.provider,
+            supplier=self.supplier,
             status=SubscriptionStatusChoices.ACTIVE,
         )
         self.tg = TenantGroup.objects.create(name="TG1", slug="tg1")
@@ -453,10 +353,10 @@ class SubscriptionLifecycleViewTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", password="testpass", is_staff=True, is_superuser=True)
         self.client.login(username="testuser", password="testpass")
-        self.provider = Provider.objects.create(name="Test Provider")
+        self.supplier = Supplier.objects.create(name="Test Supplier")
         self.sub = Subscription.objects.create(
             name="Test Subscription",
-            provider=self.provider,
+            supplier=self.supplier,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_date=date(2026, 6, 1),

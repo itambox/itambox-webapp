@@ -19,7 +19,7 @@ Manage bulk non-serialized items: accessories (keyboards, cables), consumables (
 Maintain a software catalog and track license entitlements — seat counts, product keys (encrypted at rest), expiration dates, and check-out assignments to users or assets.
 
 ### SaaS Subscriptions ***(Beta)***
-Manage recurring SaaS contracts with billing cycles, renewal tracking, provider relationships, and user seat allocations. Subscription seats roll up to linked license entitlements.
+Manage recurring SaaS contracts with billing cycles, renewal tracking, shared Supplier records, and user seat allocations. Subscription seats roll up to linked license entitlements.
 
 ### Procurement ***(Beta)***
 Track the purchasing lifecycle: Purchase Orders with approval workflows, Contracts with SLA tracking, and supplier management. POs support draft → approved → ordered → received states with segregation of duties.

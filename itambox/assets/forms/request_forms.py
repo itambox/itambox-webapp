@@ -416,7 +416,7 @@ class AssetReceiveForm(forms.Form):
         self.fields["location"].queryset = loc_qs.select_related("site").order_by("site__name", "name")
 
         # Populate Suppliers
-        self.fields["supplier"].queryset = Supplier.objects.all().order_by("name")
+        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True).order_by("name")
 
     def clean_asset_tag(self):
         asset_tag = self.cleaned_data.get("asset_tag", "").strip()

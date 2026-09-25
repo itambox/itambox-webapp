@@ -1,56 +1,26 @@
 import django_tables2 as tables
-from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from django_tables2.utils import A
 
 from core.html_styles import status_color_class
-from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.tables import TagColumn
 
-from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
-
-
-class ProviderTable(BaseTable):
-    pk = ToggleColumn(accessor="pk")
-    name = tables.LinkColumn("subscriptions:provider_detail", args=[A("pk")], verbose_name=_("Name"))
-    supplier = tables.LinkColumn(
-        "assets:supplier_detail", args=[A("supplier_id")], accessor="supplier.name", verbose_name=_("Supplier")
-    )
-    is_active = tables.BooleanColumn(verbose_name=_("Active"), yesno="✓,✗")
-    contact_email = tables.Column(accessor="primary_contact.email", verbose_name=_("Contact Email"))
-    subscription_count = CountLinkColumn(
-        "subscriptions:subscription_list",
-        "provider",
-        accessor="subscription_count",
-        verbose_name=_("Subscriptions"),
-        orderable=False,
-    )
-    tags = TagColumn(url_name="subscriptions:provider_list")
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = Provider
-        fields = (
-            "pk",
-            "name",
-            "supplier",
-            "is_active",
-            "account_id",
-            "contact_email",
-            "subscription_count",
-            "tags",
-            "actions",
-        )
-        default_columns = ("pk", "name", "is_active", "account_id", "subscription_count", "tags", "actions")
+from .models import Subscription, SubscriptionAssignment
 
 
 class SubscriptionTable(BaseTable):
     pk = ToggleColumn(accessor="pk")
     name = tables.LinkColumn("subscriptions:subscription_detail", args=[A("pk")], verbose_name=_("Name"))
-    provider = tables.Column(linkify=True, verbose_name=_("Provider"))
+    supplier = tables.LinkColumn(
+        "assets:supplier_detail",
+        args=[A("supplier_id")],
+        accessor="supplier.name",
+        verbose_name=_("Supplier"),
+    )
     status = tables.Column(verbose_name=_("Status"))
     type = tables.Column(verbose_name=_("Type"))
     tenant = tables.Column(accessor="tenant.name", verbose_name=_("Tenant"), orderable=True)
@@ -69,7 +39,7 @@ class SubscriptionTable(BaseTable):
         fields = (
             "pk",
             "name",
-            "provider",
+            "supplier",
             "status",
             "type",
             "tenant",
@@ -85,7 +55,7 @@ class SubscriptionTable(BaseTable):
         default_columns = (
             "pk",
             "name",
-            "provider",
+            "supplier",
             "status",
             "type",
             "renewal_date",
@@ -154,3 +124,15 @@ class SubscriptionAssignmentTable(BaseTable):
         if obj is None:
             return TABLE_EMPTY_VALUE
         return str(obj)
+
+
+class SupplierSubscriptionTable(BaseTable):
+    """Subscriptions of one supplier (supplier detail tab, issue #508)."""
+
+    name = tables.LinkColumn("subscriptions:subscription_detail", args=[A("pk")], verbose_name=_("Name"))
+    status = tables.Column(verbose_name=_("Status"))
+    renewal_date = tables.DateColumn(format="Y-m-d", verbose_name=_("Next Renewal"))
+
+    class Meta(BaseTable.Meta):
+        model = Subscription
+        fields = ("name", "status", "renewal_date")

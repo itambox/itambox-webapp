@@ -25,6 +25,24 @@ import random
 from django.contrib.contenttypes.models import ContentType
 
 
+def _seed_saas_suppliers(supplier_model, supplier_data, tenant, tenant_group):
+    suppliers = {}
+    for name, account_id, portal_url in supplier_data:
+        scope = {"tenant": None, "tenant_group": None}
+        if name == "Google Cloud Platform":
+            scope["tenant"] = tenant
+        elif name == "Cloudflare":
+            scope["tenant_group"] = tenant_group
+        supplier, _ = supplier_model.all_objects.get_or_create(
+            name=name,
+            tenant=scope["tenant"],
+            tenant_group=scope["tenant_group"],
+            defaults={"account_id": account_id, "portal_url": portal_url, "website": ""},
+        )
+        suppliers[name] = supplier
+    return suppliers
+
+
 class SeedOrganizationsMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
@@ -695,6 +713,8 @@ class SeedOrganizationsMixin:
         ]
 
     def _seed_organizations(self):
+        # inline imports: app-registry: assets.models and organization.models load after Django setup.
+        from assets.models import Supplier
         from organization.models import (
             AssetHolder,
             Contact,
@@ -836,6 +856,11 @@ class SeedOrganizationsMixin:
             if tenant.managed_by_id != msp_tenant.pk:
                 tenant.managed_by = msp_tenant
                 tenant.save(update_fields=["managed_by"])
+
+        # SaaS catalogue rows are created after the intended scopes exist.
+        scoped_tenant = self._tenants["northwind-internal-it"]
+        scoped_group = next(iter(self._tgroups.values()))
+        self._saas_suppliers = _seed_saas_suppliers(Supplier, self._saas_supplier_data, scoped_tenant, scoped_group)
 
         # Contacts: a primary customer contact per customer group/tenant + vendor reps
         self._contact_roles = {}

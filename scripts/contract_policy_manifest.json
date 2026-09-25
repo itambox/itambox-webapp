@@ -70,7 +70,7 @@
       "activation": "always-on",
       "contract_class": "stable",
       "exclusions": "none",
-      "scope": "Providers, subscriptions, assignments"
+      "scope": "Suppliers, subscriptions, assignments"
     },
     "users.scim_provisioning": {
       "activation": "opt-in",
@@ -147,7 +147,7 @@
       "available_seats",
       "utilization_rate",
       "subscription_name",
-      "provider",
+      "supplier",
       "agreement_entitled_quantity",
       "billing_cycle",
       "cost",

@@ -49,7 +49,6 @@ ROLE_PERMISSION_TARGETS: tuple[RolePermissionTarget, ...] = (
     RolePermissionTarget("contactrole", "organization", "contactrole"),
     RolePermissionTarget("manufacturer", "assets", "manufacturer"),
     RolePermissionTarget("supplier", "assets", "supplier"),
-    RolePermissionTarget("provider_sub", "subscriptions", "provider"),
     RolePermissionTarget("statuslabel", "assets", "statuslabel"),
     RolePermissionTarget("category", "assets", "category"),
     RolePermissionTarget("depreciation", "assets", "depreciation"),

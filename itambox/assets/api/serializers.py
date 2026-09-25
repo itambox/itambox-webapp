@@ -53,9 +53,10 @@ from organization.api.serializers import (
     AssetHolderSerializer,
     ContactAssignmentSerializer,
     NestedLocationSerializer,
+    NestedTenantGroupSerializer,
     NestedTenantSerializer,
 )
-from organization.models import Location, Tenant
+from organization.models import Location, Tenant, TenantGroup
 
 from ..services.specifications.commands import (
     create_asset_type,
@@ -547,10 +548,47 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
 class SupplierSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     contacts = ContactAssignmentSerializer(many=True, read_only=True)
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
+    )
+    tenant_group = NestedTenantGroupSerializer(read_only=True)
+    tenant_group_id: serializers.PrimaryKeyRelatedField[TenantGroup] = serializers.PrimaryKeyRelatedField(
+        queryset=TenantGroup.objects, source="tenant_group", write_only=True, required=False, allow_null=True
+    )
+
+    def validate(self, attrs):
+        # The database enforces tenant XOR tenant_group; surface a rejected
+        # payload as a 400 instead of letting it hit the constraint as a 500.
+        tenant = attrs.get("tenant", getattr(self.instance, "tenant", None))
+        tenant_group = attrs.get("tenant_group", getattr(self.instance, "tenant_group", None))
+        if tenant is not None and tenant_group is not None:
+            raise serializers.ValidationError(
+                {"tenant_group_id": _("A supplier is scoped to a tenant or a tenant group, not both.")}
+            )
+        return attrs
 
     class Meta:
         model = Supplier
-        fields = ["id", "name", "slug", "website", "address", "notes", "tags", "contacts", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "website",
+            "portal_url",
+            "account_id",
+            "address",
+            "notes",
+            "is_active",
+            "tenant",
+            "tenant_id",
+            "tenant_group",
+            "tenant_group_id",
+            "tags",
+            "contacts",
+            "created_at",
+            "updated_at",
+        ]
         brief_fields = ["id", "name", "slug"]
 
 

@@ -41,4 +41,5 @@ class SubscriptionVocabularyMigrationTests(TransactionTestCase):
         reversed_rows = [Subscription.objects.get(pk=row.pk) for row in rows]
         self.assertEqual([row.status for row in reversed_rows], ["active", "active", "active"])
         self.assertEqual([row.auto_renewal for row in reversed_rows], [False, True, False])
-        MigrationExecutor(connection).migrate([self.migrate_to])
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())

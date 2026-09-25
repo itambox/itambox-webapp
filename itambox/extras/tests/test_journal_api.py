@@ -4,11 +4,11 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel, Supplier
 from core.models import Job
 from core.tests.mixins import grant
 from extras.models import JournalEntry, Tag
-from organization.models import Role, Tenant
+from organization.models import Role, Tenant, TenantGroup
 
 User = get_user_model()
 
@@ -255,3 +255,14 @@ class JournalEntrySaveTenantDerivationTests(APITestCase):
         tag = Tag.objects.create(name="JE-Global-Tag", slug="je-global-tag")
         entry = JournalEntry.objects.create(content_object=tag, comment="on a global object")
         self.assertIsNone(entry.tenant)
+
+    def test_group_scoped_object_derives_tenant_group(self):
+        # A group-scoped object yields tenant=None plus its owning group, so the
+        # entry stays bounded to the group instead of becoming system-global.
+        tenant_group = TenantGroup.objects.create(name="JE-Group", slug="je-group")
+        supplier = Supplier.objects.create(
+            name="JE Group Supplier", slug="je-group-supplier", tenant_group=tenant_group
+        )
+        entry = JournalEntry.objects.create(content_object=supplier, comment="on a group object")
+        self.assertIsNone(entry.tenant)
+        self.assertEqual(entry.tenant_group_id, tenant_group.pk)

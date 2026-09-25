@@ -8,7 +8,7 @@ Designed to be mixed into ``Command`` in seed_data.py:
         ...
 
 ``_seed_subscriptions`` must run after ``_seed_assets`` (it reads
-``self._orgs`` / ``self._tenants`` / ``self._tenant_meta`` / ``self._providers``
+``self._orgs`` / ``self._tenants`` / ``self._tenant_meta`` / ``self._saas_suppliers``
 / ``self._provisioner`` / ``self._assets_by_tenant``). It populates
 ``self._subscriptions`` (consumed by the contracts/costing phase).
 """
@@ -55,12 +55,12 @@ class SeedSubscriptionsMixin:
             if random.random() < 0.5:
                 plan.append(("Datadog", random.randint(8000, 36000)))
             aws_sub = None
-            for prov_name, cost in plan:
+            for supplier_name, cost in plan:
                 start = days_ago(random.randint(60, 700))
                 renewal = days_ahead(random.choice([20, 35, 60, 120, 300]))
                 sub = Subscription.objects.create(
-                    name=prov_name,
-                    provider=self._providers[prov_name],
+                    name=supplier_name,
+                    supplier=self._saas_suppliers[supplier_name],
                     type="saas",
                     start_date=start,
                     renewal_date=renewal,
@@ -69,13 +69,13 @@ class SeedSubscriptionsMixin:
                     billing_cycle="annual",
                     term_months=12,
                     vendor_contract_auto_renews=True,
-                    contract_reference=f"MSA-{prov_name.split()[0].upper()}-{start.year}",
+                    contract_reference=f"MSA-{supplier_name.split()[0].upper()}-{start.year}",
                     owner=self._provisioner,
-                    description=f"{prov_name} cloud subscription. The group contract is held by {tenant.name}.",
+                    description=f"{supplier_name} cloud subscription. The group contract is held by {tenant.name}.",
                     tenant=tenant,
                 )
                 self._subscriptions.append(sub)
-                if prov_name == "Amazon Web Services":
+                if supplier_name == "Amazon Web Services":
                     aws_sub = sub
             # The contract belongs to the primary tenant, so only its servers are
             # valid assignment targets. Cross-entity cost allocation needs a separate,

@@ -25,7 +25,7 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
         widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     supplier = forms.ModelChoiceField(
-        queryset=Supplier.objects.all(),
+        queryset=Supplier.objects.filter(is_active=True),
         required=False,
         label=_("Supplier"),
         widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
@@ -86,6 +86,7 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
         # Rescope the tenant-owned `cost_center`/`subscription` FK pickers per
         # request (import-frozen unscoped). `software` is validated same-tenant in
         # License.clean(); `supplier` is a global catalogue model.

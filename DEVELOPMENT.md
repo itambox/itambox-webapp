@@ -97,7 +97,7 @@ an inconsistent disposable demo database.
 
 ### Shared Models (no tenant needed)
 
-Models that are **catalogs/references** shared across tenants: `Manufacturer`, `Software`, `AssetType`, `ComponentType`, `StatusLabel`, `AssetRole`, `Tag`, `CustomField`, `Depreciation`, `Provider`, `ContactRole`, `Region`, `SiteGroup`, `TenantGroup`
+Models that are **catalogs/references** shared across tenants: `Manufacturer`, `Software`, `AssetType`, `ComponentType`, `StatusLabel`, `AssetRole`, `Tag`, `CustomField`, `Depreciation`, `Supplier`, `ContactRole`, `Region`, `SiteGroup`, `TenantGroup`
 
 ## HTMX Boost Conventions
 
@@ -184,7 +184,7 @@ Always add `db_index=True` to ForeignKey fields. SQLite auto-indexes, but Postgr
 
 ### Models
 
-- `Provider` — Vendor/supplier (AWS, Azure, Adobe)
+- `Supplier` — Vendor/supplier (AWS, Azure, Adobe)
 - `Subscription` — Recurring agreement (SaaS, support, maintenance)
 - `SubscriptionAssignment` — GenericForeignKey linking subscriptions to Assets, AssetHolders, or Locations
 

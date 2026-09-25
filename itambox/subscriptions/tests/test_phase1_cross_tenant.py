@@ -3,11 +3,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
-from assets.models import Asset, StatusLabel
+from assets.models import Asset, StatusLabel, Supplier
 from core.managers import set_current_tenant
 from core.tests.mixins import grant
 from organization.models import Role, Tenant
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment
+from subscriptions.models import Subscription, SubscriptionAssignment
 
 User = get_user_model()
 
@@ -48,9 +48,9 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         # manager does not interfere during creation.
         set_current_tenant(self.tenant_a)
         try:
-            self.provider_a = Provider.objects.create(name="Provider A", tenant=self.tenant_a)
+            self.supplier_a = Supplier.objects.create(name="Supplier A", tenant=self.tenant_a)
             self.subscription_a = Subscription.objects.create(
-                name="Subscription A", provider=self.provider_a, tenant=self.tenant_a
+                name="Subscription A", supplier=self.supplier_a, tenant=self.tenant_a
             )
             self.asset_a = Asset.objects.create(
                 name="Asset A", asset_tag="TAG-A-001", status=self.status, tenant=self.tenant_a
@@ -69,9 +69,9 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         # otherwise pass regardless of whether scoping works).
         set_current_tenant(self.tenant_b)
         try:
-            self.provider_b = Provider.objects.create(name="Provider B", tenant=self.tenant_b)
+            self.supplier_b = Supplier.objects.create(name="Supplier B", tenant=self.tenant_b)
             self.subscription_b = Subscription.objects.create(
-                name="Subscription B", provider=self.provider_b, tenant=self.tenant_b
+                name="Subscription B", supplier=self.supplier_b, tenant=self.tenant_b
             )
             self.asset_b = Asset.objects.create(
                 name="Asset B", asset_tag="TAG-B-001", status=self.status, tenant=self.tenant_b

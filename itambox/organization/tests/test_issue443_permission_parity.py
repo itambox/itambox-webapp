@@ -35,7 +35,6 @@ EXPECTED_TARGETS = (
     ("contactrole", "organization", "contactrole"),
     ("manufacturer", "assets", "manufacturer"),
     ("supplier", "assets", "supplier"),
-    ("provider_sub", "subscriptions", "provider"),
     ("statuslabel", "assets", "statuslabel"),
     ("category", "assets", "category"),
     ("depreciation", "assets", "depreciation"),
@@ -112,7 +111,7 @@ def test_all_three_adapters_have_deleted_permission_generation_methods():
 def test_semantic_policy_matches_independent_expected_sets_and_golden_counts():
     from organization.services.role_permission_policy import permissions_for_sso_role
 
-    for role_name, expected_count in (("Admin", 235), ("Manager", 177), ("Member", 177)):
+    for role_name, expected_count in (("Admin", 231), ("Manager", 174), ("Member", 174)):
         expected = _independent_live_permissions(role_name)
         actual = set(permissions_for_sso_role(role_name))
         assert actual == expected
@@ -133,10 +132,10 @@ def test_independent_expected_set_catches_semantic_policy_target_sabotage(monkey
     assert set(policy.permissions_for_sso_role("Admin")) != expected
 
 
-def test_current_both_matrix_surfaces_preserve_the_ordered_60_key_compatibility_dict():
+def test_current_both_matrix_surfaces_preserve_the_ordered_59_key_compatibility_dict():
     assert not apps.is_installed("itambox_esign")
     expected_keys = [key for key, _app, _model in EXPECTED_TARGETS]
-    assert len(expected_keys) == 60
+    assert len(expected_keys) == 59
     assert expected_keys[-1] == "docusignenvelope"
     assert list(ROLE_FORM_MATRIX_MODELS) == expected_keys
     assert list(PACKAGE_MATRIX_MODELS) == expected_keys
@@ -155,7 +154,7 @@ def test_new_policy_has_exact_absent_branch_counts_and_dashboard_set():
         "Manager": ("view", "add", "change"),
         "Member": ("view", "add", "change"),
     }
-    for role_name, expected_count in (("Admin", 235), ("Manager", 177), ("Member", 177)):
+    for role_name, expected_count in (("Admin", 231), ("Manager", 174), ("Member", 174)):
         actual = set(permissions_for_sso_role(role_name))
         crud = {
             f"{app}.{action}_{model}"
@@ -168,7 +167,7 @@ def test_new_policy_has_exact_absent_branch_counts_and_dashboard_set():
     assert set(permissions_for_sso_role("Manager")) == set(permissions_for_sso_role("Member"))
 
 
-def test_semantic_and_presentation_declarations_have_exact_60_key_order():
+def test_semantic_and_presentation_declarations_have_exact_59_key_order():
     from organization.forms.role_matrix import ROLE_PERMISSION_PRESENTATION
     from organization.services.role_permission_policy import ROLE_PERMISSION_TARGETS
 
@@ -176,10 +175,10 @@ def test_semantic_and_presentation_declarations_have_exact_60_key_order():
         (key, app, model, "itambox_esign" if app == "itambox_esign" else None) for key, app, model in EXPECTED_TARGETS
     )
     actual = tuple((target.key, target.app, target.model, target.required_app) for target in ROLE_PERMISSION_TARGETS)
-    assert len(ROLE_PERMISSION_TARGETS) == 60
+    assert len(ROLE_PERMISSION_TARGETS) == 59
     assert actual == expected
     assert list(ROLE_PERMISSION_PRESENTATION) == [key for key, _app, _model, _required in expected]
-    assert len(ROLE_PERMISSION_PRESENTATION) == 60
+    assert len(ROLE_PERMISSION_PRESENTATION) == 59
 
 
 def test_semantic_targets_are_presentation_free_and_policy_does_not_import_forms():
@@ -222,17 +221,17 @@ def test_present_and_absent_optional_plugin_projection_and_effective_counts(monk
         )
 
     monkeypatch.setattr(apps, "is_installed", lambda label: False)
-    assert len(policy.active_role_permission_targets()) == 59
-    assert len(presentation.build_matrix_models()) == 60
+    assert len(policy.active_role_permission_targets()) == 58
+    assert len(presentation.build_matrix_models()) == 59
     assert [target.key for target in policy.active_role_permission_targets()][-1] == "configcontext"
-    assert len(policy.permissions_for_sso_role("Admin")) == 235
-    assert len(policy.permissions_for_sso_role("Manager")) == 177
-    assert len(policy.permissions_for_sso_role("Member")) == 177
+    assert len(policy.permissions_for_sso_role("Admin")) == 231
+    assert len(policy.permissions_for_sso_role("Manager")) == 174
+    assert len(policy.permissions_for_sso_role("Member")) == 174
 
     monkeypatch.setattr(apps, "is_installed", lambda label: label == "itambox_esign")
-    assert len(policy.active_role_permission_targets()) == 60
+    assert len(policy.active_role_permission_targets()) == 59
     present_matrix = presentation.build_matrix_models()
-    assert len(present_matrix) == 60
+    assert len(present_matrix) == 59
     assert [target.key for target in policy.active_role_permission_targets()][-1] == "docusignenvelope"
     expected_present = []
     for key, label, group in EXPECTED_PRESENTATION_ROWS:
@@ -243,9 +242,9 @@ def test_present_and_absent_optional_plugin_projection_and_effective_counts(monk
         for key, info in present_matrix.items()
     ]
     assert actual_present == expected_present
-    assert len(policy.permissions_for_sso_role("Admin")) == 239
-    assert len(policy.permissions_for_sso_role("Manager")) == 180
-    assert len(policy.permissions_for_sso_role("Member")) == 180
+    assert len(policy.permissions_for_sso_role("Admin")) == 235
+    assert len(policy.permissions_for_sso_role("Manager")) == 177
+    assert len(policy.permissions_for_sso_role("Member")) == 177
 
 
 @pytest.mark.django_db
@@ -335,8 +334,7 @@ EXPECTED_PRESENTATION_ROWS = (
     ("contact", "Contacts", "Organization " + chr(38) + " Structure"),
     ("contactrole", "Contact Roles", "Organization " + chr(38) + " Structure"),
     ("manufacturer", "Manufacturers", "Metadata " + chr(38) + " Settings"),
-    ("supplier", "Suppliers (Hardware)", "Metadata " + chr(38) + " Settings"),
-    ("provider_sub", "Providers (Subscription)", "Metadata " + chr(38) + " Settings"),
+    ("supplier", "Suppliers", "Metadata " + chr(38) + " Settings"),
     ("statuslabel", "Status Labels", "Metadata " + chr(38) + " Settings"),
     ("category", "Categories", "Metadata " + chr(38) + " Settings"),
     ("depreciation", "Depreciation Schedules", "Metadata " + chr(38) + " Settings"),
@@ -372,7 +370,7 @@ EXPECTED_PRESENTATION_ROWS = (
 )
 
 
-def test_presentation_values_match_the_established_60_row_contract():
+def test_presentation_values_match_the_established_59_row_contract():
     expected = []
     for key, label, group in EXPECTED_PRESENTATION_ROWS:
         target = next(target for target in EXPECTED_TARGETS if target[0] == key)
@@ -382,5 +380,5 @@ def test_presentation_values_match_the_established_60_row_contract():
         (key, str(info["label"]), info["app"], info["model_name"], str(info["group"]))
         for key, info in PACKAGE_MATRIX_MODELS.items()
     ]
-    assert len(EXPECTED_PRESENTATION_ROWS) == 60
+    assert len(EXPECTED_PRESENTATION_ROWS) == 59
     assert actual == expected

@@ -8,7 +8,7 @@ from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
-from assets.models import Asset, AssetMaintenance, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetMaintenance, AssetType, Manufacturer, StatusLabel, Supplier
 from core.managers import (
     get_current_all_accessible,
     get_current_membership,
@@ -39,7 +39,7 @@ from extras.dashboard.widgets import (
 from itambox.middleware import set_current_user
 from licenses.models import License
 from organization.models import AssetHolder, Location, Membership, Role, RoleGrantScope, Site, Tenant
-from subscriptions.models import Provider, Subscription
+from subscriptions.models import Subscription
 
 User = get_user_model()
 
@@ -118,11 +118,11 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         self.maint_b = AssetMaintenance.objects.create(asset=self.asset_b, start_date=date.today(), cost=300.00)
 
         # Setup subscriptions
-        self.provider = Provider.objects.create(name="Provider X", slug="provider-x")
+        self.supplier = Supplier.objects.create(name="Supplier X", slug="supplier-x")
         self.sub_a = Subscription.objects.create(
             name="SaaS A",
             slug="saas-a",
-            provider=self.provider,
+            supplier=self.supplier,
             status="active",
             start_date=date.today(),
             renewal_date=date.today() + timedelta(days=30),
@@ -132,7 +132,7 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         self.sub_b = Subscription.objects.create(
             name="SaaS B",
             slug="saas-b",
-            provider=self.provider,
+            supplier=self.supplier,
             status="active",
             start_date=date.today(),
             renewal_date=date.today() + timedelta(days=30),

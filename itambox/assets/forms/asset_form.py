@@ -111,7 +111,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
     warranty_supplier = forms.ModelChoiceField(
         label=_("Warranty Supplier"),
         required=False,
-        queryset=Supplier.objects.all(),
+        queryset=Supplier.objects.filter(is_active=True),
         widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     warranty_type = forms.ChoiceField(
@@ -276,6 +276,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
+        self.fields["warranty_supplier"].queryset = Supplier.objects.filter(is_active=True)
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )

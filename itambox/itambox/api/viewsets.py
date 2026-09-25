@@ -174,10 +174,18 @@ class ITAMBoxModelViewSet(
 
     @staticmethod
     def _missing_create_tenant_rows(serializer):
+        # A row that explicitly carries a tenant group is already scoped:
+        # injecting the ambient tenant on top of it would violate the tenant
+        # XOR tenant-group constraint, so only rows that leave BOTH scope
+        # fields empty count as missing a tenant.
         validated = serializer.validated_data
         if getattr(serializer, "many", False):
-            return [row for row in validated if isinstance(row, dict) and row.get("tenant") is None]
-        if isinstance(validated, dict) and validated.get("tenant") is None:
+            return [
+                row
+                for row in validated
+                if isinstance(row, dict) and row.get("tenant") is None and row.get("tenant_group") is None
+            ]
+        if isinstance(validated, dict) and validated.get("tenant") is None and validated.get("tenant_group") is None:
             return [validated]
         return []
 
@@ -272,28 +280,34 @@ class ITAMBoxModelViewSet(
         logger.info(f"Updating {model._meta.verbose_name} {serializer.instance} (PK: {serializer.instance.pk})")
 
         save_kwargs = {}
-        # Re-pin the tenant on update for non-superusers.  A PATCH/PUT that sets
-        # tenant=null (or a different tenant) on an allow_global_tenant model
-        # would otherwise globalize the row (tenant=None) — making it visible to
-        # every tenant — or move it into another tenant entirely, a cross-tenant
-        # read.  Force it back to the object's existing tenant.  Superusers may
-        # still retarget tenant explicitly.  Mirrors perform_create's tenant
-        # pinning and the GraphQL mutations, which never let a client set tenant.
+        # Re-pin the object scope on update for non-superusers.  A PATCH/PUT
+        # that sets tenant=null or tenant_group=null (or a different scope) on
+        # an allow_global_tenant model would otherwise globalize the row —
+        # making it visible to every tenant — or move it into another tenant
+        # entirely, a cross-tenant read.  The tenant_group path needs the same
+        # protection: {"tenant_group_id": null} would turn a group-scoped row
+        # into a global one, and the tenant pin alone would not catch it.
+        # Force both scope fields back to the object's existing values.
+        # Superusers may still retarget scope explicitly.  Mirrors
+        # perform_create's tenant pinning and the GraphQL mutations, which
+        # never let a client set tenant.
         validated = serializer.validated_data
         if (
             not getattr(serializer, "many", False)
             and isinstance(validated, dict)
             and not self.request.user.is_superuser
-            and "tenant" in validated
         ):
             from django.core.exceptions import FieldDoesNotExist
 
-            try:
-                model._meta.get_field("tenant")
-            except FieldDoesNotExist:
-                pass
-            else:
-                save_kwargs["tenant"] = getattr(serializer.instance, "tenant", None)
+            for scope_field in ("tenant", "tenant_group"):
+                if scope_field not in validated:
+                    continue
+                try:
+                    model._meta.get_field(scope_field)
+                except FieldDoesNotExist:
+                    pass
+                else:
+                    save_kwargs[scope_field] = getattr(serializer.instance, scope_field, None)
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):

@@ -1058,7 +1058,7 @@ class ReportTemplateForm(forms.ModelForm):
         ("utilization_rate", _("Utilization Rate")),
         # Subscription Renewals Columns
         ("subscription_name", _("Subscription Name")),
-        ("provider", _("Provider")),
+        ("supplier", _("Supplier")),
         ("agreement_entitled_quantity", _("Agreement Entitled Quantity")),
         ("billing_cycle", _("Billing Cycle")),
         ("cost", _("Cost")),

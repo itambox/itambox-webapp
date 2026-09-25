@@ -54,10 +54,10 @@ def _notify_expired(subscription):
         _notify_once(
             user=user,
             subject=_("Subscription Expired: %(name)s") % {"name": subscription.name},
-            message=_("The subscription '%(name)s' from provider '%(provider)s' has expired as of %(date)s.")
+            message=_("The subscription '%(name)s' from supplier '%(supplier)s' has expired as of %(date)s.")
             % {
                 "name": subscription.name,
-                "provider": subscription.provider,
+                "supplier": subscription.supplier,
                 "date": subscription.renewal_date,
             },
             target_url=subscription.get_absolute_url(),
@@ -71,13 +71,13 @@ def _notify_renewal_warning(subscription, days):
             subject=_("Subscription Renewal Warning: %(name)s in %(days)s Days")
             % {"name": subscription.name, "days": days},
             message=_(
-                "The subscription '%(name)s' from provider '%(provider)s' "
+                "The subscription '%(name)s' from supplier '%(supplier)s' "
                 "is due for renewal on %(date)s (%(days)s days remaining). "
                 "Cost: %(cost)s %(currency)s."
             )
             % {
                 "name": subscription.name,
-                "provider": subscription.provider,
+                "supplier": subscription.supplier,
                 "date": subscription.renewal_date,
                 "days": days,
                 "cost": subscription.renewal_cost,

@@ -106,7 +106,6 @@ https://your-itambox-instance.com/api/
 |                   | `/api/software/installed-software/`                 | Installed software records                              |
 | **Subscriptions** | `/api/subscriptions/subscriptions/`                 | Manage subscriptions                                    |
 |                   | `/api/subscriptions/assignments/`                   | Subscription assignments                                |
-|                   | `/api/subscriptions/providers/`                     | Subscription providers                                  |
 | **Users**         | `/api/users/users/`                                 | Manage users                                            |
 |                   | `/api/users/groups/`                                | Manage groups                                           |
 |                   | `/api/users/tokens/`                                | Manage API tokens                                       |

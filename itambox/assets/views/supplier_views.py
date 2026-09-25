@@ -1,3 +1,5 @@
+from django.db.models import Count, IntegerField, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
@@ -22,6 +24,28 @@ class SupplierListView(ObjectListView):
     filterset_form = forms.SupplierFilterForm
     table = tables.SupplierTable
     action_buttons = ("add",)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Mirror the detail tab's scoped Subscription.objects query — the scoped
+        # manager resolves the active single-tenant/group/all-accessible scope and
+        # soft-deletes — so the count can neither disagree with the tab nor leak
+        # subscription counts from tenants outside the active scope.
+        # inline imports: heavy-import: subscriptions.models for the supplier subscription counts
+        from subscriptions.models import Subscription
+
+        live_subscriptions = (
+            Subscription.objects.filter(supplier=OuterRef("pk"))
+            .order_by()
+            .values("supplier")
+            .annotate(total=Count("pk"))
+        )
+        return queryset.annotate(
+            subscription_count=Coalesce(
+                Subquery(live_subscriptions.values("total"), output_field=IntegerField()),
+                0,
+            )
+        )
 
 
 class SupplierDetailView(ObjectDetailView):
@@ -75,6 +99,17 @@ class SupplierDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(licenses_table)
         context["licenses_table"] = licenses_table
 
+        # inline imports: heavy-import: subscriptions.models and subscriptions.tables for the supplier detail tab only
+        from subscriptions.models import Subscription
+        from subscriptions.tables import SupplierSubscriptionTable
+
+        subscription_qs = Subscription.objects.filter(supplier=supplier)
+        subscriptions_table = SupplierSubscriptionTable(subscription_qs, request=self.request)
+        RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
+            subscriptions_table
+        )
+        context["subscriptions_table"] = subscriptions_table
+
         related_objects_list = []
         asset_count = supplier_assets.count()
         if asset_count:
@@ -110,6 +145,15 @@ class SupplierDetailView(ObjectDetailView):
                     "label": "Licenses",
                     "count": license_count,
                     "url": f"{reverse('licenses:license_list')}?supplier={supplier.slug}",
+                }
+            )
+        subscription_count = subscription_qs.count()
+        if subscription_count:
+            related_objects_list.append(
+                {
+                    "label": "Subscriptions",
+                    "count": subscription_count,
+                    "url": f"{reverse('subscriptions:subscription_list')}?supplier={supplier.pk}",
                 }
             )
         context["related_objects_list"] = related_objects_list

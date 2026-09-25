@@ -7021,6 +7021,46 @@
     },
     {
       "dependencies": [
+        "assets.0120_repair_episode",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0121_supplier_scoping_and_commercial_fields",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0121_supplier_scoping_and_commercial_fields.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0001_initial",
         "extras.0001_initial",
         "organization.0001_initial"
@@ -12689,6 +12729,47 @@
     },
     {
       "dependencies": [
+        "extras.0121_specification_library_permission",
+        "organization.0102_alter_tenantresourcegrant_options",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0122_journalentry_tenant_group",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0122_journalentry_tenant_group.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -18203,6 +18284,51 @@
     },
     {
       "dependencies": [
+        "assets.0121_supplier_scoping_and_commercial_fields",
+        "extras.0122_journalentry_tenant_group",
+        "subscriptions.0102_commercial_vendor_and_terms",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "subscriptions.0103_unified_vendor_cutover",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 1,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/subscriptions/migrations/0103_unified_vendor_cutover.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Transplants subscription provider profiles into the tenant-scoped supplier catalogue (explicit link, scope-and-name match, or create), rebinds every subscription including soft-deleted ones, copies tag links, and repoints generic contact assignments. The merge is lossy, so rollback is restore-first."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": true,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "auth.0012_alter_user_first_name_max_length"
       ],
       "id": "users.0000_issue88_shard_01_users_bootstrap",
@@ -19253,6 +19379,7 @@
     "assets.0118_assetdisposal_cancellation_reason_and_more",
     "assets.0119_warranty_supplier",
     "assets.0120_repair_episode",
+    "assets.0121_supplier_scoping_and_commercial_fields",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -19279,6 +19406,7 @@
     "extras.0119_issue479_t07_provenance_schema",
     "extras.0120_issue479_t07_provenance_cutover",
     "extras.0121_specification_library_permission",
+    "extras.0122_journalentry_tenant_group",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -19286,6 +19414,7 @@
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "subscriptions.0102_commercial_vendor_and_terms",
+    "subscriptions.0103_unified_vendor_cutover",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
     "users.0102_token_updated_at",
     "users.0103_oidcidentity"
@@ -19392,6 +19521,7 @@
       "software.0008_repoint_installedsoftware_contenttype",
       "subscriptions.0006_remove_provider_contact_email_and_more",
       "subscriptions.0101_remove_subscription_auto_renewal_and_more",
+      "subscriptions.0103_unified_vendor_cutover",
       "users.0005_remove_token_key_token_digest_token_key_preview_and_more",
       "users.0007_usergroup",
       "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more",
@@ -19582,7 +19712,7 @@
         ]
       }
     },
-    "post_transition_migrations": 56,
+    "post_transition_migrations": 59,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

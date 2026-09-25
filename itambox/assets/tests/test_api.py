@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel, Supplier, Warranty
 from core.tests.mixins import grant
 from licenses.models import License, LicenseSeatAssignment
-from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant
+from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant, TenantGroup
 from software.models import Software
 from users.models import Token
 
@@ -297,6 +297,179 @@ class ITAMBoxAPITestCase(APITestCase):
         self.assertFalse(assignment.is_active)
         self.assertEqual(assignment.checked_in_at.date().isoformat(), checkin_date)
         self.assertIn("Check in asset A with custom status and location via API", assignment.notes)
+
+    def test_non_superuser_group_scoped_supplier_create_is_not_double_scoped(self):
+        """tenant_group-only creates must not get an ambient tenant injected (no 500)."""
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Supplier Creator",
+            permissions=["assets.add_supplier"],
+        )
+        grant(self.staff, self.tenant_a, role)
+        tenant_group = TenantGroup.objects.create(name="API Scope Group", slug="api-scope-group")
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.staff_token.key}")
+        response = self.client.post(
+            reverse("api:assets_api:supplier-list"),
+            data={
+                "name": "Group Scoped Supplier",
+                "slug": "group-scoped-supplier",
+                "tenant_group_id": tenant_group.pk,
+            },
+            format="json",
+        )
+
+        # The tenant-bound actor is denied by the request-scoped object
+        # validation — the group-scoped supplier is not in their queryset —
+        # but the response is a clean 403 instead of the previous 500 from
+        # the ambient tenant injection colliding with the explicit group.
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.content)
+        self.assertFalse(Supplier.objects.filter(name="Group Scoped Supplier").exists())
+
+        # A superuser payload with only a tenant group stays legal (no injection).
+        self.client.force_authenticate(user=self.superuser)
+        superuser_response = self.client.post(
+            reverse("api:assets_api:supplier-list"),
+            data={
+                "name": "Super Group Supplier",
+                "slug": "super-group-supplier",
+                "tenant_group_id": tenant_group.pk,
+            },
+            format="json",
+        )
+        self.assertEqual(superuser_response.status_code, status.HTTP_201_CREATED, superuser_response.content)
+        group_supplier = Supplier.objects.get(name="Super Group Supplier")
+        self.assertIsNone(group_supplier.tenant_id)
+        self.assertEqual(group_supplier.tenant_group_id, tenant_group.pk)
+
+    def test_supplier_search_matches_transplanted_provider_fields(self):
+        """q must keep matching the account_id and notes transplanted from Provider."""
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Supplier Viewer",
+            permissions=["assets.view_supplier"],
+        )
+        grant(self.staff, self.tenant_a, role)
+        Supplier.objects.create(
+            name="Search Supplier",
+            account_id="ACCT-9042",
+            notes="legacy administrative note",
+            tenant=self.tenant_a,
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.staff_token.key}")
+        url = reverse("api:assets_api:supplier-list")
+        for query in ("ACCT-9042", "legacy administrative note"):
+            response = self.client.get(url, {"q": query})
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            rows = response.data["results"] if isinstance(response.data, dict) else response.data
+            self.assertEqual([row["name"] for row in rows], ["Search Supplier"])
+
+    def test_supplier_scope_rejects_both_tenant_and_tenant_group(self):
+        """The tenant XOR tenant_group constraint must surface as a 400, not a 500."""
+        self.client.force_authenticate(user=self.superuser)
+        tenant_group = TenantGroup.objects.create(name="API Scope Group", slug="api-scope-group")
+        tenant = Tenant.objects.create(name="API Scope Tenant", slug="api-scope-tenant")
+
+        response = self.client.post(
+            reverse("api:assets_api:supplier-list"),
+            data={
+                "name": "Conflicted Supplier",
+                "slug": "conflicted-supplier",
+                "tenant_id": tenant.pk,
+                "tenant_group_id": tenant_group.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("tenant_group_id", response.data)
+
+    def test_non_superuser_supplier_scope_transitions_are_pinned(self):
+        """Scope transfers are privileged: staff PATCH must not globalize or move a supplier."""
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Supplier Editor",
+            permissions=["assets.view_supplier", "assets.change_supplier"],
+        )
+        grant(self.staff, self.tenant_a, role)
+        tenant_group = TenantGroup.objects.create(name="Pin Scope Group", slug="pin-scope-group")
+        self.tenant_a.group = tenant_group
+        self.tenant_a.save(update_fields=["group"])
+        group_supplier = Supplier.objects.create(
+            name="Pinned Group Supplier",
+            slug="pinned-group-supplier",
+            tenant_group=tenant_group,
+        )
+        tenant_supplier = Supplier.objects.create(
+            name="Pinned Tenant Supplier",
+            slug="pinned-tenant-supplier",
+            tenant=self.tenant_a,
+        )
+
+        self.client.force_login(self.staff)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_a.pk
+        session.save()
+
+        # Group-scoped (tenant-less) rows are read-only for staff: the boundary
+        # hides the mutation as 404 to prevent primary key enumeration.
+        group_url = reverse("api:assets_api:supplier-detail", kwargs={"pk": group_supplier.pk})
+        response = self.client.get(group_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        response = self.client.patch(
+            group_url, data={"tenant_group_id": None}, format="json", HTTP_IF_MATCH=response["ETag"]
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        group_supplier.refresh_from_db()
+        self.assertEqual(group_supplier.tenant_group_id, tenant_group.pk)
+
+        # The reachable staff attack retargets a tenant-scoped row. The payload
+        # {"tenant_id": null, "tenant_group_id": <own group>} passes the XOR
+        # validation (exactly one key set in the payload) and must not move the
+        # row out of its tenant scope: both keys are pinned back.
+        tenant_url = reverse("api:assets_api:supplier-detail", kwargs={"pk": tenant_supplier.pk})
+        response = self.client.get(tenant_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        etag = response["ETag"]
+        response = self.client.patch(
+            tenant_url,
+            data={"tenant_id": None, "tenant_group_id": tenant_group.pk},
+            format="json",
+            HTTP_IF_MATCH=etag,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        etag = response["ETag"]
+        tenant_supplier.refresh_from_db()
+        self.assertEqual(tenant_supplier.tenant_id, self.tenant_a.pk)
+        self.assertIsNone(tenant_supplier.tenant_group_id)
+
+        # Tenant -> global alone: the pre-existing tenant pin stays intact.
+        response = self.client.patch(tenant_url, data={"tenant_id": None}, format="json", HTTP_IF_MATCH=etag)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        etag = response["ETag"]
+        tenant_supplier.refresh_from_db()
+        self.assertEqual(tenant_supplier.tenant_id, self.tenant_a.pk)
+
+        # Tenant -> group alone is rejected outright by the XOR validation.
+        response = self.client.patch(
+            tenant_url, data={"tenant_group_id": tenant_group.pk}, format="json", HTTP_IF_MATCH=etag
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Superusers may retarget scope explicitly.
+        self.client.force_login(self.superuser)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_a.pk
+        session.save()
+        response = self.client.get(group_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        response = self.client.patch(
+            group_url, data={"tenant_group_id": None}, format="json", HTTP_IF_MATCH=response["ETag"]
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        group_supplier.refresh_from_db()
+        self.assertIsNone(group_supplier.tenant_group_id)
 
     def test_warranty_supplier_link_round_trips_through_the_api(self):
         self.client.force_authenticate(user=self.superuser)

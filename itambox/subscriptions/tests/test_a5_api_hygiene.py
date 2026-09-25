@@ -21,6 +21,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from assets.models import Supplier
 from core.models import ObjectChange
 from core.tests.mixins import grant
 from organization.models import (
@@ -31,7 +32,6 @@ from organization.models import (
 )
 from subscriptions.models import (
     BillingCycleChoices,
-    Provider,
     Subscription,
     SubscriptionStatusChoices,
     SubscriptionTypeChoices,
@@ -64,16 +64,16 @@ class A5ApiHygieneTests(APITestCase):
             tenant=self.tenant,
         )
 
-        # Tenant-scoped provider + subscription (PROTECT relation lets us exercise
+        # Tenant-scoped supplier + subscription (PROTECT relation lets us exercise
         # the 409 ProtectedError handler).
-        self.provider = Provider.objects.create(
-            name="A5 Provider",
-            slug="a5-provider",
+        self.supplier = Supplier.objects.create(
+            name="A5 Supplier",
+            slug="a5-supplier",
             tenant=self.tenant,
         )
         self.subscription = Subscription.objects.create(
             name="A5 Subscription",
-            provider=self.provider,
+            supplier=self.supplier,
             type=SubscriptionTypeChoices.SAAS,
             status=SubscriptionStatusChoices.ACTIVE,
             renewal_cost=10.00,
@@ -87,8 +87,7 @@ class A5ApiHygieneTests(APITestCase):
             tenant=self.tenant,
             name="A5 Role",
             permissions=[
-                "subscriptions.view_provider",
-                "subscriptions.delete_provider",
+                "assets.delete_supplier",
                 "subscriptions.view_subscription",
                 "subscriptions.change_subscription",
                 "subscriptions.delete_subscription",
@@ -203,16 +202,16 @@ class A5ApiHygieneTests(APITestCase):
     # ----- WS3-7b ----------------------------------------------------------
 
     def test_protected_error_409_reports_count_not_pks(self):
-        """Deleting a provider that a subscription PROTECTs returns a 409 whose
+        """Deleting a supplier that a subscription PROTECTs returns a 409 whose
         body carries a COUNT of dependents, not the enumerated str()/pk."""
         self._login_as_staff()
-        provider_detail = reverse(
-            "api:subscriptions_api:provider-detail",
-            kwargs={"pk": self.provider.pk},
+        supplier_detail = reverse(
+            "api:assets_api:supplier-detail",
+            kwargs={"pk": self.supplier.pk},
         )
-        etag = self._etag_for(self.provider)
+        etag = self._etag_for(self.supplier)
 
-        response = self.client.delete(provider_detail, HTTP_IF_MATCH=etag)
+        response = self.client.delete(supplier_detail, HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, 409)
         detail = response.data["detail"]
         # A count is present.

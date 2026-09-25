@@ -159,8 +159,9 @@ class ContractFormCommercialVocabularyTests(TenantTestMixin, TestCase):
         self.clear_tenant_context()
         try:
             self.assertEqual(self._asset_pks(), set())
-            # Global reference data is not tenant-scoped, so it stays complete.
-            self.assertEqual(self._supplier_pks(), {self.supplier_a.pk, self.supplier_b.pk})
+            # Suppliers are tenant-scoped (issue #508): without a resolved tenant
+            # context the scoped manager fails closed for members as well.
+            self.assertEqual(self._supplier_pks(), set())
         finally:
             set_current_user(None)
             self.set_active_tenant(self.tenant)
