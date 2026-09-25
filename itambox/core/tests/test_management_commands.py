@@ -360,9 +360,12 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             email="invariant.holder@example.com",
             upn="invariant.holder@example.com",
         )
-        self.available = StatusLabel.objects.create(name="Available", slug="available", type="deployable")
-        self.in_use = StatusLabel.objects.create(name="In Use", slug="in-use", type="deployed")
-        self.pending_repair = StatusLabel.objects.create(name="Pending Repair", slug="pending-repair", type="pending")
+        # The status labels are migration-seeded reference data (assets.0003), so
+        # fetch them by slug instead of creating them: re-creating them violates
+        # unique_statuslabel_name_active on any already-migrated database.
+        self.available = StatusLabel._base_manager.get(slug="available")
+        self.in_use = StatusLabel._base_manager.get(slug="in-use")
+        self.pending_repair = StatusLabel._base_manager.get(slug="pending-repair")
         self.requester = User.objects.create_user(username="requester@example.com", password="password")
         Membership._base_manager.create(user=self.requester, tenant=self.tenant, is_active=True)
 
