@@ -260,6 +260,7 @@ def forwards(apps, schema_editor):
     )
     _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants)
     _rename_provider_permissions(apps)
+    _translate_provider_references(apps, ContentType, provider_to_supplier)
 
 
 def _rename_provider_permissions(apps):
@@ -268,8 +269,8 @@ def _rename_provider_permissions(apps):
     Role permissions are persisted as literal "app_label.codename" strings in a
     JSON field, so the policy rename (Provider retired, Supplier in ``assets``)
     only changes what the UI offers — existing custom roles would keep the
-    retired strings and silently lose access. Rename in place, preserve order,
-    dedupe against roles that already carry the Supplier permission.
+    retired strings and silently lose access. Rename in place, preserving
+    order; only roles actually carrying a Provider grant are rewritten.
     """
     Role = apps.get_model("organization", "Role")
     legacy_map = {
@@ -280,10 +281,58 @@ def _rename_provider_permissions(apps):
     }
     for role in Role.objects.all().only("pk", "permissions").iterator():
         permissions = list(role.permissions or [])
-        deduped = list(dict.fromkeys(legacy_map.get(permission, permission) for permission in permissions))
-        if deduped != permissions:
-            role.permissions = deduped
-            role.save(update_fields=["permissions"])
+        renamed = [legacy_map.get(permission, permission) for permission in permissions]
+        if renamed == permissions:
+            continue
+        role.permissions = list(dict.fromkeys(renamed))
+        role.save(update_fields=["permissions"])
+
+
+def _translate_provider_references(apps, ContentType, provider_to_supplier):
+    """Repoint durable Provider-bound configuration at the Supplier surfaces.
+
+    Report templates, saved filters, event rules and export templates persist
+    column keys or ContentType references to the retired model; without this
+    step they silently stop matching after the cutover (rules never fire,
+    report columns vanish, filters go inert). Filter parameter values are
+    mapped through the provider transplant while the keys are renamed.
+    """
+    provider_ct = ContentType.objects.filter(app_label="subscriptions", model="provider").first()
+    supplier_ct = ContentType.objects.filter(app_label="assets", model="supplier").first()
+    if provider_ct is None or supplier_ct is None:
+        return
+
+    EventRule = apps.get_model("extras", "EventRule")
+    ExportTemplate = apps.get_model("extras", "ExportTemplate")
+    SavedFilter = apps.get_model("extras", "SavedFilter")
+    ReportTemplate = apps.get_model("extras", "ReportTemplate")
+
+    EventRule.objects.filter(model=provider_ct).update(model=supplier_ct)
+    ExportTemplate.objects.filter(content_type=provider_ct).update(content_type=supplier_ct)
+    SavedFilter.objects.filter(content_type=provider_ct).update(content_type=supplier_ct)
+
+    for template in ReportTemplate.objects.all().iterator():
+        columns = list(template.included_columns or [])
+        renamed_columns = ["supplier" if column == "provider" else column for column in columns]
+        group_by = "supplier" if template.group_by_field == "provider" else template.group_by_field
+        if renamed_columns != columns or group_by != template.group_by_field:
+            template.included_columns = renamed_columns
+            template.group_by_field = group_by
+            template.save(update_fields=["included_columns", "group_by_field"])
+
+    for saved_filter in SavedFilter.objects.all().iterator():
+        parameters = dict(saved_filter.parameters or {})
+        if "provider" not in parameters:
+            continue
+        value = parameters.pop("provider")
+        try:
+            mapped = provider_to_supplier.get(int(value))
+        except (TypeError, ValueError):
+            mapped = None
+        if mapped is not None:
+            parameters["supplier"] = str(mapped)
+        saved_filter.parameters = parameters
+        saved_filter.save(update_fields=["parameters"])
 
 
 class Migration(migrations.Migration):

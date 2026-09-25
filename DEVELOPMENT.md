@@ -97,7 +97,7 @@ an inconsistent disposable demo database.
 
 ### Shared Models (no tenant needed)
 
-Models that are **catalogs/references** shared across tenants: `Manufacturer`, `Software`, `AssetType`, `ComponentType`, `StatusLabel`, `AssetRole`, `Tag`, `CustomField`, `Depreciation`, `Provider`, `ContactRole`, `Region`, `SiteGroup`, `TenantGroup`
+Models that are **catalogs/references** shared across tenants: `Manufacturer`, `Software`, `AssetType`, `ComponentType`, `StatusLabel`, `AssetRole`, `Tag`, `CustomField`, `Depreciation`, `Supplier`, `ContactRole`, `Region`, `SiteGroup`, `TenantGroup`
 
 ## HTMX Boost Conventions
 

@@ -190,6 +190,36 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             permissions=["subscriptions.add_provider", "assets.add_supplier"],
         )
 
+        # Durable Provider-bound configuration that must follow the cutover:
+        # content-type bindings, report columns and saved filter parameters.
+        EventRule = old_apps.get_model("extras", "EventRule")
+        ExportTemplate = old_apps.get_model("extras", "ExportTemplate")
+        SavedFilter = old_apps.get_model("extras", "SavedFilter")
+        ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
+        provider_content_type = ContentType.objects.get(app_label="subscriptions", model="provider")
+        event_rule = EventRule.objects.create(
+            name=f"Provider change events {suffix}",
+            model=provider_content_type,
+            events=["create"],
+            action_type="notification",
+        )
+        export_template = ExportTemplate.objects.create(
+            name=f"Provider export {suffix}",
+            content_type=provider_content_type,
+            template_code="{{ queryset }}",
+        )
+        saved_filter = SavedFilter.objects.create(
+            name=f"Provider subscription filter {suffix}",
+            content_type=provider_content_type,
+            parameters={"provider": str(linked_provider.pk)},
+        )
+        report_template = ReportTemplate.objects.create(
+            name=f"Provider renewal report {suffix}",
+            report_type="subscription_renewals",
+            included_columns=["subscription_name", "provider", "cost"],
+            group_by_field="provider",
+        )
+
         self.expected = {
             "linked_supplier": prelinked.pk,
             "matched_supplier": existing.pk,
@@ -211,6 +241,10 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             "bookmark_user_id": bookmark_user_id,
             "role_a_id": role_a.pk,
             "role_b_id": role_b.pk,
+            "event_rule_id": event_rule.pk,
+            "export_template_id": export_template.pk,
+            "saved_filter_id": saved_filter.pk,
+            "report_template_id": report_template.pk,
             "cutover_tenant_id": cutover_tenant.pk,
             "suffix": suffix,
         }
@@ -344,6 +378,28 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             ["assets.view_supplier", "assets.delete_supplier", "assets.view_asset"],
         )
         self.assertEqual(role_b.permissions, ["assets.add_supplier"])
+
+        # Durable configuration follows the retired model: event rules and
+        # export/saved-filter content-type bindings move to Supplier, report
+        # templates rename their columns, and saved filter parameters carry the
+        # transplanted supplier id.
+        EventRule = self.apps.get_model("extras", "EventRule")
+        ExportTemplate = self.apps.get_model("extras", "ExportTemplate")
+        SavedFilter = self.apps.get_model("extras", "SavedFilter")
+        ReportTemplate = self.apps.get_model("extras", "ReportTemplate")
+        event_rule = EventRule.objects.get(pk=expected["event_rule_id"])
+        self.assertEqual(event_rule.model_id, expected["supplier_ct_id"])
+        export_template = ExportTemplate.objects.get(pk=expected["export_template_id"])
+        self.assertEqual(export_template.content_type_id, expected["supplier_ct_id"])
+        saved_filter = SavedFilter.objects.get(pk=expected["saved_filter_id"])
+        self.assertEqual(saved_filter.content_type_id, expected["supplier_ct_id"])
+        self.assertEqual(saved_filter.parameters, {"supplier": str(expected["linked_supplier"])})
+        report_template = ReportTemplate.objects.get(pk=expected["report_template_id"])
+        self.assertEqual(
+            report_template.included_columns,
+            ["subscription_name", "supplier", "cost"],
+        )
+        self.assertEqual(report_template.group_by_field, "supplier")
 
         with self.assertRaises(LookupError):
             self.apps.get_model("subscriptions", "Provider")
