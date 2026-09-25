@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Supplier
+from organization.models import Tenant
 from subscriptions.models import (
     BillingCycleChoices,
     Subscription,
@@ -166,3 +167,38 @@ class SubscriptionAPITests(APITestCase):
         detail_url = reverse("api:subscriptions_api:subscription-detail", kwargs={"pk": new_pk})
         response = self.client.delete(detail_url, HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_subscription_create_without_tenant_id_accepts_the_active_tenants_supplier(self):
+        """The optional tenant_id is injected after validation; relation checks must still see it."""
+        self._login_as_staff()
+        list_url = reverse("api:subscriptions_api:subscription-list")
+        tenant_supplier = Supplier.objects.create(
+            name="Implicit tenant supplier", slug="implicit-tenant-supplier", tenant=self.tenant
+        )
+        post_data = {
+            "name": "Implicit Tenant Sub",
+            "supplier_id": tenant_supplier.id,
+            "type": SubscriptionTypeChoices.SAAS,
+            "status": SubscriptionStatusChoices.ACTIVE,
+            "renewal_cost": "10.00",
+            "currency": "USD",
+            "billing_cycle": BillingCycleChoices.MONTHLY,
+        }
+        response = self.client.post(list_url, data=post_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        created = Subscription.objects.get(pk=response.data["id"])
+        self.assertEqual(created.tenant_id, self.tenant.id)
+        self.assertEqual(created.supplier_id, tenant_supplier.id)
+
+        # A supplier from a different tenant is still rejected.
+        other_tenant = Tenant.objects.create(name="Implicit Tenant Other", slug="implicit-tenant-other")
+        foreign_supplier = Supplier.objects.create(
+            name="Foreign supplier", slug="foreign-supplier", tenant=other_tenant
+        )
+        response = self.client.post(
+            list_url,
+            data={**post_data, "name": "Foreign Implicit Sub", "supplier_id": foreign_supplier.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("supplier_id", response.data)

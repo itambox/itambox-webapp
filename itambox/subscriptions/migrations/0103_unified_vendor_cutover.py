@@ -85,7 +85,14 @@ def _matched_supplier(matches, provider):
 
 def _resolve_supplier(Supplier, provider, suppliers_by_name):
     if provider.supplier_id:
-        return Supplier.objects.get(pk=provider.supplier_id), False
+        linked = Supplier.objects.get(pk=provider.supplier_id)
+        # Honour an explicit link directly only when the linked supplier
+        # already lives in the provider's scope: a shared (global) link must
+        # not collapse tenant-specific commercial data into one cross-tenant
+        # row, so a scope mismatch falls through to a scope-local match or a
+        # fresh scoped incarnation instead.
+        if linked.tenant_id == provider.tenant_id and linked.tenant_group_id == provider.tenant_group_id:
+            return linked, False
 
     key = (provider.tenant_id, provider.tenant_group_id, provider.name.casefold())
     matches = suppliers_by_name.get(key, [])
@@ -162,10 +169,10 @@ def _repoint_provider_contacts(ContactAssignment, ContentType, provider_to_suppl
             )
 
 
-def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants):
+def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants, supplier_groups):
     """Move per-object references from provider rows to the matched suppliers.
 
-    Journal entries keep their denormalised tenant aligned with the supplier.
+    Journal entries keep their denormalised tenant and tenant group aligned with the supplier.
     Bookmarks and watches carry a unique (user, content type, object) constraint,
     so an equivalent row on the supplier makes the provider-era row a duplicate
     and it is dropped. Open alert logs collide on (rule, content type, object)
@@ -200,6 +207,7 @@ def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier
             model_id=supplier_ct.pk,
             object_id=supplier_id,
             tenant_id=supplier_tenants.get(supplier_id),
+            tenant_group_id=supplier_groups.get(supplier_id),
         )
 
     for model in (Bookmark, ObjectWatch):
@@ -272,7 +280,10 @@ def forwards(apps, schema_editor):
     supplier_tenants = dict(
         Supplier.objects.filter(pk__in=provider_to_supplier.values()).values_list("pk", "tenant_id")
     )
-    _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants)
+    supplier_groups = dict(
+        Supplier.objects.filter(pk__in=provider_to_supplier.values()).values_list("pk", "tenant_group_id")
+    )
+    _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier_tenants, supplier_groups)
     _rename_provider_permissions(apps)
     _translate_provider_references(apps, ContentType, provider_to_supplier)
 
@@ -564,6 +575,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("subscriptions", "0102_commercial_vendor_and_terms"),
         ("assets", "0121_supplier_scoping_and_commercial_fields"),
+        ("extras", "0122_journalentry_tenant_group"),
         ("users", "0100_issue88_shard_62_users_relations"),
     ]
 

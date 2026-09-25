@@ -3731,6 +3731,14 @@ msgstr ""
 "Denormalisierter besitzender Mandant, beim Speichern aus dem journalierten "
 "Objekt abgeleitet. Null = System-/globales Objekt."
 
+msgid ""
+"Denormalised owning tenant group, derived from the journaled object on "
+"save. Null = the object is tenant-scoped or system/global."
+msgstr ""
+"Denormalisierte besitzende Mandantengruppe, beim Speichern aus dem "
+"journalierten Objekt abgeleitet. Null = das Objekt ist mandanten- oder "
+"system-/global gebunden."
+
 msgid "Journal Entry"
 msgstr "Journaleintrag"
 

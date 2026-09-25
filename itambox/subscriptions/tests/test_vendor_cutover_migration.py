@@ -33,6 +33,7 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         ContactRole = old_apps.get_model("organization", "ContactRole")
         ContactAssignment = old_apps.get_model("organization", "ContactAssignment")
         Tenant = old_apps.get_model("organization", "Tenant")
+        TenantGroup = old_apps.get_model("organization", "TenantGroup")
         Role = old_apps.get_model("organization", "Role")
         ContentType = old_apps.get_model("contenttypes", "ContentType")
 
@@ -150,6 +151,20 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             comment="Provider journal comment",
             tenant=None,  # stale: the cutover must re-derive it from the supplier
         )
+        journal_tenant_group = TenantGroup.objects.create(
+            name=f"Journal group {suffix}", slug=f"journal-group-{suffix}"
+        )
+        group_journaled_provider = Provider.objects.create(
+            name=f"Group journaled vendor {suffix}",
+            slug=f"group-journaled-vendor-{suffix}",
+            tenant_group=journal_tenant_group,
+        )
+        group_journal_entry = JournalEntry.objects.create(
+            model=provider_ct,
+            object_id=group_journaled_provider.pk,
+            comment="Group provider journal comment",
+            tenant=None,  # stale: the cutover must re-derive it from the supplier
+        )
         attachment = FileAttachment.objects.create(
             model=provider_ct,
             object_id=matched_provider.pk,
@@ -177,6 +192,49 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             bookmark_user_id = cursor.fetchone()[0]
         Bookmark.objects.create(user_id=bookmark_user_id, model=supplier_ct, object_id=prelinked.pk)
         Bookmark.objects.create(user_id=bookmark_user_id, model=provider_ct, object_id=linked_provider.pk)
+
+        # Two tenant-scoped providers deliberately linked to the same existing
+        # (global) supplier: the cutover must keep their commercial data in
+        # scoped incarnations instead of collapsing both into the shared row.
+        second_tenant = Tenant.objects.create(
+            name=f"Second cutover tenant {suffix}", slug=f"second-cutover-tenant-{suffix}"
+        )
+        shared_link_provider_a = Provider.objects.create(
+            name=f"Shared link vendor {suffix}",
+            slug=f"shared-link-a-{suffix}",
+            tenant=cutover_tenant,
+            supplier=prelinked,
+            portal_url=f"https://tenant-a.example/{suffix}",
+            account_id=f"tenant-a-{suffix}",
+        )
+        shared_link_provider_b = Provider.objects.create(
+            name=f"Shared link vendor {suffix}",
+            slug=f"shared-link-b-{suffix}",
+            tenant=second_tenant,
+            supplier=prelinked,
+            portal_url=f"https://tenant-b.example/{suffix}",
+            account_id=f"tenant-b-{suffix}",
+        )
+        shared_link_subscriptions = {}
+        for link_label, link_provider in (("a", shared_link_provider_a), ("b", shared_link_provider_b)):
+            row = Subscription.objects.create(
+                name=f"Shared link {link_label} subscription {suffix}", provider=link_provider
+            )
+            shared_link_subscriptions[link_label] = row.pk
+        shared_contact_a = Contact.objects.create(name=f"Shared link contact A {suffix}")
+        shared_contact_b = Contact.objects.create(name=f"Shared link contact B {suffix}")
+        ContactAssignment.objects.create(
+            contact=shared_contact_a,
+            role=role,
+            content_type=provider_ct,
+            object_id=shared_link_provider_a.pk,
+        )
+        ContactAssignment.objects.create(
+            contact=shared_contact_b,
+            role=role,
+            content_type=provider_ct,
+            object_id=shared_link_provider_b.pk,
+        )
 
         role_a = Role.objects.create(
             tenant=cutover_tenant,
@@ -377,8 +435,15 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             "live_provider_filter_id": live_provider_filter.pk,
             "long_slug": long_slug,
             "long_slug_host_id": long_slug_host.pk,
+            "cutover_tenant": cutover_tenant.pk,
+            "second_tenant": second_tenant.pk,
+            "shared_link_subscriptions": shared_link_subscriptions,
+            "shared_contact_a_id": shared_contact_a.pk,
+            "shared_contact_b_id": shared_contact_b.pk,
             "unrelated_report_template_id": unrelated_report_template.pk,
             "cutover_tenant_id": cutover_tenant.pk,
+            "group_journal_entry_id": group_journal_entry.pk,
+            "journal_tenant_group_id": journal_tenant_group.pk,
             "suffix": suffix,
         }
 
@@ -456,6 +521,43 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             f"https://portal.example/{expected['suffix']}",
         )
 
+        # A shared (global) explicit link must not collapse tenant-specific
+        # providers into one cross-tenant supplier: both tenants keep their own
+        # scoped incarnation with their own commercial data and contacts, and
+        # the shared global supplier carries only the global provider's data.
+        shared_link_a = Supplier.objects.get(
+            tenant_id=expected["cutover_tenant"], name=f"Shared link vendor {expected['suffix']}"
+        )
+        shared_link_b = Supplier.objects.get(
+            tenant_id=expected["second_tenant"], name=f"Shared link vendor {expected['suffix']}"
+        )
+        self.assertNotEqual(shared_link_a.pk, shared_link_b.pk)
+        self.assertEqual(shared_link_a.account_id, f"tenant-a-{expected['suffix']}")
+        self.assertEqual(shared_link_b.account_id, f"tenant-b-{expected['suffix']}")
+        self.assertIsNone(shared_link_a.tenant_group_id)
+        self.assertIsNone(shared_link_b.tenant_group_id)
+        self.assertEqual(
+            Subscription.objects.get(pk=expected["shared_link_subscriptions"]["a"]).supplier_id,
+            shared_link_a.pk,
+        )
+        self.assertEqual(
+            Subscription.objects.get(pk=expected["shared_link_subscriptions"]["b"]).supplier_id,
+            shared_link_b.pk,
+        )
+        shared_link_assignments = {
+            assignment.contact_id: assignment.object_id
+            for assignment in ContactAssignment.objects.filter(
+                contact_id__in=[expected["shared_contact_a_id"], expected["shared_contact_b_id"]],
+                content_type_id=expected["supplier_ct_id"],
+            )
+        }
+        self.assertEqual(shared_link_assignments[expected["shared_contact_a_id"]], shared_link_a.pk)
+        self.assertEqual(shared_link_assignments[expected["shared_contact_b_id"]], shared_link_b.pk)
+        shared_link_supplier = Supplier.objects.get(pk=expected["linked_supplier"])
+        self.assertIsNone(shared_link_supplier.tenant_id)
+        self.assertIsNone(shared_link_supplier.tenant_group_id)
+        self.assertEqual(shared_link_supplier.account_id, f"linked-{expected['suffix']}")
+
         assignments = ContactAssignment.objects.filter(
             contact_id=expected["duplicate_contact_id"],
             role_id=expected["role_id"],
@@ -484,6 +586,17 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         self.assertEqual(journal.model_id, expected["supplier_ct_id"])
         self.assertEqual(journal.object_id, journaled_supplier.pk)
         self.assertEqual(journal.tenant_id, expected["cutover_tenant_id"])
+
+        # Group-scoped history stays bounded: the journal entry inherits the
+        # supplier's group instead of degrading into a system-global row.
+        group_journaled_supplier = Supplier.objects.get(name=f"Group journaled vendor {expected['suffix']}")
+        self.assertIsNone(group_journaled_supplier.tenant_id)
+        self.assertEqual(group_journaled_supplier.tenant_group_id, expected["journal_tenant_group_id"])
+        group_journal = JournalEntry.objects.get(pk=expected["group_journal_entry_id"])
+        self.assertEqual(group_journal.model_id, expected["supplier_ct_id"])
+        self.assertEqual(group_journal.object_id, group_journaled_supplier.pk)
+        self.assertIsNone(group_journal.tenant_id)
+        self.assertEqual(group_journal.tenant_group_id, expected["journal_tenant_group_id"])
 
         attachment = FileAttachment.objects.get(pk=expected["attachment_id"])
         self.assertEqual(attachment.model_id, expected["supplier_ct_id"])

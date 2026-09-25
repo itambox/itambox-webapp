@@ -64,6 +64,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0119_issue479_t07_provenance_schema",
     "extras.0120_issue479_t07_provenance_cutover",
     "extras.0121_specification_library_permission",
+    "extras.0122_journalentry_tenant_group",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",

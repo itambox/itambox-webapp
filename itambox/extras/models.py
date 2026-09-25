@@ -1213,10 +1213,12 @@ class WebhookDelivery(BaseModel):
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
-    # Journal entries are scoped to the tenant that owns the journaled object
-    # (denormalised in the `tenant` field below). allow_global_tenant keeps
-    # entries on global/shared objects (tenant=None) visible to any tenant that
-    # can see the object — mirrors the shared-catalogue pattern.
+    # Journal entries are scoped to the tenant (or tenant group) that owns the
+    # journaled object (denormalised in the `tenant` / `tenant_group` fields
+    # below). allow_global_tenant keeps entries on truly global/shared objects
+    # (tenant=None, tenant_group=None) visible to any tenant that can see the
+    # object — mirrors the shared-catalogue pattern — while group-scoped entries
+    # stay bounded to their group.
     allow_global_tenant = True
 
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="journal_entries")
@@ -1243,6 +1245,19 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
             "Denormalised owning tenant, derived from the journaled object on save. Null = system/global object."
         ),
     )
+    tenant_group = models.ForeignKey(
+        "organization.TenantGroup",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="journal_entries",
+        db_index=True,
+        verbose_name=_("Tenant group"),
+        help_text=_(
+            "Denormalised owning tenant group, derived from the journaled object on save. "
+            "Null = the object is tenant-scoped or system/global."
+        ),
+    )
 
     class Meta:
         ordering = ["-created"]
@@ -1256,13 +1271,14 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
         return f"Journal entry on {self.content_object} by {self.user}"
 
     def save(self, *args, **kwargs):
-        # Denormalise the owning tenant from the journaled object so entries can
-        # be tenant-scoped (a GFK alone can't be filtered in the ORM). The
-        # object's tenant is authoritative — derive it on every save so the UI,
-        # REST and seed create paths all agree regardless of ambient context.
+        # Denormalise the owning tenant/tenant group from the journaled object
+        # so entries can be scoped (a GFK alone can't be filtered in the ORM).
+        # The object's scope is authoritative — derive it on every save so the
+        # UI, REST and seed create paths all agree regardless of ambient context.
         parent = self.content_object
         if parent is not None:
             self.tenant = getattr(parent, "tenant", None)
+            self.tenant_group = getattr(parent, "tenant_group", None)
         super().save(*args, **kwargs)
 
 

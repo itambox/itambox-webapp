@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from assets.api.nested_serializers import NestedSupplierSerializer
 from assets.models import Supplier
+from core.managers import get_current_tenant
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import validate_gfk_target_tenant
@@ -123,6 +124,17 @@ class SubscriptionSerializer(BaseModelSerializer):
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()
 
+    def _effective_tenant(self, validated: dict[str, object]):
+        if "tenant" in validated:
+            return validated["tenant"]
+        if self.instance is not None:
+            return self.instance.tenant
+        # On create, the active tenant is injected after serializer validation
+        # in perform_create(); the relation checks must already see it so the
+        # tenant's own suppliers and contracts stay selectable when the
+        # optional tenant_id is omitted.
+        return get_current_tenant()
+
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         lifecycle_errors = {}
         current_status = self.instance.status if self.instance else SubscriptionStatusChoices.ACTIVE
@@ -143,8 +155,8 @@ class SubscriptionSerializer(BaseModelSerializer):
                 raise serializers.ValidationError({"auto_renewal": "Conflicts with vendor_contract_auto_renews."})
             attrs["vendor_contract_auto_renews"] = legacy_value
         validated = super().validate(attrs)
-        tenant = validated.get("tenant", self.instance.tenant if self.instance else None)
-        tenant_id = tenant.pk if tenant else None
+        effective_tenant = self._effective_tenant(validated)
+        tenant_id = effective_tenant.pk if effective_tenant else None
         supplier = validated.get("supplier", self.instance.supplier if self.instance else None)
         if supplier and supplier.tenant_id is not None and supplier.tenant_id != tenant_id:
             raise serializers.ValidationError({"supplier_id": "Selected supplier belongs to a different tenant."})

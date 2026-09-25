@@ -12729,6 +12729,47 @@
     },
     {
       "dependencies": [
+        "extras.0121_specification_library_permission",
+        "organization.0103_tenant_resource_grant_expiry",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0122_journalentry_tenant_group",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0122_journalentry_tenant_group.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -18244,6 +18285,7 @@
     {
       "dependencies": [
         "assets.0121_supplier_scoping_and_commercial_fields",
+        "extras.0122_journalentry_tenant_group",
         "subscriptions.0102_commercial_vendor_and_terms",
         "users.0100_issue88_shard_62_users_relations"
       ],
@@ -19364,6 +19406,7 @@
     "extras.0119_issue479_t07_provenance_schema",
     "extras.0120_issue479_t07_provenance_cutover",
     "extras.0121_specification_library_permission",
+    "extras.0122_journalentry_tenant_group",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -19669,7 +19712,7 @@
         ]
       }
     },
-    "post_transition_migrations": 58,
+    "post_transition_migrations": 59,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
