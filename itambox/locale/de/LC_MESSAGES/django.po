@@ -5550,6 +5550,11 @@ msgstr ""
 "Ein Lizenzplatz muss entweder einem Asset oder einem Asset-Inhaber "
 "zugewiesen werden."
 
+msgid "A supplier is scoped to a tenant or a tenant group, not both."
+msgstr ""
+"Ein Lieferant ist entweder einem Mandanten oder einer Mandantengruppe "
+"zugeordnet, nicht beidem."
+
 msgid ""
 "An install link can only be set on asset-assigned seats, not on holder-"
 "assigned seats."
