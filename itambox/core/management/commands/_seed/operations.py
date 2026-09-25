@@ -288,10 +288,16 @@ class SeedOperationsMixin:
             # that still has a working approve path in the UI. Demoting an existing
             # approved row to pending is not an option: the product's state machine
             # refuses approved -> pending.
-            probe = AssetRequest(requester=user, asset_type=req_type)
-            probe.tenant = self._tenant_of_user(user)
+            #
+            # The tenant is resolved from the user's membership and written
+            # explicitly: AssetRequest.save() only falls back to the ambient tenant
+            # context, which the seed does not set, so without this the request would
+            # persist with tenant=NULL while its allocation came from one tenant.
+            tenant = self._tenant_of_user(user)
+            probe = AssetRequest(requester=user, tenant=tenant, asset_type=req_type)
             allocated = self._claimable_asset_for(probe)
             AssetRequest.objects.create(
+                tenant=tenant,
                 requester=user,
                 asset_type=req_type,
                 notes="A new employee joins next month and needs a standard laptop.",

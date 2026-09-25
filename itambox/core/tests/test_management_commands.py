@@ -33,6 +33,7 @@ from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import Job, ObjectChange
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
+from inventory.models import Accessory
 from licenses.models import License
 from organization.models import AssetHolder, Location, Membership, Site, Tenant
 from procurement.models import PurchaseOrder, PurchaseOrderLine
@@ -360,6 +361,13 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             email="invariant.holder@example.com",
             upn="invariant.holder@example.com",
         )
+        self.second_holder = AssetHolder._base_manager.create(
+            tenant=self.tenant,
+            first_name="Second",
+            last_name="Holder",
+            email="second.holder@example.com",
+            upn="second.holder@example.com",
+        )
         # The status labels are migration-seeded reference data (assets.0003), but a
         # test database may legitimately not carry them: TransactionTestCase flushes
         # leave only rows a fixture re-created, and a reused database from an older
@@ -421,26 +429,130 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         with self.assertRaisesRegex(CommandError, "reports 10 received but only 3 asset"):
             check_seed_operational_invariants()
 
+    def test_inverted_assignment_interval_fails(self):
+        """An assignment checked in before it was checked out is refused.
+
+        Seeded assignments carry a ``checked_out_at`` of "now"; back-dating only the
+        check-in would invert the interval and make the assignment look open across
+        windows it never spanned.
+        """
+        asset = self._asset()
+        assignment = AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=self.holder,
+            is_active=False,
+            checked_out_at=timezone.now(),
+            notes="Seeded in its final state.",
+        )
+        AssetAssignment._base_manager.filter(pk=assignment.pk).update(
+            checked_in_at=timezone.now() - datetime.timedelta(days=30)
+        )
+        with self.assertRaisesRegex(CommandError, "but checked in earlier"):
+            check_seed_operational_invariants()
+
+    def test_closed_assignment_with_future_checkin_fails(self):
+        """A closed loan that returns in the future reads as an open one.
+
+        The row is inactive but its interval still covers months of history, so any
+        repair drawn in that stretch looks like it happened while somebody held it.
+        """
+        asset = self._asset()
+        AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=self.holder,
+            is_active=False,
+            checked_out_at=timezone.now() - datetime.timedelta(days=200),
+            checked_in_at=timezone.now() + datetime.timedelta(days=60),
+            notes="Closed, but not really yet.",
+        )
+        with self.assertRaisesRegex(CommandError, "which is in the future"):
+            check_seed_operational_invariants()
+
+    def test_assignment_before_purchase_fails(self):
+        """An assignment that starts before the asset existed is refused.
+
+        A prior-loan row dated relative to "now" rather than to the purchase date
+        makes a freshly bought laptop look like it was on loan long before it was
+        bought, which then reads as "still held" during any later repair window.
+        """
+        asset = self._asset(purchase_date=datetime.date.today() - datetime.timedelta(days=30))
+        AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=self.holder,
+            is_active=False,
+            checked_out_at=timezone.now() - datetime.timedelta(days=300),
+            checked_in_at=timezone.now() - datetime.timedelta(days=200),
+            notes="Impossible prior loan.",
+        )
+        with self.assertRaisesRegex(CommandError, "before the asset was bought"):
+            check_seed_operational_invariants()
+
     def test_po_line_fully_materialised_passes(self):
         line = self._received_line("INV-PO-2", 4)
         for _ in range(4):
             self._asset(purchase_order_line=line)
         check_seed_operational_invariants()
 
+    def test_po_line_over_materialised_fails(self):
+        """The criterion is equality, so too many assets is a mismatch as well."""
+        line = self._received_line("INV-PO-3", 2)
+        for _ in range(3):
+            self._asset(purchase_order_line=line)
+        with self.assertRaisesRegex(CommandError, "reports 2 received but only 3 asset"):
+            check_seed_operational_invariants()
+
     def test_repair_history_on_held_asset_fails(self):
-        """A repair recorded in the change log with no preceding check-in is refused."""
+        """A repair recorded while a person still holds the unit is refused."""
         asset = self._asset(status=self.in_use)
-        AssetAssignment.objects.create(
+        assignment = AssetAssignment.objects.create(
             asset=asset,
             assigned_user=self.holder,
             is_active=True,
             notes="Provisioned.",
         )
+        AssetAssignment._base_manager.filter(pk=assignment.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=200)
+        )
         # The #506 bug: history walks the unit into repair and back while the same
-        # person holds it throughout (the assignment never gets a checked_in_at).
+        # person holds it throughout.
         _log_status_change(asset, self.pending_repair, "update", days_ago=60)
         _log_status_change(asset, self.available, "update", days_ago=30)
-        with self.assertRaisesRegex(CommandError, "without a preceding check-in"):
+        with self.assertRaisesRegex(CommandError, "while a person still held it"):
+            check_seed_operational_invariants()
+
+    def test_earlier_checkin_does_not_excuse_a_later_repair(self):
+        """A check-in from months earlier must not satisfy the temporal question.
+
+        The old check asked whether *any* assignment had been checked in before the
+        repair, so a closed assignment from January satisfied a June repair even
+        though a different holder (assignment B) kept the unit through it.
+        """
+        asset = self._asset(status=self.in_use)
+        early = AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=self.holder,
+            is_active=True,
+            notes="January loan, returned in February.",
+        )
+        AssetAssignment._base_manager.filter(pk=early.pk).update(
+            is_active=False,
+            checked_out_at=timezone.now() - datetime.timedelta(days=200),
+            checked_in_at=timezone.now() - datetime.timedelta(days=180),
+        )
+        second = AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=self.second_holder,
+            is_active=True,
+            notes="March issue, still held.",
+        )
+        # Open well before the June repair and never checked back in, so this
+        # assignment was open across the whole repair window.
+        AssetAssignment._base_manager.filter(pk=second.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=100)
+        )
+        _log_status_change(asset, self.pending_repair, "update", days_ago=60)
+        _log_status_change(asset, self.available, "update", days_ago=30)
+        with self.assertRaisesRegex(CommandError, "while a person still held it"):
             check_seed_operational_invariants()
 
     def test_repair_history_with_checkin_passes(self):
@@ -453,12 +565,15 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             notes="Provisioned.",
         )
         AssetAssignment._base_manager.filter(pk=assignment.pk).update(
-            is_active=False, checked_in_at=timezone.now() - datetime.timedelta(days=70)
+            is_active=False,
+            checked_out_at=timezone.now() - datetime.timedelta(days=200),
+            checked_in_at=timezone.now() - datetime.timedelta(days=70),
         )
         AssetAssignment.objects.create(
             asset=asset,
             assigned_user=self.holder,
             is_active=True,
+            checked_out_at=timezone.now() - datetime.timedelta(days=29),
             notes="Returned after repair.",
         )
         _log_status_change(asset, self.pending_repair, "update", days_ago=60)
@@ -492,9 +607,15 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         with self.assertRaisesRegex(CommandError, "belongs to no repair episode"):
             check_seed_operational_invariants()
 
-    def test_grouped_maintenance_passes(self):
+    def test_repair_maintenance_outside_any_repair_window_fails(self):
+        """The #506 defect proper: a "repair" on an asset that never went out of service.
+
+        An episode only groups records, so belonging to one is not evidence the unit
+        was ever repaired. The record's service interval must overlap a repair window
+        the change log actually recorded for that asset.
+        """
         asset = self._asset()
-        episode = RepairEpisode.objects.create(asset=asset, notes="Invariant repair story.")
+        episode = RepairEpisode.objects.create(asset=asset, notes="Grouped but unearned.")
         AssetMaintenance._base_manager.create(
             asset=asset,
             maintenance_type="repair",
@@ -502,6 +623,35 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             start_date=datetime.date.today() - datetime.timedelta(days=10),
             completion_date=datetime.date.today() - datetime.timedelta(days=8),
             episode=episode,
+        )
+        with self.assertRaisesRegex(CommandError, "records no repair in that period"):
+            check_seed_operational_invariants()
+
+    def test_repair_maintenance_inside_a_repair_window_passes(self):
+        """The #506 fix: the record documents a repair the history really performed."""
+        asset = self._asset()
+        _log_status_change(asset, self.pending_repair, "update", days_ago=60)
+        _log_status_change(asset, self.available, "update", days_ago=40)
+        episode = RepairEpisode.objects.create(asset=asset, notes="Real episode.")
+        AssetMaintenance._base_manager.create(
+            asset=asset,
+            maintenance_type="repair",
+            status="completed",
+            start_date=datetime.date.today() - datetime.timedelta(days=55),
+            completion_date=datetime.date.today() - datetime.timedelta(days=50),
+            episode=episode,
+        )
+        check_seed_operational_invariants()
+
+    def test_in_service_maintenance_needs_no_repair_window(self):
+        """An upgrade never takes the unit out of service, so it is exempt."""
+        asset = self._asset()
+        AssetMaintenance._base_manager.create(
+            asset=asset,
+            maintenance_type="upgrade",
+            status="completed",
+            start_date=datetime.date.today() - datetime.timedelta(days=10),
+            completion_date=datetime.date.today() - datetime.timedelta(days=8),
         )
         check_seed_operational_invariants()
 
@@ -527,7 +677,25 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         )
         check_seed_operational_invariants()
 
-    def test_pending_request_must_stay_unallocated(self):
+    def test_request_without_tenant_fails(self):
+        """A tenantless request is invisible in every tenant scope."""
+        asset = self._asset()
+        AssetRequest._base_manager.create(
+            tenant=None,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            asset=asset,
+            status="approved",
+        )
+        with self.assertRaisesRegex(CommandError, "has no tenant"):
+            check_seed_operational_invariants()
+
+    def test_pending_request_may_name_a_concrete_asset(self):
+        """A pending request for a specific asset is a legitimate product state.
+
+        ``AssetRequestForm`` offers "Specific Asset (by Tag)", so the check must not
+        reject this shape just because the request is not yet approved.
+        """
         asset = self._asset()
         AssetRequest._base_manager.create(
             tenant=self.tenant,
@@ -536,8 +704,23 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             asset=asset,
             status="pending",
         )
-        with self.assertRaisesRegex(CommandError, "already carries an allocated asset"):
-            check_seed_operational_invariants()
+        check_seed_operational_invariants()
+
+    def test_approved_inventory_request_may_have_no_asset(self):
+        """An approved accessory request legitimately carries asset=NULL."""
+        accessory = Accessory.objects.create(
+            tenant=self.tenant,
+            manufacturer=self.manufacturer,
+            name="Invariant Accessory",
+            slug="invariant-accessory",
+        )
+        AssetRequest._base_manager.create(
+            tenant=self.tenant,
+            requester=self.requester,
+            accessory=accessory,
+            status="approved",
+        )
+        check_seed_operational_invariants()
 
 
 def _log_status_change(asset, status_label, action, days_ago=0):
