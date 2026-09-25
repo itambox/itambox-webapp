@@ -156,7 +156,12 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             file=f"attachments/files/{suffix}.txt",
             name="Provider file",
         )
-        event = Event.objects.create(model=provider_ct, object_id=matched_provider.pk, action="create")
+        event = Event.objects.create(
+            model=provider_ct,
+            object_id=matched_provider.pk,
+            action="create",
+            data={"app_label": "subscriptions", "model_name": "provider"},
+        )
         # The users state pinned by this rehearsal predates later user columns
         # (e.g. scim_id), so the historical User model cannot create a row here;
         # insert the minimal bookmark owner directly.
@@ -208,7 +213,8 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             content_type=provider_content_type,
             template_code=(
                 "{{ queryset.first().admin_notes }}|{{ queryset.first().supplier.name }}|"
-                "{{ queryset.first()['admin_notes'] }}"
+                "{{ queryset.first()['admin_notes'] }}|"
+                "{{ queryset.first().supplier.subscriptions.first().supplier.name }}"
             ),
         )
         saved_filter = SavedFilter.objects.create(
@@ -278,6 +284,31 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             content_type=provider_content_type,
             parameters={},
         )
+        deleted_provider_filter = SavedFilter.objects.create(
+            name=f"Deleted duplicate {suffix}",
+            content_type=provider_content_type,
+            tenant=cutover_tenant,
+            parameters={},
+            deleted_at=deleted_at,
+        )
+        live_provider_filter = SavedFilter.objects.create(
+            name=f"Deleted duplicate {suffix}",
+            content_type=provider_content_type,
+            tenant=cutover_tenant,
+            parameters={},
+        )
+        long_slug = "s" * 255
+        long_slug_host = Supplier.objects.create(
+            name=f"Slug host {suffix}",
+            slug=long_slug,
+            tenant=cutover_tenant,
+        )
+        # Both the preferred slug and slugify(name) collide with the host.
+        Provider.objects.create(
+            name=long_slug,
+            slug=long_slug,
+            tenant=cutover_tenant,
+        )
         tag_ct = ContentType.objects.get(app_label="extras", model="tag")
         tag_saved_filter = SavedFilter.objects.create(
             name=f"Tag filter {suffix}",
@@ -342,6 +373,10 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
             "provider_long_template_id": provider_long_template.pk,
             "global_filter_one_id": global_filter_one.pk,
             "global_filter_two_id": global_filter_two.pk,
+            "deleted_provider_filter_id": deleted_provider_filter.pk,
+            "live_provider_filter_id": live_provider_filter.pk,
+            "long_slug": long_slug,
+            "long_slug_host_id": long_slug_host.pk,
             "unrelated_report_template_id": unrelated_report_template.pk,
             "cutover_tenant_id": cutover_tenant.pk,
             "suffix": suffix,
@@ -457,6 +492,7 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         event = Event.objects.get(pk=expected["event_id"])
         self.assertEqual(event.model_id, expected["supplier_ct_id"])
         self.assertEqual(event.object_id, expected["matched_supplier"])
+        self.assertEqual(event.data, {"app_label": "assets", "model_name": "supplier"})
 
         # The provider-era bookmark duplicates the pre-existing supplier bookmark
         # and must be dropped, leaving exactly the supplier-owned row.
@@ -522,14 +558,25 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         supplier_long_template = ExportTemplate.objects.get(pk=expected["supplier_long_template_id"])
         self.assertEqual(supplier_long_template.name, expected["long_name"])
         lower_filter_id, higher_filter_id = sorted([expected["global_filter_one_id"], expected["global_filter_two_id"]])
-        self.assertEqual(
-            SavedFilter.objects.get(pk=lower_filter_id).name,
-            f"Global duplicate {expected['suffix']}",
-        )
-        self.assertEqual(
-            SavedFilter.objects.get(pk=higher_filter_id).name,
-            f"Global duplicate {expected['suffix']} (Provider 1)",
-        )
+        # The partial unique constraint treats null tenants as distinct, so the
+        # two global filters keep their shared name; only the content type moves.
+        for filter_id in (lower_filter_id, higher_filter_id):
+            global_filter = SavedFilter.objects.get(pk=filter_id)
+            self.assertEqual(global_filter.name, f"Global duplicate {expected['suffix']}")
+            self.assertEqual(global_filter.content_type_id, expected["supplier_ct_id"])
+        # Soft-deleted rows are excluded from the constraint, so a lower-pk
+        # deleted filter no longer forces the live namesake to be renamed.
+        deleted_provider_filter = SavedFilter.objects.get(pk=expected["deleted_provider_filter_id"])
+        self.assertEqual(deleted_provider_filter.name, f"Deleted duplicate {expected['suffix']}")
+        self.assertEqual(deleted_provider_filter.content_type_id, expected["supplier_ct_id"])
+        live_provider_filter = SavedFilter.objects.get(pk=expected["live_provider_filter_id"])
+        self.assertEqual(live_provider_filter.name, f"Deleted duplicate {expected['suffix']}")
+        self.assertEqual(live_provider_filter.content_type_id, expected["supplier_ct_id"])
+        # Maximum-length slugs truncate before the collision marker instead of
+        # overflowing the 255-character column.
+        long_slug_supplier = Supplier.objects.get(slug=f"{expected['long_slug'][:253]}-2")
+        self.assertEqual(len(long_slug_supplier.slug), 255)
+        self.assertEqual(Supplier.objects.get(pk=expected["long_slug_host_id"]).slug, expected["long_slug"])
         unrelated_report_template = ReportTemplate.objects.get(pk=expected["unrelated_report_template_id"])
         self.assertEqual(unrelated_report_template.template_content, "<p>{{ row['Provider'] }}</p>")
         self.assertEqual(unrelated_report_template.included_columns, ["name"])
@@ -549,7 +596,8 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         self.assertEqual(notification.target_url, f"/assets/suppliers/{expected['linked_supplier']}/")
         self.assertEqual(
             export_template.template_code,
-            "{{ queryset.first().notes }}|{{ queryset.first().name }}|{{ queryset.first()['notes'] }}",
+            "{{ queryset.first().notes }}|{{ queryset.first().name }}|{{ queryset.first()['notes'] }}"
+            "|{{ queryset.first().subscriptions.first().supplier.name }}",
         )
 
         with self.assertRaises(LookupError):

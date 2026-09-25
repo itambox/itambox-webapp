@@ -31,16 +31,20 @@ def _scope_slug_queryset(Supplier, provider, slug):
     return suppliers.filter(tenant__isnull=True, tenant_group__isnull=True)
 
 
+_MAX_SLUG_LENGTH = 255
+
+
 def _available_slug(Supplier, provider):
     preferred = provider.slug
     if preferred and not _scope_slug_queryset(Supplier, provider, preferred).exists():
         return preferred
 
-    base_slug = slugify(provider.name)
+    base_slug = slugify(provider.name)[:_MAX_SLUG_LENGTH]
     candidate = base_slug
     suffix = 2
     while _scope_slug_queryset(Supplier, provider, candidate).exists():
-        candidate = f"{base_slug}-{suffix}"
+        marker = f"-{suffix}"
+        candidate = f"{base_slug[: _MAX_SLUG_LENGTH - len(marker)]}{marker}"
         suffix += 1
     return candidate
 
@@ -211,10 +215,20 @@ def _repoint_provider_generics(apps, ContentType, provider_to_supplier, supplier
             else:
                 model.objects.filter(pk=row.pk).update(model_id=supplier_ct.pk, object_id=supplier_id)
 
-    for model in (ImageAttachment, FileAttachment, Event):
+    for model in (ImageAttachment, FileAttachment):
         for row in model.objects.filter(model_id=provider_ct.pk).order_by("pk"):
             supplier_id = _supplier_id(row)
             model.objects.filter(pk=row.pk).update(model_id=supplier_ct.pk, object_id=supplier_id)
+
+    for event in Event.objects.filter(model_id=provider_ct.pk).order_by("pk"):
+        supplier_id = _supplier_id(event)
+        update_kwargs = {"model_id": supplier_ct.pk, "object_id": supplier_id}
+        data = dict(event.data or {})
+        if data.get("app_label") == "subscriptions" and data.get("model_name") == "provider":
+            data["app_label"] = "assets"
+            data["model_name"] = "supplier"
+            update_kwargs["data"] = data
+        Event.objects.filter(pk=event.pk).update(**update_kwargs)
 
     for alert in AlertLog.objects.filter(content_type_id=provider_ct.pk).order_by("pk"):
         supplier_id = _supplier_id(alert)
@@ -356,22 +370,47 @@ def _collision_free_name(name, taken):
     return candidate
 
 
+def _collapse_provider_supplier_hops(template_code):
+    """Collapse only the retired Provider->supplier hop, never chained ones.
+
+    ``x.supplier.y`` becomes ``x.y`` when ``x`` is the transplanted object,
+    but a chain that already travelled through a subscription or contact keeps
+    its still-valid ``.supplier`` relation (e.g. ``subscription.supplier``).
+    """
+    hop = ".supplier."
+    protected = ("subscription", "contact")
+    pieces = []
+    cursor = 0
+    while True:
+        index = template_code.find(hop, cursor)
+        if index == -1:
+            pieces.append(template_code[cursor:])
+            break
+        start = index
+        while start > 0 and template_code[start - 1] not in " \t\r\n{%|,:'\"":
+            start -= 1
+        preceding = template_code[start:index].lower()
+        pieces.append(template_code[cursor:index])
+        pieces.append(hop if any(word in preceding for word in protected) else ".")
+        cursor = index + len(hop)
+    return "".join(pieces)
+
+
 def _translated_export_body(template_code):
     """Retarget a stored Provider export body at the consolidated Supplier.
 
     ``admin_notes`` folded into ``notes`` (attribute and bracket access), and
     the old ``Provider.supplier`` relation collapses into the transplanted
-    supplier itself, so ``x.supplier.y`` becomes ``x.y``.
+    supplier itself.
     """
     replacements = (
         (".admin_notes", ".notes"),
         ("['admin_notes']", "['notes']"),
         ('["admin_notes"]', '["notes"]'),
-        (".supplier.", "."),
     )
     for old, new in replacements:
         template_code = template_code.replace(old, new)
-    return template_code
+    return _collapse_provider_supplier_hops(template_code)
 
 
 def _move_export_templates(ExportTemplate, provider_ct, supplier_ct):
@@ -394,8 +433,9 @@ def _move_export_templates(ExportTemplate, provider_ct, supplier_ct):
 def _move_saved_filters(SavedFilter, provider_ct, supplier_ct):
     """Move Provider-bound saved filters, renaming on live unique-name clashes.
 
-    Names only collide inside the same tenant scope (the partial unique
-    constraint treats null tenants as distinct); iteration is pinned to the
+    Only live rows participate in name collisions: the partial unique
+    constraint excludes soft-deleted rows and treats null tenants as distinct,
+    so deleted and global filters keep their names. Iteration is pinned to the
     primary key so the outcome is deterministic.
     """
     taken = {}
@@ -403,6 +443,10 @@ def _move_saved_filters(SavedFilter, provider_ct, supplier_ct):
     for tenant_id, name in live_supplier_filters.values_list("tenant_id", "name"):
         taken.setdefault(tenant_id, set()).add(name)
     for saved_filter in SavedFilter.objects.filter(content_type=provider_ct).order_by("pk").iterator():
+        if saved_filter.deleted_at is not None or saved_filter.tenant_id is None:
+            saved_filter.content_type = supplier_ct
+            saved_filter.save(update_fields=["content_type"])
+            continue
         scope = taken.setdefault(saved_filter.tenant_id, set())
         saved_filter.name = _collision_free_name(saved_filter.name, scope)
         scope.add(saved_filter.name)
