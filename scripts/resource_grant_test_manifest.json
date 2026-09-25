@@ -1,6 +1,6 @@
 {
   "base_commit": "b27d16f52d17ee4c469bddd5d5bd2a6a0933269b",
-  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest. Issue #499 scope-switcher link/label and bulk mutation-target visibility tests. Issue #500 commercial-vocabulary supplier/provider link and seat-metric tests. Issue #503 blank-asset-tag form acceptance and generated-tag tests. Issue #504 repair/replacement episode grouping and asset timeline tests. Issue #508 commercial-vendor consolidation: supplier scoping and cutover migration tests, supplier scoping regression, RBAC permission-parity, dashboard widget, navigation, report, security-finish, and phase3 task-audit updates for the provider-to-supplier cut.",
+  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest. Issue #499 scope-switcher link/label and bulk mutation-target visibility tests. Issue #500 commercial-vocabulary supplier/provider link and seat-metric tests. Issue #503 blank-asset-tag form acceptance and generated-tag tests. Issue #504 repair/replacement episode grouping and asset timeline tests. Issue #508 commercial-vendor consolidation: supplier scoping and cutover migration tests, supplier scoping regression, RBAC permission-parity, dashboard widget, navigation, report, security-finish, and phase3 task-audit updates for the provider-to-supplier cut; journal tenant-group scoping tests.",
   "changed_tests": [
     "itambox/assets/tests/test_api.py",
     "itambox/assets/tests/test_asset_form_initialization.py",
@@ -21,6 +21,7 @@
     "itambox/core/tests/test_snipeit_stages_hardware.py",
     "itambox/extras/tests/test_dashboard_all_accessible.py",
     "itambox/extras/tests/test_dashboard_widgets.py",
+    "itambox/extras/tests/test_journal_api.py",
     "itambox/itambox/tests/test_generic_detail_providers.py",
     "itambox/itambox/tests/test_rest_api_options.py",
     "itambox/organization/tests/test_issue443_permission_parity.py",
@@ -455,6 +456,7 @@
     "itambox/extras/tests/test_issue445_queue_cutover.py",
     "itambox/extras/tests/test_issue445_webhook_assertions.py",
     "itambox/extras/tests/test_issue516_custom_fieldset_ui.py",
+    "itambox/extras/tests/test_journal_api.py",
     "itambox/extras/tests/test_journal_views.py",
     "itambox/extras/tests/test_library_permission.py",
     "itambox/extras/tests/test_managed_definition_actions.py",

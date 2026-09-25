@@ -66,6 +66,7 @@
   "current_leaf_ids": [
     "compliance.0105_custodyhandoffdelivery",
     "inventory.0101_alter_accessoryassignment_options_and_more",
+    "organization.0103_tenant_resource_grant_expiry",
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0103_unified_vendor_cutover",
     "users.0103_oidcidentity"
@@ -412,6 +413,7 @@
   "post_transition_leaf_ids": [
     "compliance.0105_custodyhandoffdelivery",
     "inventory.0101_alter_accessoryassignment_options_and_more",
+    "organization.0103_tenant_resource_grant_expiry",
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0103_unified_vendor_cutover",
     "users.0103_oidcidentity"

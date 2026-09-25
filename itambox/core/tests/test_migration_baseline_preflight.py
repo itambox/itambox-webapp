@@ -198,7 +198,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 58)
+        self.assertEqual(len(manifest["post_transition_ids"]), 59)
         self.assertTrue(
             {
                 "assets.0114_issue479_t06_composition_schema",
@@ -217,7 +217,6 @@ class MigrationBaselineManifestTests(SimpleTestCase):
             manifest["post_transition_leaf_ids"],
             [
                 "compliance.0105_custodyhandoffdelivery",
-                "extras.0121_specification_library_permission",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0103_tenant_resource_grant_expiry",
                 "procurement.0101_alter_purchaseorder_options",
