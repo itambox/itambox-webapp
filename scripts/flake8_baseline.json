@@ -599,7 +599,7 @@
       "path": "itambox/assets/tests/test_api.py",
       "code": "F401",
       "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant",
+      "source": "from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant, TenantGroup",
       "context": "Module:body",
       "count": 1
     },

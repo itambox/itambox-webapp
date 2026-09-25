@@ -557,6 +557,17 @@ class SupplierSerializer(BaseModelSerializer):
         queryset=TenantGroup.objects, source="tenant_group", write_only=True, required=False, allow_null=True
     )
 
+    def validate(self, attrs):
+        # The database enforces tenant XOR tenant_group; surface a rejected
+        # payload as a 400 instead of letting it hit the constraint as a 500.
+        tenant = attrs.get("tenant", getattr(self.instance, "tenant", None))
+        tenant_group = attrs.get("tenant_group", getattr(self.instance, "tenant_group", None))
+        if tenant is not None and tenant_group is not None:
+            raise serializers.ValidationError(
+                {"tenant_group_id": _("A supplier is scoped to a tenant or a tenant group, not both.")}
+            )
+        return attrs
+
     class Meta:
         model = Supplier
         fields = [

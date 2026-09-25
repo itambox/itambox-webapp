@@ -291,11 +291,13 @@ def _rename_provider_permissions(apps):
 def _translate_provider_references(apps, ContentType, provider_to_supplier):
     """Repoint durable Provider-bound configuration at the Supplier surfaces.
 
-    Report templates, saved filters, event rules and export templates persist
-    column keys or ContentType references to the retired model; without this
-    step they silently stop matching after the cutover (rules never fire,
-    report columns vanish, filters go inert). Filter parameter values are
-    mapped through the provider transplant while the keys are renamed.
+    Report templates, saved filters, user table preferences, event rules,
+    export templates and already-created notifications persist column keys,
+    ContentType references or URLs for the retired model; without this step the
+    cutover leaves them dangling (rules never fire, report columns vanish,
+    filters go inert, notifications lead to removed routes). Only rows that
+    actually reference the Provider vocabulary are touched, and every move
+    handles unique-name collisions deterministically.
     """
     provider_ct = ContentType.objects.filter(app_label="subscriptions", model="provider").first()
     supplier_ct = ContentType.objects.filter(app_label="assets", model="supplier").first()
@@ -306,21 +308,73 @@ def _translate_provider_references(apps, ContentType, provider_to_supplier):
     ExportTemplate = apps.get_model("extras", "ExportTemplate")
     SavedFilter = apps.get_model("extras", "SavedFilter")
     ReportTemplate = apps.get_model("extras", "ReportTemplate")
+    Notification = apps.get_model("core", "Notification")
+    UserPreference = apps.get_model("users", "UserPreference")
+
+    # The "provider" filter key only ever belonged to the Provider list and the
+    # Subscription list; other saved filters store arbitrary parameters, so
+    # their dictionaries must stay untouched. Capture the Provider-bound rows
+    # before their content type moves below.
+    subscription_ct = ContentType.objects.filter(app_label="subscriptions", model="subscription").first()
+    rewritable_filter_ids = set(SavedFilter.objects.filter(content_type=provider_ct).values_list("pk", flat=True))
+    if subscription_ct is not None:
+        rewritable_filter_ids.update(
+            SavedFilter.objects.filter(content_type=subscription_ct).values_list("pk", flat=True)
+        )
 
     EventRule.objects.filter(model=provider_ct).update(model=supplier_ct)
-    ExportTemplate.objects.filter(content_type=provider_ct).update(content_type=supplier_ct)
-    SavedFilter.objects.filter(content_type=provider_ct).update(content_type=supplier_ct)
 
-    for template in ReportTemplate.objects.all().iterator():
-        columns = list(template.included_columns or [])
-        renamed_columns = ["supplier" if column == "provider" else column for column in columns]
-        group_by = "supplier" if template.group_by_field == "provider" else template.group_by_field
-        if renamed_columns != columns or group_by != template.group_by_field:
-            template.included_columns = renamed_columns
-            template.group_by_field = group_by
-            template.save(update_fields=["included_columns", "group_by_field"])
+    _move_export_templates(ExportTemplate, provider_ct, supplier_ct)
+    _move_saved_filters(SavedFilter, provider_ct, supplier_ct)
+    _rename_saved_filter_parameters(SavedFilter, rewritable_filter_ids, provider_to_supplier)
+    _rename_report_templates(ReportTemplate)
+    _rewrite_user_table_preferences(UserPreference)
+    _rewrite_provider_notification_urls(Notification, provider_to_supplier)
 
-    for saved_filter in SavedFilter.objects.all().iterator():
+
+def _move_export_templates(ExportTemplate, provider_ct, supplier_ct):
+    """Move Provider-bound export templates, renaming on unique-name clashes.
+
+    The stored template body follows the model: Provider's ``admin_notes``
+    folded into Supplier's ``notes``, so bodies addressing it are retargeted.
+    """
+    for template in ExportTemplate.objects.filter(content_type=provider_ct).iterator():
+        name = template.name
+        suffix = 0
+        while ExportTemplate.objects.filter(content_type=supplier_ct, name=name).exclude(pk=template.pk).exists():
+            suffix += 1
+            name = f"{template.name} (Provider {suffix})"
+        template.name = name
+        template.content_type = supplier_ct
+        template.template_code = template.template_code.replace(".admin_notes", ".notes")
+        template.save(update_fields=["name", "content_type", "template_code"])
+
+
+def _move_saved_filters(SavedFilter, provider_ct, supplier_ct):
+    """Move Provider-bound saved filters, renaming on live unique-name clashes."""
+    for saved_filter in SavedFilter.objects.filter(content_type=provider_ct).iterator():
+        name = saved_filter.name
+        suffix = 0
+        while (
+            SavedFilter.objects.filter(
+                content_type=supplier_ct,
+                tenant_id=saved_filter.tenant_id,
+                name=name,
+                deleted_at__isnull=True,
+            )
+            .exclude(pk=saved_filter.pk)
+            .exists()
+        ):
+            suffix += 1
+            name = f"{saved_filter.name} (Provider {suffix})"
+        saved_filter.name = name
+        saved_filter.content_type = supplier_ct
+        saved_filter.save(update_fields=["name", "content_type"])
+
+
+def _rename_saved_filter_parameters(SavedFilter, rewritable_filter_ids, provider_to_supplier):
+    """Rename the provider query parameter and remap its value through the transplant."""
+    for saved_filter in SavedFilter.objects.filter(pk__in=rewritable_filter_ids).iterator():
         parameters = dict(saved_filter.parameters or {})
         if "provider" not in parameters:
             continue
@@ -333,6 +387,68 @@ def _translate_provider_references(apps, ContentType, provider_to_supplier):
             parameters["supplier"] = str(mapped)
         saved_filter.parameters = parameters
         saved_filter.save(update_fields=["parameters"])
+
+
+def _rename_report_templates(ReportTemplate):
+    """Rename provider columns, grouping and quoted row lookups in stored templates."""
+    replacements = (
+        ('["Provider"]', '["Supplier"]'),
+        ("['Provider']", "['Supplier']"),
+        ('["Anbieter"]', '["Lieferant"]'),
+        ("['Anbieter']", "['Lieferant']"),
+    )
+    for template in ReportTemplate.objects.all().iterator():
+        columns = list(template.included_columns or [])
+        renamed_columns = ["supplier" if column == "provider" else column for column in columns]
+        group_by = "supplier" if template.group_by_field == "provider" else template.group_by_field
+        content = template.template_content or ""
+        renamed_content = content
+        for old, new in replacements:
+            renamed_content = renamed_content.replace(old, new)
+        if renamed_columns != columns or group_by != template.group_by_field or renamed_content != content:
+            template.included_columns = renamed_columns
+            template.group_by_field = group_by
+            template.template_content = renamed_content
+            template.save(update_fields=["included_columns", "group_by_field", "template_content"])
+
+
+def _rewrite_user_table_preferences(UserPreference):
+    """Rename the persisted provider column in stored subscription table layouts."""
+    for preference in UserPreference.objects.all().iterator():
+        data = preference.data
+        if not isinstance(data, dict):
+            continue
+        tables = data.get("tables")
+        if not isinstance(tables, dict):
+            continue
+        changed = False
+        for app_tables in tables.values():
+            if not isinstance(app_tables, dict):
+                continue
+            table_config = app_tables.get("SubscriptionTable")
+            if not isinstance(table_config, dict):
+                continue
+            columns = table_config.get("columns")
+            if isinstance(columns, list) and "provider" in columns:
+                table_config["columns"] = ["supplier" if column == "provider" else column for column in columns]
+                changed = True
+        if changed:
+            preference.data = data
+            preference.save(update_fields=["data"])
+
+
+def _rewrite_provider_notification_urls(Notification, provider_to_supplier):
+    """Point stored provider notification links at the supplier detail pages."""
+    prefix = "/subscriptions/providers/"
+    for notification in Notification.objects.filter(target_url__startswith=prefix).iterator():
+        candidate = notification.target_url[len(prefix) :]
+        if not candidate.endswith("/") or not candidate[:-1].isdigit():
+            continue
+        mapped = provider_to_supplier.get(int(candidate[:-1]))
+        if mapped is None:
+            continue
+        notification.target_url = f"/assets/suppliers/{mapped}/"
+        notification.save(update_fields=["target_url"])
 
 
 class Migration(migrations.Migration):

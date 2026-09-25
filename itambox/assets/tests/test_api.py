@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel, Supplier, Warranty
 from core.tests.mixins import grant
 from licenses.models import License, LicenseSeatAssignment
-from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant
+from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant, TenantGroup
 from software.models import Software
 from users.models import Token
 
@@ -297,6 +297,26 @@ class ITAMBoxAPITestCase(APITestCase):
         self.assertFalse(assignment.is_active)
         self.assertEqual(assignment.checked_in_at.date().isoformat(), checkin_date)
         self.assertIn("Check in asset A with custom status and location via API", assignment.notes)
+
+    def test_supplier_scope_rejects_both_tenant_and_tenant_group(self):
+        """The tenant XOR tenant_group constraint must surface as a 400, not a 500."""
+        self.client.force_authenticate(user=self.superuser)
+        tenant_group = TenantGroup.objects.create(name="API Scope Group", slug="api-scope-group")
+        tenant = Tenant.objects.create(name="API Scope Tenant", slug="api-scope-tenant")
+
+        response = self.client.post(
+            reverse("api:assets_api:supplier-list"),
+            data={
+                "name": "Conflicted Supplier",
+                "slug": "conflicted-supplier",
+                "tenant_id": tenant.pk,
+                "tenant_group_id": tenant_group.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("tenant_group_id", response.data)
 
     def test_warranty_supplier_link_round_trips_through_the_api(self):
         self.client.force_authenticate(user=self.superuser)
