@@ -202,13 +202,10 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
                     deprecated.append(f"{choice_set['identity']}#{choice['key']}")
                 else:
                     self.assertEqual(choice["lifecycle"], "active")
-        self.assertEqual(deprecated, [])
-        storage_medium_choices = {choice["key"] for choice in self.choice_sets["itambox/storage-medium"]["choices"]}
+        self.assertEqual(deprecated, ["itambox/storage-medium#nvme_ssd"])
         storage_interface_choices = {
             choice["key"] for choice in self.choice_sets["itambox/storage-interface"]["choices"]
         }
-        self.assertIn("ssd", storage_medium_choices)
-        self.assertNotIn("nvme_ssd", storage_medium_choices)
         self.assertIn("nvme", storage_interface_choices)
         for field in self.canonical["active_fields"]:
             if field["field_type"] in {"single-select", "multi-select"}:

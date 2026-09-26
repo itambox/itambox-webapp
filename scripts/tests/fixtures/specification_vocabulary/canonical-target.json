@@ -2185,39 +2185,46 @@
           "position": 20
         },
         {
-          "key": "flash",
-          "label": "Embedded flash",
-          "lifecycle": "active",
+          "key": "nvme_ssd",
+          "label": "NVMe solid-state drive",
+          "lifecycle": "deprecated",
           "order": 3,
           "position": 30
         },
         {
-          "key": "optical",
-          "label": "Optical",
+          "key": "flash",
+          "label": "Embedded flash",
           "lifecycle": "active",
           "order": 4,
           "position": 40
         },
         {
-          "key": "tape",
-          "label": "Tape",
+          "key": "optical",
+          "label": "Optical",
           "lifecycle": "active",
           "order": 5,
           "position": 50
         },
         {
-          "key": "hybrid",
-          "label": "Hybrid",
+          "key": "tape",
+          "label": "Tape",
           "lifecycle": "active",
           "order": 6,
           "position": 60
         },
         {
-          "key": "other",
-          "label": "Other",
+          "key": "hybrid",
+          "label": "Hybrid",
           "lifecycle": "active",
           "order": 7,
           "position": 70
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
         }
       ]
     },

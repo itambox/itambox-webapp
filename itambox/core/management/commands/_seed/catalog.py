@@ -211,51 +211,6 @@ def _reconcile_core_fields(field_rows, choice_sets, asset_ct, assettype_ct, vers
     return custom_fields
 
 
-def _remove_migrated_core_field(name):
-    """Remove the core field retained only by the historical 0117 seed snapshot."""
-    fields = CustomField.objects.filter(
-        namespace="itambox",
-        management_kind=CustomField.MANAGEMENT_CORE,
-        name=name,
-    )
-    for field in fields:
-        memberships = list(field.fieldset_memberships.select_related("fieldset"))
-        if memberships:
-            identities = ", ".join(
-                f"{membership.fieldset.namespace}/{membership.fieldset.slug}" for membership in memberships
-            )
-            raise ValueError(f"Cannot remove migrated core field {name}; fieldsets still reference it: {identities}")
-        field.object_types.clear()
-        field.delete()
-
-
-def _remove_migrated_core_choice(choice_set_slug, key):
-    """Remove a deprecated choice retained only by the historical 0117 snapshot."""
-    choice_sets = list(
-        CustomFieldChoiceSet.objects.filter(
-            namespace="itambox",
-            management_kind=CustomFieldChoiceSet.MANAGEMENT_CORE,
-            slug=choice_set_slug,
-        )
-    )
-    if len(choice_sets) > 1:
-        raise ValueError(f"Ambiguous migrated core Choice Set identity: itambox/{choice_set_slug}")
-    if not choice_sets:
-        return
-    choice_set = choice_sets[0]
-    if choice_set.lifecycle != CustomFieldChoiceSet.LIFECYCLE_ACTIVE:
-        raise ValueError(f"Migrated core Choice Set is not active: itambox/{choice_set_slug}")
-    choices = list(CustomFieldChoice.objects.filter(choice_set=choice_set, key=key))
-    if len(choices) > 1:
-        raise ValueError(f"Ambiguous migrated core Choice identity: itambox/{choice_set_slug}#{key}")
-    if not choices:
-        return
-    choice = choices[0]
-    if choice.lifecycle != CustomFieldChoice.LIFECYCLE_DEPRECATED:
-        raise ValueError(f"Cannot remove active core Choice: itambox/{choice_set_slug}#{key}")
-    choice.delete()
-
-
 def _get_core_fieldset(slug, label, description, lifecycle, version, namespace):
     matches = list(CustomFieldset.objects.filter(namespace=namespace, slug=slug))
     if len(matches) > 1:
@@ -656,8 +611,6 @@ class SeedCatalogMixin:
         asset_ct = ContentType.objects.get_for_model(AssetModel)
         assettype_ct = ContentType.objects.get_for_model(AssetTypeModel)
 
-        _remove_migrated_core_field("input_voltage")
-        _remove_migrated_core_choice("storage-medium", "nvme_ssd")
         self._choice_sets = _reconcile_core_choice_set(vocabulary["choice_sets"])
         core_field_rows = vocabulary["active_fields"] + vocabulary["reserved_retired_fields"]
         self._custom_fields = _reconcile_core_fields(

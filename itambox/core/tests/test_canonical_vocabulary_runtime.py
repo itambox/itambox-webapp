@@ -143,77 +143,50 @@ def _create_migrated_input_voltage_field():
     return field
 
 
-def test_runtime_seed_removes_only_unreferenced_migrated_core_field():
+def test_runtime_seed_tolerates_migrated_retired_field_tombstone():
+    """A database still carrying the 0117 retired-voltage tombstone seeds cleanly.
+
+    The final vocabulary drops the scalar voltage identity from the runtime contract,
+    but migration 0117 planted a deprecated ``itambox``-core row on every database.
+    Definition identities are retired, never deleted, and the destructive Session 3
+    migration normalization owns the tombstone's removal, so the seed must neither
+    crash on the residue nor manage it: the row stays deprecated and nothing
+    re-enters the runtime vocabulary.
+    """
     stale_field = _create_migrated_input_voltage_field()
     stale_field.object_types.set(
         [ContentType.objects.get_for_model(Asset), ContentType.objects.get_for_model(AssetType)]
     )
-    local_field = CustomField.objects.create(
-        name="input_voltage",
-        namespace="local",
-        label="Local input voltage",
-        field_type=CustomField.FIELD_TYPE_DECIMAL,
-        activation=CustomField.ACTIVATION_COMPOSED,
-        management_kind=CustomField.MANAGEMENT_LOCAL,
-        lifecycle=CustomField.LIFECYCLE_ACTIVE,
+
+    command = _seed_catalog()
+
+    stale_field.refresh_from_db()
+    assert stale_field.lifecycle == CustomField.LIFECYCLE_DEPRECATED
+    assert "itambox/input_voltage" not in command._custom_fields
+    assert all(
+        membership.custom_field.name != "input_voltage"
+        for fieldset in command._fieldsets.values()
+        for membership in fieldset.field_memberships.all()
     )
-    local_fieldset = CustomFieldset.objects.create(
-        namespace="local",
-        slug="input-voltage-local",
-        label="Local voltage fields",
-        management_kind=CustomFieldset.MANAGEMENT_LOCAL,
-        lifecycle="active",
-    )
-    local_membership = CustomFieldsetField.objects.create(
-        fieldset=local_fieldset,
-        custom_field=local_field,
-        position=10,
-    )
-
-    _seed_catalog()
-
-    assert not CustomField.objects.filter(
-        namespace="itambox",
-        management_kind=CustomField.MANAGEMENT_CORE,
-        name="input_voltage",
-    ).exists()
-    assert CustomField.objects.filter(pk=local_field.pk).exists()
-    assert CustomFieldsetField.objects.filter(pk=local_membership.pk).exists()
+    runtime_keys = {
+        row["key"] for row in get_core_vocabulary()["active_fields"] + get_core_vocabulary()["reserved_retired_fields"]
+    }
+    assert "input_voltage" not in runtime_keys
 
 
-def test_runtime_seed_refuses_to_remove_field_referenced_by_local_fieldset():
-    _seed_catalog()
-    stale_field = _create_migrated_input_voltage_field()
-    local_fieldset = CustomFieldset.objects.create(
-        namespace="local",
-        slug="input-voltage-protected",
-        label="Protected local voltage fields",
-        management_kind=CustomFieldset.MANAGEMENT_LOCAL,
-        lifecycle="active",
-    )
-    membership = CustomFieldsetField.objects.create(
-        fieldset=local_fieldset,
-        custom_field=stale_field,
-        position=10,
-    )
+def test_runtime_seed_keeps_migrated_deprecated_choice_and_preserves_local_choices():
+    """The deprecated storage-medium choice is historical state, not deletable state.
 
-    with pytest.raises(ValueError, match="Cannot remove migrated core field input_voltage"):
-        _seed_catalog()
-
-    assert CustomField.objects.filter(pk=stale_field.pk).exists()
-    assert CustomFieldsetField.objects.filter(pk=membership.pk).exists()
-
-
-def test_runtime_seed_removes_migrated_deprecated_choice_and_preserves_local_choices():
+    Migration 0117 planted ``nvme_ssd`` as a deprecated choice on every database and
+    the model blocks its deletion on purpose ("deprecate the row instead"). The final
+    vocabulary therefore keeps the identity as the one intentionally retired choice;
+    the seed normalizes its label/position back to the vocabulary values and leaves
+    same-named local choices alone.
+    """
     _seed_catalog()
     core_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="storage-medium")
-    stale_choice = CustomFieldChoice.objects.create(
-        choice_set=core_set,
-        key="nvme_ssd",
-        label="NVMe solid-state drive",
-        position=900000,
-        lifecycle=CustomFieldChoice.LIFECYCLE_DEPRECATED,
-    )
+    stale_choice = CustomFieldChoice.objects.get(choice_set=core_set, key="nvme_ssd")
+    CustomFieldChoice.objects.filter(pk=stale_choice.pk).update(label="Diverged label", position=900000)
     local_set = CustomFieldChoiceSet.objects.create(
         namespace="local",
         slug="storage-medium",
@@ -232,25 +205,31 @@ def test_runtime_seed_removes_migrated_deprecated_choice_and_preserves_local_cho
 
     _seed_catalog()
 
-    assert not CustomFieldChoice.objects.filter(pk=stale_choice.pk).exists()
-    assert CustomFieldChoice.objects.filter(pk=local_choice.pk).exists()
+    stale_choice.refresh_from_db()
+    assert stale_choice.lifecycle == CustomFieldChoice.LIFECYCLE_DEPRECATED
+    assert stale_choice.label == "NVMe solid-state drive"
+    assert stale_choice.position == 30
+    local_choice.refresh_from_db()
+    assert local_choice.label == "Local NVMe SSD"
+    assert local_choice.lifecycle == CustomFieldChoice.LIFECYCLE_ACTIVE
 
 
-def test_runtime_seed_refuses_to_remove_active_migrated_choice():
+def test_runtime_seed_normalizes_diverged_migrated_choice_lifecycle():
+    """A diverged lifecycle on the retired choice is corrected, not propagated.
+
+    When the deprecated identity was re-activated on a database, the next seed
+    restores the vocabulary state instead of failing or leaving the divergence in
+    place — the identity stays the single intentionally retired choice.
+    """
     _seed_catalog()
     core_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="storage-medium")
-    active_choice = CustomFieldChoice.objects.create(
-        choice_set=core_set,
-        key="nvme_ssd",
-        label="Unexpected active NVMe choice",
-        position=900000,
-        lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
-    )
+    choice = CustomFieldChoice.objects.get(choice_set=core_set, key="nvme_ssd")
+    CustomFieldChoice.objects.filter(pk=choice.pk).update(lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE)
 
-    with pytest.raises(ValueError, match="Cannot remove active core Choice: itambox/storage-medium#nvme_ssd"):
-        _seed_catalog()
+    _seed_catalog()
 
-    assert CustomFieldChoice.objects.filter(pk=active_choice.pk).exists()
+    choice.refresh_from_db()
+    assert choice.lifecycle == CustomFieldChoice.LIFECYCLE_DEPRECATED
 
 
 def test_runtime_seed_refuses_local_fieldset_membership_collision():
