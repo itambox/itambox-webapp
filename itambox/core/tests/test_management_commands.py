@@ -19,11 +19,13 @@ from assets.models import (
     AssetAssignment,
     AssetMaintenance,
     AssetRequest,
+    AssetReservation,
     AssetRole,
     AssetType,
     Category,
     Manufacturer,
     RepairEpisode,
+    ReservationStatusChoices,
     StatusLabel,
     Supplier,
 )
@@ -673,6 +675,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             requester=self.requester,
             asset_type=self.asset_type,
             asset=asset,
+            assigned_user=self.holder,
             status="approved",
         )
         check_seed_operational_invariants()
@@ -685,6 +688,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             requester=self.requester,
             asset_type=self.asset_type,
             asset=asset,
+            assigned_user=self.holder,
             status="approved",
         )
         with self.assertRaisesRegex(CommandError, "has no tenant"):
@@ -702,6 +706,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             requester=self.requester,
             asset_type=self.asset_type,
             asset=asset,
+            assigned_user=self.holder,
             status="pending",
         )
         check_seed_operational_invariants()
@@ -721,6 +726,183 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             status="approved",
         )
         check_seed_operational_invariants()
+
+    def test_transit_window_is_not_a_repair(self):
+        """A transport window must not be read as a repair.
+
+        ``pending`` is a META-type: the seed types Pending Repair, In Transit and
+        Quarantined all as ``pending``, so a reader keyed on the meta-type accepts
+        out-of-service paperwork against a window in which the unit was only being
+        shipped.
+        """
+        transit = self._status_label("In Transit", "in-transit", "pending")
+        asset = self._asset()
+        _log_status_change(asset, transit, "update", days_ago=60)
+        _log_status_change(asset, self.available, "update", days_ago=40)
+        episode = RepairEpisode.objects.create(asset=asset, notes="No repair ever happened.")
+        AssetMaintenance._base_manager.create(
+            asset=asset,
+            maintenance_type="repair",
+            status="completed",
+            start_date=datetime.date.today() - datetime.timedelta(days=55),
+            completion_date=datetime.date.today() - datetime.timedelta(days=50),
+            episode=episode,
+        )
+        with self.assertRaisesRegex(CommandError, "records no repair in that period"):
+            check_seed_operational_invariants()
+
+    def test_repair_window_closes_at_the_exit_not_the_last_change(self):
+        """The window ends when the unit leaves repair, not at its last change.
+
+        Repair from -60 to -40, an unrelated status change at -10, and paperwork
+        dated -20..-18: re-deriving the end from the asset's last change of any kind
+        would stretch the window to -10 and accept evidence that is plainly outside
+        the repair.
+        """
+        asset = self._asset()
+        _log_status_change(asset, self.pending_repair, "update", days_ago=60)
+        _log_status_change(asset, self.available, "update", days_ago=40)
+        _log_status_change(asset, self.in_use, "update", days_ago=10)
+        episode = RepairEpisode.objects.create(asset=asset, notes="Outside the repair.")
+        AssetMaintenance._base_manager.create(
+            asset=asset,
+            maintenance_type="repair",
+            status="completed",
+            start_date=datetime.date.today() - datetime.timedelta(days=20),
+            completion_date=datetime.date.today() - datetime.timedelta(days=18),
+            episode=episode,
+        )
+        with self.assertRaisesRegex(CommandError, "records no repair in that period"):
+            check_seed_operational_invariants()
+
+    def test_checkout_during_a_repair_window_fails(self):
+        """A unit handed out *during* its repair is a state the product refuses.
+
+        Asking only whether somebody held the unit when the repair began misses this
+        shape: the assignment starts inside the window and never ends.
+        """
+        asset = self._asset()
+        assignment = AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=self.holder,
+            is_active=True,
+            notes="Handed out mid-repair.",
+        )
+        AssetAssignment._base_manager.filter(pk=assignment.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=50)
+        )
+        _log_status_change(asset, self.pending_repair, "update", days_ago=60)
+        _log_status_change(asset, self.available, "update", days_ago=40)
+        with self.assertRaisesRegex(CommandError, "while a person still held it"):
+            check_seed_operational_invariants()
+
+    def _requester_profile(self):
+        """Give the requester the holder profile the claim path falls back to.
+
+        ``RequestClaimView._checkout_unit`` uses the request's delegated assignee and
+        falls back to the requester's ``AssetHolder`` profile in the request's tenant,
+        so both routes have to be exercised.
+        """
+        return AssetHolder._base_manager.create(
+            tenant=self.tenant,
+            user=self.requester,
+            first_name="Request",
+            last_name="Owner",
+            upn="requester@example.com",
+        )
+
+    def test_approved_request_blocked_by_a_foreign_reservation_fails(self):
+        """Allocated is not the same as claimable (#506).
+
+        The checkout service refuses a unit reserved for a *different* holder over
+        today, so an approved request pointing at one is still a dead end even though
+        the allocation itself looks complete.
+        """
+        asset = self._asset()
+        AssetRequest._base_manager.create(
+            tenant=self.tenant,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            asset=asset,
+            assigned_user=self.holder,
+            status="approved",
+        )
+        AssetReservation._base_manager.create(
+            asset=asset,
+            reserved_for=self.second_holder,
+            start_date=datetime.date.today() - datetime.timedelta(days=5),
+            end_date=datetime.date.today() + datetime.timedelta(days=10),
+            status=ReservationStatusChoices.ACTIVE,
+        )
+        with self.assertRaisesRegex(CommandError, "cannot check it out"):
+            check_seed_operational_invariants()
+
+    def test_request_reserved_for_its_own_claim_holder_passes(self):
+        """A reservation held by the claim's own holder does not block the claim.
+
+        The blocker is only ever a *different* holder, so this legitimate shape must
+        stay allowed rather than being swept up by a wider check.
+        """
+        asset = self._asset()
+        AssetRequest._base_manager.create(
+            tenant=self.tenant,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            asset=asset,
+            assigned_user=self.holder,
+            status="approved",
+        )
+        AssetReservation._base_manager.create(
+            asset=asset,
+            reserved_for=self.holder,
+            start_date=datetime.date.today() - datetime.timedelta(days=5),
+            end_date=datetime.date.today() + datetime.timedelta(days=10),
+            status=ReservationStatusChoices.ACTIVE,
+        )
+        check_seed_operational_invariants()
+
+    def test_request_without_a_resolvable_assignee_fails(self):
+        """A request the claim view cannot resolve an assignee for is a dead end.
+
+        The customer-admin logins the seed creates deliberately carry no holder
+        profile, so a request raised by one of them without a delegated target can
+        never be checked out to anybody.
+        """
+        asset = self._asset()
+        AssetRequest._base_manager.create(
+            tenant=self.tenant,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            asset=asset,
+            status="approved",
+        )
+        with self.assertRaisesRegex(CommandError, "resolves no assignee"):
+            check_seed_operational_invariants()
+
+    def test_claim_holder_falls_back_to_the_requester_profile(self):
+        """With no delegated target, the requester's own profile carries the claim.
+
+        A reservation for somebody else still blocks that fallback route, so the
+        blocker check must resolve the same holder the claim path would.
+        """
+        self._requester_profile()
+        asset = self._asset()
+        AssetRequest._base_manager.create(
+            tenant=self.tenant,
+            requester=self.requester,
+            asset_type=self.asset_type,
+            asset=asset,
+            status="approved",
+        )
+        AssetReservation._base_manager.create(
+            asset=asset,
+            reserved_for=self.second_holder,
+            start_date=datetime.date.today() - datetime.timedelta(days=5),
+            end_date=datetime.date.today() + datetime.timedelta(days=10),
+            status=ReservationStatusChoices.ACTIVE,
+        )
+        with self.assertRaisesRegex(CommandError, "cannot check it out"):
+            check_seed_operational_invariants()
 
 
 def _log_status_change(asset, status_label, action, days_ago=0):

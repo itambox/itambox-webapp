@@ -34,8 +34,8 @@ from django.db.models import Count, F, Q
 from django.utils import timezone
 
 from assets.choices import RequestStatusChoices
-from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetRequest, StatusLabel
-from assets.models.choices import MaintenanceStatusChoices
+from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetRequest, AssetReservation, StatusLabel
+from assets.models.choices import MaintenanceStatusChoices, ReservationStatusChoices
 from core.models import ObjectChange
 from procurement.models import PurchaseOrderLine
 
@@ -145,10 +145,17 @@ def _check_po_receipts_materialised():
 
 
 def _repair_label_pks():
-    """Primary keys of the status labels that mean "this unit is out of service"."""
+    """Primary keys of the status labels that mean "this unit is out of service".
+
+    ``pending`` is a META-type, not a repair: the seed types Pending Repair, In
+    Transit and Quarantined all as ``pending``, so filtering on the meta-type reads
+    a transport or quarantine window as a repair and then validates maintenance and
+    assignments against a window that never existed. Only the repair label itself
+    (by slug) and labels genuinely typed ``in_repair`` count.
+    """
     return set(
         StatusLabel._base_manager.filter(
-            type__in=["pending", "in_repair"],
+            Q(slug="pending-repair") | Q(type="in_repair"),
             deleted_at__isnull=True,
         ).values_list("pk", flat=True)
     )
@@ -178,14 +185,19 @@ def _repair_windows(repair_pks):
     Walks each asset's timeline: a transition INTO a repair label opens a window and
     the next transition to another label closes it. Returns
     ``(still_open, closed)`` where ``still_open`` maps asset id to the time the unit
-    entered repair and ``closed`` lists ``(asset_id, entered_at)`` pairs.
+    entered repair and ``closed`` lists ``(asset_id, entered_at, left_at)`` triples.
+
+    The exit time comes from the closing transition itself. Re-deriving it later from
+    the asset's last change of any kind would stretch the window across unrelated
+    later events, and evidence that is genuinely outside the repair would then be
+    validated against the widened window.
     """
     still_open, closed = {}, []
     for asset_id, pk, when in _status_transitions(repair_pks):
         if pk in repair_pks:
             still_open.setdefault(asset_id, when)
         elif asset_id in still_open:
-            closed.append((asset_id, still_open.pop(asset_id)))
+            closed.append((asset_id, still_open.pop(asset_id), when))
     return still_open, closed
 
 
@@ -213,41 +225,29 @@ def _repair_intervals_by_asset(repair_pks):
     """
     still_open, closed = _repair_windows(repair_pks)
     intervals = {}
-    for asset_id, started in closed:
-        end = _last_status_change_time(asset_id)
-        if end is None:
-            end = started
-        intervals.setdefault(asset_id, []).append((started.date(), end.date()))
+    for asset_id, started, ended in closed:
+        intervals.setdefault(asset_id, []).append((started.date(), ended.date()))
     today = datetime.date.today()
     for asset_id, started in still_open.items():
         intervals.setdefault(asset_id, []).append((started.date(), today))
     return intervals
 
 
-def _last_status_change_time(asset_id):
-    content_type = ContentType.objects.get_for_model(Asset)
-    return (
-        ObjectChange._base_manager.filter(changed_object_type=content_type, changed_object_id=asset_id)
-        .order_by("-time", "-pk")
-        .values_list("time", flat=True)
-        .first()
-    )
-
-
-def _held_during_repair(asset, started):
-    """True when a person held ``asset`` at the moment a repair began.
+def _held_during_repair(asset, started, ended):
+    """True when a person assignment overlapped the repair window.
 
     This is the temporal question, and asking it any other way produces false
     passes: "was there ever an assignment checked in before the repair" is
     satisfied by an assignment that closed months earlier while a *different*
-    holder kept the unit through the whole repair. The correct test is whether an
-    assignment to a person was open at ``started`` — checked out at or before it and
-    not yet checked in.
+    holder kept the unit through the whole repair. Asking only about the instant the
+    repair began misses the opposite case — a unit handed to somebody *during* the
+    window — so the test is interval overlap: the assignment starts before the window
+    closes and has not ended before it opens.
     """
     return (
         asset.assignments.filter(
             assigned_user__isnull=False,
-            checked_out_at__lte=started,
+            checked_out_at__lt=ended,
         )
         .filter(Q(checked_in_at__isnull=True) | Q(checked_in_at__gt=started))
         .exists()
@@ -262,12 +262,14 @@ def _first_repair_contradiction(repair_pks):
         # A unit still flagged as being in repair must not still be held by someone.
         if asset is not None and _is_held(asset):
             return asset, f"is recorded in repair since {started:%Y-%m-%d} but is still actively assigned"
-    for asset_id, started in closed:
+    for asset_id, started, ended in closed:
         asset = Asset._base_manager.filter(pk=asset_id).first()
         if asset is None:
             continue
-        if _held_during_repair(asset, started):
-            return asset, f"was recorded in repair from {started:%Y-%m-%d} while a person still held it"
+        if _held_during_repair(asset, started, ended):
+            return asset, (
+                f"was recorded in repair from {started:%Y-%m-%d} to {ended:%Y-%m-%d} while a person still held it"
+            )
     return None
 
 
@@ -369,6 +371,45 @@ def _check_out_of_service_work_matches_repair_windows():
             )
 
 
+def _claim_holder(request):
+    """The AssetHolder the claim path would check the unit out to.
+
+    Mirrors ``RequestClaimView._checkout_unit``: the request's delegated assignee,
+    else the requester's holder profile in the request's tenant. A blocker must be
+    evaluated against *that* holder — comparing the requester's user id with a
+    reservation's holder id compares two different key spaces and never matches.
+    """
+    if request.assigned_user_id:
+        return request.assigned_user
+    return request.requester.asset_holder_profiles.filter(tenant=request.tenant).first()
+
+
+def _blocking_reservation(asset, holder):
+    """Return the reservation that would stop ``holder`` from claiming ``asset``.
+
+    Mirrors the guard in ``assets.services``: an active or pending reservation
+    covering today and belonging to a *different* holder blocks the checkout
+    outright, so an allocated unit that looks free can still leave the requester
+    unable to claim the request. ``holder=None`` means the claim path cannot resolve
+    an assignee at all, so there is nothing to compare against.
+    """
+    if holder is None:
+        return None
+    today = datetime.date.today()
+    return (
+        AssetReservation._base_manager.filter(
+            asset=asset,
+            status__in=[ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING],
+            start_date__lte=today,
+            end_date__gte=today,
+            deleted_at__isnull=True,
+        )
+        .exclude(reserved_for_id=holder.pk)
+        .order_by("pk")
+        .first()
+    )
+
+
 def _check_approved_requests_allocated():
     """A seeded asset-type request must be coherent with the product's claim path.
 
@@ -416,6 +457,42 @@ def _check_approved_requests_allocated():
                 "Seed operational invariant failed: asset request "
                 f"{request.pk} allocated asset {request.asset.pk} is in a "
                 f"{request.asset.status.type} status, so the claim cannot complete."
+            )
+
+    # Allocation alone is not claimability: the checkout service refuses a unit that
+    # is reserved for a different holder over today, and the claim view refuses a
+    # request it cannot resolve an assignee for, so an approved request pointing at
+    # such a unit is still a demo dead end.
+    _check_awaiting_claims(scoped)
+
+
+def _check_awaiting_claims(scoped):
+    """A request that still expects a claim must actually be claimable (#506).
+
+    Two ways the claim dead-ends: the checkout service refuses a unit reserved for a
+    *different* holder over today, and the claim view refuses a request that resolves
+    no assignee at all — a requester without a holder profile and no delegated target
+    cannot be checked out to anybody.
+    """
+    awaiting = scoped.filter(
+        asset__isnull=False,
+        status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED, RequestStatusChoices.PROCUREMENT],
+    ).select_related("asset", "assigned_user", "requester")
+    for request in awaiting.order_by("pk")[:200]:
+        holder = _claim_holder(request)
+        if holder is None:
+            raise CommandError(
+                "Seed operational invariant failed: asset request "
+                f"{request.pk} is awaiting its claim but resolves no assignee, so the "
+                "unit cannot be checked out to anybody."
+            )
+        blocking = _blocking_reservation(request.asset, holder)
+        if blocking is not None:
+            raise CommandError(
+                "Seed operational invariant failed: asset request "
+                f"{request.pk} is awaiting its claim, but allocated asset "
+                f"{request.asset.pk} is reserved for {blocking.reserved_for} until "
+                f"{blocking.end_date:%Y-%m-%d}, so the requester cannot check it out."
             )
 
 

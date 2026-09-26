@@ -84,6 +84,20 @@ class SeedOperationsMixin:
             return asset
         return None
 
+    def _request_target_holder(self, tenant):
+        """The person a seeded request is for: a tenant holder without a device yet.
+
+        The request must name a delegated target. ``RequestClaimView._checkout_unit``
+        checks the unit out to ``assigned_user``, and the customer-admin logins this
+        seed creates are technical accounts that deliberately carry no holder profile,
+        so a targetless request raised by one of them can never be checked out to
+        anybody (#506).
+        """
+        holders = (getattr(self, "_tenant_holders", None) or {}).get(tenant.slug, []) if tenant else []
+        primary = getattr(self, "_primary_laptop_by_holder", None) or {}
+        without_device = [holder for holder in holders if holder.pk not in primary]
+        return next(iter(without_device or holders), None)
+
     def _seed_operations(self):
         from assets.models import Asset, AssetRequest, AssetType
         from compliance.models import AssetAudit, AuditSession
@@ -102,6 +116,12 @@ class SeedOperationsMixin:
         from licenses.models import License
 
         self.stdout.write("--- Operations: alerts, reports, automation ---")
+
+        # Assets handed to an open request. Published so the later reservation phase
+        # leaves them alone: a reservation for a *different* holder covering today
+        # blocks the requester's checkout in ``assets.services`` and would dead-end
+        # the approved request (#506).
+        self._request_allocated_asset_ids = set()
 
         # Notification channels
         email_ch = NotificationChannel.objects.create(
@@ -279,15 +299,17 @@ class SeedOperationsMixin:
         req_count = 0
         for user in customer_admin_users[:5]:
             # An approved request is only claimable once a unit is allocated to it
-            # (RequestClaimView refuses a claim without ``request.asset``), so
-            # seeding "approved" without one produced a demo story that dead-ends on
-            # a validation error the prospect cannot clear (#506). Pick a free unit
-            # of the requested type from the requester's own tenant *before* the row
-            # exists: an approved request then always carries its allocation, and a
-            # tenant without a spare unit is seeded as pending — which is the state
-            # that still has a working approve path in the UI. Demoting an existing
-            # approved row to pending is not an option: the product's state machine
-            # refuses approved -> pending.
+            # (RequestClaimView refuses a claim without ``request.asset``) *and* once
+            # the claim view can resolve an assignee for it — the customer-admin logins
+            # this seed creates are technical accounts that deliberately carry no
+            # holder profile. Seeding "approved" without either produced demo stories
+            # that dead-end on a validation error the prospect cannot clear (#506). So
+            # both the allocation and the delegated target are decided *before* the row
+            # exists: an approved request always carries them, and a tenant without a
+            # spare unit is seeded as pending — which is the state that still has a
+            # working approve path in the UI. Demoting an existing approved row to
+            # pending is not an option: the product's state machine refuses
+            # approved -> pending.
             #
             # The tenant is resolved from the user's membership and written
             # explicitly: AssetRequest.save() only falls back to the ambient tenant
@@ -303,8 +325,20 @@ class SeedOperationsMixin:
                 notes="A new employee joins next month and needs a standard laptop.",
                 status=RequestStatusChoices.APPROVED if allocated else RequestStatusChoices.PENDING,
                 asset=allocated,
+                assigned_user=self._request_target_holder(tenant),
             )
             req_count += 1
+
+        # Assets already handed to an open request must stay unreserved in the later
+        # reservation phase (#506): a reservation for a *different* holder covering
+        # today blocks the claim's checkout and dead-ends the approved request. Read
+        # back from the persisted rows so the set matches what the invariant later
+        # verifies.
+        self._request_allocated_asset_ids = set(
+            AssetRequest._base_manager.filter(asset__isnull=False, deleted_at__isnull=True).values_list(
+                "asset_id", flat=True
+            )
+        )
 
         # Journal entries on a few assets
         if self._assets:
