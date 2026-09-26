@@ -37,7 +37,8 @@ EXPECTED_ASSET_TARGET_FIELDS = {
     "storage_medium",
     "vcpu_count",
 }
-EXPECTED_RETIRED_FIELDS = {"input_voltage"}
+# The foundation snapshot has the scalar voltage identity; the final contract keeps only min/max.
+EXPECTED_REMOVED_FOUNDATION_FIELDS = {"input_voltage"}
 EXPECTED_ADDED_SECTION = "itambox/virtual-compute"
 EXPECTED_ADDED_CHOICE_SET = "itambox/storage-interface"
 EXPECTED_ADDED_CATEGORIES = {
@@ -100,7 +101,7 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
             self.canonical["expected_counts"],
             {
                 "active_fields": 54,
-                "reserved_retired_fields": 1,
+                "reserved_retired_fields": 0,
                 "sections": 13,
                 "choice_sets": 14,
                 "categories": 13,
@@ -115,11 +116,11 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
         ]:
             self.assertEqual(len(self.canonical[source]), len(index), source)
         self.assertEqual(len(self.active_fields), 54)
-        self.assertEqual(len(self.retired_fields), 1)
+        self.assertEqual(len(self.retired_fields), 0)
         self.assertEqual(len(self.sections), 13)
         self.assertEqual(len(self.choice_sets), 14)
         self.assertEqual(len(self.categories), 13)
-        self.assertEqual(set(self.retired_fields), EXPECTED_RETIRED_FIELDS)
+        self.assertEqual(set(self.retired_fields), set())
         self.assertEqual(set(self.active_fields) & set(self.retired_fields), set())
         self.assertEqual(
             set(self.active_fields) - set(self.foundation_field_keys()),
@@ -144,10 +145,8 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
                 self.assertFalse(field["nullable"])
                 self.assertTrue(set(field["targets"]) <= {"asset_type", "asset"})
                 self.assertGreaterEqual(len(field["memberships"]), 1)
-        retired = self.retired_fields["input_voltage"]
-        self.assertEqual(retired["lifecycle"], "deprecated")
-        self.assertEqual(retired["label"], "Input voltage (retired)")
         self.assertNotIn("input_voltage", self.active_fields)
+        self.assertEqual(self.canonical["library"]["label"], "ITAMbox Core Vocabulary v1")
 
     def test_section_membership_is_ordered_complete_and_cross_referenced(self):
         member_keys = []
@@ -203,7 +202,14 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
                     deprecated.append(f"{choice_set['identity']}#{choice['key']}")
                 else:
                     self.assertEqual(choice["lifecycle"], "active")
-        self.assertEqual(deprecated, ["itambox/storage-medium#nvme_ssd"])
+        self.assertEqual(deprecated, [])
+        storage_medium_choices = {choice["key"] for choice in self.choice_sets["itambox/storage-medium"]["choices"]}
+        storage_interface_choices = {
+            choice["key"] for choice in self.choice_sets["itambox/storage-interface"]["choices"]
+        }
+        self.assertIn("ssd", storage_medium_choices)
+        self.assertNotIn("nvme_ssd", storage_medium_choices)
+        self.assertIn("nvme", storage_interface_choices)
         for field in self.canonical["active_fields"]:
             if field["field_type"] in {"single-select", "multi-select"}:
                 self.assertIn(field["choice_set"], self.choice_sets)
@@ -284,7 +290,7 @@ class SpecificationVocabularyContractTests(unittest.TestCase):
         self.assertEqual(len(foundation_fields), 48)
         self.assertEqual(len(canonical_active & foundation_fields), 47)
         self.assertEqual(canonical_active - foundation_fields, EXPECTED_ADDED_FIELDS)
-        self.assertEqual(foundation_fields - canonical_active, EXPECTED_RETIRED_FIELDS)
+        self.assertEqual(foundation_fields - canonical_active, EXPECTED_REMOVED_FOUNDATION_FIELDS)
         foundation_choice_sets = {item["identity"] for item in self.foundation["choice_sets"]}
         canonical_choice_sets = set(self.choice_sets)
         self.assertEqual(len(foundation_choice_sets), 13)
