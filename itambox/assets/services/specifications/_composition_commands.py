@@ -102,20 +102,31 @@ def _validate_proposed_graph(
     identities: Sequence[str],
     owner_ref: OwnerRefDTO,
 ) -> CommandRejectedDTO | None:
+    """Reject unresolvable or wholly inapplicable Fieldset selections.
+
+    A Field's target decides where that Field contributes; the final
+    specification model keeps sibling members targeting other kinds valid
+    inside the same Fieldset.  An empty Fieldset stays selectable (it locks
+    its library and contributes nothing); a Fieldset with members is
+    selectable while at least one active member targets the composition kind,
+    and every member must resolve to an existing active, composed Field.
+    """
     fields_by_identity = {str(field.identity): field for field in graph.fields_by_key.values()}
     for identity in identities:
         fieldset = graph.fieldsets_by_identity.get(QualifiedIdentity(identity))
         if fieldset is None or fieldset.lifecycle != "active":
             return _reference_rejection(owner_ref)
+        has_members = False
+        contributes = False
         for membership in fieldset.field_memberships:
             field = fields_by_identity.get(str(membership.field_identity))
-            if (
-                field is None
-                or field.lifecycle != "active"
-                or field.activation != "composed"
-                or _TARGET_KIND not in field.targets
-            ):
+            if field is None or field.lifecycle != "active" or field.activation != "composed":
                 return _reference_rejection(owner_ref)
+            has_members = True
+            if _TARGET_KIND in field.targets:
+                contributes = True
+        if has_members and not contributes:
+            return _reference_rejection(owner_ref)
     return None
 
 

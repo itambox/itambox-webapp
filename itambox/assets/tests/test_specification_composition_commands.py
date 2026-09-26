@@ -315,6 +315,35 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
             [(self.first.pk, 1)],
         )
 
+    def test_mixed_target_fieldset_composes_with_only_its_applicable_members(self):
+        mixed_type_field = self._field("mixed_type_note")
+        mixed_asset_field = self._field("mixed_asset_note", target=Asset)
+        mixed = self._fieldset("mixed", (mixed_type_field, mixed_asset_field))
+        resource_revision, definition_revision = self._type_plan((mixed,))
+        result = set_asset_type_composition(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            fieldsets=self._selection(mixed),
+            expected_resource_revision=resource_revision,
+            expected_definition_revision=definition_revision,
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+
+        self.assertIsInstance(result, OwnerChangedDTO)
+        self.assertEqual(
+            list(AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset__slug", "position")),
+            [("mixed", 1)],
+        )
+        owner = AssetType.all_objects.get(pk=self.type.pk)
+        definition, _definitions = load_effective_definition(
+            owner.pk,
+            "asset_type",
+            tuple(owner.custom_field_data),
+        )
+        keys = [field.key for section in definition.rendered_sections for field in section.fields]
+        self.assertIn("mixed_type_note", keys)
+        self.assertNotIn("mixed_asset_note", keys)
+
     def test_deprecated_field_in_proposed_fieldset_is_rejected(self):
         CustomField.objects.filter(pk=self.second_field.pk).update(lifecycle="deprecated")
         resource_revision, definition_revision = self._type_plan()

@@ -317,6 +317,41 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(changes.count(), 1)
         self.assertEqual(changes.first().user, self.user)
 
+    def test_consuming_defaults_with_mixed_targets_renders_only_applicable_members(self):
+        mixed_type_field = self._field("mixed_type_note")
+        mixed_asset_field = self._field("mixed_asset_note", target=Asset)
+        mixed = self._fieldset("mixed-defaults", (mixed_type_field, mixed_asset_field))
+        CategoryDefaultFieldset.objects.filter(category=self.category).delete()
+        CategoryDefaultFieldset.objects.create(category=self.category, fieldset=mixed, position=1)
+
+        preview = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._omitted(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, AssetTypePreviewDTO)
+        self.assertTrue(preview.consumes_category_defaults)
+        keys = [field.key for section in preview.definition.rendered_sections for field in section.fields]
+        self.assertIn("mixed_type_note", keys)
+        self.assertNotIn("mixed_asset_note", keys)
+
+        result = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._omitted(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=preview.preview_token,
+            expected_definition_revision=preview.expected_definition_revision,
+            expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+        )
+        self.assertIsInstance(result, OwnerCreatedDTO)
+        created = AssetType.all_objects.get(pk=result.owner.owner_id)
+        self.assertEqual(
+            list(created.fieldset_memberships.values_list("fieldset__slug", "position")),
+            [("mixed-defaults", 1)],
+        )
+
     def test_create_missing_preconditions_emit_two_ordered_missing_issues_without_state_lookup(self):
         before_count = AssetType.all_objects.count()
         result = create_asset_type(
