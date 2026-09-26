@@ -81,6 +81,7 @@ class PreviewAssetTypeCreateInput(graphene.InputObjectType):
 
     manufacturer_id = graphene.ID(required=True)
     model = graphene.String(required=True)
+    slug = graphene.String()
     category_id = graphene.ID()
     asset_role_id = graphene.ID()
     fieldsets = graphene.List(graphene.NonNull(graphene.String))
@@ -93,6 +94,7 @@ class CreateAssetTypeInput(graphene.InputObjectType):
 
     manufacturer_id = graphene.ID(required=True)
     model = graphene.String(required=True)
+    slug = graphene.String()
     category_id = graphene.ID()
     asset_role_id = graphene.ID()
     fieldsets = graphene.List(graphene.NonNull(graphene.String))

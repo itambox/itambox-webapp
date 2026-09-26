@@ -317,6 +317,41 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(changes.count(), 1)
         self.assertEqual(changes.first().user, self.user)
 
+    def test_consuming_defaults_with_mixed_targets_renders_only_applicable_members(self):
+        mixed_type_field = self._field("mixed_type_note")
+        mixed_asset_field = self._field("mixed_asset_note", target=Asset)
+        mixed = self._fieldset("mixed-defaults", (mixed_type_field, mixed_asset_field))
+        CategoryDefaultFieldset.objects.filter(category=self.category).delete()
+        CategoryDefaultFieldset.objects.create(category=self.category, fieldset=mixed, position=1)
+
+        preview = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._omitted(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, AssetTypePreviewDTO)
+        self.assertTrue(preview.consumes_category_defaults)
+        keys = [field.key for section in preview.definition.rendered_sections for field in section.fields]
+        self.assertIn("mixed_type_note", keys)
+        self.assertNotIn("mixed_asset_note", keys)
+
+        result = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._omitted(),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=preview.preview_token,
+            expected_definition_revision=preview.expected_definition_revision,
+            expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
+        )
+        self.assertIsInstance(result, OwnerCreatedDTO)
+        created = AssetType.all_objects.get(pk=result.owner.owner_id)
+        self.assertEqual(
+            list(created.fieldset_memberships.values_list("fieldset__slug", "position")),
+            [("mixed-defaults", 1)],
+        )
+
     def test_create_missing_preconditions_emit_two_ordered_missing_issues_without_state_lookup(self):
         before_count = AssetType.all_objects.count()
         result = create_asset_type(
@@ -528,11 +563,10 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual([issue.code for issue in expired_result.issues], ["STALE_PLAN"])
         self.assertEqual(AssetType.all_objects.count(), 1)
 
-    def test_preview_rejects_unknown_deprecated_or_inapplicable_references(self):
+    def test_preview_rejects_unknown_or_deprecated_references(self):
         for selection in (
             FieldsetSelectionDTO("explicit", ("local/does-not-exist",)),
             self._selection(self.deprecated),
-            self._selection(self.asset_only),
         ):
             result = preview_asset_type_create(
                 actor=self._actor(),
@@ -542,6 +576,35 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
             )
             self.assertIsInstance(result, CommandRejectedDTO)
             self.assertEqual([issue.code for issue in result.issues], ["REFERENCE_CONFLICT"])
+
+    def test_preview_accepts_asset_only_fieldset_without_type_contribution(self):
+        preview = preview_asset_type_create(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._selection(self.asset_only),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+        self.assertIsInstance(preview, AssetTypePreviewDTO)
+        keys = [field.key for section in preview.definition.rendered_sections for field in section.fields]
+        self.assertNotIn("asset_note", keys)
+
+    def test_create_requires_an_expected_definition_revision_precondition(self):
+        result = create_asset_type(
+            actor=self._actor(),
+            native=self._native(category_id=self.category.pk),
+            fieldsets=self._selection(self.first),
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+            preview_token=None,
+            expected_definition_revision=None,
+            expected_category_default_snapshot_revision=None,
+        )
+        self.assertIsInstance(result, CommandRejectedDTO)
+        self.assertIsNone(result.safe_owner)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in result.issues],
+            [("MISSING_PRECONDITION", ("expected_definition_revision",))],
+        )
+        self.assertEqual(AssetType.all_objects.count(), 1)
 
     def test_preview_returns_prospective_definition_and_same_input_verifies_at_write(self):
         preview = preview_asset_type_create(

@@ -265,7 +265,6 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         for selection in (
             ExplicitFieldsetSelectionDTO(("local/does-not-exist",)),
             self._selection(self.deprecated),
-            self._selection(self.asset_only),
         ):
             result = set_asset_type_composition(
                 actor=self._actor(),
@@ -282,38 +281,88 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
                 before_memberships,
             )
 
-    def test_asset_only_fieldset_is_inapplicable_to_type_and_category_commands(self):
-        resource_revision, definition_revision = self._type_plan()
-        before_type = AssetType.all_objects.filter(pk=self.type.pk).values().get()
-        before_category = Category.all_objects.filter(pk=self.category.pk).values().get()
-        results = [
-            set_asset_type_composition(
-                actor=self._actor(),
-                asset_type_id=self.type.pk,
-                fieldsets=self._selection(self.asset_only),
-                expected_resource_revision=resource_revision,
-                expected_definition_revision=definition_revision,
-                patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
-            ),
-            set_category_defaults(
-                actor=self._actor(),
-                category_id=self.category.pk,
-                expected_resource_revision=self._category_plan(),
-                fieldsets=self._selection(self.asset_only),
-            ),
-        ]
-        for result in results:
-            self.assertIsInstance(result, CommandRejectedDTO)
-            self.assertEqual([issue.code for issue in result.issues], ["REFERENCE_CONFLICT"])
-        self.assertEqual(AssetType.all_objects.filter(pk=self.type.pk).values().get(), before_type)
-        self.assertEqual(Category.all_objects.filter(pk=self.category.pk).values().get(), before_category)
-        self.assertEqual(
-            list(self.type.fieldset_memberships.values_list("fieldset_id", "position")), [(self.first.pk, 1)]
+    def test_asset_only_fieldset_composes_and_renders_only_for_the_asset_target(self):
+        resource_revision, definition_revision = self._type_plan((self.asset_only,))
+        result = set_asset_type_composition(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            fieldsets=self._selection(self.asset_only),
+            expected_resource_revision=resource_revision,
+            expected_definition_revision=definition_revision,
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
         )
+
+        self.assertIsInstance(result, OwnerChangedDTO)
         self.assertEqual(
-            list(CategoryDefaultFieldset.objects.filter(category=self.category).values_list("fieldset_id", "position")),
-            [(self.first.pk, 1)],
+            list(AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset__slug", "position")),
+            [("asset-only", 1)],
         )
+        owner = AssetType.all_objects.get(pk=self.type.pk)
+        type_definition, _type_definitions = load_effective_definition(
+            owner.pk,
+            "asset_type",
+            tuple(owner.custom_field_data),
+        )
+        type_keys = [field.key for section in type_definition.rendered_sections for field in section.fields]
+        self.assertNotIn("asset_note", type_keys)
+        asset_definition, _asset_definitions = load_effective_definition(
+            owner.pk,
+            "asset",
+            tuple(owner.custom_field_data),
+        )
+        asset_keys = [field.key for section in asset_definition.rendered_sections for field in section.fields]
+        self.assertIn("asset_note", asset_keys)
+
+        category_result = set_category_defaults(
+            actor=self._actor(),
+            category_id=self.category.pk,
+            expected_resource_revision=self._category_plan(),
+            fieldsets=self._selection(self.asset_only),
+        )
+        self.assertIsInstance(category_result, OwnerChangedDTO)
+        self.assertEqual(
+            list(
+                CategoryDefaultFieldset.objects.filter(category=self.category).values_list("fieldset__slug", "position")
+            ),
+            [("asset-only", 1)],
+        )
+
+    def test_mixed_target_fieldset_composes_with_only_its_applicable_members(self):
+        mixed_type_field = self._field("mixed_type_note")
+        mixed_asset_field = self._field("mixed_asset_note", target=Asset)
+        mixed = self._fieldset("mixed", (mixed_type_field, mixed_asset_field))
+        resource_revision, definition_revision = self._type_plan((mixed,))
+        result = set_asset_type_composition(
+            actor=self._actor(),
+            asset_type_id=self.type.pk,
+            fieldsets=self._selection(mixed),
+            expected_resource_revision=resource_revision,
+            expected_definition_revision=definition_revision,
+            patch=SpecificationPatchDTO(set_values={}, clear_keys=()),
+        )
+
+        self.assertIsInstance(result, OwnerChangedDTO)
+        self.assertEqual(
+            list(AssetTypeFieldset.objects.filter(asset_type=self.type).values_list("fieldset__slug", "position")),
+            [("mixed", 1)],
+        )
+        owner = AssetType.all_objects.get(pk=self.type.pk)
+        definition, _definitions = load_effective_definition(
+            owner.pk,
+            "asset_type",
+            tuple(owner.custom_field_data),
+        )
+        keys = [field.key for section in definition.rendered_sections for field in section.fields]
+        self.assertIn("mixed_type_note", keys)
+        self.assertNotIn("mixed_asset_note", keys)
+        asset_definition, _asset_definitions = load_effective_definition(
+            owner.pk,
+            "asset",
+            tuple(owner.custom_field_data),
+        )
+        asset_keys = [field.key for section in asset_definition.rendered_sections for field in section.fields]
+        self.assertIn("mixed_asset_note", asset_keys)
+        self.assertNotIn("mixed_type_note", asset_keys)
 
     def test_deprecated_field_in_proposed_fieldset_is_rejected(self):
         CustomField.objects.filter(pk=self.second_field.pk).update(lifecycle="deprecated")

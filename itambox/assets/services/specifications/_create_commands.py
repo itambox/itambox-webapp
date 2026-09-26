@@ -24,7 +24,7 @@ import hashlib
 import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -193,11 +193,14 @@ def _missing_create_preconditions(
     native: AssetTypeNativeCreateInputDTO,
     fieldsets: FieldsetSelectionDTO,
     preview_token: str | None,
+    expected_definition_revision: str | None,
     expected_category_default_snapshot_revision: str | None,
 ) -> tuple[DomainIssueDTO, ...]:
-    if not _consumes_category_defaults(native, fieldsets):
-        return ()
     missing: list[DomainIssueDTO] = []
+    if expected_definition_revision is None:
+        missing.append(issue("MISSING_PRECONDITION", path=("expected_definition_revision",)))
+    if not _consumes_category_defaults(native, fieldsets):
+        return tuple(missing)
     if preview_token is None:
         missing.append(issue("MISSING_PRECONDITION", path=("preview_token",)))
     if expected_category_default_snapshot_revision is None:
@@ -248,7 +251,7 @@ def _validate_create_inputs(
     fieldsets: FieldsetSelectionDTO,
     patch: SpecificationPatchDTO,
     preview_token: str | None,
-    expected_definition_revision: str,
+    expected_definition_revision: str | None,
     expected_category_default_snapshot_revision: str | None,
 ) -> None:
     _validate_create_preview_inputs(
@@ -259,7 +262,8 @@ def _validate_create_inputs(
     )
     if preview_token is not None and type(preview_token) is not str:
         raise TypeError("preview_token must be a string or None")
-    revision_string(expected_definition_revision, "expected_definition_revision")
+    if expected_definition_revision is not None:
+        revision_string(expected_definition_revision, "expected_definition_revision")
     if expected_category_default_snapshot_revision is not None:
         revision_string(
             expected_category_default_snapshot_revision,
@@ -1115,7 +1119,7 @@ def create_asset_type(
     fieldsets: FieldsetSelectionDTO,
     patch: SpecificationPatchDTO,
     preview_token: PreviewToken | None,
-    expected_definition_revision: DefinitionRevision,
+    expected_definition_revision: DefinitionRevision | None,
     expected_category_default_snapshot_revision: CategoryDefaultSnapshotRevision | None,
 ) -> AssetTypeCreateResult:
     """Create one Asset Type atomically under the exclusive catalogue lock."""
@@ -1132,6 +1136,7 @@ def create_asset_type(
         native=native,
         fieldsets=fieldsets,
         preview_token=preview_token,
+        expected_definition_revision=expected_definition_revision,
         expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
     )
     if missing:
@@ -1145,7 +1150,7 @@ def create_asset_type(
                 fieldsets=fieldsets,
                 patch=patch,
                 preview_token=preview_token,
-                expected_definition_revision=expected_definition_revision,
+                expected_definition_revision=cast(DefinitionRevision, expected_definition_revision),
                 expected_category_default_snapshot_revision=expected_category_default_snapshot_revision,
             )
 

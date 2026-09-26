@@ -40,7 +40,6 @@ from assets.models import (
     Warranty,
 )
 from assets.services.specifications.contracts import (
-    CommandRejectedDTO,
     DefinitionRevision,
     DestinationAssetTypeSelectionDTO,
     ResourceRevision,
@@ -60,7 +59,6 @@ from organization.models import Location, Tenant, TenantGroup
 
 from ..services.specifications.commands import (
     create_asset_type,
-    preview_asset_type_create,
     update_asset_specifications,
     update_asset_type_specifications,
 )
@@ -262,28 +260,6 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
         try:
             native = self._native_input(validated_data, staged_image_id=stage_id)
             with transaction.atomic():
-                if expected_definition_revision is None:
-                    # Direct serializer callers predate the HTTP precondition
-                    # gate.  The real REST view rejects this before invoking
-                    # the serializer; retaining this local preview fallback
-                    # keeps non-HTTP presentation tests deterministic.
-                    preview = command_success_or_raise(
-                        preview_asset_type_create(
-                            actor=actor,
-                            native=native,
-                            fieldsets=selection,
-                            patch=patch,
-                        )
-                    )
-                    if getattr(preview, "issues", ()):
-                        command_success_or_raise(
-                            CommandRejectedDTO(outcome="rejected", safe_owner=None, issues=tuple(preview.issues))
-                        )
-                    expected_definition_revision = preview.expected_definition_revision
-                    if preview_token is None:
-                        preview_token = preview.preview_token
-                    if expected_snapshot_revision is None:
-                        expected_snapshot_revision = preview.expected_category_default_snapshot_revision
                 result = create_asset_type(
                     actor=actor,
                     native=native,

@@ -1,6 +1,6 @@
 # Asset Types
 
-An **Asset Type** represents a specific model of hardware manufactured by a vendor (e.g. `Dell Latitude 7440`, `Apple MacBook Pro 16-inch M3`, `Cisco Catalyst 9300`). It defines the baseline specifications, EOL limits, depreciation configurations, and custom metadata for all physical assets of this type.
+An **Asset Type** represents a specific model of hardware manufactured by a vendor (e.g. `Dell Latitude 7440`, `Apple MacBook Pro 16-inch M3`, `Cisco Catalyst 9300`). It defines the model-level specification values, EOL limits, depreciation configurations, and custom metadata for its physical assets.
 
 ## Attributes
 
@@ -9,7 +9,7 @@ An **Asset Type** represents a specific model of hardware manufactured by a vend
 | **Asset Role** | The functional role of the asset (e.g. `Developer Laptop`). | Foreign Key | No |
 | **Category** | The asset category containing checkout rules. | Foreign Key | No |
 | **Comments** | The comments of the asset type. | Text | No |
-| **Custom Fieldset** | Associated custom fields grouping. | Foreign Key | No |
+| **Custom Fieldsets** | Ordered specification sections composed for this model. | Many-to-Many | No |
 | **Depreciation** | Straight-line depreciation rule template to apply. | Foreign Key | No |
 | **Description** | The description of the asset type. | Text | No |
 | **Ean** | Barcode (EAN / UPC / GTIN) — scanning shows assets of this type. | String | No |
@@ -21,5 +21,8 @@ An **Asset Type** represents a specific model of hardware manufactured by a vend
 | **Requestable** | Allows end-users to request assets of this type. | Boolean | Yes |
 | **Slug** | Auto-slug source concatenating Manufacturer + Model. | Slug | Yes |
 
-## Speclist Inheritance
-All physical assets inherit their base hardware specifications (RAM, CPU, Storage) from their defined **Asset Type**, eliminating redundant field editing across identical systems.
+## Specifications
+
+Asset Types compose reusable specification **Custom Fieldsets** into an explicit, ordered list of sections (see [Custom Fieldsets](../extras/customfieldset.md)). New types can start from their category's default sections; the composition stays fully editable afterwards.
+
+The composed sections define the specification form of the model: model-level values are stored on the Asset Type and are not copied to its assets. Each asset records its own observed values per specification field, and values that become historical are retained. See [Custom Fields](../../usage/custom-fields.md) for composition semantics, empty-versus-omitted behavior, and the API contract.
