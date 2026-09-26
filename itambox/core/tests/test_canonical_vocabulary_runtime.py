@@ -191,7 +191,7 @@ def test_runtime_seed_tolerates_migrated_deprecated_choice_residue():
         choice_set=core_set,
         key="nvme_ssd",
         label="NVMe solid-state drive",
-        position=30,
+        position=80,
         lifecycle=CustomFieldChoice.LIFECYCLE_DEPRECATED,
     )
     local_set = CustomFieldChoiceSet.objects.create(
