@@ -11,7 +11,6 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-
 from django.contrib.contenttypes.models import ContentType
 
 from assets.customfields import validate_asset_type_custom_field_data
@@ -441,9 +440,7 @@ def test_runtime_seed_matches_category_defaults_and_preserves_local_categories()
     }
     for slug, expected_fieldsets in expected_local_defaults.items():
         category = Category.objects.get(slug=slug)
-        category_defaults = list(
-            category.default_fieldset_memberships.values_list("fieldset__slug", "position")
-        )
+        category_defaults = list(category.default_fieldset_memberships.values_list("fieldset__slug", "position"))
         assert category_defaults == [
             (fieldset_slug, (index + 1) * 10) for index, fieldset_slug in enumerate(expected_fieldsets)
         ]

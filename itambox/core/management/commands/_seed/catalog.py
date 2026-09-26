@@ -365,6 +365,13 @@ def _seed_category_defaults(category_rows, categories, fieldsets, *, preserve_ma
         )
 
 
+def _demo_category_defaults(category):
+    defaults = list(category.default_fieldset_memberships.select_related("fieldset").order_by("position"))
+    if not defaults:
+        raise ValueError(f"Demo Asset Type category has no default fieldsets: {category.slug}")
+    return defaults
+
+
 def _demo_operating_system_family(atype_slug):
     if "macbook" in atype_slug or "mac-studio" in atype_slug:
         return "macos"
@@ -1170,11 +1177,7 @@ class SeedCatalogMixin:
                 ]
             )
             obj.fieldset_memberships.all().delete()
-            category_defaults = list(
-                self._categories[cat].default_fieldset_memberships.select_related("fieldset").order_by("position")
-            )
-            if not category_defaults:
-                raise ValueError(f"Demo Asset Type category has no default fieldsets: {cat}")
+            category_defaults = _demo_category_defaults(self._categories[cat])
             AssetTypeFieldset.objects.bulk_create(
                 [
                     AssetTypeFieldset(asset_type=obj, fieldset=membership.fieldset, position=membership.position)
