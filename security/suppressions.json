@@ -308,6 +308,60 @@
       ]
     },
     {
+      "id": "SEC-479-GITLEAKS-018",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in the frozen 0117 migration-contract oracle (a reviewed byte copy of the canonical-target fixture); the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "scripts/qualification/migrations/fixtures/issue479_0117_vocabulary_target.json",
+        "rule": "generic-api-key",
+        "line": 3114
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-019",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in the frozen 0117 migration-contract oracle (a reviewed byte copy of the canonical-target fixture); the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "scripts/qualification/migrations/fixtures/issue479_0117_vocabulary_target.json",
+        "rule": "generic-api-key",
+        "line": 3135
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-020",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "Immutable Choice key from the adopted public specification vocabulary in the frozen 0117 migration-contract oracle (a reviewed byte copy of the canonical-target fixture); the scanner match is a fixture value, not a credential. The scope is the exact file/rule/line identity and is independent of the introducing commit, so a squash, rebase, or cherry-pick integration keeps it suppressed.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "scripts/qualification/migrations/fixtures/issue479_0117_vocabulary_target.json",
+        "rule": "generic-api-key",
+        "line": 3142
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
       "id": "SEC-LEGACY-GITLEAKS-001",
       "tool": "gitleaks",
       "finding": "slack-webhook-url",
