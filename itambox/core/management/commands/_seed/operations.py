@@ -18,6 +18,9 @@ import random
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
+
+from assets.choices import RequestStatusChoices
 
 User = get_user_model()
 
@@ -30,6 +33,70 @@ def days_ahead(n):
 
 class SeedOperationsMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
+
+    def _tenant_of_user(self, user):
+        """Return the tenant a seeded user belongs to, or ``None`` when it has none.
+
+        ``AssetRequest.save`` falls back to the ambient tenant context, which the
+        seed does not set, so the request's tenant has to be resolved from the
+        user's active membership — the same single-membership invariant the access
+        self-check enforces for every seeded person.
+        """
+        # inline import: app-registry: organization.Membership is read from the DB in a
+        # management command; loading it at module top would import the app's models
+        # before the app registry is populated.
+        from organization.models import Membership
+
+        membership = (
+            Membership._base_manager.filter(user_id=user.pk, is_active=True)
+            .select_related("tenant")
+            .order_by("pk")
+            .first()
+        )
+        return membership.tenant if membership else None
+
+    def _claimable_asset_for(self, request_instance):
+        """Return a free, claimable asset of the requested type in the request's tenant.
+
+        Applies exactly the constraints the product enforces when an approver
+        allocates a unit (``approve_asset_request``): the asset must live in the
+        request's tenant, be of the requested asset type, be in a deployable
+        status, carry no active assignment, and be requestable. ``is_requestable``
+        is a property (per-asset override, else the asset type's flag), so the
+        query filters the two underlying columns. Returns ``None`` when the tenant
+        has no spare unit, which the caller treats as "leave the request pending".
+        """
+        # inline import: app-registry: assets.Asset is queried inside the seed command,
+        # where the model import must not happen at module load.
+        from assets.models import Asset
+
+        if not request_instance.asset_type_id or not request_instance.tenant_id:
+            return None
+        candidates = Asset._base_manager.filter(
+            tenant_id=request_instance.tenant_id,
+            asset_type=request_instance.asset_type,
+            status__type="deployable",
+            deleted_at__isnull=True,
+        ).filter(Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True))
+        for asset in candidates.order_by("-in_service_date", "pk"):
+            if asset.assignments.filter(is_active=True).exists():
+                continue
+            return asset
+        return None
+
+    def _request_target_holder(self, tenant):
+        """The person a seeded request is for: a tenant holder without a device yet.
+
+        The request must name a delegated target. ``RequestClaimView._checkout_unit``
+        checks the unit out to ``assigned_user``, and the customer-admin logins this
+        seed creates are technical accounts that deliberately carry no holder profile,
+        so a targetless request raised by one of them can never be checked out to
+        anybody (#506).
+        """
+        holders = (getattr(self, "_tenant_holders", None) or {}).get(tenant.slug, []) if tenant else []
+        primary = getattr(self, "_primary_laptop_by_holder", None) or {}
+        without_device = [holder for holder in holders if holder.pk not in primary]
+        return next(iter(without_device or holders), None)
 
     def _seed_operations(self):
         from assets.models import Asset, AssetRequest, AssetType
@@ -49,6 +116,12 @@ class SeedOperationsMixin:
         from licenses.models import License
 
         self.stdout.write("--- Operations: alerts, reports, automation ---")
+
+        # Assets handed to an open request. Published so the later reservation phase
+        # leaves them alone: a reservation for a *different* holder covering today
+        # blocks the requester's checkout in ``assets.services`` and would dead-end
+        # the approved request (#506).
+        self._request_allocated_asset_ids = set()
 
         # Notification channels
         email_ch = NotificationChannel.objects.create(
@@ -225,13 +298,47 @@ class SeedOperationsMixin:
         customer_admin_users = [u for name, u in self._users.items() if name.startswith("admin@")]
         req_count = 0
         for user in customer_admin_users[:5]:
+            # An approved request is only claimable once a unit is allocated to it
+            # (RequestClaimView refuses a claim without ``request.asset``) *and* once
+            # the claim view can resolve an assignee for it — the customer-admin logins
+            # this seed creates are technical accounts that deliberately carry no
+            # holder profile. Seeding "approved" without either produced demo stories
+            # that dead-end on a validation error the prospect cannot clear (#506). So
+            # both the allocation and the delegated target are decided *before* the row
+            # exists: an approved request always carries them, and a tenant without a
+            # spare unit is seeded as pending — which is the state that still has a
+            # working approve path in the UI. Demoting an existing approved row to
+            # pending is not an option: the product's state machine refuses
+            # approved -> pending.
+            #
+            # The tenant is resolved from the user's membership and written
+            # explicitly: AssetRequest.save() only falls back to the ambient tenant
+            # context, which the seed does not set, so without this the request would
+            # persist with tenant=NULL while its allocation came from one tenant.
+            tenant = self._tenant_of_user(user)
+            probe = AssetRequest(requester=user, tenant=tenant, asset_type=req_type)
+            allocated = self._claimable_asset_for(probe)
             AssetRequest.objects.create(
+                tenant=tenant,
                 requester=user,
                 asset_type=req_type,
                 notes="A new employee joins next month and needs a standard laptop.",
-                status=random.choice(["pending", "approved"]),
+                status=RequestStatusChoices.APPROVED if allocated else RequestStatusChoices.PENDING,
+                asset=allocated,
+                assigned_user=self._request_target_holder(tenant),
             )
             req_count += 1
+
+        # Assets already handed to an open request must stay unreserved in the later
+        # reservation phase (#506): a reservation for a *different* holder covering
+        # today blocks the claim's checkout and dead-ends the approved request. Read
+        # back from the persisted rows so the set matches what the invariant later
+        # verifies.
+        self._request_allocated_asset_ids = set(
+            AssetRequest._base_manager.filter(asset__isnull=False, deleted_at__isnull=True).values_list(
+                "asset_id", flat=True
+            )
+        )
 
         # Journal entries on a few assets
         if self._assets:

@@ -17,6 +17,8 @@ Wire-up (in seed_data.py):
 import datetime
 import random
 
+from core.management.commands._seed.engine import as_aware_datetime
+
 
 class SeedHistoryMixin:
     """Mixin for the seed ``Command``.  Requires ``self._engine`` (a
@@ -43,6 +45,180 @@ class SeedHistoryMixin:
         pool = helpdesk if (helpdesk and random.random() < 0.35) else actors
         return random.choice(pool)
 
+    def _checkin_for_repair(self, asset, assignment, *, when, user, status):
+        """End ``assignment`` and drop the asset into the deployable pool.
+
+        Mirrors ``assets.services.checkin_asset`` (deactivate the assignment, stamp
+        the check-in, revert the status) and records both facts through the change
+        log, so the seeded history shows the holder really lost the device before
+        the repair rather than silently keeping it across a repair episode.
+
+        ``checked_out_at`` is back-dated to the assignment's own purchase-era start
+        if it is still stamped "now". Seeded assignments are created in their final
+        state, so their default checkout time is the seed run's timestamp; back-dating
+        only the check-in would leave checked_in_at *before* checked_out_at, and an
+        inverted interval is not a state the product can produce — worse, it makes
+        the assignment look like it was open across any window it does not actually
+        span. The back-date never predates the purchase, either: a unit received on a
+        purchase order carries a future purchase date, and a loan cannot predate it.
+        """
+        engine = self._engine
+        checked_in_at = as_aware_datetime(when)
+        updates = {
+            "is_active": False,
+            "checked_in_at": checked_in_at,
+            "checked_in_by_id": getattr(user, "pk", None),
+        }
+        if assignment.checked_out_at is None or assignment.checked_out_at > checked_in_at:
+            # Never later than the check-in, and never before the asset was bought.
+            floor = checked_in_at - datetime.timedelta(days=1)
+            purchased = asset.purchase_date
+            if purchased is not None and purchased <= when:
+                floor = max(floor, as_aware_datetime(purchased))
+            else:
+                # The unit's purchase date is in the future, so it was not on loan
+                # before then; fall back to the same default the repair window uses.
+                floor = max(floor, as_aware_datetime(min(when, datetime.date.today()) - datetime.timedelta(days=120)))
+            updates["checked_out_at"] = floor
+            assignment.checked_out_at = floor
+        type(assignment)._base_manager.filter(pk=assignment.pk).update(**updates)
+        assignment.is_active = False
+        assignment.checked_in_at = checked_in_at
+        engine.change(
+            asset,
+            when=when,
+            user=user,
+            action="checkin",
+            status=status,
+        )
+
+    def _run_repair_episode(
+        self,
+        asset,
+        *,
+        repair_start,
+        repair_end,
+        actors,
+        helpdesk,
+        sl_available,
+        sl_in_use,
+        sl_pending_repair,
+        engine,
+    ):
+        """Walk one asset through a complete, closed repair episode.
+
+        Only repair assets that are actually deployable right now: an asset that is
+        still 'in use' must first be checked in, and one that is already in repair has
+        nothing to enter. Assigned assets are rolled back to the deployable pool for
+        the duration of the episode so the status and the assignment cannot disagree.
+
+        *Every* open person assignment is checked in, not just one of them. A seeded
+        asset can carry more than one assignment row — the checkout step appends a new
+        active one rather than re-dating the existing row — so closing only the first
+        would leave a second holder still holding the unit straight through the repair.
+        """
+        repairable = asset.status in (sl_available, sl_in_use) and asset.status is not None
+        open_assignments = list(asset.assignments.filter(is_active=True, assigned_user__isnull=False))
+        # A unit cannot enter the workshop while somebody still holds it, whatever
+        # status it currently wears. Gating the check-in on the status being exactly
+        # "in use" left a person assignment open straight through the repair whenever
+        # the status had already been rolled back to the deployable pool.
+        if repairable and open_assignments:
+            # Check the device in before the repair starts, exactly as
+            # the product's checkin does: the assignment becomes
+            # inactive, and the asset reverts to a deployable status.
+            for assignment in open_assignments:
+                self._checkin_for_repair(
+                    asset,
+                    assignment,
+                    when=repair_start,
+                    user=self._pick_actor(actors, helpdesk),
+                    status=sl_available,
+                )
+        if repairable and asset.status != sl_pending_repair:
+            engine.change(
+                asset,
+                when=repair_start,
+                user=self._pick_actor(actors, helpdesk),
+                action="update",
+                status=sl_pending_repair,
+            )
+        # Returned to the deployable pool after repair. The
+        # 'pending-repair' label's type is 'pending', and
+        # pending -> deployed is an illegal transition, so the legal
+        # path back into service is via 'available' (deployable).
+        repaired = False
+        if repairable and sl_available and asset.status != sl_available:
+            engine.change(
+                asset,
+                when=repair_end,
+                user=self._pick_actor(actors),
+                action="update",
+                status=sl_available,
+            )
+            repaired = True
+        # The holder gets the device back, so the assignment history
+        # and the status history tell the same story again. The unit sits
+        # in the deployable pool at this point, so that is the status the
+        # assignment records as the one to revert to on a later check-in.
+        # With several holders checked in above, the most recent one gets it back.
+        if repaired and open_assignments:
+            self._recheckout_after_repair(
+                asset,
+                open_assignments[-1],
+                when=repair_end,
+                user=self._pick_actor(actors),
+                status=sl_in_use,
+                pre_checkout_status=sl_available,
+            )
+        # Publish the window so the maintenance phase can create the
+        # paperwork of *this* repair instead of inventing unrelated
+        # "repair" records on assets that never left service (#506).
+        if repaired:
+            self._repair_windows.append(
+                {
+                    "asset": asset,
+                    "start": repair_start,
+                    "end": repair_end,
+                    "checked_in": bool(open_assignments),
+                }
+            )
+
+    def _recheckout_after_repair(self, asset, assignment, *, when, user, status, pre_checkout_status):
+        """Issue a fresh active assignment to the same holder after a repair.
+
+        A repair episode ends with the device going back to the person who had it,
+        which in the product means a new checkout. Reusing the closed assignment
+        row is not an option: ``unique_active_assignment_per_asset`` allows only
+        one active row per asset, and the closed one must keep its history.
+
+        ``pre_checkout_status`` is the status the asset carried *before* this
+        checkout, exactly as ``checkout_asset`` records it: a later check-in reverts
+        the unit to that label. Recording the post-checkout status instead would make
+        a normal check-in hand the unit back as "in use" while nobody holds it.
+        """
+        # inline import: app-registry: assets.AssetAssignment is created inside the seed
+        # command, where the model import must not happen at module load.
+        from assets.models import AssetAssignment
+
+        engine = self._engine
+        AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user_id=assignment.assigned_user_id,
+            assigned_location_id=assignment.assigned_location_id,
+            pre_checkout_status=pre_checkout_status,
+            checked_out_by=user,
+            checked_out_at=as_aware_datetime(when),
+            notes="Returned to the holder after the repair completed.",
+        )
+        engine.change(
+            asset,
+            when=when,
+            user=user,
+            action="checkout",
+            status=status,
+        )
+
     # ──────────────────────────────────────────────────────────────────────────
     # Main entry point
     # ──────────────────────────────────────────────────────────────────────────
@@ -66,6 +242,10 @@ class SeedHistoryMixin:
         engine = self._engine
 
         today = datetime.date.today()
+
+        # Repair windows published for the maintenance phase, which must create the
+        # paperwork of these very episodes rather than unrelated records.
+        self._repair_windows = []
 
         actors = self._engineer_users or [getattr(self, "_provisioner", None)]
         actors = [a for a in actors if a is not None]
@@ -179,34 +359,45 @@ class SeedHistoryMixin:
                         )
 
                 # ── d) ~20 % repair cycle ─────────────────────────────────────
+                # A repair episode is only coherent if the asset's assignment
+                # story agrees with its status story. The product cannot move an
+                # asset that is actively assigned to a person into repair without
+                # checking it in first (checkin_asset reverts status to the
+                # deployable pool), so a seeded repair on an assigned asset must
+                # log that checkin and, once the repair completes, re-check the
+                # asset back out to the same holder. Leaving the assignment
+                # untouched produced the contradiction #506 reports: history said
+                # "in repair" / "available" while the same person held the device
+                # the whole time.
                 if random.random() < 0.20 and sl_pending_repair:
-                    window_start = p_date + datetime.timedelta(days=60)
+                    # Anchor the window on when the unit actually entered service, not
+                    # on its purchase date: a unit received on a purchase order carries
+                    # a *future* purchase date, and one bought last month has no room
+                    # to host a repair. _rand_date clamps an inverted range, which
+                    # would otherwise hand us repair_start *after* repair_end: the unit
+                    # walks into repair and the episode never closes, leaving it stuck
+                    # in the pending-repair label.
+                    in_service = min(p_date, today - datetime.timedelta(days=120))
+                    window_start = in_service + datetime.timedelta(days=60)
                     window_end = today - datetime.timedelta(days=60)
-                    repair_start = self._rand_date(window_start, window_end)
-                    repair_end = repair_start + datetime.timedelta(days=random.randint(7, 30))
-                    if repair_end > today:
-                        repair_end = today - datetime.timedelta(days=1)
-
-                    # into repair — only if asset isn't already in that status
-                    if asset.status != sl_pending_repair:
-                        engine.change(
+                    repair_start = None
+                    repair_end = None
+                    if window_start < window_end:
+                        repair_start = self._rand_date(window_start, window_end)
+                        repair_end = repair_start + datetime.timedelta(days=random.randint(7, 30))
+                        if repair_end > today:
+                            repair_end = today - datetime.timedelta(days=1)
+                    if repair_start is not None and repair_start < repair_end:
+                        self._run_repair_episode(
                             asset,
-                            when=repair_start,
-                            user=self._pick_actor(actors, helpdesk),
-                            action="update",
-                            status=sl_pending_repair,
-                        )
-                    # Returned to the deployable pool after repair. The
-                    # 'pending-repair' label's type is 'pending', and
-                    # pending -> deployed is an illegal transition, so the legal
-                    # path back into service is via 'available' (deployable).
-                    if sl_available and asset.status != sl_available:
-                        engine.change(
-                            asset,
-                            when=repair_end,
-                            user=self._pick_actor(actors),
-                            action="update",
-                            status=sl_available,
+                            repair_start=repair_start,
+                            repair_end=repair_end,
+                            actors=actors,
+                            helpdesk=helpdesk,
+                            sl_available=sl_available,
+                            sl_in_use=sl_in_use,
+                            sl_pending_repair=sl_pending_repair,
+                            engine=engine,
                         )
 
                 # ── e) ~25 % physical audit ───────────────────────────────────

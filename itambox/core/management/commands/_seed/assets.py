@@ -27,7 +27,9 @@ import random
 
 from django.utils import timezone
 
+from assets.models import AssetAssignment
 from assets.services.specification_writers import apply_asset_specification_patch
+from core.management.commands._seed.engine import as_aware_datetime
 from core.tasks.context import TaskContext
 from inventory.services import COMPONENT_ALLOCATION_OPERATION, create_component_allocation
 
@@ -134,6 +136,42 @@ class SeedAssetsMixin:
             return
         apply_asset_specification_patch(asset_id=asset.pk, user=self._provisioner, set_values=values)
         asset.refresh_from_db(fields=["custom_field_data"])
+
+    def _seed_reissue_history(self, asset, holders, current_holder):
+        """Give ~a quarter of the laptops a prior, closed loan to someone else.
+
+        The prior loan is dated relative to the asset's own purchase date, never
+        relative to "now": a laptop bought six months ago cannot have been on loan 700
+        days ago, and an assignment predating the asset would read as "still held"
+        during any repair window drawn after the purchase date — a lifecycle the
+        product could never have produced.
+        """
+        prev = random.choice([h for h in holders if h.pk != current_holder.pk])
+        p_date = asset.purchase_date or days_ago(400)
+        # The prior loan must fit strictly between the purchase and the end of the
+        # history the simulation can still reach. A return date in the future is not
+        # a closed loan: the row would be marked inactive while its interval still
+        # covers months of history, so it reads as "this person held the unit" across
+        # any repair drawn in that stretch. Closes well before today instead.
+        latest = days_ago(90)
+        if p_date >= latest:
+            return
+        span = (latest - p_date).days
+        co = p_date + datetime.timedelta(days=random.randint(0, span))
+        room = (latest - co).days
+        if room < 1:
+            return
+        ci = co + datetime.timedelta(days=random.randint(1, room))
+        AssetAssignment.objects.create(
+            asset=asset,
+            assigned_user=prev,
+            checked_out_by=self._provisioner,
+            checked_out_at=as_aware_datetime(co),
+            is_active=False,
+            checked_in_at=as_aware_datetime(ci),
+            checked_in_by=self._provisioner,
+            notes="Previously issued; returned to the service desk on a role change.",
+        )
 
     def _seed_assets(self):
         from assets.models import Asset, AssetAssignment, AssetTagSequence
@@ -412,19 +450,7 @@ class SeedAssetsMixin:
                 # ~25% of laptops carry re-issue history: a prior, closed assignment to a
                 # different employee who returned the device (lifecycle realism).
                 if len(holders) > 3 and random.random() < 0.25:
-                    prev = random.choice([h for h in holders if h.pk != holder.pk])
-                    co = timezone.now() - datetime.timedelta(days=random.randint(220, 700))
-                    ci = co + datetime.timedelta(days=random.randint(60, 200))
-                    AssetAssignment.objects.create(
-                        asset=lt,
-                        assigned_user=prev,
-                        checked_out_by=self._provisioner,
-                        checked_out_at=co,
-                        is_active=False,
-                        checked_in_at=ci,
-                        checked_in_by=self._provisioner,
-                        notes="Previously issued; returned to the service desk on a role change.",
-                    )
+                    self._seed_reissue_history(lt, holders, holder)
                 self._laptops_by_tenant[slug].append(lt)
                 self._assets_by_tenant[slug].append(lt)
                 self._primary_laptop_by_holder[holder.pk] = lt

@@ -178,6 +178,13 @@ class SeedLifecycleMixin:
             "Pre-deployment staging hold",
         ]
 
+        # A unit already handed to an open request must stay unreserved: a reservation
+        # for a *different* holder covering today blocks the requester's checkout in
+        # ``assets.services`` and turns the approved request into a dead end (#506).
+        # ``_seed_operations`` runs first and publishes those assets; the
+        # claim-blocker invariant is the fail-closed net behind this exclusion.
+        request_allocated = getattr(self, "_request_allocated_asset_ids", set())
+
         for slug, tenant in (getattr(self, "_tenants", None) or {}).items():
             holders = tenant_holders.get(slug, [])
             tenant_assets = assets_by_tenant.get(slug, [])
@@ -186,9 +193,12 @@ class SeedLifecycleMixin:
             reservable = [
                 a
                 for a in tenant_assets
-                if a.asset_type is None
-                or (a.asset_type.category is None)
-                or (a.asset_type.category.slug not in ("servers", "network-equipment", "display-monitors"))
+                if a.pk not in request_allocated
+                and (
+                    a.asset_type is None
+                    or (a.asset_type.category is None)
+                    or (a.asset_type.category.slug not in ("servers", "network-equipment", "display-monitors"))
+                )
             ]
             if not reservable or not holders:
                 continue

@@ -35,6 +35,7 @@ from core.management.commands._seed.access import SeedAccessMixin, check_seed_ac
 from core.management.commands._seed.assets import SeedAssetsMixin
 from core.management.commands._seed.catalog import SeedCatalogMixin
 from core.management.commands._seed.compliance import SeedComplianceMixin
+from core.management.commands._seed.consistency import check_seed_operational_invariants
 from core.management.commands._seed.engine import ChangeLogEngine
 from core.management.commands._seed.finance import SeedFinanceMixin
 from core.management.commands._seed.history import SeedHistoryMixin
@@ -284,7 +285,6 @@ class Command(
             self._seed_inventory_stock()
             self._seed_licensing()
             self._seed_subscriptions()
-            self._seed_maintenance()
             self._seed_procurement()
             self._seed_operations()
             # New realistic-dataset phases (appended; order respects data deps).
@@ -294,8 +294,19 @@ class Command(
             self._seed_compliance()  # audit sessions + custody receipts
             self._seed_export_templates()  # global Jinja export templates (no tenant/random)
             self._simulate_history()  # real 2-year change history (last)
+            # Maintenance runs after the history simulation because out-of-service
+            # records must document the repair windows that simulation produced
+            # (#506): a "repair" on an asset that never left service is the exact
+            # contradiction the issue reports. It consumes no random draws of its
+            # own for those records, so the stream order of earlier phases is
+            # unaffected.
+            self._seed_maintenance()
             check_seed_access_invariants(self._users.values())
             check_seed_inventory_invariants()
+            # Operational-story coherence: a received PO line has its assets, a
+            # repair episode agrees with the assignment, maintenance belongs to the
+            # asset's timeline, and an approved request can actually be claimed.
+            check_seed_operational_invariants()
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (shared status-label defs used by both _seed_minimal and _seed_catalog)
