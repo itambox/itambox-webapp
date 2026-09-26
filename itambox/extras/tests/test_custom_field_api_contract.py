@@ -12,8 +12,11 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
-from assets.api.specification_api import SpecificationCommandAPIException
+from assets.api.specification_api import SpecificationCommandAPIException, create_fieldset_selection_from_values
 from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer
+from assets.services.specifications.commands import preview_asset_type_create
+from assets.services.specifications.contracts import CommandRejectedDTO
+from assets.specification_adapters import actor_context_for_user, native_asset_type_create_input, patch_from_mapping
 from core.tests.mixins import TenantTestMixin
 from extras.api.serializers import CustomFieldSerializer, CustomFieldsetSerializer
 from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, SpecificationLibrary
@@ -54,6 +57,24 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         if field_key is not None:
             self.assertEqual(issue["field_key"], field_key)
         return issue
+
+    def _create_precondition_revision(self, *, model, slug, manufacturer):
+        """Mint the create precondition through the canonical preview command.
+
+        Direct serializer callers must serve the final precondition contract:
+        ``expected_definition_revision`` comes from a preview of the same
+        structural input — exactly the value the HTTP gate demands — instead
+        of a serializer-local preview fallback.
+        """
+        preview = preview_asset_type_create(
+            actor=actor_context_for_user(self.tenant_admin),
+            native=native_asset_type_create_input({"manufacturer": manufacturer, "model": model, "slug": slug}),
+            fieldsets=create_fieldset_selection_from_values(None, omitted=True),
+            patch=patch_from_mapping(None),
+        )
+        if isinstance(preview, CommandRejectedDTO):
+            self.fail(f"create preview rejected: {preview.issues}")
+        return preview.expected_definition_revision
 
     def test_definition_api_rejects_invalid_regex(self):
         serializer = CustomFieldSerializer(
@@ -331,12 +352,18 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
         definition.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="API Manufacturer")
+        expected_definition_revision = self._create_precondition_revision(
+            model="API Test Type",
+            slug="api-test-type",
+            manufacturer=manufacturer,
+        )
 
         serializer = AssetTypeSerializer(
             data={
                 "model": "API Test Type",
                 "slug": "api-test-type",
                 "manufacturer_id": manufacturer.pk,
+                "expected_definition_revision": expected_definition_revision,
                 "specification_patch": {"set": {"api_integer_value": "1.0"}},
             },
             context=self._serializer_context(self.tenant_admin),
@@ -358,11 +385,17 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
         field.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="Required REST Manufacturer")
+        expected_definition_revision = self._create_precondition_revision(
+            model="Required REST Type",
+            slug="required-rest-type",
+            manufacturer=manufacturer,
+        )
         serializer = AssetTypeSerializer(
             data={
                 "model": "Required REST Type",
                 "slug": "required-rest-type",
                 "manufacturer_id": manufacturer.pk,
+                "expected_definition_revision": expected_definition_revision,
             },
             context=self._serializer_context(self.tenant_admin),
         )
@@ -666,11 +699,17 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         )
         field.object_types.add(self.asset_type_ct)
         manufacturer = Manufacturer.objects.create(name="Create API Maker")
+        expected_definition_revision = self._create_precondition_revision(
+            model="Create API Model",
+            slug="create-api-model",
+            manufacturer=manufacturer,
+        )
         serializer = AssetTypeSerializer(
             data={
                 "model": "Create API Model",
                 "slug": "create-api-model",
                 "manufacturer_id": manufacturer.pk,
+                "expected_definition_revision": expected_definition_revision,
                 "specification_patch": {"set": {"create_spec": "created"}},
             },
             context=self._serializer_context(self.tenant_admin),
@@ -690,11 +729,17 @@ class CustomFieldAPISerializerContractTests(TenantTestMixin, TestCase):
         fieldset = CustomFieldset.objects.create(namespace="local", slug="create-only-set", label="Create only set")
         CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=10)
         manufacturer = Manufacturer.objects.create(name="Fieldset Create API Maker")
+        expected_definition_revision = self._create_precondition_revision(
+            model="Fieldset Create API Model",
+            slug="fieldset-create-api-model",
+            manufacturer=manufacturer,
+        )
         serializer = AssetTypeSerializer(
             data={
                 "model": "Fieldset Create API Model",
                 "slug": "fieldset-create-api-model",
                 "manufacturer_id": manufacturer.pk,
+                "expected_definition_revision": expected_definition_revision,
                 "specification_patch": {"set": {"fieldset_only_create_spec": "must reject"}},
             },
             context=self._serializer_context(self.tenant_admin),
