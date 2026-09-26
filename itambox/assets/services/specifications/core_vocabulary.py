@@ -1274,18 +1274,11 @@ _CORE_VOCABULARY: dict[str, object] = {
             "choices": [
                 {"key": "hdd", "label": "Hard disk drive", "lifecycle": "active", "order": 1, "position": 10},
                 {"key": "ssd", "label": "Solid-state drive", "lifecycle": "active", "order": 2, "position": 20},
-                {
-                    "key": "nvme_ssd",
-                    "label": "NVMe solid-state drive",
-                    "lifecycle": "deprecated",
-                    "order": 3,
-                    "position": 30,
-                },
-                {"key": "flash", "label": "Embedded flash", "lifecycle": "active", "order": 4, "position": 40},
-                {"key": "optical", "label": "Optical", "lifecycle": "active", "order": 5, "position": 50},
-                {"key": "tape", "label": "Tape", "lifecycle": "active", "order": 6, "position": 60},
-                {"key": "hybrid", "label": "Hybrid", "lifecycle": "active", "order": 7, "position": 70},
-                {"key": "other", "label": "Other", "lifecycle": "active", "order": 8, "position": 80},
+                {"key": "flash", "label": "Embedded flash", "lifecycle": "active", "order": 3, "position": 30},
+                {"key": "optical", "label": "Optical", "lifecycle": "active", "order": 4, "position": 40},
+                {"key": "tape", "label": "Tape", "lifecycle": "active", "order": 5, "position": 50},
+                {"key": "hybrid", "label": "Hybrid", "lifecycle": "active", "order": 6, "position": 60},
+                {"key": "other", "label": "Other", "lifecycle": "active", "order": 7, "position": 70},
             ],
         },
         {

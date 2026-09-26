@@ -174,19 +174,26 @@ def test_runtime_seed_tolerates_migrated_retired_field_tombstone():
     assert "input_voltage" not in runtime_keys
 
 
-def test_runtime_seed_keeps_migrated_deprecated_choice_and_preserves_local_choices():
-    """The deprecated storage-medium choice is historical state, not deletable state.
+def test_runtime_seed_tolerates_migrated_deprecated_choice_residue():
+    """A database still carrying the 0117 residue seeds cleanly without managing it.
 
-    Migration 0117 planted ``nvme_ssd`` as a deprecated choice on every database and
-    the model blocks its deletion on purpose ("deprecate the row instead"). The final
-    vocabulary therefore keeps the identity as the one intentionally retired choice;
-    the seed normalizes its label/position back to the vocabulary values and leaves
-    same-named local choices alone.
+    Migration 0117 planted ``storage-medium#nvme_ssd`` as a deprecated choice on
+    every database and the model blocks its deletion on purpose ("deprecate the
+    row instead"). The runtime vocabulary is already clean: the identity is not
+    part of the current contract. The reconcile therefore treats the row as
+    temporary migration history, parks it outside the managed choice sequence,
+    and leaves its identity, label, and lifecycle alone until the session-3
+    migration normalization removes it.
     """
     _seed_catalog()
     core_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="storage-medium")
-    stale_choice = CustomFieldChoice.objects.get(choice_set=core_set, key="nvme_ssd")
-    CustomFieldChoice.objects.filter(pk=stale_choice.pk).update(label="Diverged label", position=900000)
+    residue = CustomFieldChoice.objects.create(
+        choice_set=core_set,
+        key="nvme_ssd",
+        label="NVMe solid-state drive",
+        position=30,
+        lifecycle=CustomFieldChoice.LIFECYCLE_DEPRECATED,
+    )
     local_set = CustomFieldChoiceSet.objects.create(
         namespace="local",
         slug="storage-medium",
@@ -205,31 +212,46 @@ def test_runtime_seed_keeps_migrated_deprecated_choice_and_preserves_local_choic
 
     _seed_catalog()
 
-    stale_choice.refresh_from_db()
-    assert stale_choice.lifecycle == CustomFieldChoice.LIFECYCLE_DEPRECATED
-    assert stale_choice.label == "NVMe solid-state drive"
-    assert stale_choice.position == 30
+    residue.refresh_from_db()
+    assert residue.lifecycle == CustomFieldChoice.LIFECYCLE_DEPRECATED
+    assert residue.label == "NVMe solid-state drive"
+    assert residue.position >= 900000  # parked, out of the managed choice sequence
     local_choice.refresh_from_db()
     assert local_choice.label == "Local NVMe SSD"
     assert local_choice.lifecycle == CustomFieldChoice.LIFECYCLE_ACTIVE
+    runtime_keys = {choice["key"] for row in get_core_vocabulary()["choice_sets"] for choice in row["choices"]}
+    assert "nvme_ssd" not in runtime_keys
+    managed = list(
+        CustomFieldChoice.objects.filter(choice_set=core_set)
+        .exclude(key="nvme_ssd")
+        .order_by("position")
+        .values_list("key", flat=True)
+    )
+    assert managed == ["hdd", "ssd", "flash", "optical", "tape", "hybrid", "other"]
 
 
-def test_runtime_seed_normalizes_diverged_migrated_choice_lifecycle():
-    """A diverged lifecycle on the retired choice is corrected, not propagated.
+def test_runtime_seed_tolerates_diverged_choice_residue_state():
+    """The residue is never reinterpreted, even when its database state diverged.
 
-    When the deprecated identity was re-activated on a database, the next seed
-    restores the vocabulary state instead of failing or leaving the divergence in
-    place — the identity stays the single intentionally retired choice.
+    The row belongs to migration history until session 3 owns its removal; the
+    seed tolerates whatever state the database holds instead of failing or
+    normalizing it back.
     """
     _seed_catalog()
     core_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="storage-medium")
-    choice = CustomFieldChoice.objects.get(choice_set=core_set, key="nvme_ssd")
-    CustomFieldChoice.objects.filter(pk=choice.pk).update(lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE)
+    residue = CustomFieldChoice.objects.create(
+        choice_set=core_set,
+        key="nvme_ssd",
+        label="Edited residue",
+        position=31,
+        lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
+    )
 
     _seed_catalog()
 
-    choice.refresh_from_db()
-    assert choice.lifecycle == CustomFieldChoice.LIFECYCLE_DEPRECATED
+    residue.refresh_from_db()
+    assert residue.label == "Edited residue"
+    assert residue.lifecycle == CustomFieldChoice.LIFECYCLE_ACTIVE
 
 
 def test_runtime_seed_refuses_local_fieldset_membership_collision():

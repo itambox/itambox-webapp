@@ -46,9 +46,19 @@ def _get_core_choice_set(slug, label):
     )
 
 
+# Migration 0117 planted these choice identities on every database and
+# definition identities can never be deleted ("deprecate the row instead").
+# The runtime vocabulary is already clean; the reconciled core choice sets
+# tolerate the residue untouched until the session-3 migration normalization
+# removes it. Migration history may still be dirty — runtime truth is not.
+_MIGRATED_0117_CHOICE_RESIDUES = {("storage-medium", "nvme_ssd")}
+
+
 def _validate_core_choice_row(choice, slug, desired_choices):
     desired = desired_choices.get(choice.key)
     if desired is None:
+        if (slug, choice.key) in _MIGRATED_0117_CHOICE_RESIDUES:
+            return
         raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
     if (
         desired["lifecycle"] == CustomFieldChoice.LIFECYCLE_ACTIVE
