@@ -46,9 +46,19 @@ def _get_core_choice_set(slug, label):
     )
 
 
+# Migration 0117 planted these choice identities on every database and
+# definition identities can never be deleted ("deprecate the row instead").
+# The runtime vocabulary is already clean; the reconciled core choice sets
+# tolerate the residue untouched until the session-3 migration normalization
+# removes it. Migration history may still be dirty — runtime truth is not.
+_MIGRATED_0117_CHOICE_RESIDUES = {("storage-medium", "nvme_ssd")}
+
+
 def _validate_core_choice_row(choice, slug, desired_choices):
     desired = desired_choices.get(choice.key)
     if desired is None:
+        if (slug, choice.key) in _MIGRATED_0117_CHOICE_RESIDUES:
+            return
         raise ValueError(f"Core Choice identity is unexpected: itambox/{slug}#{choice.key}")
     if (
         desired["lifecycle"] == CustomFieldChoice.LIFECYCLE_ACTIVE
@@ -288,14 +298,25 @@ def _reconcile_core_fieldsets(section_rows, custom_fields, version):
     return fieldsets
 
 
-def _seed_core_category_defaults(category_rows, categories, fieldsets):
+def _seed_category_defaults(category_rows, categories, fieldsets, *, preserve_matching_existing=False):
     for category_row in category_rows:
         category = categories[category_row["slug"]]
-        existing_memberships = list(category.default_fieldset_memberships.select_related("fieldset"))
+        existing_memberships = list(
+            category.default_fieldset_memberships.select_related("fieldset").order_by("position")
+        )
         if any(
             membership.fieldset.management_kind != CustomFieldset.MANAGEMENT_CORE for membership in existing_memberships
         ):
             raise ValueError(f"Core category default ownership collision: {category_row['slug']}")
+        if preserve_matching_existing and existing_memberships:
+            expected_memberships = [
+                (fieldsets[item["fieldset"].rsplit("/", 1)[1]].pk, item["position"])
+                for item in category_row["default_fieldsets"]
+            ]
+            actual_memberships = [(membership.fieldset_id, membership.position) for membership in existing_memberships]
+            if actual_memberships != expected_memberships:
+                raise ValueError(f"Local demo category default composition collision: {category_row['slug']}")
+            continue
         category.default_fieldset_memberships.all().delete()
         CategoryDefaultFieldset.objects.bulk_create(
             [
@@ -309,6 +330,13 @@ def _seed_core_category_defaults(category_rows, categories, fieldsets):
         )
 
 
+def _demo_category_defaults(category):
+    defaults = list(category.default_fieldset_memberships.select_related("fieldset").order_by("position"))
+    if not defaults:
+        raise ValueError(f"Demo Asset Type category has no default fieldsets: {category.slug}")
+    return defaults
+
+
 def _demo_operating_system_family(atype_slug):
     if "macbook" in atype_slug or "mac-studio" in atype_slug:
         return "macos"
@@ -320,38 +348,13 @@ def _demo_operating_system_family(atype_slug):
         return "android"
     if atype_slug == "synology-ds1823xs":
         return "embedded"
+    if atype_slug == "logitech-rally-bar":
+        return "embedded"
     if atype_slug in ("dell-poweredge-r760", "hpe-proliant-dl380-g11"):
         return "linux"
     if atype_slug in ("cisco-catalyst-9300", "unifi-switch-pro-48", "meraki-mr46", "unifi-dream-machine-pro"):
         return "network_os"
     return "windows"
-
-
-def _translate_legacy_demo_specs(raw_specs):
-    specs = {}
-    if raw_specs.get("cpu"):
-        specs["processor_model"] = raw_specs["cpu"]
-    if "ram_gb" in raw_specs:
-        specs["memory_capacity"] = f"{float(raw_specs['ram_gb']):.3f}"
-    if "storage_gb" in raw_specs:
-        specs["storage_capacity"] = f"{float(raw_specs['storage_gb']):.3f}"
-    if "storage_type" in raw_specs:
-        specs["storage_medium"] = {
-            "NVMe": "nvme_ssd",
-            "SSD": "ssd",
-            "HDD": "hdd",
-            "SSD RAID": "ssd",
-            "SATA SSD": "ssd",
-        }.get(raw_specs["storage_type"], "other")
-    if "screen_size" in raw_specs:
-        specs["display_size"] = f"{float(raw_specs['screen_size']):.2f}"
-    if "port_count" in raw_specs:
-        specs["ethernet_port_count"] = int(raw_specs["port_count"])
-    if "poe_port_count" in raw_specs:
-        specs["poe_port_count"] = int(raw_specs["poe_port_count"])
-    if "poe_budget_w" in raw_specs:
-        specs["poe_budget"] = f"{float(raw_specs['poe_budget_w']):.3f}"
-    return specs
 
 
 def _add_default_demo_specs(specs, atype_slug, category_slug):
@@ -362,9 +365,11 @@ def _add_default_demo_specs(specs, atype_slug, category_slug):
             "desktops": "desktop",
             "servers": "rack",
             "storage-devices": "appliance",
+            "switches": "appliance",
+            "routers": "appliance",
+            "access-points": "appliance",
             "mobile-phones": "phone",
             "tablets": "tablet",
-            "network-devices": "appliance",
             "monitors": "peripheral",
             "conference-systems": "appliance",
         }.get(category_slug, "other"),
@@ -381,32 +386,39 @@ def _add_default_demo_specs(specs, atype_slug, category_slug):
         specs.setdefault("ethernet_port_count", 0)
         specs.setdefault("ethernet_speeds", [])
         specs.setdefault("usb_port_count", 1)
-    elif category_slug == "network-devices":
-        specs.setdefault("ethernet_speeds", ["10g", "1g"])
+    elif category_slug in {"switches", "routers", "access-points"}:
+        specs.setdefault("ethernet_speeds", ["1g"] if atype_slug == "meraki-mr46" else ["10g", "1g"])
         specs.setdefault("usb_port_count", 1)
         specs.setdefault(
             "network_functions",
             {
+                "cisco-catalyst-9300": ["switch"],
+                "unifi-switch-pro-48": ["switch"],
                 "meraki-mr46": ["wlan_ap"],
                 "unifi-dream-machine-pro": ["firewall", "router"],
-            }.get(atype_slug, ["switch"] if "switch" in atype_slug else ["gateway"]),
+            }[atype_slug],
         )
-    if "wifi_standards" not in specs and category_slug in {"laptops", "desktops", "mobile-phones", "tablets"}:
+        if atype_slug == "meraki-mr46":
+            specs.setdefault("ethernet_port_count", 1)
+            specs.setdefault("wifi_standards", ["802_11ac", "802_11ax"])
+    if "wifi_standards" not in specs and category_slug in {
+        "laptops",
+        "desktops",
+        "mobile-phones",
+        "tablets",
+    }:
         specs["wifi_standards"] = ["802_11ac", "802_11ax"]
     if "management_protocols" not in specs and category_slug in {
         "laptops",
         "desktops",
         "servers",
         "storage-devices",
-        "network-devices",
+        "switches",
+        "routers",
+        "access-points",
     }:
         specs["management_protocols"] = sorted(["https", "ssh"])
     return specs
-
-
-def _canonical_demo_specs(raw_specs, atype_slug, category_slug):
-    specs = _translate_legacy_demo_specs(raw_specs)
-    return _add_default_demo_specs(specs, atype_slug, category_slug)
 
 
 class SeedCatalogMixin:
@@ -620,53 +632,10 @@ class SeedCatalogMixin:
         )
         self._fieldsets = _reconcile_core_fieldsets(vocabulary["sections"], self._custom_fields, library_release)
 
-        # Keep these handles for the existing asset-type data table while the
-        # actual composition below is driven by the category release rows.
-        self._fs_laptop = self._fieldsets["compute-memory"]
-        self._fs_mobile = self._fieldsets["compute-memory"]
-        self._fs_server = self._fieldsets["compute-memory"]
-        self._fs_switch = self._fieldsets["network-function"]
-        self._fs_av = self._fieldsets["display-av-imaging"]
-
         canonical_category_rows = vocabulary["categories"]
-        self._category_fieldsets = {
-            row["slug"]: [item["fieldset"].rsplit("/", 1)[1] for item in row["default_fieldsets"]]
-            for row in canonical_category_rows
-        }
-        self._category_fieldsets.update(
-            {
-                "network-devices": [
-                    "product-physical",
-                    "connectivity-io",
-                    "network-function",
-                    "power-battery",
-                    "management-security",
-                    "environmental-ruggedization",
-                    "compliance-sustainability",
-                ],
-                "storage-devices": [
-                    "product-physical",
-                    "compute-memory",
-                    "storage",
-                    "connectivity-io",
-                    "power-battery",
-                    "management-security",
-                    "compliance-sustainability",
-                ],
-                "conference-systems": [
-                    "product-physical",
-                    "connectivity-io",
-                    "power-battery",
-                    "display-av-imaging",
-                    "management-security",
-                    "compliance-sustainability",
-                ],
-            }
-        )
 
-        # Existing generic/local catalog categories retain their historical
-        # names, colours, and applicability. Canonical starter rows below own
-        # only their overlapping identity and release metadata.
+        # Local catalog categories remain available to users. Seeded network
+        # models use the specific starter categories instead of network-devices.
         self._categories = {}
         category_defs = [
             ("laptops", "4263eb"),
@@ -727,9 +696,55 @@ class SeedCatalogMixin:
                 obj.save(update_fields=["name", "description", "applies_to"])
             self._categories[category_row["slug"]] = obj
 
-        _seed_core_category_defaults(canonical_category_rows, self._categories, self._fieldsets)
+        _seed_category_defaults(canonical_category_rows, self._categories, self._fieldsets)
 
-        # Asset types: (model, slug, mfr, part_number, eol_months, fieldset, depreciation, category, role, specs)
+        # The starter taxonomy has no NAS or conference AV categories, so those
+        # two demo examples keep explicit local categories and compositions.
+        local_demo_category_rows = [
+            {
+                "slug": "storage-devices",
+                "default_fieldsets": [
+                    {"fieldset": f"itambox/{slug}", "position": 10 * order}
+                    for order, slug in enumerate(
+                        (
+                            "product-physical",
+                            "compute-memory",
+                            "storage",
+                            "connectivity-io",
+                            "power-battery",
+                            "management-security",
+                            "compliance-sustainability",
+                        ),
+                        start=1,
+                    )
+                ],
+            },
+            {
+                "slug": "conference-systems",
+                "default_fieldsets": [
+                    {"fieldset": f"itambox/{slug}", "position": 10 * order}
+                    for order, slug in enumerate(
+                        (
+                            "product-physical",
+                            "connectivity-io",
+                            "power-battery",
+                            "display-av-imaging",
+                            "management-security",
+                            "compliance-sustainability",
+                        ),
+                        start=1,
+                    )
+                ],
+            },
+        ]
+        _seed_category_defaults(
+            local_demo_category_rows,
+            self._categories,
+            self._fieldsets,
+            preserve_matching_existing=True,
+        )
+
+        # Asset types: (model, slug, manufacturer, part, eol, depreciation, category, role, specifications)
         at_data = [
             (
                 "Latitude 5550",
@@ -737,16 +752,15 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "LAT5550-2025",
                 36,
-                self._fs_laptop,
                 "3-Year Straight-Line",
                 "laptops",
                 "standard-workstation",
                 {
-                    "cpu": "Intel Core i7-1365U",
-                    "ram_gb": 16,
-                    "storage_gb": 512,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "x86_64",
+                    "processor_model": "Intel Core i7-1365U",
+                    "memory_capacity": "16.000",
+                    "storage_capacity": "512.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -755,16 +769,15 @@ class SeedCatalogMixin:
                 "hp-inc",
                 "866S7EA",
                 36,
-                self._fs_laptop,
                 "3-Year Straight-Line",
                 "laptops",
                 "standard-workstation",
                 {
-                    "cpu": "Intel Core i7-1370P",
-                    "ram_gb": 32,
-                    "storage_gb": 1024,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "x86_64",
+                    "processor_model": "Intel Core i7-1370P",
+                    "memory_capacity": "32.000",
+                    "storage_capacity": "1024.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -773,16 +786,15 @@ class SeedCatalogMixin:
                 "lenovo-group",
                 "21KC004PGE",
                 36,
-                self._fs_laptop,
                 "3-Year Straight-Line",
                 "laptops",
                 "developer-workstation",
                 {
-                    "cpu": "Intel Core i7-1365U",
-                    "ram_gb": 32,
-                    "storage_gb": 1024,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "x86_64",
+                    "processor_model": "Intel Core i7-1365U",
+                    "memory_capacity": "32.000",
+                    "storage_capacity": "1024.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -791,16 +803,15 @@ class SeedCatalogMixin:
                 "apple-inc",
                 "MBP16-M4",
                 36,
-                self._fs_laptop,
                 "3-Year Straight-Line",
                 "laptops",
                 "developer-workstation",
                 {
-                    "cpu": "Apple M4 Pro",
-                    "ram_gb": 36,
-                    "storage_gb": 1024,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "ARM64",
+                    "processor_model": "Apple M4 Pro",
+                    "memory_capacity": "36.000",
+                    "storage_capacity": "1024.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -809,16 +820,15 @@ class SeedCatalogMixin:
                 "apple-inc",
                 "MBA15-M3",
                 36,
-                self._fs_laptop,
                 "3-Year Straight-Line",
                 "laptops",
                 "standard-workstation",
                 {
-                    "cpu": "Apple M3",
-                    "ram_gb": 16,
-                    "storage_gb": 512,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "ARM64",
+                    "processor_model": "Apple M3",
+                    "memory_capacity": "16.000",
+                    "storage_capacity": "512.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -827,17 +837,15 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "PREC5680-WS",
                 48,
-                self._fs_laptop,
                 "4-Year Straight-Line",
                 "laptops",
                 "developer-workstation",
                 {
-                    "cpu": "Intel Core i9-13900H",
-                    "ram_gb": 64,
-                    "storage_gb": 2048,
-                    "storage_type": "NVMe",
-                    "gpu": "NVIDIA RTX 3000 Ada",
-                    "cpu_architecture": "x86_64",
+                    "processor_model": "Intel Core i9-13900H",
+                    "memory_capacity": "64.000",
+                    "storage_capacity": "2048.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -846,16 +854,15 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "OPT7010-SFF",
                 48,
-                self._fs_laptop,
                 "4-Year Straight-Line",
                 "desktops",
                 "standard-workstation",
                 {
-                    "cpu": "Intel Core i5-13500",
-                    "ram_gb": 16,
-                    "storage_gb": 512,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "x86_64",
+                    "processor_model": "Intel Core i5-13500",
+                    "memory_capacity": "16.000",
+                    "storage_capacity": "512.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -864,16 +871,15 @@ class SeedCatalogMixin:
                 "apple-inc",
                 "MSTUDIO-M2U",
                 60,
-                self._fs_laptop,
                 "5-Year Straight-Line",
                 "desktops",
                 "cad-design-workstation",
                 {
-                    "cpu": "Apple M2 Ultra",
-                    "ram_gb": 64,
-                    "storage_gb": 1024,
-                    "storage_type": "NVMe",
-                    "cpu_architecture": "ARM64",
+                    "processor_model": "Apple M2 Ultra",
+                    "memory_capacity": "64.000",
+                    "storage_capacity": "1024.000",
+                    "storage_medium": "ssd",
+                    "storage_interface": "nvme",
                 },
             ),
             (
@@ -882,17 +888,14 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "PREC7960-TWR",
                 60,
-                self._fs_laptop,
                 "5-Year Straight-Line",
                 "desktops",
                 "cad-design-workstation",
                 {
-                    "cpu": "Intel Xeon w7-3465X",
-                    "ram_gb": 128,
-                    "storage_gb": 4096,
-                    "storage_type": "SSD RAID",
-                    "gpu": "NVIDIA RTX 6000 Ada",
-                    "cpu_architecture": "x86_64",
+                    "processor_model": "Intel Xeon w7-3465X",
+                    "memory_capacity": "128.000",
+                    "storage_capacity": "4096.000",
+                    "storage_medium": "ssd",
                 },
             ),
             (
@@ -901,11 +904,15 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "R760-XEON",
                 60,
-                self._fs_server,
                 "5-Year Straight-Line",
                 "servers",
                 "virtualization-host-server",
-                {"cpu": "2x Intel Xeon Gold 6430", "ram_gb": 256, "storage_gb": 8000, "storage_type": "SSD RAID"},
+                {
+                    "processor_model": "2x Intel Xeon Gold 6430",
+                    "memory_capacity": "256.000",
+                    "storage_capacity": "8000.000",
+                    "storage_medium": "ssd",
+                },
             ),
             (
                 "ProLiant DL380 Gen11",
@@ -913,11 +920,15 @@ class SeedCatalogMixin:
                 "hp-inc",
                 "P52534-B21",
                 60,
-                self._fs_server,
                 "5-Year Straight-Line",
                 "servers",
                 "application-server",
-                {"cpu": "2x Intel Xeon Silver 4416+", "ram_gb": 128, "storage_gb": 4000, "storage_type": "SSD RAID"},
+                {
+                    "processor_model": "2x Intel Xeon Silver 4416+",
+                    "memory_capacity": "128.000",
+                    "storage_capacity": "4000.000",
+                    "storage_medium": "ssd",
+                },
             ),
             (
                 "DiskStation DS1823xs+",
@@ -925,11 +936,16 @@ class SeedCatalogMixin:
                 "synology-inc",
                 "DS1823XS+",
                 60,
-                self._fs_server,
                 "5-Year Straight-Line",
                 "storage-devices",
                 "backup-server",
-                {"cpu": "AMD Ryzen V1780B", "ram_gb": 32, "storage_gb": 64000, "storage_type": "HDD"},
+                {
+                    "processor_model": "AMD Ryzen V1780B",
+                    "memory_capacity": "32.000",
+                    "memory_type": "ddr4",
+                    "storage_capacity": "64000.000",
+                    "storage_medium": "hdd",
+                },
             ),
             (
                 "iPhone 15 Pro",
@@ -937,11 +953,15 @@ class SeedCatalogMixin:
                 "apple-inc",
                 "A2847",
                 24,
-                self._fs_mobile,
                 "3-Year Straight-Line",
                 "mobile-phones",
                 "corporate-smartphone",
-                {"cpu": "Apple A17 Pro", "ram_gb": 8, "storage_gb": 256, "screen_size": 6.1},
+                {
+                    "processor_model": "Apple A17 Pro",
+                    "memory_capacity": "8.000",
+                    "storage_capacity": "256.000",
+                    "display_size": "6.10",
+                },
             ),
             (
                 "Galaxy S24 Ultra",
@@ -949,11 +969,15 @@ class SeedCatalogMixin:
                 "samsung-electronics",
                 "SM-S928B",
                 24,
-                self._fs_mobile,
                 "3-Year Straight-Line",
                 "mobile-phones",
                 "corporate-smartphone",
-                {"cpu": "Snapdragon 8 Gen 3", "ram_gb": 12, "storage_gb": 256, "screen_size": 6.8},
+                {
+                    "processor_model": "Snapdragon 8 Gen 3",
+                    "memory_capacity": "12.000",
+                    "storage_capacity": "256.000",
+                    "display_size": "6.80",
+                },
             ),
             (
                 'iPad Pro 12.9"',
@@ -961,11 +985,15 @@ class SeedCatalogMixin:
                 "apple-inc",
                 "A2436",
                 36,
-                self._fs_mobile,
                 "3-Year Straight-Line",
                 "tablets",
                 "field-tablet",
-                {"cpu": "Apple M4", "ram_gb": 8, "storage_gb": 256, "screen_size": 12.9},
+                {
+                    "processor_model": "Apple M4",
+                    "memory_capacity": "8.000",
+                    "storage_capacity": "256.000",
+                    "display_size": "12.90",
+                },
             ),
             (
                 "Surface Pro 10",
@@ -973,11 +1001,15 @@ class SeedCatalogMixin:
                 "microsoft-corporation",
                 "SURFPRO10-I7",
                 36,
-                self._fs_mobile,
                 "3-Year Straight-Line",
                 "tablets",
                 "field-tablet",
-                {"cpu": "Intel Core i7-1365U", "ram_gb": 16, "storage_gb": 512, "screen_size": 13.0},
+                {
+                    "processor_model": "Intel Core i7-1365U",
+                    "memory_capacity": "16.000",
+                    "storage_capacity": "512.000",
+                    "display_size": "13.00",
+                },
             ),
             (
                 "Catalyst 9300",
@@ -985,11 +1017,10 @@ class SeedCatalogMixin:
                 "cisco-systems",
                 "C9300-48P",
                 84,
-                self._fs_switch,
                 "7-Year Straight-Line",
-                "network-devices",
+                "switches",
                 "access-switch",
-                {"port_count": 48, "poe_budget_w": 740},
+                {"ethernet_port_count": 48, "poe_budget": "740.000"},
             ),
             (
                 "UniFi Switch Pro 48 PoE",
@@ -997,11 +1028,10 @@ class SeedCatalogMixin:
                 "ubiquiti-inc",
                 "USW-PRO-48-POE",
                 60,
-                self._fs_switch,
                 "5-Year Straight-Line",
-                "network-devices",
+                "switches",
                 "access-switch",
-                {"port_count": 48, "poe_budget_w": 600},
+                {"ethernet_port_count": 48, "poe_budget": "600.000"},
             ),
             (
                 "Meraki MR46",
@@ -1009,9 +1039,8 @@ class SeedCatalogMixin:
                 "cisco-systems",
                 "MR46-HW",
                 60,
-                None,
                 "5-Year Straight-Line",
-                "network-devices",
+                "access-points",
                 "wireless-ap",
                 {},
             ),
@@ -1021,11 +1050,10 @@ class SeedCatalogMixin:
                 "ubiquiti-inc",
                 "UDM-Pro",
                 60,
-                self._fs_switch,
                 "5-Year Straight-Line",
-                "network-devices",
+                "routers",
                 "core-router-firewall",
-                {"port_count": 8, "poe_budget_w": 0},
+                {"ethernet_port_count": 8, "poe_budget": "0.000"},
             ),
             (
                 'Dell P2723DE 27" Monitor',
@@ -1033,7 +1061,6 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "P2723DE",
                 60,
-                None,
                 "5-Year Straight-Line",
                 "monitors",
                 "desktop-monitor",
@@ -1045,7 +1072,6 @@ class SeedCatalogMixin:
                 "dell-technologies",
                 "P2422HE",
                 60,
-                None,
                 "5-Year Straight-Line",
                 "monitors",
                 "desktop-monitor",
@@ -1057,17 +1083,16 @@ class SeedCatalogMixin:
                 "logitech-international",
                 "960-001308",
                 60,
-                self._fs_av,
                 "5-Year Straight-Line",
                 "conference-systems",
                 "conference-av",
-                {"screen_size": 0},
+                {},
             ),
         ]
 
         self._asset_types = {}
-        for model_name, slug, mfr, part, eol, _legacy_fs, dep, cat, role, raw_specs in at_data:
-            specs = _canonical_demo_specs(raw_specs, slug, cat)
+        for model_name, slug, mfr, part, eol, dep, cat, role, specifications in at_data:
+            specs = _add_default_demo_specs(dict(specifications), slug, cat)
             obj, _ = AssetType.objects.get_or_create(
                 slug=slug,
                 defaults={
@@ -1078,7 +1103,7 @@ class SeedCatalogMixin:
                     "depreciation": self._depreciations[dep],
                     "category": self._categories[cat],
                     "asset_role": self._asset_roles[role],
-                    "custom_field_data": specs,
+                    "custom_field_data": {},
                     "management_kind": AssetType.MANAGEMENT_LOCAL,
                     "region": "",
                     "configuration": "",
@@ -1086,23 +1111,44 @@ class SeedCatalogMixin:
                     "library_definition_key": None,
                 },
             )
-            # Update the JSON payload without invoking dynamic value validation;
-            # the catalogue release may retain historical deprecated values.
-            AssetType.objects.filter(pk=obj.pk).update(custom_field_data=specs)
-            obj.custom_field_data = specs
+            obj.model = model_name
+            obj.manufacturer = self._manufacturers[mfr]
+            obj.part_number = part
+            obj.eol_months = eol
+            obj.depreciation = self._depreciations[dep]
+            obj.category = self._categories[cat]
+            obj.asset_role = self._asset_roles[role]
             obj.management_kind = AssetType.MANAGEMENT_LOCAL
             obj.region = ""
             obj.configuration = ""
             obj.library = None
             obj.library_definition_key = None
-            obj.save(update_fields=["management_kind", "region", "configuration", "library", "library_definition_key"])
-            obj.fieldset_memberships.all().delete()
-            AssetTypeFieldset.objects.bulk_create(
-                [
-                    AssetTypeFieldset(asset_type=obj, fieldset=self._fieldsets[fieldset_slug], position=index)
-                    for index, fieldset_slug in enumerate(self._category_fieldsets[cat], start=1)
+            obj.save(
+                update_fields=[
+                    "model",
+                    "manufacturer",
+                    "part_number",
+                    "eol_months",
+                    "depreciation",
+                    "category",
+                    "asset_role",
+                    "management_kind",
+                    "region",
+                    "configuration",
+                    "library",
+                    "library_definition_key",
                 ]
             )
+            obj.fieldset_memberships.all().delete()
+            category_defaults = _demo_category_defaults(self._categories[cat])
+            AssetTypeFieldset.objects.bulk_create(
+                [
+                    AssetTypeFieldset(asset_type=obj, fieldset=membership.fieldset, position=membership.position)
+                    for membership in category_defaults
+                ]
+            )
+            obj.custom_field_data = specs
+            obj.save(update_fields=["custom_field_data"])
             self._asset_types[slug] = obj
 
         # Components

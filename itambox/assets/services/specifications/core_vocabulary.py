@@ -10,10 +10,10 @@ from copy import deepcopy
 _CORE_VOCABULARY: dict[str, object] = {
     "schema_version": 1,
     "kind": "itambox.type-library.release",  # noqa: E128
-    "library": {"namespace": "itambox", "release": 1, "label": "ITAMbox core vocabulary v1 (proposed)"},  # noqa: E128
+    "library": {"namespace": "itambox", "release": 1, "label": "ITAMbox Core Vocabulary v1"},  # noqa: E128
     "expected_counts": {
         "active_fields": 54,
-        "reserved_retired_fields": 1,
+        "reserved_retired_fields": 0,
         "sections": 13,
         "choice_sets": 14,
         "categories": 13,
@@ -1019,27 +1019,7 @@ _CORE_VOCABULARY: dict[str, object] = {
             "memberships": [{"section": "itambox/compliance-sustainability", "order": 4, "position": 40}],
         },
     ],
-    "reserved_retired_fields": [
-        {
-            "identity": "itambox/input_voltage",
-            "namespace": "itambox",
-            "key": "input_voltage",
-            "label": "Input voltage (retired)",
-            "help_text": "Reserved tombstone for the foundation scalar. Do not infer an operating "
-            "range from this value.",
-            "targets": ["asset_type"],
-            "activation": "composed",
-            "field_type": "decimal",
-            "quantity_kind": "voltage",
-            "canonical_unit": "V",
-            "validation": {"minimum": "0.000", "maximum": "1000000.000", "scale": 3},
-            "required": False,
-            "nullable": False,
-            "lifecycle": "deprecated",
-            "choice_set": None,
-            "memberships": [],
-        }
-    ],
+    "reserved_retired_fields": [],
     "sections": [
         {
             "identity": "itambox/product-physical",
@@ -1294,18 +1274,11 @@ _CORE_VOCABULARY: dict[str, object] = {
             "choices": [
                 {"key": "hdd", "label": "Hard disk drive", "lifecycle": "active", "order": 1, "position": 10},
                 {"key": "ssd", "label": "Solid-state drive", "lifecycle": "active", "order": 2, "position": 20},
-                {
-                    "key": "nvme_ssd",
-                    "label": "NVMe solid-state drive",
-                    "lifecycle": "deprecated",
-                    "order": 3,
-                    "position": 30,
-                },
-                {"key": "flash", "label": "Embedded flash", "lifecycle": "active", "order": 4, "position": 40},
-                {"key": "optical", "label": "Optical", "lifecycle": "active", "order": 5, "position": 50},
-                {"key": "tape", "label": "Tape", "lifecycle": "active", "order": 6, "position": 60},
-                {"key": "hybrid", "label": "Hybrid", "lifecycle": "active", "order": 7, "position": 70},
-                {"key": "other", "label": "Other", "lifecycle": "active", "order": 8, "position": 80},
+                {"key": "flash", "label": "Embedded flash", "lifecycle": "active", "order": 3, "position": 30},
+                {"key": "optical", "label": "Optical", "lifecycle": "active", "order": 4, "position": 40},
+                {"key": "tape", "label": "Tape", "lifecycle": "active", "order": 5, "position": 50},
+                {"key": "hybrid", "label": "Hybrid", "lifecycle": "active", "order": 6, "position": 60},
+                {"key": "other", "label": "Other", "lifecycle": "active", "order": 7, "position": 70},
             ],
         },
         {

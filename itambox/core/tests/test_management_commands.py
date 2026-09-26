@@ -130,10 +130,11 @@ class ManagementCommandsTestCase(TransactionTestCase):
                 self.assertEqual(field.max_values, 1)
         asset_type = AssetType.objects.get(slug="dell-latitude-5550")
         self.assertFalse(hasattr(asset_type, "custom_fieldset"))
+        self.assertNotIn("custom_fieldset", {field.name for field in AssetType._meta.get_fields()})
         self.assertGreater(asset_type.fieldset_memberships.count(), 1)
-        expected_asset_type_fieldsets = [
-            (slug, index) for index, slug in enumerate(command._category_fieldsets["laptops"], start=1)
-        ]
+        expected_asset_type_fieldsets = list(
+            asset_type.category.default_fieldset_memberships.values_list("fieldset__slug", "position")
+        )
         self.assertEqual(
             list(asset_type.fieldset_memberships.values_list("fieldset__slug", "position")),
             expected_asset_type_fieldsets,
@@ -154,7 +155,22 @@ class ManagementCommandsTestCase(TransactionTestCase):
         resolved_keys = {item.definition.name for item in resolve_asset_type_custom_fields(asset_type)}
         self.assertTrue(stored_keys)
         self.assertTrue(stored_keys.issubset(resolved_keys))
-        self.assertFalse(stored_keys & {"cpu", "ram_gb", "storage_gb", "storage_type", "os_version"})
+        self.assertFalse(
+            stored_keys
+            & {
+                "cpu",
+                "ram_gb",
+                "storage_gb",
+                "storage_type",
+                "screen_size",
+                "port_count",
+                "poe_budget_w",
+                "input_voltage",
+                "os_version",
+                "gpu",
+                "cpu_architecture",
+            }
+        )
 
     def test_seed_catalog_validates_field_before_reconciling_object_types(self):
 

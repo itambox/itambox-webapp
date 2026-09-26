@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import io
 import json
+import textwrap
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from django.contrib.contenttypes.models import ContentType
 
-from assets.models import AssetType, Category, CategoryDefaultFieldset, Manufacturer
-from core.management.commands._seed.catalog import _translate_legacy_demo_specs
+from assets.customfields import validate_asset_type_custom_field_data
+from assets.models import Asset, AssetType, Category, CategoryDefaultFieldset, Manufacturer
+from assets.services.specifications.core_vocabulary import get_core_vocabulary
+from core.management.commands._seed import catalog as catalog_seed
+from core.management.commands._seed.catalog import SeedCatalogMixin
 from core.management.commands.seed_data import Command as SeedDataCommand
-from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
+from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -37,21 +44,214 @@ def _seed_catalog():
     return command
 
 
-def test_legacy_demo_translation_preserves_history_without_generic_poe_inference():
-    assert _translate_legacy_demo_specs({"storage_type": "NVMe", "port_count": 48, "poe_budget_w": 740}) == {
-        "storage_medium": "nvme_ssd",
-        "ethernet_port_count": 48,
-        "poe_budget": "740.000",
+def _demo_asset_type_source():
+    source = textwrap.dedent(inspect.getsource(SeedCatalogMixin._seed_catalog))
+    module = ast.parse(source)
+    assignment = next(
+        node
+        for node in ast.walk(module)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "at_data" for target in node.targets)
+    )
+    return source, ast.literal_eval(assignment.value)
+
+
+def test_demo_asset_type_source_uses_only_current_canonical_keys():
+    source, rows = _demo_asset_type_source()
+    vocabulary_keys = {row["key"] for row in get_core_vocabulary()["active_fields"]}
+    retired_or_unsupported_demo_keys = {
+        "cpu",
+        "ram_gb",
+        "storage_gb",
+        "storage_type",
+        "screen_size",
+        "port_count",
+        "poe_budget_w",
+        "input_voltage",
+        "gpu",
+        "cpu_architecture",
     }
-    assert _translate_legacy_demo_specs({"storage_type": "SSD RAID", "port_count": 8, "poe_budget_w": 0}) == {
-        "storage_medium": "ssd",
-        "ethernet_port_count": 8,
-        "poe_budget": "0.000",
+
+    assert len(rows) == 23
+    assert all(len(row) == 9 for row in rows)
+    assert not hasattr(catalog_seed, "_translate_legacy_demo_specs")
+    assert not hasattr(catalog_seed, "_canonical_demo_specs")
+    assert not any(
+        marker in source
+        for marker in (
+            "_legacy_fs",
+            "_fs_laptop",
+            "_fs_mobile",
+            "_fs_server",
+            "_fs_switch",
+            "_fs_av",
+            "_translate_legacy_demo_specs",
+            "_canonical_demo_specs",
+        )
+    )
+    for row in rows:
+        assert not (set(row[-1]) & retired_or_unsupported_demo_keys), row[1]
+        assert set(row[-1]) <= vocabulary_keys, row[1]
+        assert "nvme_ssd" not in row[-1].values(), row[1]
+        if row[-1].get("storage_interface") == "nvme":
+            assert row[-1].get("storage_medium") == "ssd", row[1]
+
+    categories = {row[1]: row[6] for row in rows}
+    assert categories["cisco-catalyst-9300"] == "switches"
+    assert categories["unifi-switch-pro-48"] == "switches"
+    assert categories["meraki-mr46"] == "access-points"
+    assert categories["unifi-dream-machine-pro"] == "routers"
+    assert categories["synology-ds1823xs"] == "storage-devices"
+    assert categories["logitech-rally-bar"] == "conference-systems"
+
+
+def test_seeded_asset_type_values_validate_against_deterministic_category_defaults():
+    command = _seed_catalog()
+    active_keys = {row["key"] for row in get_core_vocabulary()["active_fields"]}
+
+    for asset_type in command._asset_types.values():
+        category_defaults = list(
+            asset_type.category.default_fieldset_memberships.values_list("fieldset__slug", "position")
+        )
+        type_fieldsets = list(asset_type.fieldset_memberships.values_list("fieldset__slug", "position"))
+
+        assert type_fieldsets == category_defaults, asset_type.slug
+        assert set(asset_type.custom_field_data) <= active_keys, asset_type.slug
+        assert "input_voltage" not in asset_type.custom_field_data, asset_type.slug
+        assert asset_type.custom_field_data.get("storage_medium") != "nvme_ssd", asset_type.slug
+        validate_asset_type_custom_field_data(asset_type)
+
+
+def _create_migrated_input_voltage_field():
+    field, _ = CustomField.objects.get_or_create(
+        namespace="itambox",
+        management_kind=CustomField.MANAGEMENT_CORE,
+        name="input_voltage",
+        defaults={
+            "label": "Input voltage (retired)",
+            "help_text": "Historical scalar voltage field.",
+            "field_type": CustomField.FIELD_TYPE_DECIMAL,
+            "activation": CustomField.ACTIVATION_COMPOSED,
+            "quantity_kind": "voltage",
+            "canonical_unit": "V",
+            "minimum_value": 0,
+            "maximum_value": 1_000_000,
+            "decimal_scale": 3,
+            "lifecycle": CustomField.LIFECYCLE_DEPRECATED,
+        },
+    )
+    return field
+
+
+def test_runtime_seed_tolerates_migrated_retired_field_tombstone():
+    """A database still carrying the 0117 retired-voltage tombstone seeds cleanly.
+
+    The final vocabulary drops the scalar voltage identity from the runtime contract,
+    but migration 0117 planted a deprecated ``itambox``-core row on every database.
+    Definition identities are retired, never deleted, and the destructive Session 3
+    migration normalization owns the tombstone's removal, so the seed must neither
+    crash on the residue nor manage it: the row stays deprecated and nothing
+    re-enters the runtime vocabulary.
+    """
+    stale_field = _create_migrated_input_voltage_field()
+    stale_field.object_types.set(
+        [ContentType.objects.get_for_model(Asset), ContentType.objects.get_for_model(AssetType)]
+    )
+
+    command = _seed_catalog()
+
+    stale_field.refresh_from_db()
+    assert stale_field.lifecycle == CustomField.LIFECYCLE_DEPRECATED
+    assert "itambox/input_voltage" not in command._custom_fields
+    assert all(
+        membership.custom_field.name != "input_voltage"
+        for fieldset in command._fieldsets.values()
+        for membership in fieldset.field_memberships.all()
+    )
+    runtime_keys = {
+        row["key"] for row in get_core_vocabulary()["active_fields"] + get_core_vocabulary()["reserved_retired_fields"]
     }
-    assert _translate_legacy_demo_specs({"port_count": 8, "poe_port_count": 4}) == {
-        "ethernet_port_count": 8,
-        "poe_port_count": 4,
-    }
+    assert "input_voltage" not in runtime_keys
+
+
+def test_runtime_seed_tolerates_migrated_deprecated_choice_residue():
+    """A database still carrying the 0117 residue seeds cleanly without managing it.
+
+    Migration 0117 planted ``storage-medium#nvme_ssd`` as a deprecated choice on
+    every database and the model blocks its deletion on purpose ("deprecate the
+    row instead"). The runtime vocabulary is already clean: the identity is not
+    part of the current contract. The reconcile therefore treats the row as
+    temporary migration history, parks it outside the managed choice sequence,
+    and leaves its identity, label, and lifecycle alone until the session-3
+    migration normalization removes it.
+    """
+    _seed_catalog()
+    core_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="storage-medium")
+    residue = CustomFieldChoice.objects.create(
+        choice_set=core_set,
+        key="nvme_ssd",
+        label="NVMe solid-state drive",
+        position=80,
+        lifecycle=CustomFieldChoice.LIFECYCLE_DEPRECATED,
+    )
+    local_set = CustomFieldChoiceSet.objects.create(
+        namespace="local",
+        slug="storage-medium",
+        label="Local storage medium",
+        management_kind=CustomFieldChoiceSet.MANAGEMENT_LOCAL,
+        version=1,
+        lifecycle=CustomFieldChoiceSet.LIFECYCLE_ACTIVE,
+    )
+    local_choice = CustomFieldChoice.objects.create(
+        choice_set=local_set,
+        key="nvme_ssd",
+        label="Local NVMe SSD",
+        position=10,
+        lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
+    )
+
+    _seed_catalog()
+
+    residue.refresh_from_db()
+    assert residue.lifecycle == CustomFieldChoice.LIFECYCLE_DEPRECATED
+    assert residue.label == "NVMe solid-state drive"
+    assert residue.position >= 900000  # parked, out of the managed choice sequence
+    local_choice.refresh_from_db()
+    assert local_choice.label == "Local NVMe SSD"
+    assert local_choice.lifecycle == CustomFieldChoice.LIFECYCLE_ACTIVE
+    runtime_keys = {choice["key"] for row in get_core_vocabulary()["choice_sets"] for choice in row["choices"]}
+    assert "nvme_ssd" not in runtime_keys
+    managed = list(
+        CustomFieldChoice.objects.filter(choice_set=core_set)
+        .exclude(key="nvme_ssd")
+        .order_by("position")
+        .values_list("key", flat=True)
+    )
+    assert managed == ["hdd", "ssd", "flash", "optical", "tape", "hybrid", "other"]
+
+
+def test_runtime_seed_tolerates_diverged_choice_residue_state():
+    """The residue is never reinterpreted, even when its database state diverged.
+
+    The row belongs to migration history until session 3 owns its removal; the
+    seed tolerates whatever state the database holds instead of failing or
+    normalizing it back.
+    """
+    _seed_catalog()
+    core_set = CustomFieldChoiceSet.objects.get(namespace="itambox", slug="storage-medium")
+    residue = CustomFieldChoice.objects.create(
+        choice_set=core_set,
+        key="nvme_ssd",
+        label="Edited residue",
+        position=31,
+        lifecycle=CustomFieldChoice.LIFECYCLE_ACTIVE,
+    )
+
+    _seed_catalog()
+
+    residue.refresh_from_db()
+    assert residue.label == "Edited residue"
+    assert residue.lifecycle == CustomFieldChoice.LIFECYCLE_ACTIVE
 
 
 def test_runtime_seed_refuses_local_fieldset_membership_collision():
@@ -93,6 +293,23 @@ def test_runtime_seed_refuses_local_category_default_collision():
     assert CategoryDefaultFieldset.objects.filter(pk=membership.pk).exists()
 
 
+def test_runtime_seed_refuses_to_overwrite_existing_local_demo_composition():
+    _seed_catalog()
+    category = Category.objects.get(slug="storage-devices")
+    category.default_fieldset_memberships.all().delete()
+    unexpected_fieldset = CustomFieldset.objects.get(namespace="itambox", slug="compute-memory")
+    membership = CategoryDefaultFieldset.objects.create(
+        category=category,
+        fieldset=unexpected_fieldset,
+        position=10,
+    )
+
+    with pytest.raises(ValueError, match="Local demo category default composition collision: storage-devices"):
+        _seed_catalog()
+
+    assert CategoryDefaultFieldset.objects.filter(pk=membership.pk).exists()
+
+
 def _assert_field_matches(field, expected):
     validation = expected["validation"]
     assert field.namespace == expected["namespace"]
@@ -123,8 +340,11 @@ def _assert_field_matches(field, expected):
 
 def test_runtime_seed_matches_complete_normalized_vocabulary():
     canonical = _load_fixture("canonical-target.json")
+    runtime_vocabulary = get_core_vocabulary()
     _seed_catalog()
 
+    assert runtime_vocabulary["library"]["label"] == canonical["library"]["label"]
+    assert runtime_vocabulary["expected_counts"] == canonical["expected_counts"]
     expected_active = {row["key"]: row for row in canonical["active_fields"]}
     expected_retired = {row["key"]: row for row in canonical["reserved_retired_fields"]}
     expected_fields = {**expected_active, **expected_retired}
@@ -199,6 +419,33 @@ def test_runtime_seed_matches_category_defaults_and_preserves_local_categories()
         assert category.color == expected["color"]
         assert category.applies_to == {target: True for target in expected["applies_to"]}
         assert category.slug not in canonical_slugs
+
+    expected_local_defaults = {
+        "storage-devices": [
+            "product-physical",
+            "compute-memory",
+            "storage",
+            "connectivity-io",
+            "power-battery",
+            "management-security",
+            "compliance-sustainability",
+        ],
+        "conference-systems": [
+            "product-physical",
+            "connectivity-io",
+            "power-battery",
+            "display-av-imaging",
+            "management-security",
+            "compliance-sustainability",
+        ],
+    }
+    for slug, expected_fieldsets in expected_local_defaults.items():
+        category = Category.objects.get(slug=slug)
+        category_defaults = list(category.default_fieldset_memberships.values_list("fieldset__slug", "position"))
+        assert category_defaults == [
+            (fieldset_slug, (index + 1) * 10) for index, fieldset_slug in enumerate(expected_fieldsets)
+        ]
+    assert not AssetType.objects.filter(category__slug="network-devices").exists()
 
 
 def test_runtime_seed_is_idempotent_without_catalogue_duplication_or_type_propagation():

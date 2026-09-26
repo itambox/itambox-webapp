@@ -392,7 +392,9 @@ class SeedAssetsMixin:
                     "operating_system_family": self._os_family_for(atype_slug),
                     "firmware_version": f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}",
                 }
-            elif category_slug == "network-devices":
+            elif category_slug in {"network-devices", "switches", "access-points", "routers"}:
+                # Network gear by canonical starter category; the local demo category
+                # stays supported for users who assign it.
                 cv = {
                     "hostname": f"{host}.net.local",
                     "firmware_version": f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}",
