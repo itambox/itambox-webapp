@@ -25,4 +25,4 @@ An **Asset Type** represents a specific model of hardware manufactured by a vend
 
 Asset Types compose reusable specification **Custom Fieldsets** into an explicit, ordered list of sections (see [Custom Fieldsets](../extras/customfieldset.md)). New types can start from their category's default sections; the composition stays fully editable afterwards.
 
-The composed sections define the specification form of the model: model-level values are stored on the Asset Type and are not copied to its assets. Each asset records its own observed values per specification field, and values that become historical are retained. See [Custom Fields](../usage/custom-fields.md) for composition semantics, empty-versus-omitted behavior, and the API contract.
+The composed sections define the specification form of the model: model-level values are stored on the Asset Type and are not copied to its assets. Each asset records its own observed values per specification field, and values that become historical are retained. See [Custom Fields](../../usage/custom-fields.md) for composition semantics, empty-versus-omitted behavior, and the API contract.
