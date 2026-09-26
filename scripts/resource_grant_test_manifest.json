@@ -1,6 +1,6 @@
 {
   "base_commit": "b27d16f52d17ee4c469bddd5d5bd2a6a0933269b",
-  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest. Issue #499 scope-switcher link/label and bulk mutation-target visibility tests. Issue #500 commercial-vocabulary supplier/provider link and seat-metric tests. Issue #503 blank-asset-tag form acceptance and generated-tag tests. Issue #504 repair/replacement episode grouping and asset timeline tests. Issue #508 commercial-vendor consolidation: supplier scoping and cutover migration tests, supplier scoping regression, RBAC permission-parity, dashboard widget, navigation, report, security-finish, and phase3 task-audit updates for the provider-to-supplier cut; journal tenant-group scoping tests. Issue #506 demo-seed operational-story coherence: the seed self-check and its per-contradiction regression tests in itambox/core/tests/test_management_commands.py.",
+  "provenance": "All Python test modules in the exact base_commit-to-current-PR-head diff. This covers issue #444 generic-presentation architecture removal, the predecessor queue-drain settings regression, issue #445 ownership-cutover characterization and implementation packets, issue #446 domain-boundary implementation tests, issue #465 fail-closed Playwright qualification tests, and the migration-baseline preflight gate. The documented selector is every *.py file under a tests path (itambox/*/tests/test_*.py or scripts/tests/test_*.py) changed by git diff against base_commit, plus matching untracked files, exactly as enforced by itambox/core/tests/test_import_boundaries.py::test_manifest_mandatory_selector_matches_complete_manifest. Issue #499 scope-switcher link/label and bulk mutation-target visibility tests. Issue #500 commercial-vocabulary supplier/provider link and seat-metric tests. Issue #503 blank-asset-tag form acceptance and generated-tag tests. Issue #504 repair/replacement episode grouping and asset timeline tests. Issue #508 commercial-vendor consolidation: supplier scoping and cutover migration tests, supplier scoping regression, RBAC permission-parity, dashboard widget, navigation, report, security-finish, and phase3 task-audit updates for the provider-to-supplier cut; journal tenant-group scoping tests. Issue #506 demo-seed operational-story coherence: the seed self-check and its per-contradiction regression tests in itambox/core/tests/test_management_commands.py. Issue #479 session-1 clean-slate seed and vocabulary cleanup: canonical demo-specification authoring, migration-residue convergence, and category-default membership tests in itambox/core/tests/test_canonical_vocabulary_runtime.py and the specification vocabulary contract test.",
   "changed_tests": [
     "itambox/assets/tests/test_api.py",
     "itambox/assets/tests/test_asset_form_initialization.py",
@@ -11,6 +11,7 @@
     "itambox/assets/tests/test_repair_episode.py",
     "itambox/assets/tests/test_supplier_scoping.py",
     "itambox/assets/tests/test_warranty_vendor_links.py",
+    "itambox/core/tests/test_canonical_vocabulary_runtime.py",
     "itambox/core/tests/test_management_commands.py",
     "itambox/core/tests/test_migration_baseline_preflight.py",
     "itambox/core/tests/test_navigation_tenancy.py",
@@ -43,6 +44,7 @@
     "itambox/subscriptions/tests/test_views.py",
     "scripts/tests/test_documentation_policy.py",
     "scripts/tests/test_migration_audit.py",
+    "scripts/tests/test_specification_vocabulary_contract.py",
     "scripts/tests/test_typing_policy.py"
   ],
   "baseline_tests": [
