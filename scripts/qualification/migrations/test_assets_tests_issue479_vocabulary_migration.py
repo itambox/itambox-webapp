@@ -1,6 +1,18 @@
 """Migration rehearsal from itambox/assets/tests/test_issue479_vocabulary_migration.py — run explicitly:
 
 PYTHONPATH=itambox pytest scripts/qualification/migrations/
+
+This rehearsal validates the **frozen** contract of migration 0117: it compares
+the post-migration vocabulary against ``migrations/fixtures/issue479_0117_vocabulary_target.json``,
+the target exactly as 0117 defines it. Migration history may still be dirty —
+0117 plants the ``input_voltage`` tombstone and the deprecated
+``storage-medium#nvme_ssd`` residue on every database and definition identities
+can never be deleted — until the session-3 migration normalization removes them.
+The **current** runtime contract is pinned separately: ``core_vocabulary.py`` is
+generated from ``scripts/tests/fixtures/specification_vocabulary/canonical-target.json``
+and the two must stay exactly equal (``CurrentRuntimeVocabularyContractTests``
+below; the contract test and the runtime seed tests cover the same split from
+the runtime side).
 """
 
 import inspect
@@ -125,9 +137,15 @@ class CoreVocabularyMigrationTests(TransactionTestCase):
 
     @staticmethod
     def _oracle():
+        """Frozen 0117 migration contract (see the module docstring)."""
         repository_root = Path(__file__).resolve().parents[3]
         oracle_path = (
-            repository_root / "scripts" / "tests" / "fixtures" / "specification_vocabulary" / "canonical-target.json"
+            repository_root
+            / "scripts"
+            / "qualification"
+            / "migrations"
+            / "fixtures"
+            / "issue479_0117_vocabulary_target.json"
         )
         return json.loads(oracle_path.read_text(encoding="utf-8"))
 
@@ -382,6 +400,28 @@ class CoreVocabularyMigrationTests(TransactionTestCase):
         self.assertEqual(poe.lifecycle, "active")
         self.assertTrue(input_voltage.deprecated_at)
         self.assertTrue(nvme.deprecated_at)
+
+
+class CurrentRuntimeVocabularyContractTests(unittest.TestCase):
+    """The live runtime vocabulary must match the current canonical target.
+
+    Deliberately separate from the 0117 rehearsal above: migration history may
+    still be dirty (the 0117 residues survive until the session-3 migration
+    normalization removes them), while the runtime truth must already be clean.
+    ``core_vocabulary.py`` is generated from ``canonical-target.json``, so the
+    two must be exactly equal.
+    """
+
+    def test_runtime_vocabulary_matches_current_canonical_target(self):
+        from assets.services.specifications.core_vocabulary import get_core_vocabulary
+
+        repository_root = Path(__file__).resolve().parents[3]
+        target_path = (
+            repository_root / "scripts" / "tests" / "fixtures" / "specification_vocabulary" / "canonical-target.json"
+        )
+        target = json.loads(target_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(get_core_vocabulary(), target)
 
 
 if __name__ == "__main__":

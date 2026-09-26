@@ -1,0 +1,3684 @@
+{
+  "schema_version": 1,
+  "kind": "itambox.type-library.release",
+  "library": {
+    "namespace": "itambox",
+    "release": 1,
+    "label": "ITAMbox core vocabulary v1 (proposed)"
+  },
+  "expected_counts": {
+    "active_fields": 54,
+    "reserved_retired_fields": 1,
+    "sections": 13,
+    "choice_sets": 14,
+    "categories": 13
+  },
+  "value_write_policy": {
+    "multi_select_storage_order": "lexicographic_key",
+    "presentation_order": "explicit_fieldset_or_choice_position",
+    "choice_value_representation": "immutable_choice_key",
+    "conversion": "none_without_known_source_semantics",
+    "history": "separate_from_value_independent_definition"
+  },
+  "active_fields": [
+    {
+      "identity": "itambox/form_factor",
+      "namespace": "itambox",
+      "key": "form_factor",
+      "label": "Form factor",
+      "help_text": "Physical packaging, not operational role or category.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/form-factor",
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/rack_units",
+      "namespace": "itambox",
+      "key": "rack_units",
+      "label": "Rack height",
+      "help_text": "Nominal vertical rack space consumed by the product.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "length",
+      "canonical_unit": "U",
+      "validation": {
+        "minimum": "0.0",
+        "maximum": "100.0",
+        "scale": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/weight",
+      "namespace": "itambox",
+      "key": "weight",
+      "label": "Product weight",
+      "help_text": "Unpackaged product mass for this configuration, not shipping weight.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "mass",
+      "canonical_unit": "kg",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "100000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ip_rating",
+      "namespace": "itambox",
+      "key": "ip_rating",
+      "label": "Declared IP rating",
+      "help_text": "Manufacturer-declared text code; syntactic validation is not certification verification.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 8,
+        "regex": "^IP[0-6X][0-9X]K?$"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/product-physical",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/processor_model",
+      "namespace": "itambox",
+      "key": "processor_model",
+      "label": "Processor model",
+      "help_text": "Primary processor model; type is shipped configuration, asset is observed configuration. No numbered socket records.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 255
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/core_count",
+      "namespace": "itambox",
+      "key": "core_count",
+      "label": "Physical processor cores",
+      "help_text": "Total physical CPU cores, not threads and not virtual CPUs.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "1048576"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/memory_capacity",
+      "namespace": "itambox",
+      "key": "memory_capacity",
+      "label": "Memory capacity",
+      "help_text": "Total usable installed/configured RAM, binary GiB; Asset Type shipped value and Asset actual value remain independent.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "digital_information",
+      "canonical_unit": "GiB",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "1048576.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "section": "itambox/virtual-compute",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/memory_type",
+      "namespace": "itambox",
+      "key": "memory_type",
+      "label": "Memory technology",
+      "help_text": "Primary RAM technology; do not invent values for an unknown virtual host.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/memory-type",
+      "memberships": [
+        {
+          "section": "itambox/compute-memory",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/vcpu_count",
+      "namespace": "itambox",
+      "key": "vcpu_count",
+      "label": "Virtual CPUs",
+      "help_text": "Allocated virtual processors, never inferred from physical core count.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "1",
+        "maximum": "1048576"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/virtual-compute",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage_capacity",
+      "namespace": "itambox",
+      "key": "storage_capacity",
+      "label": "Local storage capacity",
+      "help_text": "Sum of local block-device nominal capacities before RAID/filesystem overhead. Excludes remote mounted storage and free-space measurements. Explicitly use binary GiB.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "digital_information",
+      "canonical_unit": "GiB",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "1073741824.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage_medium",
+      "namespace": "itambox",
+      "key": "storage_medium",
+      "label": "Primary storage medium",
+      "help_text": "Scalar summary of the principal storage medium; use hybrid for a mixed configuration. NVMe is an interface, not a new medium.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/storage-medium",
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage_interface",
+      "namespace": "itambox",
+      "key": "storage_interface",
+      "label": "Primary storage interface",
+      "help_text": "Interface of the principal storage configuration. Detailed disks/interfaces remain outside specification fields.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/storage-interface",
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/drive_bay_count",
+      "namespace": "itambox",
+      "key": "drive_bay_count",
+      "label": "Drive bays",
+      "help_text": "Total physical drive bays; not a list of installed drives.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/hot_swap_supported",
+      "namespace": "itambox",
+      "key": "hot_swap_supported",
+      "label": "Hot-swap storage supported",
+      "help_text": "Product supports hot-swappable storage; missing is unknown, false is explicitly not supported.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/storage",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ethernet_port_count",
+      "namespace": "itambox",
+      "key": "ethernet_port_count",
+      "label": "Ethernet ports",
+      "help_text": "Total built-in Ethernet data ports; excludes separately installed expansion modules.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ethernet_speeds",
+      "namespace": "itambox",
+      "key": "ethernet_speeds",
+      "label": "Supported Ethernet speeds",
+      "help_text": "Set of supported nominal link rates, not one entry per physical port.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/ethernet-speeds",
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/wifi_standards",
+      "namespace": "itambox",
+      "key": "wifi_standards",
+      "label": "Supported Wi-Fi standards",
+      "help_text": "Product capability, not negotiated connection state.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 8
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/wifi-standards",
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/usb_port_count",
+      "namespace": "itambox",
+      "key": "usb_port_count",
+      "label": "USB ports",
+      "help_text": "Built-in externally accessible USB connectors.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "1024"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/network_functions",
+      "namespace": "itambox",
+      "key": "network_functions",
+      "label": "Network capabilities",
+      "help_text": "Supported product functions; this does not replace the operator-assigned Asset Role.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 10
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/network-functions",
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/switching_capacity",
+      "namespace": "itambox",
+      "key": "switching_capacity",
+      "label": "Rated switching capacity",
+      "help_text": "Manufacturer-rated aggregate switching capacity; not firewall throughput or live traffic.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "data_rate",
+      "canonical_unit": "Gbit/s",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "1000000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/poe_port_count",
+      "namespace": "itambox",
+      "key": "poe_port_count",
+      "label": "PoE output ports",
+      "help_text": "Number of built-in ports capable of sourcing PoE.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/poe_budget",
+      "namespace": "itambox",
+      "key": "poe_budget",
+      "label": "Total PoE output budget",
+      "help_text": "Total available PoE output power for the specified power-supply configuration.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "power",
+      "canonical_unit": "W",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "10000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/network-function",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/input_voltage_min",
+      "namespace": "itambox",
+      "key": "input_voltage_min",
+      "label": "Minimum rated input voltage",
+      "help_text": "Lower bound of supported rated input voltage, RMS for AC equipment.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "voltage",
+      "canonical_unit": "V",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "1000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/input_voltage_max",
+      "namespace": "itambox",
+      "key": "input_voltage_max",
+      "label": "Maximum rated input voltage",
+      "help_text": "Upper bound of supported rated input voltage; must be at least the minimum when both are present.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "voltage",
+      "canonical_unit": "V",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "1000000.000",
+        "scale": 3,
+        "rule": "voltage_max_gte_min"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/power_consumption_max",
+      "namespace": "itambox",
+      "key": "power_consumption_max",
+      "label": "Maximum rated power draw",
+      "help_text": "Maximum rated input power, not PSU nameplate output capability.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "power",
+      "canonical_unit": "W",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "100000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/power_output",
+      "namespace": "itambox",
+      "key": "power_output",
+      "label": "Rated real output power",
+      "help_text": "Rated continuous real output power of a UPS or power source.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "power",
+      "canonical_unit": "W",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "100000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/apparent_power",
+      "namespace": "itambox",
+      "key": "apparent_power",
+      "label": "Rated apparent output power",
+      "help_text": "Rated apparent output power. VA and W are distinct quantities; no implicit conversion.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "apparent_power",
+      "canonical_unit": "VA",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "100000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "itambox/battery_capacity",
+      "namespace": "itambox",
+      "key": "battery_capacity",
+      "label": "Battery energy capacity",
+      "help_text": "Nominal battery energy for the configuration, not remaining charge percentage.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "energy",
+      "canonical_unit": "Wh",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "10000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 6,
+          "position": 60
+        }
+      ]
+    },
+    {
+      "identity": "itambox/battery_runtime",
+      "namespace": "itambox",
+      "key": "battery_runtime",
+      "label": "Battery runtime",
+      "help_text": "Runtime at the explicitly recorded battery_runtime_load. Store neither a free-floating runtime claim nor a percentage.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "duration",
+      "canonical_unit": "min",
+      "validation": {
+        "minimum": "0",
+        "maximum": "5256000"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "itambox/battery_runtime_load",
+      "namespace": "itambox",
+      "key": "battery_runtime_load",
+      "label": "Runtime test load",
+      "help_text": "Positive real load for the recorded battery runtime; required whenever battery_runtime is set.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "power",
+      "canonical_unit": "W",
+      "validation": {
+        "minimum": "0.001",
+        "maximum": "100000000.000",
+        "scale": 3,
+        "rule": "runtime_requires_load"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/power-battery",
+          "order": 8,
+          "position": 80
+        }
+      ]
+    },
+    {
+      "identity": "itambox/display_size",
+      "namespace": "itambox",
+      "key": "display_size",
+      "label": "Display diagonal",
+      "help_text": "Diagonal of the principal display; do not enumerate multi-panel assemblies here.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "length",
+      "canonical_unit": "in",
+      "validation": {
+        "minimum": "0.00",
+        "maximum": "1000.00",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/display_resolution",
+      "namespace": "itambox",
+      "key": "display_resolution",
+      "label": "Native display resolution",
+      "help_text": "Native horizontal x vertical pixels in ASCII, such as 1920x1080.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 11,
+        "regex": "^[1-9][0-9]{1,4}x[1-9][0-9]{1,4}$"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/touch_supported",
+      "namespace": "itambox",
+      "key": "touch_supported",
+      "label": "Touch input supported",
+      "help_text": "Touch capability of the principal display.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/camera_resolution",
+      "namespace": "itambox",
+      "key": "camera_resolution",
+      "label": "Principal camera resolution",
+      "help_text": "Nominal still-image resolution of the principal camera.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "resolution",
+      "canonical_unit": "MP",
+      "validation": {
+        "minimum": "0.00",
+        "maximum": "10000.00",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/display-av-imaging",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print_technology",
+      "namespace": "itambox",
+      "key": "print_technology",
+      "label": "Print technology",
+      "help_text": "Primary print-engine technology.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/print-technology",
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/color_supported",
+      "namespace": "itambox",
+      "key": "color_supported",
+      "label": "Color printing supported",
+      "help_text": "Ability to print in color, not current print settings.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/duplex_supported",
+      "namespace": "itambox",
+      "key": "duplex_supported",
+      "label": "Automatic duplex supported",
+      "help_text": "Automatic two-sided printing capability; manual paper reinsertion is not this capability.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print_speed",
+      "namespace": "itambox",
+      "key": "print_speed",
+      "label": "Rated monochrome print speed",
+      "help_text": "Manufacturer-rated A4/Letter monochrome simplex speed for the base mode. Other benchmark conditions belong in notes, not a comparable scalar.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "rate",
+      "canonical_unit": "pages_per_minute",
+      "validation": {
+        "minimum": "0.00",
+        "maximum": "100000.00",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/print-scan",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating_system_family",
+      "namespace": "itambox",
+      "key": "operating_system_family",
+      "label": "Operating system family",
+      "help_text": "Type shipped/default OS family versus independently recorded installed family on a device.",
+      "targets": [
+        "asset_type",
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "single-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 1
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/operating-system-family",
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/management_protocols",
+      "namespace": "itambox",
+      "key": "management_protocols",
+      "label": "Supported management protocols",
+      "help_text": "Product capability only. Listing a protocol is not an endorsement or proof that it is enabled.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/management-protocols",
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/hostname",
+      "namespace": "itambox",
+      "key": "hostname",
+      "label": "Hostname",
+      "help_text": "Configured hostname without a trailing dot, validated by the existing bounded registered hostname validator.",
+      "targets": [
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 253,
+        "rule": "rfc1123_hostname"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/firmware_version",
+      "namespace": "itambox",
+      "key": "firmware_version",
+      "label": "Installed firmware version",
+      "help_text": "Observed firmware version of this Asset; never inferred from the product catalogue.",
+      "targets": [
+        "asset"
+      ],
+      "activation": "composed",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 255
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/management-security",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating_temperature_min",
+      "namespace": "itambox",
+      "key": "operating_temperature_min",
+      "label": "Minimum operating temperature",
+      "help_text": "Manufacturer-rated ambient operating temperature lower bound.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "temperature",
+      "canonical_unit": "°C",
+      "validation": {
+        "minimum": "-273.15",
+        "maximum": "1000.00",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating_temperature_max",
+      "namespace": "itambox",
+      "key": "operating_temperature_max",
+      "label": "Maximum operating temperature",
+      "help_text": "Manufacturer-rated ambient upper bound, at least the lower bound when both are present.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "temperature",
+      "canonical_unit": "°C",
+      "validation": {
+        "minimum": "-273.15",
+        "maximum": "1000.00",
+        "scale": 2,
+        "rule": "temperature_max_gte_min"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/outdoor_rated",
+      "namespace": "itambox",
+      "key": "outdoor_rated",
+      "label": "Outdoor use rated",
+      "help_text": "Explicit manufacturer declaration; not derived from IP rating text.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/acoustic_level",
+      "namespace": "itambox",
+      "key": "acoustic_level",
+      "label": "Declared acoustic level",
+      "help_text": "Declared A-weighted sound pressure. Measurement condition belongs in the description; not automatically comparable across manufacturers.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "sound_pressure",
+      "canonical_unit": "dBA",
+      "validation": {
+        "minimum": "0.00",
+        "maximum": "250.00",
+        "scale": 2
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/environmental-ruggedization",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/sensor_types",
+      "namespace": "itambox",
+      "key": "sensor_types",
+      "label": "Sensor capabilities",
+      "help_text": "Kinds of quantities sensed; not individual sensor-channel readings.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 32
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/sensor-types",
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/analog_input_count",
+      "namespace": "itambox",
+      "key": "analog_input_count",
+      "label": "Analog inputs",
+      "help_text": "Count of built-in analog input channels.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/digital_input_count",
+      "namespace": "itambox",
+      "key": "digital_input_count",
+      "label": "Digital inputs",
+      "help_text": "Count of built-in digital input channels.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "integer",
+      "quantity_kind": "count",
+      "canonical_unit": null,
+      "validation": {
+        "minimum": "0",
+        "maximum": "65535"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/industrial_protocols",
+      "namespace": "itambox",
+      "key": "industrial_protocols",
+      "label": "Industrial protocols",
+      "help_text": "Supported protocol families, not configured connections.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/industrial-protocols",
+      "memberships": [
+        {
+          "section": "itambox/sensors-control",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/regulatory_certifications",
+      "namespace": "itambox",
+      "key": "regulatory_certifications",
+      "label": "Declared regulatory marks",
+      "help_text": "Unverified product declarations, not evidence of organization compliance or a completed audit.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/regulatory-certifications",
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 1,
+          "position": 10
+        }
+      ]
+    },
+    {
+      "identity": "itambox/rohs_compliant",
+      "namespace": "itambox",
+      "key": "rohs_compliant",
+      "label": "RoHS compliance declared",
+      "help_text": "Manufacturer declaration only; absence is unknown.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "boolean",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {},
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/energy_certifications",
+      "namespace": "itambox",
+      "key": "energy_certifications",
+      "label": "Declared energy and sustainability marks",
+      "help_text": "Unverified product declarations; no legal certification claim is inferred by the application.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "multi-select",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_values": 16
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": "itambox/energy-certifications",
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "itambox/country_of_origin",
+      "namespace": "itambox",
+      "key": "country_of_origin",
+      "label": "Declared country of origin",
+      "help_text": "Two-letter country code supplied by the source. Pattern checks syntax only, not a maintained country registry.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "text",
+      "quantity_kind": null,
+      "canonical_unit": null,
+      "validation": {
+        "max_length": 2,
+        "regex": "^[A-Z]{2}$"
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "active",
+      "choice_set": null,
+      "memberships": [
+        {
+          "section": "itambox/compliance-sustainability",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    }
+  ],
+  "reserved_retired_fields": [
+    {
+      "identity": "itambox/input_voltage",
+      "namespace": "itambox",
+      "key": "input_voltage",
+      "label": "Input voltage (retired)",
+      "help_text": "Reserved tombstone for the foundation scalar. Do not infer an operating range from this value.",
+      "targets": [
+        "asset_type"
+      ],
+      "activation": "composed",
+      "field_type": "decimal",
+      "quantity_kind": "voltage",
+      "canonical_unit": "V",
+      "validation": {
+        "minimum": "0.000",
+        "maximum": "1000000.000",
+        "scale": 3
+      },
+      "required": false,
+      "nullable": false,
+      "lifecycle": "deprecated",
+      "choice_set": null,
+      "memberships": []
+    }
+  ],
+  "sections": [
+    {
+      "identity": "itambox/product-physical",
+      "namespace": "itambox",
+      "slug": "product-physical",
+      "label": "Product and Physical",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/form_factor",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/rack_units",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/weight",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/ip_rating",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/compute-memory",
+      "namespace": "itambox",
+      "slug": "compute-memory",
+      "label": "Compute and Memory",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/processor_model",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/core_count",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/memory_capacity",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/memory_type",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/virtual-compute",
+      "namespace": "itambox",
+      "slug": "virtual-compute",
+      "label": "Virtual Compute",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/vcpu_count",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/memory_capacity",
+          "order": 2,
+          "position": 20
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage",
+      "namespace": "itambox",
+      "slug": "storage",
+      "label": "Storage",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/storage_capacity",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/storage_medium",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/storage_interface",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/drive_bay_count",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "field": "itambox/hot_swap_supported",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "itambox/connectivity-io",
+      "namespace": "itambox",
+      "slug": "connectivity-io",
+      "label": "Connectivity and I/O",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/ethernet_port_count",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/ethernet_speeds",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/wifi_standards",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/usb_port_count",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/network-function",
+      "namespace": "itambox",
+      "slug": "network-function",
+      "label": "Network Function",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/network_functions",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/switching_capacity",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/poe_port_count",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/poe_budget",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/power-battery",
+      "namespace": "itambox",
+      "slug": "power-battery",
+      "label": "Power and Battery",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/input_voltage_min",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/input_voltage_max",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/power_consumption_max",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/power_output",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "field": "itambox/apparent_power",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "field": "itambox/battery_capacity",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "field": "itambox/battery_runtime",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "field": "itambox/battery_runtime_load",
+          "order": 8,
+          "position": 80
+        }
+      ]
+    },
+    {
+      "identity": "itambox/display-av-imaging",
+      "namespace": "itambox",
+      "slug": "display-av-imaging",
+      "label": "Display, AV and Imaging",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/display_size",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/display_resolution",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/touch_supported",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/camera_resolution",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print-scan",
+      "namespace": "itambox",
+      "slug": "print-scan",
+      "label": "Print and Scan",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/print_technology",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/color_supported",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/duplex_supported",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/print_speed",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/management-security",
+      "namespace": "itambox",
+      "slug": "management-security",
+      "label": "Management and Security",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/operating_system_family",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/management_protocols",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/hostname",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/firmware_version",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/environmental-ruggedization",
+      "namespace": "itambox",
+      "slug": "environmental-ruggedization",
+      "label": "Environmental and Ruggedization",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/operating_temperature_min",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/operating_temperature_max",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/outdoor_rated",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/acoustic_level",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/sensors-control",
+      "namespace": "itambox",
+      "slug": "sensors-control",
+      "label": "Sensors and Control",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/sensor_types",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/analog_input_count",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/digital_input_count",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/industrial_protocols",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "itambox/compliance-sustainability",
+      "namespace": "itambox",
+      "slug": "compliance-sustainability",
+      "label": "Compliance and Sustainability",
+      "description": "Reusable capability section. Scope is determined by each field target, not by the section label.",
+      "lifecycle": "active",
+      "memberships": [
+        {
+          "field": "itambox/regulatory_certifications",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "field": "itambox/rohs_compliant",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "field": "itambox/energy_certifications",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "field": "itambox/country_of_origin",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    }
+  ],
+  "choice_sets": [
+    {
+      "identity": "itambox/form-factor",
+      "namespace": "itambox",
+      "slug": "form-factor",
+      "label": "Form factor",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "desktop",
+          "label": "Desktop",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "notebook",
+          "label": "Notebook",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "tablet",
+          "label": "Tablet",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "phone",
+          "label": "Phone",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "rack",
+          "label": "Rack",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "tower",
+          "label": "Tower",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "blade",
+          "label": "Blade",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "appliance",
+          "label": "Appliance",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "peripheral",
+          "label": "Peripheral",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "module",
+          "label": "Module",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        }
+      ]
+    },
+    {
+      "identity": "itambox/memory-type",
+      "namespace": "itambox",
+      "slug": "memory-type",
+      "label": "Memory type",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "ddr3",
+          "label": "DDR3",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "ddr4",
+          "label": "DDR4",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "ddr5",
+          "label": "DDR5",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "lpddr4x",
+          "label": "LPDDR4X",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "lpddr5",
+          "label": "LPDDR5",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "lpddr5x",
+          "label": "LPDDR5X",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "hbm2",
+          "label": "HBM2",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "hbm3",
+          "label": "HBM3",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage-medium",
+      "namespace": "itambox",
+      "slug": "storage-medium",
+      "label": "Storage medium",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "hdd",
+          "label": "Hard disk drive",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "ssd",
+          "label": "Solid-state drive",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "nvme_ssd",
+          "label": "NVMe solid-state drive",
+          "lifecycle": "deprecated",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "flash",
+          "label": "Embedded flash",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "optical",
+          "label": "Optical",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "tape",
+          "label": "Tape",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "hybrid",
+          "label": "Hybrid",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        }
+      ]
+    },
+    {
+      "identity": "itambox/storage-interface",
+      "namespace": "itambox",
+      "slug": "storage-interface",
+      "label": "Primary storage interface",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "sata",
+          "label": "SATA",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "sas",
+          "label": "SAS",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "nvme",
+          "label": "NVMe",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "usb",
+          "label": "USB",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "emmc",
+          "label": "eMMC",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "ufs",
+          "label": "UFS",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "virtual",
+          "label": "Virtual",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        }
+      ]
+    },
+    {
+      "identity": "itambox/ethernet-speeds",
+      "namespace": "itambox",
+      "slug": "ethernet-speeds",
+      "label": "Ethernet speeds",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "10m",
+          "label": "10 Mbit/s",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "100m",
+          "label": "100 Mbit/s",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "1g",
+          "label": "1 Gbit/s",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "2_5g",
+          "label": "2.5 Gbit/s",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "5g",
+          "label": "5 Gbit/s",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "10g",
+          "label": "10 Gbit/s",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "25g",
+          "label": "25 Gbit/s",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "40g",
+          "label": "40 Gbit/s",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "50g",
+          "label": "50 Gbit/s",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "100g",
+          "label": "100 Gbit/s",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "200g",
+          "label": "200 Gbit/s",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        },
+        {
+          "key": "400g",
+          "label": "400 Gbit/s",
+          "lifecycle": "active",
+          "order": 12,
+          "position": 120
+        }
+      ]
+    },
+    {
+      "identity": "itambox/wifi-standards",
+      "namespace": "itambox",
+      "slug": "wifi-standards",
+      "label": "Wi-Fi standards",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "802_11a",
+          "label": "802.11a",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "802_11b",
+          "label": "802.11b",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "802_11g",
+          "label": "802.11g",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "802_11n",
+          "label": "802.11n",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "802_11ac",
+          "label": "802.11ac",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "802_11ax",
+          "label": "802.11ax",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "802_11be",
+          "label": "802.11be",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "itambox/network-functions",
+      "namespace": "itambox",
+      "slug": "network-functions",
+      "label": "Network functions",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "switch",
+          "label": "Switch",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "router",
+          "label": "Router",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "firewall",
+          "label": "Firewall",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "wlan_ap",
+          "label": "Wireless access point",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "wlan_controller",
+          "label": "Wireless controller",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "load_balancer",
+          "label": "Load balancer",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "vpn_gateway",
+          "label": "VPN gateway",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "modem",
+          "label": "Modem",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "gateway",
+          "label": "Gateway",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "bridge",
+          "label": "Bridge",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        }
+      ]
+    },
+    {
+      "identity": "itambox/print-technology",
+      "namespace": "itambox",
+      "slug": "print-technology",
+      "label": "Print technology",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "laser",
+          "label": "Laser",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "inkjet",
+          "label": "Inkjet",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "thermal",
+          "label": "Thermal",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "dot_matrix",
+          "label": "Dot matrix",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "dye_sublimation",
+          "label": "Dye sublimation",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "solid_ink",
+          "label": "Solid ink",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "itambox/operating-system-family",
+      "namespace": "itambox",
+      "slug": "operating-system-family",
+      "label": "Operating system family",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "windows",
+          "label": "Windows",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "windows_server",
+          "label": "Windows Server",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "macos",
+          "label": "macOS",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "linux",
+          "label": "Linux",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "chromeos",
+          "label": "ChromeOS",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "ios",
+          "label": "iOS",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "ipados",
+          "label": "IPadOS",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "android",
+          "label": "Android",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "bsd",
+          "label": "BSD",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "network_os",
+          "label": "Network OS",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "embedded",
+          "label": "Embedded",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 12,
+          "position": 120
+        }
+      ]
+    },
+    {
+      "identity": "itambox/management-protocols",
+      "namespace": "itambox",
+      "slug": "management-protocols",
+      "label": "Management protocols",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "https",
+          "label": "HTTPS",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "ssh",
+          "label": "SSH",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "snmpv1",
+          "label": "SNMPv1",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "snmpv2c",
+          "label": "SNMPv2c",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "snmpv3",
+          "label": "SNMPv3",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "redfish",
+          "label": "Redfish",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "ipmi",
+          "label": "IPMI",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "wsman",
+          "label": "WS-Man",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "rest",
+          "label": "REST",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "graphql",
+          "label": "GraphQL",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        }
+      ]
+    },
+    {
+      "identity": "itambox/sensor-types",
+      "namespace": "itambox",
+      "slug": "sensor-types",
+      "label": "Sensor types",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "temperature",
+          "label": "Temperature",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "humidity",
+          "label": "Humidity",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "pressure",
+          "label": "Pressure",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "light",
+          "label": "Light",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "motion",
+          "label": "Motion",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "vibration",
+          "label": "Vibration",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "current",
+          "label": "Current",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "voltage",
+          "label": "Voltage",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "power",
+          "label": "Power",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "energy",
+          "label": "Energy",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "flow",
+          "label": "Flow",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        },
+        {
+          "key": "level",
+          "label": "Level",
+          "lifecycle": "active",
+          "order": 12,
+          "position": 120
+        },
+        {
+          "key": "gas",
+          "label": "Gas",
+          "lifecycle": "active",
+          "order": 13,
+          "position": 130
+        },
+        {
+          "key": "smoke",
+          "label": "Smoke",
+          "lifecycle": "active",
+          "order": 14,
+          "position": 140
+        },
+        {
+          "key": "position",
+          "label": "Position",
+          "lifecycle": "active",
+          "order": 15,
+          "position": 150
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 16,
+          "position": 160
+        }
+      ]
+    },
+    {
+      "identity": "itambox/industrial-protocols",
+      "namespace": "itambox",
+      "slug": "industrial-protocols",
+      "label": "Industrial protocols",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "modbus_rtu",
+          "label": "Modbus RTU",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "modbus_tcp",
+          "label": "Modbus TCP",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "profinet",
+          "label": "PROFINET",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "profibus",
+          "label": "PROFIBUS",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "ethernet_ip",
+          "label": "EtherNet/IP",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "ethercat",
+          "label": "EtherCAT",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "bacnet_ip",
+          "label": "BACnet/IP",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "opc_ua",
+          "label": "OPC UA",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "canopen",
+          "label": "CANopen",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        }
+      ]
+    },
+    {
+      "identity": "itambox/regulatory-certifications",
+      "namespace": "itambox",
+      "slug": "regulatory-certifications",
+      "label": "Declared regulatory marks",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "ce",
+          "label": "CE",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "fcc",
+          "label": "FCC",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "ul",
+          "label": "UL",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "csa",
+          "label": "CSA",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "ukca",
+          "label": "UKCA",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "vcci",
+          "label": "VCCI",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "rcm",
+          "label": "RCM",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "eac",
+          "label": "EAC",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        }
+      ]
+    },
+    {
+      "identity": "itambox/energy-certifications",
+      "namespace": "itambox",
+      "slug": "energy-certifications",
+      "label": "Declared energy and sustainability marks",
+      "description": "Controlled vocabulary; absence means unknown. Keys do not assert a certification or security policy.",
+      "lifecycle": "active",
+      "choices": [
+        {
+          "key": "energy_star",
+          "label": "ENERGY STAR",
+          "lifecycle": "active",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "key": "epeat_bronze",
+          "label": "EPEAT Bronze",
+          "lifecycle": "active",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "key": "epeat_silver",
+          "label": "EPEAT Silver",
+          "lifecycle": "active",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "key": "epeat_gold",
+          "label": "EPEAT Gold",
+          "lifecycle": "active",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "key": "80plus",
+          "label": "80 PLUS",
+          "lifecycle": "active",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "key": "80plus_bronze",
+          "label": "80 PLUS Bronze",
+          "lifecycle": "active",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "key": "80plus_silver",
+          "label": "80 PLUS Silver",
+          "lifecycle": "active",
+          "order": 7,
+          "position": 70
+        },
+        {
+          "key": "80plus_gold",
+          "label": "80 PLUS Gold",
+          "lifecycle": "active",
+          "order": 8,
+          "position": 80
+        },
+        {
+          "key": "80plus_platinum",
+          "label": "80 PLUS Platinum",
+          "lifecycle": "active",
+          "order": 9,
+          "position": 90
+        },
+        {
+          "key": "80plus_titanium",
+          "label": "80 PLUS Titanium",
+          "lifecycle": "active",
+          "order": 10,
+          "position": 100
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "lifecycle": "active",
+          "order": 11,
+          "position": 110
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "identity": "catalog/laptops",
+      "namespace": "catalog",
+      "slug": "laptops",
+      "label": "Laptop",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "catalog/desktops",
+      "namespace": "catalog",
+      "slug": "desktops",
+      "label": "Desktop",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 6,
+          "position": 60
+        }
+      ]
+    },
+    {
+      "identity": "catalog/servers",
+      "namespace": "catalog",
+      "slug": "servers",
+      "label": "Server",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/environmental-ruggedization",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "catalog/virtual-machines",
+      "namespace": "catalog",
+      "slug": "virtual-machines",
+      "label": "Virtual Machine",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/virtual-compute",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 3,
+          "position": 30
+        }
+      ]
+    },
+    {
+      "identity": "catalog/switches",
+      "namespace": "catalog",
+      "slug": "switches",
+      "label": "Switch",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "catalog/routers",
+      "namespace": "catalog",
+      "slug": "routers",
+      "label": "Router",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "catalog/firewalls",
+      "namespace": "catalog",
+      "slug": "firewalls",
+      "label": "Firewall",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "catalog/access-points",
+      "namespace": "catalog",
+      "slug": "access-points",
+      "label": "Access Point",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/network-function",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/environmental-ruggedization",
+          "order": 6,
+          "position": 60
+        }
+      ]
+    },
+    {
+      "identity": "catalog/printers",
+      "namespace": "catalog",
+      "slug": "printers",
+      "label": "Printer",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/print-scan",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 5,
+          "position": 50
+        }
+      ]
+    },
+    {
+      "identity": "catalog/monitors",
+      "namespace": "catalog",
+      "slug": "monitors",
+      "label": "Monitor",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "catalog/ups",
+      "namespace": "catalog",
+      "slug": "ups",
+      "label": "UPS",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 4,
+          "position": 40
+        }
+      ]
+    },
+    {
+      "identity": "catalog/mobile-phones",
+      "namespace": "catalog",
+      "slug": "mobile-phones",
+      "label": "Mobile Phone",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    },
+    {
+      "identity": "catalog/tablets",
+      "namespace": "catalog",
+      "slug": "tablets",
+      "label": "Tablet",
+      "description": "Starter category. Default sections initialize new types only.",
+      "lifecycle": "active",
+      "applies_to": [
+        "asset"
+      ],
+      "default_fieldsets": [
+        {
+          "fieldset": "itambox/product-physical",
+          "order": 1,
+          "position": 10
+        },
+        {
+          "fieldset": "itambox/compute-memory",
+          "order": 2,
+          "position": 20
+        },
+        {
+          "fieldset": "itambox/storage",
+          "order": 3,
+          "position": 30
+        },
+        {
+          "fieldset": "itambox/connectivity-io",
+          "order": 4,
+          "position": 40
+        },
+        {
+          "fieldset": "itambox/power-battery",
+          "order": 5,
+          "position": 50
+        },
+        {
+          "fieldset": "itambox/display-av-imaging",
+          "order": 6,
+          "position": 60
+        },
+        {
+          "fieldset": "itambox/management-security",
+          "order": 7,
+          "position": 70
+        }
+      ]
+    }
+  ]
+}
