@@ -784,6 +784,7 @@ def _fieldset_selection(
 def _native_create(value: object) -> tuple[AssetTypeNativeCreateInputDTO, FieldsetSelectionDTO, SpecificationPatchDTO]:
     manufacturer_id = _positive_id(_field(value, "manufacturer_id"), path=("input", "manufacturerId"))
     model = _required_string(_field(value, "model"), path=("input", "model"))
+    slug = _optional_string(_field(value, "slug"), path=("input", "slug")) or None
     category_id = _optional_id(_field(value, "category_id"), path=("input", "categoryId"))
     asset_role_id = _optional_id(_field(value, "asset_role_id"), path=("input", "assetRoleId"))
     fieldsets = _fieldset_selection(_field(value, "fieldsets"), presence_sensitive=True)
@@ -792,7 +793,7 @@ def _native_create(value: object) -> tuple[AssetTypeNativeCreateInputDTO, Fields
         native = AssetTypeNativeCreateInputDTO(
             manufacturer_id=manufacturer_id,
             model=model,
-            slug=None,
+            slug=slug,
             part_number="",
             ean="",
             region="",

@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from PIL import Image
@@ -15,9 +15,12 @@ from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 from rest_framework.test import APITestCase
 
 from assets.api.serializers import AssetSerializer, AssetTypeSerializer
-from assets.api.specification_api import SpecificationCommandAPIException
+from assets.api.specification_api import SpecificationCommandAPIException, create_fieldset_selection_from_values
+from assets.graphql_specifications.mutations import _native_create
 from assets.models import Asset, AssetType, AssetTypeFieldset, Manufacturer, StatusLabel
+from assets.services.specifications._create_commands import _create_input_digest
 from assets.services.specifications.commands import create_asset_type
+from assets.specification_adapters import native_asset_type_create_input, patch_from_mapping
 from core.mixins import suppress_custom_field_data_validation
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
@@ -34,6 +37,37 @@ def test_public_asset_serializers_collect_specification_patch_field():
     assert "custom_fieldsets" not in list(asset_type_fields)  # Composition REST input belongs to T12.
     assert asset_type_fields["specification_patch"].write_only is True
     assert asset_fields["specification_patch"].write_only is True
+
+
+class SpecificationNativeCreateTransportParityTests(TestCase):
+    def test_graphql_and_rest_adapters_produce_the_same_canonical_create_input(self):
+        manufacturer = Manufacturer.objects.create(name="Parity Maker", slug="parity-maker")
+        # The GraphQL adapter accepts mapping or object input; the mapping
+        # mirrors an absent optional field.  Both transports now bind the
+        # same canonical native input — including the optional slug — so a
+        # preview token minted by one transport verifies at the other.
+        gql_native, gql_selection, gql_patch = _native_create(
+            {
+                "manufacturer_id": str(manufacturer.pk),
+                "model": "Parity type",
+                "slug": "parity-type",
+                "patch": {"set": [], "clear": []},
+            }
+        )
+        rest_native = native_asset_type_create_input(
+            {"manufacturer": manufacturer, "model": "Parity type", "slug": "parity-type"}
+        )
+        rest_selection = create_fieldset_selection_from_values(None, omitted=True)
+        rest_patch = patch_from_mapping({"set": {}, "clear": []})
+
+        self.assertEqual(gql_native.slug, "parity-type")
+        self.assertEqual(gql_native, rest_native)
+        self.assertEqual(gql_selection, rest_selection)
+        self.assertEqual(gql_patch, rest_patch)
+        self.assertEqual(
+            _create_input_digest(gql_native, gql_selection, gql_patch),
+            _create_input_digest(rest_native, rest_selection, rest_patch),
+        )
 
 
 class TestAssetSpecificationAPI(TenantTestMixin, APITestCase):
