@@ -201,11 +201,8 @@ jobs:
       contents: write
       pull-requests: read
       security-events: write
-      # Publishing the qualified image and its registry attestations: push the
-      # image itself, emit the artifact metadata storage records, and attach
-      # the OCI attestations.
+      # Publishing the qualified image to the GitHub Container Registry.
       packages: write
-      artifact-metadata: write
       # Scoped to this job only: artifact attestations sign with the
       # workflow's OIDC identity and are stored in the repository store.
       id-token: write
@@ -410,6 +407,9 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.ghcr-image.outputs.GHCR_MANIFEST_DIGEST }}
           push-to-registry: true
+          # Storage records require an organization-owned repository; the
+          # itambox account is a user account, so records stay disabled.
+          create-storage-record: false
 
       - name: Attest the published image SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -418,6 +418,9 @@ jobs:
           subject-digest: ${{ steps.ghcr-image.outputs.GHCR_MANIFEST_DIGEST }}
           sbom-path: itambox-${{ inputs.version }}.sbom.spdx.json
           push-to-registry: true
+          # Storage records require an organization-owned repository; the
+          # itambox account is a user account, so records stay disabled.
+          create-storage-record: false
 
       - name: Verify the published image attestations
         shell: bash
@@ -455,13 +458,14 @@ jobs:
       - name: Record the published image identity
         shell: bash
         run: |
+          package_name="${IMAGE_NAME##*/}"
           {
             echo "### GitHub Container Registry"
             echo "- Published ${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
             echo "- Resolved manifest form ${MODE}"
             echo "- Manifest digest ${GHCR_MANIFEST_DIGEST}"
             echo "- Image config digest ${IMAGE_CONFIG_DIGEST}"
-            echo "- First publish only: verify the package visibility (organization Packages tab, itambox-webapp, Package settings, Danger Zone, Change visibility); anonymous docker pull requires Public."
+            echo "- First publish only: review the package visibility (GitHub package settings for ${package_name} → Package settings → Change visibility → Public); anonymous docker pull requires Public."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Attest release artifact provenance

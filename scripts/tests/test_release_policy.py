@@ -311,13 +311,26 @@ class ReleaseWorkflowHardeningTests(unittest.TestCase):
         prepare = self.jobs["prepare-release"]
 
         self.assertIn("packages: write", prepare)
-        self.assertIn("artifact-metadata: write", prepare)
         rehearsal = self.jobs["rehearsal"]
         self.assertNotIn("packages: write", rehearsal)
-        self.assertNotIn("artifact-metadata", rehearsal)
         top_level = self.workflow_text.split("\njobs:\n", 1)[0]
         self.assertNotIn("packages", top_level)
-        self.assertNotIn("artifact-metadata", top_level)
+
+    def test_registry_storage_records_are_disabled_without_the_scope(self):
+        prepare = self.jobs["prepare-release"]
+
+        # Storage records require an organization-owned repository; the
+        # itambox account is a user account, so the scope must not be
+        # requested and both OCI attestations disable records explicitly.
+        self.assertNotIn("artifact-metadata", self.workflow_text)
+        for step_name in (
+            "Attest the published image provenance",
+            "Attest the published image SBOM",
+        ):
+            with self.subTest(step=step_name):
+                step = prepare.split(step_name, 1)[1].split("- name:", 1)[0]
+                self.assertIn("create-storage-record: false", step)
+                self.assertIn("push-to-registry: true", step)
 
     def test_sbom_is_generated_from_the_image_that_is_released(self):
         rehearsal = self.jobs["rehearsal"]
