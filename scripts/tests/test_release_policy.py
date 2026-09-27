@@ -400,7 +400,7 @@ class ReleaseWorkflowHardeningTests(unittest.TestCase):
         self.assertIn("oci://${REGISTRY}/${IMAGE_NAME}@${GHCR_MANIFEST_DIGEST}", prepare)
         self.assertIn('--predicate-type "$predicate"', prepare)
         self.assertIn('"https://slsa.dev/provenance/v1"', prepare)
-        self.assertIn('"https://spdx.dev/Document"', prepare)
+        self.assertIn('"https://spdx.dev/Document/v2.3"', prepare)
         self.assertIn("--bundle-from-oci", prepare)
         self.assertLess(
             prepare.index("Resolve and verify the published registry image identity"),

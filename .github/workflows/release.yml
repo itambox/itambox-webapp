@@ -427,7 +427,10 @@ jobs:
         run: |
           set -euo pipefail
           image_ref="oci://${REGISTRY}/${IMAGE_NAME}@${GHCR_MANIFEST_DIGEST}"
-          for predicate in "https://slsa.dev/provenance/v1" "https://spdx.dev/Document"; do
+          # actions/attest signs the SPDX 2.3 document with the versioned
+          # predicate type; the registry bundle matches that annotation
+          # exactly, so verify the exact signed value.
+          for predicate in "https://slsa.dev/provenance/v1" "https://spdx.dev/Document/v2.3"; do
             for bundle_source in github registry; do
               flags=()
               if [[ "$bundle_source" == "registry" ]]; then
