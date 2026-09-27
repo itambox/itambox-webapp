@@ -6,26 +6,34 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0-beta.2] - 2026-09-27
+
 ### Added
 
+- The Asset Type Library was finalized on the specification model: asset types compose an explicit, ordered list of fieldsets and fields with per-target applicability, the type-library vocabulary is pinned to a canonical core set, and the runtime serves exactly this vocabulary with no development-era compatibility layer left (issue #479).
 - Repair/replacement stories can be reconstructed as episodes: link maintenance records, reservations, and disposals to a repair episode (an asset plus an optional loaner/substitute) and read the grouped story on the asset detail Timeline tab (issue #504).
+- Asset holders gain a read-only **Offboarding** tab that gathers everything a departing person still holds across assets, inventory, licenses, custody receipts, subscriptions, and memberships; it replaces the removed `offboard_user.py` helper (issue #498).
 
 ### Changed
 
-- Merged `subscriptions.Provider` into the shared `assets.Supplier` catalogue, now scoped by tenant or tenant group with null representing global scope; moved portal, account, and active fields onto suppliers, and made subscriptions reference suppliers directly with an optional procurement contract link. This is a breaking prerelease change (issue #508).
+- Merged `subscriptions.Provider` into the shared `assets.Supplier` catalogue, now scoped by tenant or tenant group with null representing global scope; moved portal, account, and active fields onto suppliers, and made subscriptions reference suppliers directly with an optional procurement contract link. The cutover is a deterministic, upgrade-only migration with no compatibility aliases. This is a breaking prerelease change (issue #508).
 - Added supplier links for SaaS subscriptions and asset warranties, documented when to use Contracts versus Subscriptions, and distinguished agreement entitlement quantities from linked-license seat counts in subscription details and reports (issue #500).
 - Added the read-only `migration_baseline_preflight` release gate and checked manifest. The gate recognizes the current normalized baseline and the two supported predecessor states (`supported-predecessor-pre-squash`, `supported-predecessor-transition-release`) as exit-0 outcomes; partial, old, or mixed states are rejected before a cleanup attempt, and restore-first handling for interrupted non-atomic migrations is documented.
 - Normalized the migration history for the #479 release: the two #479 development waves and the replaced issue-#88 originals are gone, fresh installs and both supported predecessors (pre-squash and transition release) migrate to the same final schema, and the checked baseline manifest moves to the normalized layout (issue #479). The supported-upgrade qualification driver is checked in at `scripts/qualification/migrations/run-supported-upgrade-p1p2.sh`.
-
+- Forwarded client-IP handling is explicit and opt-in in production: `ITAMBOX_RATELIMIT_USE_X_FORWARDED_FOR` and `ITAMBOX_RATELIMIT_NUM_PROXIES` configure trusted-proxy client IPs, while directly reachable deployments stay fail-closed.
+- Release preparation from `main` now requires the app-owned end-to-end qualification suite to pass on the dispatched commit before the draft release is prepared.
+- Scope switching preserves list context: search, filters, and paging survive a switch, scope-bound filters are dropped with a visible notice instead of an empty list, a switch from an object page lands on the list instead of a 404, and aggregate bulk confirmations name each object's tenant. The platform-wide scope is labelled **All Tenants** (superusers: **Global View**), and users can choose a personal default workspace for a tenant, tenant group, or aggregate view (issue #499).
 - Tightened the first organization/membership English copy: role-form guidance, the assign-users explanation, member-selection help, role presets, and user-group help are shorter and more direct; the role assignment page and the permissions-matrix help now render reviewed German translations (part of issue #386).
 - The first German asset UI text chunk uses the established glossary terms and clearer labels for asset types, locations, custody receipts, and warranties.
 - Tightened the first English asset/request text slice: selection errors, request labels, custody notifications, disposal guidance, and bulk receiving copy are shorter and more direct without changing behavior.
-- The tenant switcher now uses **All Tenants** consistently, and users can choose a personal default workspace for a tenant, tenant group, or aggregate tenant view.
 - The desktop footer keeps its timestamp and version stamp without the optional Tabler theme credit; the full application footer is hidden below the mobile action-bar breakpoint.
 
 ### Fixed
 
 - The demo seed dataset now tells stories the product can actually produce: a received purchase-order line materialises an asset for every unit it reports, a repair episode is preceded by the check-in that removed the device from its holder (and the device is handed back afterwards with the status it had before the re-checkout), out-of-service maintenance documents a repair window the asset's own change log recorded, and an approved asset request always carries a tenant and an allocated unit that is actually claimable. Repaired units are no longer left stranded in a repair episode whose window never closed, and seeded assignments can no longer run backwards, start before their asset was bought, or return from the future. The self-check reads a repair window from the repair label itself rather than the `pending` meta-type that In Transit and Quarantined share, closes the window at the transition that leaves repair instead of at the asset's last change of any kind, and treats an assignment that overlaps the window at any point as a contradiction rather than only one open when it began; a unit already allocated to an open request is left unreserved so that a reservation for a different holder cannot dead-end the claim. A seed self-check fails closed when any of these regresses (issue #506).
+- The demo seed writes no placeholder signature payloads for accepted custody receipts, and the full-seed qualification covers the custody-receipt story end to end (issue #407).
+- Disposal history is preserved through explicit cancellation: a cancelled disposal keeps its record with reason, actor, and timestamp, the asset returns to Pending, a later disposal becomes a new historical record, and effective report totals exclude cancelled rows while the history stays visible (issue #496).
+- The dashboard target picker offers every canonically authorized live tenant (including managed-only MSP reach), renders each target independently of the ambient tenant, and fails closed for inaccessible, deleted, or revoked targets instead of falling back to ambient data (issue #447).
 - The asset creation form now accepts a blank asset tag and generates one from the tag sequence on save, matching the model contract and the PO receiving, bulk receive, import, and clone paths (issue #503).
 - Scan baskets now report an EAN that maps to several assets distinctly instead of claiming no asset matches, directing the operator to scan the asset tag (issue #502).
 - Subscription annual cost now annualizes multi-year terms over their length and one-time purchases are labeled as a one-time cost instead of occupying the annual slot; zero-cost subscriptions display `0.00` instead of an omitted row or "Not set" (issue #501).
@@ -37,12 +45,32 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tenant creation now exposes only object-authorized live provider tenants to eligible non-superusers, requires an explicit provider when one is available, and uses the same onboarding projection for normal and managed-tenant routes (issue #405).
 - Asset reservation quick-add now preserves a native POST fallback from asset detail pages instead of submitting a GET request (issue #390).
 - List page refreshes no longer emit an HTMX `htmx:oobErrorNoTarget` console error when the applied-filter count badge is updated: the filter-toggle badge now carries the `filters-applied-count` target id that the list refresh out-of-band swap expects, so applying, clearing, loading, or saving list filters update the visible count cleanly (issue #421).
+- Bulk check-in, check-out, and disposal keep their pre-seeded baskets when a target tenant is selected in an aggregate scope; every submitted asset is validated as a live asset of the bound tenant before any job is created, and job lists and cancellation follow the accessible-tenant scope in aggregate scopes (issue #424).
 - Non-staff users with tenant-scoped asset request permissions can now see and use their authorized actions consistently in tenant, tenant group, and All-accessible scopes: fulfilment actors record the handover from the request detail page, the bulk-receipt toolbar follows the per-request decision, and malformed or repeated selections report a message instead of an access-denied page (issue #497).
+- Asset request fulfilment consumes exactly one request unit per physical handover and distinguishes explicit completion from the recorded handover, so concurrent handovers cannot claim more than the request holds (issues #492, #493).
+- Assigning an asset to a person preserves the asset's recorded base location (issue #494).
+- Hardware-kit checkout follows the individual asset obligations: explicit device selection per kit row, all-or-nothing allocation that never silently substitutes a conflicting device, and owner-derived availability for tenant-owned kits (issues #495, #523, #524).
+- Managed core/library definitions — custom fields and custom fieldsets — render their labels as names and hide mutation actions they do not support; bulk edit is unavailable on definition lists while changelog access and permitted local actions remain (issues #516, #518).
+- Bulk asset-label jobs isolate their notifications per job and keep the job's scope, label PDFs stay downloadable from their notifications, and PDF generation failures report their actual phase instead of a single generic error (issue #453).
+- Event dispatch now preserves the identity of deleted objects after the transaction commits, so event rules and webhooks receive coherent records for deletions.
+- Unset optional table values render as an en dash instead of a placeholder label.
 
 ### Security
 
-- Secret-scan suppressions are now keyed to a commit-independent file/rule/line identity, so squash, rebase, or cherry-pick integrations no longer invalidate reviewed suppressions; the previously ungoverned historical placeholder findings in the pre-rename tree are governed as well (issue #510).
+- OIDC sign-in now resolves users through a persisted, exact `(issuer, subject)` identity binding: plausible legacy email/username candidates fail closed, there is no automatic backfill, and existing OIDC users require an explicit `bind_oidc_identity` operator step (issue #454).
+- Production startup now enforces the operator-documented configuration contract: a development secret-key fallback is rejected with Django `security.W009` parity, and a malformed `ITAMBOX_API_TOKEN_PEPPERS` value aborts startup instead of silently disabling token peppers.
+- Job attachment downloads resolve through the canonical active-scope job visibility policy before the object-bound permission check (issue #459).
+- Upgraded `djangorestframework` to 3.17.2, `pypdf` to 6.17.0, and `fast-uri` to 3.1.7 to address open dependency advisories.
 - Upgraded `sqlparse` to 0.6.0 to address CVE-2026-54284, CVE-2026-59893, CVE-2026-59894, and CVE-2026-71491.
+- Secret-scan suppressions are now keyed to a commit-independent file/rule/line identity, so squash, rebase, or cherry-pick integrations no longer invalidate reviewed suppressions; the previously ungoverned historical placeholder findings in the pre-rename tree are governed as well (issue #510).
+- Release artifacts now include a generated SPDX SBOM and a build-provenance attestation that binds the archived release image to the repository, the reviewed commit, and the release workflow.
+
+### Known limitations and upgrade requirements
+
+- Supported upgrade origins for this release are the two predecessor revisions recorded in the checked migration manifest (pre-squash and transition release). Version skipping remains unsupported, and databases created by transitional development states are not recognized — run `migration_baseline_preflight` from the exact candidate checkout before any migration work.
+- The supplier consolidation (issue #508) is an upgrade-only cutover with no compatibility aliases; rolling it back in place is not supported — restore the verified predecessor backup instead.
+- OIDC identity bindings are not backfilled: existing OIDC users require an explicit `bind_oidc_identity --confirm` before the new login path works, and rolling back the binding code temporarily reopens mutable-claim resolution — treat the predecessor code as a security-relevant, transitional rollback target and follow the upgrade guide.
+- Capabilities graded Beta or Experimental keep their documented caveats: their interfaces may still change before the stable release. Maturity grades never waive tenant isolation or security requirements.
 
 ## [1.0.0-beta.1] - 2026-08-16
 
@@ -234,7 +262,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
 - SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
 
-[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-beta.2...HEAD
+[1.0.0-beta.2]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-beta.1
 [1.0.0-alpha.3]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.2
