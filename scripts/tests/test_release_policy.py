@@ -362,9 +362,12 @@ class ReleaseWorkflowHardeningTests(unittest.TestCase):
         self.assertNotIn("docker/build-push-action", self.workflow_text)
         self.assertIn('docker tag "itambox:${RELEASE_VERSION}"', prepare)
         self.assertIn('docker push "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"', prepare)
-        self.assertIn("scripts/check_registry_image.py verify", prepare)
+        self.assertIn("scripts/check_registry_image.py verify-manifest", prepare)
+        self.assertIn("scripts/check_registry_image.py verify-image", prepare)
         self.assertIn("docker buildx imagetools inspect --raw", prepare)
+        self.assertIn('--raw "${REGISTRY}/${IMAGE_NAME}@${image_manifest_digest}"', prepare)
         self.assertIn("GHCR_MANIFEST_DIGEST", prepare)
+        self.assertIn("IMAGE_CONFIG_DIGEST", prepare)
 
     def test_registry_identity_matches_the_repository_and_publishes_no_moving_alias(self):
         prepare = self.jobs["prepare-release"]

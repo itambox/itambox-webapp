@@ -377,16 +377,30 @@ jobs:
         run: |
           set -euo pipefail
           image_ref="${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
-          docker image inspect "itambox:${RELEASE_VERSION}" --format '{{.Id}}' > local-config-digest.txt
+          docker image inspect "itambox:${RELEASE_VERSION}" --format '{{.Id}}' > local-image-id.txt
           docker image inspect "$image_ref" --format '{{range .RepoDigests}}{{println .}}{{end}}' > repo-digests.txt
           docker buildx imagetools inspect --raw "$image_ref" > registry-manifest.json
           docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}' > registry-manifest-descriptor.json
-          python scripts/check_registry_image.py verify \
+          python scripts/check_registry_image.py verify-manifest \
             --manifest-raw registry-manifest.json \
             --descriptor registry-manifest-descriptor.json \
             --repo-digests repo-digests.txt \
-            --local-config-digest local-config-digest.txt \
-            --image "${REGISTRY}/${IMAGE_NAME}" | tee ghcr-image-identity.txt
+            --local-image-id local-image-id.txt \
+            --image "${REGISTRY}/${IMAGE_NAME}" > registry-identity.txt
+          mode="$(grep '^MODE=' registry-identity.txt | cut -d= -f2)"
+          image_manifest_digest="$(grep '^IMAGE_MANIFEST_DIGEST=' registry-identity.txt | cut -d= -f2)"
+          if [ "$mode" = "index" ]; then
+            # Docker 29 keeps built images in the containerd image store, where the
+            # pushed tag resolves to an image index; resolve the platform image
+            # manifest the index lists by its digest.
+            docker buildx imagetools inspect --raw "${REGISTRY}/${IMAGE_NAME}@${image_manifest_digest}" > registry-image-manifest.json
+          else
+            cp registry-manifest.json registry-image-manifest.json
+          fi
+          python scripts/check_registry_image.py verify-image \
+            --manifest-raw registry-image-manifest.json \
+            --expected-digest "$image_manifest_digest" > image-config-digest.txt
+          cat registry-identity.txt image-config-digest.txt > ghcr-image-identity.txt
           cat ghcr-image-identity.txt >> "$GITHUB_OUTPUT"
           cat ghcr-image-identity.txt >> "$GITHUB_ENV"
 
@@ -444,6 +458,7 @@ jobs:
           {
             echo "### GitHub Container Registry"
             echo "- Published ${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+            echo "- Resolved manifest form ${MODE}"
             echo "- Manifest digest ${GHCR_MANIFEST_DIGEST}"
             echo "- Image config digest ${IMAGE_CONFIG_DIGEST}"
             echo "- First publish only: verify the package visibility (organization Packages tab, itambox-webapp, Package settings, Danger Zone, Change visibility); anonymous docker pull requires Public."
@@ -493,7 +508,9 @@ jobs:
             itambox-${{ inputs.version }}.tar.gz.sha256
             itambox-${{ inputs.version }}.sbom.spdx.json
             image-inspect.json
+            registry-manifest.json
             registry-manifest-descriptor.json
+            registry-image-manifest.json
             ghcr-image-identity.txt
           if-no-files-found: error
           retention-days: 14
