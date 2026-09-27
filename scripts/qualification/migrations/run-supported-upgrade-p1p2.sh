@@ -137,7 +137,7 @@ upgrade_one() {  # key sha worktree database predecessor-state
   assert_rc "$key-second-migrate" 0
   run_manage candidate "$repo" "$db" "$key-verify" shell -c "exec(open('$helpers/verify_upgrade.py').read())"
   assert_rc "$key-verify" 0
-  run_manage candidate "$repo" "$db" "$key-seed" seed_data --noinput
+  run_manage candidate "$repo" "$db" "$key-seed" seed_data
   assert_rc "$key-seed" 0
 
   run_manage candidate "$repo" "$db" "$key-schema" capture_schema_evidence
