@@ -13,10 +13,12 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "itambox/itambox/release.py"
+      - "scripts/check_registry_image.py"
       - "scripts/release_policy.py"
       - "scripts/release_sbom.py"
       - "scripts/security_gate.py"
       - "scripts/install_security_tools.sh"
+      - "scripts/tests/test_check_registry_image.py"
       - "scripts/tests/test_release_policy.py"
       - "scripts/tests/test_release_sbom.py"
   workflow_dispatch:
@@ -56,7 +58,7 @@ jobs:
         id: metadata
         shell: bash
         run: |
-          python -m unittest scripts.tests.test_release_policy scripts.tests.test_release_sbom
+          python -m unittest scripts.tests.test_check_registry_image scripts.tests.test_release_policy scripts.tests.test_release_sbom
           VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           python scripts/release_policy.py verify --version "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -199,6 +201,11 @@ jobs:
       contents: write
       pull-requests: read
       security-events: write
+      # Publishing the qualified image and its registry attestations: push the
+      # image itself, emit the artifact metadata storage records, and attach
+      # the OCI attestations.
+      packages: write
+      artifact-metadata: write
       # Scoped to this job only: artifact attestations sign with the
       # workflow's OIDC identity and are stored in the repository store.
       id-token: write
@@ -206,6 +213,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ inputs.version }}
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -346,8 +355,102 @@ jobs:
             --image-inspect image-inspect.json \
             --image-ref "itambox:${RELEASE_VERSION}"
 
+      - name: Log in to the GitHub Container Registry
+        shell: bash
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          printf '%s' "$REGISTRY_TOKEN" | docker login "${REGISTRY}" \
+            --username "${{ github.actor }}" --password-stdin
+
+      - name: Publish the qualified release image to the GitHub Container Registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker tag "itambox:${RELEASE_VERSION}" "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+          docker push "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+
+      - name: Resolve and verify the published registry image identity
+        id: ghcr-image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_ref="${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+          docker image inspect "itambox:${RELEASE_VERSION}" --format '{{.Id}}' > local-config-digest.txt
+          docker image inspect "$image_ref" --format '{{range .RepoDigests}}{{println .}}{{end}}' > repo-digests.txt
+          docker buildx imagetools inspect --raw "$image_ref" > registry-manifest.json
+          docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}' > registry-manifest-descriptor.json
+          python scripts/check_registry_image.py verify \
+            --manifest-raw registry-manifest.json \
+            --descriptor registry-manifest-descriptor.json \
+            --repo-digests repo-digests.txt \
+            --local-config-digest local-config-digest.txt \
+            --image "${REGISTRY}/${IMAGE_NAME}" | tee ghcr-image-identity.txt
+          cat ghcr-image-identity.txt >> "$GITHUB_OUTPUT"
+          cat ghcr-image-identity.txt >> "$GITHUB_ENV"
+
+      - name: Attest the published image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.ghcr-image.outputs.GHCR_MANIFEST_DIGEST }}
+          push-to-registry: true
+
+      - name: Attest the published image SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.ghcr-image.outputs.GHCR_MANIFEST_DIGEST }}
+          sbom-path: itambox-${{ inputs.version }}.sbom.spdx.json
+          push-to-registry: true
+
+      - name: Verify the published image attestations
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_ref="oci://${REGISTRY}/${IMAGE_NAME}@${GHCR_MANIFEST_DIGEST}"
+          for predicate in "https://slsa.dev/provenance/v1" "https://spdx.dev/Document"; do
+            for bundle_source in github registry; do
+              flags=()
+              if [[ "$bundle_source" == "registry" ]]; then
+                flags+=(--bundle-from-oci)
+              fi
+              verified=false
+              for attempt in 1 2 3; do
+                if gh attestation verify "$image_ref" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+                  --source-ref "refs/heads/main" \
+                  --source-digest "$GITHUB_SHA" \
+                  --predicate-type "$predicate" \
+                  "${flags[@]}"; then
+                  verified=true
+                  break
+                fi
+                echo "Attestation (${predicate}, ${bundle_source}) not yet resolvable; retrying (${attempt}/3)" >&2
+                sleep 10
+              done
+              test "$verified" = "true" || {
+                echo "Attestation verification failed (${predicate}, source ${bundle_source})" >&2
+                exit 1
+              }
+            done
+          done
+
+      - name: Record the published image identity
+        shell: bash
+        run: |
+          {
+            echo "### GitHub Container Registry"
+            echo "- Published ${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+            echo "- Manifest digest ${GHCR_MANIFEST_DIGEST}"
+            echo "- Image config digest ${IMAGE_CONFIG_DIGEST}"
+            echo "- First publish only: verify the package visibility (organization Packages tab, itambox-webapp, Package settings, Danger Zone, Change visibility); anonymous docker pull requires Public."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Attest release artifact provenance
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v4.2.2
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
             itambox-${{ inputs.version }}.tar.gz
@@ -360,6 +463,7 @@ jobs:
           set -euo pipefail
           for artifact in \
             "itambox-${RELEASE_VERSION}.tar.gz" \
+            "itambox-${RELEASE_VERSION}.tar.gz.sha256" \
             "itambox-${RELEASE_VERSION}.sbom.spdx.json"; do
             verified=false
             for attempt in 1 2 3; do
@@ -389,6 +493,8 @@ jobs:
             itambox-${{ inputs.version }}.tar.gz.sha256
             itambox-${{ inputs.version }}.sbom.spdx.json
             image-inspect.json
+            registry-manifest-descriptor.json
+            ghcr-image-identity.txt
           if-no-files-found: error
           retention-days: 14
 
