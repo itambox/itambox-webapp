@@ -79,16 +79,27 @@ uv run --locked --no-sync python manage.py migration_baseline_preflight --format
 ```
 
 The command reads only first-party migration-recorder rows and the checked
-runtime manifest. Exit code `0` attests recorder-row completeness only: it does
+runtime manifest. Exit code `0` attests recorder-row recognition only: it does
 not prove schema or data parity and cannot detect rows created with `migrate
---fake`, `--fake-initial`, or direct recorder SQL. Exit code `0` means that all replacement rows, their complete
-historical recognition set, and every current post-transition leaf are present.
+--fake`, `--fake-initial`, or direct recorder SQL. Exit code `0` covers two
+recognized shapes:
+
+- `current-normalized-baseline`: all replacement rows, their complete
+  historical recognition set, and every current post-transition leaf are
+  present; no migration action is required.
+- `supported-predecessor-pre-squash` and
+  `supported-predecessor-transition-release`: the recorder is exactly at one of
+  the two supported predecessor states declared in the checked manifest. The
+  database is recognized and safe to upgrade with the ordinary migration
+  executor; the migration itself is still required.
+
 A non-zero result is a stop condition. It distinguishes a partial normalized
-baseline (for example a database that never ran the replacement layer), an
-incomplete post-transition state, empty/unmigrated databases, and unknown or
-mixed first-party rows. Remediation is to run the ordinary migration executor
-with this release, or to restore the verified predecessor and investigate the
-schema/data evidence as directed by the state.
+baseline (for example a database that never ran the replacement layer, or only
+part of it), an incomplete post-transition state, empty/unmigrated databases,
+and unknown or mixed first-party rows — including transitional development
+states that are not one of the two declared predecessors. Remediation is to
+restore the verified predecessor and investigate the schema/data evidence as
+directed by the state.
 
 The command does not validate that an image or running process matches a
 caller-declared revision. Bind the exact full Git SHA to the immutable image or

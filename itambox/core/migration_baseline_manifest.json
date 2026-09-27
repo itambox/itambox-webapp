@@ -736,11 +736,23 @@
   "supported_predecessors": [
     {
       "name": "issue88-pre-squash",
+      "recognition": {
+        "post_transition_ids": [],
+        "replacement": "absent",
+        "state": "supported-predecessor-pre-squash"
+      },
       "revision": "deef4c8bf3fe678edecacf2c523d7bd0dcb6f6ef",
       "state": "complete-old-history-no-replacement"
     },
     {
       "name": "issue88-transition-release",
+      "recognition": {
+        "post_transition_ids": [
+          "extras.0101_issue88_drop_legacy_webhook_name_like"
+        ],
+        "replacement": "complete",
+        "state": "supported-predecessor-transition-release"
+      },
       "revision": "2246573fcbfc238e3878cc2eb623476da28b20dc",
       "state": "complete-replacement-recognition"
     }

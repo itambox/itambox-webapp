@@ -775,6 +775,7 @@ _PREFLIGHT_MANIFEST_LIST_FIELDS = (
     "current_leaf_ids",
 )
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_PREDECESSOR_RECOGNITION_STATE_RE = re.compile(r"^supported-predecessor-[a-z0-9]+(?:-[a-z0-9]+)*$")
 SUPPORTED_PREDECESSOR_STATES = frozenset(
     {
         "complete-old-history-no-replacement",
@@ -827,6 +828,29 @@ def _assert_manifest_ids(manifest, key, expected):
         )
 
 
+def _validate_predecessor_recognition(recognition, recognition_states, post_transition_ids):
+    if not isinstance(recognition, dict):
+        raise ValueError("migration preflight manifest predecessor recognition must be an object")
+    recognition_state = recognition.get("state")
+    if (
+        not isinstance(recognition_state, str)
+        or not _PREDECESSOR_RECOGNITION_STATE_RE.fullmatch(recognition_state)
+        or recognition_state in recognition_states
+    ):
+        raise ValueError("migration preflight manifest predecessor recognition state must be unique and recognized")
+    if recognition.get("replacement") not in {"absent", "complete"}:
+        raise ValueError("migration preflight manifest predecessor recognition replacement is invalid")
+    recognition_post_ids = recognition.get("post_transition_ids")
+    if (
+        not isinstance(recognition_post_ids, list)
+        or any(not isinstance(item, str) for item in recognition_post_ids)
+        or recognition_post_ids != sorted(set(recognition_post_ids))
+        or not set(recognition_post_ids).issubset(set(post_transition_ids))
+    ):
+        raise ValueError("migration preflight manifest predecessor recognition post-transition IDs are invalid")
+    return recognition_state
+
+
 def _validate_manifest_predecessors(manifest):
     transition_release_sha = manifest.get("transition_release_sha")
     if not isinstance(transition_release_sha, str) or not _GIT_SHA_RE.fullmatch(transition_release_sha):
@@ -836,6 +860,7 @@ def _validate_manifest_predecessors(manifest):
         raise ValueError("migration preflight manifest supported_predecessors must be a non-empty list")
     names = []
     revisions = set()
+    recognition_states = set()
     for predecessor in predecessors:
         if not isinstance(predecessor, dict):
             raise ValueError("migration preflight manifest predecessor entries must be objects")
@@ -850,8 +875,14 @@ def _validate_manifest_predecessors(manifest):
             )
         if state not in SUPPORTED_PREDECESSOR_STATES:
             raise ValueError("migration preflight manifest predecessor state is not recognized")
+        recognition_state = _validate_predecessor_recognition(
+            predecessor.get("recognition"),
+            recognition_states,
+            manifest["post_transition_ids"],
+        )
         names.append(name)
         revisions.add(revision)
+        recognition_states.add(recognition_state)
     if transition_release_sha not in revisions:
         raise ValueError("migration preflight manifest transition release is not a named predecessor revision")
 

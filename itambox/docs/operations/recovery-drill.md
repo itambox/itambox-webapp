@@ -76,7 +76,8 @@ probe key into an issue, pull request, CI log, or evidence JSON file.
 The current candidate ships a read-only `migration_baseline_preflight` command and
 checked manifest. The gate is a cleanup-release admission check, not a substitute
 for the ordinary upgrade. In this Path C drill, a restored pre-squash
-predecessor is expected to report `partial-normalized-baseline` (non-zero)
+predecessor is expected to report `supported-predecessor-pre-squash` (zero:
+recognized supported starting point, migration required)
 before the normal candidate migration; after that migration completes, rerun the
 gate and require `current-normalized-baseline` (zero). Every future release must
 run the gate before any migration writes and stop on every non-zero result. The command only reads `django_migrations` and cannot detect a
@@ -422,7 +423,7 @@ The helper does not start app/worker:
 
 ```bash
 restore_drill_project "$UPGRADE_PROJECT" "$UPGRADE_OVERRIDE"
-if docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE" \
+if ! docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE" \
   run --rm -T --no-deps --no-build \
   -v "$MIGRATION_PREFLIGHT_MODULE_MOUNT" \
   -v "$MIGRATION_PREFLIGHT_COMMAND_MOUNT" \
@@ -430,10 +431,10 @@ if docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE
   app python manage.py migration_baseline_preflight --format=json \
   > evidence/predecessor-migration-preflight.json \
   2> evidence/predecessor-migration-preflight.stderr; then
-  echo 'predecessor unexpectedly reports a transitioned baseline' >&2
+  echo 'predecessor preflight did not recognize the supported starting point' >&2
   exit 1
 fi
-python -c "import json; r=json.load(open('evidence/predecessor-migration-preflight.json')); assert r['state'] == 'complete-old-history-no-replacement'"
+python -c "import json; r=json.load(open('evidence/predecessor-migration-preflight.json')); assert r['state'] == 'supported-predecessor-pre-squash', r['state']; assert r['exit_code'] == 0, r['exit_code']"
 upgrade_compose up -d --no-build app worker
 verify_app_revision "$UPGRADE_PROJECT" "$PREDECESSOR_REVISION"
 upgrade_compose exec -T app python manage.py check

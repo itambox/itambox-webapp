@@ -770,6 +770,24 @@ class PreflightManifestAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "predecessor state"):
             validate_preflight_manifest(self.inventory, manifest)
 
+    def test_unrecognized_predecessor_recognition_state_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["supported_predecessors"][0]["recognition"]["state"] = "not-a-recognition-state"
+        with self.assertRaisesRegex(ValueError, "recognition state"):
+            validate_preflight_manifest(self.inventory, manifest)
+
+    def test_missing_predecessor_recognition_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["supported_predecessors"][0].pop("recognition")
+        with self.assertRaisesRegex(ValueError, "recognition must be an object"):
+            validate_preflight_manifest(self.inventory, manifest)
+
+    def test_predecessor_recognition_with_unmanifested_post_ids_fails_closed(self):
+        manifest = json.loads(json.dumps(self.manifest))
+        manifest["supported_predecessors"][1]["recognition"]["post_transition_ids"] = ["assets.9999_unmanifested"]
+        with self.assertRaisesRegex(ValueError, "recognition post-transition"):
+            validate_preflight_manifest(self.inventory, manifest)
+
     def test_missing_replacement_id_fails_closed(self):
         manifest = json.loads(json.dumps(self.manifest))
         manifest["replacement_ids"].pop()
