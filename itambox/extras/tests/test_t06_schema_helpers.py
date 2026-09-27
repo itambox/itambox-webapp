@@ -1,18 +1,19 @@
+"""Preflight applicability rules of the normalized definition conversion.
+
+The wave-1 helper module (extras.t06_schema) and its migration were replaced
+by the normalized extras chain; the pure applicability preflight now lives in
+extras.0115, so this module exercises it directly with the same row fakes the
+wave-1 suite used. The scope concept was removed with the normalization -
+object types are the only applicability authority - so the cases cover
+supported owners, owners without custom-field storage, fields without object
+types and unresolvable object types.
+"""
+
 import unittest
-from datetime import datetime, timezone
 from importlib import import_module
 from types import SimpleNamespace
 
-from extras.t06_schema import (
-    T06SchemaConflict,
-    classify_activation,
-    dense_ordinals,
-    normalize_lifecycle,
-    validate_activation,
-    validate_object_types,
-)
-
-_t06_migration = import_module("extras.migrations.0118_issue479_t06_definition_schema")
+_t06_migration = import_module("extras.migrations.0115_asset_type_definition_conversion")
 
 
 class _FakeRows:
@@ -61,15 +62,12 @@ class _FakeApps:
             raise LookupError((app_label, model_name)) from exc
 
 
-def _historical_preflight_apps(scope, identities, *, owners_with_custom_field_data=()):
+def _historical_preflight_apps(identities, *, owners_with_custom_field_data=()):
     content_types = [
         SimpleNamespace(pk=index, app_label=app_label, model=model_name)
         for index, (app_label, model_name) in enumerate(identities, start=1)
     ]
-    custom_field = SimpleNamespace(
-        pk=1,
-        scope=scope,
-    )
+    custom_field = SimpleNamespace(pk=1)
     custom_field.object_types = SimpleNamespace(
         through=SimpleNamespace(
             _base_manager=_FakeRows(
@@ -93,73 +91,29 @@ def _historical_preflight_apps(scope, identities, *, owners_with_custom_field_da
 
 
 class T06SchemaHelperTests(unittest.TestCase):
-    def test_object_types_are_the_only_applicability_authority(self):
-        self.assertEqual(
-            validate_object_types(("assets.assettype", "organization.assetholder", "assets.assettype")),
-            ("assets.assettype", "organization.assetholder"),
-        )
-
-    def test_empty_object_types_are_blocking(self):
-        with self.assertRaisesRegex(T06SchemaConflict, "empty_object_types"):
-            validate_object_types(())
-
-    def test_activation_is_a_closed_vocabulary(self):
-        self.assertEqual(validate_activation("global"), "global")
-        with self.assertRaisesRegex(T06SchemaConflict, "invalid_activation"):
-            validate_activation("membership-derived")
-
-    def test_activation_classification_is_not_recomputed_at_runtime(self):
-        self.assertEqual(classify_activation(has_memberships=True), "composed")
-        self.assertEqual(classify_activation(has_memberships=False), "global")
-
-    def test_lifecycle_preserves_deprecated_history(self):
-        timestamp = datetime(2026, 9, 6, tzinfo=timezone.utc)
-        lifecycle, deprecated_at = normalize_lifecycle(
-            lifecycle="deleted",
-            deleted_at=None,
-            deprecated_at=None,
-            migration_timestamp=timestamp,
-        )
-        self.assertEqual((lifecycle, deprecated_at), ("deprecated", timestamp))
-
-    def test_ordinals_are_dense_and_stable(self):
-        self.assertEqual(
-            dense_ordinals(((30, "z"), (10, "a"), (20, "m"))),
-            {"a": 1, "m": 2, "z": 3},
-        )
-        with self.assertRaisesRegex(T06SchemaConflict, "duplicate_member"):
-            dense_ordinals(((1, "same"), (2, "same")))
-
-    def test_preflight_requires_exact_non_null_scope_target_set(self):
-        cases = (
-            ("asset", (("assets", "asset"), ("assets", "assettype"))),
-            ("asset", (("assets", "asset"), ("organization", "assetholder"))),
-            ("both", (("assets", "asset"), ("assets", "assettype"), ("organization", "assetholder"))),
-        )
-        for scope, identities in cases:
-            with self.subTest(scope=scope, identities=identities):
-                apps = _historical_preflight_apps(
-                    scope,
-                    identities,
-                    owners_with_custom_field_data=identities,
-                )
-                with self.assertRaisesRegex(_t06_migration.MigrationConflict, "scope_object_types_contradiction"):
-                    _t06_migration._preflight_applicability(apps, "default")
-
-    def test_preflight_preserves_generic_scope_for_supported_non_asset_owner(self):
+    def test_preflight_preserves_supported_owner_with_custom_field_data(self):
         identities = (("assets", "asset"), ("organization", "assetholder"))
-        apps = _historical_preflight_apps(
-            None,
-            identities,
-            owners_with_custom_field_data=identities,
-        )
+        apps = _historical_preflight_apps(identities, owners_with_custom_field_data=identities)
 
         _t06_migration._preflight_applicability(apps, "default")
 
     def test_preflight_rejects_resolvable_owner_without_custom_field_data(self):
-        apps = _historical_preflight_apps(None, (("extras", "tag"),))
+        apps = _historical_preflight_apps((("extras", "tag"),))
 
         with self.assertRaisesRegex(_t06_migration.MigrationConflict, "missing_custom_field_data"):
+            _t06_migration._preflight_applicability(apps, "default")
+
+    def test_preflight_rejects_field_without_object_types(self):
+        apps = _historical_preflight_apps(())
+
+        with self.assertRaisesRegex(_t06_migration.MigrationConflict, "empty_object_types"):
+            _t06_migration._preflight_applicability(apps, "default")
+
+    def test_preflight_rejects_unresolvable_object_type(self):
+        apps = _historical_preflight_apps((("assets", "assettype"),))
+        del apps._models[("assets", "assettype")]
+
+        with self.assertRaisesRegex(_t06_migration.MigrationConflict, "unresolvable_object_type"):
             _t06_migration._preflight_applicability(apps, "default")
 
 

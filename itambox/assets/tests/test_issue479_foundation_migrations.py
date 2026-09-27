@@ -8,7 +8,7 @@ from django.test import SimpleTestCase
 
 
 class AdoptionPreflightUnitTests(SimpleTestCase):
-    migration = importlib.import_module("assets.migrations.0103_asset_type_data_backfill")
+    migration = importlib.import_module("assets.migrations.0103_asset_type_specification_conversion")
 
     @staticmethod
     def _field(name, label, field_type, content_type):

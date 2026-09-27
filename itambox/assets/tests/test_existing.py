@@ -52,14 +52,16 @@ User = get_user_model()
 
 
 class _SeededStatusLabelsMixin:
-    """Restore the migration-seeded StatusLabel defaults for this class.
+    """Restore the seeded StatusLabel defaults for this class.
 
     A TransactionTestCase (here or in an earlier, possibly crashed run against
     the reused test DB) flushes every table, and flush's post_migrate does NOT
-    re-run data migrations — so the defaults from
-    assets/migrations/0003_seed_status_labels.py can be missing. Each class
-    re-seeds inside its own class-level transaction (idempotent get_or_create;
-    rolls back with the class, so it never pollutes anything else).
+    re-run data migrations — so the seeded defaults can be missing. The
+    migration that originally carried them was removed with the migration
+    normalization, so each class re-seeds from the seed command's canonical
+    definitions inside its own class-level transaction (idempotent
+    get_or_create; rolls back with the class, so it never pollutes anything
+    else).
     """
 
     @classmethod
@@ -70,24 +72,26 @@ class _SeededStatusLabelsMixin:
 
 class ComponentTrackingTestCase(TransactionTestCase):
     # TransactionTestCase teardown TRUNCATEs every table (flush), which — unlike
-    # TestCase's savepoint rollback — permanently destroys the migration-seeded
-    # StatusLabel defaults (assets/migrations/0003_seed_status_labels.py); flush's
-    # post_migrate does NOT re-run data migrations. serialized_rollback restores
-    # a DB snapshot instead, but in full-suite runs the deserialize collides with
-    # post_migrate-recreated rows (duplicate content types/permissions), so we
-    # deterministically re-seed via the migration's own idempotent function:
-    # before each test here (a prior flush may have emptied the table) and once
-    # after the class for every later module in the session. Unrelated to the
-    # RBAC collapse; found while diagnosing cascading setUp failures.
+    # TestCase's savepoint rollback — permanently destroys the seeded StatusLabel
+    # defaults; flush's post_migrate does NOT re-run data migrations.
+    # serialized_rollback restores a DB snapshot instead, but in full-suite runs
+    # the deserialize collides with post_migrate-recreated rows (duplicate
+    # content types/permissions), so we deterministically re-seed from the seed
+    # command's idempotent definitions: before each test here (a prior flush may
+    # have emptied the table) and once after the class for every later module in
+    # the session. Unrelated to the RBAC collapse; found while diagnosing
+    # cascading setUp failures.
 
     @staticmethod
     def _restore_seeded_status_labels():
-        from importlib import import_module
+        from assets.models import StatusLabel
+        from core.management.commands.seed_data import Command
 
-        from django.apps import apps as global_apps
-
-        seed = import_module("assets.migrations.0003_seed_status_labels")
-        seed.seed_status_labels(global_apps, None)
+        for name, slug, stype, color in Command._status_label_defs():
+            StatusLabel.objects.get_or_create(
+                slug=slug,
+                defaults={"name": name, "type": stype, "color": color},
+            )
 
     @classmethod
     def tearDownClass(cls):

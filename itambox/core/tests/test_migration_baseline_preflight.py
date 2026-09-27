@@ -35,16 +35,31 @@ def _manifest(*, layout="transitional"):
         "replacement_ids": replacement_ids,
         "replacement_target_ids": historical_ids,
         "baseline_ids": replacement_ids,
-        "post_transition_ids": ["assets.0101_current"],
-        "post_transition_leaf_ids": ["assets.0101_current"],
-        "current_leaf_ids": ["assets.0101_current"],
+        "post_transition_ids": ["assets.0101_current", "assets.0102_next"],
+        "post_transition_leaf_ids": ["assets.0102_next"],
+        "current_leaf_ids": ["assets.0102_next"],
         "transition_release_sha": "b" * 40,
         "supported_predecessors": [
             {
-                "name": "test-predecessor",
+                "name": "test-pre-squash",
                 "revision": "b" * 40,
                 "state": "complete-old-history-no-replacement",
-            }
+                "recognition": {
+                    "state": "supported-predecessor-test-pre-squash",
+                    "replacement": "absent",
+                    "post_transition_ids": [],
+                },
+            },
+            {
+                "name": "test-transition",
+                "revision": "c" * 40,
+                "state": "complete-replacement-recognition",
+                "recognition": {
+                    "state": "supported-predecessor-test-transition",
+                    "replacement": "complete",
+                    "post_transition_ids": ["assets.0101_current"],
+                },
+            },
         ],
     }
 
@@ -65,6 +80,7 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
                 "assets.0100_other",
                 "assets.0100_shard",
                 "assets.0101_current",
+                "assets.0102_next",
             },
             "complete-replacement-recognition",
             exit_code=0,
@@ -116,6 +132,7 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
                 "assets.0100_other",
                 "assets.0100_shard",
                 "assets.0101_current",
+                "assets.0102_next",
             },
             "current-normalized-baseline",
             layout="normalized",
@@ -190,26 +207,87 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
         )
         self.assertEqual(result.reason_code, "BASELINE_STATE_UNRECOGNIZED")
 
+    def test_normalized_layout_recognizes_the_pre_squash_predecessor_shape(self):
+        result = self.assert_state(
+            {"assets.0001_initial", "assets.0002_second"},
+            "supported-predecessor-test-pre-squash",
+            layout="normalized",
+            exit_code=0,
+        )
+        self.assertEqual(result.reason_code, "SUPPORTED_PREDECESSOR_TEST_PRE_SQUASH")
+        self.assertIn("ordinary", result.remediation)
+
+    def test_normalized_layout_recognizes_the_transition_predecessor_shape(self):
+        result = self.assert_state(
+            {
+                "assets.0001_initial",
+                "assets.0002_second",
+                "assets.0100_other",
+                "assets.0100_shard",
+                "assets.0101_current",
+            },
+            "supported-predecessor-test-transition",
+            layout="normalized",
+            exit_code=0,
+        )
+        self.assertEqual(result.reason_code, "SUPPORTED_PREDECESSOR_TEST_TRANSITION")
+        self.assertIn("ordinary", result.remediation)
+
+    def test_normalized_layout_rejects_the_pre_squash_shape_with_a_stale_post_row(self):
+        result = self.assert_state(
+            {"assets.0001_initial", "assets.0002_second", "assets.0101_current"},
+            "mixed-or-unknown-first-party-state",
+            layout="normalized",
+            exit_code=1,
+        )
+        self.assertEqual(result.reason_code, "POST_TRANSITION_WITHOUT_BASELINE")
+
+    def test_normalized_layout_rejects_a_partial_predecessor_history(self):
+        result = self.assert_state(
+            {"assets.0001_initial"},
+            "partial-normalized-baseline",
+            layout="normalized",
+            exit_code=1,
+        )
+        self.assertEqual(result.reason_code, "NORMALIZED_BASELINE_INCOMPLETE")
+        self.assertFalse(result.state.startswith("supported-predecessor"))
+
+    def test_normalized_layout_rejects_the_transition_shape_with_a_missing_transition_row(self):
+        result = self.assert_state(
+            {
+                "assets.0001_initial",
+                "assets.0002_second",
+                "assets.0100_other",
+                "assets.0100_shard",
+                "assets.0102_next",
+            },
+            "partial-post-transition-state",
+            layout="normalized",
+            exit_code=1,
+        )
+        self.assertEqual(result.reason_code, "POST_TRANSITION_INCOMPLETE")
+
 
 class MigrationBaselineManifestTests(SimpleTestCase):
     def test_checked_manifest_has_the_expected_current_layout_and_complete_sets(self):
         manifest = load_manifest()
-        self.assertEqual(manifest["layout"], "transitional")
+        self.assertEqual(manifest["layout"], "normalized")
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 59)
+        self.assertEqual(len(manifest["post_transition_ids"]), 45)
         self.assertTrue(
             {
-                "assets.0114_issue479_t06_composition_schema",
-                "assets.0115_issue479_t07_provenance_bridge",
-                "assets.0117_issue479_final_core_vocabulary",
+                "assets.0102_asset_type_composition_schema",
+                "assets.0103_asset_type_specification_conversion",
+                "assets.0104_asset_type_core_vocabulary",
+                "assets.0107_asset_type_specification_guards",
                 "assets.0118_assetdisposal_cancellation_reason_and_more",
                 "assets.0121_supplier_scoping_and_commercial_fields",
-                "extras.0118_issue479_t06_definition_schema",
-                "extras.0119_issue479_t07_provenance_schema",
-                "extras.0120_issue479_t07_provenance_cutover",
-                "extras.0121_specification_library_permission",
+                "extras.0114_asset_type_definition_library_schema",
+                "extras.0115_asset_type_definition_conversion",
+                "extras.0116_asset_type_definition_cutover",
+                "extras.0117_asset_type_definition_guards",
                 "subscriptions.0103_unified_vendor_cutover",
             }.issubset(manifest["post_transition_ids"])
         )
@@ -226,6 +304,83 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         )
         self.assertEqual(manifest["current_leaf_ids"], manifest["post_transition_leaf_ids"])
         self.assertEqual(manifest["baseline_ids"], manifest["replacement_ids"])
+
+    def test_checked_manifest_recognizes_the_pre_squash_predecessor_recorder_shape(self):
+        # Measured on a real predecessor database: the pre-squash revision records
+        # exactly the 262 replaced historical identities and nothing else.
+        manifest = load_manifest()
+        applied = set(manifest["historical_ids"])
+        self.assertEqual(len(applied), 262)
+
+        result = classify_applied_migrations(applied, manifest)
+
+        self.assertEqual(result.state, "supported-predecessor-pre-squash")
+        self.assertEqual(result.reason_code, "SUPPORTED_PREDECESSOR_PRE_SQUASH")
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("ordinary", result.remediation)
+
+    def test_checked_manifest_recognizes_the_transition_release_predecessor_recorder_shape(self):
+        # Measured on a real predecessor database: 262 historical rows, the 62
+        # replacement shards, and the single post-transition row of the
+        # transition release (325 rows in total).
+        manifest = load_manifest()
+        applied = (
+            set(manifest["historical_ids"])
+            | set(manifest["replacement_ids"])
+            | {"extras.0101_issue88_drop_legacy_webhook_name_like"}
+        )
+        self.assertEqual(len(applied), 325)
+
+        result = classify_applied_migrations(applied, manifest)
+
+        self.assertEqual(result.state, "supported-predecessor-transition-release")
+        self.assertEqual(result.reason_code, "SUPPORTED_PREDECESSOR_TRANSITION_RELEASE")
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("ordinary", result.remediation)
+
+    def test_checked_manifest_declares_the_measured_predecessor_recognition_shapes(self):
+        manifest = load_manifest()
+        pre_squash, transition = manifest["supported_predecessors"]
+
+        self.assertEqual(pre_squash["name"], "issue88-pre-squash")
+        self.assertEqual(pre_squash["recognition"]["state"], "supported-predecessor-pre-squash")
+        self.assertEqual(pre_squash["recognition"]["replacement"], "absent")
+        self.assertEqual(pre_squash["recognition"]["post_transition_ids"], [])
+
+        self.assertEqual(transition["name"], "issue88-transition-release")
+        self.assertEqual(transition["recognition"]["state"], "supported-predecessor-transition-release")
+        self.assertEqual(transition["recognition"]["replacement"], "complete")
+        self.assertEqual(
+            transition["recognition"]["post_transition_ids"],
+            ["extras.0101_issue88_drop_legacy_webhook_name_like"],
+        )
+
+    def test_checked_manifest_rejects_a_partial_predecessor_replacement_set(self):
+        manifest = load_manifest()
+        applied = set(manifest["historical_ids"]) | {manifest["replacement_ids"][0]}
+
+        result = classify_applied_migrations(applied, manifest)
+
+        self.assertEqual(result.state, "partial-normalized-baseline")
+        self.assertEqual(result.exit_code, 1)
+        self.assertFalse(result.state.startswith("supported-predecessor"))
+
+    def test_checked_manifest_rejects_a_stale_post_row_on_the_transition_shape(self):
+        manifest = load_manifest()
+        applied = (
+            set(manifest["historical_ids"])
+            | set(manifest["replacement_ids"])
+            | {
+                "extras.0101_issue88_drop_legacy_webhook_name_like",
+                "assets.0101_seed_canonical_missing_status",
+            }
+        )
+
+        result = classify_applied_migrations(applied, manifest)
+
+        self.assertEqual(result.state, "partial-post-transition-state")
+        self.assertEqual(result.exit_code, 1)
+        self.assertFalse(result.state.startswith("supported-predecessor"))
 
     def test_checked_manifest_rejects_malformed_shape(self):
         cases = (
@@ -258,6 +413,33 @@ class MigrationBaselineManifestTests(SimpleTestCase):
             (
                 "transition_predecessor",
                 lambda m: m.update(supported_predecessors=[{"name": "old", "revision": "a" * 40, "state": "old"}]),
+            ),
+            ("predecessor_recognition_missing", lambda m: m["supported_predecessors"][0].pop("recognition")),
+            (
+                "predecessor_recognition_state",
+                lambda m: m["supported_predecessors"][0]["recognition"].update(state="not-a-recognition-state"),
+            ),
+            (
+                "predecessor_recognition_duplicate",
+                lambda m: m["supported_predecessors"][1]["recognition"].update(
+                    state=m["supported_predecessors"][0]["recognition"]["state"]
+                ),
+            ),
+            (
+                "predecessor_recognition_replacement",
+                lambda m: m["supported_predecessors"][0]["recognition"].update(replacement="partial"),
+            ),
+            (
+                "predecessor_recognition_post_ids",
+                lambda m: m["supported_predecessors"][0]["recognition"].update(
+                    post_transition_ids=["assets.9999_unmanifested"]
+                ),
+            ),
+            (
+                "predecessor_recognition_post_duplicate",
+                lambda m: m["supported_predecessors"][1]["recognition"].update(
+                    post_transition_ids=["assets.0101_current", "assets.0101_current"]
+                ),
             ),
         )
         for name, mutate in cases:
@@ -425,7 +607,7 @@ class PostgreSQLMigrationBaselineCommandTests(TransactionTestCase):
         after = recorder.applied_migrations()
 
         self.assertEqual(before, after)
-        self.assertEqual(json.loads(stdout.getvalue())["state"], "complete-replacement-recognition")
+        self.assertEqual(json.loads(stdout.getvalue())["state"], "current-normalized-baseline")
         statements = [query["sql"].lstrip().upper() for query in queries.captured_queries]
         self.assertTrue(statements)
         self.assertTrue(all(statement.startswith("SELECT") for statement in statements), statements)

@@ -428,6 +428,60 @@
       "references": [
         "https://github.com/itambox/itambox-webapp/issues/510"
       ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-021",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "The normalized migration helper carries the frozen power-supply efficiency vocabulary; the 'key'/'80plus_*' identifier pairs match the generic-api-key heuristic but are non-secret vocabulary identifiers, verified not credentials. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "itambox/assets/migrations/_core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1465
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-022",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "The normalized migration helper carries the frozen power-supply efficiency vocabulary; the 'key'/'80plus_*' identifier pairs match the generic-api-key heuristic but are non-secret vocabulary identifiers, verified not credentials. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "itambox/assets/migrations/_core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1480
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
+    },
+    {
+      "id": "SEC-479-GITLEAKS-023",
+      "tool": "gitleaks",
+      "finding": "generic-api-key",
+      "reason": "The normalized migration helper carries the frozen power-supply efficiency vocabulary; the 'key'/'80plus_*' identifier pairs match the generic-api-key heuristic but are non-secret vocabulary identifiers, verified not credentials. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
+      "owner": "@itambox",
+      "scope": {
+        "path": "itambox/assets/migrations/_core_vocabulary.py",
+        "rule": "generic-api-key",
+        "line": 1485
+      },
+      "review_on": "2026-10-10",
+      "expires_on": "2026-10-24",
+      "references": [
+        "https://github.com/itambox/itambox-webapp/issues/479",
+        "https://github.com/itambox/itambox-webapp/issues/510"
+      ]
     }
   ]
 }

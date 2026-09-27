@@ -75,20 +75,20 @@ probe key into an issue, pull request, CI log, or evidence JSON file.
 
 The current candidate ships a read-only `migration_baseline_preflight` command and
 checked manifest. The gate is a cleanup-release admission check, not a substitute
-for the ordinary transition upgrade. In this Path C drill, a restored pre-squash
-predecessor is expected to report `complete-old-history-no-replacement` (non-zero)
+for the ordinary upgrade. In this Path C drill, a restored pre-squash
+predecessor is expected to report `supported-predecessor-pre-squash` (zero:
+recognized supported starting point, migration required)
 before the normal candidate migration; after that migration completes, rerun the
-gate and require `complete-replacement-recognition` (zero). A future cleanup
-release must run the gate before any cleanup migration writes and stop on every
-non-zero result. The command only reads `django_migrations` and cannot detect a
+gate and require `current-normalized-baseline` (zero). Every future release must
+run the gate before any migration writes and stop on every non-zero result. The command only reads `django_migrations` and cannot detect a
 failed non-atomic migration whose operations ran before its recorder row committed.
 For any interrupted or failed run, restore first and compare schema, data, and
 protected-canary evidence; do not infer safety from a missing recorder row.
 
-The checked layout remains transitional. This gate does not remove migration
-files, change `replaces`, write recorder rows, or authorize arbitrary release
-skips. The future normalized-baseline state is valid only after a separately
-reviewed manifest/layout transition.
+The checked layout is normalized: the historical migration files are replaced
+by the replacement shards that declare them through `replaces`. This gate does
+not write recorder rows, change `replaces`, or authorize arbitrary release
+skips.
 
 ## Record immutable inputs and build exact application images
 
@@ -423,7 +423,7 @@ The helper does not start app/worker:
 
 ```bash
 restore_drill_project "$UPGRADE_PROJECT" "$UPGRADE_OVERRIDE"
-if docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE" \
+if ! docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE" \
   run --rm -T --no-deps --no-build \
   -v "$MIGRATION_PREFLIGHT_MODULE_MOUNT" \
   -v "$MIGRATION_PREFLIGHT_COMMAND_MOUNT" \
@@ -431,10 +431,10 @@ if docker compose -p "$UPGRADE_PROJECT" -f "$COMPOSE_FILE" -f "$UPGRADE_OVERRIDE
   app python manage.py migration_baseline_preflight --format=json \
   > evidence/predecessor-migration-preflight.json \
   2> evidence/predecessor-migration-preflight.stderr; then
-  echo 'predecessor unexpectedly reports a transitioned baseline' >&2
+  echo 'predecessor preflight did not recognize the supported starting point' >&2
   exit 1
 fi
-python -c "import json; r=json.load(open('evidence/predecessor-migration-preflight.json')); assert r['state'] == 'complete-old-history-no-replacement'"
+python -c "import json; r=json.load(open('evidence/predecessor-migration-preflight.json')); assert r['state'] == 'supported-predecessor-pre-squash', r['state']; assert r['exit_code'] == 0, r['exit_code']"
 upgrade_compose up -d --no-build app worker
 verify_app_revision "$UPGRADE_PROJECT" "$PREDECESSOR_REVISION"
 upgrade_compose exec -T app python manage.py check

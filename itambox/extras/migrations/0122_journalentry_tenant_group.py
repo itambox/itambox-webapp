@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("extras", "0121_specification_library_permission"),
+        ("extras", "0117_asset_type_definition_guards"),
         ("organization", "0102_alter_tenantresourcegrant_options"),
         ("users", "0100_issue88_shard_62_users_relations"),
     ]

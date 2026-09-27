@@ -236,7 +236,7 @@ python manage.py integrity_report --proposals /tmp/grants.json --fail-on-finding
 ### `migration_baseline_preflight`
 
 Inspect the first-party rows in `django_migrations` and fail closed unless the
-shipped transitional baseline has been fully recognized. This command is
+shipped normalized baseline has been fully recognized. This command is
 strictly read-only: it never runs migrations, repairs recorder state, or writes
 application data.
 
@@ -246,13 +246,15 @@ application data.
 | **Production-safe** | Yes (read-only migration-recorder inspection). |
 | **When to use** | Before a migration cleanup or recovery retry, after a successful ordinary migration run, and in the CI fresh-database qualification. |
 
-The checked manifest recognizes these states: complete replacement recognition,
-complete old history without replacement rows, partial old history, partial
-replacement set, incomplete post-transition state, empty/unmigrated, mixed or
-unknown first-party rows, and (when a future manifest explicitly selects that
-layout) the current normalized baseline. Only complete replacement recognition
-and current normalized baseline return exit code `0`. All other states return a
-non-zero status with a safe reason code and remediation text.
+The checked manifest recognizes these states: the current normalized baseline,
+the two supported predecessor states (`supported-predecessor-pre-squash`,
+`supported-predecessor-transition-release`), a partial normalized baseline
+(replacement rows missing), an incomplete post-transition state,
+empty/unmigrated databases, and mixed or unknown first-party rows. The current
+baseline and the two recognized supported predecessor states return exit code
+`0`; predecessor states are recognized as safe to upgrade and still require the
+ordinary migration executor, and every other state returns a non-zero status
+with a safe reason code and remediation text.
 
 A successful preflight is not crash-recovery evidence and it is not schema or data-semantic parity evidence. It attests only to the completeness of the rows recorded in `django_migrations`; it cannot detect rows created through `migrate --fake`, `--fake-initial`, or direct recorder SQL. If a migration was
 interrupted or failed after database operations began, restore the verified

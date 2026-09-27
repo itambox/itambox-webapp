@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,7 +19,12 @@ _RESTORE_REMEDIATION = (
     "Stop the candidate, restore the verified predecessor, and compare schema, data, "
     "and protected-canary evidence before retrying."
 )
+_SUPPORTED_PREDECESSOR_REMEDIATION = (
+    "Recognized supported predecessor {name}. Run the ordinary migration executor with this release, "
+    "then rerun migration_baseline_preflight."
+)
 _SHA_LENGTH = 40
+_PREDECESSOR_RECOGNITION_STATE_RE = re.compile(r"^supported-predecessor-[a-z0-9]+(?:-[a-z0-9]+)*$")
 SUPPORTED_PREDECESSOR_STATES = frozenset(
     {
         "complete-old-history-no-replacement",
@@ -77,6 +83,33 @@ def _validate_manifest_relationships(manifest: Mapping[str, Any], values: Mappin
         raise ValueError("migration preflight manifest baseline IDs are not known migration IDs")
 
 
+def _validate_predecessor_recognition(
+    recognition: Any,
+    recognition_states: set[str],
+    post_transition_ids: list[str],
+) -> str:
+    if not isinstance(recognition, dict):
+        raise ValueError("migration preflight manifest predecessor recognition must be an object")
+    recognition_state = recognition.get("state")
+    if (
+        not isinstance(recognition_state, str)
+        or not _PREDECESSOR_RECOGNITION_STATE_RE.fullmatch(recognition_state)
+        or recognition_state in recognition_states
+    ):
+        raise ValueError("migration preflight manifest predecessor recognition state must be unique and recognized")
+    if recognition.get("replacement") not in {"absent", "complete"}:
+        raise ValueError("migration preflight manifest predecessor recognition replacement is invalid")
+    recognition_post_ids = recognition.get("post_transition_ids")
+    if (
+        not isinstance(recognition_post_ids, list)
+        or any(not isinstance(item, str) for item in recognition_post_ids)
+        or recognition_post_ids != sorted(set(recognition_post_ids))
+        or not set(recognition_post_ids).issubset(set(post_transition_ids))
+    ):
+        raise ValueError("migration preflight manifest predecessor recognition post-transition IDs are invalid")
+    return recognition_state
+
+
 def _validate_manifest_predecessors(manifest: Mapping[str, Any]) -> None:
     if not _is_sha(manifest.get("transition_release_sha")):
         raise ValueError("migration preflight manifest transition_release_sha must be a lowercase 40-character Git SHA")
@@ -85,6 +118,7 @@ def _validate_manifest_predecessors(manifest: Mapping[str, Any]) -> None:
         raise ValueError("migration preflight manifest supported_predecessors must be a non-empty list")
     predecessor_names: set[str] = set()
     predecessor_revisions: set[str] = set()
+    recognition_states: set[str] = set()
     for predecessor in predecessors:
         if not isinstance(predecessor, dict):
             raise ValueError("migration preflight manifest predecessor entries must be objects")
@@ -99,8 +133,14 @@ def _validate_manifest_predecessors(manifest: Mapping[str, Any]) -> None:
             )
         if state not in SUPPORTED_PREDECESSOR_STATES:
             raise ValueError("migration preflight manifest predecessor state is not recognized")
+        recognition_state = _validate_predecessor_recognition(
+            predecessor.get("recognition"),
+            recognition_states,
+            manifest["post_transition_ids"],
+        )
         predecessor_names.add(name)
         predecessor_revisions.add(revision)
+        recognition_states.add(recognition_state)
     if manifest["transition_release_sha"] not in predecessor_revisions:
         raise ValueError("migration preflight manifest transition release is not a named predecessor revision")
 
@@ -171,6 +211,35 @@ def _result(
     )
 
 
+def _recognized_predecessor(
+    manifest: Mapping[str, Any],
+    observed: Mapping[str, set[str]],
+    predecessor: Mapping[str, Any],
+) -> PreflightResult | None:
+    """Return the recognition result when the recorder matches a declared predecessor shape."""
+
+    recognition = predecessor["recognition"]
+    if observed["historical"] != set(manifest["historical_ids"]):
+        return None
+    if recognition["replacement"] == "complete":
+        if observed["replacement"] != set(manifest["replacement_ids"]):
+            return None
+        if observed["baseline"] != set(manifest["baseline_ids"]):
+            return None
+    elif observed["replacement"] or observed["baseline"]:
+        return None
+    if observed["post_transition"] != set(recognition["post_transition_ids"]):
+        return None
+    return _result(
+        manifest=manifest,
+        observed=observed,
+        state=recognition["state"],
+        reason_code=recognition["state"].upper().replace("-", "_"),
+        exit_code=0,
+        remediation=_SUPPORTED_PREDECESSOR_REMEDIATION.format(name=predecessor["name"]),
+    )
+
+
 def _classify_normalized(
     manifest: Mapping[str, Any],
     observed: Mapping[str, set[str]],
@@ -187,7 +256,12 @@ def _classify_normalized(
             state="current-normalized-baseline",
             reason_code="NORMALIZED_BASELINE",
             exit_code=0,
+            remediation="No migration action is required; continue only after independent release checks pass.",
         )
+    for predecessor in manifest["supported_predecessors"]:
+        recognized = _recognized_predecessor(manifest, observed, predecessor)
+        if recognized is not None:
+            return recognized
     if observed["post_transition"] and not all_baseline:
         return _result(
             manifest=manifest,
