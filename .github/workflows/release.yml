@@ -14,9 +14,11 @@ on:
       - "uv.lock"
       - "itambox/itambox/release.py"
       - "scripts/release_policy.py"
+      - "scripts/release_sbom.py"
       - "scripts/security_gate.py"
       - "scripts/install_security_tools.sh"
       - "scripts/tests/test_release_policy.py"
+      - "scripts/tests/test_release_sbom.py"
   workflow_dispatch:
     inputs:
       version:
@@ -54,7 +56,7 @@ jobs:
         id: metadata
         shell: bash
         run: |
-          python -m unittest scripts.tests.test_release_policy
+          python -m unittest scripts.tests.test_release_policy scripts.tests.test_release_sbom
           VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           python scripts/release_policy.py verify --version "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -148,6 +150,30 @@ jobs:
             exit 1
           fi
 
+      - name: Generate rehearsed image SBOM
+        env:
+          ITAMBOX_VERSION: ${{ steps.metadata.outputs.version }}
+        shell: bash
+        run: |
+          set +x
+          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --format spdx-json \
+            --output "itambox-${ITAMBOX_VERSION}.sbom.spdx.json" \
+            itambox:release-rehearsal \
+            >"$RUNNER_TEMP/trivy-sbom.stdout" 2>"$RUNNER_TEMP/trivy-sbom.stderr"; then
+            echo "SBOM generation failed; raw diagnostics are retained only on the runner" >&2
+            exit 2
+          fi
+
+      - name: Validate rehearsed image SBOM
+        env:
+          ITAMBOX_VERSION: ${{ steps.metadata.outputs.version }}
+        shell: bash
+        run: |
+          python scripts/release_sbom.py verify \
+            --sbom "itambox-${ITAMBOX_VERSION}.sbom.spdx.json" \
+            --image-inspect image-inspect.json \
+            --image-ref itambox:release-rehearsal
+
   validate-dispatch-ref:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -173,6 +199,10 @@ jobs:
       contents: write
       pull-requests: read
       security-events: write
+      # Scoped to this job only: artifact attestations sign with the
+      # workflow's OIDC identity and are stored in the repository store.
+      id-token: write
+      attestations: write
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ inputs.version }}
@@ -296,6 +326,60 @@ jobs:
           python scripts/release_policy.py notes \
             --version "$RELEASE_VERSION" > release-notes.md
 
+      - name: Generate release image SBOM
+        shell: bash
+        run: |
+          set +x
+          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --format spdx-json \
+            --output "itambox-${RELEASE_VERSION}.sbom.spdx.json" \
+            "itambox:${RELEASE_VERSION}" \
+            >"$RUNNER_TEMP/trivy-sbom.stdout" 2>"$RUNNER_TEMP/trivy-sbom.stderr"; then
+            echo "SBOM generation failed; raw diagnostics are retained only on the runner" >&2
+            exit 2
+          fi
+
+      - name: Validate release image SBOM
+        shell: bash
+        run: |
+          python scripts/release_sbom.py verify \
+            --sbom "itambox-${RELEASE_VERSION}.sbom.spdx.json" \
+            --image-inspect image-inspect.json \
+            --image-ref "itambox:${RELEASE_VERSION}"
+
+      - name: Attest release artifact provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v4.2.2
+        with:
+          subject-path: |
+            itambox-${{ inputs.version }}.tar.gz
+            itambox-${{ inputs.version }}.tar.gz.sha256
+            itambox-${{ inputs.version }}.sbom.spdx.json
+
+      - name: Verify release artifact attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          for artifact in \
+            "itambox-${RELEASE_VERSION}.tar.gz" \
+            "itambox-${RELEASE_VERSION}.sbom.spdx.json"; do
+            verified=false
+            for attempt in 1 2 3; do
+              if gh attestation verify "$artifact" \
+                --repo "$GITHUB_REPOSITORY" \
+                --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+                --source-ref "refs/heads/main" \
+                --source-digest "$GITHUB_SHA"; then
+                verified=true
+                break
+              fi
+              echo "Attestation for $artifact not yet resolvable; retrying (${attempt}/3)" >&2
+              sleep 10
+            done
+            test "$verified" = "true" || {
+              echo "Attestation verification failed for $artifact" >&2
+              exit 1
+            }
+          done
+
       - name: Retain reviewed image candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -303,6 +387,7 @@ jobs:
           path: |
             itambox-${{ inputs.version }}.tar.gz
             itambox-${{ inputs.version }}.tar.gz.sha256
+            itambox-${{ inputs.version }}.sbom.spdx.json
             image-inspect.json
           if-no-files-found: error
           retention-days: 14
@@ -338,5 +423,6 @@ jobs:
           fi
           gh release create "$release_tag" "${flags[@]}" \
             "itambox-${RELEASE_VERSION}.tar.gz" \
-            "itambox-${RELEASE_VERSION}.tar.gz.sha256"
+            "itambox-${RELEASE_VERSION}.tar.gz.sha256" \
+            "itambox-${RELEASE_VERSION}.sbom.spdx.json"
           verify_release_tag

@@ -240,5 +240,93 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         self.assertNotIn("self-hosted", workflow)
 
 
+class ReleaseWorkflowHardeningTests(unittest.TestCase):
+    """Security invariants of the release workflow itself.
+
+    Each check rejects a concrete unsafe configuration: a floating action tag,
+    an over-broad permission, an SBOM that is not generated from the released
+    image, a release asset list that silently drops the SBOM, or an attestation
+    that is not bound to the reviewed run. The workflow is the artifact here,
+    so the invariants are modelled over its parsed job structure.
+    """
+
+    WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    JOB_HEADER = re.compile(r"(?m)^  (?P<name>[a-z0-9_-]+):\s*$")
+
+    def setUp(self):
+        self.workflow_text = self.WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.jobs = self._job_blocks()
+
+    def _job_blocks(self) -> dict[str, str]:
+        jobs_section = self.workflow_text.split("\njobs:\n", 1)[1]
+        matches = list(self.JOB_HEADER.finditer(jobs_section))
+        blocks = {}
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(jobs_section)
+            blocks[match.group("name")] = jobs_section[match.start() : end]
+        return blocks
+
+    def test_every_action_use_is_pinned_to_a_full_commit_sha(self):
+        uses = re.findall(r"(?m)^[ \t]*(?:-[ \t]+)?uses:[ \t]*(\S+)", self.workflow_text)
+
+        self.assertGreaterEqual(len(uses), 5)
+        for use in uses:
+            if use.startswith("./"):
+                continue  # local reusable workflow, not a third-party action
+            path, separator, ref = use.partition("@")
+            with self.subTest(use=use):
+                self.assertTrue(path and separator, f"{use} is not pinned")
+                self.assertRegex(ref, r"^[0-9a-f]{40}$")
+
+    def test_rehearsal_job_cannot_attest_and_keeps_read_only_permissions(self):
+        rehearsal = self.jobs["rehearsal"]
+
+        self.assertIn("contents: read", rehearsal)
+        self.assertNotIn("id-token", rehearsal)
+        self.assertNotIn("attestations", rehearsal)
+        self.assertNotIn("attest-build-provenance", rehearsal)
+
+    def test_attestation_scopes_are_limited_to_the_prepare_job(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("id-token: write", prepare)
+        self.assertIn("attestations: write", prepare)
+        top_level = self.workflow_text.split("\njobs:\n", 1)[0]
+        self.assertIn("permissions:\n  contents: read", top_level)
+        self.assertNotIn("id-token", top_level)
+        self.assertNotIn("attestations", top_level)
+
+    def test_sbom_is_generated_from_the_image_that_is_released(self):
+        rehearsal = self.jobs["rehearsal"]
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("--format spdx-json", rehearsal)
+        self.assertIn("scripts/release_sbom.py verify", rehearsal)
+        self.assertIn("itambox:release-rehearsal", rehearsal)
+        self.assertIn("--format spdx-json", prepare)
+        self.assertIn("scripts/release_sbom.py verify", prepare)
+        self.assertIn('"itambox:${RELEASE_VERSION}"', prepare)
+
+    def test_sbom_is_shipped_as_a_release_asset_with_the_release_identity(self):
+        self.assertIn("itambox-${{ inputs.version }}.sbom.spdx.json", self.workflow_text)
+        release_command = self.workflow_text.split('gh release create "$release_tag"', 1)[1]
+        for asset in (
+            '"itambox-${RELEASE_VERSION}.tar.gz"',
+            '"itambox-${RELEASE_VERSION}.tar.gz.sha256"',
+            '"itambox-${RELEASE_VERSION}.sbom.spdx.json"',
+        ):
+            with self.subTest(asset=asset):
+                self.assertIn(asset, release_command)
+
+    def test_release_attestation_is_bound_to_the_reviewed_run_and_verified(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("attest-build-provenance", prepare)
+        self.assertIn("gh attestation verify", prepare)
+        self.assertIn('"${GITHUB_REPOSITORY}/.github/workflows/release.yml"', prepare)
+        self.assertIn('--source-ref "refs/heads/main"', prepare)
+        self.assertIn('--source-digest "$GITHUB_SHA"', prepare)
+
+
 if __name__ == "__main__":
     unittest.main()
