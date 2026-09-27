@@ -62,10 +62,10 @@ class VersionPolicyTests(unittest.TestCase):
 
 class RepositoryPolicyTests(unittest.TestCase):
     def test_checked_in_release_metadata_is_consistent(self):
-        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-beta.1")
+        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-beta.2")
 
-        self.assertEqual(version.semver, "1.0.0-beta.1")
-        self.assertEqual(version.pep440, "1.0.0b1")
+        self.assertEqual(version.semver, "1.0.0-beta.2")
+        self.assertEqual(version.pep440, "1.0.0b2")
 
     def test_checked_in_openapi_schema_matches_release_identity(self):
         version = validate_repository(REPOSITORY_ROOT)
@@ -238,6 +238,191 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         self.assertIn("docker image inspect", workflow)
         self.assertNotIn("push: true", workflow)
         self.assertNotIn("self-hosted", workflow)
+
+
+class ReleaseWorkflowHardeningTests(unittest.TestCase):
+    """Security invariants of the release workflow itself.
+
+    Each check rejects a concrete unsafe configuration: a floating action tag,
+    an over-broad permission, an SBOM that is not generated from the released
+    image, a release asset list that silently drops the SBOM, an attestation
+    that is not bound to the reviewed run, or a registry publication that could
+    drift from the qualified image. The workflow is the artifact here, so the
+    invariants are modelled over its parsed job structure.
+    """
+
+    WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    JOB_HEADER = re.compile(r"(?m)^  (?P<name>[a-z0-9_-]+):\s*$")
+
+    def setUp(self):
+        self.workflow_text = self.WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.jobs = self._job_blocks()
+
+    def _job_blocks(self) -> dict[str, str]:
+        jobs_section = self.workflow_text.split("\njobs:\n", 1)[1]
+        matches = list(self.JOB_HEADER.finditer(jobs_section))
+        blocks = {}
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(jobs_section)
+            blocks[match.group("name")] = jobs_section[match.start() : end]
+        return blocks
+
+    def test_every_action_use_is_pinned_to_a_full_commit_sha(self):
+        uses = re.findall(r"(?m)^[ \t]*(?:-[ \t]+)?uses:[ \t]*(\S+)", self.workflow_text)
+
+        self.assertGreaterEqual(len(uses), 5)
+        for use in uses:
+            if use.startswith("./"):
+                continue  # local reusable workflow, not a third-party action
+            path, separator, ref = use.partition("@")
+            with self.subTest(use=use):
+                self.assertTrue(path and separator, f"{use} is not pinned")
+                self.assertRegex(ref, r"^[0-9a-f]{40}$")
+
+    def test_rehearsal_job_cannot_attest_publish_or_mutate_packages(self):
+        rehearsal = self.jobs["rehearsal"]
+
+        self.assertIn("contents: read", rehearsal)
+        for forbidden in (
+            "id-token",
+            "attestations",
+            "packages:",
+            "artifact-metadata",
+            "docker login",
+            "docker push",
+            "actions/attest",
+            "push-to-registry",
+            "gh attestation verify",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, rehearsal)
+
+    def test_attestation_scopes_are_limited_to_the_prepare_job(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("id-token: write", prepare)
+        self.assertIn("attestations: write", prepare)
+        top_level = self.workflow_text.split("\njobs:\n", 1)[0]
+        self.assertIn("permissions:\n  contents: read", top_level)
+        self.assertNotIn("id-token", top_level)
+        self.assertNotIn("attestations", top_level)
+
+    def test_package_publication_scopes_are_limited_to_the_prepare_job(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("packages: write", prepare)
+        rehearsal = self.jobs["rehearsal"]
+        self.assertNotIn("packages: write", rehearsal)
+        top_level = self.workflow_text.split("\njobs:\n", 1)[0]
+        self.assertNotIn("packages", top_level)
+
+    def test_registry_storage_records_are_disabled_without_the_scope(self):
+        prepare = self.jobs["prepare-release"]
+
+        # Storage records require an organization-owned repository; the
+        # itambox account is a user account, so the scope must not be
+        # requested and both OCI attestations disable records explicitly.
+        self.assertNotIn("artifact-metadata", self.workflow_text)
+        for step_name in (
+            "Attest the published image provenance",
+            "Attest the published image SBOM",
+        ):
+            with self.subTest(step=step_name):
+                step = prepare.split(step_name, 1)[1].split("- name:", 1)[0]
+                self.assertIn("create-storage-record: false", step)
+                self.assertIn("push-to-registry: true", step)
+
+    def test_sbom_is_generated_from_the_image_that_is_released(self):
+        rehearsal = self.jobs["rehearsal"]
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("--format spdx-json", rehearsal)
+        self.assertIn("scripts/release_sbom.py verify", rehearsal)
+        self.assertIn("itambox:release-rehearsal", rehearsal)
+        self.assertIn("--format spdx-json", prepare)
+        self.assertIn("scripts/release_sbom.py verify", prepare)
+        self.assertIn('"itambox:${RELEASE_VERSION}"', prepare)
+
+    def test_sbom_is_shipped_as_a_release_asset_with_the_release_identity(self):
+        self.assertIn("itambox-${{ inputs.version }}.sbom.spdx.json", self.workflow_text)
+        release_command = self.workflow_text.split('gh release create "$release_tag"', 1)[1]
+        for asset in (
+            '"itambox-${RELEASE_VERSION}.tar.gz"',
+            '"itambox-${RELEASE_VERSION}.tar.gz.sha256"',
+            '"itambox-${RELEASE_VERSION}.sbom.spdx.json"',
+        ):
+            with self.subTest(asset=asset):
+                self.assertIn(asset, release_command)
+
+    def test_release_attestation_is_bound_to_the_reviewed_run_and_verified(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("actions/attest@", prepare)
+        self.assertNotIn("attest-build-provenance", self.workflow_text)
+        self.assertIn("gh attestation verify", prepare)
+        self.assertIn('"${GITHUB_REPOSITORY}/.github/workflows/release.yml"', prepare)
+        self.assertIn('--source-ref "refs/heads/main"', prepare)
+        self.assertIn('--source-digest "$GITHUB_SHA"', prepare)
+
+    def test_published_image_is_the_qualified_release_image(self):
+        prepare = self.jobs["prepare-release"]
+
+        # The registry image is the exact image that was built, scanned, archived,
+        # and SBOM-validated: one build, no rebuild, and the pushed reference is
+        # derived from the qualified local image.
+        self.assertEqual(len(re.findall(r"(?m)^\s*docker build ", prepare)), 1)
+        self.assertNotIn("buildx build", prepare)
+        self.assertNotIn("docker/build-push-action", self.workflow_text)
+        self.assertIn('docker tag "itambox:${RELEASE_VERSION}"', prepare)
+        self.assertIn('docker push "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"', prepare)
+        self.assertIn("scripts/check_registry_image.py verify-manifest", prepare)
+        self.assertIn("scripts/check_registry_image.py verify-image", prepare)
+        self.assertIn("docker buildx imagetools inspect --raw", prepare)
+        self.assertIn('--raw "${REGISTRY}/${IMAGE_NAME}@${image_manifest_digest}"', prepare)
+        self.assertIn("GHCR_MANIFEST_DIGEST", prepare)
+        self.assertIn("IMAGE_CONFIG_DIGEST", prepare)
+
+    def test_registry_identity_matches_the_repository_and_publishes_no_moving_alias(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("REGISTRY: ghcr.io", prepare)
+        self.assertIn("IMAGE_NAME: ${{ github.repository }}", prepare)
+        self.assertNotIn(":latest", prepare)
+        self.assertNotIn(":beta", prepare)
+
+    def test_registry_attestations_share_the_registry_digest_and_are_verified_before_the_release(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertEqual(prepare.count("subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"), 2)
+        self.assertEqual(prepare.count("subject-digest: ${{ steps.ghcr-image.outputs.GHCR_MANIFEST_DIGEST }}"), 2)
+        self.assertEqual(prepare.count("push-to-registry: true"), 2)
+        self.assertIn("sbom-path: itambox-${{ inputs.version }}.sbom.spdx.json", prepare)
+        self.assertIn("oci://${REGISTRY}/${IMAGE_NAME}@${GHCR_MANIFEST_DIGEST}", prepare)
+        self.assertIn('--predicate-type "$predicate"', prepare)
+        self.assertIn('"https://slsa.dev/provenance/v1"', prepare)
+        self.assertIn('"https://spdx.dev/Document"', prepare)
+        self.assertIn("--bundle-from-oci", prepare)
+        self.assertLess(
+            prepare.index("Resolve and verify the published registry image identity"),
+            prepare.index("Prepare draft GitHub release"),
+        )
+        self.assertLess(
+            prepare.index("Verify the published image attestations"),
+            prepare.index("Prepare draft GitHub release"),
+        )
+
+    def test_all_published_file_subjects_are_verified(self):
+        prepare = self.jobs["prepare-release"]
+        verification = prepare.split("Verify release artifact attestation", 1)[1]
+        verification = verification.split("Retain reviewed image candidate", 1)[0]
+
+        for artifact in (
+            "itambox-${RELEASE_VERSION}.tar.gz",
+            "itambox-${RELEASE_VERSION}.tar.gz.sha256",
+            "itambox-${RELEASE_VERSION}.sbom.spdx.json",
+        ):
+            with self.subTest(artifact=artifact):
+                self.assertIn(artifact, verification)
 
 
 if __name__ == "__main__":

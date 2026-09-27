@@ -91,7 +91,7 @@ REST/OpenAPI, scoped GraphQL, SCIM, identity-provider integrations, imports, exp
 ITAMbox is licensed under Apache 2.0 and designed to run on infrastructure you control. Your deployment, data, integrations, retention policies, and upgrade decisions remain under your administration.
 
 > [!IMPORTANT]
-> This repository is pre-release. `1.0.0-beta.1` is current version metadata for the public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability maturity guide](itambox/docs/operations/capability-maturity.md) before relying on pre-release functionality.
+> This repository is pre-release. `1.0.0-beta.2` is current version metadata for the public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability maturity guide](itambox/docs/operations/capability-maturity.md) before relying on pre-release functionality.
 
 The Beta report-template designer is opt-in. Set `ITAMBOX_FEATURE_REPORT_DESIGNER=True` before enabling authoring or scheduled delivery; with the flag disabled, designer and schedule surfaces remain closed, delivery is skipped for non-grandfathered templates, and the migration-managed grandfathered set may continue rendering and delivery while grandfathered templates remain read-only. Saved schedules and the curated catalogue are preserved.
 
@@ -117,7 +117,7 @@ A public demo is available at [demo.itambox.dev](https://demo.itambox.dev). It c
 - **Evaluate maturity:** read the [capability maturity guide](itambox/docs/operations/capability-maturity.md).
 
 > [!NOTE]
-> ITAMbox currently supports deployment from a repository checkout or a locally built container image. It does not yet publish a Python package or prebuilt container image.
+> ITAMbox can be deployed from a repository checkout or a locally built container image. Starting with `v1.0.0-beta.2`, tagged releases also publish an official container image to the GitHub Container Registry (`ghcr.io/itambox/itambox-webapp:<version>`), with build-provenance and SPDX-SBOM attestations bound to its registry digest. No Python package is published yet, and `main` does not publish images.
 
 ## Integrations and extensibility
 

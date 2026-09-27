@@ -7,8 +7,8 @@
   "drf_spectacular_version": "0.29.0",
   "pyyaml_version": "6.0.3",
   "python_hash_seed": "0",
-  "settings_sha256": "36c44b25eac30085f5fb1a59159f90857c52d3bbe1a78db5895956ba2c0165fc",
-  "policy_sha256": "f2a0563f8d2dbebe730dc89ecbedb95fc4f5be7359673616f06c661f64750c7f",
+  "settings_sha256": "7423c6fc0d38ef9b5bb7949d453a257ec0246e27069568712afaeb53b5e01a02",
+  "policy_sha256": "d7f85011ed485cddc5e9cf952dd29e894ff2f267e3c6c370d0c4198b9eee500a",
   "diagnostics": [
     {
       "severity": "warning",

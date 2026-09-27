@@ -1,6 +1,6 @@
 # Updating a deployment
 
-ITAMbox is pre-release and currently ships as source, not as a published container image. There is no compatibility or version-skipping guarantee yet. Treat every target revision as a potentially breaking change and test it against a restored copy of production first.
+ITAMbox is pre-release and ships as source and, starting with `v1.0.0-beta.2`, as the official container image published with each tagged release (`ghcr.io/itambox/itambox-webapp:<version>`). There is no compatibility or version-skipping guarantee yet. Treat every target revision as a potentially breaking change and test it against a restored copy of production first.
 
 Releases that change migrations, storage, encryption, or other recovery-critical
 behavior must also pass the isolated [Recovery qualification drill](recovery-drill.md).

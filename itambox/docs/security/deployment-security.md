@@ -127,8 +127,10 @@ anything.
 
 ## Security reporting
 
-Follow [SECURITY.md](https://github.com/itambox/itambox-webapp/blob/main/SECURITY.md)
-and report privately to [security@itambox.dev](mailto:security@itambox.dev)
-with the subject prefix `[ITAMbox Security]`. During the pre-release period
-there is no supported release line and no guaranteed remediation timeline;
-reports against current source are still welcome.
+Follow [SECURITY.md](https://github.com/itambox/itambox-webapp/blob/main/SECURITY.md):
+report privately through [security@itambox.dev](mailto:security@itambox.dev)
+with the subject prefix `[ITAMbox Security]`, or via GitHub Private
+Vulnerability Reporting — never through public issues. The latest published
+prerelease is the current supported target; reports against current source are
+still welcome, and response or remediation times are not guaranteed during the
+prerelease period.
