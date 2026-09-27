@@ -72,7 +72,9 @@ run_manage() {  # kind worktree database label manage-args...
   local kind=$1 wt=$2 db=$3 label=$4
   shift 4
   local group_flag=()
-  [ "$kind" = candidate ] && group_flag=(--group dev)
+  if [ "$kind" = candidate ]; then
+    group_flag=(--group dev)
+  fi
   set +e
   (cd "$wt/itambox" && ITAMBOX_ENV=dev ITAMBOX_DB_NAME="$db" \
     uv run --locked "${group_flag[@]}" python manage.py "$@") \
@@ -114,6 +116,7 @@ upgrade_one() {  # key sha worktree database predecessor-state
 
   echo "-- $key: constructing predecessor $sha"
   git -C "$repo" worktree add --detach "$wt" "$sha" >/dev/null
+  createdb_ "$db"
 
   run_manage predecessor "$wt" "$db" "$key-predecessor-migrate" migrate --noinput
   assert_rc "$key-predecessor-migrate" 0
