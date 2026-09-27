@@ -686,7 +686,8 @@ class SeedAssetsMixin:
                 if random.random() < 0.6:
                     self._component_allocation_plan.append((comp_slug, qty, ws))
 
-        # Custody receipts for regulated-industry laptops/mobiles (signed)
+        # Custody receipts for regulated-industry laptops/mobiles (accepted, no
+        # signature image).
         receipts = 0
         for slug, tenant in self._tenants.items():
             # Sign receipts for regulated industries plus any tenant that has its own
@@ -709,16 +710,20 @@ class SeedAssetsMixin:
                     continue
                 holder = active.assigned_user
                 h = hashlib.sha256(f"{asset.asset_tag}-{holder.pk}-{timezone.now()}".encode()).hexdigest()[:64]
+                signed_at = timezone.now() - datetime.timedelta(days=random.randint(5, 200))
+                # Accepted demo receipts are modeled without a signature image:
+                # no placeholder PNG payload is stored, and the internal detail
+                # surface renders its explicit no-image state.
                 CustodyReceipt.objects.create(
                     asset=asset,
                     holder=holder,
                     custody_template=tmpl,
                     verification_hash=h,
-                    signature_canvas=f"data:image/png;base64,SIGNED_{asset.asset_tag}",
                     eula_version="1.0",
                     accepted=True,
-                    acceptance_status="accepted",
-                    signed_at=timezone.now() - datetime.timedelta(days=random.randint(5, 200)),
+                    acceptance_status=CustodyReceipt.STATUS_ACCEPTED,
+                    accepted_date=signed_at,
+                    signed_at=signed_at,
                 )
                 receipts += 1
 

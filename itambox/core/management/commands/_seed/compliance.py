@@ -236,7 +236,8 @@ class SeedComplianceMixin:
                 receipt_date = assign_date + datetime.timedelta(days=random.randint(0, 7))
                 receipt_dt = _as_dt(receipt_date)
 
-                # 75 % signed/accepted; 25 % still pending.
+                # 75 % signed/accepted; 25 % still pending. Accepted demo
+                # receipts carry no signature image (no placeholder payload).
                 accepted = random.random() < 0.75
                 if accepted:
                     h = hashlib.sha256(f"{asset.asset_tag}-{holder.pk}-{receipt_date}".encode()).hexdigest()[:64]
@@ -253,7 +254,6 @@ class SeedComplianceMixin:
                         accepted_date=receipt_dt,
                         signed_at=receipt_dt,
                         verification_hash=h,
-                        signature_canvas=f"data:image/png;base64,SIGNED_{asset.asset_tag}",
                         acceptance_method="link",
                     )
                 else:
