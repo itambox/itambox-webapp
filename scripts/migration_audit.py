@@ -111,19 +111,14 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "required-fresh",
-        (
-            "Deterministically recreates the two required asset seed datasets on the replacement path."
-        ),
+        ("Deterministically recreates the two required asset seed datasets on the replacement path."),
         {
             "assets.0100_issue88_shard_43_assets_seed",
         },
     ),
     **_dispositions(
         "required-fresh",
-        (
-            "Enables the PostgreSQL btree_gist extension required by the asset reservation exclusion "
-            "constraint."
-        ),
+        ("Enables the PostgreSQL btree_gist extension required by the asset reservation exclusion constraint."),
         {
             "assets.0100_issue88_shard_42_assets_relations",
         },
@@ -151,9 +146,7 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "required-fresh",
-        (
-            "Pre-provisions the canonical global Missing status outside tenant-scoped audit mutation paths."
-        ),
+        ("Pre-provisions the canonical global Missing status outside tenant-scoped audit mutation paths."),
         {
             "assets.0101_seed_canonical_missing_status",
         },
@@ -182,10 +175,7 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "upgrade-only",
-        (
-            "Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay "
-            "unsigned."
-        ),
+        ("Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay unsigned."),
         {
             "compliance.0102_clear_unsigned_receipt_timestamps",
         },
@@ -235,9 +225,7 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "upgrade-only",
-        (
-            "Preserves or transforms data/content types for an existing installation."
-        ),
+        ("Preserves or transforms data/content types for an existing installation."),
         {
             "extras.0101_issue88_drop_legacy_webhook_name_like",
         },

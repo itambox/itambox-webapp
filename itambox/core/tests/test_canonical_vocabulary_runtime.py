@@ -11,15 +11,14 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from django.contrib.contenttypes.models import ContentType
 
 from assets.customfields import validate_asset_type_custom_field_data
-from assets.models import Asset, AssetType, Category, CategoryDefaultFieldset, Manufacturer
+from assets.models import AssetType, Category, CategoryDefaultFieldset, Manufacturer
 from assets.services.specifications.core_vocabulary import get_core_vocabulary
 from core.management.commands._seed import catalog as catalog_seed
 from core.management.commands._seed.catalog import SeedCatalogMixin
 from core.management.commands.seed_data import Command as SeedDataCommand
-from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
+from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
