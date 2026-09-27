@@ -117,7 +117,7 @@ A public demo is available at [demo.itambox.dev](https://demo.itambox.dev). It c
 - **Evaluate maturity:** read the [capability maturity guide](itambox/docs/operations/capability-maturity.md).
 
 > [!NOTE]
-> ITAMbox currently supports deployment from a repository checkout or a locally built container image. It does not yet publish a Python package or prebuilt container image.
+> ITAMbox can be deployed from a repository checkout or a locally built container image. Starting with `v1.0.0-beta.2`, tagged releases also publish an official container image to the GitHub Container Registry (`ghcr.io/itambox/itambox-webapp:<version>`), with build-provenance and SPDX-SBOM attestations bound to its registry digest. No Python package is published yet, and `main` does not publish images.
 
 ## Integrations and extensibility
 

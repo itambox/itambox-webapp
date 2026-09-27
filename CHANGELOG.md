@@ -13,6 +13,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The Asset Type Library was finalized on the specification model: asset types compose an explicit, ordered list of fieldsets and fields with per-target applicability, the type-library vocabulary is pinned to a canonical core set, and the runtime serves exactly this vocabulary with no development-era compatibility layer left (issue #479).
 - Repair/replacement stories can be reconstructed as episodes: link maintenance records, reservations, and disposals to a repair episode (an asset plus an optional loaner/substitute) and read the grouped story on the asset detail Timeline tab (issue #504).
 - Asset holders gain a read-only **Offboarding** tab that gathers everything a departing person still holds across assets, inventory, licenses, custody receipts, subscriptions, and memberships; it replaces the removed `offboard_user.py` helper (issue #498).
+- Tagged releases now also publish the official container image to the GitHub Container Registry at `ghcr.io/itambox/itambox-webapp:1.0.0-beta.2`: the release workflow pushes the exact image it built, scanned, archived, and SBOM-validated, verifies the registry digest against that image, and attaches build provenance and the SPDX SBOM to it as OCI attestations. The downloadable archive, the standalone SBOM, and the registry image all describe the same reviewed commit.
 
 ### Changed
 

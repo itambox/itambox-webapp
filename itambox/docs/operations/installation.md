@@ -2,7 +2,25 @@
 
 This guide covers the source-built Docker Compose production stack. For a disposable evaluation with development settings and demo data, use "Evaluate from source" in the repository-root `README.md` instead.
 
-ITAMbox has no published container image or tagged release yet. Pin every deployment to a reviewed commit; do not deploy a moving branch without reviewing its migrations and changelog.
+ITAMbox ships as source and, starting with `v1.0.0-beta.2`, as an official container image published from each tagged release. Pin every deployment to a tagged release or a reviewed commit; do not deploy a moving branch without reviewing its migrations and changelog.
+
+## Official container image
+
+Each tagged release publishes the qualified build to the GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/itambox/itambox-webapp:1.0.0-beta.2
+```
+
+The image is the exact build the release workflow scanned, archived, and SBOM-validated, and its registry digest carries build-provenance and SPDX-SBOM attestations:
+
+```bash
+gh attestation verify "oci://ghcr.io/itambox/itambox-webapp@<digest>" \
+  --repo itambox/itambox-webapp \
+  --signer-workflow itambox/itambox-webapp/.github/workflows/release.yml
+```
+
+The remaining sections build the stack from source, which stays the supported path for auditing or customizing the build.
 
 ## Prerequisites
 
