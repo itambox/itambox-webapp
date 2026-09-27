@@ -67,9 +67,11 @@ forward order above as soon as possible.
 
 ## Migration baseline recognition preflight
 
-The current release retains the issue-#88 replacement layer and its later
-post-transition migrations. Before a cleanup release or a recovery retry, run
-this command against the intended database from the exact candidate checkout:
+The normalized baseline retains the issue-#88 replacement layer: the historical
+migration files are replaced by the 62 replacement shards, which declare the
+262 replaced identities through `replaces`. Before any migration work, a
+recovery retry, or a cleanup release, run this command against the intended
+database from the exact candidate checkout:
 
 ```bash
 cd itambox
@@ -81,12 +83,12 @@ runtime manifest. Exit code `0` attests recorder-row completeness only: it does
 not prove schema or data parity and cannot detect rows created with `migrate
 --fake`, `--fake-initial`, or direct recorder SQL. Exit code `0` means that all replacement rows, their complete
 historical recognition set, and every current post-transition leaf are present.
-A non-zero result is a stop condition. It distinguishes complete old history
-without replacement recognition, partial old history, partial replacement,
+A non-zero result is a stop condition. It distinguishes a partial normalized
+baseline (for example a database that never ran the replacement layer), an
 incomplete post-transition state, empty/unmigrated databases, and unknown or
-mixed first-party rows. Remediation is to deploy the designated transition
-release and run the ordinary migration executor, or to restore the verified
-predecessor and investigate the schema/data evidence as directed by the state.
+mixed first-party rows. Remediation is to run the ordinary migration executor
+with this release, or to restore the verified predecessor and investigate the
+schema/data evidence as directed by the state.
 
 The command does not validate that an image or running process matches a
 caller-declared revision. Bind the exact full Git SHA to the immutable image or
@@ -95,10 +97,12 @@ non-atomic operations before its recorder row commits; a missing row therefore
 never proves that no schema/data change occurred. Use restore-first rollback and
 fresh schema/protected-canary comparisons before retrying.
 
-The preflight is a prerequisite for a future baseline cleanup, not a claim that
-this prerelease supports arbitrary version skipping. The current checked layout
-is still transitional; no historical migration file is removed, renamed, or
-pruned by this release.
+This prerelease still supports no arbitrary version skipping. The supported
+starting points for this release are the two predecessor revisions recorded in
+the checked manifest (`supported_predecessors`): the pre-squash revision and the
+transition release. Databases created by transitional development states of the
+#479 work are explicitly not supported; the executor fails closed with a clear
+recorder inconsistency instead of rewriting their history.
 
 ## Source-built Compose update
 

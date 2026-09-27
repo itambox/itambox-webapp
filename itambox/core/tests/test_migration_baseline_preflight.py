@@ -194,22 +194,23 @@ class MigrationBaselineClassifierTests(SimpleTestCase):
 class MigrationBaselineManifestTests(SimpleTestCase):
     def test_checked_manifest_has_the_expected_current_layout_and_complete_sets(self):
         manifest = load_manifest()
-        self.assertEqual(manifest["layout"], "transitional")
+        self.assertEqual(manifest["layout"], "normalized")
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 59)
+        self.assertEqual(len(manifest["post_transition_ids"]), 45)
         self.assertTrue(
             {
-                "assets.0114_issue479_t06_composition_schema",
-                "assets.0115_issue479_t07_provenance_bridge",
-                "assets.0117_issue479_final_core_vocabulary",
+                "assets.0102_asset_type_composition_schema",
+                "assets.0103_asset_type_specification_conversion",
+                "assets.0104_asset_type_core_vocabulary",
+                "assets.0107_asset_type_specification_guards",
                 "assets.0118_assetdisposal_cancellation_reason_and_more",
                 "assets.0121_supplier_scoping_and_commercial_fields",
-                "extras.0118_issue479_t06_definition_schema",
-                "extras.0119_issue479_t07_provenance_schema",
-                "extras.0120_issue479_t07_provenance_cutover",
-                "extras.0121_specification_library_permission",
+                "extras.0114_asset_type_definition_library_schema",
+                "extras.0115_asset_type_definition_conversion",
+                "extras.0116_asset_type_definition_cutover",
+                "extras.0117_asset_type_definition_guards",
                 "subscriptions.0103_unified_vendor_cutover",
             }.issubset(manifest["post_transition_ids"])
         )
@@ -425,7 +426,7 @@ class PostgreSQLMigrationBaselineCommandTests(TransactionTestCase):
         after = recorder.applied_migrations()
 
         self.assertEqual(before, after)
-        self.assertEqual(json.loads(stdout.getvalue())["state"], "complete-replacement-recognition")
+        self.assertEqual(json.loads(stdout.getvalue())["state"], "current-normalized-baseline")
         statements = [query["sql"].lstrip().upper() for query in queries.captured_queries]
         self.assertTrue(statements)
         self.assertTrue(all(statement.startswith("SELECT") for statement in statements), statements)

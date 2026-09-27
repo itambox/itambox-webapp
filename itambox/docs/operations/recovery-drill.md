@@ -75,20 +75,19 @@ probe key into an issue, pull request, CI log, or evidence JSON file.
 
 The current candidate ships a read-only `migration_baseline_preflight` command and
 checked manifest. The gate is a cleanup-release admission check, not a substitute
-for the ordinary transition upgrade. In this Path C drill, a restored pre-squash
-predecessor is expected to report `complete-old-history-no-replacement` (non-zero)
+for the ordinary upgrade. In this Path C drill, a restored pre-squash
+predecessor is expected to report `partial-normalized-baseline` (non-zero)
 before the normal candidate migration; after that migration completes, rerun the
-gate and require `complete-replacement-recognition` (zero). A future cleanup
-release must run the gate before any cleanup migration writes and stop on every
-non-zero result. The command only reads `django_migrations` and cannot detect a
+gate and require `current-normalized-baseline` (zero). Every future release must
+run the gate before any migration writes and stop on every non-zero result. The command only reads `django_migrations` and cannot detect a
 failed non-atomic migration whose operations ran before its recorder row committed.
 For any interrupted or failed run, restore first and compare schema, data, and
 protected-canary evidence; do not infer safety from a missing recorder row.
 
-The checked layout remains transitional. This gate does not remove migration
-files, change `replaces`, write recorder rows, or authorize arbitrary release
-skips. The future normalized-baseline state is valid only after a separately
-reviewed manifest/layout transition.
+The checked layout is normalized: the historical migration files are replaced
+by the replacement shards that declare them through `replaces`. This gate does
+not write recorder rows, change `replaces`, or authorize arbitrary release
+skips.
 
 ## Record immutable inputs and build exact application images
 

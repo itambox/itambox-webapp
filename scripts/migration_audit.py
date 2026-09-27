@@ -19,21 +19,11 @@ OPERATION_TYPES = (
 POST_TRANSITION_MIGRATIONS = {
     "assets.0101_seed_canonical_missing_status",
     "assets.0102_asset_type_composition_schema",
-    "assets.0103_asset_type_data_backfill",
-    "assets.0104_asset_type_composition_backfill",
-    "assets.0105_asset_type_core_adoption",
-    "assets.0106_asset_type_core_seed",
-    "assets.0107_asset_type_library_contract",
-    "assets.0108_asset_type_singular_cutover",
-    "assets.0109_alter_assettype_lifecycle",
-    "assets.0110_alter_assettypefieldset_asset_type",
-    "assets.0111_alter_categorydefaultfieldset_category",
-    "assets.0112_alter_assettype_library_definition_key_and_more",
-    "assets.0113_assettype_library_identity_immutable",
-    "assets.0114_issue479_t06_composition_schema",
-    "assets.0115_issue479_t07_provenance_bridge",
-    "assets.0116_assettypeimagestage",
-    "assets.0117_issue479_final_core_vocabulary",
+    "assets.0103_asset_type_specification_conversion",
+    "assets.0104_asset_type_core_vocabulary",
+    "assets.0105_asset_type_provenance_capture",
+    "assets.0106_asset_type_composition_cutover",
+    "assets.0107_asset_type_specification_guards",
     "assets.0118_assetdisposal_cancellation_reason_and_more",
     "assets.0119_warranty_supplier",
     "assets.0120_repair_episode",
@@ -56,14 +46,10 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0111_webhookdelivery_target_claim",
     "extras.0112_backfill_webhookdelivery_targets",
     "extras.0113_upgrade_legacy_webhook_retry_schedules",
-    "extras.0114_asset_type_definition_schema",
-    "extras.0115_asset_type_fieldset_cutover",
-    "extras.0116_alter_customfield_lifecycle_and_more",
-    "extras.0117_alter_customfieldchoice_choice_set_and_more",
-    "extras.0118_issue479_t06_definition_schema",
-    "extras.0119_issue479_t07_provenance_schema",
-    "extras.0120_issue479_t07_provenance_cutover",
-    "extras.0121_specification_library_permission",
+    "extras.0114_asset_type_definition_library_schema",
+    "extras.0115_asset_type_definition_conversion",
+    "extras.0116_asset_type_definition_cutover",
+    "extras.0117_asset_type_definition_guards",
     "extras.0122_journalentry_tenant_group",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
@@ -102,68 +88,119 @@ def _dispositions(disposition, rationale, migration_ids):
 # migration/function names, reversibility syntax, and operation implementation.
 SEMANTIC_DISPOSITIONS = {
     **_dispositions(
-        "upgrade-only",
+        "required-fresh",
         (
-            "Converts legacy custom-field identities, types, relational choices, memberships, and stored JSON values "
-            "into the Issue #479 additive definition schema while preserving unknown keys and aborting on ambiguity."
+            "Adds additive WP-13 delivery observability fields and idempotently derives the filterable "
+            "delivery_outcome from existing per-channel payloads without mutating delivery_status; fully "
+            "reversible."
         ),
-        {"assets.0103_asset_type_data_backfill"},
+        {
+            "extras.0108_alertlog_delivery_outcome",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Creates and reconciles the normative final core vocabulary (active specification fields, the "
+            "retired foundation tombstone, ordered choice sets and fieldsets, field memberships, and category "
+            "defaults) without creating concrete Asset Types."
+        ),
+        {
+            "assets.0104_asset_type_core_vocabulary",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Deterministically recreates the two required asset seed datasets on the replacement path."
+        ),
+        {
+            "assets.0100_issue88_shard_43_assets_seed",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Enables the PostgreSQL btree_gist extension required by the asset reservation exclusion "
+            "constraint."
+        ),
+        {
+            "assets.0100_issue88_shard_42_assets_relations",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Installs the PostgreSQL guard that keeps Asset Type specification identity columns immutable "
+            "after creation and refuses hard deletion of core and library Asset Type identities."
+        ),
+        {
+            "assets.0107_asset_type_specification_guards",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Installs the PostgreSQL guards for permanent reusable-definition identities, immutable definition "
+            "and choice identities, global-field membership rejection, and the append-only legacy provenance "
+            "and specification library archives."
+        ),
+        {
+            "extras.0117_asset_type_definition_guards",
+        },
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Pre-provisions the canonical global Missing status outside tenant-scoped audit mutation paths."
+        ),
+        {
+            "assets.0101_seed_canonical_missing_status",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Copies the legacy singular Asset Type fieldset relation into the ordered plural composition before the "
-            "later clean-cut removal of the migration-input column."
+            "Archives the legacy evidence state of every existing Asset Type and reusable definition as "
+            "immutable SpecificationLibraryLegacyProvenance rows before the transitional columns are removed; "
+            "supported upgrade states carry no library-managed ownership or reconciliation evidence, so every "
+            "archived row is uninitialized."
         ),
-        {"assets.0104_asset_type_composition_backfill"},
+        {
+            "assets.0105_asset_type_provenance_capture",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Retains physical legacy report-designer columns while removing them from the historical ORM state "
-            "before the durable 1.x contract is restored."
+            "Backfills tenant attribution for legacy tenant-less alerts while marking ambiguous or unresolved "
+            "targets for operator review."
         ),
-        {"extras.0103_remove_reporttemplate_advanced_mode_and_more"},
+        {
+            "extras.0104_issue183_alert_tenant_reconciliation",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Restores durable report-designer fields, recovers serialized legacy values, stamps only the bounded "
-            "live scheduled set, and reports out-of-bound custom HTML templates."
+            "Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay "
+            "unsigned."
         ),
-        {"extras.0105_reporttemplate_advanced_mode_and_more"},
+        {
+            "compliance.0102_clear_unsigned_receipt_timestamps",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Transplants subscription provider profiles into the tenant-scoped supplier catalogue (explicit link, "
-            "scope-and-name match, or create), rebinds every subscription including soft-deleted ones, copies tag "
-            "links, and repoints generic contact assignments. The merge is lossy, so rollback is restore-first."
+            "Converts pre-#479 definition identities, field types, relational choices, memberships, and stored "
+            "JSON values into the final specification contract while preserving unknown keys and aborting on "
+            "ambiguity, and copies the legacy singular Asset Type fieldset relation into the final ordered "
+            "composition; a fresh install has nothing to convert or copy."
         ),
-        {"subscriptions.0103_unified_vendor_cutover"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        (
-            "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states during 1.0 upgrade."
-        ),
-        {"subscriptions.0101_remove_subscription_auto_renewal_and_more"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        (
-            "Populates stable opaque SCIM IDs idempotently and adds scoped group/user "
-            "correlation fields while preserving legacy principals for the 1.x dual-read window."
-        ),
-        {"users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        (
-            "Rewrites the twelve canonical django-q Schedule.func values to their issue-#445 domain-owner "
-            "paths forward and back, preserving every other schedule field, PK and row multiplicity."
-        ),
-        {"extras.0110_issue445_task_paths"},
+        {
+            "assets.0103_asset_type_specification_conversion",
+        },
     ),
     **_dispositions(
         "upgrade-only",
@@ -171,224 +208,102 @@ SEMANTIC_DISPOSITIONS = {
             "Copies endpoint configuration into immutable webhook delivery target snapshots; endpoint-less "
             "history remains unbound because exact legacy rule provenance cannot be reconstructed safely."
         ),
-        {"extras.0112_backfill_webhookdelivery_targets"},
+        {
+            "extras.0112_backfill_webhookdelivery_targets",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Validates and upgrades delayed legacy webhook retry schedules to assertion-only payloads, moves exact "
-            "endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue secrets."
+            "Normalizes predecessor definition ownership, applicability, lifecycle, and ordered fieldset "
+            "membership positions to the final contract and installs the deferred owner/position uniqueness as "
+            "immediate; a fresh install has nothing to normalize."
         ),
-        {"extras.0113_upgrade_legacy_webhook_retry_schedules"},
+        {
+            "extras.0115_asset_type_definition_conversion",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Adopts exactly the five preflight-authenticated legacy core candidates, validates their converted values, "
-            "and switches their final core ownership and Asset/AssetType scopes before the final seed."
+            "Populates stable opaque SCIM IDs idempotently and adds scoped group/user correlation fields while "
+            "preserving legacy principals for the 1.x dual-read window."
         ),
-        {"assets.0105_asset_type_core_adoption"},
+        {
+            "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
+        },
     ),
     **_dispositions(
-        "required-fresh",
+        "upgrade-only",
         (
-            "Creates and reconciles the normative 48-field core vocabulary, thirteen choice sets, twelve ordered "
-            "fieldsets, and field memberships without creating concrete Asset Types."
+            "Preserves or transforms data/content types for an existing installation."
         ),
-        {"assets.0106_asset_type_core_seed"},
-    ),
-    **_dispositions(
-        "required-fresh",
-        "Enables the PostgreSQL btree_gist extension required by the asset reservation exclusion constraint.",
         {
-            "assets.0051_assetreservation_assetreservation_no_overlap",
-            "assets.0100_issue88_shard_42_assets_relations",
-        },
-    ),
-    **_dispositions(
-        "required-fresh",
-        "Deterministically recreates the two required asset seed datasets on the replacement path.",
-        {"assets.0100_issue88_shard_43_assets_seed"},
-    ),
-    **_dispositions(
-        "required-fresh",
-        "Pre-provisions the canonical global Missing status outside tenant-scoped audit mutation paths.",
-        {"assets.0101_seed_canonical_missing_status"},
-    ),
-    **_dispositions(
-        "required-fresh",
-        "Creates application data required on an empty installation.",
-        {
-            "assets.0003_seed_status_labels",
-            "assets.0043_seed_depreciation_policies",
-        },
-    ),
-    **_dispositions(
-        "safely-replaced-by-final-schema",
-        "Database/state transition is superseded by the final schema on an empty installation.",
-        {
-            "assets.0033_remove_customfieldset_fields_and_more",
-            "assets.0036_remove_installedsoftware",
-            "assets.0037_remove_auditsession_created_by_and_more",
-            "compliance.0011_remove_assetmaintenance",
-            "core.0023_remove_event_eventrule_webhookendpoint",
-            "core.0024_remove_exporttemplate_labeltemplate",
-            "core.0025_remove_journalentry_bookmark_attachments",
-            "core.0026_remove_reporttemplate_scheduledreport_reportgenerationarchive",
-            "core.0027_remove_notificationchannel_alertrule_alertlog",
-            "extras.0019_align_report_field_metadata",
-            "extras.0022_fix_scheduledreport_channels_ref",
-            "extras.0023_align_alerting_field_metadata",
-            "organization.0025_delete_usergroup",
-        },
-    ),
-    **_dispositions(
-        "review-blocker",
-        "Known greenfield and upgrade-support blocker; do not claim snapshot support.",
-        {"organization.0027_drop_legacy_role_models"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        "Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay unsigned.",
-        {"compliance.0102_clear_unsigned_receipt_timestamps"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        "Preserves or transforms data/content types for an existing installation.",
-        {
-            "assets.0020_alter_asset_requestable",
-            "assets.0038_assetmaintenance",
-            "assets.0039_repoint_assetmaintenance_contenttype",
-            "assets.0040_null_to_empty_strings",
-            "assets.0042_depreciation_v2",
-            "assets.0044_assetrole_allows_components",
-            "assets.0049_supplier_contacts_unification",
-            "compliance.0009_auditsession_assetaudit",
-            "compliance.0010_repoint_audit_contenttypes",
-            "compliance.0012_null_to_empty_strings",
-            "compliance.0014_auditsession_tenant",
-            "core.0028_encrypt_emailsettings_smtp_password",
-            "core.0029_null_to_empty_strings",
-            "extras.0003_alter_dashboard_options_dashboard_is_default_and_more",
-            "extras.0008_customfield_customfieldset",
-            "extras.0009_repoint_customfield_contenttype",
-            "extras.0010_customfield_object_types",
-            "extras.0011_event_eventrule_webhookendpoint",
-            "extras.0012_repoint_event_contenttypes",
-            "extras.0013_exporttemplate_labeltemplate",
-            "extras.0014_repoint_exporttemplate_contenttypes",
-            "extras.0015_journalentry_bookmark_attachments",
-            "extras.0016_repoint_group3_contenttypes",
-            "extras.0017_reporttemplate_scheduledreport_reportgenerationarchive",
-            "extras.0018_repoint_report_contenttypes",
-            "extras.0020_notificationchannel_alertrule_alertlog",
-            "extras.0021_repoint_alerting_contenttypes",
-            "extras.0024_null_to_empty_strings",
-            "extras.0025_objectwatch",
-            "extras.0026_disable_script_event_rules",
-            "extras.0028_encrypt_webhookendpoint_secret",
-            "extras.0033_alertlog_uniq_open_alert_per_object",
-            "extras.0034_journalentry_tenant",
             "extras.0101_issue88_drop_legacy_webhook_name_like",
-            "inventory.0013_backfill_stock_tenant_and_provenance",
-            "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
-            "organization.0014_null_to_empty_strings",
-            "organization.0039_backfill_phase5_rbac",
-            "organization.0040_remove_rolegrant_legacy_assignment_and_more",
-            "procurement.0004_setup_groups",
-            "software.0007_installedsoftware",
-            "software.0008_repoint_installedsoftware_contenttype",
-            "subscriptions.0006_remove_provider_contact_email_and_more",
-            "users.0005_remove_token_key_token_digest_token_key_preview_and_more",
-            "users.0007_usergroup",
-            "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more",
         },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Backfills tenant attribution for legacy tenant-less alerts while marking "
-            "ambiguous or unresolved targets for operator review."
-        ),
-        {"extras.0104_issue183_alert_tenant_reconciliation"},
-    ),
-    **_dispositions(
-        "required-fresh",
-        (
-            "Adds additive WP-13 delivery observability fields and idempotently derives "
-            "the filterable delivery_outcome from existing per-channel payloads without "
-            "mutating delivery_status; fully reversible."
-        ),
-        {"extras.0108_alertlog_delivery_outcome"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        (
-            "Performs the irreversible clean cutover from the singular/legacy fieldset columns to the final relational "
-            "contract; reverse migration is refused before any destructive rollback operation."
+            "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states "
+            "during 1.0 upgrade."
         ),
         {
-            "assets.0108_asset_type_singular_cutover",
-            "extras.0115_asset_type_fieldset_cutover",
+            "subscriptions.0101_remove_subscription_auto_renewal_and_more",
         },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Normalizes historical lifecycle='deleted' rows to the final active/deprecated contract and records "
-            "missing deletion timestamps; the reverse is explicitly refused because the original state is not recoverable."
+            "Restores durable report-designer fields, recovers serialized legacy values, stamps only the "
+            "bounded live scheduled set, and reports out-of-bound custom HTML templates."
         ),
         {
-            "assets.0109_alter_assettype_lifecycle",
-            "extras.0116_alter_customfield_lifecycle_and_more",
+            "extras.0105_reporttemplate_advanced_mode_and_more",
         },
     ),
     **_dispositions(
-        "required-fresh",
-        "Installs the PostgreSQL trigger that keeps Asset Type library identity immutable and restricts "
-        "library release/checksum reconciliation-state changes to the controlled reconciliation path, "
-        "including for QuerySet and direct SQL updates.",
-        {"assets.0113_assettype_library_identity_immutable"},
-    ),
-    **_dispositions(
-        "required-fresh",
-        "Installs PostgreSQL guards for permanent reusable-definition identities and "
-        "rejects global-field fieldset membership through direct SQL or ORM writes.",
+        "upgrade-only",
+        (
+            "Retains physical legacy report-designer columns while removing them from the historical ORM state "
+            "before the durable 1.x contract is restored."
+        ),
         {
-            "extras.0118_issue479_t06_definition_schema",
+            "extras.0103_remove_reporttemplate_advanced_mode_and_more",
         },
     ),
     **_dispositions(
         "upgrade-only",
-        "Normalizes predecessor composition positions to dense one-based ordinals and installs deferred owner/position uniqueness.",
+        (
+            "Rewrites the twelve canonical django-q Schedule.func values to their issue-#445 domain-owner "
+            "paths forward and back, preserving every other schedule field, PK and row multiplicity."
+        ),
         {
-            "assets.0114_issue479_t06_composition_schema",
+            "extras.0110_issue445_task_paths",
         },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Bridges legacy Asset Type and definition provenance into the new Specification Library schema, captures "
-            "transition evidence, and performs the irreversible Asset Type cutover with guarded identity semantics."
+            "Transplants subscription provider profiles into the tenant-scoped supplier catalogue (explicit "
+            "link, scope-and-name match, or create), rebinds every subscription including soft-deleted ones, "
+            "copies tag links, and repoints generic contact assignments. The merge is lossy, so rollback is "
+            "restore-first."
         ),
-        {"assets.0115_issue479_t07_provenance_bridge"},
+        {
+            "subscriptions.0103_unified_vendor_cutover",
+        },
     ),
     **_dispositions(
         "upgrade-only",
         (
-            "Reconciles existing core vocabulary definitions, memberships, and category defaults to the reviewed "
-            "Issue #479 matrix, retaining legacy values and refusing ambiguous ownership or identity conflicts; "
-            "reverse is refused because the existing-data reconciliation is not safely reversible."
+            "Validates and upgrades delayed legacy webhook retry schedules to assertion-only payloads, moves "
+            "exact endpoint-less targets into encrypted durable snapshots, and irreversibly removes queue "
+            "secrets."
         ),
-        {"assets.0117_issue479_final_core_vocabulary"},
-    ),
-    **_dispositions(
-        "upgrade-only",
-        (
-            "Completes the irreversible provenance cutover by removing legacy source fields and installing database "
-            "guards that preserve library, release, and legacy evidence identities."
-        ),
-        {"extras.0120_issue479_t07_provenance_cutover"},
+        {
+            "extras.0113_upgrade_legacy_webhook_retry_schedules",
+        },
     ),
 }
 
@@ -690,7 +605,9 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         explicit_replacement_chain_edges = _validate_issue88_shard_chain(replacement_migrations)
         replacement_targets = [target for migration in replacement_migrations for target in migration["replaces"]]
         unknown_targets = sorted(set(replacement_targets) - node_ids)
-        if unknown_targets:
+        if unknown_targets and node_ids:
+            # A normalized layout deletes the replaced history, so the replacement targets then
+            # carry the frozen historical identities and cannot be resolved against source files.
             raise ValueError(f"unknown replacement targets: {unknown_targets}")
         duplicate_targets = sorted(
             target for target in set(replacement_targets) if replacement_targets.count(target) > 1
@@ -783,7 +700,10 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         for migration_id, policy in semantic_dispositions.items()
         if policy["disposition"] not in ALLOWED_DISPOSITIONS
     }
-    missing_blockers = expected_blockers - node_ids
+    known_historical_ids = node_ids | {
+        target for migration in replacement_migrations for target in migration["replaces"]
+    }
+    missing_blockers = expected_blockers - known_historical_ids
     if invalid_dispositions:
         raise ValueError(f"invalid semantic dispositions: {invalid_dispositions}")
     if custom_operation_ids != policy_ids:
@@ -969,14 +889,17 @@ def validate_preflight_manifest_git_objects(manifest, repository_root):
 
 def _preflight_manifest_expected_ids(inventory):
     post_ids = set(inventory["post_transition_migrations"])
-    historical_ids = sorted(
-        migration["id"]
-        for migration in inventory["migrations"]
-        if not migration["is_replacement"] and migration["id"] not in post_ids
-    )
     replacement_migrations = [migration for migration in inventory["migrations"] if migration["is_replacement"]]
     replacement_ids = sorted(migration["id"] for migration in replacement_migrations)
     replacement_target_ids = sorted(target for migration in replacement_migrations for target in migration["replaces"])
+    historical_ids = sorted(
+        {
+            migration["id"]
+            for migration in inventory["migrations"]
+            if not migration["is_replacement"] and migration["id"] not in post_ids
+        }
+        | set(replacement_target_ids)
+    )
     post_transition_ids = sorted(post_ids)
     current_graph = _post_transition_graph(inventory)
     post_transition_leaf_ids = sorted(post_ids - {source for source, _ in current_graph["edges"] if source in post_ids})
@@ -1000,11 +923,26 @@ def render_preflight_manifest(inventory, manifest):
     return json.dumps(rendered, indent=2, sort_keys=True) + "\n"
 
 
+def _expected_source_layout(inventory):
+    """Derive the reviewed layout from the source graph.
+
+    A source without historical migration files but with replacement migrations is the
+    normalized layout: the replaced history has been deleted and only the replacement
+    shards carry it. Any other source keeps the transitional layout.
+    """
+
+    has_historical = bool(inventory["historical_graph"]["nodes"])
+    has_replacements = any(migration["is_replacement"] for migration in inventory["migrations"])
+    if not has_historical and has_replacements:
+        return "normalized"
+    return "transitional"
+
+
 def validate_preflight_manifest(inventory, manifest):
     if manifest.get("schema_version") != 1:
         raise ValueError("migration preflight manifest schema_version must be 1")
-    if manifest.get("layout") != "transitional":
-        raise ValueError("migration preflight manifest layout must match the current transitional source")
+    if manifest.get("layout") != _expected_source_layout(inventory):
+        raise ValueError("migration preflight manifest layout must match the current migration source")
     for key in _PREFLIGHT_MANIFEST_LIST_FIELDS:
         _manifest_list(manifest, key)
     for key, expected in _preflight_manifest_expected_ids(inventory).items():

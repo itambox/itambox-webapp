@@ -2,10 +2,10 @@
   "schema_version": 1,
   "source": {
     "migration_vocabulary": "itambox/assets/migrations/_core_vocabulary.py",
-    "foundation_migration": "itambox/assets/migrations/0106_asset_type_core_seed.py",
+    "foundation_migration": "itambox/assets/migrations/0104_asset_type_core_vocabulary.py",
     "current_demo_seed": "itambox/core/management/commands/_seed/catalog.py",
-    "adoption_migration": "itambox/assets/migrations/0103_asset_type_data_backfill.py",
-    "adoption_to_core_migration": "itambox/assets/migrations/0105_asset_type_core_adoption.py"
+    "adoption_migration": "itambox/assets/migrations/0103_asset_type_specification_conversion.py",
+    "adoption_to_core_migration": "itambox/assets/migrations/0104_asset_type_core_vocabulary.py"
   },
   "observed_counts": {
     "migration_fields": 48,

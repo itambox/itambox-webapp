@@ -543,32 +543,22 @@ class MigrationAuditTests(unittest.TestCase):
 
         inventory = build_inventory(repository_root / "itambox")
 
-        self.assertEqual(inventory["summary"]["first_party_nodes"], 262)
-        self.assertEqual(inventory["summary"]["first_party_edges"], 522)
+        self.assertEqual(inventory["summary"]["first_party_nodes"], 0)
+        self.assertEqual(inventory["summary"]["first_party_edges"], 0)
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 59)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 45)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
                 "assets.0101_seed_canonical_missing_status",
                 "assets.0102_asset_type_composition_schema",
-                "assets.0103_asset_type_data_backfill",
-                "assets.0104_asset_type_composition_backfill",
-                "assets.0105_asset_type_core_adoption",
-                "assets.0106_asset_type_core_seed",
-                "assets.0107_asset_type_library_contract",
-                "assets.0108_asset_type_singular_cutover",
-                "assets.0109_alter_assettype_lifecycle",
-                "assets.0110_alter_assettypefieldset_asset_type",
-                "assets.0111_alter_categorydefaultfieldset_category",
-                "assets.0112_alter_assettype_library_definition_key_and_more",
-                "assets.0113_assettype_library_identity_immutable",
-                "assets.0114_issue479_t06_composition_schema",
-                "assets.0115_issue479_t07_provenance_bridge",
-                "assets.0116_assettypeimagestage",
-                "assets.0117_issue479_final_core_vocabulary",
+                "assets.0103_asset_type_specification_conversion",
+                "assets.0104_asset_type_core_vocabulary",
+                "assets.0105_asset_type_provenance_capture",
+                "assets.0106_asset_type_composition_cutover",
+                "assets.0107_asset_type_specification_guards",
                 "assets.0118_assetdisposal_cancellation_reason_and_more",
                 "assets.0119_warranty_supplier",
                 "assets.0120_repair_episode",
@@ -591,14 +581,10 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0111_webhookdelivery_target_claim",
                 "extras.0112_backfill_webhookdelivery_targets",
                 "extras.0113_upgrade_legacy_webhook_retry_schedules",
-                "extras.0114_asset_type_definition_schema",
-                "extras.0115_asset_type_fieldset_cutover",
-                "extras.0116_alter_customfield_lifecycle_and_more",
-                "extras.0117_alter_customfieldchoice_choice_set_and_more",
-                "extras.0118_issue479_t06_definition_schema",
-                "extras.0119_issue479_t07_provenance_schema",
-                "extras.0120_issue479_t07_provenance_cutover",
-                "extras.0121_specification_library_permission",
+                "extras.0114_asset_type_definition_library_schema",
+                "extras.0115_asset_type_definition_conversion",
+                "extras.0116_asset_type_definition_cutover",
+                "extras.0117_asset_type_definition_guards",
                 "extras.0122_journalentry_tenant_group",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
@@ -618,55 +604,42 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertTrue(inventory["summary"]["effective_replacement_quotient_acyclic"])
         self.assertEqual(
             inventory["summary"]["global_roots"],
-            ["users.0010_user"],
+            [],
         )
         self.assertEqual(
             inventory["summary"]["global_leaves"],
-            [
-                "assets.0056_remove_assetassignment_unique_active_assignment_per_asset_and_more",
-                "compliance.0016_alter_assetaudit_asset_alter_assetaudit_auditor_and_more",
-                "core.0032_alter_emailsettings_enabled_and_more",
-                "extras.0041_alter_reporttemplate_style_preset",
-                "inventory.0014_alter_accessorystock_tenant_and_more",
-                "licenses.0013_licenseseatassignment_unique_active_license_seat_per_asset_and_more",
-                "procurement.0012_alter_contract_contract_number_and_more",
-                "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more",
-            ],
+            [],
         )
         self.assertEqual(
             inventory["summary"]["custom_operation_file_counts"],
             {
-                "RunPython": 38,
-                "RunSQL": 11,
-                "SeparateDatabaseAndState": 24,
-                "BtreeGistExtension": 1,
+                "RunPython": 0,
+                "RunSQL": 0,
+                "SeparateDatabaseAndState": 0,
+                "BtreeGistExtension": 0,
             },
         )
-        self.assertEqual(
-            inventory["special_users_bootstrap"]["migration"],
-            "users.0010_user",
-        )
+        # The bootstrap migration itself is part of the replaced history now;
+        # only its swappable dependents remain visible in the normalized source.
+        self.assertIsNone(inventory["special_users_bootstrap"]["migration"])
         self.assertEqual(
             inventory["special_users_bootstrap"]["run_before"],
-            ["users.0001_initial"],
+            [],
         )
         self.assertEqual(
             len(inventory["special_users_bootstrap"]["swappable_dependents"]),
-            59,
+            7,
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["required_fresh"],
             [
-                "assets.0003_seed_status_labels",
-                "assets.0043_seed_depreciation_policies",
-                "assets.0051_assetreservation_assetreservation_no_overlap",
                 "assets.0100_issue88_shard_42_assets_relations",
                 "assets.0100_issue88_shard_43_assets_seed",
                 "assets.0101_seed_canonical_missing_status",
-                "assets.0106_asset_type_core_seed",
-                "assets.0113_assettype_library_identity_immutable",
+                "assets.0104_asset_type_core_vocabulary",
+                "assets.0107_asset_type_specification_guards",
                 "extras.0108_alertlog_delivery_outcome",
-                "extras.0118_issue479_t06_definition_schema",
+                "extras.0117_asset_type_definition_guards",
             ],
         )
         replacement_extension = next(
@@ -690,16 +663,16 @@ class MigrationAuditTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            SEMANTIC_DISPOSITIONS["procurement.0004_setup_groups"]["disposition"],
+            SEMANTIC_DISPOSITIONS["assets.0103_asset_type_specification_conversion"]["disposition"],
             "upgrade-only",
         )
         self.assertEqual(
-            SEMANTIC_DISPOSITIONS["assets.0117_issue479_final_core_vocabulary"]["disposition"],
-            "upgrade-only",
+            SEMANTIC_DISPOSITIONS["assets.0104_asset_type_core_vocabulary"]["disposition"],
+            "required-fresh",
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["review_blocker"],
-            ["organization.0027_drop_legacy_role_models"],
+            [],
         )
         self.assertEqual(len(inventory["effective_graph"]["nodes"]), 62)
         self.assertEqual(
@@ -771,7 +744,7 @@ class PreflightManifestAuditTests(unittest.TestCase):
         self.inventory = build_inventory(self.source_root)
         self.manifest = load_preflight_manifest(self.manifest_path)
 
-    def test_checked_manifest_matches_the_current_transitional_inventory(self):
+    def test_checked_manifest_matches_the_current_normalized_inventory(self):
         validate_preflight_manifest(self.inventory, self.manifest)
         validate_preflight_manifest_git_objects(self.manifest, self.repository_root)
 
@@ -809,9 +782,9 @@ class PreflightManifestAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "post_transition_leaf_ids"):
             validate_preflight_manifest(self.inventory, manifest)
 
-    def test_unexpected_normalized_layout_fails_closed_against_transitional_source(self):
+    def test_unexpected_transitional_layout_fails_closed_against_normalized_source(self):
         manifest = json.loads(json.dumps(self.manifest))
-        manifest["layout"] = "normalized"
+        manifest["layout"] = "transitional"
         with self.assertRaisesRegex(ValueError, "layout"):
             validate_preflight_manifest(self.inventory, manifest)
 
