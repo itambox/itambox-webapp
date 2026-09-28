@@ -2,7 +2,7 @@
 FROM ghcr.io/astral-sh/uv:0.11.31@sha256:ecd4de2f060c64bea0ff8ecb182ddf46ba3fcccdc8a60cfdbaf20d1a047d7437 AS uv
 
 # ---- Stage 1: build the frontend (SCSS + vendor copy + JS bundle) ----
-FROM node:20-slim AS frontend
+FROM node:26-slim AS frontend
 WORKDIR /app
 COPY itambox/package.json itambox/package-lock.json ./
 RUN npm ci
