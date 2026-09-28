@@ -9,7 +9,7 @@ ITAMbox ships as source and, starting with `v1.0.0-beta.2`, as an official conta
 Each tagged release publishes the qualified build to the GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/itambox/itambox-webapp:1.0.0-beta.2
+docker pull ghcr.io/itambox/itambox-webapp:1.0.0-beta.3
 ```
 
 The image is the exact build the release workflow scanned, archived, and SBOM-validated, and its registry digest carries build-provenance and SPDX-SBOM attestations:

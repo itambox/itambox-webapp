@@ -6,6 +6,12 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] - 2026-09-28
+
+### Security
+
+- The published image installs the current `openssl`, `libssl3`, and `tzdata` security builds in its runtime stage instead of inheriting the stale base-image pins, clearing the medium- and low-severity findings that remained from the `v1.0.0-beta.2` image scan.
+
 ## [1.0.0-beta.2] - 2026-09-27
 
 ### Added
@@ -263,7 +269,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
 - SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
 
-[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-beta.2...HEAD
+[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-beta.3...HEAD
+[1.0.0-beta.3]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-beta.1
 [1.0.0-alpha.3]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.3
