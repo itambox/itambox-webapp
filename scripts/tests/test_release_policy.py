@@ -313,6 +313,13 @@ class ReleaseWorkflowHardeningTests(unittest.TestCase):
         ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, rehearsal)
+        # The rehearsal compiles both release platforms into the builder cache
+        # and loads the host-platform image for scanning only; publishing stays
+        # impossible because nothing is exported to a registry.
+        self.assertIn("--output type=cacheonly", rehearsal)
+        self.assertIn("--load", rehearsal)
+        self.assertNotIn("--push", rehearsal)
+        self.assertNotIn("push-by-digest", rehearsal)
 
     def test_attestation_scopes_are_limited_to_the_prepare_job(self):
         prepare = self.jobs["prepare-release"]
@@ -381,23 +388,95 @@ class ReleaseWorkflowHardeningTests(unittest.TestCase):
         self.assertIn('--source-ref "refs/heads/main"', prepare)
         self.assertIn('--source-digest "$GITHUB_SHA"', prepare)
 
-    def test_published_image_is_the_qualified_release_image(self):
+    def test_published_tag_promotes_the_digest_the_qualified_build_pushed(self):
         prepare = self.jobs["prepare-release"]
 
-        # The registry image is the exact image that was built, scanned, archived,
-        # and SBOM-validated: one build, no rebuild, and the pushed reference is
-        # derived from the qualified local image.
-        self.assertEqual(len(re.findall(r"(?m)^\s*docker build ", prepare)), 1)
-        self.assertNotIn("buildx build", prepare)
+        # The registry image is the exact image that was built, scanned,
+        # archived, and SBOM-validated: one multi-platform build pushes its
+        # result by digest while the gates are pending, and the version tag is
+        # created from that recorded digest afterwards. No rebuild, no classic
+        # ``docker push``, and no local re-upload of the release image.
+        self.assertEqual(len(re.findall(r"(?m)^\s*docker buildx build \\$", prepare)), 1)
+        self.assertEqual(len(re.findall(r"(?m)^\s*docker build \\$", prepare)), 0)
+        self.assertNotIn("docker push", prepare)
+        self.assertNotIn("--push ", prepare)
         self.assertNotIn("docker/build-push-action", self.workflow_text)
-        self.assertIn('docker tag "itambox:${RELEASE_VERSION}"', prepare)
-        self.assertIn('docker push "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"', prepare)
+        self.assertIn("--platform linux/amd64,linux/arm64", prepare)
+        self.assertIn(
+            '--output "type=image,name=${REGISTRY}/${IMAGE_NAME},push-by-digest=true,push=true"',
+            prepare,
+        )
+        self.assertIn("--metadata-file itambox-build-metadata.json", prepare)
+        self.assertIn(
+            'docker pull --platform linux/amd64 "${REGISTRY}/${IMAGE_NAME}@${index_digest}"',
+            prepare,
+        )
+        self.assertIn(
+            'docker tag "${REGISTRY}/${IMAGE_NAME}@${index_digest}" "itambox:${RELEASE_VERSION}"',
+            prepare,
+        )
+        self.assertIn(
+            'docker buildx imagetools create -t "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"',
+            prepare,
+        )
+        self.assertIn('"${REGISTRY}/${IMAGE_NAME}@${INDEX_DIGEST}"', prepare)
         self.assertIn("scripts/check_registry_image.py verify-manifest", prepare)
         self.assertIn("scripts/check_registry_image.py verify-image", prepare)
         self.assertIn("docker buildx imagetools inspect --raw", prepare)
         self.assertIn('--raw "${REGISTRY}/${IMAGE_NAME}@${image_manifest_digest}"', prepare)
         self.assertIn("GHCR_MANIFEST_DIGEST", prepare)
-        self.assertIn("IMAGE_CONFIG_DIGEST", prepare)
+        self.assertIn("IMAGE_MANIFEST_DIGEST_AMD64", prepare)
+        self.assertIn("IMAGE_MANIFEST_DIGEST_ARM64", prepare)
+        self.assertIn("IMAGE_CONFIG_DIGEST_AMD64", prepare)
+        self.assertIn("IMAGE_CONFIG_DIGEST_ARM64", prepare)
+        # The build must be logged in before it pushes its result, and the tag
+        # may only be created after every gate and the SBOM validation passed.
+        self.assertLess(
+            prepare.index("Log in to the GitHub Container Registry"),
+            prepare.index("Build and push the reviewed release image by digest"),
+        )
+        self.assertLess(
+            prepare.index("Validate release image SBOM"),
+            prepare.index("Promote the verified image digest to the release tag"),
+        )
+        self.assertLess(
+            prepare.index("Promote the verified image digest to the release tag"),
+            prepare.index("Prepare draft GitHub release"),
+        )
+
+    def test_both_release_jobs_prepare_amd64_and_arm64_builds(self):
+        rehearsal = self.jobs["rehearsal"]
+        prepare = self.jobs["prepare-release"]
+
+        # The rehearsal compiles both platforms into the builder cache and
+        # loads the host-platform image for the scan chain; the release build
+        # pushes the multi-platform index by digest without a local load.
+        self.assertIn("--platform linux/amd64,linux/arm64", rehearsal)
+        self.assertIn("--output type=cacheonly", rehearsal)
+        self.assertIn("--platform linux/amd64", rehearsal)
+        self.assertIn("--load", rehearsal)
+        self.assertNotIn("--push ", rehearsal)
+        self.assertIn("--platform linux/amd64,linux/arm64", prepare)
+        self.assertIn("push-by-digest=true", prepare)
+        for job_name in ("rehearsal", "prepare-release"):
+            with self.subTest(job=job_name):
+                self.assertIn("docker/setup-qemu-action@", self.jobs[job_name])
+                self.assertIn("docker/setup-buildx-action@", self.jobs[job_name])
+
+    def test_both_platform_images_are_boot_checked_before_the_draft_release(self):
+        prepare = self.jobs["prepare-release"]
+
+        self.assertIn("Boot-check both platform images", prepare)
+        boot_step = prepare.split("Boot-check both platform images", 1)[1].split("- name:", 1)[0]
+        self.assertIn('--platform "linux/${platform}"', boot_step)
+        self.assertIn("python manage.py check", boot_step)
+        self.assertIn("IMAGE_MANIFEST_DIGEST_${upper}", boot_step)
+        self.assertIn("ITAMBOX_SECRET_KEY", boot_step)
+        self.assertIn("ITAMBOX_DB_PASSWORD", boot_step)
+        self.assertLess(
+            prepare.index("Boot-check both platform images"),
+            prepare.index("Prepare draft GitHub release"),
+        )
 
     def test_registry_identity_matches_the_repository_and_publishes_no_moving_alias(self):
         prepare = self.jobs["prepare-release"]

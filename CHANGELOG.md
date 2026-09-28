@@ -8,6 +8,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [1.0.0-beta.3] - 2026-09-28
 
+### Changed
+
+- Release images are published as a multi-platform index with `linux/amd64` and `linux/arm64` variants instead of an amd64-only image, so ARM64 hosts can pull the official tag directly; the release workflow builds both platforms from one reviewed commit, verifies both platform manifests fail-closed, and boot-checks both platform images before the draft release is prepared (issue #549).
+
 ### Security
 
 - The published image installs the current `openssl`, `libssl3`, and `tzdata` security builds in its runtime stage instead of inheriting the stale base-image pins, clearing the medium- and low-severity findings that remained from the `v1.0.0-beta.2` image scan.

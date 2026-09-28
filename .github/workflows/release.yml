@@ -42,7 +42,7 @@ jobs:
   rehearsal:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
       security-events: write
@@ -53,6 +53,12 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
 
       - name: Validate release metadata
         id: metadata
@@ -66,8 +72,24 @@ jobs:
       - name: Build release image without publishing
         env:
           ITAMBOX_VERSION: ${{ steps.metadata.outputs.version }}
+        shell: bash
         run: |
-          docker build \
+          set -euo pipefail
+          # Compile both release platforms into the builder cache first: an
+          # architecture-specific build break fails the rehearsal long before a
+          # release is ever prepared. This build exports nothing.
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --output type=cacheonly \
+            --build-arg "ITAMBOX_VERSION=$ITAMBOX_VERSION" \
+            --build-arg "ITAMBOX_REVISION=$GITHUB_SHA" \
+            --build-arg "ITAMBOX_SOURCE=$ITAMBOX_SOURCE" \
+            .
+          # Load the host-platform image from that cache, so scanning, the
+          # archive, and the SBOM keep operating on a local image as before.
+          docker buildx build \
+            --platform linux/amd64 \
+            --load \
             --build-arg "ITAMBOX_VERSION=$ITAMBOX_VERSION" \
             --build-arg "ITAMBOX_REVISION=$GITHUB_SHA" \
             --build-arg "ITAMBOX_SOURCE=$ITAMBOX_SOURCE" \
@@ -197,7 +219,7 @@ jobs:
     needs: [validate-dispatch-ref, e2e-qualification]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.e2e-qualification.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: read
@@ -223,6 +245,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
       - name: Validate requested version and reviewed commit
         shell: bash
         run: |
@@ -245,15 +273,47 @@ jobs:
           print("Reviewed main-branch release commit verified")
           PY
 
-
-      - name: Build release image from reviewed main commit
+      - name: Log in to the GitHub Container Registry
+        shell: bash
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
         run: |
-          docker build \
+          set +x
+          printf '%s' "$REGISTRY_TOKEN" | docker login "${REGISTRY}" \
+            --username "${{ github.actor }}" --password-stdin
+
+      - name: Build and push the reviewed release image by digest
+        id: image-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One build produces the multi-platform release image. It is pushed to
+          # the registry by digest only — no tag exists yet — and the version
+          # tag is created from this recorded digest after every gate passed.
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --output "type=image,name=${REGISTRY}/${IMAGE_NAME},push-by-digest=true,push=true" \
+            --metadata-file itambox-build-metadata.json \
             --build-arg "ITAMBOX_VERSION=$RELEASE_VERSION" \
             --build-arg "ITAMBOX_REVISION=$GITHUB_SHA" \
             --build-arg "ITAMBOX_SOURCE=$ITAMBOX_SOURCE" \
-            --tag "itambox:${RELEASE_VERSION}" \
             .
+          index_digest="$(python - <<'PY'
+          import json
+          import re
+          digest = json.load(open("itambox-build-metadata.json", encoding="utf-8"))["containerimage.digest"]
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+              raise SystemExit(f"unexpected built image digest: {digest!r}")
+          print(digest)
+          PY
+          )"
+          echo "index_digest=$index_digest" >> "$GITHUB_OUTPUT"
+          echo "INDEX_DIGEST=$index_digest" >> "$GITHUB_ENV"
+          # Materialize the host-platform image from the digest that was just
+          # pushed, so everything verified below is byte-identical to the
+          # registry state of the release candidate.
+          docker pull --platform linux/amd64 "${REGISTRY}/${IMAGE_NAME}@${index_digest}"
+          docker tag "${REGISTRY}/${IMAGE_NAME}@${index_digest}" "itambox:${RELEASE_VERSION}"
 
       - name: Verify release image identity
         shell: bash
@@ -354,21 +414,17 @@ jobs:
             --image-inspect image-inspect.json \
             --image-ref "itambox:${RELEASE_VERSION}"
 
-      - name: Log in to the GitHub Container Registry
+      - name: Promote the verified image digest to the release tag
         shell: bash
         env:
-          REGISTRY_TOKEN: ${{ github.token }}
-        run: |
-          set +x
-          printf '%s' "$REGISTRY_TOKEN" | docker login "${REGISTRY}" \
-            --username "${{ github.actor }}" --password-stdin
-
-      - name: Publish the qualified release image to the GitHub Container Registry
-        shell: bash
+          INDEX_DIGEST: ${{ steps.image-build.outputs.index_digest }}
         run: |
           set -euo pipefail
-          docker tag "itambox:${RELEASE_VERSION}" "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
-          docker push "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+          # Publishing the version tag is a registry-side promotion of the
+          # digest the qualified build pushed: nothing is uploaded from the
+          # local store again, and no other tag is ever created.
+          docker buildx imagetools create -t "${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}" \
+            "${REGISTRY}/${IMAGE_NAME}@${INDEX_DIGEST}"
 
       - name: Resolve and verify the published registry image identity
         id: ghcr-image
@@ -376,30 +432,31 @@ jobs:
         run: |
           set -euo pipefail
           image_ref="${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
-          docker image inspect "itambox:${RELEASE_VERSION}" --format '{{.Id}}' > local-image-id.txt
-          docker image inspect "$image_ref" --format '{{range .RepoDigests}}{{println .}}{{end}}' > repo-digests.txt
+          printf '%s\n' "$INDEX_DIGEST" > expected-index-digest.txt
+          printf '%s@%s\n' "${REGISTRY}/${IMAGE_NAME}" "$INDEX_DIGEST" > repo-digests.txt
           docker buildx imagetools inspect --raw "$image_ref" > registry-manifest.json
           docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}' > registry-manifest-descriptor.json
           python scripts/check_registry_image.py verify-manifest \
             --manifest-raw registry-manifest.json \
             --descriptor registry-manifest-descriptor.json \
             --repo-digests repo-digests.txt \
-            --local-image-id local-image-id.txt \
+            --expected-index-digest expected-index-digest.txt \
             --image "${REGISTRY}/${IMAGE_NAME}" > registry-identity.txt
-          mode="$(grep '^MODE=' registry-identity.txt | cut -d= -f2)"
-          image_manifest_digest="$(grep '^IMAGE_MANIFEST_DIGEST=' registry-identity.txt | cut -d= -f2)"
-          if [ "$mode" = "index" ]; then
-            # Docker 29 keeps built images in the containerd image store, where the
-            # pushed tag resolves to an image index; resolve the platform image
-            # manifest the index lists by its digest.
-            docker buildx imagetools inspect --raw "${REGISTRY}/${IMAGE_NAME}@${image_manifest_digest}" > registry-image-manifest.json
-          else
-            cp registry-manifest.json registry-image-manifest.json
-          fi
-          python scripts/check_registry_image.py verify-image \
-            --manifest-raw registry-image-manifest.json \
-            --expected-digest "$image_manifest_digest" > image-config-digest.txt
-          cat registry-identity.txt image-config-digest.txt > ghcr-image-identity.txt
+          # The released tag must resolve to the multi-platform image index the
+          # qualified build pushed; resolve each platform image manifest the
+          # index lists by its digest and verify it.
+          for platform in amd64 arm64; do
+            upper="$(printf '%s' "$platform" | tr '[:lower:]' '[:upper:]')"
+            image_manifest_digest="$(grep "^IMAGE_MANIFEST_DIGEST_${upper}=" registry-identity.txt | cut -d= -f2)"
+            registry_image_manifest="registry-image-manifest-${platform}.json"
+            docker buildx imagetools inspect --raw "${REGISTRY}/${IMAGE_NAME}@${image_manifest_digest}" \
+              > "$registry_image_manifest"
+            image_config_digest="$(python scripts/check_registry_image.py verify-image \
+              --manifest-raw "$registry_image_manifest" \
+              --expected-digest "$image_manifest_digest" | cut -d= -f2)"
+            printf 'IMAGE_CONFIG_DIGEST_%s=%s\n' "$upper" "$image_config_digest" >> image-config-digests.txt
+          done
+          cat registry-identity.txt image-config-digests.txt > ghcr-image-identity.txt
           cat ghcr-image-identity.txt >> "$GITHUB_OUTPUT"
           cat ghcr-image-identity.txt >> "$GITHUB_ENV"
 
@@ -460,16 +517,38 @@ jobs:
             done
           done
 
+      - name: Boot-check both platform images
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run the application's own system check inside each published platform
+          # image, so a release can only pass when both architectures boot. The
+          # production settings require explicit secrets, so generate throwaway
+          # values for this check; nothing is persisted.
+          boot_secret_key="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          boot_db_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          for platform in amd64 arm64; do
+            upper="$(printf '%s' "$platform" | tr '[:lower:]' '[:upper:]')"
+            digest_var="IMAGE_MANIFEST_DIGEST_${upper}"
+            digest="${!digest_var}"
+            docker run --rm --platform "linux/${platform}" \
+              -e "ITAMBOX_SECRET_KEY=$boot_secret_key" \
+              -e "ITAMBOX_DB_PASSWORD=$boot_db_password" \
+              "${REGISTRY}/${IMAGE_NAME}@${digest}" \
+              python manage.py check
+          done
+
       - name: Record the published image identity
         shell: bash
         run: |
           package_name="${IMAGE_NAME##*/}"
           {
             echo "### GitHub Container Registry"
-            echo "- Published ${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION}"
+            echo "- Published ${REGISTRY}/${IMAGE_NAME}:${RELEASE_VERSION} (multi-platform index)"
             echo "- Resolved manifest form ${MODE}"
             echo "- Manifest digest ${GHCR_MANIFEST_DIGEST}"
-            echo "- Image config digest ${IMAGE_CONFIG_DIGEST}"
+            echo "- Platform manifest digests: linux/amd64 ${IMAGE_MANIFEST_DIGEST_AMD64}, linux/arm64 ${IMAGE_MANIFEST_DIGEST_ARM64}"
+            echo "- Platform image config digests: linux/amd64 ${IMAGE_CONFIG_DIGEST_AMD64}, linux/arm64 ${IMAGE_CONFIG_DIGEST_ARM64}"
             echo "- First publish only: review the package visibility (GitHub package settings for ${package_name} → Package settings → Change visibility → Public); anonymous docker pull requires Public."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -516,10 +595,12 @@ jobs:
             itambox-${{ inputs.version }}.tar.gz
             itambox-${{ inputs.version }}.tar.gz.sha256
             itambox-${{ inputs.version }}.sbom.spdx.json
+            itambox-build-metadata.json
             image-inspect.json
             registry-manifest.json
             registry-manifest-descriptor.json
-            registry-image-manifest.json
+            registry-image-manifest-amd64.json
+            registry-image-manifest-arm64.json
             ghcr-image-identity.txt
           if-no-files-found: error
           retention-days: 14
