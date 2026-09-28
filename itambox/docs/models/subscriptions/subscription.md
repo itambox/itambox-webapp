@@ -1,8 +1,8 @@
 # SaaS Subscriptions
 
-!!! warning "Status: Beta"
-    The Subscriptions module is Beta. Core functionality is stable; reporting and renewal
-    automation features are still evolving.
+!!! note "Capability grade"
+    The **SaaS Subscriptions** capability is **Stable**: always on, with no switch to
+    disable it. See [Capability Maturity](../../operations/capability-maturity.md).
 
 A **SaaS Subscription** represents a recurring subscription contract for SaaS platforms, tools, or cloud resources (e.g. `Figma Professional Plan`, `GitHub Enterprise Cloud`, `AWS Organization Account`). Use the exclusive mapping in [Commercial Vocabulary](../../usage/commercial-vocabulary.md) to decide whether an agreement belongs here or in Contracts.
 

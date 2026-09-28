@@ -18,23 +18,23 @@ Manage bulk non-serialized items: accessories (keyboards, cables), consumables (
 ### Software & Licenses
 Maintain a software catalog and track license entitlements — seat counts, product keys (encrypted at rest), expiration dates, and check-out assignments to users or assets.
 
-### SaaS Subscriptions ***(Beta)***
-Manage recurring SaaS contracts with billing cycles, renewal tracking, shared Supplier records, and user seat allocations. Subscription seats roll up to linked license entitlements.
+### SaaS Subscriptions
+Manage recurring SaaS contracts with billing cycles, renewal tracking, shared Supplier records, and user seat allocations. Subscription seats roll up to linked license entitlements. The **SaaS Subscriptions** capability is **Stable** and always on.
 
-### Procurement ***(Beta)***
-Track the purchasing lifecycle: Purchase Orders with approval workflows, Contracts with SLA tracking, and supplier management. POs support draft → approved → ordered → received states with segregation of duties.
+### Procurement
+Track the purchasing lifecycle: Purchase Orders with approval workflows, Contracts with SLA tracking, and supplier management. POs support draft → approved → ordered → received states with segregation of duties. Purchase Orders and Contracts are a **Stable** capability; the opt-in Asset Request Procurement Seam remains **Beta**.
 
 ### Compliance
 Conduct hardware audits with barcode scanning, generate legally binding custody receipts with digital signatures, and schedule preventive maintenance. Custody receipts capture EULA acceptance with tamper-proof verification hashes.
 
 ### Extras & Customization
-Extend ITAMbox with custom fields, alert rules, webhooks, event-driven automation, saved filters, dashboards, export templates, label/QR code printing, and scheduled reports. The reporting engine and webhook system are ***(Beta)***.
+Extend ITAMbox with custom fields, alert rules, webhooks, event-driven automation, saved filters, dashboards, export templates, label/QR code printing, and scheduled reports. **Curated Reports** and **Alerts and Notifications** are **Stable** capabilities; **Report Designer**, **Scheduled Reports**, **Alert Rules and Channels**, and **Webhooks and Event Rules** are **Beta**.
 
 ### Users & Authentication
-Manage Django user accounts, API tokens, role-based access control (RBAC), tenant memberships, and SSO integrations (LDAP, SAML, OIDC). SCIM 2.0 provisioning is available for identity-provider-driven user lifecycle management ***(Beta)***.
+Manage Django user accounts, API tokens, role-based access control (RBAC), tenant memberships, and SSO integrations (LDAP, SAML, OIDC). SCIM 2.0 provisioning is available for identity-provider-driven user lifecycle management; **SCIM Provisioning** is a **Beta** capability.
 
-### Plugins ***(Experimental)***
-Extend ITAMbox with custom Django apps — add models, REST/GraphQL endpoints, sidebar menus, and template injections without modifying core code. The plugin system follows the NetBox plugin model and is opt-in through `ITAMBOX_PLUGINS`; plugins run as trusted, unsandboxed in-process code (see the [plugin guide](plugins/getting_started.md)).
+### Plugins
+Extend ITAMbox with custom Django apps — add models, REST/GraphQL endpoints, sidebar menus, and template injections without modifying core code. The **Plugin System** follows the NetBox plugin model, is opt-in through `ITAMBOX_PLUGINS`, and is graded **Experimental**; plugins run as trusted, unsandboxed in-process code (see the [plugin guide](plugins/getting_started.md)).
 
 ---
 
@@ -70,5 +70,5 @@ the asset returns to `pending`.
 ### Context-Sensitive Help
 Every list, detail, and editing view in ITAMbox features an embedded help icon (`mdi-help-circle`) on the breadcrumb header. Clicking it opens a context-specific static page explaining that specific model's fields, business logic rules, and import/export layouts.
 
-### Module Maturity
-Capabilities marked ***(Beta)*** are functional and in active use, but their data model, API shape, or feature set may change between revisions. The public grades — Stable, Beta, Experimental — and the activation modes of every capability are defined in the [Capability Maturity](operations/capability-maturity.md) guide.
+### Capability Maturity
+Maturity is declared per capability rather than per module, so this overview grades individual capabilities rather than whole modules. The public grades — Stable, Beta, Experimental — and the activation modes of every capability are defined in the [Capability Maturity](operations/capability-maturity.md) guide.
