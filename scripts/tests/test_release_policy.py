@@ -62,10 +62,10 @@ class VersionPolicyTests(unittest.TestCase):
 
 class RepositoryPolicyTests(unittest.TestCase):
     def test_checked_in_release_metadata_is_consistent(self):
-        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-beta.2")
+        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-beta.3")
 
-        self.assertEqual(version.semver, "1.0.0-beta.2")
-        self.assertEqual(version.pep440, "1.0.0b2")
+        self.assertEqual(version.semver, "1.0.0-beta.3")
+        self.assertEqual(version.pep440, "1.0.0b3")
 
     def test_checked_in_openapi_schema_matches_release_identity(self):
         version = validate_repository(REPOSITORY_ROOT)
@@ -202,6 +202,14 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         install_block = runtime_stage.split("RUN apt-get update", 1)[1].split("&& rm -rf /var/lib/apt/lists/*", 1)[0]
 
         self.assertIn("ca-certificates", install_block)
+
+    def test_runtime_image_explicitly_installs_openssl_and_tzdata(self):
+        dockerfile = (REPOSITORY_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        runtime_stage = dockerfile.rsplit("FROM python:3.12-slim-bookworm", 1)[1]
+        install_block = runtime_stage.split("RUN apt-get update", 1)[1].split("&& rm -rf /var/lib/apt/lists/*", 1)[0]
+
+        for package in ("openssl", "libssl3", "tzdata"):
+            self.assertIn(package, install_block)
 
     def test_public_guidance_uses_dotted_prerelease_examples(self):
         security_policy = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
