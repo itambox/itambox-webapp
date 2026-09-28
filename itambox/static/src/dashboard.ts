@@ -270,7 +270,7 @@ const echartsLib: EChartsLib = {
     }
   });
 
-  // --- HTMX lifecycle: destroy GridStack before navigating away ---
+  // --- HTMX lifecycle: forget the GridStack handle before navigating away ---
   document.body.addEventListener('htmx:beforeSwap', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
     const target = detail.target as HTMLElement | undefined;
@@ -280,12 +280,16 @@ const echartsLib: EChartsLib = {
       gsLoaded = false;
       window.__gsInitialized = false;
     }
-    // Release chart instances inside the subtree that is about to be replaced.
-    dashboardCharts.disposeWithin(target);
+    // Chart instances are deliberately NOT disposed here: htmx fires this
+    // event before it commits the swap, and a failed or cancelled swap keeps
+    // the current DOM — and its live charts — in place. Disposal happens in
+    // htmx:beforeCleanupElement below, which only runs for elements HTMX
+    // actually removes.
   });
 
-  // Belt and braces: any element HTMX removes releases its chart instance and
-  // ResizeObserver registration instead of leaking them.
+  // Any element HTMX removes releases its chart instance and ResizeObserver
+  // registration here instead of leaking them; aborted swaps never reach this
+  // event, so the charts on an untouched DOM stay alive.
   document.body.addEventListener('htmx:beforeCleanupElement', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
     const element = (detail.elt || detail.target) as HTMLElement | undefined;

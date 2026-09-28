@@ -228,6 +228,69 @@ test('theme switching, a HTMX swap, and a GridStack resize keep single chart ins
   expect(errors).toEqual([]);
 });
 
+test('an aborted HTMX swap keeps the existing chart instances alive', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await removeDebugToolbar(page);
+
+  const statusChart = page.locator(STATUS_SELECTOR);
+  await expect.poll(async () => (await readChartState(statusChart)).instanceId).toBeTruthy();
+  await expect.poll(async () => (await readChartState(statusChart)).canvases).toBe(1);
+  const before = await readChartState(statusChart);
+
+  // A swap that is vetoed after htmx:beforeSwap fired (cancelled by an
+  // application handler) keeps the current DOM in place, so the live chart
+  // instances must survive it instead of being torn down with the swap.
+  const vetoed = await page.evaluate(async () => {
+    const htmx = (
+      window as unknown as {
+        htmx: { ajax: (verb: string, path: string, context: Record<string, string>) => Promise<unknown> };
+      }
+    ).htmx;
+    let vetoed = false;
+    const veto = (evt: Event): void => {
+      vetoed = true;
+      evt.preventDefault();
+    };
+    document.body.addEventListener('htmx:beforeSwap', veto, { once: true });
+    const done = Promise.resolve(htmx.ajax('GET', '/', { target: 'body' })).catch(() => undefined);
+    await Promise.race([done, new Promise((resolve) => setTimeout(resolve, 4000))]);
+    document.body.removeEventListener('htmx:beforeSwap', veto);
+    return vetoed;
+  });
+  expect(vetoed, 'the veto listener must have cancelled a real beforeSwap event').toBe(true);
+
+  // A swap whose request fails (the server answers 404) is aborted by htmx the
+  // same way and must not tear the charts down either.
+  const failedSwap = await page.evaluate(async () => {
+    const htmx = (
+      window as unknown as {
+        htmx: { ajax: (verb: string, path: string, context: Record<string, string>) => Promise<unknown> };
+      }
+    ).htmx;
+    let respondedWithError = false;
+    const onError = (): void => {
+      respondedWithError = true;
+    };
+    document.body.addEventListener('htmx:responseError', onError, { once: true });
+    const done = Promise.resolve(htmx.ajax('GET', '/__e2e_aborted_swap_404__/', { target: 'body' })).catch(() => undefined);
+    await Promise.race([done, new Promise((resolve) => setTimeout(resolve, 4000))]);
+    document.body.removeEventListener('htmx:responseError', onError);
+    return respondedWithError;
+  });
+  expect(failedSwap, 'the second request must have failed server-side').toBe(true);
+
+  // Both aborted swaps left the dashboard untouched: the same live instance is
+  // still attached, still rendered, and not duplicated.
+  const after = await readChartState(statusChart);
+  expect(after.instanceId, 'the live chart instance survives aborted swaps').toBe(before.instanceId);
+  expect(after.canvases, 'the chart canvas is still rendered').toBe(1);
+  expect(after.counts, 'the rendered dataset is unchanged').toEqual(before.counts);
+  await expect(statusChart).toBeVisible();
+  expect(await page.locator(STATUS_SELECTOR).count()).toBe(1);
+  expect(await page.locator(AGE_SELECTOR).count()).toBe(1);
+});
+
 test('empty chart datasets and hostile labels stay safe at runtime', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const errors = collectPageErrors(page);
