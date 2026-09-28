@@ -1,11 +1,14 @@
 """Behaviour tests for the container registry publication gate.
 
 The gate runs on a bare interpreter inside the release workflow, so these tests
-are standard-library-only and exercise the real verification paths for both
-image store models: the classic single-manifest push and the containerd image
-store (Docker 29 default) index push that bundles the platform image manifest
-with build-time attestation manifests. Every way of describing a different
-image, a different digest, or a malformed digest fails closed.
+are standard-library-only and exercise the real verification path for the
+multi-platform index push the release publishes: the containerd image store
+(Docker 29 default) publishes the built image as an OCI image index that
+bundles the linux/amd64 and linux/arm64 platform image manifests with
+build-time attestation manifests. Every way of describing a different image, a
+different digest, a missing or unsupported platform, or a malformed digest
+fails closed, and a single-platform push is rejected because the release
+publishes both platforms.
 """
 
 import hashlib
@@ -25,8 +28,10 @@ from scripts.check_registry_image import (
 
 IMAGE = "ghcr.io/itambox/itambox-webapp"
 CONFIG_DIGEST = "sha256:" + "cd" * 32
+ARM64_CONFIG_DIGEST = "sha256:" + "ef" * 32
 LAYER_DIGEST = "sha256:" + "11" * 32
 OTHER_DIGEST = "sha256:" + "ab" * 32
+ATTESTATION_DIGEST = "sha256:" + "5a" * 32
 
 
 def _raw(document: dict) -> bytes:
@@ -56,24 +61,34 @@ def _image_manifest(*, config_digest: str = CONFIG_DIGEST) -> dict:
     }
 
 
-def _index(*, image_manifest_digest: str, extra_entries: list | None = None) -> dict:
+def _platform_entry(*, digest: str, architecture: str, size: int = 1234) -> dict:
+    return {
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": digest,
+        "size": size,
+        "platform": {"architecture": architecture, "os": "linux"},
+    }
+
+
+def _attestation_entry(*, digest: str, reference_digest: str) -> dict:
+    return {
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": digest,
+        "size": 837,
+        "annotations": {
+            "vnd.docker.reference.digest": reference_digest,
+            "vnd.docker.reference.type": "attestation-manifest",
+        },
+        "platform": {"architecture": "unknown", "os": "unknown"},
+    }
+
+
+def _index(*, amd64_manifest_digest: str, arm64_manifest_digest: str, extra_entries: list | None = None) -> dict:
     entries = [
-        {
-            "mediaType": "application/vnd.oci.image.manifest.v1+json",
-            "digest": image_manifest_digest,
-            "size": 1234,
-            "platform": {"architecture": "amd64", "os": "linux"},
-        },
-        {
-            "mediaType": "application/vnd.oci.image.manifest.v1+json",
-            "digest": OTHER_DIGEST,
-            "size": 837,
-            "annotations": {
-                "vnd.docker.reference.digest": image_manifest_digest,
-                "vnd.docker.reference.type": "attestation-manifest",
-            },
-            "platform": {"architecture": "unknown", "os": "unknown"},
-        },
+        _platform_entry(digest=amd64_manifest_digest, architecture="amd64"),
+        _platform_entry(digest=arm64_manifest_digest, architecture="arm64"),
+        _attestation_entry(digest=OTHER_DIGEST, reference_digest=amd64_manifest_digest),
+        _attestation_entry(digest=ATTESTATION_DIGEST, reference_digest=arm64_manifest_digest),
     ]
     if extra_entries:
         entries.extend(extra_entries)
@@ -105,10 +120,10 @@ class RegistryImageGateTests(unittest.TestCase):
         image_manifest: dict | None = None,
         reported_digest: str | None = None,
         repo_digest_entries: str | None = None,
-        local_image_id: str = CONFIG_DIGEST,
+        expected_index_digest: str = CONFIG_DIGEST,
         image: str = IMAGE,
     ) -> dict:
-        """Write the inputs describing a classic single-manifest push."""
+        """Write the inputs describing a single-platform manifest push."""
         if image_manifest is None:
             image_manifest = _image_manifest()
         raw = _raw(image_manifest)
@@ -128,7 +143,7 @@ class RegistryImageGateTests(unittest.TestCase):
                 },
             ),
             "repo_digests_path": self._write("repo-digests.txt", repo_digest_entries),
-            "local_image_id_path": self._write("local-image-id.txt", local_image_id),
+            "expected_index_digest_path": self._write("expected-index-digest.txt", expected_index_digest),
             "image_manifest_raw_path": self._write("manifest-copy.json", raw),
             "manifest_digest": digest,
             "image": image,
@@ -138,27 +153,32 @@ class RegistryImageGateTests(unittest.TestCase):
         self,
         *,
         platform_manifest: dict | None = None,
+        arm64_platform_manifest: dict | None = None,
         index_document: dict | None = None,
         reported_digest: str | None = None,
         repo_digest_entries: str | None = None,
-        local_image_id: str | None = None,
+        expected_index_digest: str | None = None,
         image: str = IMAGE,
     ) -> dict:
-        """Write the inputs describing a containerd image store index push."""
+        """Write the inputs describing a published image index."""
         if platform_manifest is None:
             platform_manifest = _image_manifest()
+        if arm64_platform_manifest is None:
+            arm64_platform_manifest = _image_manifest(config_digest=ARM64_CONFIG_DIGEST)
         platform_raw = _raw(platform_manifest)
         platform_digest = _digest(platform_raw)
+        arm64_raw = _raw(arm64_platform_manifest)
+        arm64_digest = _digest(arm64_raw)
         if index_document is None:
-            index_document = _index(image_manifest_digest=platform_digest)
+            index_document = _index(amd64_manifest_digest=platform_digest, arm64_manifest_digest=arm64_digest)
         index_raw = _raw(index_document)
         index_digest = _digest(index_raw)
         if reported_digest is None:
             reported_digest = index_digest
         if repo_digest_entries is None:
             repo_digest_entries = f"{image}@{index_digest}\n"
-        if local_image_id is None:
-            local_image_id = index_digest
+        if expected_index_digest is None:
+            expected_index_digest = index_digest
         return {
             "manifest_raw_path": self._write("index.json", index_raw),
             "descriptor_path": self._write(
@@ -170,10 +190,12 @@ class RegistryImageGateTests(unittest.TestCase):
                 },
             ),
             "repo_digests_path": self._write("repo-digests.txt", repo_digest_entries),
-            "local_image_id_path": self._write("local-image-id.txt", local_image_id),
-            "image_manifest_raw_path": self._write("image-manifest.json", platform_raw),
+            "expected_index_digest_path": self._write("expected-index-digest.txt", expected_index_digest),
+            "image_manifest_raw_path": self._write("image-manifest-amd64.json", platform_raw),
+            "arm64_image_manifest_raw_path": self._write("image-manifest-arm64.json", arm64_raw),
             "index_digest": index_digest,
             "platform_digest": platform_digest,
+            "arm64_platform_digest": arm64_digest,
             "image": image,
         }
 
@@ -182,89 +204,73 @@ class RegistryImageGateTests(unittest.TestCase):
             manifest_raw_path=files["manifest_raw_path"],
             descriptor_path=files["descriptor_path"],
             repo_digests_path=files["repo_digests_path"],
-            local_image_id_path=files["local_image_id_path"],
+            expected_index_digest_path=files["expected_index_digest_path"],
             image=files["image"],
         )
 
-    def test_single_manifest_mode_binds_the_configuration_digest(self):
+    def test_rejects_a_single_manifest_push(self):
         files = self._single_inputs()
 
-        selection = self._verify_manifest(files)
-
-        self.assertEqual(selection.mode, "single")
-        self.assertEqual(selection.manifest_digest, files["manifest_digest"])
-        self.assertEqual(selection.image_manifest_digest, files["manifest_digest"])
-        config_digest = verify_image_manifest(
-            manifest_raw_path=files["image_manifest_raw_path"],
-            expected_digest=selection.image_manifest_digest,
-        )
-        self.assertEqual(config_digest, CONFIG_DIGEST)
-
-    def test_single_manifest_mode_accepts_the_containerd_image_id(self):
-        files = self._single_inputs()
-        files["local_image_id_path"] = self._write("local-image-id-containerd.txt", files["manifest_digest"])
-
-        selection = self._verify_manifest(files)
-
-        self.assertEqual(selection.mode, "single")
-        self.assertEqual(selection.manifest_digest, files["manifest_digest"])
-
-    def test_rejects_a_single_manifest_matching_neither_local_identity(self):
-        files = self._single_inputs(local_image_id=OTHER_DIGEST)
-
-        with self.assertRaisesRegex(RegistryImageError, "do not match the qualified local image"):
+        with self.assertRaisesRegex(RegistryImageError, "not a multi-platform image index"):
             self._verify_manifest(files)
 
-    def test_index_mode_binds_the_index_digest_and_selects_the_platform_manifest(self):
+    def test_index_mode_binds_the_index_digest_and_selects_both_platform_manifests(self):
         files = self._index_inputs()
 
         selection = self._verify_manifest(files)
 
         self.assertEqual(selection.mode, "index")
         self.assertEqual(selection.manifest_digest, files["index_digest"])
-        self.assertEqual(selection.image_manifest_digest, files["platform_digest"])
-        config_digest = verify_image_manifest(
-            manifest_raw_path=files["image_manifest_raw_path"],
-            expected_digest=selection.image_manifest_digest,
+        self.assertEqual(
+            selection.platform_manifest_digests,
+            {"amd64": files["platform_digest"], "arm64": files["arm64_platform_digest"]},
         )
-        self.assertEqual(config_digest, CONFIG_DIGEST)
-        self.assertNotEqual(selection.manifest_digest, config_digest)
+        self.assertEqual(
+            verify_image_manifest(
+                manifest_raw_path=files["image_manifest_raw_path"],
+                expected_digest=files["platform_digest"],
+            ),
+            CONFIG_DIGEST,
+        )
+        self.assertEqual(
+            verify_image_manifest(
+                manifest_raw_path=files["arm64_image_manifest_raw_path"],
+                expected_digest=files["arm64_platform_digest"],
+            ),
+            ARM64_CONFIG_DIGEST,
+        )
+        self.assertNotEqual(selection.manifest_digest, CONFIG_DIGEST)
 
-    def test_rejects_an_index_without_exactly_one_platform_manifest(self):
-        extra = {
-            "mediaType": "application/vnd.oci.image.manifest.v1+json",
-            "digest": OTHER_DIGEST,
-            "size": 1234,
-            "platform": {"architecture": "arm64", "os": "linux"},
-        }
+    def test_rejects_an_index_without_exactly_the_two_supported_platforms(self):
+        amd64_raw = _raw(_image_manifest())
+        arm64_raw = _raw(_image_manifest(config_digest=ARM64_CONFIG_DIGEST))
+        amd64_entry = _platform_entry(digest=_digest(amd64_raw), architecture="amd64")
+        arm64_entry = _platform_entry(digest=_digest(arm64_raw), architecture="arm64")
+        attestation_entry = _attestation_entry(digest=OTHER_DIGEST, reference_digest=amd64_entry["digest"])
+        extra_platform_entry = _platform_entry(digest=ATTESTATION_DIGEST, architecture="ppc64le")
         cases = {
-            "two platform manifests": self._index_inputs(
-                index_document=_index(image_manifest_digest=OTHER_DIGEST, extra_entries=[extra])
-            ),
-            "no platform manifest": self._index_inputs(
-                index_document={
-                    "schemaVersion": 2,
-                    "mediaType": "application/vnd.oci.image.index.v1+json",
-                    "manifests": [
-                        {
-                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
-                            "digest": OTHER_DIGEST,
-                            "size": 837,
-                            "platform": {"architecture": "unknown", "os": "unknown"},
-                        }
-                    ],
-                }
-            ),
+            "arm64 platform missing": [amd64_entry, attestation_entry],
+            "amd64 platform missing": [arm64_entry, attestation_entry],
+            "unsupported extra platform": [amd64_entry, arm64_entry, extra_platform_entry],
+            "duplicate platform": [amd64_entry, {**amd64_entry, "digest": ATTESTATION_DIGEST}, arm64_entry],
+            "no platform manifests": [attestation_entry],
         }
-        for label, files in cases.items():
+        for label, entries in cases.items():
             with self.subTest(case=label):
-                with self.assertRaisesRegex(RegistryImageError, "exactly one platform image manifest"):
+                files = self._index_inputs(
+                    index_document={
+                        "schemaVersion": 2,
+                        "mediaType": "application/vnd.oci.image.index.v1+json",
+                        "manifests": entries,
+                    }
+                )
+                with self.assertRaisesRegex(RegistryImageError, "must contain exactly the linux/amd64 and linux/arm64"):
                     self._verify_manifest(files)
 
-    def test_rejects_an_index_digest_that_is_not_the_local_image(self):
-        files = self._index_inputs(local_image_id=OTHER_DIGEST)
+    def test_rejects_an_index_digest_that_is_not_the_qualified_build(self):
+        files = self._index_inputs(expected_index_digest=OTHER_DIGEST)
 
-        with self.assertRaisesRegex(RegistryImageError, "not the qualified local image"):
+        with self.assertRaisesRegex(RegistryImageError, "does not match the qualified build"):
             self._verify_manifest(files)
 
     def test_rejects_an_image_manifest_that_does_not_hash_to_the_index_entry(self):
@@ -301,23 +307,53 @@ class RegistryImageGateTests(unittest.TestCase):
         self.assertEqual(selection.manifest_digest, files["index_digest"])
 
     def test_rejects_malformed_digests_in_every_input(self):
+        def malformed_index_entry():
+            return self._index_inputs(
+                index_document={
+                    "schemaVersion": 2,
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "manifests": [
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:short",
+                            "size": 1234,
+                            "platform": {"architecture": "amd64", "os": "linux"},
+                        }
+                    ],
+                }
+            )
+
         cases = {
             "descriptor": lambda: self._index_inputs(reported_digest="sha256:not-hex"),
-            "local image id": lambda: self._index_inputs(local_image_id="deadbeef"),
-            "index entry": lambda: self._index_inputs(index_document=_index(image_manifest_digest="sha256:short")),
-            "manifest config": lambda: self._single_inputs(
-                image_manifest=_image_manifest(config_digest="sha256:short")
-            ),
+            "expected index digest": lambda: self._index_inputs(expected_index_digest="deadbeef"),
+            "index entry": malformed_index_entry,
         }
         for label, build in cases.items():
             with self.subTest(input=label):
                 with self.assertRaisesRegex(RegistryImageError, "sha256 content digest"):
                     self._verify_manifest(build())
 
+    def test_rejects_a_platform_manifest_with_a_malformed_configuration_digest(self):
+        raw = _raw(_image_manifest(config_digest="sha256:short"))
+
+        with self.assertRaisesRegex(RegistryImageError, "sha256 content digest"):
+            verify_image_manifest(
+                manifest_raw_path=self._write("bad-config.json", raw),
+                expected_digest=_digest(raw),
+            )
+
+    def test_rejects_a_platform_manifest_without_a_configuration_descriptor(self):
+        raw = _raw({"schemaVersion": 2})
+
+        with self.assertRaisesRegex(RegistryImageError, "no image configuration descriptor"):
+            verify_image_manifest(
+                manifest_raw_path=self._write("no-config.json", raw),
+                expected_digest=_digest(raw),
+            )
+
     def test_rejects_missing_digest_inputs(self):
         cases = {
             "no repository digests": lambda: self._index_inputs(repo_digest_entries="\n"),
-            "no configuration descriptor": lambda: self._single_inputs(image_manifest={"schemaVersion": 2}),
             "empty manifest descriptor": lambda: self._index_inputs(reported_digest=""),
         }
         for label, build in cases.items():
@@ -342,8 +378,8 @@ class RegistryImageGateTests(unittest.TestCase):
             str(files["descriptor_path"]),
             "--repo-digests",
             str(files["repo_digests_path"]),
-            "--local-image-id",
-            str(files["local_image_id_path"]),
+            "--expected-index-digest",
+            str(files["expected_index_digest_path"]),
             "--image",
             files["image"],
         ]
@@ -359,13 +395,14 @@ class RegistryImageGateTests(unittest.TestCase):
             [
                 "MODE=index",
                 f"GHCR_MANIFEST_DIGEST={files['index_digest']}",
-                f"IMAGE_MANIFEST_DIGEST={files['platform_digest']}",
+                f"IMAGE_MANIFEST_DIGEST_AMD64={files['platform_digest']}",
+                f"IMAGE_MANIFEST_DIGEST_ARM64={files['arm64_platform_digest']}",
             ],
         )
         self.assertIn("verification passed", stderr.getvalue())
 
-        rejected = self._index_inputs(local_image_id=OTHER_DIGEST)
-        argv[argv.index("--local-image-id") + 1] = str(rejected["local_image_id_path"])
+        rejected = self._index_inputs(expected_index_digest=OTHER_DIGEST)
+        argv[argv.index("--expected-index-digest") + 1] = str(rejected["expected_index_digest_path"])
         stdout = io.StringIO()
         stderr = io.StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -409,6 +446,22 @@ class RegistryImageGateTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("registry image verification failed", stderr.getvalue())
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            status = main(
+                [
+                    "verify-image",
+                    "--manifest-raw",
+                    str(files["arm64_image_manifest_raw_path"]),
+                    "--expected-digest",
+                    files["arm64_platform_digest"],
+                ]
+            )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stdout.getvalue().splitlines(), [f"IMAGE_CONFIG_DIGEST={ARM64_CONFIG_DIGEST}"])
 
 
 if __name__ == "__main__":

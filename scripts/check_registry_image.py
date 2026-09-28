@@ -1,35 +1,38 @@
 #!/usr/bin/env python3
 """Verify that the image published to a container registry is the qualified release image.
 
-The release workflow publishes the exact image it built, scanned, archived, and
-SBOM-validated, then resolves the published tag from the registry and binds it
-back to the qualified local image. This gate refuses to let the release
-continue when that binding cannot be established, and it never conflates the
-two distinct digest families involved:
+The release workflow builds one multi-platform image, pushes it to the registry
+by digest while every gate is still pending, and promotes the recorded digest
+to the version tag only after the scan, archive, and SBOM gates have passed.
+This gate refuses to let the release continue when the served tag cannot be
+bound to the digest the qualified build recorded, and it never conflates the
+digest families involved:
 
-- ``GHCR_MANIFEST_DIGEST``: the digest the registry serves for the pushed tag.
-  Docker 29 (the GitHub runner default) keeps built images in the containerd
-  image store, where the tag resolves to an OCI image index that bundles the
-  platform image manifest and any build-time attestation manifests. The digest
-  of that index is what ``docker push`` records and what the registry returns,
-  so it is the canonical pushed digest.
-- ``IMAGE_CONFIG_DIGEST``: the configuration digest of the platform image
-  manifest (the image ID of the classic image store). It identifies the
-  runnable image, not the registry entry.
+- ``GHCR_MANIFEST_DIGEST``: the digest the registry serves for the released
+  tag. The builder publishes the built multi-platform image as an OCI image
+  index that bundles one platform image manifest per supported platform
+  (``linux/amd64`` and ``linux/arm64``) plus build-time attestation manifests.
+  The digest of that index is what the build records when it pushes and what
+  the registry returns, so it is the canonical published digest.
+- ``IMAGE_MANIFEST_DIGEST_<PLATFORM>``: the digest of each platform image
+  manifest the index lists; it is the content-addressed identity of that
+  platform image.
+- ``IMAGE_CONFIG_DIGEST_<PLATFORM>``: the configuration digest inside each
+  platform image manifest. It identifies the runnable image, not the registry
+  entry.
 
 Verification performed:
 
 - ``verify-manifest`` compares the raw manifest served by the registry against
-  the push result recorded by Docker and the descriptor reported by Buildx,
-  then checks the local image identity against exact content digests of the
-  served artifact:
-  - single manifest mode: the local image ID must equal the served manifest
-    digest (containerd image store) or the manifest's configuration digest
-    (classic image store);
-  - index mode: the served index digest must equal the local image ID, and the
-    index must contain exactly one platform image manifest besides optional
-    attestation manifests, whose digest is reported for the second phase.
-- ``verify-image`` fetches the platform image manifest by the digest listed in
+  the descriptor reported by Buildx and the digest recorded when the qualified
+  build pushed its result, then binds the served tag to that build: the served
+  digest must equal the recorded build digest, and the served document must be
+  an image index that contains exactly the ``linux/amd64`` and ``linux/arm64``
+  platform image manifests, besides optional attestation manifests. Both
+  platform manifest digests are reported for the second phase. Every other
+  served form fails closed: the release publishes a multi-platform image, so a
+  single platform manifest is never accepted.
+- ``verify-image`` fetches one platform image manifest by the digest listed in
   the verified index, requires the fetched bytes to hash to that digest, and
   extracts the configuration digest.
 
@@ -48,6 +51,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+SUPPORTED_PLATFORM_LABELS = ("linux/amd64", "linux/arm64")
 
 
 class RegistryImageError(ValueError):
@@ -60,7 +64,7 @@ class ManifestSelection:
 
     mode: str
     manifest_digest: str
-    image_manifest_digest: str
+    platform_manifest_digests: dict[str, str]
 
 
 def _read_bytes(path: Path, label: str) -> bytes:
@@ -141,11 +145,12 @@ def _repo_digests(repo_digests_path: Path, image: str) -> set[str]:
     return digests
 
 
-def _platform_image_manifest(document: dict) -> dict:
+def _platform_image_manifests(document: dict) -> dict[str, str]:
+    """Return each supported platform's image manifest digest from the index."""
     entries = document.get("manifests")
     if not isinstance(entries, list) or not entries:
         raise RegistryImageError("registry index does not list any manifests")
-    image_entries = []
+    platform_entries: list[tuple[str, str]] = []
     for entry in entries:
         if not isinstance(entry, dict):
             raise RegistryImageError("registry index contains a non-object manifest entry")
@@ -155,12 +160,27 @@ def _platform_image_manifest(document: dict) -> dict:
         platform = entry.get("platform") or {}
         if platform.get("os") == "unknown" and platform.get("architecture") == "unknown":
             continue
-        image_entries.append(entry)
-    if len(image_entries) != 1:
-        raise RegistryImageError(
-            f"registry index must contain exactly one platform image manifest, found {len(image_entries)}"
+        label = (
+            "/".join(
+                str(part)
+                for part in (platform.get("os"), platform.get("architecture"), platform.get("variant"))
+                if part
+            )
+            or "<missing platform>"
         )
-    return image_entries[0]
+        digest = _require_digest(entry.get("digest"), f"index entry digest for {label}")
+        platform_entries.append((label, digest))
+    labels = sorted(label for label, _ in platform_entries)
+    if labels != sorted(SUPPORTED_PLATFORM_LABELS):
+        found = ", ".join(labels) if labels else "none"
+        raise RegistryImageError(
+            "registry index must contain exactly the linux/amd64 and linux/arm64 platform "
+            f"image manifests, found {found}"
+        )
+    platform_digests = {label.split("/")[1]: digest for label, digest in platform_entries}
+    if platform_digests["amd64"] == platform_digests["arm64"]:
+        raise RegistryImageError("registry index platform manifests must have distinct digests")
+    return platform_digests
 
 
 def verify_manifest(
@@ -168,17 +188,19 @@ def verify_manifest(
     manifest_raw_path: Path,
     descriptor_path: Path,
     repo_digests_path: Path,
-    local_image_id_path: Path,
+    expected_index_digest_path: Path,
     image: str,
 ) -> ManifestSelection:
-    """Bind the registry-served manifest to the push record and the local image."""
+    """Bind the registry-served tag to the digest the qualified build recorded."""
     image = _require_untagged_image(image)
     raw = _read_bytes(manifest_raw_path, "registry manifest")
     document = _decode_json_object(raw, "registry manifest", manifest_raw_path)
     computed = _manifest_digest_of(raw)
     reported = _reported_manifest_digest(descriptor_path)
     repo_digests = _repo_digests(repo_digests_path, image)
-    local_image_id = _require_digest(_read_text_line(local_image_id_path, "local image ID"), "local image ID")
+    expected_index_digest = _require_digest(
+        _read_text_line(expected_index_digest_path, "expected index digest"), "expected index digest"
+    )
 
     if reported != computed:
         raise RegistryImageError(
@@ -187,27 +209,16 @@ def verify_manifest(
     if computed not in repo_digests:
         rendered = ", ".join(sorted(repo_digests))
         raise RegistryImageError(f"push recorded {rendered} for {image}, not the served manifest digest {computed}")
-    if "config" in document:
-        config_digest = _manifest_config_digest(document)
-        # The containerd image store reports the manifest digest as the image
-        # ID, the classic image store the configuration digest. Both are exact
-        # content identities of the served image, so either may be the
-        # qualified local image.
-        if local_image_id not in {computed, config_digest}:
-            raise RegistryImageError(
-                f"served manifest digest {computed} and configuration digest {config_digest} "
-                f"do not match the qualified local image {local_image_id}"
-            )
-        return ManifestSelection("single", computed, computed)
     if "manifests" in document:
-        if local_image_id != computed:
+        if expected_index_digest != computed:
             raise RegistryImageError(
-                f"published index digest {computed} is not the qualified local image {local_image_id}"
+                f"published index digest {computed} does not match the qualified build {expected_index_digest}"
             )
-        entry = _platform_image_manifest(document)
-        digest = _require_digest(entry.get("digest"), "index entry digest")
-        return ManifestSelection("index", computed, digest)
-    raise RegistryImageError("registry manifest is neither an image manifest nor an image index")
+        return ManifestSelection("index", computed, _platform_image_manifests(document))
+    raise RegistryImageError(
+        "registry manifest is not a multi-platform image index; "
+        "the release publishes a linux/amd64 and linux/arm64 image"
+    )
 
 
 def verify_image_manifest(*, manifest_raw_path: Path, expected_digest: str) -> str:
@@ -237,10 +248,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     manifest.add_argument("--repo-digests", type=Path, required=True, help="repository digests recorded by the push")
     manifest.add_argument(
-        "--local-image-id",
+        "--expected-index-digest",
         type=Path,
         required=True,
-        help="image ID reported by 'docker image inspect' for the qualified local image",
+        help="index digest recorded by the qualified build, for example 'containerimage.digest' from the buildx metadata file",
     )
     manifest.add_argument(
         "--image",
@@ -262,12 +273,14 @@ def main(argv: list[str] | None = None) -> int:
                 manifest_raw_path=args.manifest_raw,
                 descriptor_path=args.descriptor,
                 repo_digests_path=args.repo_digests,
-                local_image_id_path=args.local_image_id,
+                expected_index_digest_path=args.expected_index_digest,
                 image=args.image,
             )
             print(f"MODE={selection.mode}")
             print(f"GHCR_MANIFEST_DIGEST={selection.manifest_digest}")
-            print(f"IMAGE_MANIFEST_DIGEST={selection.image_manifest_digest}")
+            for architecture in sorted(selection.platform_manifest_digests):
+                digest = selection.platform_manifest_digests[architecture]
+                print(f"IMAGE_MANIFEST_DIGEST_{architecture.upper()}={digest}")
             print(f"registry manifest verification passed for {args.image}", file=sys.stderr)
         else:
             config_digest = verify_image_manifest(

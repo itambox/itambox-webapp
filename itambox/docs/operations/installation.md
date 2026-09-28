@@ -12,6 +12,12 @@ Each tagged release publishes the qualified build to the GitHub Container Regist
 docker pull ghcr.io/itambox/itambox-webapp:1.0.0-beta.3
 ```
 
+The image is published as a multi-platform index for **linux/amd64** and **linux/arm64**; `docker pull` selects the variant matching the host platform, and `docker pull --platform linux/arm64` overrides that choice. Verify that the tag lists both platforms before pinning a digest:
+
+```bash
+docker buildx imagetools inspect ghcr.io/itambox/itambox-webapp:1.0.0-beta.3
+```
+
 The image is the exact build the release workflow scanned, archived, and SBOM-validated, and its registry digest carries build-provenance and SPDX-SBOM attestations:
 
 ```bash
