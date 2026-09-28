@@ -1,0 +1,106 @@
+name: Image drift
+
+# Weekly rebuild-and-rescan of the current main image. New advisories against
+# the shipped dependency set surface as refreshed code scanning alerts and a
+# failing scheduled run between releases, so the strict release gates rarely
+# block a dispatch. The scan ignores unfixed findings, like the release gates.
+
+on:
+  schedule:
+    - cron: "47 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-drift-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ITAMBOX_SOURCE: https://github.com/${{ github.repository }}
+
+jobs:
+  drift-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Determine release metadata
+        id: metadata
+        shell: bash
+        run: |
+          VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build current main image without publishing
+        env:
+          ITAMBOX_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          docker build \
+            --build-arg "ITAMBOX_VERSION=$ITAMBOX_VERSION" \
+            --build-arg "ITAMBOX_REVISION=$GITHUB_SHA" \
+            --build-arg "ITAMBOX_SOURCE=$ITAMBOX_SOURCE" \
+            --tag itambox:drift-scan \
+            .
+
+      - name: Scan current main image
+        shell: bash
+        run: |
+          set +x
+          bash scripts/install_security_tools.sh "$RUNNER_TEMP/security-tools" trivy
+          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --scanners vuln --ignore-unfixed \
+            --format json --output "$RUNNER_TEMP/trivy-image.json" \
+            itambox:drift-scan \
+            >"$RUNNER_TEMP/trivy.stdout" 2>"$RUNNER_TEMP/trivy.stderr"; then
+            echo "Image scanner failed; raw diagnostics are retained only on the runner" >&2
+            exit 2
+          fi
+
+      - name: Apply release-image thresholds and suppressions
+        id: image-gate
+        shell: bash
+        run: |
+          set +x
+          set +e
+          python scripts/security_gate.py trivy \
+            --report "$RUNNER_TEMP/trivy-image.json" \
+            --sarif "$RUNNER_TEMP/trivy-image.sarif" \
+            --fail-on any
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          if [[ -s "$RUNNER_TEMP/trivy-image.sarif" ]]; then
+            echo "sarif=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sarif=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retain drift results in Code Scanning
+        if: always() && steps.image-gate.outputs.sarif == 'true'
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
+        with:
+          sarif_file: ${{ runner.temp }}/trivy-image.sarif
+          # Shares the single draft-image code scanning configuration that
+          # already exists on the default branch, so alert comparison and
+          # lifecycle stay bound to the same category as the release scans.
+          category: trivy-draft-image
+
+      - name: Enforce drift gate
+        if: always()
+        env:
+          GATE_STATUS: ${{ steps.image-gate.outputs.status }}
+        run: |
+          if [[ -z "$GATE_STATUS" || "$GATE_STATUS" != "0" ]]; then
+            echo "Image drift gate failed: the current main image reports unsuppressed findings" >&2
+            exit 1
+          fi

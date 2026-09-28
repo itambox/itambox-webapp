@@ -211,6 +211,15 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         for package in ("openssl", "libssl3", "tzdata"):
             self.assertIn(package, install_block)
 
+    def test_release_image_gates_block_every_unsuppressed_finding(self):
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+        self.assertEqual(workflow.count("--fail-on any"), 2)
+        rehearsal = workflow[: workflow.index("prepare-release:")]
+        prepare_release = workflow[workflow.index("prepare-release:") :]
+        self.assertIn("--fail-on any", rehearsal)
+        self.assertIn("--fail-on any", prepare_release)
+
     def test_public_guidance_uses_dotted_prerelease_examples(self):
         security_policy = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
         bug_template = (REPOSITORY_ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.md").read_text(encoding="utf-8")

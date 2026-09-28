@@ -1,6 +1,8 @@
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from scripts.security_gate import (
     evaluate_gitleaks,
     evaluate_trivy,
     load_suppressions,
+    main,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -177,6 +180,97 @@ class FindingPolicyTests(unittest.TestCase):
             self.assertTrue(result.passed)
             self.assertEqual(result.suppressed, 1)
 
+    def test_trivy_fail_on_any_blocks_every_unsuppressed_severity(self):
+        severities = ("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL")
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": "uv.lock",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": f"CVE-2026-{index:04d}",
+                            "PkgName": f"example{index}",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": severity,
+                        }
+                        for index, severity in enumerate(severities, start=1)
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            result = evaluate_trivy([report], [], Path(root) / "results.sarif", fail_on="any")
+            self.assertFalse(result.passed)
+            self.assertEqual(result.blocking, len(severities))
+
+    def test_trivy_fail_on_medium_keeps_low_and_unknown_informational(self):
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": "uv.lock",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-0001",
+                            "PkgName": "low",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "LOW",
+                        },
+                        {
+                            "VulnerabilityID": "CVE-2026-0002",
+                            "PkgName": "unknown",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "UNKNOWN",
+                        },
+                        {
+                            "VulnerabilityID": "CVE-2026-0003",
+                            "PkgName": "medium",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "MEDIUM",
+                        },
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            sarif = Path(root) / "results.sarif"
+            result = evaluate_trivy([report], [], sarif, fail_on="medium")
+            self.assertFalse(result.passed)
+            self.assertEqual(result.blocking, 1)
+            # Informational severities stay retained in the SARIF upload.
+            self.assertEqual(len(json.loads(sarif.read_text(encoding="utf-8"))["runs"][0]["results"]), 3)
+
+    def test_trivy_fail_on_any_respects_governed_suppressions(self):
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": "uv.lock",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-0001",
+                            "PkgName": "example",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "HIGH",
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            manifest = Path(root) / "suppressions.json"
+            manifest.write_text(json.dumps({"version": 1, "suppressions": [suppression()]}), encoding="utf-8")
+            result = evaluate_trivy([report], load_suppressions(manifest), Path(root) / "results.sarif", fail_on="any")
+            self.assertTrue(result.passed)
+            self.assertEqual(result.suppressed, 1)
+
+    def test_trivy_rejects_unknown_fail_on_policy(self):
+        report = {"SchemaVersion": 2, "Results": [{"Target": "uv.lock", "Vulnerabilities": []}]}
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaisesRegex(SecurityGateError, "fail-on"):
+                evaluate_trivy([report], [], Path(root) / "results.sarif", fail_on="everything")
+
     def test_trivy_rejects_malformed_reports_and_missing_expected_targets(self):
         with tempfile.TemporaryDirectory() as root:
             sarif = Path(root) / "results.sarif"
@@ -273,6 +367,51 @@ class FindingPolicyTests(unittest.TestCase):
                 self.assertEqual(result.suppressed, 1)
 
 
+class SecurityGateCommandTests(unittest.TestCase):
+    def _run_trivy(self, root, report, *extra):
+        report_path = Path(root) / "report.json"
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        manifest = Path(root) / "suppressions.json"
+        manifest.write_text(json.dumps({"version": 1, "suppressions": []}), encoding="utf-8")
+        return main(
+            [
+                "--manifest",
+                str(manifest),
+                "trivy",
+                "--report",
+                str(report_path),
+                "--sarif",
+                str(Path(root) / "results.sarif"),
+                *extra,
+            ]
+        )
+
+    def test_trivy_cli_applies_the_fail_on_policy(self):
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": "uv.lock",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-0001",
+                            "PkgName": "example",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "LOW",
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            with redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(self._run_trivy(root, report, "--fail-on", "any"), 1)
+            self.assertIn("blocking=1", output.getvalue())
+
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(self._run_trivy(root, report), 0)
+
+
 class SecurityAutomationContractTests(unittest.TestCase):
     def test_security_workflow_covers_canonical_inputs_without_leaking_reports(self):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "security.yml").read_text(encoding="utf-8")
@@ -351,6 +490,17 @@ class SecurityAutomationContractTests(unittest.TestCase):
         self.assertIn("GITLEAKS_VERSION=8.30.1", installer)
         self.assertIn("bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea", installer)
         self.assertIn("551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb", installer)
+
+    def test_drift_workflow_rescans_the_current_image_under_the_release_policy(self):
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "image-drift.yml").read_text(encoding="utf-8")
+
+        self.assertIn("schedule:", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("--ignore-unfixed", workflow)
+        self.assertIn("--fail-on any", workflow)
+        self.assertIn("security-events: write", workflow)
+        self.assertIn("category: trivy-draft-image", workflow)
+        self.assertIn("itambox:drift-scan", workflow)
 
 
 if __name__ == "__main__":
