@@ -3,57 +3,12 @@ name: CI
 on:
   push:
     branches: [master, main]
+  # Every pull request runs the full suite, deliberately unfiltered: a change
+  # that matches no path filter would leave this workflow's required checks
+  # unreported, and a required check that never runs blocks the merge. A rule
+  # whose inputs are listed in two places quietly stops running on the ones
+  # somebody forgot to list; scope the work inside the jobs instead.
   pull_request:
-    paths:
-      - ".github/workflows/**"
-      - ".pre-commit-config.yaml"
-      # The six root documents and every development document below are read by
-      # the architecture gate's R-DOC1 link rule. They are matched by prefix and
-      # by glob rather than enumerated: a rule whose inputs are listed in two
-      # places quietly stops running on the ones somebody forgot to list here,
-      # which is a broken link merging on a green tick.
-      - "AGENTS.md"
-      - "CLAUDE.md"
-      - "CONTRIBUTING.md"
-      - "DEVELOPMENT.md"
-      - "README.md"
-      - "SECURITY.md"
-      - "Makefile"
-      - "pyproject.toml"
-      - "setup.cfg"
-      - "uv.lock"
-      - "itambox/**/*.py"
-      - "itambox/core/migration_baseline_manifest.json"
-      - "itambox/**/*.html"
-      - "itambox/static/src/**/*.css"
-      - "itambox/static/src/**/*.scss"
-      - "itambox/.stylelintrc.json"
-      # TypeScript sources and the JS unit tests are the frontend job's inputs,
-      # and the catalogs feed the localization gates; a frontend-only change
-      # used to trigger no CI run because none of them matched a filter.
-      - "itambox/static/src/**/*.ts"
-      - "itambox/tests/js/**"
-      - "itambox/locale/**"
-      - "itambox/package.json"
-      - "itambox/package-lock.json"
-      - "itambox/schema.yaml"
-      - "itambox/docs/plugins/api_reference.md"
-      # The MkDocs pages and their assets are the docs job's inputs, and the
-      # documentation-policy suite scans them; a docs-only change used to
-      # trigger no CI run because none of them matched a filter.
-      - "itambox/docs/**"
-      - "itambox/mkdocs.yml"
-      - "scripts/**/*.py"
-      - "scripts/architecture_baseline.json"
-      - "scripts/architecture_issue_states.json"
-      - "scripts/contract_policy_manifest.json"
-      - "scripts/migration_audit.json"
-      - "scripts/exception_baseline.json"
-      - "scripts/local_import_baseline.json"
-      - "scripts/coverage_baseline.json"
-      - "scripts/openapi_diagnostics_baseline.json"
-      - "scripts/suite_baseline.json"
-      - "scripts/typing_checked_modules.json"
   workflow_dispatch:
 
 permissions:
