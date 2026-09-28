@@ -12,6 +12,10 @@ scripts:
 * **A hand-enumerated test list rots.** A new ``scripts/tests/test_*.py`` suite
   that nobody remembers to add to the workflow never runs, and a gate whose
   tests never run is not a gate.
+* **A filtered trigger skips the whole suite.** A change that matches no
+  ``on.pull_request.paths`` entry leaves every job of this workflow
+  unreported, and a required check that never runs blocks the merge: the
+  pull request trigger is unconditional, and scope lives inside the jobs.
 
 The workflow is read as text rather than parsed as YAML on purpose: this suite
 is stdlib-only, and CI runs it on the bare interpreter before any dependency is
@@ -21,8 +25,6 @@ installed, precisely so a broken gate is caught before the ~40 minute suite.
 import re
 import unittest
 from pathlib import Path
-
-from scripts.check_architecture import linked_documents
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
@@ -111,46 +113,6 @@ def parse_steps(workflow_text):
 
 def load_steps():
     return parse_steps(WORKFLOW_PATH.read_text(encoding="utf-8"))
-
-
-def path_filters(workflow_text):
-    """The ``on.pull_request.paths`` entries, unquoted, in file order."""
-    filters = []
-    inside = False
-    for line in workflow_text.splitlines():
-        stripped = line.strip()
-        if stripped == "paths:":
-            inside = True
-            continue
-        if not inside:
-            continue
-        if stripped.startswith("- "):
-            filters.append(stripped[2:].strip().strip('"'))
-            continue
-        # A comment inside the sequence is not the end of it. Treating it as one
-        # would silently shorten the filter list and pass every assertion below.
-        if stripped and not stripped.startswith("#"):
-            break
-    return filters
-
-
-def _filter_matcher(pattern):
-    """Compile one path filter the way GitHub matches it.
-
-    ``**`` crosses directory separators and ``*`` does not. Internal development
-    prose is maintained in the private design-docs repository, so the path-filter
-    tests cover only public documentation and source paths.
-    """
-    compiled = []
-    for token in re.split(r"(\*\*/|\*\*|\*|\?)", pattern):
-        compiled.append(
-            {"**/": r"(?:[^/]+/)*", "**": r".*", "*": r"[^/]*", "?": r"[^/]"}.get(token) or re.escape(token)
-        )
-    return re.compile("".join(compiled) + r"\Z")
-
-
-def triggers_ci(workflow_text, repository_path):
-    return any(_filter_matcher(pattern).match(repository_path) for pattern in path_filters(workflow_text))
 
 
 def step_named(steps, name):
@@ -284,6 +246,23 @@ class PostSuiteGateIndependenceTests(unittest.TestCase):
         self.assertIn("--serial artifacts/junit-serial-only.xml", run)
 
 
+class PullRequestSuiteScopeTests(unittest.TestCase):
+    """Required checks must be reportable for every pull request.
+
+    A required check that never runs blocks the merge, so this workflow must
+    not path-filter its pull request trigger: every change runs the full
+    suite. That supersedes the former per-directory filter and the tests
+    that enumerated it, because a hand-maintained list of inputs quietly
+    stops covering the ones somebody forgot to add.
+    """
+
+    def test_the_pull_request_trigger_is_not_path_filtered(self):
+        before_jobs = WORKFLOW_PATH.read_text(encoding="utf-8").split("jobs:", 1)[0]
+        self.assertIn("pull_request:", before_jobs)
+        self.assertNotIn("paths:", before_jobs)
+        self.assertNotIn("paths-ignore:", before_jobs)
+
+
 class GateSuiteDiscoveryTests(unittest.TestCase):
     """A hand-written list of test modules is a list that goes stale silently."""
 
@@ -299,17 +278,6 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
             "then be silently excluded. Run them by discovery instead.",
         )
 
-    def test_suite_baseline_changes_trigger_ci(self):
-        self.assertIn('- "scripts/suite_baseline.json"', self.workflow_text)
-
-    def test_openapi_artifacts_and_baseline_changes_trigger_ci(self):
-        self.assertIn('- "itambox/schema.yaml"', self.workflow_text)
-        self.assertIn('- "scripts/openapi_diagnostics_baseline.json"', self.workflow_text)
-
-    def test_migration_preflight_manifest_changes_trigger_ci(self):
-        self.assertIn('- "itambox/core/migration_baseline_manifest.json"', self.workflow_text)
-        self.assertTrue(triggers_ci(self.workflow_text, "itambox/core/migration_baseline_manifest.json"))
-
     def test_migration_baseline_preflight_runs_after_fresh_migrate(self):
         steps = load_steps()
         names = [step.get("name") for step in steps if step.get("name")]
@@ -320,9 +288,7 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         )
         self.assertLess(names.index("Verify migration baseline recognition"), names.index("Run Django system checks"))
 
-    def test_exception_policy_changes_trigger_ci_and_run_the_gate(self):
-        self.assertIn('- "scripts/exception_baseline.json"', self.workflow_text)
-        self.assertTrue(triggers_ci(self.workflow_text, "scripts/check_exception_policy.py"))
+    def test_the_exception_policy_gate_runs_in_ci(self):
         gate = step_named(load_steps(), "Check the exception policy gate")
         self.assertIn("scripts/check_exception_policy.py", gate.get("run", ""))
 
@@ -347,13 +313,7 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         self.assertIn("always()", condition)
         self.assertIn("steps.openapi.conclusion != 'skipped'", condition)
 
-    def test_architecture_policy_changes_trigger_ci_and_run_the_gate(self):
-        self.assertIn('- "scripts/architecture_baseline.json"', self.workflow_text)
-        self.assertIn('- "scripts/contract_policy_manifest.json"', self.workflow_text)
-        self.assertTrue(triggers_ci(self.workflow_text, "scripts/contract_policy_manifest.json"))
-        for document in ("scripts/check_architecture.py", "itambox/docs/plugins/api_reference.md"):
-            with self.subTest(document=document):
-                self.assertTrue(triggers_ci(self.workflow_text, document))
+    def test_the_architecture_boundary_gate_runs_in_ci(self):
         gate = step_named(load_steps(), "Check the architecture boundary gate")
         self.assertIn("scripts/check_architecture.py", gate.get("run", ""))
 
@@ -390,34 +350,6 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
                 self.assertIn(target, phony)
                 self.assertIn(f"\n{target}:\n", makefile)
                 self.assertIn(f"make {target}", makefile)
-
-    def test_every_document_the_link_rule_reads_also_triggers_ci(self):
-        """`R-DOC1` is pointless on a document whose change runs no CI at all.
-
-        Derived from the gate's own document set rather than from a list
-        repeated here: enumerating the inputs in two places is how five of the
-        development documents came to be scanned by a rule that never ran on them.
-        """
-        for document in linked_documents(REPO_ROOT):
-            relative = document.relative_to(REPO_ROOT).as_posix()
-            with self.subTest(document=relative):
-                self.assertTrue(
-                    triggers_ci(self.workflow_text, relative),
-                    f"{relative} is read by R-DOC1 but matches no on.pull_request.paths filter",
-                )
-
-    def test_internal_development_documents_are_not_public_ci_inputs(self):
-        """Internal prose is reviewed in design-docs; the manifest is the CI input."""
-        self.assertFalse(triggers_ci(self.workflow_text, "private-development/architecture-policy.md"))
-        self.assertTrue(triggers_ci(self.workflow_text, "scripts/contract_policy_manifest.json"))
-
-    def test_the_path_filter_reader_distinguishes_star_from_double_star(self):
-        """Guards the assertions above: a matcher that ignores `**` proves nothing."""
-        self.assertTrue(triggers_ci('paths:\n  - "a/**/*.md"\n', "a/b/c.md"))
-        self.assertFalse(triggers_ci('paths:\n  - "a/*.md"\n', "a/b/c.md"))
-        self.assertTrue(triggers_ci('paths:\n  - "a/*.md"\n', "a/c.md"))
-        self.assertEqual(path_filters('paths:\n  - "a/*.md"\n  - "b.py"\n'), ["a/*.md", "b.py"])
-        self.assertEqual(path_filters('paths:\n  # note\n  - "a.md"\nother:\n  - "b"\n'), ["a.md"])
 
     def test_internal_development_docs_are_not_in_the_mkdocs_nav(self):
         navigation = (REPO_ROOT / "itambox" / "mkdocs.yml").read_text(encoding="utf-8")
@@ -492,18 +424,6 @@ class TypingPolicyWiringTests(unittest.TestCase):
         typing_hook = "\n".join(pre_commit_lines[hook_start:hook_end])
         self.assertNotIn("--list", typing_hook)
         self.assertNotIn(f"{self.GATE} --list", MAKEFILE_PATH.read_text(encoding="utf-8"))
-
-    def test_the_record_and_the_policy_document_trigger_ci(self):
-        self.assertIn('- "scripts/typing_checked_modules.json"', self.workflow_text)
-        for path in (
-            "scripts/typing_checked_modules.json",
-            "scripts/check_typing_policy.py",
-            "scripts/contract_policy_manifest.json",
-            "pyproject.toml",
-            "uv.lock",
-        ):
-            with self.subTest(path=path):
-                self.assertTrue(triggers_ci(self.workflow_text, path))
 
     def test_pre_commit_runs_the_same_gate_in_the_full_dev_environment(self):
         config = PRE_COMMIT_PATH.read_text(encoding="utf-8")
