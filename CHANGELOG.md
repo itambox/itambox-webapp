@@ -6,6 +6,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- Dashboard charts (asset status distribution and asset age distribution) are rendered with Apache ECharts instead of ApexCharts; categories, colors, tooltips, legends, empty states, light and dark theming, and the behavior across HTMX swaps and GridStack resizes are preserved. The chart code is bundled locally with no runtime downloads and no CSP exception was added, and the ApexCharts dependency and its vendored script are removed entirely.
+
 ### Fixed
 
 - Corrected the maturity statements in the documentation index and the SaaS Subscriptions model page to the declared capability grades: SaaS Subscriptions and Purchase Orders and Contracts are Stable; the report designer, scheduled reports, alert rules, webhooks, the Asset Request procurement seam, and SCIM provisioning remain Beta; the plugin system remains Experimental. No declared capability grade changed; only the published documentation was corrected.
