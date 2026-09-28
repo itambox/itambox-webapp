@@ -16,7 +16,7 @@ ITAMbox accepts focused changes through pull requests. This guide describes the 
 |---|---|
 | Python | Minimum metadata version 3.12; Python 3.12 is the currently qualified and canonical interpreter for CI, Docker, native Windows development, and lint |
 | PostgreSQL | 15 or newer; CI uses PostgreSQL 16 and SQLite is not supported |
-| Node.js | 20, with the npm version supplied by that release |
+| Node.js | 26, with the npm version supplied by that release |
 | Git | Current maintained release |
 | Docker Compose | Optional for deployment and production smoke tests; the smoke test requires v2.24.4 or newer |
 | GNU Make | Optional convenience wrapper; on Windows, use it from Git Bash or WSL |
