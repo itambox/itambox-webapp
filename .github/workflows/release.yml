@@ -117,7 +117,8 @@ jobs:
           set +e
           python scripts/security_gate.py trivy \
             --report "$RUNNER_TEMP/trivy-image.json" \
-            --sarif "$RUNNER_TEMP/trivy-image.sarif"
+            --sarif "$RUNNER_TEMP/trivy-image.sarif" \
+            --fail-on any
           status=$?
           set -e
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -294,7 +295,8 @@ jobs:
           set +e
           python scripts/security_gate.py trivy \
             --report "$RUNNER_TEMP/trivy-image.json" \
-            --sarif "$RUNNER_TEMP/trivy-image.sarif"
+            --sarif "$RUNNER_TEMP/trivy-image.sarif" \
+            --fail-on any
           status=$?
           set -e
           echo "status=$status" >> "$GITHUB_OUTPUT"

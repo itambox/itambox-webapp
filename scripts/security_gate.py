@@ -14,8 +14,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-BLOCKING_SEVERITIES = {"HIGH", "CRITICAL"}
 TRIVY_SEVERITIES = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
+# Lowest severity band that blocks a gate run. The release-image gates pass
+# ``--fail-on any`` so every unsuppressed, fix-available finding blocks; the
+# dependency-lock gates keep the ``high`` default.
+FAIL_ON_THRESHOLDS = {
+    "high": frozenset({"HIGH", "CRITICAL"}),
+    "medium": frozenset({"MEDIUM", "HIGH", "CRITICAL"}),
+    "any": frozenset(TRIVY_SEVERITIES),
+}
 MAX_SUPPRESSION_DAYS = 90
 _OWNER_RE = re.compile(r"^@[A-Za-z0-9](?:[A-Za-z0-9-]*/)?[A-Za-z0-9-]+$")
 _REQUIRED_FIELDS = {
@@ -223,7 +230,11 @@ def evaluate_trivy(
     suppressions: list[dict[str, Any]],
     sarif_path: Path,
     expected_targets: set[str] | None = None,
+    fail_on: str = "high",
 ) -> GateResult:
+    if fail_on not in FAIL_ON_THRESHOLDS:
+        raise SecurityGateError(f"unknown fail-on policy {fail_on!r}")
+
     findings: list[dict[str, str]] = []
     seen_targets: set[str] = set()
     for report in reports:
@@ -249,7 +260,7 @@ def evaluate_trivy(
         else:
             visible.append(finding)
     counts = Counter(finding["severity"] for finding in visible)
-    blocking = sum(counts[severity] for severity in BLOCKING_SEVERITIES)
+    blocking = sum(counts[severity] for severity in FAIL_ON_THRESHOLDS[fail_on])
     _write_sarif(sarif_path, visible)
     return GateResult(blocking == 0, blocking, suppressed, dict(counts))
 
@@ -325,6 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
     trivy.add_argument("--report", action="append", required=True, type=Path)
     trivy.add_argument("--sarif", required=True, type=Path)
     trivy.add_argument("--expect-target", action="append", default=[])
+    trivy.add_argument("--fail-on", choices=("high", "medium", "any"), default="high")
     gitleaks = subparsers.add_parser("gitleaks")
     gitleaks.add_argument("--report", required=True, type=Path)
     return parser
@@ -343,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
                 suppressions,
                 args.sarif,
                 expected_targets=set(args.expect_target) if args.expect_target else None,
+                fail_on=args.fail_on,
             )
             _print_result("dependency vulnerabilities", result)
         else:

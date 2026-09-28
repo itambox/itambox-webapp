@@ -11,6 +11,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Security
 
 - The published image installs the current `openssl`, `libssl3`, and `tzdata` security builds in its runtime stage instead of inheriting the stale base-image pins, clearing the medium- and low-severity findings that remained from the `v1.0.0-beta.2` image scan.
+- The release gates now block on every unsuppressed image finding (`--fail-on any`) instead of only high and critical findings, so a cut can only pass from a scan-clean candidate; governed suppressions remain the only exception.
+- A scheduled drift scan rebuilds and rescans the current `main` image weekly, so new advisories surface between releases instead of only at the next release gate.
 
 ## [1.0.0-beta.2] - 2026-09-27
 
