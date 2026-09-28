@@ -6,6 +6,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected the maturity statements in the documentation index and the SaaS Subscriptions model page to the declared capability grades: SaaS Subscriptions and Purchase Orders and Contracts are Stable; the report designer, scheduled reports, alert rules, webhooks, the Asset Request procurement seam, and SCIM provisioning remain Beta; the plugin system remains Experimental. No declared capability grade changed; only the published documentation was corrected.
+
 ## [1.0.0-beta.3] - 2026-09-28
 
 ### Changed
