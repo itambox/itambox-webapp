@@ -105,7 +105,10 @@ async function hoverForTooltip(page: Page, chart: Locator): Promise<string> {
     const tooltip = page.locator('text=/\\d+ assets/').first();
     try {
       await tooltip.waitFor({ state: 'visible', timeout: 2000 });
-      return (await tooltip.innerText()).replace(/\s+/g, ' ').trim();
+      // The text locator resolves to the innermost value span; return the whole
+      // tooltip text instead (the chart container holds only canvas + tooltip).
+      const tooltipText = (await chart.textContent()) ?? '';
+      return tooltipText.replace(/\s+/g, ' ').trim();
     } catch {
       // Missed a slice boundary; try the next ring position.
     }
