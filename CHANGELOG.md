@@ -14,6 +14,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The release gates now block on every unsuppressed image finding (`--fail-on any`) instead of only high and critical findings, so a cut can only pass from a scan-clean candidate; governed suppressions remain the only exception.
 - A scheduled drift scan rebuilds and rescans the current `main` image weekly, so new advisories surface between releases instead of only at the next release gate.
 
+### Known limitations and upgrade requirements
+
+- The supported upgrade origin for this release is `v1.0.0-beta.2`. Version skipping remains unsupported, and the earlier prereleases (`v1.0.0-alpha.*`, `v1.0.0-beta.1`) are not supported origins — run `migration_baseline_preflight` from the exact candidate checkout before any migration work.
+
 ## [1.0.0-beta.2] - 2026-09-27
 
 ### Added
