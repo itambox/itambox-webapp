@@ -82,10 +82,6 @@ msgid "Total"
 msgstr "Gesamt"
 
 #: .\static\dist\itambox.js:1
-msgid "Spend"
-msgstr "Ausgaben"
-
-#: .\static\dist\itambox.js:1
 msgid "Camera unavailable. On iPhone/iPad, scanning requires HTTPS. Please use a hardware scanner or type the asset tag."
 msgstr "Kamera nicht verfügbar. Auf iPhone/iPad erfordert das Scannen HTTPS. Bitte verwenden Sie einen Hardware-Scanner oder geben Sie die Inventarnummer ein."
 

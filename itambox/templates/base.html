@@ -83,7 +83,6 @@
     </script>
     {# HTMX (in head for early hx-* processing) #}
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
-    <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
     {% block extra_head %}{% endblock %}
     {% if object %}
       {% plugin_template_content object "head" object %}

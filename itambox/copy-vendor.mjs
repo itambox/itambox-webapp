@@ -67,9 +67,6 @@ cpSync('node_modules/gridstack/dist/gridstack-all.js', dist('gridstack-all.js'))
 // Tom Select JS
 cpSync('node_modules/tom-select/dist/js/tom-select.complete.min.js', dist('tom-select.complete.min.js'));
 
-// ApexCharts
-cpSync('node_modules/apexcharts/dist/apexcharts.min.js', dist('apexcharts.min.js'));
-
 // HTML5 QR Code Scanner fallback
 cpSync('node_modules/html5-qrcode/html5-qrcode.min.js', dist('html5-qrcode.min.js'));
 

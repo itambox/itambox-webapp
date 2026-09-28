@@ -6,14 +6,42 @@
  *  - Lock/unlock toggle
  *  - Save layout (with CSRF token fallback to cookie)
  *  - HTMX beforeSwap/afterSettle reinit
+ *
+ * Chart rendering delegates to the ECharts adapter in `dashboard-charts.ts`.
  */
+import * as echarts from 'echarts/core';
+import { BarChart, PieChart } from 'echarts/charts';
+import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+
+import {
+  createDashboardCharts,
+  type DashboardCharts,
+  type EChartsLib,
+  type ResizeObserverClassLike,
+} from './dashboard-charts';
+
+// Register only the chart types and components the dashboard actually uses so
+// the bundle stays tree-shaken instead of shipping the full ECharts distribution.
+echarts.use([BarChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
+
+const echartsLib: EChartsLib = {
+  init: (element) => echarts.init(element),
+  getInstanceByDom: (element) => echarts.getInstanceByDom(element),
+  dispose: (element) => {
+    echarts.dispose(element);
+  },
+};
+
 (function () {
+  const dashboardCharts: DashboardCharts = createDashboardCharts({
+    echarts: echartsLib,
+    document,
+    resizeObserverClass:
+      typeof ResizeObserver === 'undefined' ? null : (ResizeObserver as unknown as ResizeObserverClassLike),
+  });
   let grid: GridStackInstance | null = null;
   let gsLoaded = false;
-
-  function getCSPNonce(): string | undefined {
-    return document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') || undefined;
-  }
 
   function getCSRFToken(): string {
     return ITAMboxState.getCSRFToken();
@@ -197,518 +225,18 @@
     }
   });
 
-  function initStatusLabelsCharts(): void {
-    document.querySelectorAll('.itambox-status-labels-chart').forEach(function (container) {
-      if ((container as any)._chart_init) return;
-      (container as any)._chart_init = true;
-
-      const chartType = container.getAttribute('data-chart-type') || 'doughnut';
-      const dataRaw = container.getAttribute('data-chart-data') || '[]';
-      let data: any[] = [];
-      try {
-        data = JSON.parse(dataRaw);
-      } catch (e) {
-        console.error('Failed to parse status label chart data:', e);
-        return;
-      }
-
-      if (data.length === 0) {
-        container.innerHTML = '<div class="text-muted text-center py-4">' + gettext('No assets assigned to active status labels.') + '</div>';
-        return;
-      }
-
-      const series = data.map((d: any) => d.count);
-      const labels = data.map((d: any) => d.name);
-      const colors = data.map((d: any) => d.color);
-
-      const getThemeMode = () => document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
-
-      let options: any = {
-        chart: {
-          nonce: getCSPNonce(),
-          type: chartType === "doughnut" ? "donut" : chartType,
-          height: 200,
-          fontFamily: 'inherit',
-          background: 'transparent',
-          animations: {
-            enabled: true,
-            animateGradually: { enabled: true, delay: 150 },
-            dynamicAnimation: { enabled: true, speed: 350 }
-          },
-          toolbar: { show: false }
-        },
-        theme: {
-          mode: getThemeMode()
-        },
-        stroke: {
-          show: true,
-          width: 2,
-          colors: getThemeMode() === 'dark' ? ['#1e293b'] : ['#ffffff']
-        },
-        colors: colors,
-        labels: labels,
-        legend: {
-          show: true,
-          position: 'bottom',
-          fontSize: '11px',
-          fontFamily: 'inherit',
-          labels: {
-            colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
-          },
-          markers: { width: 8, height: 8, radius: 4 }
-        },
-        dataLabels: {
-          enabled: true,
-          style: {
-            fontSize: '11px',
-            fontFamily: 'inherit',
-            fontWeight: '600'
-          },
-          dropShadow: { enabled: false }
-        },
-        tooltip: {
-          theme: getThemeMode(),
-          y: {
-            formatter: function(val: any) { return interpolate(gettext("%(count)s assets"), { count: val }, true); }
-          }
-        }
-      };
-
-      if (chartType === 'bar') {
-        options = {
-          ...options,
-          series: [{ name: gettext("Assets"), data: series }],
-          chart: {
-            ...options.chart,
-            type: 'bar',
-            height: 180
-          },
-          plotOptions: {
-            bar: {
-              borderRadius: 4,
-              horizontal: true,
-              barHeight: '60%',
-              distributed: true
-            }
-          },
-          dataLabels: {
-            enabled: true,
-            formatter: function(val: any) { return val; },
-            style: { colors: ['#fff'] }
-          },
-          xaxis: {
-            categories: labels,
-            labels: {
-              style: {
-                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                fontFamily: 'inherit'
-              }
-            }
-          },
-          yaxis: {
-            labels: {
-              style: {
-                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                fontFamily: 'inherit'
-              }
-            }
-          },
-          legend: { show: false }
-        };
-      } else {
-        options.series = series;
-        if (chartType === 'doughnut') {
-          options.plotOptions = {
-            pie: {
-              donut: {
-                size: '65%',
-                labels: {
-                  show: true,
-                  name: {
-                    show: true,
-                    fontSize: '12px',
-                    color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
-                  },
-                  value: {
-                    show: true,
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    color: getThemeMode() === 'dark' ? '#f8fafc' : '#0f172a',
-                    formatter: function(val: any) { return val; }
-                  },
-                  total: {
-                    show: true,
-                    label: gettext("Total"),
-                    color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                    formatter: function(w: any) {
-                      return w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
-                    }
-                  }
-                }
-              }
-            }
-          };
-        }
-      }
-
-      const chart = new (window as any).ApexCharts(container, options);
-      chart.render();
-
-      // Theme Switcher observer
-      const observer = new MutationObserver(() => {
-        const currentTheme = getThemeMode();
-        chart.updateOptions({
-          theme: { mode: currentTheme },
-          stroke: {
-            colors: currentTheme === 'dark' ? ['#1e293b'] : ['#ffffff']
-          },
-          legend: {
-            labels: {
-              colors: currentTheme === 'dark' ? '#94a3b8' : '#64748b'
-            }
-          },
-          tooltip: { theme: currentTheme }
-        });
-      });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
-    });
-  }
-
-  function initAssetAgeCharts(): void {
-    document.querySelectorAll('.itambox-asset-age-chart').forEach(function (container) {
-      if ((container as any)._chart_init) return;
-      (container as any)._chart_init = true;
-
-      const chartFormat = container.getAttribute('data-chart-format') || 'bar';
-      const dataRaw = container.getAttribute('data-chart-data') || '[]';
-      let data: any[] = [];
-      try {
-        data = JSON.parse(dataRaw);
-      } catch (e) {
-        console.error('Failed to parse asset age chart data:', e);
-        return;
-      }
-
-      const series = data.map((d: any) => d.count);
-      const labels = data.map((d: any) => d.name);
-      const colors = data.map((d: any) => d.color);
-
-      const getThemeMode = () => document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
-
-      let options: any = {
-        chart: {
-          nonce: getCSPNonce(),
-          type: chartFormat,
-          height: 180,
-          fontFamily: 'inherit',
-          background: 'transparent',
-          animations: {
-            enabled: true,
-            animateGradually: { enabled: true, delay: 100 },
-            dynamicAnimation: { enabled: true, speed: 300 }
-          },
-          toolbar: { show: false }
-        },
-        theme: {
-          mode: getThemeMode()
-        },
-        stroke: {
-          show: true,
-          width: 2,
-          colors: getThemeMode() === 'dark' ? ['#1e293b'] : ['#ffffff']
-        },
-        colors: colors,
-        labels: labels,
-        legend: {
-          show: true,
-          position: 'right',
-          fontSize: '11px',
-          fontFamily: 'inherit',
-          labels: {
-            colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
-          },
-          markers: { width: 8, height: 8, radius: 4 }
-        },
-        dataLabels: {
-          enabled: true,
-          style: {
-            fontSize: '11px',
-            fontFamily: 'inherit'
-          },
-          dropShadow: { enabled: false }
-        },
-        tooltip: {
-          theme: getThemeMode(),
-          y: {
-            formatter: function(val: any) { return interpolate(gettext("%(count)s assets"), { count: val }, true); }
-          }
-        }
-      };
-
-      if (chartFormat === 'bar') {
-        options = {
-          ...options,
-          series: [{ name: gettext("Assets"), data: series }],
-          chart: {
-            ...options.chart,
-            type: 'bar',
-            height: 180
-          },
-          plotOptions: {
-            bar: {
-              borderRadius: 4,
-              columnWidth: '55%',
-              distributed: true
-            }
-          },
-          dataLabels: {
-            enabled: true,
-            formatter: function(val: any) { return val; },
-            style: { colors: ['#fff'] }
-          },
-          xaxis: {
-            categories: labels,
-            labels: {
-              style: {
-                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                fontFamily: 'inherit'
-              }
-            }
-          },
-          yaxis: {
-            labels: {
-              style: {
-                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                fontFamily: 'inherit'
-              }
-            }
-          },
-          legend: { show: false }
-        };
-      } else {
-        options.series = series;
-        if (chartFormat === 'pie') {
-          options.legend = {
-            ...options.legend,
-            position: 'bottom'
-          };
-        }
-      }
-
-      const chart = new (window as any).ApexCharts(container, options);
-      chart.render();
-
-      // Theme Switcher observer
-      const observer = new MutationObserver(() => {
-        const currentTheme = getThemeMode();
-        chart.updateOptions({
-          theme: { mode: currentTheme },
-          stroke: {
-            colors: currentTheme === 'dark' ? ['#1e293b'] : ['#ffffff']
-          },
-          legend: {
-            labels: {
-              colors: currentTheme === 'dark' ? '#94a3b8' : '#64748b'
-            }
-          },
-          tooltip: { theme: currentTheme }
-        });
-      });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
-    });
-  }
-
-  function initTenantSpendCharts(): void {
-    document.querySelectorAll('.itambox-tenant-spend-chart').forEach(function (container) {
-      if ((container as any)._chart_init) return;
-      (container as any)._chart_init = true;
-
-      const chartType = container.getAttribute('data-chart-type') || 'bar';
-      const currency = container.getAttribute('data-currency') || '€';
-      const dataRaw = container.getAttribute('data-chart-data') || '[]';
-      let data: any[] = [];
-      try {
-        data = JSON.parse(dataRaw);
-      } catch (e) {
-        console.error('Failed to parse tenant spend chart data:', e);
-        return;
-      }
-
-      const seriesData = data.map((d: any) => d.total);
-      const categories = data.map((d: any) => d.name);
-
-      const getThemeMode = () => document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
-
-      let options: any = {
-        chart: {
-          nonce: getCSPNonce(),
-          type: chartType === "doughnut" ? "donut" : chartType,
-          height: chartType === "bar" ? Math.max(160, 30 * data.length) : 200,
-          fontFamily: 'inherit',
-          background: 'transparent',
-          animations: {
-            enabled: true,
-            animateGradually: { enabled: true, delay: 100 },
-            dynamicAnimation: { enabled: true, speed: 300 }
-          },
-          toolbar: { show: false }
-        },
-        theme: {
-          mode: getThemeMode()
-        },
-        stroke: {
-          show: true,
-          width: chartType === "bar" ? 0 : 2,
-          colors: getThemeMode() === 'dark' ? ['#1e293b'] : ['#ffffff']
-        },
-        colors: [
-          '#206bc4', '#7c3aed', '#2fb344', '#f59f00', 
-          '#d63939', '#0ca678', '#f1c40f', '#17a2b8'
-        ],
-        dataLabels: {
-          enabled: false
-        },
-        tooltip: {
-          theme: getThemeMode(),
-          y: {
-            formatter: function(val: any) {
-              return currency + " " + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
-          }
-        },
-        legend: {
-          show: chartType !== "bar",
-          position: 'bottom',
-          fontSize: '11px',
-          fontFamily: 'inherit',
-          labels: {
-            colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
-          },
-          markers: { width: 8, height: 8, radius: 4 }
-        }
-      };
-
-      if (chartType === 'bar') {
-        options = {
-          ...options,
-          series: [{
-            name: gettext("Spend"),
-            data: seriesData
-          }],
-          plotOptions: {
-            bar: {
-              borderRadius: 4,
-              horizontal: true,
-              barHeight: '70%',
-              distributed: true
-            }
-          },
-          xaxis: {
-            categories: categories,
-            labels: {
-              style: {
-                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                fontFamily: 'inherit'
-              },
-              formatter: function(val: any) {
-                return currency + val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-              }
-            }
-          },
-          yaxis: {
-            labels: {
-              style: {
-                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                fontFamily: 'inherit'
-              }
-            }
-          }
-        };
-      } else {
-        options.series = seriesData;
-        options.labels = categories;
-        if (chartType === 'doughnut') {
-          options.plotOptions = {
-            pie: {
-              donut: {
-                size: '65%',
-                labels: {
-                  show: true,
-                  name: {
-                    show: true,
-                    fontSize: '11px',
-                    color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
-                  },
-                  value: {
-                    show: true,
-                    fontSize: '15px',
-                    fontWeight: 'bold',
-                    color: getThemeMode() === 'dark' ? '#f8fafc' : '#0f172a',
-                    formatter: function(val: any) { 
-                      return currency + " " + Number(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-                    }
-                  },
-                  total: {
-                    show: true,
-                    label: gettext("Total"),
-                    color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
-                    formatter: function(w: any) {
-                      const sum = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
-                      return currency + " " + sum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-                    }
-                  }
-                }
-              }
-            }
-          };
-        }
-      }
-
-      const chart = new (window as any).ApexCharts(container, options);
-      chart.render();
-
-      // Theme Switcher observer
-      const observer = new MutationObserver(() => {
-        const currentTheme = getThemeMode();
-        const updateObj: any = {
-          theme: { mode: currentTheme },
-          stroke: {
-            colors: currentTheme === 'dark' ? ['#1e293b'] : ['#ffffff']
-          },
-          tooltip: { theme: currentTheme },
-          legend: {
-            labels: {
-              colors: currentTheme === 'dark' ? '#94a3b8' : '#64748b'
-            }
-          }
-        };
-        if (chartType === 'bar') {
-          updateObj.xaxis = {
-            labels: {
-              style: {
-                colors: currentTheme === 'dark' ? '#94a3b8' : '#64748b'
-              }
-            }
-          };
-          updateObj.yaxis = {
-            labels: {
-              style: {
-                colors: currentTheme === 'dark' ? '#94a3b8' : '#64748b'
-              }
-            }
-          };
-        }
-        chart.updateOptions(updateObj);
-      });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
-    });
-  }
-
+  // Chart rendering lives in the ECharts adapter (dashboard-charts.ts), which
+  // owns the init/update/resize/dispose lifecycle; this wrapper keeps the
+  // GridStack and HTMX call sites unchanged.
   function initDashboardCharts(): void {
-    initStatusLabelsCharts();
-    initAssetAgeCharts();
-    initTenantSpendCharts();
+    dashboardCharts.initAll();
   }
+
+  // Live theme switching: a single observer re-renders every chart for the
+  // current color mode instead of accumulating one observer per chart.
+  new MutationObserver(function () {
+    dashboardCharts.updateTheme();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
 
   // Delegated rename dashboard input listener to show check icon (replaces inline script)
   document.addEventListener('input', function (evt) {
@@ -742,7 +270,7 @@
     }
   });
 
-  // --- HTMX lifecycle: destroy GridStack before navigating away ---
+  // --- HTMX lifecycle: forget the GridStack handle before navigating away ---
   document.body.addEventListener('htmx:beforeSwap', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
     const target = detail.target as HTMLElement | undefined;
@@ -752,6 +280,21 @@
       gsLoaded = false;
       window.__gsInitialized = false;
     }
+    // Chart instances are deliberately NOT disposed here: htmx fires this
+    // event before it commits the swap, and a failed or cancelled swap keeps
+    // the current DOM — and its live charts — in place. Disposal happens in
+    // htmx:beforeCleanupElement below, which only runs for elements HTMX
+    // actually removes.
+  });
+
+  // Any element HTMX removes releases its chart instance and ResizeObserver
+  // registration here instead of leaking them; aborted swaps never reach this
+  // event, so the charts on an untouched DOM stay alive.
+  document.body.addEventListener('htmx:beforeCleanupElement', function (evt: Event) {
+    const detail = (evt as CustomEvent).detail;
+    const element = (detail.elt || detail.target) as HTMLElement | undefined;
+    if (!element || !element.querySelectorAll) return;
+    dashboardCharts.disposeWithin(element);
   });
 
   // --- HTMX lifecycle: reinitialize after history restore or content swap ---

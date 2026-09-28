@@ -9,6 +9,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Changed
 
 - The frontend build toolchain migrated from Node.js 20 to Node.js 26: the `stylelint`, `frontend`, and E2E CI jobs, the runner-validation workflow, the production image's frontend build stage (`node:26-slim`), and the contributor prerequisites in `CONTRIBUTING.md` now use Node.js 26.
+- Dashboard charts (asset status distribution and asset age distribution) are rendered with Apache ECharts instead of ApexCharts; categories, colors, tooltips, legends, empty states, light and dark theming, and the behavior across HTMX swaps and GridStack resizes are preserved, and crowded category labels rotate on narrow widgets the way the previous engine rotated them. The chart code is bundled locally with no runtime downloads and no CSP exception was added, and the ApexCharts dependency and its vendored script are removed entirely.
 
 ### Fixed
 
