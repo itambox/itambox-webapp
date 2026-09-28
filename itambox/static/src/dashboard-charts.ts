@@ -231,11 +231,21 @@ export function buildStatusLabelsOptions(
   return option;
 }
 
+/**
+ * Rotate crowded category labels (narrow widgets) the way the previous
+ * engine auto-rotated them, so every bucket name stays readable instead of
+ * being clipped or hidden. Wide widgets keep horizontal labels.
+ */
+export function axisRotationForWidth(width: number): number {
+  return width > 0 && width < 300 ? 40 : 0;
+}
+
 export function buildAssetAgeOptions(
   data: ChartDatum[],
   chartFormat: string,
   theme: ThemeMode,
   fontFamily: string,
+  width = 0,
 ): object {
   const palette = PALETTES[theme];
   const names = data.map((datum) => datum.name);
@@ -277,7 +287,14 @@ export function buildAssetAgeOptions(
       data: names,
       axisTick: { show: false },
       axisLine: { lineStyle: { color: palette.axisLine } },
-      axisLabel: { color: palette.muted, fontSize: 10, fontFamily, interval: 0 },
+      axisLabel: {
+        color: palette.muted,
+        fontSize: 10,
+        fontFamily,
+        interval: 0,
+        hideOverlap: true,
+        rotate: axisRotationForWidth(width),
+      },
     },
     yAxis: {
       type: 'value',
@@ -313,6 +330,7 @@ export function createDashboardCharts(options: DashboardChartsOptions): Dashboar
   const echarts = options.echarts;
   const ResizeObserverCtor = options.resizeObserverClass ?? null;
   const tracked = new Set<HTMLElement>();
+  const rotations = new Map<HTMLElement, number>();
   let resizeObserver: ResizeObserverLike | null = null;
   let resizeScheduled = false;
 
@@ -326,13 +344,42 @@ export function createDashboardCharts(options: DashboardChartsOptions): Dashboar
     return null;
   }
 
+  function containerWidth(container: HTMLElement): number {
+    if (typeof container.clientWidth === 'number' && container.clientWidth > 0) {
+      return container.clientWidth;
+    }
+    if (typeof container.getBoundingClientRect === 'function') {
+      const rect = container.getBoundingClientRect();
+      return typeof rect.width === 'number' ? rect.width : 0;
+    }
+    return 0;
+  }
+
   function buildOption(container: HTMLElement, data: ChartDatum[]): object {
     const theme = currentTheme();
     const fontFamily = resolveFontFamily(doc, container);
     if (chartKind(container) === 'status-labels') {
       return buildStatusLabelsOptions(data, container.getAttribute('data-chart-type') || 'doughnut', theme, fontFamily);
     }
-    return buildAssetAgeOptions(data, container.getAttribute('data-chart-format') || 'bar', theme, fontFamily);
+    return buildAssetAgeOptions(
+      data,
+      container.getAttribute('data-chart-format') || 'bar',
+      theme,
+      fontFamily,
+      containerWidth(container),
+    );
+  }
+
+  function isAgeBar(container: HTMLElement): boolean {
+    return chartKind(container) === 'asset-age' && (container.getAttribute('data-chart-format') || 'bar') === 'bar';
+  }
+
+  function syncAxisRotation(container: HTMLElement, instance: EChartsInstanceLike): void {
+    if (!isAgeBar(container)) return;
+    const next = axisRotationForWidth(containerWidth(container));
+    if (rotations.get(container) === next) return;
+    rotations.set(container, next);
+    instance.setOption({ xAxis: { axisLabel: { rotate: next } } });
   }
 
   function renderEmptyState(container: HTMLElement): void {
@@ -345,7 +392,9 @@ export function createDashboardCharts(options: DashboardChartsOptions): Dashboar
   function resizeAll(): void {
     tracked.forEach((container) => {
       const instance = echarts.getInstanceByDom(container);
-      if (instance) instance.resize();
+      if (!instance) return;
+      instance.resize();
+      syncAxisRotation(container, instance);
     });
   }
 
@@ -377,6 +426,7 @@ export function createDashboardCharts(options: DashboardChartsOptions): Dashboar
     if (tracked.delete(container)) {
       resizeObserver?.unobserve(container);
     }
+    rotations.delete(container);
     if (echarts.getInstanceByDom(container)) {
       echarts.dispose(container);
     }
@@ -395,6 +445,9 @@ export function createDashboardCharts(options: DashboardChartsOptions): Dashboar
     }
     const instance = echarts.init(container);
     instance.setOption(buildOption(container, data));
+    if (isAgeBar(container)) {
+      rotations.set(container, axisRotationForWidth(containerWidth(container)));
+    }
     tracked.add(container);
     ensureResizeSource();
     resizeObserver?.observe(container);

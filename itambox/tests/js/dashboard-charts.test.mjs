@@ -150,9 +150,8 @@ class FakeResizeObserver {
   }
 }
 
-const { parseChartData, buildStatusLabelsOptions, buildAssetAgeOptions, createDashboardCharts } = await import(
-  './.build/dashboard-charts.mjs'
-);
+const { parseChartData, buildStatusLabelsOptions, buildAssetAgeOptions, axisRotationForWidth, createDashboardCharts } =
+  await import('./.build/dashboard-charts.mjs');
 
 const STATUS_DATA = [
   { name: 'In Use', count: 12, color: '#206bc4' },
@@ -369,4 +368,47 @@ test('chart option data keeps hostile label text as plain string data', () => {
   const option = buildStatusLabelsOptions(hostile, 'doughnut', 'light', 'Inter');
   assert.equal(option.series[0].data[0].name, '<img src=x onerror=alert(1)>');
   assert.equal(option.title.text, '1');
+});
+
+test('axisRotationForWidth rotates narrow asset-age labels and keeps wide ones horizontal', () => {
+  assert.equal(axisRotationForWidth(0), 0, 'unknown width stays horizontal');
+  assert.equal(axisRotationForWidth(226), 40, 'narrow widget rotates the category labels');
+  assert.equal(axisRotationForWidth(299), 40);
+  assert.equal(axisRotationForWidth(300), 0, 'wide widget keeps the labels horizontal');
+  assert.equal(axisRotationForWidth(640), 0);
+});
+
+test('asset-age bar options carry the rotation for narrow containers', () => {
+  const data = [
+    { name: '< 1 Year', count: 8, color: '#2fb344' },
+    { name: '1 - 3 Years', count: 5, color: '#4299e1' },
+  ];
+  const narrow = buildAssetAgeOptions(data, 'bar', 'light', 'Inter', 226);
+  assert.equal(narrow.xAxis.axisLabel.rotate, 40);
+  assert.equal(narrow.xAxis.axisLabel.hideOverlap, true);
+  const wide = buildAssetAgeOptions(data, 'bar', 'light', 'Inter', 640);
+  assert.equal(wide.xAxis.axisLabel.rotate, 0);
+  const implicit = buildAssetAgeOptions(data, 'bar', 'light', 'Inter');
+  assert.equal(implicit.xAxis.axisLabel.rotate, 0);
+  const pie = buildAssetAgeOptions(data, 'pie', 'light', 'Inter', 226);
+  assert.equal(pie.xAxis, undefined, 'the pie variant has no category axis');
+});
+
+test('a resize that crosses the width threshold re-applies the label rotation', () => {
+  const document = createFakeDocument();
+  const container = ageContainer();
+  container.clientWidth = 226;
+  document.roots.push(container);
+  const { adapter, echarts } = makeAdapter(document);
+
+  adapter.initAll();
+  const instance = echarts.instances.get(container);
+  assert.equal(instance.options[0].xAxis.axisLabel.rotate, 40);
+
+  container.clientWidth = 640;
+  FakeResizeObserver.instances[0].callback();
+
+  assert.equal(instance.resizes, 1);
+  const last = instance.options[instance.options.length - 1];
+  assert.equal(last.xAxis.axisLabel.rotate, 0, 'the widened widget drops the rotation');
 });

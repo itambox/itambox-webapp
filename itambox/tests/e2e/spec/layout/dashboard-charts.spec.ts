@@ -78,8 +78,29 @@ async function hoverForTooltip(page: Page, chart: Locator): Promise<string> {
     [centerX + ring * 0.85, centerY],
     [centerX, centerY + ring],
     [centerX - ring, centerY],
+    [centerX, centerY - ring],
+    [centerX + ring * 0.7, centerY + ring * 0.7],
   ];
+  const covered: string[] = [];
   for (const [x, y] of candidates) {
+    // A fixed overlay (sidebar, debug toolbar, floating chrome) would swallow
+    // the hover silently; only drive the mouse when the chart owns the point.
+    const topmost = await chart.evaluate(
+      (element, [px, py]) => {
+        const top = document.elementFromPoint(px, py);
+        const covering = top
+          ? `${top.tagName}${top.id ? '#' + top.id : ''}${
+              typeof top.className === 'string' && top.className ? '.' + top.className.split(' ')[0] : ''
+            }`
+          : 'none';
+        return { owns: top !== null && element.contains(top), covering };
+      },
+      [x, y] as [number, number],
+    );
+    if (!topmost.owns) {
+      covered.push(`${Math.round(x)},${Math.round(y)} -> ${topmost.covering}`);
+      continue;
+    }
     await page.mouse.move(x, y);
     const tooltip = page.locator('text=/\\d+ assets/').first();
     try {
@@ -89,7 +110,11 @@ async function hoverForTooltip(page: Page, chart: Locator): Promise<string> {
       // Missed a slice boundary; try the next ring position.
     }
   }
-  throw new Error('No slice tooltip appeared on the chart within the expected positions.');
+  throw new Error(
+    `No slice tooltip appeared on the chart within the expected positions (covered candidates: ${
+      covered.join('; ') || 'none'
+    }).`,
+  );
 }
 
 test('dashboard charts render with ECharts, keep their data and tooltips, and need no CSP exception', async ({ page }) => {
@@ -212,6 +237,12 @@ test('empty chart datasets and hostile labels stay safe at runtime', async ({ pa
     const host = document.createElement('div');
     host.id = 'e2e-chart-probe-host';
     host.style.width = '320px';
+    // Keep the probe above fixed chrome (sidebar, toolbars): a body-level block
+    // at x=0 would sit underneath the sidebar and swallow every hover.
+    host.style.position = 'fixed';
+    host.style.right = '24px';
+    host.style.bottom = '24px';
+    host.style.zIndex = '5000';
 
     const empty = document.createElement('div');
     empty.id = 'e2e-empty-chart';
