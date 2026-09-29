@@ -52,7 +52,7 @@ class ProcurementCurrencyInvariantTests(TestCase):
             unit_price=Decimal("123.45"),
         )
 
-        receive_purchase_order(purchase_order, {line.pk: 1})
+        receive_purchase_order(purchase_order, {line.pk: 1}, expected_received={line.pk: line.qty_received})
 
         asset = Asset._base_manager.get(purchase_order_line=line)
         self.assertEqual(asset.purchase_cost, Decimal("123.45"))

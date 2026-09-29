@@ -42,6 +42,12 @@ from procurement.services import (
 User = get_user_model()
 
 
+def _expected(line):
+    """Recorded receipt quantities a receipt submission is prepared against."""
+    line.refresh_from_db()
+    return {line.pk: line.qty_received}
+
+
 class PartialReceiptFixture(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser(
@@ -86,7 +92,8 @@ class PartialReceiptFixture(TestCase):
         return Component.objects.create(name=name, manufacturer=self.manufacturer, category=category)
 
     def _request(self, **kwargs):
-        request = AssetRequest(tenant=self.tenant, requester=self.user, status=RequestStatusChoices.APPROVED, **kwargs)
+        kwargs.setdefault("status", RequestStatusChoices.APPROVED)
+        request = AssetRequest(tenant=self.tenant, requester=self.user, **kwargs)
         request._skip_duplicate_check = True
         request.save()
         return request
@@ -132,7 +139,12 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         line = link.purchase_order_line
         self._open(purchase_order)
 
-        receive_purchase_order(purchase_order, {line.pk: 2}, self._serial_details(line, range(2)))
+        receive_purchase_order(
+            purchase_order,
+            {line.pk: 2},
+            self._serial_details(line, range(2)),
+            expected_received=_expected(line),
+        )
 
         for child in children:
             child.refresh_from_db()
@@ -147,7 +159,12 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
             self.assertTrue(delivered_link.fully_delivered)
         self.assertEqual(FulfillmentLink.objects.get(asset_request=children[2]).qty_received, 0)
 
-        receive_purchase_order(purchase_order, {line.pk: 3}, self._serial_details(line, range(2, 5)))
+        receive_purchase_order(
+            purchase_order,
+            {line.pk: 3},
+            self._serial_details(line, range(2, 5)),
+            expected_received=_expected(line),
+        )
 
         for child in children:
             child.refresh_from_db()
@@ -157,7 +174,12 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         parent.refresh_from_db()
         self.assertEqual(parent.status, RequestStatusChoices.PROCUREMENT)
 
-        receive_purchase_order(purchase_order, {line.pk: 5}, self._serial_details(line, range(5, 10)))
+        receive_purchase_order(
+            purchase_order,
+            {line.pk: 5},
+            self._serial_details(line, range(5, 10)),
+            expected_received=_expected(line),
+        )
 
         parent.refresh_from_db()
         self.assertEqual(parent.status, RequestStatusChoices.APPROVED)
@@ -176,7 +198,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         line = link.purchase_order_line
         self._open(purchase_order)
 
-        receive_purchase_order(purchase_order, {line.pk: 2})
+        receive_purchase_order(purchase_order, {line.pk: 2}, expected_received=_expected(line))
 
         line.refresh_from_db()
         link.refresh_from_db()
@@ -190,7 +212,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 2)
         self.assertEqual(purchase_order.status, PurchaseOrder.STATUS_PARTIAL)
 
-        receive_purchase_order(purchase_order, {line.pk: 3})
+        receive_purchase_order(purchase_order, {line.pk: 3}, expected_received=_expected(line))
 
         link.refresh_from_db()
         request.refresh_from_db()
@@ -199,7 +221,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         self.assertEqual(request.status, RequestStatusChoices.PROCUREMENT)
         self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 5)
 
-        receive_purchase_order(purchase_order, {line.pk: 5})
+        receive_purchase_order(purchase_order, {line.pk: 5}, expected_received=_expected(line))
 
         line.refresh_from_db()
         link.refresh_from_db()
@@ -250,7 +272,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         early_request.refresh_from_db()
         late_request.refresh_from_db()
 
-        receive_purchase_order(purchase_order, {line.pk: 2})
+        receive_purchase_order(purchase_order, {line.pk: 2}, expected_received=_expected(line))
 
         early_request.refresh_from_db()
         late_request.refresh_from_db()
@@ -259,7 +281,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         self.assertEqual(late_request.status, RequestStatusChoices.PROCUREMENT)
         self.assertEqual(FulfillmentLink.objects.get(asset_request=late_request).qty_received, 0)
 
-        receive_purchase_order(purchase_order, {line.pk: 2})
+        receive_purchase_order(purchase_order, {line.pk: 2}, expected_received=_expected(line))
 
         late_request.refresh_from_db()
         self.assertEqual(late_request.status, RequestStatusChoices.APPROVED)
@@ -273,10 +295,10 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         line = link.purchase_order_line
         self._open(purchase_order)
 
-        receive_purchase_order(purchase_order, {line.pk: 8})
+        receive_purchase_order(purchase_order, {line.pk: 8}, expected_received=_expected(line))
 
         with self.assertRaisesMessage(ValidationError, "only 2 remain outstanding"):
-            receive_purchase_order(purchase_order, {line.pk: 5})
+            receive_purchase_order(purchase_order, {line.pk: 5}, expected_received=_expected(line))
 
         line.refresh_from_db()
         link.refresh_from_db()
@@ -307,7 +329,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
             qty_received=0,
         )
 
-        receive_purchase_order(purchase_order, {line.pk: 10})
+        receive_purchase_order(purchase_order, {line.pk: 10}, expected_received=_expected(line))
 
         request.refresh_from_db()
         link.refresh_from_db()
@@ -339,6 +361,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
             purchase_order,
             {line.pk: 1},
             [{"line_id": line.pk, "serial_number": "LEGACY-SN-1", "asset_tag": "LEGACY-TAG-1"}],
+            expected_received=_expected(line),
         )
 
         request.refresh_from_db()
@@ -353,6 +376,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
             purchase_order,
             {line.pk: 1},
             [{"line_id": line.pk, "serial_number": "LEGACY-SN-2", "asset_tag": "LEGACY-TAG-2"}],
+            expected_received=_expected(line),
         )
 
         request.refresh_from_db()
@@ -383,7 +407,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         )
         self.assertEqual(link.qty_outstanding, 5)
 
-        receive_purchase_order(purchase_order, {line.pk: 5})
+        receive_purchase_order(purchase_order, {line.pk: 5}, expected_received=_expected(line))
 
         request.refresh_from_db()
         link.refresh_from_db()
@@ -398,7 +422,7 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         link = link_asset_request_to_purchase_order(purchase_order, request.pk, user=self.user)
         line = link.purchase_order_line
         self._open(purchase_order)
-        receive_purchase_order(purchase_order, {line.pk: 2})
+        receive_purchase_order(purchase_order, {line.pk: 2}, expected_received=_expected(line))
 
         self.client.force_login(self.user)
         session = self.client.session
@@ -413,6 +437,67 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         request_response = self.client.get(reverse("assets:request_detail", kwargs={"pk": request.pk}))
         self.assertEqual(request_response.status_code, 200)
         self.assertContains(request_response, "Received 2 / 10")
+
+    def test_replayed_receipt_submission_is_refused_without_double_booking(self):
+        component = self._component("Replay RAM", "replay-ram")
+        purchase_order = self._draft_purchase_order("PO-PARTIAL-REPLAY-001")
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            component=component,
+            qty_ordered=10,
+            unit_price="5.00",
+        )
+        self._open(purchase_order)
+        request = self._request(component=component, qty=10, status=RequestStatusChoices.PROCUREMENT)
+        link = FulfillmentLink.objects.create(
+            tenant=self.tenant,
+            asset_request=request,
+            purchase_order_line=line,
+            qty_allocated=10,
+            qty_received=0,
+        )
+
+        receive_purchase_order(purchase_order, {line.pk: 3}, expected_received={line.pk: 0})
+
+        # Replaying the exact submission after it was applied must not book it a second time.
+        with self.assertRaisesMessage(ValidationError, "changed since this receipt was prepared"):
+            receive_purchase_order(purchase_order, {line.pk: 3}, expected_received={line.pk: 0})
+
+        line.refresh_from_db()
+        link.refresh_from_db()
+        request.refresh_from_db()
+        self.assertEqual(line.qty_received, 3)
+        self.assertEqual(link.qty_received, 3)
+        self.assertEqual(request.status, RequestStatusChoices.PROCUREMENT)
+        self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 3)
+
+        # A submission prepared against the current state is a distinct, genuine delivery.
+        receive_purchase_order(purchase_order, {line.pk: 3}, expected_received=_expected(line))
+
+        line.refresh_from_db()
+        link.refresh_from_db()
+        self.assertEqual(line.qty_received, 6)
+        self.assertEqual(link.qty_received, 6)
+        self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 6)
+
+    def test_receipt_submission_without_stated_state_is_refused(self):
+        component = self._component("Unstated RAM", "unstated-ram")
+        purchase_order = self._draft_purchase_order("PO-PARTIAL-UNSTATED-001")
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            component=component,
+            qty_ordered=4,
+            unit_price="5.00",
+        )
+        self._open(purchase_order)
+
+        with self.assertRaisesMessage(ValidationError, "does not state the recorded quantity"):
+            receive_purchase_order(purchase_order, {line.pk: 2}, expected_received={})
+
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 0)
 
 
 class CancellationReleaseTests(PartialReceiptFixture):
@@ -430,7 +515,7 @@ class CancellationReleaseTests(PartialReceiptFixture):
         link = link_asset_request_to_purchase_order(purchase_order, request.pk, user=self.user)
         line = link.purchase_order_line
         self._open(purchase_order)
-        receive_purchase_order(purchase_order, {line.pk: 3})
+        receive_purchase_order(purchase_order, {line.pk: 3}, expected_received=_expected(line))
 
         other_component = self._component("Untouched RAM", "untouched-ram")
         other_purchase_order = self._draft_purchase_order("PO-PARTIAL-CANCEL-002")
@@ -466,6 +551,7 @@ class CancellationReleaseTests(PartialReceiptFixture):
             purchase_order,
             {line.pk: 1},
             [{"line_id": line.pk, "serial_number": "CANCEL-SN-1", "asset_tag": "CANCEL-TAG-1"}],
+            expected_received=_expected(line),
         )
         children[0].refresh_from_db()
         children[1].refresh_from_db()

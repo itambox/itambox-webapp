@@ -346,6 +346,19 @@ python manage.py purge_deleted --days 7 --dry-run
 
 ---
 
+### `reconcile_procurement_legacy`
+
+Report fulfilment pledges that predate receipt attribution: a request that a partial
+purchase-order receipt approved while delivered quantities were still untracked keeps its
+historical approval and a blank received quantity, and later receipts are deliberately
+never booked against it.
+
+| | |
+|---|---|
+| **Usage** | `python manage.py reconcile_procurement_legacy [--apply]` |
+| **Production-safe** | Read-only by default (a dry-run report). `--apply` softly closes the reported dead pledges; recorded quantities, stock, and approval states are never rewritten. |
+| **When to use** | After upgrading a deployment that ran the Asset Request Procurement Seam while it was Beta: review the affected pledges and close the ones whose outstanding units will never arrive. Re-request the units if they are still needed. |
+
 ### `rotate_encryption_keys`
 
 Re-encrypt every encrypted database field with the current primary Fernet key. Used when rotating `ITAMBOX_FIELD_ENCRYPTION_KEYS`.

@@ -408,7 +408,7 @@ class PurchaseOrderActionAPITests(APITestCase):
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/receive/",
-            data={"line_quantities": {str(self.line.pk): 1}},
+            data={"line_quantities": {str(self.line.pk): 1}, "expected_received": {str(self.line.pk): 0}},
             format="json",
         )
 
@@ -421,12 +421,15 @@ class PurchaseOrderActionAPITests(APITestCase):
         self._assert_status_audit(PurchaseOrder.STATUS_ORDERED, PurchaseOrder.STATUS_RECEIVED, self.approver)
 
     def test_completed_receive_replay_is_rejected_without_duplicate_materialization(self):
-        """A stale retry after full receipt is inert; partial receipt replay needs a durable key owned by WP-5."""
+        """A stale retry of an applied receipt is refused without duplicate materialization.
+
+        The receipt-state snapshot (``expected_received``) makes replays inert for partial
+        receipts too, not only once the line is fully received."""
         self.purchase_order.status = PurchaseOrder.STATUS_ORDERED
         self.purchase_order.save(update_fields=["status"])
         self.client.force_authenticate(user=self.approver)
         url = f"/api/procurement/purchase-orders/{self.purchase_order.pk}/receive/"
-        payload = {"line_quantities": {str(self.line.pk): 1}}
+        payload = {"line_quantities": {str(self.line.pk): 1}, "expected_received": {str(self.line.pk): 0}}
 
         first_response = self.client.post(url, data=payload, format="json")
         self.assertEqual(first_response.status_code, status.HTTP_200_OK, first_response.content)
@@ -455,7 +458,7 @@ class PurchaseOrderActionAPITests(APITestCase):
             with self.subTest(line_quantities=line_quantities):
                 response = self.client.post(
                     url,
-                    data={"line_quantities": line_quantities},
+                    data={"line_quantities": line_quantities, "expected_received": {str(self.line.pk): 0}},
                     format="json",
                 )
 
@@ -486,7 +489,7 @@ class PurchaseOrderActionAPITests(APITestCase):
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/receive/",
-            data={"line_quantities": {str(foreign_line.pk): 1}},
+            data={"line_quantities": {str(foreign_line.pk): 1}, "expected_received": {str(foreign_line.pk): 0}},
             format="json",
         )
 
@@ -518,12 +521,22 @@ class PurchaseOrderActionAPITests(APITestCase):
             with self.subTest(alias=alias):
                 response = self.client.post(
                     url,
-                    data={"line_quantities": {alias: 1}},
+                    data={"line_quantities": {alias: 1}, "expected_received": {canonical: 0}},
                     format="json",
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
                 self.line.refresh_from_db()
                 self.assertEqual(self.line.qty_received, 0)
+
+        # The receipt-state snapshot rejects ambiguous spellings the same way.
+        response = self.client.post(
+            url,
+            data={"line_quantities": {canonical: 1}, "expected_received": {aliases[0]: 0}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
+        self.line.refresh_from_db()
+        self.assertEqual(self.line.qty_received, 0)
 
     def test_receive_action_ignores_sparse_field_query_parameters(self):
         self.purchase_order.status = PurchaseOrder.STATUS_ORDERED
@@ -532,7 +545,7 @@ class PurchaseOrderActionAPITests(APITestCase):
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/receive/?fields=id&omit=url",
-            data={"line_quantities": {str(self.line.pk): 1}},
+            data={"line_quantities": {str(self.line.pk): 1}, "expected_received": {str(self.line.pk): 0}},
             format="json",
         )
 
@@ -611,7 +624,7 @@ class PurchaseOrderActionAPITests(APITestCase):
             ["procurement.view_purchaseorder", "procurement.receive_purchaseorder"],
         )
         url = f"/api/procurement/purchase-orders/{self.purchase_order.pk}/receive/"
-        payload = {"line_quantities": {str(self.line.pk): 1}}
+        payload = {"line_quantities": {str(self.line.pk): 1}, "expected_received": {str(self.line.pk): 0}}
 
         self._login_to_tenant(add_only)
         response = self.client.post(url, data=payload, format="json")

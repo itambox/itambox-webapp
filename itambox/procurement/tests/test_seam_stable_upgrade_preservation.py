@@ -9,7 +9,10 @@ pre-upgrade receipts. Untracked links simply complete on their next full
 receipt.
 """
 
+from io import StringIO
+
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TransactionTestCase
 from django.utils import timezone
 
@@ -111,7 +114,7 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
         )
         self.assertIsNone(link.qty_received)
 
-        receive_purchase_order(purchase_order, {line.pk: 10})
+        receive_purchase_order(purchase_order, {line.pk: 10}, expected_received={line.pk: line.qty_received})
 
         request.refresh_from_db()
         link.refresh_from_db()
@@ -194,6 +197,7 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
             purchase_order,
             {line.pk: 1},
             [{"line_id": line.pk, "serial_number": "UPG-SN-2", "asset_tag": "UPG-TAG-2"}],
+            expected_received={line.pk: line.qty_received},
         )
 
         children[0].refresh_from_db()
@@ -206,3 +210,71 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(Asset._base_manager.filter(purchase_order_line=line).count(), 2)
         self.assertEqual(FulfillmentLink.objects.get(asset_request=children[1]).qty_received, 1)
         self.assertIsNone(FulfillmentLink.objects.get(asset_request=children[0]).qty_received)
+
+    def test_legacy_premature_approval_is_reported_and_preserved(self):
+        purchase_order, line = self._ordered_component_purchase_order("PO-UPGRADE-004", 10)
+        line.qty_received = 2
+        line.save(update_fields=["qty_received"])
+        request = self._beta_request(component=self.component, qty=10)
+        request.status = RequestStatusChoices.APPROVED
+        request.save(update_fields=["status"])
+        link = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=request, purchase_order_line=line, qty_allocated=10
+        )
+        ComponentStock.objects.create(component=self.component, location=self.location, qty=2)
+        before = (self._snapshot(link), self._snapshot(request), self._snapshot(line))
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", stdout=out)
+        output = out.getvalue()
+        self.assertIn("Legacy pledge", output)
+        self.assertIn(purchase_order.order_number, output)
+        self.assertIn("Dry run", output)
+
+        for row, snapshot in zip((link, request, line), before, strict=True):
+            row.refresh_from_db()
+            self.assertEqual(self._snapshot(row), snapshot)
+        self.assertIsNone(link.qty_received)
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+
+        # New receipts book against the line (and free stock) and are never ghost-attributed
+        # to the already-approved request: historical truth without fabricated attribution.
+        receive_purchase_order(purchase_order, {line.pk: 3}, expected_received={line.pk: 2})
+
+        line.refresh_from_db()
+        link.refresh_from_db()
+        request.refresh_from_db()
+        self.assertEqual(line.qty_received, 5)
+        self.assertEqual(ComponentStock.objects.get(component=self.component, location=self.location).qty, 5)
+        self.assertIsNone(link.qty_received)
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+
+    def test_legacy_premature_approval_reconciliation_closes_the_dead_pledge(self):
+        _purchase_order, line = self._ordered_component_purchase_order("PO-UPGRADE-005", 10)
+        line.qty_received = 2
+        line.save(update_fields=["qty_received"])
+        request = self._beta_request(component=self.component, qty=10)
+        request.status = RequestStatusChoices.APPROVED
+        request.save(update_fields=["status"])
+        link = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=request, purchase_order_line=line, qty_allocated=10
+        )
+        ComponentStock.objects.create(component=self.component, location=self.location, qty=2)
+        request_before = self._snapshot(request)
+        line_before = self._snapshot(line)
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", "--apply", stdout=out)
+        self.assertIn("closed", out.getvalue())
+
+        link = FulfillmentLink._base_manager.get(pk=link.pk)
+        self.assertIsNotNone(link.deleted_at)
+        request.refresh_from_db()
+        line.refresh_from_db()
+        self.assertEqual(self._snapshot(request), request_before)
+        self.assertEqual(self._snapshot(line), line_before)
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", stdout=out)
+        self.assertIn("No legacy pledges", out.getvalue())

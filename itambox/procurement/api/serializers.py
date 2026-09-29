@@ -250,6 +250,13 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
 
 class PurchaseOrderReceiveSerializer(serializers.Serializer[object]):
     line_quantities = serializers.DictField(child=serializers.IntegerField(min_value=0))
+    expected_received = serializers.DictField(
+        child=serializers.IntegerField(min_value=0),
+        help_text=(
+            "The recorded received quantity per line id this submission was prepared against. "
+            "Stale submissions, replays, and parallel duplicates whose lines have moved on are refused."
+        ),
+    )
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         # Sparse-field controls apply to model response serializers, not this
@@ -274,6 +281,37 @@ class PurchaseOrderReceiveSerializer(serializers.Serializer[object]):
         if owned_line_ids != set(quantities):
             raise serializers.ValidationError("Every line must belong to this purchase order.")
         return quantities
+
+    def validate_expected_received(self, value: dict[str, int]) -> dict[int, int]:
+        if any(not re.fullmatch(r"[1-9][0-9]*", line_id) for line_id in value):
+            raise serializers.ValidationError("Line IDs must be canonical positive decimal integers.")
+        expected = {int(line_id): quantity for line_id, quantity in value.items()}
+
+        purchase_order = self.context.get("purchase_order")
+        if purchase_order is None:
+            raise serializers.ValidationError("Purchase order context is required.")
+
+        owned_line_ids = set(purchase_order.lines.filter(pk__in=expected).values_list("pk", flat=True))
+        if owned_line_ids != set(expected):
+            raise serializers.ValidationError("Every line must belong to this purchase order.")
+        return expected
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        missing = sorted(
+            line_id
+            for line_id, quantity in attrs["line_quantities"].items()
+            if quantity > 0 and line_id not in attrs["expected_received"]
+        )
+        if missing:
+            raise serializers.ValidationError(
+                {
+                    "expected_received": (
+                        "Every line with a positive quantity must state the recorded received "
+                        f"quantity it was prepared against (missing: {missing})."
+                    )
+                }
+            )
+        return attrs
 
 
 class PurchaseOrderActionResponseSerializer(serializers.Serializer):

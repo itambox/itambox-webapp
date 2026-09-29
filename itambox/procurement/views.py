@@ -375,6 +375,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
             # Submitting Step 2 (Asset Provisioning)
             line_quantities = request.session.get("receive_po_quantities", {})
             line_quantities = {int(k): int(v) for k, v in line_quantities.items()}
+            # The receipt-state snapshot taken when Step 1 was submitted; the service refuses
+            # the submission if any line moved on since (replay protection).
+            expected_received = request.session.get("receive_po_expected", {})
+            expected_received = {int(k): int(v) for k, v in expected_received.items()}
 
             # Count the total number of physical assets being received to initialize the formset correctly
             total_assets = 0
@@ -393,10 +397,11 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 
                 try:
                     asset_details = formset.cleaned_data
-                    receive_purchase_order(po, line_quantities, asset_details)
+                    receive_purchase_order(po, line_quantities, asset_details, expected_received=expected_received)
                     # Clear session
-                    if "receive_po_quantities" in request.session:
-                        del request.session["receive_po_quantities"]
+                    if "receive_po_expected" in request.session:
+                        request.session.pop("receive_po_quantities", None)
+                        request.session.pop("receive_po_expected", None)
                     messages.success(request, _("Stock received and assets provisioned successfully."))
                     return redirect(po.get_absolute_url())
                 except Exception as e:
@@ -430,6 +435,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 for form in formset:
                     line_quantities[form.cleaned_data["line_id"]] = form.cleaned_data["qty_to_receive"]
 
+                # Snapshot the recorded receipt quantities this submission is prepared against;
+                # the service refuses stale submissions (replays / parallel duplicates).
+                line_expected = {line_id: po.lines.get(pk=line_id).qty_received for line_id in line_quantities}
+
                 # Check if any asset lines are being received
                 has_assets = False
                 step2_initial = []
@@ -450,8 +459,9 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                                 )
 
                 if has_assets:
-                    # Save quantities to session for step 2
+                    # Save quantities and the receipt-state snapshot for step 2
                     request.session["receive_po_quantities"] = line_quantities
+                    request.session["receive_po_expected"] = line_expected
 
                     # Initialize step 2 formset
                     DynamicAssetProvisionFormSet = formset_factory(
@@ -474,7 +484,7 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                     from .services import receive_purchase_order
 
                     try:
-                        receive_purchase_order(po, line_quantities, asset_details=None)
+                        receive_purchase_order(po, line_quantities, asset_details=None, expected_received=line_expected)
                         messages.success(request, _("Stock received successfully."))
                         return redirect(po.get_absolute_url())
                     except Exception as e:

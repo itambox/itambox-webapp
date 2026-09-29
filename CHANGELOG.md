@@ -6,6 +6,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- `reconcile_procurement_legacy` reports pre-upgrade fulfilment pledges (requests that a partial receipt approved while delivered quantities were still untracked, with a blank `qty_received`) and softly closes them on explicit `--apply` without rewriting any recorded quantity, stock, or approval state; the affected units can be re-requested (issue #569).
+
 ### Changed
 
 - **Asset Request Procurement Seam** is promoted from **Beta** to **Stable** and becomes always available: manual procurement no longer depends on the optional `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` setting, which keeps governing automatic approval only. The published capability carries no activation probe and no limitations (issue #569).
@@ -22,6 +26,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Fixed
 
 - Partial purchase-order receipts no longer approve every linked request at once: a receipt attributes the delivered quantity per fulfilment link, serialised request units receive exactly one asset per delivered unit and are approved only on full delivery, genuinely quantity-bearing requests (components, accessories, consumables) are approved only once their full reserved quantity has arrived, attribution follows the oldest open request on the line, and surplus units beyond the reserved demand stay as free stock. Cancelling a request closes its still-unreceived fulfilment links while the delivered quantity stays on record and the purchase-order line is left untouched; requests for multiple serialised units can no longer be linked to a purchase order and must be split into request units first. One schema migration adds the per-link received quantity (`FulfillmentLink.qty_received`), blank on links that predate it; those keep their reservation and complete on their next full receipt, so no historical quantities are invented (issue #569).
+- Partial-receipt submissions carry a receipt-state snapshot: every receipt states the recorded quantities it was prepared against, and a submission whose lines have moved on (a retry, double-click, replay, or parallel duplicate of the same operation) is refused before anything mutates instead of silently booking additional stock. The receive form captures the snapshot when its first step is submitted and can be reloaded to submit against the fresh state; the REST receive action requires the matching `expected_received` field next to `line_quantities` (issue #569).
 
 ### Security
 

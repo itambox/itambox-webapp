@@ -18,6 +18,15 @@ from software.models import Software
 User = get_user_model()
 
 
+def _expected(*lines):
+    """Recorded receipt quantities a receipt submission is prepared against."""
+    expected = {}
+    for line in lines:
+        line.refresh_from_db()
+        expected[line.pk] = line.qty_received
+    return expected
+
+
 class ProcurementStatusTransitionTests(TestCase):
     def setUp(self):
         # Create user
@@ -210,6 +219,7 @@ class ProcurementStatusTransitionTests(TestCase):
             self.po,
             {line.pk: 1},
             [{"line_id": line.pk, "serial_number": "GROUP-SN-1", "asset_tag": "GROUP-TAG-1"}],
+            expected_received=_expected(line),
         )
 
         parent.refresh_from_db()
@@ -234,6 +244,7 @@ class ProcurementStatusTransitionTests(TestCase):
             self.po,
             {line.pk: 1},
             [{"line_id": line.pk, "serial_number": "GROUP-SN-2", "asset_tag": "GROUP-TAG-2"}],
+            expected_received=_expected(line),
         )
 
         parent.refresh_from_db()
@@ -506,7 +517,7 @@ class ProcurementStatusTransitionTests(TestCase):
         order_purchase_order(self.po)
 
         # Receive 3 licenses
-        receive_purchase_order(self.po, {line.pk: 3})
+        receive_purchase_order(self.po, {line.pk: 3}, expected_received=_expected(line))
 
         line.refresh_from_db()
         self.assertEqual(line.qty_received, 3)
@@ -515,7 +526,7 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(self.po.status, PurchaseOrder.STATUS_PARTIAL)
 
         # Receive the remaining 2 licenses
-        receive_purchase_order(self.po, {line.pk: 2})
+        receive_purchase_order(self.po, {line.pk: 2}, expected_received=_expected(line))
         line.refresh_from_db()
         self.assertEqual(line.qty_received, 5)
         self.assertEqual(line.qty_outstanding, 0)
@@ -563,7 +574,7 @@ class ProcurementStatusTransitionTests(TestCase):
 
         approve_purchase_order(self.po)
         order_purchase_order(self.po)
-        receive_purchase_order(self.po, {line.pk: 5})
+        receive_purchase_order(self.po, {line.pk: 5}, expected_received=_expected(line))
 
         # Seat pool is entitlement-driven: unchanged by receipt.
         self.license.refresh_from_db()
@@ -611,7 +622,11 @@ class ProcurementStatusTransitionTests(TestCase):
         order_purchase_order(self.po)
 
         with CaptureQueriesContext(connection) as ctx:
-            receive_purchase_order(self.po, {higher_line.pk: 5, lower_line.pk: 3})
+            receive_purchase_order(
+                self.po,
+                {higher_line.pk: 5, lower_line.pk: 3},
+                expected_received=_expected(higher_line, lower_line),
+            )
 
         lower_stock = ComponentStock.objects.get(component=lower_component, location=self.location)
         higher_stock = ComponentStock.objects.get(component=higher_component, location=self.location)
@@ -647,7 +662,11 @@ class ProcurementStatusTransitionTests(TestCase):
         approve_purchase_order(self.po)
         order_purchase_order(self.po)
 
-        receive_purchase_order(self.po, {accessory_line.pk: 3, consumable_line.pk: 7})
+        receive_purchase_order(
+            self.po,
+            {accessory_line.pk: 3, consumable_line.pk: 7},
+            expected_received=_expected(accessory_line, consumable_line),
+        )
 
         self.assertEqual(AccessoryStock.objects.get(accessory=accessory, location=self.location).qty, 3)
         self.assertEqual(ConsumableStock.objects.get(consumable=consumable, location=self.location).qty, 7)
@@ -660,7 +679,7 @@ class ProcurementStatusTransitionTests(TestCase):
 
         # Try to receive while in Draft
         with self.assertRaises(ValidationError):
-            receive_purchase_order(self.po, {line.pk: 2})
+            receive_purchase_order(self.po, {line.pk: 2}, expected_received=_expected(line))
 
     def test_receive_form_view_post_does_not_crash(self):
         line = PurchaseOrderLine.objects.create(
@@ -699,6 +718,7 @@ class ProcurementStatusTransitionTests(TestCase):
         # Setup session for step 2
         session = self.client.session
         session["receive_po_quantities"] = {line.pk: 2}
+        session["receive_po_expected"] = {line.pk: 0}
         session.save()
 
         # Deployable status label is required by the receiving service
@@ -746,6 +766,7 @@ class ProcurementStatusTransitionTests(TestCase):
             self.po,
             {line.pk: 1},
             asset_details=[{"line_id": line.pk, "serial_number": "", "asset_tag": "", "name": "Test Asset"}],
+            expected_received=_expected(line),
         )
 
         from assets.models import Asset

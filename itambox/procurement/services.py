@@ -155,6 +155,24 @@ def link_asset_request_to_purchase_order(po, asset_request_id, user):
     return _create_fulfillment_link(locked_po, asset_request, targets)
 
 
+def lock_unit_fulfillment_links(asset_request_ids):
+    """Lock the live fulfilment links of the given request units in deterministic pk order.
+
+    Must be called inside an open transaction. Cancellation calls this BEFORE locking the
+    request rows so every transaction acquires these two lock classes in the same global
+    order as the receipt path (links, then requests); a concurrent cancellation and
+    receiving can then never deadlock.
+    """
+    request_ids = sorted({int(asset_request_id) for asset_request_id in asset_request_ids})
+    if not request_ids:
+        return []
+    return list(
+        FulfillmentLink._base_manager.select_for_update()
+        .filter(asset_request_id__in=request_ids, deleted_at__isnull=True)
+        .order_by("pk")
+    )
+
+
 @transaction.atomic
 def release_fulfillment_links(asset_requests):
     """Close the fulfillment links of cancelled request units.
@@ -166,10 +184,13 @@ def release_fulfillment_links(asset_requests):
     request_ids = [asset_request.pk for asset_request in asset_requests]
     if not request_ids:
         return 0
-    links = list(
-        FulfillmentLink._base_manager.select_for_update()
-        .filter(asset_request_id__in=request_ids, deleted_at__isnull=True)
-        .order_by("pk")
+    links = lock_unit_fulfillment_links(request_ids)
+    # Lock the request rows after their links (global order: links, then requests) so the
+    # relative acquisition order matches the receipt path.
+    list(
+        AssetRequest._base_manager.select_for_update()
+        .filter(pk__in=set(request_ids), deleted_at__isnull=True)
+        .order_by("request_date", "pk")
     )
     for link in links:
         link.delete()
@@ -374,11 +395,45 @@ def _receive_license_line(line):
         req.save()
 
 
+def _assert_receipt_state(lines, line_quantities, expected_received):
+    """Refuse stale receipt submissions before any mutation happens.
+
+    Called with the purchase order lines already locked, so a concurrent receipt that
+    committed first is visible here and its replay is refused deterministically.
+    """
+    for line in lines:
+        if line_quantities.get(line.pk, 0) <= 0:
+            continue
+        if line.pk not in expected_received:
+            raise ValidationError(
+                _(
+                    "The receipt submission does not state the recorded quantity it was prepared against for line "
+                    "%(line)s. Reload the receive form and submit again."
+                )
+                % {"line": line.pk}
+            )
+        expected = expected_received[line.pk]
+        if line.qty_received != expected:
+            raise ValidationError(
+                _(
+                    "The recorded quantity for line %(line)s changed since this receipt was prepared "
+                    "(expected %(expected)s, found %(found)s). Reload the receive form and submit again."
+                )
+                % {"line": line.pk, "expected": expected, "found": line.qty_received}
+            )
+
+
 @transaction.atomic
-def receive_purchase_order(po, line_quantities, asset_details=None):
+def receive_purchase_order(po, line_quantities, asset_details=None, *, expected_received):
     """
     line_quantities: dict of {line_id (int): qty_to_receive (int)}
     asset_details: list of dicts [{'line_id': int, 'serial_number': str, 'asset_tag': str, 'name': str}]
+    expected_received: dict of {line_id (int): qty_received (int)} this submission was prepared against.
+
+    Every submitted delivery must state the recorded receipt quantity it saw (the documented
+    retry contract): replays, parallel duplicates, and obsolete forms whose lines have moved
+    on are refused before anything mutates, so a repeated submission can never silently book
+    additional stock. Each accepted submission is a new partial delivery.
     """
     if po.status not in [PurchaseOrder.STATUS_ORDERED, PurchaseOrder.STATUS_PARTIAL]:
         raise ValidationError(
@@ -397,6 +452,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
 
     details_by_line = _group_details_by_line(asset_details)
     lines = list(po.lines.select_for_update().order_by("pk"))
+    _assert_receipt_state(lines, line_quantities, expected_received)
     stock_maps = _lock_receipt_stock_rows(lines, line_quantities, po.destination_location)
 
     for line in lines:

@@ -228,6 +228,7 @@ MODULE_LAYER_OVERRIDES = {
     "extras.utils": "domain-service",
     "organization.access": "domain-service",
     "organization.rbac": "domain-service",
+    "procurement.management.commands.reconcile_procurement_legacy": "composition",
     # These Snipe-IT stages translate remote rows into existing domain commands;
     # they are orchestration, not transport/client modules. The client/common
     # importer boundary remains integration-layer code.
