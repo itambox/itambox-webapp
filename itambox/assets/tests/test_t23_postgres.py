@@ -3,7 +3,7 @@
 import json
 from types import SimpleNamespace
 
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetType, Manufacturer
@@ -205,7 +205,6 @@ class T23PostgreSQLConsumerTests(TenantTestMixin, TestCase):
         self.assertEqual(len(machine_export.rows), 1)
         self.assertEqual(machine_export.rows[0]["asset.spec.memory_capacity.value"], "24.000")
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_public_preview_and_download_urls_transport_filters(self):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         filter_document = json.dumps(
