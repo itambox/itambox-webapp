@@ -525,3 +525,133 @@ class AlertDeliveryTableRenderTests(TestCase):
             delivery_status={"__no_channels__": "no channels attached to this rule"},
         )
         self.assertIn("badge bg-secondary", table.render_delivery(no_channels))
+
+
+class AlertStableChannelGateTests(TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tenant = Tenant.objects.create(name="Issue 567 delivery tenant", slug="issue-567-delivery-tenant")
+        self.rule = AlertRule.objects.create(
+            name="Issue 567 tenant rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=self.tenant,
+        )
+        self.match = {"subject": "Issue 567 alert", "message": "Low stock", "tenant": self.tenant}
+
+    def _channel(self, name, *, enabled, tenant=None):
+        channel = NotificationChannel.objects.create(
+            name=name,
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=self.tenant if tenant is None else tenant,
+            enabled=enabled,
+        )
+        return channel
+
+    def test_disabled_channel_is_skipped_and_enabled_sibling_still_delivers(self):
+        from unittest.mock import patch
+
+        disabled = self._channel("Issue 567 disabled sibling", enabled=False)
+        enabled = self._channel("Issue 567 enabled sibling", enabled=True)
+        self.rule.channels.add(disabled, enabled)
+        success = DeliveryResult("in_app.deliver", DeliveryDisposition.SUCCESS)
+
+        with patch("extras.tasks.alerts.send_notification_to_channel", return_value=success) as sender:
+            delivery = _dispatch_channels(self.rule, self.match, None, delivery_id="enabled-sibling-run")
+
+        sender.assert_called_once()
+        self.assertEqual(sender.call_args.args[0].pk, enabled.pk)
+        self.assertIn(str(enabled.pk), delivery)
+        self.assertNotIn(str(disabled.pk), delivery)
+
+    def test_all_disabled_channels_record_disabled_reason_and_none_outcome(self):
+        from unittest.mock import patch
+
+        self.rule.channels.add(
+            self._channel("Issue 567 disabled A", enabled=False),
+            self._channel("Issue 567 disabled B", enabled=False),
+        )
+
+        with patch("extras.tasks.alerts.send_notification_to_channel") as sender:
+            delivery = _dispatch_channels(self.rule, self.match, None)
+
+        self.assertEqual(delivery, {"__no_enabled_channels__": "every attached channel is disabled"})
+        self.assertEqual(_delivery_outcome(delivery), AlertLog.DELIVERY_OUTCOME_NONE)
+        sender.assert_not_called()
+
+    def test_out_of_scope_channel_attachments_never_dispatch(self):
+        from unittest.mock import patch
+
+        from core.tasks.context import TaskContext
+
+        tenant_rule = AlertRule._base_manager.get(pk=self.rule.pk)
+        global_rule = AlertRule._base_manager.create(
+            name="Issue 567 platform rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=None,
+        )
+        global_channel = NotificationChannel._base_manager.create(
+            name="Issue 567 platform channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=None,
+            enabled=True,
+        )
+        tenant_channel = NotificationChannel._base_manager.create(
+            name="Issue 567 tenant channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=self.tenant,
+            enabled=True,
+        )
+        with TaskContext(tenant_id=None, user_id=None):
+            tenant_rule.channels.add(global_channel)
+            global_rule.channels.add(tenant_channel)
+
+        with patch("extras.tasks.alerts.send_notification_to_channel") as sender:
+            with TaskContext(tenant_id=self.tenant.pk, user_id=None):
+                tenant_delivery = _dispatch_channels(tenant_rule, self.match, None)
+            with TaskContext(tenant_id=None, user_id=None):
+                global_delivery = _dispatch_channels(global_rule, self.match, None)
+
+        self.assertEqual(tenant_delivery, {"__no_channels__": "no channels attached to this rule"})
+        self.assertEqual(global_delivery, {"__no_channels__": "no channels attached to this rule"})
+        sender.assert_not_called()
+
+    def test_reenabling_a_channel_restores_delivery(self):
+        from unittest.mock import patch
+
+        from assets.models import Manufacturer
+        from extras.tasks.alerts import run_alert_rule_now
+        from inventory.models import Accessory, AccessoryStock
+        from organization.models import Location, Site
+
+        channel = self._channel("Issue 567 re-enabled channel", enabled=False)
+        self.rule.channels.add(channel)
+        disabled_delivery = _dispatch_channels(self.rule, self.match, None)
+        self.assertEqual(disabled_delivery, {"__no_enabled_channels__": "every attached channel is disabled"})
+        self.assertEqual(_delivery_outcome(disabled_delivery), AlertLog.DELIVERY_OUTCOME_NONE)
+
+        channel.enabled = True
+        channel.save(update_fields=["enabled"])
+        manufacturer = Manufacturer.objects.create(name="Issue 567 stock maker", slug="issue-567-stock-maker")
+        site = Site.objects.create(name="Issue 567 stock site", slug="issue-567-stock-site", tenant=self.tenant)
+        location = Location.objects.create(
+            name="Issue 567 stock location", slug="issue-567-stock-location", site=site, tenant=self.tenant
+        )
+        accessory = Accessory.objects.create(
+            name="Issue 567 low stock accessory",
+            slug="issue-567-low-stock-accessory",
+            manufacturer=manufacturer,
+            tenant=self.tenant,
+            min_qty=5,
+        )
+        AccessoryStock.objects.create(accessory=accessory, location=location, qty=1)
+        success = DeliveryResult("in_app.deliver", DeliveryDisposition.SUCCESS)
+
+        with patch("extras.tasks.alerts.send_notification_to_channel", return_value=success) as sender:
+            run_alert_rule_now(self.rule.pk)
+
+        sender.assert_called_once()
+        alert = AlertLog._base_manager.get(rule=self.rule)
+        self.assertEqual(alert.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+        self.assertEqual(alert.delivery_status[str(channel.pk)]["disposition"], DeliveryDisposition.SUCCESS.value)

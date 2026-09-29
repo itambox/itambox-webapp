@@ -24,6 +24,7 @@ from extras.models import (
     Tag,
     WebhookDelivery,
     WebhookEndpoint,
+    alert_rule_channel_scope_errors,
 )
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
@@ -533,6 +534,25 @@ class AlertRuleSerializer(BaseModelSerializer):
             "updated_at",
         ]
         brief_fields = ["id", "url", "name", "alert_type", "severity", "is_active"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Scope guard (issue #567): a rule notifies only through channels of
+        # its own scope. Fail the write instead of accepting a configuration
+        # that can never deliver.
+        channels = attrs.get("channels")
+        if channels is None and "tenant" in attrs and self.instance is not None:
+            channels = list(self.instance.channels.all())
+        if channels:
+            tenant = attrs.get("tenant", getattr(self.instance, "tenant", None))
+            if "tenant" not in attrs and self.instance is None:
+                from core.managers import get_current_tenant
+
+                tenant = get_current_tenant()
+            errors = alert_rule_channel_scope_errors(channels, tenant.pk if tenant else None)
+            if errors:
+                raise serializers.ValidationError({"channel_ids": errors})
+        return attrs
 
 
 class AlertLogSerializer(BaseModelSerializer):

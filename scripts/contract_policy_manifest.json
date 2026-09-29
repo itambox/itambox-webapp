@@ -7,9 +7,9 @@
       "scope": "Notification and alert-log records"
     },
     "alerting.rules": {
-      "activation": "enabled",
-      "contract_class": "beta-enabled",
-      "exclusions": "Evaluation is daily, not on write; channel delivery failures are logged, not retried",
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
       "scope": "Alert rules and notification channels"
     },
     "automation.webhooks": {

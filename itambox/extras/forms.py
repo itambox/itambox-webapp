@@ -475,6 +475,7 @@ from .models import (
     NotificationChannel,
     ScheduledReport,
     WebhookEndpoint,
+    alert_rule_channel_scope_errors,
 )
 
 
@@ -1444,7 +1445,29 @@ class AlertRuleForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         _resolve_nonadmin_write_tenant(self, get_current_user())
+        self._validate_channel_scope(cleaned_data)
         return cleaned_data
+
+    def _validate_channel_scope(self, cleaned_data):
+        """Reject channel attachments that can never deliver for this rule.
+
+        A rule notifies only through channels of its own scope: a tenant rule
+        through its own tenant's channels, a platform-wide rule through
+        platform-wide channels. Without this guard such an attachment is
+        accepted and then silently never delivers (issue #567, WP3/WP5).
+        """
+        channels = cleaned_data.get("channels")
+        if not channels:
+            return
+        effective_tenant = cleaned_data.get("tenant")
+        if "tenant" not in self.fields:
+            # Non-admin writes carry no tenant field: an edit keeps the
+            # record's tenant and a create is bound to the active tenant
+            # scope (see ``_resolve_nonadmin_write_tenant``).
+            effective_tenant = self.instance.tenant if self.instance.pk else get_current_tenant()
+        errors = alert_rule_channel_scope_errors(channels, effective_tenant.pk if effective_tenant else None)
+        if errors:
+            raise forms.ValidationError({"channels": errors})
 
     def save(self, commit=True):
         instance = super().save(commit=False)

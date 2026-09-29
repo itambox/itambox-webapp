@@ -319,9 +319,24 @@ def _dispatch_channels(rule, match, alert_log, delivery_id=None):
     delivery identifier, the attempt timestamp, and — for failures — the typed
     error class and a user-visible message when the boundary declared one.
     """
+    # Scope guard (issue #567): a rule delivers only through channels of its
+    # own scope — a tenant rule through its own tenant's channels, a
+    # platform-wide rule through platform-wide channels. The tenant-scoping
+    # manager already excludes foreign rows in a tenant context; the explicit
+    # filter keeps the guarantee even for rows attached outside that boundary.
     channels = rule.channels.all()
+    if rule.tenant_id is None:
+        channels = channels.filter(tenant_id__isnull=True)
+    else:
+        channels = channels.filter(tenant_id=rule.tenant_id)
     if not channels.exists():
         return {"__no_channels__": "no channels attached to this rule"}
+    # A disabled channel is never contacted; an alert whose attached channels
+    # are all disabled records an explicit reason instead of silently
+    # reporting success (issue #567).
+    channels = channels.filter(enabled=True)
+    if not channels.exists():
+        return {"__no_enabled_channels__": "every attached channel is disabled"}
 
     delivery = {}
     for channel in channels:
@@ -402,6 +417,8 @@ def _delivery_outcome(payload):
     if payload.get("__dispatch__") == "terminal":
         return AlertLog.DELIVERY_OUTCOME_FAILED
     if "__no_channels__" in payload:
+        return AlertLog.DELIVERY_OUTCOME_NONE
+    if "__no_enabled_channels__" in payload:
         return AlertLog.DELIVERY_OUTCOME_NONE
     channel_values = [value for key, value in payload.items() if not key.startswith("__")]
     if not channel_values:

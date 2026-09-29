@@ -496,3 +496,95 @@ class TokenSingleTenantTests(APITestCase):
         created = NotificationChannel._base_manager.filter(name__in=names)
         self.assertEqual(created.count(), 2)
         self.assertEqual(set(created.values_list("tenant_id", flat=True)), {self.tenant_a.pk})
+
+
+class AlertRuleChannelScopeValidationTests(APITestCase):
+    def setUp(self):
+        _reset_scope()
+        self.tenant = Tenant.objects.create(name="Alert scope tenant", slug="alert-scope-tenant")
+        self.role = Role.objects.create(tenant=self.tenant, name="Alert scope role", permissions=ALERT_PERMS)
+        self.member = User.objects.create_user(username="alert-scope-writer", password="pw")
+        grant(self.member, self.tenant, self.role)
+        self.channel = _channel("Alert scope tenant channel", self.tenant)
+        self.platform_channel = NotificationChannel._base_manager.create(
+            name="Alert scope platform channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=None,
+            enabled=True,
+        )
+        self.rule = AlertRule._base_manager.create(
+            name="Alert scope existing rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=self.tenant,
+        )
+        self.rule.channels.add(self.channel)
+
+    def tearDown(self):
+        _reset_scope()
+
+    def _login_to_tenant(self):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+    @staticmethod
+    def _create_payload(name, channel_id):
+        return {
+            "name": name,
+            "alert_type": AlertRule.ALERT_TYPE_LOW_STOCK,
+            "threshold_value": 5,
+            "severity": AlertRule.SEVERITY_WARNING,
+            "channel_ids": [channel_id],
+        }
+
+    @staticmethod
+    def _etag(rule):
+        rule.refresh_from_db()
+        return 'W/"{0}"'.format(rule.updated_at.isoformat())
+
+    def test_create_with_same_tenant_channel_succeeds(self):
+        self._login_to_tenant()
+
+        response = self.client.post(
+            reverse("api:extras_api:alertrule-list"),
+            data=self._create_payload("Alert scope accepted rule", self.channel.pk),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        created = AlertRule._base_manager.get(name="Alert scope accepted rule")
+        self.assertEqual(created.tenant_id, self.tenant.pk)
+        self.assertEqual(set(created.channels.values_list("pk", flat=True)), {self.channel.pk})
+
+    def test_create_with_platform_channel_is_rejected_without_creating_rule(self):
+        self._login_to_tenant()
+        name = "Alert scope rejected platform channel"
+        before = AlertRule._base_manager.count()
+
+        response = self.client.post(
+            reverse("api:extras_api:alertrule-list"),
+            data=self._create_payload(name, self.platform_channel.pk),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("cannot deliver for this rule", str(response.data))
+        self.assertEqual(AlertRule._base_manager.count(), before)
+        self.assertFalse(AlertRule._base_manager.filter(name=name).exists())
+
+    def test_patch_to_platform_channel_is_rejected_and_keeps_attachment(self):
+        self._login_to_tenant()
+
+        response = self.client.patch(
+            reverse("api:extras_api:alertrule-detail", kwargs={"pk": self.rule.pk}),
+            {"channel_ids": [self.platform_channel.pk]},
+            format="json",
+            HTTP_IF_MATCH=self._etag(self.rule),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("cannot deliver for this rule", str(response.data))
+        self.rule.refresh_from_db()
+        self.assertEqual(set(self.rule.channels.values_list("pk", flat=True)), {self.channel.pk})

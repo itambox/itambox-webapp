@@ -1,5 +1,7 @@
 """Tests for Alert Center bulk acknowledge/resolve views."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import Client, TestCase
@@ -84,3 +86,55 @@ class AlertBulkActionViewTests(TestCase):
         self.assertIn("tableRefreshRequired", resp["HX-Trigger"])
         l1.refresh_from_db()
         self.assertEqual(l1.status, AlertLog.STATUS_ACKNOWLEDGED)
+
+
+class AlertRuleRunNowViewTests(TestCase):
+    """Run-now keeps the ``extras.change_alertrule`` gate and stays tenant-scoped (issue #567)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tenant = Tenant.objects.create(name="Run Now Tenant", slug="run-now-tenant")
+        self.rule = AlertRule.objects.create(
+            tenant=self.tenant,
+            name="Run Now Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+        )
+        self.url = reverse("extras:alertrule_run", kwargs={"pk": self.rule.pk})
+
+    def _client_for(self, user):
+        client = Client()
+        client.force_login(user)
+        session = client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+        return client
+
+    def test_anonymous_is_sent_to_login(self):
+        response = Client().post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_without_change_permission_the_action_is_denied(self):
+        user = User.objects.create_user(username="alertviewer", password="x", email="viewer@example.com")
+        response = self._client_for(user).post(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_change_permission_queues_the_single_rule_evaluation(self):
+        user = User.objects.create_superuser(username="alertrunner", password="x", email="runner@example.com")
+        with patch("django_q.tasks.async_task") as async_task:
+            response = self._client_for(user).post(self.url)
+        self.assertEqual(response.status_code, 302)
+        async_task.assert_called_once_with("extras.tasks.alerts.run_alert_rule_now", self.rule.pk)
+
+    def test_rule_outside_the_active_tenant_is_not_reachable(self):
+        other = Tenant.objects.create(name="Other Tenant", slug="other-run-tenant")
+        other_rule = AlertRule.objects.create(
+            tenant=other,
+            name="Other Run Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+        )
+        user = User.objects.create_superuser(username="alertroamer", password="x", email="roamer@example.com")
+        response = self._client_for(user).post(reverse("extras:alertrule_run", kwargs={"pk": other_rule.pk}))
+        self.assertEqual(response.status_code, 404)

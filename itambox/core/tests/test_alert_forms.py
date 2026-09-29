@@ -134,3 +134,75 @@ class NotificationChannelFormTests(TestCase):
         )
         form = NotificationChannelForm(instance=channel)
         self.assertEqual(form.initial.get("email_recipients"), "a@example.com\nb@example.com")
+
+
+class AlertRuleFormChannelScopeTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        from organization.models import Tenant
+
+        self.admin = User.objects.create_user(username="alert_form_admin", password="x", is_superuser=True, is_staff=True)
+        _current_user.set(self.admin)
+        self.tenant = Tenant.objects.create(name="Alert form tenant", slug="alert-form-tenant")
+        self.platform_channel = NotificationChannel.objects.create(
+            name="Alert form platform channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=None,
+        )
+        self.tenant_channel = NotificationChannel.objects.create(
+            name="Alert form tenant channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=self.tenant,
+        )
+
+    def tearDown(self):
+        _current_user.set(None)
+        super().tearDown()
+
+    @staticmethod
+    def _form_data(name, channel, tenant):
+        from extras.models import AlertRule
+
+        return {
+            "name": name,
+            "description": "",
+            "alert_type": AlertRule.ALERT_TYPE_LOW_STOCK,
+            "threshold_value": 5,
+            "severity": AlertRule.SEVERITY_WARNING,
+            "is_active": True,
+            "is_muted": False,
+            "renotify_interval_days": 0,
+            "channels": [str(channel.pk)],
+            "tenant": str(tenant.pk) if tenant else "",
+        }
+
+    def test_tenant_rule_rejects_platform_wide_channel(self):
+        from extras.forms import AlertRuleForm
+
+        form = AlertRuleForm(data=self._form_data("Tenant rule with global channel", self.platform_channel, self.tenant))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("cannot deliver for this rule", str(form.errors))
+        self.assertIn("channels", form.errors)
+        self.assertIn("cannot deliver for this rule", " ".join(form.errors.get("channels", [])))
+
+    def test_tenant_rule_accepts_same_tenant_channel(self):
+        from extras.forms import AlertRuleForm
+
+        form = AlertRuleForm(data=self._form_data("Tenant rule with tenant channel", self.tenant_channel, self.tenant))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_platform_wide_rule_accepts_only_platform_wide_channel(self):
+        from extras.forms import AlertRuleForm
+
+        platform_form = AlertRuleForm(
+            data=self._form_data("Platform rule with global channel", self.platform_channel, None)
+        )
+        self.assertTrue(platform_form.is_valid(), platform_form.errors)
+
+        tenant_form = AlertRuleForm(data=self._form_data("Platform rule with tenant channel", self.tenant_channel, None))
+        self.assertFalse(tenant_form.is_valid())
+        self.assertIn("cannot deliver for this rule", str(tenant_form.errors))
+        self.assertIn("channels", tenant_form.errors)
+        self.assertIn("cannot deliver for this rule", " ".join(tenant_form.errors.get("channels", [])))
