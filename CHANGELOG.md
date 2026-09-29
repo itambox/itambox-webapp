@@ -6,20 +6,17 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] - 2026-09-28
+
 ### Changed
 
+- Release images are published as a multi-platform index with `linux/amd64` and `linux/arm64` variants instead of an amd64-only image, so ARM64 hosts can pull the official tag directly; the release workflow builds both platforms from one reviewed commit, verifies both platform manifests fail-closed, and boot-checks both platform images before the draft release is prepared (issue #549).
 - The frontend build toolchain migrated from Node.js 20 to Node.js 26: the `stylelint`, `frontend`, and E2E CI jobs, the runner-validation workflow, the production image's frontend build stage (`node:26-slim`), and the contributor prerequisites in `CONTRIBUTING.md` now use Node.js 26.
 - Dashboard charts (asset status distribution and asset age distribution) are rendered with Apache ECharts instead of ApexCharts; categories, colors, tooltips, legends, empty states, light and dark theming, and the behavior across HTMX swaps and GridStack resizes are preserved, and crowded category labels rotate on narrow widgets the way the previous engine rotated them. The chart code is bundled locally with no runtime downloads and no CSP exception was added, and the ApexCharts dependency and its vendored script are removed entirely.
 
 ### Fixed
 
 - Corrected the maturity statements in the documentation index and the SaaS Subscriptions model page to the declared capability grades: SaaS Subscriptions and Purchase Orders and Contracts are Stable; the report designer, scheduled reports, alert rules, webhooks, the Asset Request procurement seam, and SCIM provisioning remain Beta; the plugin system remains Experimental. No declared capability grade changed; only the published documentation was corrected.
-
-## [1.0.0-beta.3] - 2026-09-28
-
-### Changed
-
-- Release images are published as a multi-platform index with `linux/amd64` and `linux/arm64` variants instead of an amd64-only image, so ARM64 hosts can pull the official tag directly; the release workflow builds both platforms from one reviewed commit, verifies both platform manifests fail-closed, and boot-checks both platform images before the draft release is prepared (issue #549).
 
 ### Security
 
