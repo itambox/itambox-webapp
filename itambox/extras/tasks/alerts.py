@@ -102,13 +102,17 @@ def _prefetch_open_logs(rule_id=None):
     return {(log.rule_id, log.content_type_id, log.object_id): log for log in qs}
 
 
-def _schedule_alert_dispatch(rule, match, alert_log):
+def _schedule_alert_dispatch(rule, match, alert_log, expected_prior_notified_at=None):
     """Dispatch one persisted alert after commit and record disposition state.
 
     WP-13 (Path B): exactly one delivery attempt per planned dispatch. Each run
     carries a stable unique ``delivery_id``; the run is claimed (marker written)
     before any channel send so a repeated invocation of the same run cannot
-    duplicate in-app notifications or lifecycle transitions.
+    duplicate in-app notifications or lifecycle transitions. The claim is a
+    single conditional UPDATE that matches only while the alert still carries
+    the ``last_notified_at`` value this run planned from, so two parallel
+    evaluations planning a dispatch for the same alert state cannot both
+    deliver — exactly one claim wins (issue #567, WP4).
     """
     alert_id = alert_log.pk
     rule_id = rule.pk
@@ -130,14 +134,30 @@ def _schedule_alert_dispatch(rule, match, alert_log):
                 persisted_alert = AlertLog.unscoped.get(pk=alert_id)
                 # Claim the run before sending: pending marker + attempt counter
                 # + delivery id are persisted first so a replayed invocation
-                # observes the marker and backs off.
-                AlertLog.unscoped.filter(pk=alert_id).update(
+                # observes the marker and backs off. The single conditional
+                # UPDATE is the atomic claim: it matches only while the alert
+                # still carries the planned-from notification state, so a
+                # parallel evaluation planning its own run for the same state
+                # claims zero rows and backs off without sending.
+                prior_condition = (
+                    Q(last_notified_at__isnull=True)
+                    if expected_prior_notified_at is None
+                    else Q(last_notified_at=expected_prior_notified_at)
+                )
+                claimed = AlertLog.unscoped.filter(Q(pk=alert_id) & prior_condition).update(
                     delivery_status={"__dispatch__": "pending", "__delivery_id__": delivery_id},
                     delivery_attempts=F("delivery_attempts") + 1,
                     last_delivery_id=delivery_id,
                     delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
                     last_notified_at=notified_at,
                 )
+                if not claimed:
+                    logger.info(
+                        "Alert dispatch run %s for AlertLog %s skipped: a parallel evaluation already claimed this alert state.",
+                        delivery_id,
+                        alert_id,
+                    )
+                    return
                 delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert, delivery_id=delivery_id)
                 delivery["__delivery_id__"] = delivery_id
         # broad except: boundary-isolation: delivery backend failures are non-enumerable and become terminal
@@ -224,7 +244,8 @@ def _process_rule_match(rule, match, now, existing_logs, matched_keys, scheduled
                 # one evaluation cannot immediately re-notify it before commit.
                 alert_log.last_notified_at = now
 
-                _schedule_alert_dispatch(rule, match, alert_log)
+                # The freshly created row carries no last_notified_at yet.
+                _schedule_alert_dispatch(rule, match, alert_log, None)
                 scheduled_dispatch_keys.add(key)
         else:
             # Treat the adopted row as the existing alert (re-notify below).
@@ -299,14 +320,24 @@ def _renotify_when_due(rule, match, existing, now, key, scheduled_dispatch_keys)
     ref = existing.last_notified_at or existing.created_at
     due = ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days)
     if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:
-        AlertLog.unscoped.filter(pk=existing.pk).update(
+        # Mark the planned dispatch atomically against the notification state
+        # this evaluation read: a parallel evaluation that already advanced the
+        # alert wins the planning write and this run backs off without
+        # scheduling (issue #567, WP4).
+        prior_notified_at = existing.last_notified_at
+        prior_condition = (
+            Q(last_notified_at__isnull=True) if prior_notified_at is None else Q(last_notified_at=prior_notified_at)
+        )
+        planned = AlertLog.unscoped.filter(Q(pk=existing.pk) & prior_condition).update(
             delivery_status={"__dispatch__": "pending"},
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
         )
+        if not planned:
+            return
         existing.delivery_status = {"__dispatch__": "pending"}
         existing.delivery_outcome = AlertLog.DELIVERY_OUTCOME_PENDING
         existing.last_notified_at = now
-        _schedule_alert_dispatch(rule, match, existing)
+        _schedule_alert_dispatch(rule, match, existing, prior_notified_at)
         scheduled_dispatch_keys.add(key)
         logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
 

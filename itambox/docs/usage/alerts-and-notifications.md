@@ -173,6 +173,10 @@ Channel delivery follows an explicitly **single-attempt, best-effort policy**
 with a terminal failed state — there is **no automatic retry**:
 
 - Each planned dispatch runs **exactly one attempt** per attached channel.
+- The dispatch claim is atomic: when two parallel evaluations plan a dispatch
+  for the same alert state, exactly one claim wins and the other backs off
+  without sending — a repeated or overlapping evaluation cannot produce a
+  duplicate delivery for the same alert.
 - The per-channel outcome is recorded as a typed result:
   `success`, `retryable` (transient-class failure, e.g. SMTP timeout or HTTP 5xx),
   or `terminal` (permanent failure, e.g. rejected credentials or 4xx response),
@@ -236,7 +240,7 @@ many-to-many relationship.
 | Email | `email` | SMTP (global) | `recipients` — SMTP settings come from global `EmailSettings`, **not** per-channel config |
 | Slack | `slack` | Incoming Webhook | `webhook_url` |
 | Microsoft Teams | `teams` | Incoming Webhook | `webhook_url` |
-| In-App | `in_app` | Built-in | No config needed — alerts appear in the Alert Center bell icon |
+| In-App | `in_app` | Built-in | No config needed — alerts appear in the Alert Center bell icon. An optional `recipient_users` list can target specific users; each recipient must be inside the channel's scope (tenant members, or staff for a platform-wide channel) |
 
 ### Configuring an email channel
 

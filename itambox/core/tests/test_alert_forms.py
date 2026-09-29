@@ -204,3 +204,26 @@ class AlertRuleFormChannelScopeTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("tenant", form.errors)
+
+    def test_non_admin_channel_choices_stay_inside_the_active_scope(self):
+        from core.managers import set_current_tenant
+        from extras.forms import AlertRuleForm
+        from organization.models import Tenant
+
+        other_tenant = Tenant.objects.create(name="Alert form other tenant", slug="alert-form-other-tenant")
+        foreign_channel = NotificationChannel.objects.create(
+            name="Alert form foreign channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=other_tenant,
+        )
+        member = User.objects.create_user(username="alert_form_member", password="x")
+        _current_user.set(member)
+        set_current_tenant(self.tenant)
+        try:
+            form = AlertRuleForm()
+            choice_ids = set(form.fields["channels"].queryset.values_list("pk", flat=True))
+        finally:
+            set_current_tenant(None)
+
+        self.assertIn(self.tenant_channel.pk, choice_ids)
+        self.assertNotIn(foreign_channel.pk, choice_ids)

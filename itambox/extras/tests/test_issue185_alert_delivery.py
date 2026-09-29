@@ -11,7 +11,7 @@ from rest_framework.test import APITestCase
 
 from core.events import DeliveryDisposition, DeliveryResult
 from core.models import Notification
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 from extras.filters import AlertLogFilterSet
 from extras.models import AlertLog, AlertRule, NotificationChannel
 from extras.tables import AlertLogTable
@@ -22,9 +22,17 @@ from extras.tasks.alerts import (
     _evaluate_rule,
     _schedule_alert_dispatch,
 )
-from organization.models import Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
+
+
+def _tenant_member(tenant, username):
+    """Create an active user who is a member of ``tenant`` (in-app delivery scope)."""
+    user = User.objects.create_user(username=username, password="x")
+    role = Role.objects.create(tenant=tenant, name=f"{username} role", permissions=[])
+    grant(user, tenant, role)
+    return user
 
 
 class DeliveryOutcomeDerivationTests(SimpleTestCase):
@@ -90,7 +98,7 @@ class ChannelDeliveryOutcomeTests(TestCase):
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name="WP-13 Channel Tenant", slug="wp-13-channel-tenant")
-        self.user = User.objects.create_user(username="wp13-channel", password="x")
+        self.user = _tenant_member(self.tenant, "wp13-channel")
         self.rule = AlertRule.objects.create(
             name="WP-13 Channel Rule", alert_type=AlertRule.ALERT_TYPE_LOW_STOCK, threshold_value=1, tenant=self.tenant
         )
@@ -158,7 +166,7 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
 
     def _setup(self, renotify_interval_days=0):
         tenant = Tenant.objects.create(name="WP-13 Observability Tenant", slug="wp-13-observability-tenant")
-        user = User.objects.create_user(username="wp13-obs", password="x")
+        user = _tenant_member(tenant, "wp13-obs")
         rule = AlertRule.objects.create(
             name="WP-13 Observability Rule",
             alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
@@ -419,7 +427,7 @@ class AlertLifecycleIndependentOfDeliveryTests(TransactionTestCase):
         from organization.models import Location, Site
 
         tenant = Tenant.objects.create(name="WP-13 Lifecycle Tenant", slug="wp-13-lifecycle-tenant")
-        user = User.objects.create_user(username="wp13-lifecycle", password="x")
+        user = _tenant_member(tenant, "wp13-lifecycle")
         rule = AlertRule.objects.create(
             name="WP-13 Lifecycle Rule", alert_type=AlertRule.ALERT_TYPE_LOW_STOCK, threshold_value=5, tenant=tenant
         )
@@ -655,3 +663,66 @@ class AlertStableChannelGateTests(TransactionTestCase):
         alert = AlertLog._base_manager.get(rule=self.rule)
         self.assertEqual(alert.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
         self.assertEqual(alert.delivery_status[str(channel.pk)]["disposition"], DeliveryDisposition.SUCCESS.value)
+
+
+class AlertDispatchConcurrencyTests(TransactionTestCase):
+    """Parallel evaluations planning a dispatch for the same alert state must
+    deliver exactly once: the dispatch claim is a single conditional UPDATE
+    gated on the planned-from notification state (issue #567, WP4)."""
+
+    def test_parallel_dispatch_plans_deliver_exactly_once(self):
+        import threading
+        from unittest.mock import patch
+
+        from django.db import connection
+
+        tenant = Tenant.objects.create(name="Concurrency Tenant", slug="concurrency-tenant")
+        rule = AlertRule.objects.create(
+            name="Concurrency Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="concurrency",
+            message="concurrency",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "concurrency", "message": "concurrency"}
+        calls = []
+        calls_lock = threading.Lock()
+
+        def counting_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            with calls_lock:
+                calls.append(delivery_id)
+            return {"1": "ok"}
+
+        barrier = threading.Barrier(2)
+        errors = []
+
+        def run_dispatch():
+            try:
+                barrier.wait(timeout=10)
+                _schedule_alert_dispatch(rule, match, alert, None)
+            except Exception as exc:  # pragma: no cover - surfaced via assertion below
+                errors.append(exc)
+            finally:
+                connection.close()
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=counting_dispatch):
+            threads = [threading.Thread(target=run_dispatch) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 1, "exactly one parallel dispatch may deliver")
+        alert.refresh_from_db()
+        self.assertEqual(alert.delivery_attempts, 1)
+        self.assertEqual(alert.last_delivery_id, calls[0])
+        self.assertEqual((alert.delivery_status or {}).get("__delivery_id__"), calls[0])

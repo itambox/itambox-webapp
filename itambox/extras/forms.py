@@ -1378,6 +1378,10 @@ class AlertRuleForm(forms.ModelForm):
         if user and not (user.is_superuser or (hasattr(user, "is_staff") and user.is_staff)):
             if "tenant" in self.fields:
                 self.fields.pop("tenant")
+            # Channel choices follow the active canonical read scope resolved by
+            # the tenant-scoping manager — rebound per request so the dropdown
+            # never lists channels outside the actor's scope (issue #567).
+            self.fields["channels"].queryset = NotificationChannel.objects.all()
 
         # Make the threshold label/help reflect what the number actually means
         # for the selected alert type (days horizon vs. unit count).

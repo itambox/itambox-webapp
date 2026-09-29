@@ -532,18 +532,21 @@ class AlertRuleChannelScopeValidationTests(APITestCase):
         session["active_tenant_id"] = self.tenant.pk
         session.save()
 
+    def _login_unscoped(self, user):
+        # No active tenant: the tenant-scoping manager leaves the request
+        # unscoped, so the field queryset contains every channel — including
+        # platform-wide rows that a single-tenant scope hides.
+        self.client.force_login(user)
+
     @staticmethod
-    def _create_payload(name, channel_id, tenant_id=None):
-        payload = {
+    def _create_payload(name, channel_id):
+        return {
             "name": name,
             "alert_type": AlertRule.ALERT_TYPE_LOW_STOCK,
             "threshold_value": 5,
             "severity": AlertRule.SEVERITY_WARNING,
             "channel_ids": [channel_id],
         }
-        if tenant_id is not None:
-            payload["tenant"] = tenant_id
-        return payload
 
     @staticmethod
     def _etag(rule):
@@ -564,27 +567,31 @@ class AlertRuleChannelScopeValidationTests(APITestCase):
         self.assertEqual(created.tenant_id, self.tenant.pk)
         self.assertEqual(set(created.channels.values_list("pk", flat=True)), {self.channel.pk})
 
-    def test_create_with_platform_channel_is_rejected_without_creating_rule(self):
-        # The superuser field scope includes platform-wide channels, so the write
-        # reaches the serializer's channel-scope guard; a tenant member's field
-        # queryset already excludes the platform channel (covered separately).
-        self._login_to_tenant(self.superuser)
-        name = "Alert scope rejected platform channel"
-        before = AlertRule._base_manager.count()
+    def test_create_platform_rule_with_platform_channel_succeeds(self):
+        # ``tenant`` is not a writable API field: a superuser create without one
+        # yields a platform-wide rule (mirrors ``_tenant_create_kwargs``), and
+        # the platform channel is in scope for it. An unscoped session is used
+        # because a single-tenant scope hides platform-wide channels from the
+        # field queryset.
+        self._login_unscoped(self.superuser)
+        name = "Alert scope platform rule"
 
         response = self.client.post(
             reverse("api:extras_api:alertrule-list"),
-            data=self._create_payload(name, self.platform_channel.pk, self.tenant.pk),
+            data=self._create_payload(name, self.platform_channel.pk),
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertIn("cannot deliver for this rule", str(response.data))
-        self.assertEqual(AlertRule._base_manager.count(), before)
-        self.assertFalse(AlertRule._base_manager.filter(name=name).exists())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        created = AlertRule._base_manager.get(name=name)
+        self.assertIsNone(created.tenant_id)
+        self.assertEqual(set(created.channels.values_list("pk", flat=True)), {self.platform_channel.pk})
 
     def test_patch_to_platform_channel_is_rejected_and_keeps_attachment(self):
-        self._login_to_tenant(self.superuser)
+        # Unscoped superuser session: the platform channel is selectable in the
+        # field queryset, so the serializer's scope guard is what rejects the
+        # write (a single-tenant scope already hides the platform channel).
+        self._login_unscoped(self.superuser)
 
         response = self.client.patch(
             reverse("api:extras_api:alertrule-detail", kwargs={"pk": self.rule.pk}),

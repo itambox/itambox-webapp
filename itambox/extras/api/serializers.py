@@ -540,17 +540,15 @@ class AlertRuleSerializer(BaseModelSerializer):
         attrs = super().validate(attrs)
         # Scope guard (issue #567): a rule notifies only through channels of
         # its own scope. Fail the write instead of accepting a configuration
-        # that can never deliver. The target scope mirrors the create-time
-        # tenant resolution of ``ITAMBoxModelViewSet._tenant_create_kwargs``:
-        # an omitted tenant on a superuser create yields a platform-wide rule,
-        # every other create is bound to the active tenant scope.
+        # that can never deliver. ``tenant`` is not a writable API field, so
+        # the target scope is the stored tenant on updates and the create-time
+        # resolution of ``ITAMBoxModelViewSet._tenant_create_kwargs`` on
+        # creates: a superuser create without a tenant field yields a
+        # platform-wide rule, every other create is bound to the active
+        # tenant scope.
         channels = attrs.get("channels")
-        if channels is None and "tenant" in attrs and self.instance is not None:
-            channels = list(self.instance.channels.all())
         if channels:
-            if "tenant" in attrs:
-                tenant = attrs["tenant"]
-            elif self.instance is not None:
+            if self.instance is not None:
                 tenant = self.instance.tenant
             else:
                 context = getattr(self, "_context", None) or {}

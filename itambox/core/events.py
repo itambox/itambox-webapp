@@ -307,7 +307,21 @@ def send_notification_to_channel(channel: NotificationChannelRef, subject, body)
         # Resolve target users: explicit list in config → tenant members → global staff
         user_ids = channel.config.get("recipient_users", [])
         if user_ids:
-            users = list(User.objects.filter(pk__in=user_ids, is_active=True))
+            # The scope boundary applies to explicit recipients too, at delivery
+            # time: a user outside the channel's scope never receives its data
+            # (issue #567 — enforced here, not only in the form).
+            recipients = User.objects.filter(pk__in=user_ids, is_active=True)
+            if channel.tenant_id:
+                recipients = recipients.filter(memberships__tenant_id=channel.tenant_id).distinct()
+            else:
+                recipients = recipients.filter(is_staff=True)
+            users = list(recipients)
+            if len(users) < len(set(user_ids)):
+                logger.warning(
+                    "In-App channel '%s': %s configured recipient(s) did not resolve inside the channel scope.",
+                    channel.name,
+                    len(set(user_ids)) - len(users),
+                )
         elif channel.tenant_id:
             # Members of the channel's tenant (via Membership) — covers
             # users with no AssetHolder profile, unlike the old
