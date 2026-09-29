@@ -34,14 +34,20 @@ class TestSurfaceMarker:
     """U2: a non-Stable model carries its owning capability's marker."""
 
     def test_a_beta_owned_model_yields_a_notice(self):
-        from extras.models import ScheduledReport
+        from procurement.models import FulfillmentLink
 
-        notice = capability_notice(ScheduledReport)
-        assert notice["key"] == "reporting.scheduled"
+        notice = capability_notice(FulfillmentLink)
+        assert notice["key"] == "procurement.requisition_seam"
         assert notice["maturity"] == BETA
         assert notice["title"]
         assert notice["docs_url"].endswith(".md")
         assert notice["limitations"]
+
+    def test_stable_scheduled_models_yield_no_notice(self):
+        from extras.models import ReportGenerationArchive, ScheduledReport
+
+        assert capability_notice(ScheduledReport) is None
+        assert capability_notice(ReportGenerationArchive) is None
 
     def test_a_stable_owned_model_yields_no_notice(self):
         from procurement.models import PurchaseOrder
@@ -70,34 +76,34 @@ class TestSurfaceMarker:
         assert notice["maturity"] == EXPERIMENTAL
 
     def test_a_notice_never_carries_the_probe_or_a_value(self):
-        from extras.models import ScheduledReport
+        from procurement.models import FulfillmentLink
 
-        notice = capability_notice(ScheduledReport)
+        notice = capability_notice(FulfillmentLink)
         assert "activation_probe" not in notice
         assert set(notice) == {"key", "title", "maturity", "activation", "docs_url", "limitations"}
 
     def test_a_deactivated_capability_still_marks_its_surface(self):
         """Inactive is not invisible: the grade is a property of the contract."""
-        from extras.models import ScheduledReport
+        from procurement.models import FulfillmentLink
 
-        with deactivated("reporting.scheduled"):
-            assert capability_notice(ScheduledReport)["maturity"] == BETA
+        with deactivated("procurement.requisition_seam"):
+            assert capability_notice(FulfillmentLink)["maturity"] == BETA
 
     def test_the_notice_survives_a_failing_probe(self):
-        from extras.models import ScheduledReport
+        from procurement.models import FulfillmentLink
 
-        with probe_failing("reporting.scheduled"):
-            assert capability_notice(ScheduledReport)["key"] == "reporting.scheduled"
+        with probe_failing("procurement.requisition_seam"):
+            assert capability_notice(FulfillmentLink)["key"] == "procurement.requisition_seam"
 
 
 class TestBannerTemplate:
     def test_the_banner_names_the_capability_and_links_its_document(self):
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("reporting.scheduled")},
+            {"capability_notice": _notice_for_key("users.scim_provisioning")},
         )
         assert "Beta" in html
-        assert "Scheduled" in html
+        assert "SCIM" in html
         assert "capability-maturity" in html
 
     def test_the_contract_link_is_excluded_from_boost(self):
@@ -108,19 +114,19 @@ class TestBannerTemplate:
         """
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("reporting.scheduled")},
+            {"capability_notice": _notice_for_key("users.scim_provisioning")},
         )
         assert 'hx-boost="false"' in html
 
     def test_the_banner_renders_the_declared_limitations(self):
-        notice = _notice_for_key("reporting.scheduled")
+        notice = _notice_for_key("users.scim_provisioning")
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert notice["limitations"][0] in html
 
     def test_the_beta_banner_is_a_polite_live_region_with_a_label(self):
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("reporting.scheduled")},
+            {"capability_notice": _notice_for_key("users.scim_provisioning")},
         )
         assert 'role="status"' in html
         assert 'aria-live="polite"' in html
@@ -281,7 +287,7 @@ class TestOperatorDiagnostics:
         assert "demo_plugin_secret" not in output
 
     def test_a_failing_probe_is_reported_by_type_only(self):
-        with probe_failing("reporting.scheduled"):
+        with probe_failing("users.scim_provisioning"):
             output = _run_command()
         assert "RuntimeError" in output
         assert "hunter2" not in output
@@ -357,11 +363,11 @@ class TestNavigationMaturity:
         scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
         assert designer.condition(None) is True
         assert scheduled.condition(None) is True
-        # The promotion moves the Beta marker from the shared group to the one
-        # still-beta capability, so the group header no longer implies Beta.
+        # Every reporting slice is Stable now, so neither the group header nor
+        # any item carries the Beta marker.
         assert reporting.beta is False
         assert designer.beta is False
-        assert scheduled.beta is True
+        assert scheduled.beta is False
 
 
 DESIGNER_VIEWS = (
@@ -386,6 +392,8 @@ SCHEDULED_REPORT_VIEWS = (
     "ScheduledReportDeleteView",
     "ScheduledReportBulkDeleteView",
     "ReportTriggerImmediateView",
+    "ScheduledReportRetryDeliveryView",
+    "ScheduledReportScopeApprovalView",
 )
 
 
@@ -420,15 +428,15 @@ class TestReportDesignerStable:
 
 
 @pytest.mark.django_db
-class TestScheduledReportRoutesUseDesignerCapability:
-    """Designer promotion leaves the scheduled route capability binding intact."""
+class TestScheduledReportRoutesUseTheScheduledCapability:
+    """The scheduled routes bind to the scheduled capability, not the designer."""
 
     @pytest.mark.parametrize("view_name", SCHEDULED_REPORT_VIEWS)
-    def test_every_scheduled_report_route_names_the_designer_capability(self, view_name):
-        assert _designer_view(view_name).capability_key == "reporting.designer"
+    def test_every_scheduled_report_route_names_the_scheduled_capability(self, view_name):
+        assert _designer_view(view_name).capability_key == "reporting.scheduled"
 
     @pytest.mark.parametrize("view_name", ("ScheduledReportListView", "ScheduledReportBulkDeleteView"))
-    def test_scheduled_routes_are_open_with_the_always_on_designer(self, view_name):
+    def test_scheduled_routes_are_open_with_the_stable_capability(self, view_name):
         assert _gate_outcome(view_name) != "Http404"
 
 

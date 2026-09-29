@@ -52,6 +52,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0117_asset_type_definition_guards",
     "extras.0122_journalentry_tenant_group",
     "extras.0123_pause_flag_suppressed_report_schedules",
+    "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -304,6 +305,19 @@ SEMANTIC_DISPOSITIONS = {
         ),
         {
             "extras.0123_pause_flag_suppressed_report_schedules",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Reconciles the django-q registration rows for the Scheduled Reports promotion: marks every "
+            "report schedule row with the fire-identity kwarg so a redelivered occurrence can never dispatch "
+            "twice, and collapses duplicate registration rows onto the surviving row with the schedule FK "
+            "re-pointed; saved schedules, active states, approvals, archives, and next-run state are otherwise "
+            "untouched, so no dormant or paused schedule is resumed and no delivery state is rewritten."
+        ),
+        {
+            "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
         },
     ),
 }

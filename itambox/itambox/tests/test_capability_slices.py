@@ -42,7 +42,7 @@ DECLARED = {
     "procurement.requisition_seam": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.curated": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.designer": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
-    "reporting.scheduled": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
+    "reporting.scheduled": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "alerting.inbox": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "alerting.rules": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
@@ -107,6 +107,17 @@ class TestDeclaredSlice:
 
     def test_scim_provisioning_is_declared_stable_always_on_without_probe_or_limitations(self):
         capability = registry.get("users.scim_provisioning")
+
+        assert (capability.maturity, capability.activation, capability.activation_source) == (
+            STABLE,
+            ALWAYS_ON,
+            SOURCE_ALWAYS,
+        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
+
+    def test_scheduled_reports_are_declared_stable_always_on_without_probe_or_limitations(self):
+        capability = registry.get("reporting.scheduled")
 
         assert (capability.maturity, capability.activation, capability.activation_source) == (
             STABLE,
@@ -196,6 +207,13 @@ class TestActivationDefaults:
 
         assert Token._base_manager.count() == 0
         assert registry.state("users.scim_provisioning") == ActivationState(active=True, value_present=True)
+
+    def test_scheduled_reports_are_active_with_zero_rows(self, db):
+        from extras.models import ReportGenerationArchive, ScheduledReport
+
+        assert ScheduledReport._base_manager.count() == 0
+        assert ReportGenerationArchive._base_manager.count() == 0
+        assert registry.state("reporting.scheduled") == ActivationState(active=True, value_present=True)
 
     def test_every_opt_in_capability_is_inert_on_a_fresh_deployment(self, db):
         """``db``: the object-backed probes must *answer* here, not fail closed.
@@ -329,24 +347,40 @@ class TestRegistrationIdempotence:
 class TestExistingDeploymentCompatibility:
     """An object-enabled Beta slice is inert on a fresh install and live on a used one."""
 
-    def test_scheduled_reports_are_inactive_until_an_active_schedule_row_exists(self, db):
-        state = registry.state("reporting.scheduled")
+    def test_scim_provisioning_is_inert_until_a_credential_exists(self, db):
+        state = registry.state("users.scim_provisioning")
 
         assert (state.active, state.value_present) == (False, False)
 
-    def test_inactive_schedule_row_configures_but_does_not_activate_scheduled_reports(self, db):
-        template = baker.make("extras.ReportTemplate")
-        baker.make("extras.ScheduledReport", report=template, is_active=False)
+    def test_an_unusable_scim_credential_configures_without_activating_provisioning(self, db):
+        from users.models import Token
 
-        state = registry.state("reporting.scheduled")
+        tenant = baker.make("organization.Tenant")
+        user = baker.make("users.User", is_active=True)
+        Token.objects.create(
+            user=user,
+            tenant=tenant,
+            write_enabled=True,
+            expires=timezone.now() - timedelta(hours=1),
+        )
+
+        state = registry.state("users.scim_provisioning")
 
         assert (state.active, state.value_present) == (False, True)
 
-    def test_scheduled_reports_activate_when_an_active_row_exists(self, db):
-        template = baker.make("extras.ReportTemplate")
-        baker.make("extras.ScheduledReport", report=template, is_active=True)
+    def test_a_usable_scim_credential_activates_provisioning(self, db):
+        from users.models import Token
 
-        state = registry.state("reporting.scheduled")
+        tenant = baker.make("organization.Tenant")
+        user = baker.make("users.User", is_active=True)
+        Token.objects.create(
+            user=user,
+            tenant=tenant,
+            write_enabled=True,
+            expires=timezone.now() + timedelta(days=1),
+        )
+
+        state = registry.state("users.scim_provisioning")
 
         assert (state.active, state.value_present) == (True, True)
 
@@ -399,6 +433,10 @@ class TestInactiveSafety:
         assert "users.scim_provisioning" not in deactivatable_keys()
         assert registry.is_active("users.scim_provisioning") is True
 
+    def test_scheduled_reports_are_not_deactivatable(self):
+        assert "reporting.scheduled" not in deactivatable_keys()
+        assert registry.is_active("reporting.scheduled") is True
+
     @pytest.mark.parametrize(
         "key",
         ["organization.resource_grants", "organization.role_grants"],
@@ -429,14 +467,6 @@ class TestDeprecatedAdapters:
 
 class TestDocumentationConsistency:
     """U8: code-owned contracts and capability links stay coherent."""
-
-    def test_scheduled_reporting_limitations_keep_the_active_row_semantics(self):
-        scheduled = registry.get("reporting.scheduled")
-
-        assert scheduled.limitations[0] == (
-            "The scheduled capability requires an active schedule row; deactivating a schedule pauses its delivery "
-            "without deleting the saved schedule."
-        )
 
     def test_every_docs_url_points_at_a_public_or_internal_document(self):
         for capability in registry.all():

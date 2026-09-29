@@ -222,7 +222,15 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(send_channel.call_count, 2)
         archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
         self.assertEqual(archive.status, "success")
-        self.assertEqual(archive.error_message, "channel.delivery_rejected")
+        # The compile/archive stage succeeded; the delivery stage carries its
+        # own ledger instead of overloading the generation error field.
+        self.assertEqual(archive.error_message, "")
+        self.assertEqual(archive.delivery_status, "partial")
+        self.assertEqual(sorted(target["status"] for target in archive.delivery_targets), ["failed", "ok"])
+        failed_entry = next(target for target in archive.delivery_targets if target["status"] == "failed")
+        self.assertEqual(failed_entry["error"], "channel.delivery_rejected")
+        healthy_entry = next(target for target in archive.delivery_targets if target["status"] == "ok")
+        self.assertEqual(healthy_entry["target"], f"channel:{healthy_channel.pk}")
 
     def test_delivery_outcome_marks_all_failures_as_failed(self):
         outcome = _DeliveryOutcome()
@@ -235,7 +243,8 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_delivery_outcome_tracks_success_and_partial(self):
         outcome = _DeliveryOutcome()
-        self.assertEqual(outcome.status, "success")
+        # Attempting nothing at all is a recorded "none", never a silent success.
+        self.assertEqual(outcome.status, "none")
         outcome.record_success()
         outcome.record_failure("one channel failed")
         self.assertEqual(outcome.status, "partial")
@@ -277,7 +286,11 @@ class ScheduledReportingAndAlertsTests(TestCase):
         with patch("extras.tasks.reports.send_notification_to_channel") as send_channel:
             outcome = _deliver_report_channels(sched, [], 0)
             send_channel.assert_not_called()
-        self.assertEqual(outcome.status, "success")
+        # A disabled channel is never contacted; with no enabled targets the
+        # delivery stage records "none" instead of a false success.
+        self.assertEqual(outcome.status, "none")
+        self.assertEqual(outcome.attempted, 0)
+        self.assertEqual(outcome.targets, [])
 
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""
@@ -360,7 +373,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             format=ScheduledReport.FORMAT_HTML,
             save_to_archive=False,
         )
-        sched.last_status = "delivery_failed: slack down"
+        sched.last_status = "failed"
         sched.save(update_fields=["last_status"])
         self.client.force_login(self.user)
 
@@ -547,10 +560,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_channel_delivery_reports_partial_failures_and_skips_disabled_channels(self):
         channels = [
-            SimpleNamespace(name="email", enabled=True),
-            SimpleNamespace(name="disabled", enabled=False),
-            SimpleNamespace(name="webhook", enabled=True),
-            SimpleNamespace(name="slack", enabled=True),
+            SimpleNamespace(pk=1, name="email", enabled=True),
+            SimpleNamespace(pk=2, name="disabled", enabled=False),
+            SimpleNamespace(pk=3, name="webhook", enabled=True),
+            SimpleNamespace(pk=4, name="slack", enabled=True),
         ]
         sched = SimpleNamespace(
             name="Channel report",
@@ -566,7 +579,17 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(outcome.attempted, 3)
         self.assertEqual(outcome.succeeded, 1)
         self.assertEqual(outcome.status, "partial")
-        self.assertEqual(len(outcome.failures), 2)
+        self.assertEqual(outcome.failures, ["channel.delivery_failed", "channel.delivery_rejected"])
+        # The per-target ledger carries channel identity, so a retry can
+        # re-attempt exactly the failed channels.
+        self.assertEqual(
+            [(target["target"], target["status"], target["error"]) for target in outcome.targets],
+            [
+                ("channel:1", "ok", ""),
+                ("channel:3", "failed", "channel.delivery_failed"),
+                ("channel:4", "failed", "channel.delivery_rejected"),
+            ],
+        )
 
     def test_scheduled_delivery_email_exception_is_observable(self):
         sched = SimpleNamespace(
@@ -589,7 +612,19 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         self.assertFalse(success)
         self.assertEqual(sched.last_status, "failed")
-        self.assertEqual(archive.error_message, "email.delivery_failed")
+        self.assertEqual(archive.delivery_status, "failed")
+        self.assertEqual(
+            archive.delivery_targets,
+            [
+                {
+                    "target": "email",
+                    "label": "email",
+                    "status": "failed",
+                    "error": "email.delivery_failed",
+                    "retried": False,
+                }
+            ],
+        )
 
     def test_scheduled_delivery_false_email_is_observable(self):
         sched = SimpleNamespace(
@@ -611,7 +646,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             success = _process_scheduled_report(sched, self.tenant, [])
 
         self.assertFalse(success)
-        self.assertEqual(sched.last_status, "delivery_failed: email.delivery_rejected")
+        self.assertEqual(sched.last_status, "failed")
 
 
 class ScheduledReportScopeAuthorizationTests(TestCase):

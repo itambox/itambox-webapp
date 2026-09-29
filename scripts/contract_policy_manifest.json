@@ -61,9 +61,9 @@
       "scope": "Saved report templates"
     },
     "reporting.scheduled": {
-      "activation": "opt-in",
-      "contract_class": "beta-opt-in",
-      "exclusions": "Requires at least one enabled schedule row; deactivating a schedule pauses its delivery without deleting the saved schedule; delivery also depends on a running worker",
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
       "scope": "Scheduled reports and generation archive"
     },
     "subscriptions.tracking": {

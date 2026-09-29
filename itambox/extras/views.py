@@ -1,6 +1,7 @@
 import datetime
 import json
 
+from croniter import croniter
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -24,8 +25,13 @@ from assets.services.specification_consumers.exporting import machine_csv_bytes
 from assets.tables import AssetTable  # Import AssetTable
 from core.managers import get_current_tenant
 from core.reports.rendering import render_report_csv, render_report_html
-from extras.tasks.reports import generate_scheduled_report_task
-from itambox.capabilities import registry
+from core.schedules import (
+    SCHEDULED_REPORT_FIRE_KWARG,
+    SCHEDULED_REPORT_TASK_PATH,
+    register_schedule,
+    remove_schedule,
+)
+from extras.tasks.reports import delivery_ledger_message, generate_scheduled_report_task, retry_failed_deliveries
 from itambox.panels import Panel
 from itambox.utils import get_model_viewname, get_paginate_count  # Import the utility function
 from itambox.views.generic import (
@@ -762,11 +768,13 @@ class NotificationChannelTestView(SimplePostView):
 # =============================================================================
 
 #: The report designer routes below edit, preview, render, or schedule a
-#: ReportTemplate. The capability was promoted to Stable (always-on), so the
-#: routes are open by contract; the capability gate stays wired so the routes
-#: and the published registry state cannot drift apart. The Stable curated
-#: report catalogue (`reporting.curated`) remains independent.
+#: ReportTemplate. Both the designer and the scheduled-report capability are
+#: Stable (always-on), so those routes are open by contract; each surface's
+#: capability gate stays wired so the routes and the published registry state
+#: cannot drift apart. The Stable curated report catalogue
+#: (`reporting.curated`) remains independent.
 REPORT_DESIGNER_CAPABILITY = "reporting.designer"
+REPORTING_SCHEDULED_CAPABILITY = "reporting.scheduled"
 
 
 @method_decorator(login_required, name="dispatch")
@@ -843,8 +851,8 @@ class ReportTemplateBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView
 
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
-    capability_key = REPORT_DESIGNER_CAPABILITY
-    queryset = ScheduledReport.objects.select_related("report").prefetch_related("scope_authorization")
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
+    queryset = ScheduledReport.objects.select_related("report", "schedule").prefetch_related("scope_authorization")
     filterset = ScheduledReportFilterSet
     filterset_form = ScheduledReportFilterForm
     table = ScheduledReportTable
@@ -858,72 +866,103 @@ class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
         context = super().get_context_data(**kwargs)
         context["title"] = _("Scheduled Reports")
         context["templates"] = ReportTemplate.objects.all()
-        context["is_beta_module"] = True
         return context
 
 
-def handle_report_scheduling(sched_report):
-    from django.utils import timezone
+def _initial_next_run(sched_report, now=None):
+    """Frozen V1 first-run anchoring for a schedule registration.
+
+    With a start time, the next run is the next occurrence of that time of day
+    (today if it is still ahead, else tomorrow). Without one, the schedule is
+    due immediately. A custom cron expression without a start time anchors at
+    the next cron occurrence instead. The django-q library owns every further
+    advance (calendar-aware months/years, DST-stable local wall time); this
+    helper only computes the anchor a (re)registration starts from.
+    """
+    now = now or timezone.now()
+    local_now = timezone.localtime(now)
+    if sched_report.start_time is None:
+        if sched_report.frequency == ScheduledReport.FREQUENCY_CRON and sched_report.cron_expression:
+            try:
+                # Cron expressions are interpreted in the project's local wall
+                # time (matching the django-q scheduler), so anchor against the
+                # local representation of ``now``.
+                return croniter(sched_report.cron_expression, local_now).get_next(datetime.datetime)
+            except (KeyError, ValueError):
+                # An invalid expression is rejected by the model/form; fall back
+                # to the plain due-now anchor instead of failing registration.
+                return now
+        return now
+    next_run = timezone.make_aware(
+        datetime.datetime.combine(local_now.date(), sched_report.start_time), timezone.get_current_timezone()
+    )
+    if next_run < now:
+        next_run += datetime.timedelta(days=1)
+    return next_run
+
+
+def handle_report_scheduling(sched_report, *, reanchor=True):
+    """Sync the django-q registration row for one scheduled report.
+
+    Registration is name-keyed (``scheduled_report_<pk>``), advisory-locked and
+    idempotent: concurrent saves collapse onto a single row, duplicate rows
+    left by the pre-promotion registration are removed, and the row always
+    carries the ``intended_fire_at`` kwarg so the worker can claim each
+    occurrence. Deactivating a schedule removes the registration and keeps the
+    saved schedule and its records.
+
+    ``reanchor`` controls the first-run anchor: creating or re-activating a
+    schedule, or changing its frequency, cron expression, or start time,
+    anchors the next run (see ``_initial_next_run``); editing anything else
+    keeps the live next run. Without ``reanchor`` the row is only created
+    (due immediately) if it went missing.
+    Django-q registration is only needed when a schedule actually saves; the
+    library import stays local so view import time is unaffected.
+    """
+    # inline import: app-registry: avoid AppRegistryNotReady at app-load time
     from django_q.models import Schedule
 
-    if sched_report.is_active:
-        if not registry.is_active(REPORT_DESIGNER_CAPABILITY):
-            return
-        # Map frequency choice to django-q Schedule type
-        freq_mapping = {
-            "once": Schedule.ONCE,
-            "hourly": Schedule.HOURLY,
-            "daily": Schedule.DAILY,
-            "weekly": Schedule.WEEKLY,
-            "biweekly": "BW",
-            "monthly": Schedule.MONTHLY,
-            "quarterly": "Q",
-            "yearly": "Y",
-            "cron": Schedule.CRON,
-        }
-        q_freq = freq_mapping.get(sched_report.frequency, Schedule.WEEKLY)
-
-        defaults = {
-            "func": "extras.tasks.reports.generate_scheduled_report_task",
-            "args": str(sched_report.pk),
-            "schedule_type": q_freq,
-            "repeats": -1,
-        }
-        if q_freq == Schedule.CRON:
-            defaults["cron"] = sched_report.cron_expression
-        else:
-            defaults["cron"] = ""
-
-        # Configure next_run if start_time is set
-        if sched_report.start_time:
-            now = timezone.now()
-            # Compute next run date with this start time
-            next_date = now.date()
-            next_run = timezone.make_aware(
-                datetime.datetime.combine(next_date, sched_report.start_time), timezone.get_current_timezone()
-            )
-            if next_run < now:
-                # If the time has already passed today, set to tomorrow
-                next_run += datetime.timedelta(days=1)
-            defaults["next_run"] = next_run
-
-        q_schedule, created = Schedule.objects.update_or_create(
-            name=f"scheduled_report_{sched_report.pk}", defaults=defaults
-        )
-        if sched_report.schedule != q_schedule:
-            sched_report.schedule = q_schedule
-            sched_report.save(update_fields=["schedule"])
-    else:
-        if sched_report.schedule:
-            q_sched = sched_report.schedule
+    schedule_name = f"scheduled_report_{sched_report.pk}"
+    if not sched_report.is_active:
+        if sched_report.schedule_id is not None:
             sched_report.schedule = None
             sched_report.save(update_fields=["schedule"])
-            q_sched.delete()
+        remove_schedule(SCHEDULED_REPORT_TASK_PATH, name=schedule_name)
+        return
+
+    # Map frequency choice to django-q Schedule type
+    freq_mapping = {
+        "once": Schedule.ONCE,
+        "hourly": Schedule.HOURLY,
+        "daily": Schedule.DAILY,
+        "weekly": Schedule.WEEKLY,
+        "biweekly": "BW",
+        "monthly": Schedule.MONTHLY,
+        "quarterly": "Q",
+        "yearly": "Y",
+        "cron": Schedule.CRON,
+    }
+    q_freq = freq_mapping.get(sched_report.frequency, Schedule.WEEKLY)
+
+    defaults = {
+        "args": str(sched_report.pk),
+        "schedule_type": q_freq,
+        "repeats": -1,
+        "cron": sched_report.cron_expression if q_freq == Schedule.CRON else "",
+        "intended_date_kwarg": SCHEDULED_REPORT_FIRE_KWARG,
+    }
+    if reanchor:
+        defaults["next_run"] = _initial_next_run(sched_report)
+
+    q_schedule = register_schedule(SCHEDULED_REPORT_TASK_PATH, name=schedule_name, defaults=defaults)
+    if q_schedule is not None and sched_report.schedule_id != q_schedule.pk:
+        sched_report.schedule = q_schedule
+        sched_report.save(update_fields=["schedule"])
 
 
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportCreateView(CapabilityRequiredMixin, ObjectEditView):
-    capability_key = REPORT_DESIGNER_CAPABILITY
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
     queryset = ScheduledReport.objects.all()
     model_form = ScheduledReportForm
     template_name = "core/reports/report_schedule_form.html"
@@ -941,7 +980,7 @@ class ScheduledReportCreateView(CapabilityRequiredMixin, ObjectEditView):
 
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportUpdateView(CapabilityRequiredMixin, ObjectEditView):
-    capability_key = REPORT_DESIGNER_CAPABILITY
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
     queryset = ScheduledReport.objects.all()
     model_form = ScheduledReportForm
     template_name = "core/reports/report_schedule_form.html"
@@ -952,20 +991,35 @@ class ScheduledReportUpdateView(CapabilityRequiredMixin, ObjectEditView):
         return context
 
     def form_valid(self, form):
+        # Decided before the save: anchoring the next run on every save would
+        # silently move the cadence of an edited schedule. Only schedule-shape
+        # changes (frequency, cron expression, start time) or a fresh
+        # registration re-anchor; everything else keeps the live next run.
+        previous = (
+            ScheduledReport.objects.filter(pk=self.object.pk)
+            .values("frequency", "cron_expression", "start_time", "is_active", "schedule_id")
+            .first()
+            or {}
+        )
+        schedule_shape_changed = any(
+            previous.get(field) != getattr(self.object, field)
+            for field in ("frequency", "cron_expression", "start_time")
+        )
+        reanchor = not previous.get("is_active") or previous.get("schedule_id") is None or schedule_shape_changed
         response = super().form_valid(form)
-        handle_report_scheduling(self.object)
+        handle_report_scheduling(self.object, reanchor=reanchor)
         return response
 
 
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportDeleteView(CapabilityRequiredMixin, ObjectDeleteView):
-    capability_key = REPORT_DESIGNER_CAPABILITY
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
     queryset = ScheduledReport.objects.all()
     template_name = "core/reports/report_schedule_confirm_delete.html"
 
 
 class ScheduledReportBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView):
-    capability_key = REPORT_DESIGNER_CAPABILITY
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
     queryset = ScheduledReport.objects.all()
 
 
@@ -979,7 +1033,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
     fail-closed ``report.scope_unauthorized`` terminal state to delivery time.
     """
 
-    capability_key = REPORT_DESIGNER_CAPABILITY
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
     permission_required = ("reports.view_cross_tenant_reports",)
     template_name = "core/reports/report_schedule_scope_approval.html"
 
@@ -1140,7 +1194,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
 
 @method_decorator(login_required, name="dispatch")
 class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
-    capability_key = REPORT_DESIGNER_CAPABILITY
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
     permission_required = ("extras.view_scheduledreport",)
 
     def has_permission(self):
@@ -1157,27 +1211,18 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
         # Trigger report generation synchronously for immediate visual feedback in the UI
         success = generate_scheduled_report_task(sched.pk)
         sched.refresh_from_db()
-        archive = sched.archives.first()
         status = sched.last_status or ""
-        _status_kind, _separator, status_detail = status.partition(":")
-        status_detail = status_detail.strip()
-        if status.startswith("delivery_") and status_detail:
-            delivery_detail = status_detail
-        elif status.startswith("failed:"):
-            delivery_detail = status
-        else:
-            delivery_detail = (archive.error_message if archive else "") or status or _("Check logs.")
-        if status == "partial" or status.startswith("delivery_partial:"):
+        if status == "partial":
             messages.warning(
                 request,
                 _("Scheduled report '%(name)s' was generated but delivered only partially: %(error)s")
-                % {"name": sched.name, "error": delivery_detail},
+                % {"name": sched.name, "error": _last_delivery_detail(sched)},
             )
-        elif status == "failed" or status.startswith("delivery_failed:"):
+        elif status == "failed":
             messages.error(
                 request,
                 _("Scheduled report '%(name)s' was generated but all deliveries failed: %(error)s")
-                % {"name": sched.name, "error": delivery_detail},
+                % {"name": sched.name, "error": _last_delivery_detail(sched)},
             )
         elif success:
             messages.success(
@@ -1187,7 +1232,97 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
             messages.error(
                 request,
                 _("Failed to generate scheduled report '%(name)s': %(error)s")
-                % {"name": sched.name, "error": delivery_detail},
+                % {"name": sched.name, "error": _last_run_failure_detail(sched)},
+            )
+
+        return redirect(
+            safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
+        )
+
+
+def _last_delivery_detail(sched):
+    """Render the last run's delivery outcome for operator messages.
+
+    New rows carry a per-target ledger on the archive; older rows may still
+    embed the detail in the status token, which stays readable.
+    """
+    archive = sched.archives.order_by("-generated_at").first()
+    if archive is not None and archive.delivery_targets:
+        return delivery_ledger_message(archive.delivery_targets)
+    _kind, _separator, legacy_detail = (sched.last_status or "").partition(":")
+    legacy_detail = legacy_detail.strip()
+    return legacy_detail or _("Check logs.")
+
+
+def _last_run_failure_detail(sched):
+    """Render the last run's failure detail for operator messages."""
+    status = sched.last_status or ""
+    _kind, _separator, detail = status.partition(":")
+    detail = detail.strip()
+    if detail:
+        return detail
+    archive = sched.archives.order_by("-generated_at").first()
+    if archive is not None and archive.error_message:
+        return archive.error_message
+    return status or _("Check logs.")
+
+
+@method_decorator(login_required, name="dispatch")
+class ScheduledReportRetryDeliveryView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
+    """Recover a partially failed delivery without repeating successful sends.
+
+    Redelivers only the failed targets of the newest archived run, after
+    re-validating the schedule's current tenant authorization. Mirrors the
+    ``Run now`` gating: visible schedule plus the change permission.
+    """
+
+    capability_key = REPORTING_SCHEDULED_CAPABILITY
+    permission_required = ("extras.change_scheduledreport",)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        try:
+            obj = get_object_or_404(ScheduledReport, pk=self.kwargs.get("pk"))
+        except Http404:
+            return False
+        return self.request.user.has_perms(perms, obj=obj)
+
+    def post(self, request, pk):
+        sched = get_object_or_404(ScheduledReport, pk=pk)
+        outcome = retry_failed_deliveries(sched)
+        if outcome.code == "retry.no_archive":
+            messages.warning(
+                request,
+                _(
+                    "Scheduled report '%(name)s' has no retained archived output to redeliver; "
+                    "use Run now to generate it again."
+                )
+                % {"name": sched.name},
+            )
+        elif outcome.code == "retry.no_recorded_failures":
+            messages.info(
+                request,
+                _("Scheduled report '%(name)s' has no recorded failed deliveries to retry.") % {"name": sched.name},
+            )
+        elif outcome.code == "retry.scope_unauthorized":
+            messages.error(
+                request,
+                _(
+                    "Retry delivery for '%(name)s' was refused: the schedule's cross-tenant scope "
+                    "approval is no longer current."
+                )
+                % {"name": sched.name},
+            )
+        elif outcome.code == "retry.completed":
+            messages.success(
+                request,
+                _("Failed deliveries of scheduled report '%(name)s' were retried successfully.") % {"name": sched.name},
+            )
+        else:
+            messages.warning(
+                request,
+                _("Retry delivery for '%(name)s' left targets failing: %(error)s")
+                % {"name": sched.name, "error": outcome.detail or _("Check logs.")},
             )
 
         return redirect(

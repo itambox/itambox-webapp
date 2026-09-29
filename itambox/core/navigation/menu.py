@@ -83,6 +83,11 @@ def _report_designer_active(_user):
     return registry.is_active("reporting.designer")
 
 
+def _reporting_scheduled_active(_user):
+    """Keep scheduled-report navigation in lock-step with its route capability gate."""
+    return registry.is_active("reporting.scheduled")
+
+
 ORG_MENU = Menu(
     label=_("Organization"),
     icon_class="mdi mdi-domain",
@@ -427,8 +432,7 @@ MONITORING_MENU = Menu(
                     link="extras:scheduledreport_list",
                     link_text=_("Scheduled Reports"),
                     permissions=["extras.view_scheduledreport"],
-                    condition=_report_designer_active,
-                    beta=True,
+                    condition=_reporting_scheduled_active,
                     buttons=(
                         MenuItemButton(
                             link="extras:scheduledreport_create",

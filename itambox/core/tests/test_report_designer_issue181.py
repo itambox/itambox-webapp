@@ -15,7 +15,6 @@ from core.reports.rendering import (
     render_report_csv,
     render_report_html,
 )
-from extras.apps import _scheduled_reports_probe
 from extras.forms import ReportTemplateForm
 from extras.models import ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
 from extras.tasks.reports import (
@@ -30,7 +29,6 @@ from extras.tasks.reports import (
     generate_scheduled_report_task,
 )
 from extras.views import ReportTemplateDetailView, ReportTemplateDownloadView, ReportTemplatePreviewView
-from itambox.capabilities import ActivationState
 from organization.models import Tenant
 
 
@@ -571,20 +569,17 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         through_manager.filter.assert_called_once_with(reporttemplate_id=27)
         queryset.values_list.assert_called_once_with("tenant_id", flat=True)
 
-    def test_scheduled_reports_probe_is_only_the_active_schedule_row_probe(self):
-        row_probe = Mock(return_value=ActivationState(True, True))
-        with patch("extras.apps.object_enabled_probe", return_value=row_probe) as object_enabled_probe:
-            assert _scheduled_reports_probe() == ActivationState(True, True)
-        object_enabled_probe.assert_called_once_with("extras", "ScheduledReport", "is_active")
-        row_probe.assert_called_once_with()
+    def test_scheduled_reports_promotion_drops_the_row_probe_and_limitations(self):
+        """The scheduled slice is Stable/always-on; the row probe is gone."""
+        from extras import apps as extras_apps
+
+        assert not hasattr(extras_apps, "_scheduled_reports_probe")
 
         from itambox.capabilities import registry
 
         capability = registry.get("reporting.scheduled")
-        assert capability.limitations[0] == (
-            "The scheduled capability requires an active schedule row; deactivating a schedule pauses its delivery "
-            "without deleting the saved schedule."
-        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
 
     def test_report_views_cover_preview_permissions_and_rendering_seams(self):
         preview = ReportTemplatePreviewView()

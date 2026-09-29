@@ -15469,3 +15469,82 @@ msgstr "Die Wareneingangsübermittlung enthält für Position %(line)s keine Ang
 msgid "The recorded quantity for line %(line)s changed since this receipt was prepared (expected %(expected)s, found %(found)s). Reload the receive form and submit again."
 msgstr "Die erfasste Menge für Position %(line)s hat sich seit Vorbereitung dieses Wareneingangs geändert (erwartet %(expected)s, vorgefunden %(found)s). Bitte das Wareneingangsformular neu laden und erneut absenden."
 
+#: itambox/extras/models.py
+msgid "Delivery Targets"
+msgstr "Zustellziele"
+
+
+#: itambox/extras/models.py
+msgid "Disclosure Text"
+msgstr "Offenlegungstext"
+
+
+#: itambox/extras/views.py
+#, python-format
+msgid "Failed deliveries of scheduled report '%(name)s' were retried successfully."
+msgstr "Fehlgeschlagene Zustellungen des geplanten Berichts '%(name)s' wurden erfolgreich erneut zugestellt."
+
+
+#: itambox/extras/models.py
+msgid "Last Accepted Fire"
+msgstr "Zuletzt akzeptierte Auslösung"
+
+
+#: itambox/extras/models.py
+msgid "Newest intended run time accepted for execution. A redelivered or duplicated occurrence at or before this time is a no-op, so broker redelivery can never dispatch a run twice."
+msgstr "Neueste akzeptierte geplante Ausführungszeit. Ein erneut oder doppelt zugestellter Lauf zu oder vor diesem Zeitpunkt ist wirkungslos, damit eine erneute Broker-Zustellung niemals einen Lauf doppelt ausführt."
+
+
+#: itambox/extras/tables.py
+msgid "Next run"
+msgstr "Nächster Lauf"
+
+
+#: itambox/extras/models.py
+msgid "Outcome of the delivery fan-out for this run: blank (not dispatched or pre-upgrade row), 'none' (no targets configured), 'success', 'partial', or 'failed'."
+msgstr "Ergebnis der Zustellung dieses Laufs: leer (nicht zugestellt oder Zeile aus der Zeit vor dem Upgrade), 'none' (keine Ziele konfiguriert), 'success', 'partial' oder 'failed'."
+
+
+#: itambox/extras/models.py
+msgid "Per-target delivery ledger of this run (email aggregate and one entry per notification channel). Retry delivery re-attempts only targets recorded as failed."
+msgstr "Zustellprotokoll je Ziel für diesen Lauf (E-Mail gesammelt sowie ein Eintrag je Benachrichtigungskanal). 'Zustellung erneut versuchen' kontaktiert nur als fehlgeschlagen erfasste Ziele erneut."
+
+
+#: itambox/extras/tables.py
+msgid "Retry delivery"
+msgstr "Zustellung erneut versuchen"
+
+
+#: itambox/extras/views.py
+#, python-format
+msgid "Retry delivery for '%(name)s' left targets failing: %(error)s"
+msgstr "Erneute Zustellung für '%(name)s' ließ weiterhin Ziele fehlschlagen: %(error)s"
+
+
+#: itambox/extras/views.py
+#, python-format
+msgid "Retry delivery for '%(name)s' was refused: the schedule's cross-tenant scope approval is no longer current."
+msgstr "Erneute Zustellung für '%(name)s' wurde abgelehnt: Die mandantenübergreifende Genehmigung des Zeitplans ist nicht mehr aktuell."
+
+
+#: itambox/extras/views.py
+#, python-format
+msgid "Scheduled report '%(name)s' has no recorded failed deliveries to retry."
+msgstr "Der geplante Bericht '%(name)s' hat keine erfassten fehlgeschlagenen Zustellungen für einen erneuten Versuch."
+
+
+#: itambox/extras/views.py
+#, python-format
+msgid "Scheduled report '%(name)s' has no retained archived output to redeliver; use Run now to generate it again."
+msgstr "Der geplante Bericht '%(name)s' hat keine aufbewahrte archivierte Ausgabe für eine erneute Zustellung; verwenden Sie 'Jetzt ausführen', um sie neu zu erzeugen."
+
+
+#: itambox/extras/views.py
+#, python-format
+msgid "Scheduled report '%(name)s' was generated on %(timestamp)s UTC and is being redelivered.\nFormat: %(format)s"
+msgstr "Der geplante Bericht '%(name)s' wurde am %(timestamp)s UTC erzeugt und wird erneut zugestellt.\nFormat: %(format)s"
+
+
+#: itambox/extras/models.py
+msgid "Scope/truncation disclosure carried by the delivered output, kept for faithful redelivery."
+msgstr "Offenlegungshinweis zu Geltungsbereich/Kürzung, den die zugestellte Ausgabe trägt und der für eine originalgetreue erneute Zustellung aufbewahrt wird."

@@ -1805,6 +1805,16 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
     last_run = models.DateTimeField(null=True, blank=True, verbose_name=_("Last Run"))
     last_status = models.CharField(max_length=50, blank=True, verbose_name=_("Last Status"))
+    last_accepted_fire_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Last Accepted Fire"),
+        help_text=_(
+            "Newest intended run time accepted for execution. A redelivered or duplicated occurrence at or "
+            "before this time is a no-op, so broker redelivery can never dispatch a run twice."
+        ),
+    )
 
     class Meta:
         ordering = ["name"]
@@ -1813,6 +1823,17 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
 
     def __str__(self):
         return f"{self.name} -> {self.report.name}"
+
+    @property
+    def delivery_retryable(self):
+        """Whether the last run left a retryable delivery failure to recover.
+
+        Generation failures are terminal for the run and are recovered with
+        ``Run now``; this only marks runs whose generation succeeded but whose
+        delivery fan-out did not fully succeed, including legacy rows that
+        still carry the pre-promotion ``delivery_...`` status text.
+        """
+        return self.last_status in ("partial", "failed") or self.last_status.startswith("delivery_")
 
     def persisted_scope_tenant_ids(self):
         """Return explicit persisted filter-scope ids without tenant scoping.
@@ -1863,14 +1884,6 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         active_tenant = self.tenant or (self.report.tenant if self.report_id else None)
         scope_ids = self.effective_scope_tenant_ids()
         return active_tenant is None or scope_ids != [active_tenant.pk]
-
-    def delete(self, *args, **kwargs):
-        if self.schedule:
-            try:
-                self.schedule.delete()
-            except Exception:
-                pass
-        super().delete(*args, **kwargs)
 
     def clean(self):
         super().clean()
@@ -2011,6 +2024,31 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
     format = models.CharField(max_length=20, verbose_name=_("Format"))
     status = models.CharField(max_length=50, verbose_name=_("Status"))
     error_message = models.TextField(blank=True, verbose_name=_("Error Message"))
+    delivery_status = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name=_("Delivery Status"),
+        help_text=_(
+            "Outcome of the delivery fan-out for this run: blank (not dispatched or pre-upgrade row), "
+            "'none' (no targets configured), 'success', 'partial', or 'failed'."
+        ),
+    )
+    delivery_targets = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name=_("Delivery Targets"),
+        help_text=_(
+            "Per-target delivery ledger of this run (email aggregate and one entry per notification "
+            "channel). Retry delivery re-attempts only targets recorded as failed."
+        ),
+    )
+    disclosure_text = models.TextField(
+        blank=True,
+        default="",
+        verbose_name=_("Disclosure Text"),
+        help_text=_("Scope/truncation disclosure carried by the delivered output, kept for faithful redelivery."),
+    )
     file = models.ForeignKey(
         "extras.FileAttachment",
         on_delete=models.SET_NULL,

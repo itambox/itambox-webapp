@@ -587,6 +587,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0117_asset_type_definition_guards",
                 "extras.0122_journalentry_tenant_group",
                 "extras.0123_pause_flag_suppressed_report_schedules",
+                "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",

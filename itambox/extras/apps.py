@@ -4,16 +4,12 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models.signals import post_migrate
 
-from core.features import object_enabled_probe
 from core.schedules import register_schedule
 from itambox.capabilities import (
     ALWAYS_ON,
-    BETA,
     CAPABILITY_REGISTRY_DOC_URL,
     CONTRACT_VERSION,
-    OPT_IN,
     SOURCE_ALWAYS,
-    SOURCE_OBJECT_ENABLED,
     STABLE,
     Capability,
 )
@@ -32,11 +28,6 @@ ISSUE445_WEBHOOK_DURABILITY = ("extras", "0113_upgrade_legacy_webhook_retry_sche
 ALERT_DISPATCH_UID = "extras.issue445.register_daily_alert_schedule.v1"
 ALERT_TASK_PATH = "extras.tasks.alerts.evaluate_alert_rules_task"
 WEBHOOK_RECOVERY_TASK_PATH = "extras.tasks.webhooks.recover_pending_webhook_deliveries"
-
-
-def _scheduled_reports_probe():
-    """Report schedules as active while at least one live schedule row is enabled."""
-    return object_enabled_probe("extras", "ScheduledReport", "is_active")()
 
 
 class ExtrasConfig(AppConfig):
@@ -121,9 +112,10 @@ class ExtrasConfig(AppConfig):
         """Declare the reporting, alerting, and automation slices.
 
         ``extras`` is the clearest case for a capability registry: one Django
-        app holds a Stable alert inbox, a Stable curated report catalogue, and
-        four separately-graded Beta slices. A single app-level grade could only
-        ever be wrong in one direction or the other.
+        app holds the curated report catalogue, the report designer, scheduled
+        reports, the alert inbox, alert rules, and webhook automation. Each is
+        declared as its own slice with its own published grade, so a single
+        app-level grade could only ever be wrong in one direction or the other.
 
         ``register_all`` rather than a loop: ``ready()`` runs again whenever a
         test swaps ``INSTALLED_APPS``, and with six entries a failure partway
@@ -186,19 +178,14 @@ class ExtrasConfig(AppConfig):
                 key="reporting.scheduled",
                 title="Scheduled Reports",
                 owning_area="area:operations",
-                maturity=BETA,
+                maturity=STABLE,
                 security_critical=False,
-                activation=OPT_IN,
-                activation_probe=_scheduled_reports_probe,
-                activation_source=SOURCE_OBJECT_ENABLED,
+                activation=ALWAYS_ON,
+                activation_probe=None,
+                activation_source=SOURCE_ALWAYS,
                 owns=("extras.ReportGenerationArchive", "extras.ScheduledReport"),
                 docs_url=DOCS,
-                limitations=(
-                    "The scheduled capability requires an active schedule row; deactivating a schedule pauses its "
-                    "delivery without deleting the saved schedule.",
-                    "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
-                    "Archive retention is not yet configurable per schedule.",
-                ),
+                limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
             Capability(

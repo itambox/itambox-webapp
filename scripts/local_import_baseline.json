@@ -1498,18 +1498,6 @@
       "count": 2
     },
     {
-      "path": "itambox/extras/views.py",
-      "context": "FunctionDef:handle_report_scheduling",
-      "statement": "from django.utils import timezone",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "FunctionDef:handle_report_scheduling",
-      "statement": "from django_q.models import Schedule",
-      "count": 1
-    },
-    {
       "path": "itambox/inventory/abstract_models.py",
       "context": "ClassDef:AbstractAssignment/FunctionDef:_source_stock",
       "statement": "from django.apps import apps",
