@@ -2,7 +2,6 @@ import ast
 import hashlib
 import hmac
 import json
-from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import requests
