@@ -1361,33 +1361,11 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
 
         active_tenant = get_current_tenant()
 
-        # Resolve the persisted constellation through unscoped reads: the
-        # ambient tenant would silently truncate the pinned scope and a
-        # truncated constellation is a different report. Soft-deleted pinned
-        # tenants drop out; an entirely dead constellation fails closed
-        # instead of silently substituting the active tenant, mirroring the
-        # scheduled-report scope resolver.
-        pinned_ids = template.persisted_filter_tenant_ids()
-        filter_tenants = []
-        if pinned_ids:
-            # inline import: heavy-import: organization models are only needed for tenant resolution
-            from django.apps import apps as django_apps
-
-            Tenant = django_apps.get_model("organization", "Tenant")
-            filter_tenants = list(
-                Tenant._base_manager.filter(pk__in=pinned_ids, deleted_at__isnull=True).order_by("pk")
-            )
-            if not filter_tenants:
-                logger.error(
-                    "Report template scope tenants are all soft-deleted; refusing compilation",
-                    extra={"operation": "reports.download", "reporttemplate_id": template.pk},
-                )
-                return HttpResponse(gettext("You may not view this report's data."), status=403)
-
         # inline imports: heavy-import: report provider discovery is only needed for this export request
         from core.reports import build_report_context
 
         try:
+            filter_tenants = self._persisted_scope_tenants(template)
             specification_filters, specification_export_references = _specification_inputs(request, source=request.GET)
             headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template,
@@ -1403,18 +1381,9 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             safe_name = safe_csv_filename(template.name).lower().replace(" ", "_")
             stamp = f"{timezone.now():%Y%m%d}"
 
-            machine_export = context_data.get("specification_export")
-            if format_type == "machine_csv":
-                if machine_export is None:
-                    return HttpResponse(gettext("This report does not provide a machine-format export."), status=400)
-                response = HttpResponse(machine_csv_bytes(machine_export), content_type="text/csv")
-                response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
-                return _apply_report_disclosure_headers(response, context_data)
-
-            if machine_export is not None and format_type == "csv":
-                response = HttpResponse(machine_csv_bytes(machine_export), content_type="text/csv")
-                response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
-                return _apply_report_disclosure_headers(response, context_data)
+            machine_response = self._machine_format_response(format_type, context_data, safe_name, stamp)
+            if machine_response is not None:
+                return machine_response
 
             if format_type == "csv":
                 response = HttpResponse(
@@ -1434,6 +1403,7 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             if format_type == "xlsx":
                 from core.reports.exporters import XLSX_MIME, report_xlsx_bytes
 
+                machine_export = context_data.get("specification_export")
                 export_headers = machine_export.columns if machine_export is not None else headers
                 export_rows = machine_export.rows if machine_export is not None else rows
                 response = HttpResponse(
@@ -1473,3 +1443,52 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             return HttpResponse(
                 f"<h3>{gettext('Template render failed. See the server log for details.')}</h3>", status=400
             )
+
+    def _persisted_scope_tenants(self, template):
+        """Resolve the persisted constellation through unscoped reads.
+
+        The ambient tenant would silently truncate the pinned scope and a
+        truncated constellation is a different report. Soft-deleted pinned
+        tenants drop out; an entirely dead constellation fails closed instead
+        of silently substituting the active tenant, mirroring the
+        scheduled-report scope resolver. Raises ``PermissionError`` for the
+        caller's 403 branch.
+        """
+        pinned_ids = template.persisted_filter_tenant_ids()
+        if not pinned_ids:
+            return []
+        # inline import: heavy-import: organization models are only needed for tenant resolution
+        from django.apps import apps as django_apps
+
+        Tenant = django_apps.get_model("organization", "Tenant")
+        filter_tenants = list(Tenant._base_manager.filter(pk__in=pinned_ids, deleted_at__isnull=True).order_by("pk"))
+        if not filter_tenants:
+            logger.error(
+                "Report template scope tenants are all soft-deleted; refusing compilation",
+                extra={"operation": "reports.download", "reporttemplate_id": template.pk},
+            )
+            raise PermissionError("Report template scope tenants are all soft-deleted")
+        return filter_tenants
+
+    def _machine_format_response(self, format_type, context_data, safe_name, stamp):
+        """Machine-format downloads: the provider's own export bytes, undecorated.
+
+        ``machine_csv`` is a machine contract and requires the provider export
+        (400 without one); ``csv`` keeps returning the machine bytes whenever
+        the provider built an export. Disclosure travels in the response
+        headers instead of the file body so the machine bytes stay
+        byte-stable. Returns ``None`` when the format is not a machine format.
+        """
+        machine_export = context_data.get("specification_export")
+        if format_type == "machine_csv":
+            if machine_export is None:
+                return HttpResponse(gettext("This report does not provide a machine-format export."), status=400)
+            return self._attachment_response(machine_csv_bytes(machine_export), safe_name, stamp, context_data)
+        if format_type == "csv" and machine_export is not None:
+            return self._attachment_response(machine_csv_bytes(machine_export), safe_name, stamp, context_data)
+        return None
+
+    def _attachment_response(self, payload, safe_name, stamp, context_data):
+        response = HttpResponse(payload, content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
+        return _apply_report_disclosure_headers(response, context_data)
