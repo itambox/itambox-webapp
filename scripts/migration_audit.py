@@ -53,6 +53,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0122_journalentry_tenant_group",
     "extras.0123_pause_flag_suppressed_report_schedules",
     "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
+    "extras.0125_scheduled_report_fire_records_retry_hardening",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -318,6 +319,19 @@ SEMANTIC_DISPOSITIONS = {
         ),
         {
             "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Registers each schedule's newest accepted occurrence as a per-occurrence fire record so the "
+            "idempotency fence becomes exact-match (out-of-order replays and parallel workers can never "
+            "discard an older occurrence), and adds the delivery-retry hardening columns to the generation "
+            "archive (archived generation scope snapshot plus the lease-fenced retry claim token); saved "
+            "schedules, approvals, archives, and delivery outcomes are otherwise untouched."
+        ),
+        {
+            "extras.0125_scheduled_report_fire_records_retry_hardening",
         },
     ),
 }

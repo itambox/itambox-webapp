@@ -1272,8 +1272,9 @@ class ScheduledReportRetryDeliveryView(CapabilityRequiredMixin, PermissionRequir
     """Recover a partially failed delivery without repeating successful sends.
 
     Redelivers only the failed targets of the newest archived run, after
-    re-validating the schedule's current tenant authorization. Mirrors the
-    ``Run now`` gating: visible schedule plus the change permission.
+    re-validating the archived generation scope and while the schedule is
+    active. Mirrors the ``Run now`` gating: visible schedule plus the change
+    permission.
     """
 
     capability_key = REPORTING_SCHEDULED_CAPABILITY
@@ -1304,12 +1305,36 @@ class ScheduledReportRetryDeliveryView(CapabilityRequiredMixin, PermissionRequir
                 request,
                 _("Scheduled report '%(name)s' has no recorded failed deliveries to retry.") % {"name": sched.name},
             )
+        elif outcome.code == "retry.no_retained_output":
+            messages.warning(
+                request,
+                _(
+                    "Retry delivery for '%(name)s' could not read the retained archive output; "
+                    "use Run now to generate it again."
+                )
+                % {"name": sched.name},
+            )
+        elif outcome.code == "retry.inactive":
+            messages.error(
+                request,
+                _(
+                    "Retry delivery for '%(name)s' was refused: the schedule is inactive; "
+                    "reactivate it before retrying its delivery."
+                )
+                % {"name": sched.name},
+            )
+        elif outcome.code == "retry.in_progress":
+            messages.info(
+                request,
+                _("Retry delivery for '%(name)s' is already in progress; the running attempt performs the deliveries.")
+                % {"name": sched.name},
+            )
         elif outcome.code == "retry.scope_unauthorized":
             messages.error(
                 request,
                 _(
-                    "Retry delivery for '%(name)s' was refused: the schedule's cross-tenant scope "
-                    "approval is no longer current."
+                    "Retry delivery for '%(name)s' was refused: the cross-tenant scope of the archived "
+                    "run is no longer covered by a current approval."
                 )
                 % {"name": sched.name},
             )

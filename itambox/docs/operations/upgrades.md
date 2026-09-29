@@ -106,14 +106,21 @@ The upgrade also arms the delivery improvements before the first fire:
    schedules are untouched.
 3. Archive rows gain the per-target delivery ledger; rows from before the
    upgrade keep a blank ledger and are never rewritten.
+4. Each schedule's newest accepted occurrence is registered as a fire record,
+   so idempotency stays exact-match per occurrence across the upgrade and an
+   older, still-unaccepted occurrence is never dropped behind a newer one.
+5. Archive rows gain the generation-scope snapshot (the tenant scope a
+   retained file is valid under) and the retry-claim columns; rows from before
+   the upgrade keep empty values and are never rewritten.
 
 ### Rollback
 
-The migration reverses cleanly: the ledger columns are dropped and the
-injected task keyword argument is cleared again, because the predecessor task
-signature does not accept it. A code-only rollback without the schema
+The migrations reverse cleanly: the ledger, snapshot, and claim columns are
+dropped, the fire records are removed with the table that carried them, and
+the injected task keyword argument is cleared again, because the predecessor
+task signature does not accept it. A code-only rollback without the schema
 rollback would leave the keyword argument in place and fail every report fire,
-so reverse the migration (or restore the pre-upgrade backup) when rolling
+so reverse the migrations (or restore the pre-upgrade backup) when rolling
 back. Collapsed duplicate rows are not resurrected.
 
 ## Preflight

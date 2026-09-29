@@ -1,10 +1,12 @@
 import logging
+import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -22,6 +24,7 @@ from extras.models import (
     NotificationChannel,
     ReportGenerationArchive,
     ScheduledReport,
+    ScheduledReportFire,
     ScheduledReportScopeAuthorization,
 )
 
@@ -32,6 +35,12 @@ logger = logging.getLogger(__name__)
 #: a failed channel can be re-attempted by ``Retry delivery`` without touching
 #: the targets that already received the report.
 DELIVERY_TARGET_EMAIL = "email"
+
+#: How long a ``Retry delivery`` claim stays exclusive before another request
+#: may take it over. Mirrors the alert-dispatch claim lease: a claim left
+#: behind by an interrupted request is recoverable after the lease expires,
+#: and two parallel requests can never both contact the same failed targets.
+RETRY_CLAIM_LEASE = timedelta(minutes=15)
 
 
 def _channel_target_key(channel):
@@ -71,21 +80,26 @@ def _parse_intended_fire_at(value):
 
 
 def _claim_fire(sched, fire_at):
-    """Atomically claim an intended occurrence; ``False`` when already accepted.
+    """Atomically claim one intended occurrence by its exact fire time.
 
-    The conditional UPDATE is the idempotency fence: a broker redelivery of the
-    same occurrence — or any occurrence at or before the last accepted one
-    (duplicated registration rows, replayed queue entries) — cannot advance the
-    marker again and is skipped before any generation or delivery work happens.
+    Idempotency is per ``(schedule, occurrence)``: the unique fire record
+    makes the insert the fence, so a broker redelivery of the same occurrence
+    is an exact-match no-op, and out-of-order execution (parallel workers, a
+    catch-up backlog after downtime) can never let a newer occurrence discard
+    an older, not-yet-accepted one. ``last_accepted_fire_at`` remains a
+    monotonic informational marker and is never a rejection criterion.
     """
-    claimed = (
-        ScheduledReport._base_manager.filter(pk=sched.pk)
-        .filter(Q(last_accepted_fire_at__isnull=True) | Q(last_accepted_fire_at__lt=fire_at))
-        .update(last_accepted_fire_at=fire_at)
-    )
-    if claimed:
+    try:
+        with transaction.atomic():
+            ScheduledReportFire.objects.create(schedule_id=sched.pk, intended_fire_at=fire_at)
+    except IntegrityError:
+        return False
+    ScheduledReport._base_manager.filter(pk=sched.pk).filter(
+        Q(last_accepted_fire_at__isnull=True) | Q(last_accepted_fire_at__lt=fire_at)
+    ).update(last_accepted_fire_at=fire_at)
+    if sched.last_accepted_fire_at is None or sched.last_accepted_fire_at < fire_at:
         sched.last_accepted_fire_at = fire_at
-    return bool(claimed)
+    return True
 
 
 def _render_report_html(context_data, template=None):
@@ -117,15 +131,22 @@ class _DeliveryOutcome:
             return "success"
         return "partial" if self.succeeded else "failed"
 
-    def record_success(self, *, target="", label=""):
+    def record_success(self, *, target="", label="", details=None):
         self.attempted += 1
         self.succeeded += 1
         if target:
             self.targets.append(
-                {"target": target, "label": label or target, "status": "ok", "error": "", "retried": False}
+                {
+                    "target": target,
+                    "label": label or target,
+                    "status": "ok",
+                    "error": "",
+                    "retried": False,
+                    "details": details or {},
+                }
             )
 
-    def record_failure(self, failure, *, target="", label=""):
+    def record_failure(self, failure, *, target="", label="", details=None):
         self.attempted += 1
         self.failures.append(str(failure))
         if target:
@@ -136,6 +157,7 @@ class _DeliveryOutcome:
                     "status": "failed",
                     "error": str(failure),
                     "retried": False,
+                    "details": details or {},
                 }
             )
 
@@ -209,7 +231,7 @@ def _render_report_output(sched, template, headers, rows, context_data):
     raise ValueError(f"Unsupported scheduled report format: {sched.format}")
 
 
-def _archive_report_output(sched, template, output, active_tenant, disclosure_text=""):
+def _archive_report_output(sched, template, output, active_tenant, disclosure_text="", generation_scope=None):
     if not getattr(sched, "save_to_archive", True):
         return None
 
@@ -219,6 +241,7 @@ def _archive_report_output(sched, template, output, active_tenant, disclosure_te
         status="running",
         tenant=active_tenant,
         disclosure_text=disclosure_text or "",
+        generation_scope=generation_scope or {},
     )
     if sched.format == ScheduledReport.FORMAT_HTML:
         content_bytes = output.email_body.encode("utf-8")
@@ -295,6 +318,13 @@ def _deliver_report_channels(sched, summary_cards, total_rows, disclosure_text="
         if not channel.enabled:
             continue
         target_key = _channel_target_key(channel)
+        # The delivered payload is recorded per target so Retry delivery can
+        # re-send the original notification (subject and body with its summary
+        # cards) instead of a reduced reconstruction.
+        details = {
+            "channel_id": getattr(channel, "pk", None),
+            "payload": {"subject": report_subject, "body": report_body},
+        }
         try:
             delivered = send_notification_to_channel(channel, report_subject, report_body)
         # broad except: boundary-isolation: channel integrations may raise implementation-specific failures
@@ -307,16 +337,18 @@ def _deliver_report_channels(sched, summary_cards, total_rows, disclosure_text="
                     "exception_type": type(error).__name__,
                 },
             )
-            outcome.record_failure("channel.delivery_failed", target=target_key, label=channel.name)
+            outcome.record_failure("channel.delivery_failed", target=target_key, label=channel.name, details=details)
         else:
             if delivered:
-                outcome.record_success(target=target_key, label=channel.name)
+                outcome.record_success(target=target_key, label=channel.name, details=details)
             else:
                 logger.warning(
                     "Scheduled report channel reported delivery failure",
                     extra={"operation": "reports.channel_delivery", "channel_id": getattr(channel, "pk", None)},
                 )
-                outcome.record_failure("channel.delivery_rejected", target=target_key, label=channel.name)
+                outcome.record_failure(
+                    "channel.delivery_rejected", target=target_key, label=channel.name, details=details
+                )
     return outcome
 
 
@@ -467,6 +499,29 @@ def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
     return principal.pk
 
 
+def _generation_scope_snapshot(sched, active_tenant, filter_tenants):
+    """Record the tenant scope a generated archive is valid under.
+
+    Retry delivery re-validates THIS archived scope instead of the schedule's
+    current one: a later scope change or revocation must not legitimize
+    redelivering an export that was compiled under a broader scope.
+    """
+    schedule_id = getattr(sched, "pk", None)
+    authorization = _load_scope_authorization(sched) if schedule_id is not None else None
+    filter_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
+    active_tenant_id = getattr(active_tenant, "pk", None)
+    data_tenant_ids = sorted(
+        {tenant_id for tenant_id in [active_tenant_id, *filter_tenant_ids] if tenant_id is not None}
+    )
+    return {
+        "active_tenant_id": active_tenant_id,
+        "filter_tenant_ids": filter_tenant_ids,
+        "data_tenant_ids": data_tenant_ids,
+        "cross_tenant": _scope_requires_authorization(active_tenant, filter_tenants),
+        "authorization_id": getattr(authorization, "pk", None),
+    }
+
+
 def _process_scheduled_report(sched, active_tenant, filter_tenants):
     archive_entry = None
     try:
@@ -479,7 +534,12 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
         context_data["scheduled_report"] = sched
         output = _render_report_output(sched, template, headers, rows, context_data)
         archive_entry = _archive_report_output(
-            sched, template, output, active_tenant, context_data.get("disclosure_text", "")
+            sched,
+            template,
+            output,
+            active_tenant,
+            context_data.get("disclosure_text", ""),
+            generation_scope=_generation_scope_snapshot(sched, active_tenant, filter_tenants),
         )
     # broad except: task-isolation: one scheduled report failure must not abort the worker batch
     except Exception as error:
@@ -502,6 +562,9 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
 
     delivery = _DeliveryOutcome()
     recipients = _resolve_report_recipients(sched)
+    # Record the original recipients on the email target so Retry delivery
+    # re-contacts exactly the recorded targets, not a since-edited list.
+    email_details = {"recipients": recipients}
     if recipients:
         try:
             delivered = _deliver_report_email(sched, template, output, recipients)
@@ -515,12 +578,12 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
                     "exception_type": type(error).__name__,
                 },
             )
-            delivery.record_failure("email.delivery_failed", target=DELIVERY_TARGET_EMAIL)
+            delivery.record_failure("email.delivery_failed", target=DELIVERY_TARGET_EMAIL, details=email_details)
         else:
             if delivered:
-                delivery.record_success(target=DELIVERY_TARGET_EMAIL)
+                delivery.record_success(target=DELIVERY_TARGET_EMAIL, details=email_details)
             else:
-                delivery.record_failure("email.delivery_rejected", target=DELIVERY_TARGET_EMAIL)
+                delivery.record_failure("email.delivery_rejected", target=DELIVERY_TARGET_EMAIL, details=email_details)
 
     delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows), context_data.get("disclosure_text", "")))
     _persist_delivery_outcome(sched, archive_entry, delivery)
@@ -577,10 +640,12 @@ def generate_scheduled_report_task(scheduled_report_id: int, intended_fire_at: s
 
     ``intended_fire_at`` is injected by the django-q scheduler (through the
     ``intended_date_kwarg`` registration) as the occurrence this firing
-    represents. When present, the occurrence is claimed before any work
-    happens, and a broker redelivery at or before the claimed occurrence is a
-    no-op instead of a second dispatch. Manual invocations (the synchronous
-    ``Run now`` path) pass no occurrence and execute unconditionally.
+    represents. When present, the occurrence is claimed by its exact fire time
+    before any work happens: a broker redelivery of the same occurrence is a
+    no-op instead of a second dispatch, while a still-unaccepted older
+    occurrence (out-of-order replay) is still processed exactly once. Manual
+    invocations (the synchronous ``Run now`` path) pass no occurrence and
+    execute unconditionally.
     """
     try:
         sched = ScheduledReport.objects.get(pk=scheduled_report_id)
@@ -658,12 +723,12 @@ class _RetryOutcome:
     detail: str = ""
 
 
-def _retry_scope_is_authorized(sched):
+def _retry_current_scope_is_authorized(sched):
     """Execution-time re-validation of the schedule's current tenant authorization.
 
-    The recovery path must not become a delivery bypass: a revoked or changed
-    cross-tenant approval, a lapsed approving principal, or a collapsed scope
-    refuses the redelivery exactly like generation would.
+    Pre-snapshot fallback only: archives generated before the scope snapshot
+    existed keep their old behavior. New archives are validated against the
+    archived generation scope instead.
     """
     scope = _resolve_report_scope(sched)
     if scope is None:
@@ -674,6 +739,64 @@ def _retry_scope_is_authorized(sched):
     if _scope_requires_authorization(active_tenant, filter_tenants):
         return _resolve_scope_authorization(sched, active_tenant, filter_tenants) is not None
     return True
+
+
+def _retry_scope_is_authorized(sched, archive):
+    """Re-validate the ARCHIVED generation scope before any redelivery.
+
+    A scope change must not legitimize an older export: the retry proceeds
+    only while the schedule still resolves to the archived generation's
+    active tenant and, for a cross-tenant archive, while a current, durable
+    approval still covers every tenant whose data the retained file contains.
+    Reducing the scope, revoking the approval, or losing the approving
+    principal's permission all refuse the redelivery exactly like generation
+    would have refused under the archived scope.
+    """
+    snapshot = archive.generation_scope if isinstance(getattr(archive, "generation_scope", None), dict) else {}
+    if not snapshot:
+        return _retry_current_scope_is_authorized(sched)
+    scope = _resolve_report_scope(sched)
+    if scope is None:
+        return False
+    active_tenant, _filter_tenants = scope
+    if snapshot.get("active_tenant_id") != getattr(active_tenant, "pk", None):
+        return False
+    if not snapshot.get("cross_tenant"):
+        return True
+    return _archived_cross_tenant_scope_is_authorized(sched, snapshot)
+
+
+def _archived_cross_tenant_scope_is_authorized(sched, snapshot):
+    """Whether a current approval still covers the archived cross-tenant data.
+
+    The archived file contains the archived active tenant plus every filter
+    tenant; all of them must still be live and covered by an unrevoked
+    approval whose authorized scope is a superset, and the approving principal
+    must still hold the cross-tenant permission on each of them.
+    """
+    try:
+        required_tenant_ids = sorted({int(tenant_id) for tenant_id in snapshot.get("data_tenant_ids") or []})
+    except (TypeError, ValueError):
+        return False
+    if not required_tenant_ids:
+        return False
+    authorization = _load_scope_authorization(sched)
+    if authorization is None or getattr(authorization, "revoked_at", None) is not None:
+        return False
+    authorized_scope = _parse_authorized_scope(authorization)
+    if authorized_scope is None or not set(required_tenant_ids).issubset(set(authorized_scope)):
+        return False
+    principal = _resolve_authorized_principal(authorization)
+    if principal is None:
+        return False
+    # inline import: heavy-import: organization models are only needed for tenant resolution
+    from django.apps import apps
+
+    Tenant = apps.get_model("organization", "Tenant")
+    required_tenants = list(Tenant._base_manager.filter(pk__in=required_tenant_ids, deleted_at__isnull=True))
+    if len(required_tenants) != len(required_tenant_ids):
+        return False
+    return _principal_can_authorize_scope(principal, required_tenants)
 
 
 def _output_from_archive(sched, archive):
@@ -699,6 +822,51 @@ def _output_from_archive(sched, archive):
         attachment_filename=archive.file.name,
         attachment_mime=archive.file.mime_type or "application/octet-stream",
     )
+
+
+def _claim_retry(archive):
+    """Take the exclusive retry claim; ``None`` when another attempt holds it.
+
+    Mirrors the alert-dispatch claim lease: the claim is an atomic conditional
+    UPDATE, so two parallel ``Retry delivery`` requests can never both read
+    the same failed targets and both deliver, and a claim left behind by an
+    interrupted request is recoverable once the lease expires.
+    """
+    token = uuid.uuid4().hex
+    now = timezone.now()
+    expires_at = now + RETRY_CLAIM_LEASE
+    claimed = (
+        ReportGenerationArchive._base_manager.filter(pk=archive.pk)
+        .filter(Q(retry_claim_expires_at__isnull=True) | Q(retry_claim_expires_at__lt=now))
+        .update(retry_claim_token=token, retry_claim_expires_at=expires_at)
+    )
+    if not claimed:
+        return None
+    archive.retry_claim_token = token
+    archive.retry_claim_expires_at = expires_at
+    return token
+
+
+def _release_retry_claim(archive, token, *, delivery_targets=None, delivery_status=""):
+    """Release the claim, writing the outcome only while the token still owns it.
+
+    Returns ``False`` when the claim was superseded (the lease expired and a
+    newer attempt took over); the caller then leaves the newer state in place
+    instead of clobbering it with a stale ledger.
+    """
+    updates = {"retry_claim_token": "", "retry_claim_expires_at": None}
+    if delivery_targets is not None:
+        updates["delivery_targets"] = delivery_targets
+        updates["delivery_status"] = delivery_status
+    return bool(ReportGenerationArchive._base_manager.filter(pk=archive.pk, retry_claim_token=token).update(**updates))
+
+
+def _recorded_detail(target, key, default=None):
+    """Read one recorded detail from a ledger entry (``None`` when absent)."""
+    details = target.get("details")
+    if isinstance(details, dict):
+        return details.get(key, default)
+    return default
 
 
 def _retry_channel_body(sched, archive):
@@ -738,12 +906,16 @@ def _retry_email_target(sched, output, recipients):
     return False, "email.delivery_rejected"
 
 
-def _retry_channel_target(sched, archive, target_key):
+def _retry_channel_target(sched, archive, target_key, target=None):
     """Re-attempt one recorded channel target; returns (ok, error_token).
 
     The channel must still be attached to the schedule, still exist, and still
     be enabled: a detached or disabled channel is never contacted, mirroring
-    the dispatch rule that disabled channels are skipped.
+    the dispatch rule that disabled channels are skipped. The original
+    notification payload recorded with the failed attempt is re-sent, so the
+    redelivery matches the first attempt (summary cards included) instead of a
+    reduced reconstruction; entries without a recorded payload fall back to
+    the reconstruction.
     """
     try:
         channel_id = int(target_key.split(":", 1)[1])
@@ -757,8 +929,15 @@ def _retry_channel_target(sched, archive, target_key):
         return False, "channel.detached"
     if not channel.enabled:
         return False, "channel.disabled"
+    recorded_payload = _recorded_detail(target or {}, "payload", None)
+    if isinstance(recorded_payload, dict) and recorded_payload.get("body"):
+        subject = recorded_payload.get("subject") or _retry_subject(sched)
+        body = recorded_payload["body"]
+    else:
+        subject = _retry_subject(sched)
+        body = _retry_channel_body(sched, archive)
     try:
-        delivered = send_notification_to_channel(channel, _retry_subject(sched), _retry_channel_body(sched, archive))
+        delivered = send_notification_to_channel(channel, subject, body)
     # broad except: boundary-isolation: channel integrations may raise implementation-specific failures
     except Exception as error:
         logger.error(
@@ -779,15 +958,53 @@ def _retry_subject(sched):
     return _("[Scheduled Report] %(name)s") % {"name": sched.name}
 
 
+def _complete_retry_claim(sched, archive, token, ledger):
+    """Close a retry claim with the final ledger state.
+
+    The write is fenced to the owning token; when the claim was superseded
+    (the lease expired and a newer attempt took over), the newer state is left
+    in place and only a warning is recorded.
+    """
+    all_ok = all(target.get("status") == "ok" for target in ledger)
+    any_ok = any(target.get("status") == "ok" for target in ledger)
+    new_status = "success" if all_ok else ("partial" if any_ok else "failed")
+    if not _release_retry_claim(archive, token, delivery_targets=ledger, delivery_status=new_status):
+        logger.warning(
+            "Retry completion was superseded by a newer claim; newer state is left in place",
+            extra={"operation": "reports.delivery_retry", "scheduled_report_id": sched.pk},
+        )
+        return False
+    archive.delivery_status = new_status
+    archive.delivery_targets = ledger
+    if sched.last_status != new_status:
+        sched.last_status = new_status
+        sched.save(update_fields=["last_status"])
+    return True
+
+
+def _retry_failed_target(sched, archive, output, target):
+    """Re-attempt one recorded failed target; returns ``(ok, error_token)``."""
+    target_key = target.get("target", "")
+    if target_key == DELIVERY_TARGET_EMAIL:
+        recipients = _recorded_detail(target, "recipients") or []
+        return _retry_email_target(sched, output, recipients)
+    if target_key.startswith("channel:"):
+        return _retry_channel_target(sched, archive, target_key, target)
+    return False, "retry.unknown_target"
+
+
 def retry_failed_deliveries(sched):
     """Re-attempt only the failed targets of the newest archived run.
 
     This is the recovery path of the frozen V1 contract: prior successful
     sends are never repeated (targets whose recorded outcome was already ok
-    are not contacted again), and the schedule's current tenant authorization
-    is re-validated before anything leaves the system. Without a retained
-    archive output there is nothing to redeliver — ``Run now`` re-runs the
-    schedule instead.
+    are not contacted again), the archived generation scope is re-validated
+    before anything leaves the system (a later scope change or revocation
+    must not legitimize an older export), a paused schedule is refused, the
+    recorded original targets and payloads are replayed, and a lease-fenced
+    claim makes two parallel attempts deliver exactly once. Without a
+    retained archive output there is nothing to redeliver — ``Run now``
+    re-runs the schedule instead.
     """
     archive = ReportGenerationArchive._base_manager.filter(scheduled_report=sched).order_by("-generated_at").first()
     if archive is None or archive.file is None:
@@ -795,25 +1012,34 @@ def retry_failed_deliveries(sched):
     failed_targets = [target for target in (archive.delivery_targets or []) if target.get("status") != "ok"]
     if not failed_targets:
         return _RetryOutcome("retry.no_recorded_failures")
-    if not _retry_scope_is_authorized(sched):
+    if not sched.is_active:
         logger.warning(
-            "Retry delivery refused: the schedule's tenant scope is no longer authorized",
+            "Retry delivery refused: the schedule is inactive",
+            extra={"operation": "reports.delivery_retry", "scheduled_report_id": sched.pk},
+        )
+        return _RetryOutcome("retry.inactive")
+    if not _retry_scope_is_authorized(sched, archive):
+        logger.warning(
+            "Retry delivery refused: the archived generation scope is no longer authorized",
             extra={"operation": "reports.delivery_retry", "scheduled_report_id": sched.pk},
         )
         return _RetryOutcome("retry.scope_unauthorized")
 
     output = _output_from_archive(sched, archive)
-    recipients = _resolve_report_recipients(sched)
+    if output is None:
+        return _RetryOutcome("retry.no_retained_output")
+    token = _claim_retry(archive)
+    if token is None:
+        logger.warning(
+            "Retry delivery refused: another attempt already holds the delivery claim",
+            extra={"operation": "reports.delivery_retry", "scheduled_report_id": sched.pk},
+        )
+        return _RetryOutcome("retry.in_progress")
+
     retried = 0
     still_failed = 0
     for target in failed_targets:
-        target_key = target.get("target", "")
-        if target_key == DELIVERY_TARGET_EMAIL:
-            ok, error_token = _retry_email_target(sched, output, recipients)
-        elif target_key.startswith("channel:"):
-            ok, error_token = _retry_channel_target(sched, archive, target_key)
-        else:
-            ok, error_token = False, "retry.unknown_target"
+        ok, error_token = _retry_failed_target(sched, archive, output, target)
         retried += 1
         target["retried"] = True
         if ok:
@@ -824,13 +1050,7 @@ def retry_failed_deliveries(sched):
             still_failed += 1
 
     ledger = list(archive.delivery_targets or [])
-    all_ok = all(target.get("status") == "ok" for target in ledger)
-    any_ok = any(target.get("status") == "ok" for target in ledger)
-    archive.delivery_targets = ledger
-    archive.delivery_status = "success" if all_ok else ("partial" if any_ok else "failed")
-    archive.save(update_fields=["delivery_targets", "delivery_status"])
-    sched.last_status = archive.delivery_status
-    sched.save(update_fields=["last_status"])
+    _complete_retry_claim(sched, archive, token, ledger)
     logger.info(
         "Retried scheduled report deliveries",
         extra={

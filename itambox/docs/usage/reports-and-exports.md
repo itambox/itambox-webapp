@@ -314,7 +314,7 @@ The Stable scheduling contract is frozen for V1:
 | Next run | The list view shows the next scheduled execution per active schedule, calculated from the stored start time and cadence. |
 | Schedule changes | Editing a schedule's cadence re-anchors the next run from the start time; editing only metadata (for example recipients) keeps the live next run. Deactivating removes the background row; reactivating re-registers it with a fresh anchor. |
 | Concurrent runs | Occurrences are independent: a run that is still executing when the next occurrence comes due does not block it, and each run is identified by its intended occurrence time, which is what deduplicates redelivery. |
-| Redelivery and limits | A redelivery of the same occurrence is a recorded no-op, so a stuck or crashed run is never dispatched twice. If a run stops after claiming its occurrence, that occurrence is not re-run automatically: the archive and the run status show how far it got, **Retry delivery** recovers failed deliveries, and the next occurrence runs normally. The contract prioritizes never sending a duplicate over guaranteed completion. |
+| Redelivery and limits | A redelivery of the same occurrence is a recorded no-op and idempotency is tracked per occurrence, so an out-of-order replay (a newer occurrence accepted first) never discards an older one, and a stuck or crashed run is never dispatched twice. If a run stops after claiming its occurrence, that occurrence is not re-run automatically: the archive and the run status show how far it got, **Retry delivery** recovers failed deliveries, and the next occurrence runs normally. The contract prioritizes never sending a duplicate over guaranteed completion. |
 
 ### Delivery Outcomes and Retry
 
@@ -330,10 +330,15 @@ Each run is observable per stage:
 - **Retry delivery**: the action appears for schedules whose latest run ended
   `partial` or `failed` (a generation failure is recovered with **Run now**).
   It re-attempts exactly the targets recorded as failed, never
-  re-sends targets that already succeeded, and re-checks that the scope
-  approval of a cross-tenant schedule is still current before contacting
-  anything. Without a retained archived output there is nothing to redeliver;
-  use **Run now** to generate a fresh run.
+  re-sends targets that already succeeded, and contacts the recorded original
+  recipients and payloads even if the schedule was edited since. It is refused
+  while the schedule is inactive, and it re-checks the archived run's
+  generation scope against the standing approval before contacting anything,
+  so a later scope change cannot legitimize an older export. Two parallel
+  retry requests deliver exactly once: the attempt holds an exclusive claim
+  that expires by itself if the request is interrupted. Without a retained
+  archived output there is nothing to redeliver; use **Run now** to generate a
+  fresh run.
 
 ### Cross-Tenant Scope Approvals
 
@@ -350,7 +355,9 @@ current approval.
   checks authorization at compile time; an unauthorized generation is
   recorded as failed and is not delivered. Changing the scope after an
   approval invalidates it, as does revoking it; **Retry delivery** re-checks
-  the approval before it re-contacts any failed target.
+  the archived run's generation scope against the standing approval before it
+  re-contacts any failed target, so a narrowed re-approval never authorizes an
+  older, broader export.
 - Revocation keeps the approval history visible and marks it void; approving
   again records a fresh approval.
 

@@ -1811,8 +1811,8 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         editable=False,
         verbose_name=_("Last Accepted Fire"),
         help_text=_(
-            "Newest intended run time accepted for execution. A redelivered or duplicated occurrence at or "
-            "before this time is a no-op, so broker redelivery can never dispatch a run twice."
+            "Newest intended run time accepted for execution. Informational marker only; per-occurrence "
+            "idempotency is enforced by the fire records, where a redelivered occurrence is an exact-match no-op."
         ),
     )
 
@@ -1828,11 +1828,17 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     def delivery_retryable(self):
         """Whether the last run left a retryable delivery failure to recover.
 
-        Generation failures are terminal for the run and are recovered with
-        ``Run now``; this only marks runs whose generation succeeded but whose
-        delivery fan-out did not fully succeed, including legacy rows that
-        still carry the pre-promotion ``delivery_...`` status text.
+        Requires an active schedule: pausing a schedule stops its delivery, so
+        the recovery action only surfaces while the schedule is enabled; a
+        paused schedule must never dispatch externally, mirroring the run path
+        that skips inactive schedules. Generation failures are terminal for
+        the run and are recovered with ``Run now``; this only marks runs whose
+        generation succeeded but whose delivery fan-out did not fully succeed,
+        including legacy rows that still carry the pre-promotion
+        ``delivery_`` status text.
         """
+        if not self.is_active:
+            return False
         return self.last_status in ("partial", "failed") or self.last_status.startswith("delivery_")
 
     def persisted_scope_tenant_ids(self):
@@ -1914,6 +1920,40 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
                     raise ValidationError(
                         {"recipients": _("'%(email)s' is not a valid email address.") % {"email": email}}
                     ) from None
+
+
+class ScheduledReportFire(models.Model):
+    """One accepted occurrence of a scheduled report.
+
+    Idempotency is per ``(schedule, intended fire time)``: the unique record
+    makes the insert the fence, so a broker redelivery of the same occurrence
+    is an exact-match no-op, and out-of-order execution (parallel workers, a
+    catch-up backlog replayed after downtime) can never let a newer occurrence
+    discard an older, not-yet-accepted one.
+    """
+
+    schedule = models.ForeignKey(
+        ScheduledReport,
+        on_delete=models.CASCADE,
+        related_name="fires",
+        verbose_name=_("Scheduled Report"),
+    )
+    intended_fire_at = models.DateTimeField(verbose_name=_("Intended Fire"))
+    accepted_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Accepted At"))
+
+    class Meta:
+        ordering = ["-intended_fire_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schedule", "intended_fire_at"],
+                name="extras_scheduledreportfire_unique_occurrence",
+            )
+        ]
+        verbose_name = _("Scheduled Report Fire")
+        verbose_name_plural = _("Scheduled Report Fires")
+
+    def __str__(self):
+        return f"{self.schedule_id}@{self.intended_fire_at:%Y-%m-%d %H:%M:%S}"
 
 
 class ScheduledReportScopeAuthorization(models.Model):
@@ -2040,8 +2080,33 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
         verbose_name=_("Delivery Targets"),
         help_text=_(
             "Per-target delivery ledger of this run (email aggregate and one entry per notification "
-            "channel). Retry delivery re-attempts only targets recorded as failed."
+            "channel). Retry delivery re-attempts only targets recorded as failed, using the recorded "
+            "original targets and payloads."
         ),
+    )
+    generation_scope = models.JSONField(
+        default=dict,
+        blank=True,
+        editable=False,
+        verbose_name=_("Generation Scope"),
+        help_text=_(
+            "Tenant scope snapshot of the archived generation (active tenant, data tenant ids, cross-tenant "
+            "flag, approval reference). Retry delivery re-validates this archived scope, so a later scope "
+            "change cannot legitimize redelivering an older export."
+        ),
+    )
+    retry_claim_token = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        editable=False,
+        verbose_name=_("Retry Claim Token"),
+    )
+    retry_claim_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Retry Claim Expires At"),
     )
     disclosure_text = models.TextField(
         blank=True,

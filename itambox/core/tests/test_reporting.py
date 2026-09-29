@@ -622,6 +622,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
                     "status": "failed",
                     "error": "email.delivery_failed",
                     "retried": False,
+                    "details": {"recipients": ["a@example.com"]},
                 }
             ],
         )
