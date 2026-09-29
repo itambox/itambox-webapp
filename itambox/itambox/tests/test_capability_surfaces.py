@@ -34,10 +34,10 @@ class TestSurfaceMarker:
     """U2: a non-Stable model carries its owning capability's marker."""
 
     def test_a_beta_owned_model_yields_a_notice(self):
-        from extras.models import AlertRule
+        from extras.models import ScheduledReport
 
-        notice = capability_notice(AlertRule)
-        assert notice["key"] == "alerting.rules"
+        notice = capability_notice(ScheduledReport)
+        assert notice["key"] == "reporting.scheduled"
         assert notice["maturity"] == BETA
         assert notice["title"]
         assert notice["docs_url"].endswith(".md")
@@ -54,6 +54,12 @@ class TestSurfaceMarker:
         assert capability_notice(WebhookEndpoint) is None
         assert capability_notice(EventRule) is None
 
+    def test_stable_alert_models_yield_no_notice(self):
+        from extras.models import AlertRule, NotificationChannel
+
+        assert capability_notice(AlertRule) is None
+        assert capability_notice(NotificationChannel) is None
+
     def test_an_unowned_model_yields_no_notice(self):
         from assets.models import Asset
 
@@ -64,34 +70,34 @@ class TestSurfaceMarker:
         assert notice["maturity"] == EXPERIMENTAL
 
     def test_a_notice_never_carries_the_probe_or_a_value(self):
-        from extras.models import AlertRule
+        from extras.models import ScheduledReport
 
-        notice = capability_notice(AlertRule)
+        notice = capability_notice(ScheduledReport)
         assert "activation_probe" not in notice
         assert set(notice) == {"key", "title", "maturity", "activation", "docs_url", "limitations"}
 
     def test_a_deactivated_capability_still_marks_its_surface(self):
         """Inactive is not invisible: the grade is a property of the contract."""
-        from extras.models import AlertRule
+        from extras.models import ScheduledReport
 
-        with deactivated("alerting.rules"):
-            assert capability_notice(AlertRule)["maturity"] == BETA
+        with deactivated("reporting.scheduled"):
+            assert capability_notice(ScheduledReport)["maturity"] == BETA
 
     def test_the_notice_survives_a_failing_probe(self):
-        from extras.models import AlertRule
+        from extras.models import ScheduledReport
 
-        with probe_failing("alerting.rules"):
-            assert capability_notice(AlertRule)["key"] == "alerting.rules"
+        with probe_failing("reporting.scheduled"):
+            assert capability_notice(ScheduledReport)["key"] == "reporting.scheduled"
 
 
 class TestBannerTemplate:
     def test_the_banner_names_the_capability_and_links_its_document(self):
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("alerting.rules")},
+            {"capability_notice": _notice_for_key("reporting.scheduled")},
         )
         assert "Beta" in html
-        assert "Alert Rules" in html
+        assert "Scheduled" in html
         assert "capability-maturity" in html
 
     def test_the_contract_link_is_excluded_from_boost(self):
@@ -102,19 +108,19 @@ class TestBannerTemplate:
         """
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("alerting.rules")},
+            {"capability_notice": _notice_for_key("reporting.scheduled")},
         )
         assert 'hx-boost="false"' in html
 
     def test_the_banner_renders_the_declared_limitations(self):
-        notice = _notice_for_key("alerting.rules")
+        notice = _notice_for_key("reporting.scheduled")
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert notice["limitations"][0] in html
 
     def test_the_beta_banner_is_a_polite_live_region_with_a_label(self):
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("alerting.rules")},
+            {"capability_notice": _notice_for_key("reporting.scheduled")},
         )
         assert 'role="status"' in html
         assert 'aria-live="polite"' in html
@@ -273,7 +279,7 @@ class TestOperatorDiagnostics:
         assert "demo_plugin_secret" not in output
 
     def test_a_failing_probe_is_reported_by_type_only(self):
-        with probe_failing("alerting.rules"):
+        with probe_failing("reporting.scheduled"):
             output = _run_command()
         assert "RuntimeError" in output
         assert "hunter2" not in output
@@ -287,11 +293,10 @@ class TestOperatorDiagnostics:
 class TestOpenAPIMaturity:
     """The schema publishes the same grade the UI shows."""
 
-    def test_an_owned_operation_is_annotated(self):
+    def test_a_stable_alert_owned_operation_is_annotated_stable(self):
         from extras.models import AlertRule
 
-        operation = _operation_for(AlertRule)
-        assert operation["x-itambox-maturity"] == BETA
+        assert _operation_for(AlertRule)["x-itambox-maturity"] == STABLE
 
     def test_a_stable_webhook_owned_operation_is_annotated_stable(self):
         from extras.models import WebhookEndpoint

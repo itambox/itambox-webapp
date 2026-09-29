@@ -11,7 +11,7 @@ from rest_framework.test import APITestCase
 
 from core.events import DeliveryDisposition, DeliveryResult
 from core.models import Notification
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 from extras.filters import AlertLogFilterSet
 from extras.models import AlertLog, AlertRule, NotificationChannel
 from extras.tables import AlertLogTable
@@ -22,9 +22,17 @@ from extras.tasks.alerts import (
     _evaluate_rule,
     _schedule_alert_dispatch,
 )
-from organization.models import Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
+
+
+def _tenant_member(tenant, username):
+    """Create an active user who is a member of ``tenant`` (in-app delivery scope)."""
+    user = User.objects.create_user(username=username, password="x")
+    role = Role.objects.create(tenant=tenant, name=f"{username} role", permissions=[])
+    grant(user, tenant, role)
+    return user
 
 
 class DeliveryOutcomeDerivationTests(SimpleTestCase):
@@ -90,7 +98,7 @@ class ChannelDeliveryOutcomeTests(TestCase):
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name="WP-13 Channel Tenant", slug="wp-13-channel-tenant")
-        self.user = User.objects.create_user(username="wp13-channel", password="x")
+        self.user = _tenant_member(self.tenant, "wp13-channel")
         self.rule = AlertRule.objects.create(
             name="WP-13 Channel Rule", alert_type=AlertRule.ALERT_TYPE_LOW_STOCK, threshold_value=1, tenant=self.tenant
         )
@@ -158,7 +166,7 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
 
     def _setup(self, renotify_interval_days=0):
         tenant = Tenant.objects.create(name="WP-13 Observability Tenant", slug="wp-13-observability-tenant")
-        user = User.objects.create_user(username="wp13-obs", password="x")
+        user = _tenant_member(tenant, "wp13-obs")
         rule = AlertRule.objects.create(
             name="WP-13 Observability Rule",
             alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
@@ -419,7 +427,7 @@ class AlertLifecycleIndependentOfDeliveryTests(TransactionTestCase):
         from organization.models import Location, Site
 
         tenant = Tenant.objects.create(name="WP-13 Lifecycle Tenant", slug="wp-13-lifecycle-tenant")
-        user = User.objects.create_user(username="wp13-lifecycle", password="x")
+        user = _tenant_member(tenant, "wp13-lifecycle")
         rule = AlertRule.objects.create(
             name="WP-13 Lifecycle Rule", alert_type=AlertRule.ALERT_TYPE_LOW_STOCK, threshold_value=5, tenant=tenant
         )
@@ -525,3 +533,404 @@ class AlertDeliveryTableRenderTests(TestCase):
             delivery_status={"__no_channels__": "no channels attached to this rule"},
         )
         self.assertIn("badge bg-secondary", table.render_delivery(no_channels))
+
+
+class AlertStableChannelGateTests(TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tenant = Tenant.objects.create(name="Issue 567 delivery tenant", slug="issue-567-delivery-tenant")
+        self.rule = AlertRule.objects.create(
+            name="Issue 567 tenant rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=self.tenant,
+        )
+        self.match = {"subject": "Issue 567 alert", "message": "Low stock", "tenant": self.tenant}
+
+    def _channel(self, name, *, enabled, tenant=None):
+        channel = NotificationChannel.objects.create(
+            name=name,
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=self.tenant if tenant is None else tenant,
+            enabled=enabled,
+        )
+        return channel
+
+    def test_disabled_channel_is_skipped_and_enabled_sibling_still_delivers(self):
+        from unittest.mock import patch
+
+        disabled = self._channel("Issue 567 disabled sibling", enabled=False)
+        enabled = self._channel("Issue 567 enabled sibling", enabled=True)
+        self.rule.channels.add(disabled, enabled)
+        success = DeliveryResult("in_app.deliver", DeliveryDisposition.SUCCESS)
+
+        with patch("extras.tasks.alerts.send_notification_to_channel", return_value=success) as sender:
+            delivery = _dispatch_channels(self.rule, self.match, None, delivery_id="enabled-sibling-run")
+
+        sender.assert_called_once()
+        self.assertEqual(sender.call_args.args[0].pk, enabled.pk)
+        self.assertIn(str(enabled.pk), delivery)
+        self.assertNotIn(str(disabled.pk), delivery)
+
+    def test_all_disabled_channels_record_disabled_reason_and_none_outcome(self):
+        from unittest.mock import patch
+
+        self.rule.channels.add(
+            self._channel("Issue 567 disabled A", enabled=False),
+            self._channel("Issue 567 disabled B", enabled=False),
+        )
+
+        with patch("extras.tasks.alerts.send_notification_to_channel") as sender:
+            delivery = _dispatch_channels(self.rule, self.match, None)
+
+        self.assertEqual(delivery, {"__no_enabled_channels__": "every attached channel is disabled"})
+        self.assertEqual(_delivery_outcome(delivery), AlertLog.DELIVERY_OUTCOME_NONE)
+        sender.assert_not_called()
+
+    def test_out_of_scope_channel_attachments_never_dispatch(self):
+        from unittest.mock import patch
+
+        from core.tasks.context import TaskContext
+
+        tenant_rule = AlertRule._base_manager.get(pk=self.rule.pk)
+        global_rule = AlertRule._base_manager.create(
+            name="Issue 567 platform rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=None,
+        )
+        global_channel = NotificationChannel._base_manager.create(
+            name="Issue 567 platform channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=None,
+            enabled=True,
+        )
+        tenant_channel = NotificationChannel._base_manager.create(
+            name="Issue 567 tenant channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=self.tenant,
+            enabled=True,
+        )
+        with TaskContext(tenant_id=None, user_id=None):
+            tenant_rule.channels.add(global_channel)
+            global_rule.channels.add(tenant_channel)
+
+        with patch("extras.tasks.alerts.send_notification_to_channel") as sender:
+            with TaskContext(tenant_id=self.tenant.pk, user_id=None):
+                tenant_delivery = _dispatch_channels(tenant_rule, self.match, None)
+            with TaskContext(tenant_id=None, user_id=None):
+                global_delivery = _dispatch_channels(global_rule, self.match, None)
+
+        self.assertEqual(tenant_delivery, {"__no_channels__": "no channels attached to this rule"})
+        self.assertEqual(global_delivery, {"__no_channels__": "no channels attached to this rule"})
+        sender.assert_not_called()
+
+    def test_reenabling_a_channel_restores_delivery(self):
+        from unittest.mock import patch
+
+        from assets.models import Manufacturer
+        from extras.tasks.alerts import run_alert_rule_now
+        from inventory.models import Accessory, AccessoryStock
+        from organization.models import Location, Site
+
+        channel = self._channel("Issue 567 re-enabled channel", enabled=False)
+        self.rule.channels.add(channel)
+        disabled_delivery = _dispatch_channels(self.rule, self.match, None)
+        self.assertEqual(disabled_delivery, {"__no_enabled_channels__": "every attached channel is disabled"})
+        self.assertEqual(_delivery_outcome(disabled_delivery), AlertLog.DELIVERY_OUTCOME_NONE)
+
+        channel.enabled = True
+        channel.save(update_fields=["enabled"])
+        manufacturer = Manufacturer.objects.create(name="Issue 567 stock maker", slug="issue-567-stock-maker")
+        site = Site.objects.create(name="Issue 567 stock site", slug="issue-567-stock-site", tenant=self.tenant)
+        location = Location.objects.create(
+            name="Issue 567 stock location", slug="issue-567-stock-location", site=site, tenant=self.tenant
+        )
+        accessory = Accessory.objects.create(
+            name="Issue 567 low stock accessory",
+            slug="issue-567-low-stock-accessory",
+            manufacturer=manufacturer,
+            tenant=self.tenant,
+            min_qty=5,
+        )
+        AccessoryStock.objects.create(accessory=accessory, location=location, qty=1)
+        success = DeliveryResult("in_app.deliver", DeliveryDisposition.SUCCESS)
+
+        with patch("extras.tasks.alerts.send_notification_to_channel", return_value=success) as sender:
+            run_alert_rule_now(self.rule.pk)
+
+        sender.assert_called_once()
+        alert = AlertLog._base_manager.get(rule=self.rule)
+        self.assertEqual(alert.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+        self.assertEqual(alert.delivery_status[str(channel.pk)]["disposition"], DeliveryDisposition.SUCCESS.value)
+
+
+class AlertDispatchConcurrencyTests(TransactionTestCase):
+    """Parallel evaluations planning a dispatch for the same alert state must
+    deliver exactly once: the dispatch claim is a single conditional UPDATE
+    gated on the planned-from notification state (issue #567, WP4)."""
+
+    def test_parallel_dispatch_plans_deliver_exactly_once(self):
+        import threading
+        from unittest.mock import patch
+
+        from django.db import connection
+
+        tenant = Tenant.objects.create(name="Concurrency Tenant", slug="concurrency-tenant")
+        rule = AlertRule.objects.create(
+            name="Concurrency Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="concurrency",
+            message="concurrency",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "concurrency", "message": "concurrency"}
+        calls = []
+        calls_lock = threading.Lock()
+
+        def counting_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            with calls_lock:
+                calls.append(delivery_id)
+            return {"1": "ok"}
+
+        barrier = threading.Barrier(2)
+        errors = []
+
+        def run_dispatch():
+            try:
+                barrier.wait(timeout=10)
+                _schedule_alert_dispatch(rule, match, alert, None)
+            except Exception as exc:  # pragma: no cover - surfaced via assertion below
+                errors.append(exc)
+            finally:
+                connection.close()
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=counting_dispatch):
+            threads = [threading.Thread(target=run_dispatch) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 1, "exactly one parallel dispatch may deliver")
+        alert.refresh_from_db()
+        self.assertEqual(alert.delivery_attempts, 1)
+        self.assertEqual(alert.last_delivery_id, calls[0])
+        self.assertEqual((alert.delivery_status or {}).get("__delivery_id__"), calls[0])
+
+    def test_in_flight_claim_is_not_recovered_by_a_parallel_evaluation(self):
+        """A pending marker whose claim is still fresh must not be re-dispatched.
+
+        The first evaluation claims its run and blocks inside the channel
+        sender; a second evaluation observing the same pending alert must back
+        off instead of planning and claiming a duplicate delivery.
+        """
+        import threading
+        from unittest.mock import patch
+
+        from django.db import connection
+
+        from extras.tasks.alerts import _renotify_when_due
+
+        tenant = Tenant.objects.create(name="In-flight Tenant", slug="in-flight-tenant")
+        rule = AlertRule.objects.create(
+            name="In-flight Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+            renotify_interval_days=1,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="in-flight",
+            message="in-flight",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "in-flight", "message": "in-flight"}
+        calls = []
+        calls_lock = threading.Lock()
+        sender_entered = threading.Event()
+        release_sender = threading.Event()
+
+        def blocking_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            with calls_lock:
+                calls.append(delivery_id)
+            sender_entered.set()
+            release_sender.wait(timeout=15)
+            return {"1": "ok"}
+
+        snapshot = AlertLog._base_manager.get(pk=alert.pk)
+        errors = []
+
+        def run_first_dispatch():
+            try:
+                _schedule_alert_dispatch(rule, match, snapshot, None)
+            except Exception as exc:  # pragma: no cover - surfaced via assertion below
+                errors.append(exc)
+            finally:
+                connection.close()
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=blocking_dispatch):
+            thread = threading.Thread(target=run_first_dispatch)
+            thread.start()
+            self.assertTrue(sender_entered.wait(timeout=10), "first dispatch must reach the sender")
+            try:
+                claimed = AlertLog._base_manager.get(pk=alert.pk)
+                # The first evaluation has claimed the run and is inside the sender.
+                self.assertEqual(claimed.delivery_attempts, 1)
+                self.assertEqual(claimed.delivery_status.get("__dispatch__"), "pending")
+                self.assertIn("__claimed_at__", claimed.delivery_status)
+                first_run_id = claimed.last_delivery_id
+                self.assertEqual(len(calls), 1)
+
+                # A parallel evaluation sees the same pending alert and must not
+                # plan or claim a second dispatch while the claim is in flight.
+                scheduled = set()
+                _renotify_when_due(rule, match, claimed, timezone.now(), ("key",), scheduled)
+                self.assertEqual(scheduled, set(), "an in-flight claim must not be re-dispatched")
+                still = AlertLog._base_manager.get(pk=alert.pk)
+                self.assertEqual(still.delivery_attempts, 1)
+                self.assertEqual(still.last_delivery_id, first_run_id)
+                self.assertEqual(len(calls), 1)
+            finally:
+                release_sender.set()
+            thread.join(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 1, "exactly one outbound delivery")
+        final = AlertLog._base_manager.get(pk=alert.pk)
+        self.assertEqual(final.delivery_attempts, 1)
+        self.assertEqual(final.last_delivery_id, calls[0])
+        self.assertEqual((final.delivery_status or {}).get("__delivery_id__"), calls[0])
+        self.assertEqual(final.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+
+    def test_stale_claim_is_recovered_after_the_lease(self):
+        """A crashed run's claim is still recovered once the lease expired."""
+        from unittest.mock import patch
+
+        from extras.tasks.alerts import _DISPATCH_CLAIM_LEASE, _renotify_when_due
+
+        tenant = Tenant.objects.create(name="Stale claim tenant", slug="stale-claim-tenant")
+        rule = AlertRule.objects.create(
+            name="Stale claim rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+            renotify_interval_days=1,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        stale_at = timezone.now() - _DISPATCH_CLAIM_LEASE - timezone.timedelta(minutes=5)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="stale",
+            message="stale",
+            content_type=content_type,
+            object_id=rule.pk,
+            delivery_status={
+                "__dispatch__": "pending",
+                "__delivery_id__": "dead-run",
+                "__claimed_at__": stale_at.isoformat(),
+            },
+            delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
+            delivery_attempts=1,
+            last_delivery_id="dead-run",
+            last_notified_at=stale_at,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "stale", "message": "stale"}
+        calls = []
+
+        def counting_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            calls.append(delivery_id)
+            return {"1": "ok"}
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=counting_dispatch):
+            scheduled = set()
+            _renotify_when_due(rule, match, alert, timezone.now(), ("key",), scheduled)
+
+        self.assertEqual(scheduled, {("key",)}, "a stale claim must be recovered")
+        self.assertEqual(len(calls), 1, "a crashed claim is recovered exactly once")
+        self.assertNotEqual(calls[0], "dead-run")
+        recovered = AlertLog._base_manager.get(pk=alert.pk)
+        self.assertEqual(recovered.last_delivery_id, calls[0])
+        self.assertEqual(recovered.delivery_attempts, 2)
+        self.assertEqual(recovered.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+
+    def test_completion_update_is_fenced_to_its_delivery_id(self):
+        """A superseded run must not overwrite a newer attempt's final state."""
+        import threading
+        from unittest.mock import patch
+
+        from django.db import connection
+
+        tenant = Tenant.objects.create(name="Fence Tenant", slug="fence-tenant")
+        rule = AlertRule.objects.create(
+            name="Fence Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="fence",
+            message="fence",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "fence", "message": "fence"}
+        calls = []
+        sender_entered = threading.Event()
+        release_sender = threading.Event()
+
+        def blocking_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            calls.append(delivery_id)
+            sender_entered.set()
+            release_sender.wait(timeout=15)
+            return {"1": "ok"}
+
+        snapshot = AlertLog._base_manager.get(pk=alert.pk)
+        errors = []
+
+        def run_dispatch():
+            try:
+                _schedule_alert_dispatch(rule, match, snapshot, None)
+            except Exception as exc:  # pragma: no cover - surfaced via assertion below
+                errors.append(exc)
+            finally:
+                connection.close()
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=blocking_dispatch):
+            thread = threading.Thread(target=run_dispatch)
+            thread.start()
+            self.assertTrue(sender_entered.wait(timeout=10), "dispatch must reach the sender")
+            try:
+                # A newer attempt supersedes the in-flight run while it is
+                # blocked inside the sender (e.g. a takeover after the lease).
+                AlertLog._base_manager.filter(pk=alert.pk).update(
+                    last_delivery_id="successor-run",
+                    delivery_status={"__dispatch__": "pending", "__delivery_id__": "successor-run"},
+                )
+            finally:
+                release_sender.set()
+            thread.join(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 1)
+        fenced = AlertLog._base_manager.get(pk=alert.pk)
+        self.assertEqual(fenced.last_delivery_id, "successor-run")
+        self.assertEqual((fenced.delivery_status or {}).get("__delivery_id__"), "successor-run")
+        self.assertNotEqual(fenced.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)

@@ -2093,6 +2093,32 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return f"{self.name} ({self.get_channel_type_display()})"
 
 
+def alert_rule_channel_scope_errors(channels, tenant_id):
+    """Explain every channel attachment outside the rule's delivery scope.
+
+    A rule notifies only through channels of its own scope: a tenant rule
+    through its own tenant's channels, a platform-wide rule through
+    platform-wide channels. The dispatch guard treats out-of-scope rows as
+    absent (fail closed); the form and API boundaries reject them up front
+    with these messages so a configuration that can never deliver fails
+    predictably instead of silently (issue #567).
+    """
+    errors = []
+    for channel in channels:
+        if channel.tenant_id == tenant_id:
+            continue
+        if tenant_id is None:
+            reason = _("it belongs to a tenant; a platform-wide rule notifies only through platform-wide channels.")
+        elif channel.tenant_id is None:
+            reason = _("it is platform-wide; a tenant rule notifies only through its own tenant's channels.")
+        else:
+            reason = _("it belongs to another tenant; a tenant rule notifies only through its own tenant's channels.")
+        errors.append(
+            _('Channel "%(name)s" cannot deliver for this rule: %(reason)s') % {"name": channel.name, "reason": reason}
+        )
+    return errors
+
+
 class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()

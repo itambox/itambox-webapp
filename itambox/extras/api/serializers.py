@@ -8,6 +8,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from core.managers import get_current_tenant
 from extras.customfields import apply_custom_field_patch, custom_fields_for_model
 from extras.definition_contract import custom_field_definition_contract_errors
 from extras.models import (
@@ -24,6 +25,7 @@ from extras.models import (
     Tag,
     WebhookDelivery,
     WebhookEndpoint,
+    alert_rule_channel_scope_errors,
 )
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
@@ -533,6 +535,29 @@ class AlertRuleSerializer(BaseModelSerializer):
             "updated_at",
         ]
         brief_fields = ["id", "url", "name", "alert_type", "severity", "is_active"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Scope guard (issue #567): a rule notifies only through channels of
+        # its own scope. Fail the write instead of accepting a configuration
+        # that can never deliver. ``tenant`` is not a writable API field, so
+        # the target scope is the stored tenant on updates and the create-time
+        # resolution of ``ITAMBoxModelViewSet._tenant_create_kwargs`` on
+        # creates: a superuser create without a tenant field yields a
+        # platform-wide rule, every other create is bound to the active
+        # tenant scope.
+        channels = attrs.get("channels")
+        if channels:
+            if self.instance is not None:
+                tenant = self.instance.tenant
+            else:
+                context = getattr(self, "_context", None) or {}
+                user = getattr(context.get("request"), "user", None)
+                tenant = None if getattr(user, "is_superuser", False) else get_current_tenant()
+            errors = alert_rule_channel_scope_errors(channels, tenant.pk if tenant else None)
+            if errors:
+                raise serializers.ValidationError({"channel_ids": errors})
+        return attrs
 
 
 class AlertLogSerializer(BaseModelSerializer):

@@ -658,6 +658,12 @@ class AlertLogTable(BaseTable):
                     _("No channels attached to this rule"),
                     _("None"),
                 )
+            if statuses.get("__no_enabled_channels__"):
+                return format_html(
+                    '<span class="badge bg-secondary" title="{}">{}</span>',
+                    _("Every attached channel is disabled"),
+                    _("None"),
+                )
             return format_html(
                 '<span class="text-muted" title="{}">{}</span>',
                 _("No delivery planned (muted rule or never dispatched)"),

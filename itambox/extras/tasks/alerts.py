@@ -6,6 +6,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 
@@ -29,6 +30,11 @@ from licenses.models import License
 from subscriptions.models import Subscription
 
 logger = logging.getLogger(__name__)
+
+# A claimed dispatch owns its alert until the claim lease expires: longer than
+# any plausible channel send, short enough that a crashed run is still recovered
+# by a later evaluation without ever racing an active attempt (issue #567, WP4).
+_DISPATCH_CLAIM_LEASE = timezone.timedelta(minutes=15)
 
 
 def evaluate_alert_rules_task() -> int:
@@ -102,13 +108,17 @@ def _prefetch_open_logs(rule_id=None):
     return {(log.rule_id, log.content_type_id, log.object_id): log for log in qs}
 
 
-def _schedule_alert_dispatch(rule, match, alert_log):
+def _schedule_alert_dispatch(rule, match, alert_log, expected_prior_notified_at=None):
     """Dispatch one persisted alert after commit and record disposition state.
 
     WP-13 (Path B): exactly one delivery attempt per planned dispatch. Each run
     carries a stable unique ``delivery_id``; the run is claimed (marker written)
     before any channel send so a repeated invocation of the same run cannot
-    duplicate in-app notifications or lifecycle transitions.
+    duplicate in-app notifications or lifecycle transitions. The claim is a
+    single conditional UPDATE that matches only while the alert still carries
+    the ``last_notified_at`` value this run planned from, so two parallel
+    evaluations planning a dispatch for the same alert state cannot both
+    deliver — exactly one claim wins (issue #567, WP4).
     """
     alert_id = alert_log.pk
     rule_id = rule.pk
@@ -130,14 +140,34 @@ def _schedule_alert_dispatch(rule, match, alert_log):
                 persisted_alert = AlertLog.unscoped.get(pk=alert_id)
                 # Claim the run before sending: pending marker + attempt counter
                 # + delivery id are persisted first so a replayed invocation
-                # observes the marker and backs off.
-                AlertLog.unscoped.filter(pk=alert_id).update(
-                    delivery_status={"__dispatch__": "pending", "__delivery_id__": delivery_id},
+                # observes the marker and backs off. The single conditional
+                # UPDATE is the atomic claim: it matches only while the alert
+                # still carries the planned-from notification state, so a
+                # parallel evaluation planning its own run for the same state
+                # claims zero rows and backs off without sending.
+                prior_condition = (
+                    Q(last_notified_at__isnull=True)
+                    if expected_prior_notified_at is None
+                    else Q(last_notified_at=expected_prior_notified_at)
+                )
+                claimed = AlertLog.unscoped.filter(Q(pk=alert_id) & prior_condition).update(
+                    delivery_status={
+                        "__dispatch__": "pending",
+                        "__delivery_id__": delivery_id,
+                        "__claimed_at__": notified_at.isoformat(),
+                    },
                     delivery_attempts=F("delivery_attempts") + 1,
                     last_delivery_id=delivery_id,
                     delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
                     last_notified_at=notified_at,
                 )
+                if not claimed:
+                    logger.info(
+                        "Alert dispatch run %s for AlertLog %s skipped: a parallel evaluation already claimed this alert state.",
+                        delivery_id,
+                        alert_id,
+                    )
+                    return
                 delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert, delivery_id=delivery_id)
                 delivery["__delivery_id__"] = delivery_id
         # broad except: boundary-isolation: delivery backend failures are non-enumerable and become terminal
@@ -145,12 +175,21 @@ def _schedule_alert_dispatch(rule, match, alert_log):
             logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
             delivery = {"__dispatch__": "terminal", "__delivery_id__": delivery_id}
         try:
-            AlertLog.unscoped.filter(pk=alert_id).update(
+            # Fence the completion to this run's own delivery id: a run that no
+            # longer owns the claim (superseded by a newer attempt) must not
+            # overwrite the newer result (issue #567, WP4).
+            completed = AlertLog.unscoped.filter(pk=alert_id, last_delivery_id=delivery_id).update(
                 delivery_status=delivery,
                 delivery_outcome=_delivery_outcome(delivery),
                 last_delivery_error=_delivery_error(delivery),
                 last_notified_at=notified_at,
             )
+            if not completed:
+                logger.info(
+                    "Alert delivery run %s for AlertLog %s no longer owns the alert; completion metadata not written.",
+                    delivery_id,
+                    alert_id,
+                )
         # broad except: task-isolation: metadata write failure must not abort later callbacks
         except Exception:
             # A metadata-write failure must not escape the on_commit callback:
@@ -224,7 +263,8 @@ def _process_rule_match(rule, match, now, existing_logs, matched_keys, scheduled
                 # one evaluation cannot immediately re-notify it before commit.
                 alert_log.last_notified_at = now
 
-                _schedule_alert_dispatch(rule, match, alert_log)
+                # The freshly created row carries no last_notified_at yet.
+                _schedule_alert_dispatch(rule, match, alert_log, None)
                 scheduled_dispatch_keys.add(key)
         else:
             # Treat the adopted row as the existing alert (re-notify below).
@@ -293,20 +333,55 @@ def _create_or_adopt_alert_log(rule, match, ct, obj):
     return alert_log, True
 
 
+def _dispatch_claim_is_recoverable(delivery_status, last_notified_at, now):
+    """Whether a pending dispatch marker may be recovered by a new attempt.
+
+    An unclaimed marker (no claim time and no notification timestamp) is
+    recoverable immediately; a claimed marker stays owned by its run until the
+    claim lease expires, so a parallel evaluation never re-dispatches an
+    active attempt while a crashed run is still recovered by a later
+    evaluation (issue #567, WP4).
+    """
+    raw = (delivery_status or {}).get("__claimed_at__")
+    claimed_at = parse_datetime(raw) if isinstance(raw, str) else None
+    if claimed_at is None:
+        claimed_at = last_notified_at
+    if claimed_at is None:
+        return True
+    return now - claimed_at >= _DISPATCH_CLAIM_LEASE
+
+
 def _renotify_when_due(rule, match, existing, now, key, scheduled_dispatch_keys):
     """Retry a committed-but-undelivered alert, or re-notify on cadence."""
-    pending = (existing.delivery_status or {}).get("__dispatch__") == "pending"
+    status = existing.delivery_status or {}
+    pending = status.get("__dispatch__") == "pending"
+    if pending and not _dispatch_claim_is_recoverable(status, existing.last_notified_at, now):
+        logger.info(
+            "AlertLog %s has a claimed dispatch in flight; a parallel evaluation will not re-dispatch it.",
+            existing.pk,
+        )
+        return
     ref = existing.last_notified_at or existing.created_at
     due = ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days)
     if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:
-        AlertLog.unscoped.filter(pk=existing.pk).update(
+        # Mark the planned dispatch atomically against the notification state
+        # this evaluation read: a parallel evaluation that already advanced the
+        # alert wins the planning write and this run backs off without
+        # scheduling (issue #567, WP4).
+        prior_notified_at = existing.last_notified_at
+        prior_condition = (
+            Q(last_notified_at__isnull=True) if prior_notified_at is None else Q(last_notified_at=prior_notified_at)
+        )
+        planned = AlertLog.unscoped.filter(Q(pk=existing.pk) & prior_condition).update(
             delivery_status={"__dispatch__": "pending"},
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
         )
+        if not planned:
+            return
         existing.delivery_status = {"__dispatch__": "pending"}
         existing.delivery_outcome = AlertLog.DELIVERY_OUTCOME_PENDING
         existing.last_notified_at = now
-        _schedule_alert_dispatch(rule, match, existing)
+        _schedule_alert_dispatch(rule, match, existing, prior_notified_at)
         scheduled_dispatch_keys.add(key)
         logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
 
@@ -319,9 +394,24 @@ def _dispatch_channels(rule, match, alert_log, delivery_id=None):
     delivery identifier, the attempt timestamp, and — for failures — the typed
     error class and a user-visible message when the boundary declared one.
     """
+    # Scope guard (issue #567): a rule delivers only through channels of its
+    # own scope — a tenant rule through its own tenant's channels, a
+    # platform-wide rule through platform-wide channels. The tenant-scoping
+    # manager already excludes foreign rows in a tenant context; the explicit
+    # filter keeps the guarantee even for rows attached outside that boundary.
     channels = rule.channels.all()
+    if rule.tenant_id is None:
+        channels = channels.filter(tenant_id__isnull=True)
+    else:
+        channels = channels.filter(tenant_id=rule.tenant_id)
     if not channels.exists():
         return {"__no_channels__": "no channels attached to this rule"}
+    # A disabled channel is never contacted; an alert whose attached channels
+    # are all disabled records an explicit reason instead of silently
+    # reporting success (issue #567).
+    channels = channels.filter(enabled=True)
+    if not channels.exists():
+        return {"__no_enabled_channels__": "every attached channel is disabled"}
 
     delivery = {}
     for channel in channels:
@@ -402,6 +492,8 @@ def _delivery_outcome(payload):
     if payload.get("__dispatch__") == "terminal":
         return AlertLog.DELIVERY_OUTCOME_FAILED
     if "__no_channels__" in payload:
+        return AlertLog.DELIVERY_OUTCOME_NONE
+    if "__no_enabled_channels__" in payload:
         return AlertLog.DELIVERY_OUTCOME_NONE
     channel_values = [value for key, value in payload.items() if not key.startswith("__")]
     if not channel_values:

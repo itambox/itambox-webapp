@@ -21,19 +21,22 @@ can switch the authorization path off.
 **Always on means always available.** A Stable grade promises that the
 capability's surfaces cannot be switched off by configuration; it does not
 promise that effects happen by themselves. A capability whose effect requires an
-operator-created object — a webhook endpoint, an event rule, a delivery target —
-remains completely dormant until that object exists and is enabled. Webhooks and
-Event Rules are the example: the capability is Stable and always available, and
-nothing is ever delivered until an administrator deliberately creates and
-enables an endpoint and a rule.
+operator-created object — a webhook endpoint, an event rule, an alert rule, a
+notification channel — remains completely dormant until that object exists and
+is enabled. Webhooks and Event Rules are one example: the capability is Stable
+and always available, and nothing is ever delivered until an administrator
+deliberately creates and enables an endpoint and a rule. Alert Rules and
+Channels behave the same way: nothing is notified until an administrator
+deliberately creates an active rule with attached, enabled channels, and no
+rule or channel is ever provisioned or enabled automatically.
 
 ## Activation modes
 
 | Mode | How it is switched on | Example in this release |
 |---|---|---|
-| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Webhooks and Event Rules, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
+| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Alert Rules and Channels, Webhooks and Event Rules, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
 | Opt-in through configuration | An operator sets an environment variable / setting; takes effect on restart. | Plugin System (`ITAMBOX_PLUGINS`), Asset Request auto-approval (`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`) |
-| Opt-in through an application object | An administrator creates or enables a record in the application. | Scheduled Reports (an active schedule row), Alert Rules and Channels (an active `AlertRule`), SCIM Provisioning (a tenant-scoped API token with write access) |
+| Opt-in through an application object | An administrator creates or enables a record in the application. | Scheduled Reports (an active schedule row), SCIM Provisioning (a tenant-scoped API token with write access) |
 
 A capability that is not switched on is reported as **inactive** — it keeps its
 declared grade, but contributes none of its surfaces until it is activated.
@@ -48,7 +51,7 @@ inactive.
 | Report Designer | Stable | Always on | [Reports & Exports](../usage/reports-and-exports.md) |
 | Scheduled Reports | Beta | Opt-in: an active schedule row | [Reports & Exports](../usage/reports-and-exports.md) |
 | Alerts and Notifications | Stable | Enabled by default | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
-| Alert Rules and Channels | Beta | Opt-in: an active `AlertRule` | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
+| Alert Rules and Channels | Stable | Enabled by default; delivery requires an active rule and attached, enabled channels | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
 | Webhooks and Event Rules | Stable | Enabled by default; delivery requires an enabled event rule and endpoint | [Webhooks & Automation](../usage/webhooks-and-automation.md) |
 | Role Grants | Stable | Enabled by default (security-critical) | — |
 | Tenant Resource Grants | Stable | Enabled by default (security-critical) | [Resource Grant Expiry](resource-grant-expiry.md) |
@@ -73,6 +76,7 @@ python manage.py capabilities --format json
 CAPABILITY                          CLASS    MODE       STATE     SOURCE          VALUE
 reporting.designer                  stable   always-on  active    always          present
 automation.webhooks                 stable   always-on  active    always          present
+alerting.rules                      stable   always-on  active    always          present
 organization.resource_grants *      stable   always-on  active    always          present
 ```
 

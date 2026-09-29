@@ -500,7 +500,7 @@ The following tasks run automatically via django-q2 `Schedule` entries registere
 
 | Schedule | Function | Frequency | Registered by |
 |---|---|---|---|
-| **Daily Alert Rule Evaluation** | `core.tasks.evaluate_alert_rules_task` | Daily | `CoreConfig._register_alert_schedule` |
+| **Daily Alert Rule Evaluation** | `extras.tasks.alerts.evaluate_alert_rules_task` | Daily | `ExtrasConfig._register_alert_schedule` |
 | **Daily Changelog & Operational-Data Retention Prune** | `core.tasks.prune_changelog_task` | Daily | `CoreConfig._register_prune_schedule` |
 | **Daily Subscription Expiries and Reminders** | `subscriptions.tasks.check_subscription_expiries_and_reminders` | Daily | `SubscriptionsConfig._register_subscription_tasks` |
 

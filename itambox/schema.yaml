@@ -12384,7 +12384,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: extras_alert_rules_create
       tags:
@@ -12448,7 +12448,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_alert_rules_update_bulk
       tags:
@@ -12512,7 +12512,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_alert_rules_partial_update_bulk
       tags:
@@ -12575,7 +12575,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_alert_rules_destroy_bulk
       tags:
@@ -12617,7 +12617,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/alert-rules/{id}/:
     get:
       operationId: extras_alert_rules_retrieve
@@ -12665,7 +12665,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_alert_rules_update
       parameters:
@@ -12742,7 +12742,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_alert_rules_partial_update
       parameters:
@@ -12818,7 +12818,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_alert_rules_destroy
       parameters:
@@ -12873,7 +12873,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/custom-fields/:
     get:
       operationId: extras_custom_fields_list
@@ -15756,7 +15756,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: extras_notification_channels_create
       tags:
@@ -15820,7 +15820,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_notification_channels_update_bulk
       tags:
@@ -15884,7 +15884,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_notification_channels_partial_update_bulk
       tags:
@@ -15947,7 +15947,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_notification_channels_destroy_bulk
       tags:
@@ -15989,7 +15989,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/notification-channels/{id}/:
     get:
       operationId: extras_notification_channels_retrieve
@@ -16037,7 +16037,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_notification_channels_update
       parameters:
@@ -16114,7 +16114,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_notification_channels_partial_update
       parameters:
@@ -16190,7 +16190,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_notification_channels_destroy
       parameters:
@@ -16245,7 +16245,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/tags/:
     get:
       operationId: extras_tags_list
