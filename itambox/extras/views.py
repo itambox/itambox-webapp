@@ -761,11 +761,11 @@ class NotificationChannelTestView(SimplePostView):
 # Reporting Views
 # =============================================================================
 
-#: The report designer is opt-in (ITAMBOX_FEATURE_REPORT_DESIGNER). Every route
-#: below that edits, previews, renders, or schedules a ReportTemplate is closed
-#: while the capability is inactive, so the flag an operator sets and the routes
-#: or background delivery a deployment serves cannot drift apart. The Stable
-#: curated report catalogue (`reporting.curated`) remains independent.
+#: The report designer routes below edit, preview, render, or schedule a
+#: ReportTemplate. The capability was promoted to Stable (always-on), so the
+#: routes are open by contract; the capability gate stays wired so the routes
+#: and the published registry state cannot drift apart. The Stable curated
+#: report catalogue (`reporting.curated`) remains independent.
 REPORT_DESIGNER_CAPABILITY = "reporting.designer"
 
 
@@ -785,7 +785,6 @@ class ReportTemplateListView(CapabilityRequiredMixin, ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = _("Report Templates")
-        context["is_beta_module"] = True
         return context
 
 
@@ -1322,6 +1321,24 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             )
 
 
+def _apply_report_disclosure_headers(response, context_data):
+    """Expose the output-window facts on every report download response.
+
+    Machine-format exports deliberately carry no in-file decorators; the
+    HTTP response (and the scheduled mail body) state the window instead,
+    and the published contract documents that machine exports cover the
+    compiled window rather than the full population.
+    """
+    if context_data.get("truncated"):
+        response["X-Report-Truncated"] = "true"
+        response["X-Report-Row-Window"] = str(context_data.get("row_limit", ""))
+        if context_data.get("total_rows") is not None:
+            response["X-Report-Total-Rows"] = str(context_data["total_rows"])
+    if context_data.get("is_sample"):
+        response["X-Report-Sample"] = "true"
+    return response
+
+
 @method_decorator(login_required, name="dispatch")
 class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
     capability_key = REPORT_DESIGNER_CAPABILITY
@@ -1344,13 +1361,11 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
 
         active_tenant = get_current_tenant()
 
-        # Enforce sandboxed constellation
-        filter_tenants = list(template.filter_tenants.all())
-
         # inline imports: heavy-import: report provider discovery is only needed for this export request
         from core.reports import build_report_context
 
         try:
+            filter_tenants = self._persisted_scope_tenants(template)
             specification_filters, specification_export_references = _specification_inputs(request, source=request.GET)
             headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template,
@@ -1366,29 +1381,42 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             safe_name = safe_csv_filename(template.name).lower().replace(" ", "_")
             stamp = f"{timezone.now():%Y%m%d}"
 
-            machine_export = context_data.get("specification_export")
-            if machine_export is not None and format_type in {"csv", "machine_csv"}:
-                response = HttpResponse(machine_csv_bytes(machine_export), content_type="text/csv")
-                response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
-                return response
+            machine_response = self._machine_format_response(format_type, context_data, safe_name, stamp)
+            if machine_response is not None:
+                return machine_response
 
             if format_type == "csv":
                 response = HttpResponse(
-                    render_report_csv(template, headers, rows, _summary_cards, _grouped_data), content_type="text/csv"
+                    render_report_csv(
+                        template,
+                        headers,
+                        rows,
+                        _summary_cards,
+                        _grouped_data,
+                        disclosure_text=context_data.get("disclosure_text", ""),
+                    ),
+                    content_type="text/csv",
                 )
                 response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
-                return response
+                return _apply_report_disclosure_headers(response, context_data)
 
             if format_type == "xlsx":
                 from core.reports.exporters import XLSX_MIME, report_xlsx_bytes
 
+                machine_export = context_data.get("specification_export")
                 export_headers = machine_export.columns if machine_export is not None else headers
                 export_rows = machine_export.rows if machine_export is not None else rows
                 response = HttpResponse(
-                    report_xlsx_bytes(export_headers, export_rows, sheet_title=template.name), content_type=XLSX_MIME
+                    report_xlsx_bytes(
+                        export_headers,
+                        export_rows,
+                        sheet_title=template.name,
+                        disclosure_text=context_data.get("disclosure_text", ""),
+                    ),
+                    content_type=XLSX_MIME,
                 )
                 response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.xlsx"'
-                return response
+                return _apply_report_disclosure_headers(response, context_data)
 
             # HTML render — shared by the html and pdf formats.
             context_data["request"] = request
@@ -1400,12 +1428,12 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
                 response = HttpResponse(report_pdf_bytes(rendered_html), content_type=PDF_MIME)
                 disposition = "inline" if request.GET.get("print") == "true" else "attachment"
                 response["Content-Disposition"] = f'{disposition}; filename="{safe_name}_{stamp}.pdf"'
-                return response
+                return _apply_report_disclosure_headers(response, context_data)
 
             response = HttpResponse(rendered_html, content_type="text/html")
             disposition = "inline" if request.GET.get("print") == "true" else "attachment"
             response["Content-Disposition"] = f'{disposition}; filename="{safe_name}_{stamp}.html"'
-            return response
+            return _apply_report_disclosure_headers(response, context_data)
         except PermissionError:
             return HttpResponse(gettext("You may not view this report's data."), status=403)
         except Exception:
@@ -1415,3 +1443,53 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             return HttpResponse(
                 f"<h3>{gettext('Template render failed. See the server log for details.')}</h3>", status=400
             )
+
+    def _persisted_scope_tenants(self, template):
+        """Resolve the persisted constellation through unscoped reads.
+
+        The ambient tenant would silently truncate the pinned scope and a
+        truncated constellation is a different report. A partially deleted
+        constellation fails closed instead of silently compiling a different
+        population, mirroring the scheduled-report scope resolver: the
+        persisted constellation is the report's identity, so dropping one
+        pinned tenant would change the requested reporting population. Raises
+        ``PermissionError`` for the caller's 403 branch.
+        """
+        pinned_ids = template.persisted_filter_tenant_ids()
+        if not pinned_ids:
+            return []
+        # inline import: heavy-import: organization models are only needed for tenant resolution
+        from django.apps import apps as django_apps
+
+        Tenant = django_apps.get_model("organization", "Tenant")
+        filter_tenants = list(Tenant._base_manager.filter(pk__in=pinned_ids, deleted_at__isnull=True).order_by("pk"))
+        if len(filter_tenants) != len(set(pinned_ids)):
+            logger.error(
+                "Report template scope tenants are soft-deleted; refusing compilation",
+                extra={"operation": "reports.download", "reporttemplate_id": template.pk},
+            )
+            raise PermissionError("Report template scope tenants are soft-deleted")
+        return filter_tenants
+
+    def _machine_format_response(self, format_type, context_data, safe_name, stamp):
+        """Machine-format downloads: the provider's own export bytes, undecorated.
+
+        ``machine_csv`` is a machine contract and requires the provider export
+        (400 without one); ``csv`` keeps returning the machine bytes whenever
+        the provider built an export. Disclosure travels in the response
+        headers instead of the file body so the machine bytes stay
+        byte-stable. Returns ``None`` when the format is not a machine format.
+        """
+        machine_export = context_data.get("specification_export")
+        if format_type == "machine_csv":
+            if machine_export is None:
+                return HttpResponse(gettext("This report does not provide a machine-format export."), status=400)
+            return self._attachment_response(machine_csv_bytes(machine_export), safe_name, stamp, context_data)
+        if format_type == "csv" and machine_export is not None:
+            return self._attachment_response(machine_csv_bytes(machine_export), safe_name, stamp, context_data)
+        return None
+
+    def _attachment_response(self, payload, safe_name, stamp, context_data):
+        response = HttpResponse(payload, content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
+        return _apply_report_disclosure_headers(response, context_data)

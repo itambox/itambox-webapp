@@ -15,8 +15,12 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PDF_MIME = "application/pdf"
 
 
-def report_xlsx_bytes(headers, rows, sheet_title="Report"):
-    """Render the report grid (headers + rows) into an .xlsx workbook (bytes)."""
+def report_xlsx_bytes(headers, rows, sheet_title="Report", disclosure_text=""):
+    """Render the report grid (headers + rows) into an .xlsx workbook (bytes).
+
+    ``disclosure_text`` is written as an italic note row below the grid when
+    the compiled window was capped or the report shows its sample.
+    """
     from openpyxl import Workbook
     from openpyxl.styles import Font
     from openpyxl.utils import get_column_letter
@@ -33,6 +37,10 @@ def report_xlsx_bytes(headers, rows, sheet_title="Report"):
 
     for r in rows:
         ws.append([r.get(h, "-") for h in headers])
+
+    if disclosure_text:
+        note = ws.cell(row=ws.max_row + 2, column=1, value=disclosure_text)
+        note.font = Font(italic=True)
 
     for col_idx, h in enumerate(headers, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = max(12, min(40, len(str(h)) + 4))

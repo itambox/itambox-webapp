@@ -151,8 +151,7 @@ def recover_and_stamp_report_designer(apps, schema_editor):
         affected = ", ".join(f"{row['name']} (pk={row['pk']})" for row in out_of_bound_templates)
         logger.warning(
             "Report designer migration found %s active custom HTML template(s) outside the bounded "
-            "grandfathered set. Their custom HTML will not render while "
-            "ITAMBOX_FEATURE_REPORT_DESIGNER is disabled. Affected templates: %s",
+            "grandfathered set. Affected templates: %s",
             len(out_of_bound_templates),
             affected,
         )

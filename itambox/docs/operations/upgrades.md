@@ -53,6 +53,38 @@ binding code. Treat this as a temporary security regression, keep OIDC traffic
 blocked unless explicitly accepted, and redeploy the binding code/schema in the
 forward order above as soon as possible.
 
+## Report Designer promotion and scheduled deliveries (#565)
+
+The Report Designer was promoted from Beta to Stable and the
+`ITAMBOX_FEATURE_REPORT_DESIGNER` activation flag (with its alias
+`ITAMBOX_REPORT_DESIGNER_ENABLED`) is removed: designer routes and downloads no
+longer require an activation setting. Stable availability must not resume
+outbound deliveries that the disabled flag had suppressed, so the upgrade
+carries a one-time transition for schedules whose delivery the flag was
+skipping:
+
+1. Keep `ITAMBOX_FEATURE_REPORT_DESIGNER` in place through the first upgraded
+   start. The transition reads it once to tell an enabled deployment (delivery
+   keeps running, nothing changes) from a disabled one; application code
+   ignores the variable afterwards, and it can be removed then.
+2. On a deployment that ran the designer disabled, the transition pauses
+   registered, active, non-grandfathered schedules that were being skipped:
+   their django-q row is removed and `is_active` is cleared, while the row, its
+   configuration, and its `last_run`/`last_status` history are preserved.
+   Grandfathered templates kept delivering under the disabled flag and are not
+   touched; already-inactive or unregistered schedules are not touched either.
+3. Review **Extras → Scheduled Reports** after the upgrade and re-enable the
+   schedules that should resume; reactivating a schedule re-registers its
+   django-q row through the normal save path.
+
+### Rollback
+
+The transition migration refuses to reverse: un-pausing by migration could
+re-arm deliveries nobody consented to. Roll back by restoring the database
+backup taken before the upgrade, or leave the paused schedules in place and
+re-enable them explicitly; a code-only rollback keeps the paused state, which
+the predecessor application treats as an ordinary inactive schedule.
+
 ## Preflight
 
 1. Select and review an exact target commit.

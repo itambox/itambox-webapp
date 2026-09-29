@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import translation
 from django_q.models import Schedule
@@ -76,7 +76,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
         report_valid.full_clean()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_schedule_creation_in_view(self):
         """Test that Schedule is created or updated in ScheduledReport form_valid views."""
         self.client.force_login(self.user)
@@ -103,7 +102,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(sched.schedule.next_run.time().hour, 9)
         self.assertEqual(sched.schedule.next_run.time().minute, 30)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("django.core.mail.EmailMessage")
     @patch("core.http.request_pinned")
     def test_generate_report_task_success(self, mock_request_pinned, mock_email_message):
@@ -161,7 +159,35 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # Verify Slack channel was called
         mock_request_pinned.assert_called_once()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    def test_compile_permission_error_is_a_generation_failure_without_archive_or_delivery(self):
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        sched = ScheduledReport.objects.create(
+            name="Unauthorized Compile Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=True,
+        )
+
+        with (
+            patch("extras.tasks.reports.build_report_context", side_effect=PermissionError("scope denied")),
+            patch("extras.tasks.reports._deliver_report_email") as deliver_email,
+            patch("extras.tasks.reports._deliver_report_channels") as deliver_channels,
+            patch("extras.tasks.reports._archive_report_output") as archive_output,
+        ):
+            result = generate_scheduled_report_task(sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.generation_failed")
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "terminal: report.generation_failed")
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
+        deliver_email.assert_not_called()
+        deliver_channels.assert_not_called()
+        archive_output.assert_not_called()
+
     def test_delivery_failure_is_partial_and_later_channels_are_attempted(self):
         """One channel failure is persisted without hiding later delivery success."""
         failed_channel = NotificationChannel.objects.create(
@@ -253,7 +279,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
             send_channel.assert_not_called()
         self.assertEqual(outcome.status, "success")
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""
         # Create some sample assets to exercise the asset summary report compilation path
@@ -297,92 +322,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Asset Inventory Test Report", response.content)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    def test_scheduled_report_routes_are_closed_when_designer_is_inactive(self):
-        self.client.force_login(self.user)
-        response = self.client.get(reverse("extras:scheduledreport_list"))
-        self.assertEqual(response.status_code, 404)
-
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    def test_disabled_designer_does_not_register_schedule_from_internal_helper(self):
-        sched = ScheduledReport.objects.create(
-            name="Helper Paused Schedule",
-            report=self.template,
-            tenant=self.tenant,
-            frequency="weekly",
-            is_active=True,
-        )
-
-        from extras.views import handle_report_scheduling
-
-        handle_report_scheduling(sched)
-        sched.refresh_from_db()
-        self.assertIsNone(sched.schedule_id)
-        self.assertFalse(Schedule.objects.filter(name=f"scheduled_report_{sched.pk}").exists())
-
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    @patch("extras.tasks.reports._process_scheduled_report")
-    def test_disabled_designer_skips_existing_scheduled_report_task(self, mock_process):
-        sched = ScheduledReport.objects.create(
-            name="Paused Schedule",
-            report=self.template,
-            tenant=self.tenant,
-            frequency="once",
-            format=ScheduledReport.FORMAT_HTML,
-            is_active=True,
-        )
-
-        q_schedule = Schedule.objects.create(
-            name=f"scheduled_report_{sched.pk}",
-            func="extras.tasks.reports.generate_scheduled_report_task",
-            schedule_type=Schedule.ONCE,
-            repeats=-1,
-        )
-        sched.schedule = q_schedule
-        sched.save(update_fields=["schedule"])
-
-        from extras.tasks.reports import generate_scheduled_report_task
-
-        self.assertFalse(generate_scheduled_report_task(sched.pk))
-        mock_process.assert_not_called()
-        sched.refresh_from_db()
-        self.assertIsNone(sched.last_run)
-        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
-        self.assertEqual(sched.schedule_id, q_schedule.pk)
-        self.assertEqual(sched.schedule.schedule_type, Schedule.ONCE)
-        self.assertIsNone(sched.schedule.cron)
-        self.assertEqual(sched.schedule.repeats, -1)
-
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    @patch("extras.tasks.reports._process_scheduled_report")
-    def test_disabled_designer_preserves_existing_recurring_schedule(self, mock_process):
-        sched = ScheduledReport.objects.create(
-            name="Paused Recurring Schedule",
-            report=self.template,
-            tenant=self.tenant,
-            frequency="weekly",
-            is_active=True,
-        )
-        q_schedule = Schedule.objects.create(
-            name=f"scheduled_report_{sched.pk}",
-            func="extras.tasks.reports.generate_scheduled_report_task",
-            schedule_type=Schedule.WEEKLY,
-            repeats=-1,
-        )
-        sched.schedule = q_schedule
-        sched.save(update_fields=["schedule"])
-
-        from extras.tasks.reports import generate_scheduled_report_task
-
-        self.assertFalse(generate_scheduled_report_task(sched.pk))
-        mock_process.assert_not_called()
-        sched.refresh_from_db()
-        q_schedule.refresh_from_db()
-        self.assertEqual(sched.schedule_id, q_schedule.pk)
-        self.assertEqual(q_schedule.schedule_type, Schedule.WEEKLY)
-        self.assertEqual(q_schedule.repeats, -1)
-
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_once_schedule_uses_django_q_once_semantics(self):
         sched = ScheduledReport.objects.create(
             name="Once Schedule",
@@ -402,14 +341,12 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(sched.schedule.repeats, -1)
         self.assertEqual(sched.schedule.cron, "")
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_scheduled_report_list_shows_active_designer_links(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("extras:scheduledreport_list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("extras:reporttemplate_list"))
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch(
         "extras.views.generate_scheduled_report_task",
         return_value=TaskResult(TaskStatus.TERMINAL, "report.delivery_failed", user_visible=True),
@@ -481,7 +418,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertIn("Total Software Products", [c["label"] for c in summary_cards])
         self.assertIsNotNone(chart_svg)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports.build_report_context")
     def test_pre_archive_failure_preserves_status(self, mock_compile):
         """build_report_context raising before archive_entry is assigned must
@@ -701,7 +637,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         )
         self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_unauthorized_broad_schedule_is_rejected_before_generation(self, mock_process):
         from core.tasks.utils import TaskStatus
@@ -715,7 +650,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.sched.refresh_from_db()
         self.assertIsNone(self.sched.last_run)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_scope_tenants_all_soft_deleted_fails_closed(self, mock_process):
         from core.tasks.utils import TaskStatus
@@ -741,7 +675,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         deleted_scope.refresh_from_db()
         self.assertIsNone(deleted_scope.last_run)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_principal_lacking_one_persisted_tenant_is_rejected(self, mock_process):
         from core.tasks.utils import TaskStatus
@@ -766,7 +699,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.sched.refresh_from_db()
         self.assertIsNone(self.sched.last_run)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_authorized_broad_schedule_runs_as_approved_principal_and_exact_scope(self, mock_process):
         from core.context import get_current_all_accessible, get_current_tenant, get_current_user
@@ -810,7 +742,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertEqual(result.status, TaskStatus.SUCCESS)
         mock_process.assert_called_once()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_scope_change_after_approval_fails_closed_without_cross_tenant_expansion(self, mock_process):
         from core.tasks.utils import TaskStatus
@@ -825,7 +756,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertEqual(result.code, "report.scope_unauthorized")
         mock_process.assert_not_called()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_ordinary_single_tenant_schedule_does_not_require_approval(self, mock_process):
         from core.context import get_current_all_accessible, get_current_tenant
@@ -847,7 +777,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertEqual(result.status, TaskStatus.SUCCESS)
         mock_process.assert_called_once()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_revoked_approval_fails_closed_at_generation(self, mock_process):
         from core.tasks.utils import TaskStatus
@@ -868,7 +797,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.sched.refresh_from_db()
         self.assertIsNone(self.sched.last_run)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_revoked_schedule_wound_back_to_single_tenant_runs_normally(self, mock_process):
         from core.context import get_current_tenant
@@ -891,7 +819,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertEqual(result.status, TaskStatus.SUCCESS)
         mock_process.assert_called_once()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_schedule_wound_back_with_a_live_approval_runs_single_tenant(self, mock_process):
         from core.context import get_current_all_accessible, get_current_tenant
@@ -914,7 +841,6 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertEqual(result.status, TaskStatus.SUCCESS)
         mock_process.assert_called_once()
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("extras.tasks.reports._process_scheduled_report")
     def test_approve_after_revoke_restores_generation(self, mock_process):
         from core.tasks.utils import TaskResult, TaskStatus
@@ -1007,20 +933,9 @@ class ReportCrossTenantPermissionTests(TestCase):
 
     def test_non_holder_with_active_tenant_falls_back_to_single_tenant(self):
         """Non-holder + empty filter_tenants + active_tenant → single-tenant."""
-        # The gate should set filter_tenants=[active_tenant] when the user
-        # lacks the cross-tenant permission and active_tenant is present.
-        filter_tenants = None
-        active_tenant = self.tenant_a
-        # Simulate what build_report_context does with those inputs
-        if not filter_tenants:
-            user = self.user
-            if user is not None and user.has_perm("reports.view_cross_tenant_reports"):
-                pass
-            elif active_tenant is not None:
-                filter_tenants = [active_tenant]
-            else:
-                raise PermissionError("Cross-tenant report aggregation requires the permission.")
-        self.assertEqual(filter_tenants, [self.tenant_a])
+        from core.reports.orchestration import _resolve_report_scope
+
+        self.assertEqual(_resolve_report_scope(self.tenant_a, None), [self.tenant_a])
 
     def test_holder_with_empty_filter_tenants_gets_global_aggregation(self):
         """Holder + empty filter_tenants + active_tenant → global aggregation."""
@@ -1038,14 +953,9 @@ class ReportCrossTenantPermissionTests(TestCase):
         if hasattr(self.user, "_perm_cache"):
             del self.user._perm_cache
 
-        # The gate should NOT override filter_tenants when the user holds the permission.
-        filter_tenants = None
-        if not filter_tenants:
-            user = self.user
-            if user is not None and user.has_perm("reports.view_cross_tenant_reports"):
-                pass  # holder — allow global
-            elif self.tenant_a is not None:
-                filter_tenants = [self.tenant_a]
-            else:
-                raise PermissionError("no.")
-        self.assertIsNone(filter_tenants, "holder should keep filter_tenants=None for global aggregation")
+        from core.reports.orchestration import _resolve_report_scope
+
+        self.assertIsNone(
+            _resolve_report_scope(self.tenant_a, None),
+            "holder should keep filter_tenants=None for global aggregation",
+        )

@@ -241,7 +241,7 @@ class DerivationSurfaceTests(unittest.TestCase):
 
     def test_every_itambox_setting_the_application_reads_is_derived(self):
         names = policy.derived_settings(REPO_ROOT)
-        self.assertIn("ITAMBOX_REPORT_DESIGNER_ENABLED", names)
+        self.assertNotIn("ITAMBOX_REPORT_DESIGNER_ENABLED", names)
         self.assertIn("ITAMBOX_FIELD_ENCRYPTION_KEYS", names)
         self.assertEqual(sorted(names), list(names), "derived setting names are sorted for a stable diff")
 

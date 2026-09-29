@@ -51,6 +51,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0116_asset_type_definition_cutover",
     "extras.0117_asset_type_definition_guards",
     "extras.0122_journalentry_tenant_group",
+    "extras.0123_pause_flag_suppressed_report_schedules",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -291,6 +292,17 @@ SEMANTIC_DISPOSITIONS = {
         ),
         {
             "extras.0113_upgrade_legacy_webhook_retry_schedules",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Pauses registered, active, non-grandfathered report schedules once on deployments that ran the "
+            "report designer disabled, so removing the feature flag cannot silently resume suppressed "
+            "outbound deliveries; rows and history are preserved and re-enabling resumes deliberately."
+        ),
+        {
+            "extras.0123_pause_flag_suppressed_report_schedules",
         },
     ),
 }

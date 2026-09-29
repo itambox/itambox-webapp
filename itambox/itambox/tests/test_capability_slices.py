@@ -44,8 +44,8 @@ DECLARED = {
     "procurement.core": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "procurement.requisition_seam": (BETA, "enabled", SOURCE_CONFIGURED),
     "reporting.curated": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
-    "reporting.designer": (BETA, OPT_IN, SOURCE_OPERATOR_FLAG),
-    "reporting.scheduled": (BETA, OPT_IN, SOURCE_OPERATOR_FLAG),
+    "reporting.designer": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
+    "reporting.scheduled": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
     "alerting.inbox": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "alerting.rules": (BETA, "enabled", SOURCE_OBJECT_ENABLED),
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
@@ -336,23 +336,20 @@ class TestExistingDeploymentCompatibility:
         state = registry.state("alerting.rules")
         assert (state.active, state.value_present) == (True, True)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    def test_scheduled_reports_are_inactive_when_the_designer_flag_is_off(self, db):
+    def test_scheduled_reports_are_inactive_until_an_active_schedule_row_exists(self, db):
+        state = registry.state("reporting.scheduled")
+
+        assert (state.active, state.value_present) == (False, False)
+
+    def test_inactive_schedule_row_configures_but_does_not_activate_scheduled_reports(self, db):
         template = baker.make("extras.ReportTemplate")
-        baker.make("extras.ScheduledReport", report=template, is_active=True)
+        baker.make("extras.ScheduledReport", report=template, is_active=False)
 
         state = registry.state("reporting.scheduled")
 
         assert (state.active, state.value_present) == (False, True)
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
-    def test_scheduled_reports_report_the_flag_but_wait_for_an_enabled_row(self, db):
-        state = registry.state("reporting.scheduled")
-
-        assert (state.active, state.value_present) == (False, True)
-
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
-    def test_scheduled_reports_are_active_when_the_flag_and_a_row_are_enabled(self, db):
+    def test_scheduled_reports_activate_when_an_active_row_exists(self, db):
         template = baker.make("extras.ReportTemplate")
         baker.make("extras.ScheduledReport", report=template, is_active=True)
 
@@ -427,6 +424,14 @@ class TestDeprecatedAdapters:
 
 class TestDocumentationConsistency:
     """U8: code-owned contracts and capability links stay coherent."""
+
+    def test_scheduled_reporting_limitations_keep_the_active_row_semantics(self):
+        scheduled = registry.get("reporting.scheduled")
+
+        assert scheduled.limitations[0] == (
+            "The scheduled capability requires an active schedule row; deactivating a schedule pauses its delivery "
+            "without deleting the saved schedule."
+        )
 
     def test_every_docs_url_points_at_a_public_or_internal_document(self):
         for capability in registry.all():

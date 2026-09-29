@@ -19,7 +19,7 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory, override_settings
 
 from itambox.api.openapi import CapabilityAwareAutoSchema
-from itambox.capabilities import BETA, EXPERIMENTAL, STABLE, registry
+from itambox.capabilities import ALWAYS_ON, BETA, EXPERIMENTAL, SOURCE_ALWAYS, STABLE, registry
 from itambox.tests.capability_harness import deactivated, probe_failing
 from itambox.views.generic.capability_notices import capability_notice
 
@@ -342,20 +342,7 @@ class TestNavigationMaturity:
         procurement = next(group for group in OPERATIONS_MENU.groups if str(group.label) == "Procurement")
         assert procurement.beta is False
 
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    def test_report_designer_navigation_is_hidden_when_inactive(self):
-        from core.navigation.menu import MONITORING_MENU
-
-        reporting = next(group for group in MONITORING_MENU.groups if str(group.label) == "Reporting")
-        designer = next(item for item in reporting.items if str(item.link_text) == "Report Templates")
-        scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
-        assert designer.condition is not None
-        assert designer.condition(None) is False
-        assert scheduled.condition is not None
-        assert scheduled.condition(None) is False
-
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
-    def test_report_designer_navigation_is_visible_when_active(self):
+    def test_report_designer_navigation_is_visible_with_the_stable_capability(self):
         from core.navigation.menu import MONITORING_MENU
 
         reporting = next(group for group in MONITORING_MENU.groups if str(group.label) == "Reporting")
@@ -363,6 +350,11 @@ class TestNavigationMaturity:
         scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
         assert designer.condition(None) is True
         assert scheduled.condition(None) is True
+        # The promotion moves the Beta marker from the shared group to the one
+        # still-beta capability, so the group header no longer implies Beta.
+        assert reporting.beta is False
+        assert designer.beta is False
+        assert scheduled.beta is True
 
 
 DESIGNER_VIEWS = (
@@ -376,9 +368,8 @@ DESIGNER_VIEWS = (
     "ReportTemplateDownloadView",
 )
 
-#: The pk-less designer routes. The detail, edit, delete, and download routes
-#: would 404 on a missing row as well, so an open gate is only unambiguous on
-#: these two; the closed direction is proven for all eight.
+#: The pk-less designer routes. The other routes would 404 on a missing row as
+#: well, so an open gate is only unambiguous on these two without URL kwargs.
 UNAMBIGUOUS_DESIGNER_VIEWS = ("ReportTemplateListView", "ReportTemplateBulkDeleteView")
 
 SCHEDULED_REPORT_VIEWS = (
@@ -392,75 +383,45 @@ SCHEDULED_REPORT_VIEWS = (
 
 
 @pytest.mark.django_db
-class TestReportDesignerOptIn:
-    """The report designer is opt-in, and one mechanism decides it.
+class TestReportDesignerStable:
+    """The designer is a Stable, always-on capability after #565."""
 
-    ``ITAMBOX_FEATURE_REPORT_DESIGNER`` is the operator flag; the registry reads
-    it and the routes read the registry. A flag the probe consults but no route
-    honours would be a label, not an activation mechanism.
-    """
+    def test_the_operator_setting_is_removed_and_the_capability_is_always_on(self):
+        capability = registry.get("reporting.designer")
 
-    def test_the_flag_exists_and_ships_off(self):
-        assert settings.REPORT_DESIGNER_ENABLED is False
-
-    def test_a_fresh_deployment_reports_the_designer_inactive(self):
-        assert registry.is_active("reporting.designer") is False
-
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
-    def test_an_operator_who_sets_the_flag_activates_the_designer(self):
-        state = registry.state("reporting.designer")
-        assert (state.active, state.value_present) == (True, True)
+        assert not hasattr(settings, "REPORT_DESIGNER_ENABLED")
+        assert (capability.maturity, capability.activation, capability.activation_source) == (
+            STABLE,
+            ALWAYS_ON,
+            SOURCE_ALWAYS,
+        )
+        assert registry.is_active("reporting.designer") is True
 
     @pytest.mark.parametrize("view_name", DESIGNER_VIEWS)
     def test_every_designer_route_names_the_capability_that_gates_it(self, view_name):
         assert _designer_view(view_name).capability_key == "reporting.designer"
 
-    @pytest.mark.parametrize("view_name", DESIGNER_VIEWS)
-    def test_every_designer_route_is_closed_on_a_fresh_deployment(self, view_name):
-        assert _gate_outcome(view_name) == "Http404"
-
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @pytest.mark.parametrize("view_name", UNAMBIGUOUS_DESIGNER_VIEWS)
-    def test_an_enabled_deployment_keeps_its_designer_routes(self, view_name):
+    def test_designer_routes_are_open_by_default(self, view_name):
         assert _gate_outcome(view_name) != "Http404"
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
-    def test_the_route_follows_the_registry_rather_than_re_reading_the_flag(self):
-        """One mechanism: with the flag on but the capability off, the route is closed."""
-        with deactivated("reporting.designer"):
-            assert _gate_outcome("ReportTemplateListView") == "Http404"
-
-    def test_a_switched_off_designer_is_still_graded_beta(self):
+    def test_the_report_template_surface_is_marked_stable(self):
         from extras.models import ReportTemplate
 
-        assert capability_notice(ReportTemplate)["maturity"] == BETA
-
-    def test_the_diagnostics_row_reports_the_flag_without_printing_it(self):
-        rows = {row["key"]: row for row in registry.diagnostics()}
-        row = rows["reporting.designer"]
-        assert (row["active"], row["value_present"], row["activation"]) == (False, False, "opt-in")
-        assert row["activation_source"] == "operator-flag"
-
-    def test_the_curated_report_catalogue_is_untouched_by_the_designer_flag(self):
-        """The Stable report path is a different capability and stays on."""
-        assert registry.is_active("reporting.curated") is True
+        assert capability_notice(ReportTemplate) is None
+        assert registry.owner_of("extras.ReportTemplate").maturity == STABLE
 
 
 @pytest.mark.django_db
-class TestScheduledReportsFollowDesignerOptIn:
-    """Scheduled reports share the designer's operator activation boundary."""
+class TestScheduledReportRoutesUseDesignerCapability:
+    """Designer promotion leaves the scheduled route capability binding intact."""
 
     @pytest.mark.parametrize("view_name", SCHEDULED_REPORT_VIEWS)
     def test_every_scheduled_report_route_names_the_designer_capability(self, view_name):
         assert _designer_view(view_name).capability_key == "reporting.designer"
 
-    @pytest.mark.parametrize("view_name", SCHEDULED_REPORT_VIEWS)
-    def test_every_scheduled_report_route_is_closed_when_the_designer_is_off(self, view_name):
-        assert _gate_outcome(view_name) == "Http404"
-
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @pytest.mark.parametrize("view_name", ("ScheduledReportListView", "ScheduledReportBulkDeleteView"))
-    def test_enabled_designer_keeps_unambiguous_scheduled_routes_open(self, view_name):
+    def test_scheduled_routes_are_open_with_the_always_on_designer(self, view_name):
         assert _gate_outcome(view_name) != "Http404"
 
 

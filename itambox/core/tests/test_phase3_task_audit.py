@@ -13,7 +13,7 @@ import datetime
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TransactionTestCase, override_settings
+from django.test import TransactionTestCase
 from django.utils import timezone
 
 from assets.models import Supplier
@@ -33,7 +33,6 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
     """generate_scheduled_report_task must now log its sched.save() as an
     ObjectChange (it runs inside TaskContext)."""
 
-    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_scheduled_report_run_logs_object_change(self):
         from organization.models import Tenant
 

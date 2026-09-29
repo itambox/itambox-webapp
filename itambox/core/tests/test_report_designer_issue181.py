@@ -5,14 +5,13 @@ from unittest.mock import ANY, Mock, call, patch
 
 import pytest
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
-from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from core.models import ChangeLoggingMixin
 from core.reports.columns import headers_for, label_for
 from core.reports.rendering import (
     _custom_context,
     _safe_custom_value,
-    custom_html_execution_allowed,
     render_report_csv,
     render_report_html,
 )
@@ -43,21 +42,6 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         form = ReportTemplateForm()
         assert {"advanced_mode", "template_content"} <= set(form.fields)
         assert "legacy_designer_grandfathered" not in form.fields
-
-    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
-    def test_flag_off_rejects_new_advanced_mode_and_custom_html(self):
-        with pytest.raises(ValidationError, match="ITAMBOX_FEATURE_REPORT_DESIGNER"):
-            ReportTemplate(
-                name="blocked advanced",
-                report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-                advanced_mode=True,
-            ).clean()
-        with pytest.raises(ValidationError, match="ITAMBOX_FEATURE_REPORT_DESIGNER"):
-            ReportTemplate(
-                name="blocked html",
-                report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-                template_content="<p>custom</p>",
-            ).clean()
 
     def test_unknown_columns_are_rejected_with_machine_key(self):
         with pytest.raises(ValidationError, match="not_published"):
@@ -92,7 +76,6 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         assert "secret" not in rendered
         assert "missing" in rendered
 
-    @override_settings(FEATURE_REPORT_DESIGNER=True, REPORT_DESIGNER_ENABLED=False)
     def test_html_execution_is_independent_from_legacy_csv_shape(self):
         template = SimpleNamespace(
             name="custom",
@@ -108,8 +91,7 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         )
         assert output.email_body == "<h1>custom</h1>"
 
-    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
-    def test_grandfathered_html_rendering_helper_works_but_worker_delivery_is_paused(self):
+    def test_grandfathered_html_continues_to_render_for_scheduled_delivery(self):
         template = SimpleNamespace(
             name="grandfathered",
             advanced_mode=False,
@@ -125,8 +107,7 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         )
         assert output.email_body == "<h1>grandfathered</h1>"
 
-    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
-    def test_flag_off_does_not_execute_non_grandfathered_custom_html(self):
+    def test_scheduled_delivery_renders_non_grandfathered_custom_html(self):
         template = SimpleNamespace(
             name="inactive",
             advanced_mode=True,
@@ -140,7 +121,7 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
             [],
             {"report_name": "inactive", "summary_cards": [], "grouped_data": {}},
         )
-        assert "<h1>inactive</h1>" not in output.email_body
+        assert output.email_body == "<h1>inactive</h1>"
 
     def test_worker_scope_authorization_checks_each_persisted_tenant(self):
         tenant_a = SimpleNamespace(pk=1)
@@ -217,21 +198,14 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         context = _custom_context({"report_name": "safe", "request": runtime_object, "ignored": "hidden"})
         assert context == {"report_name": "safe", "request": None}
 
-    def test_custom_html_gate_and_fallback_cover_feature_and_grandfather_paths(self):
+    def test_custom_html_renders_with_autoescape_and_empty_custom_html_uses_curated_fallback(self):
         template = SimpleNamespace(template_content="<p>{{ report_name }}</p>", legacy_designer_grandfathered=False)
-        with patch("core.reports.rendering.report_designer_probe", return_value=SimpleNamespace(active=False)):
-            assert custom_html_execution_allowed(template) is False
-            fallback = render_report_html({"report_name": "curated"}, template)
-        assert "curated" in fallback
-
-        with patch("core.reports.rendering.report_designer_probe", return_value=SimpleNamespace(active=True)):
-            assert custom_html_execution_allowed(template) is True
-            rendered = render_report_html({"report_name": "<safe>"}, template)
+        rendered = render_report_html({"report_name": "<safe>"}, template)
         assert "&lt;safe&gt;" in rendered
 
-        template.legacy_designer_grandfathered = True
-        with patch("core.reports.rendering.report_designer_probe", return_value=SimpleNamespace(active=False)):
-            assert custom_html_execution_allowed(template) is True
+        template.template_content = ""
+        fallback = render_report_html({"report_name": "curated"}, template)
+        assert "curated" in fallback
 
     def test_csv_renderer_covers_stable_and_each_legacy_report_shape(self):
         stable = SimpleNamespace(advanced_mode=False)
@@ -363,33 +337,18 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             assert _resolve_scope_authorization(schedule, tenant_a, [tenant_a]) is None
             unused.filter.assert_not_called()
 
-    def test_generate_task_stops_for_inactive_capability_and_unauthorized_scope(self):
-        inactive_schedule = SimpleNamespace(
-            pk=1,
-            report=SimpleNamespace(legacy_designer_grandfathered=False),
-            is_active=True,
-        )
-        manager = Mock()
-        manager.get.return_value = inactive_schedule
-        with (
-            patch("extras.tasks.reports.ScheduledReport.objects", manager),
-            patch("extras.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=False)),
-        ):
-            result = generate_scheduled_report_task(1)
-        assert result.status.value == "skipped"
-        assert result.code == "report.capability_inactive"
-
+    def test_generate_task_stops_for_unauthorized_scope(self):
         broad_schedule = SimpleNamespace(
             pk=2,
             report=SimpleNamespace(legacy_designer_grandfathered=False),
             is_active=True,
         )
+        manager = Mock()
         manager.get.return_value = broad_schedule
         tenant_a = SimpleNamespace(pk=1, id=1)
         tenant_b = SimpleNamespace(pk=2, id=2)
         with (
             patch("extras.tasks.reports.ScheduledReport.objects", manager),
-            patch("extras.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
             patch("extras.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
             patch("extras.tasks.reports._resolve_scope_authorization", return_value=None),
             patch("extras.tasks.reports._scope_requires_authorization", return_value=True),
@@ -414,7 +373,6 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
 
         with (
             patch("extras.tasks.reports.ScheduledReport.objects", manager),
-            patch("extras.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
             patch("extras.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
             patch("extras.tasks.reports._resolve_scope_authorization", return_value=authorized_principal_id),
             patch("extras.tasks.reports._scope_requires_authorization", return_value=True),
@@ -451,35 +409,31 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         state.update(overrides)
         return state
 
-    def test_report_template_clean_and_save_enforce_disabled_designer_without_database(self):
+    def test_report_template_write_guard_only_freezes_grandfathered_marker(self):
         active_template = ReportTemplate(name="active", included_columns=[])
-        with patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=True)):
-            assert active_template.clean() is None
+        assert active_template.clean() is None
 
         existing_query = Mock()
         existing_query.values.return_value.first.return_value = self._persisted_template_state(
-            name="unchanged",
+            name="grandfathered",
             advanced_mode=True,
             template_content="<p>old</p>",
             legacy_designer_grandfathered=True,
         )
-        unchanged = ReportTemplate(
+        edited = ReportTemplate(
             pk=5,
-            name="unchanged",
+            name="grandfathered",
             report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
             included_columns=[],
             advanced_mode=True,
-            template_content="<p>old</p>",
+            template_content="<p>edited</p>",
             legacy_designer_grandfathered=True,
         )
-        with (
-            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
-            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
-        ):
-            assert unchanged.clean() is None
-            unchanged.template_content = "<p>new</p>"
-            with pytest.raises(ValidationError, match="editing a grandfathered"):
-                unchanged.clean()
+        with patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query):
+            assert edited.clean() is None
+            with patch.object(ChangeLoggingMixin, "save") as parent_save:
+                edited.save()
+            parent_save.assert_called_once()
 
         forged = ReportTemplate(name="forged", included_columns=[], legacy_designer_grandfathered=True)
         with pytest.raises(ValidationError, match="cannot be forged"):
@@ -501,7 +455,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             with pytest.raises(ValidationError, match="cannot be changed"):
                 changed_marker.save()
 
-    def test_flag_off_rejects_changes_to_existing_non_grandfathered_html_on_clean_and_save(self):
+    def test_non_grandfathered_custom_html_can_be_edited(self):
         existing_query = Mock()
         existing_query.values.return_value.first.return_value = self._persisted_template_state(
             name="custom html",
@@ -516,82 +470,9 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         )
         with (
             patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
-            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
-        ):
-            with pytest.raises(ValidationError, match="saving custom HTML"):
-                template.clean()
-            with patch.object(ChangeLoggingMixin, "save") as parent_save:
-                with pytest.raises(ValidationError, match="saving custom HTML"):
-                    template.save()
-            parent_save.assert_not_called()
-
-    def test_flag_off_rejects_metadata_only_edits_to_grandfathered_template(self):
-        existing_query = Mock()
-        existing_query.values.return_value.first.return_value = self._persisted_template_state(
-            name="grandfathered",
-            description="original",
-            template_content="<p>legacy</p>",
-            legacy_designer_grandfathered=True,
-        )
-        template = ReportTemplate(
-            pk=5,
-            name="grandfathered",
-            description="edited",
-            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            included_columns=[],
-            template_content="<p>legacy</p>",
-            legacy_designer_grandfathered=True,
-        )
-        with (
-            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
-            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
             patch.object(ChangeLoggingMixin, "save") as parent_save,
         ):
-            with pytest.raises(ValidationError, match="editing a grandfathered"):
-                template.save()
-        parent_save.assert_not_called()
-
-    def test_flag_off_allows_noop_save_of_grandfathered_template(self):
-        existing_query = Mock()
-        existing_query.values.return_value.first.return_value = self._persisted_template_state(
-            name="grandfathered",
-            template_content="<p>legacy</p>",
-            legacy_designer_grandfathered=True,
-        )
-        template = ReportTemplate(
-            pk=5,
-            name="grandfathered",
-            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            included_columns=[],
-            template_content="<p>legacy</p>",
-            legacy_designer_grandfathered=True,
-        )
-        with (
-            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
-            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
-            patch.object(ChangeLoggingMixin, "save") as parent_save,
-        ):
-            template.save()
-        parent_save.assert_called_once()
-
-    def test_flag_on_allows_editing_existing_non_grandfathered_html(self):
-        existing_query = Mock()
-        existing_query.values.return_value.first.return_value = self._persisted_template_state(
-            name="custom html",
-            template_content="<p>old</p>",
-        )
-        template = ReportTemplate(
-            pk=5,
-            name="custom html",
-            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            included_columns=[],
-            template_content="<p>new</p>",
-        )
-        with (
-            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
-            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=True)),
-            patch.object(ChangeLoggingMixin, "save") as parent_save,
-        ):
+            assert template.clean() is None
             template.save()
         parent_save.assert_called_once()
 
@@ -676,24 +557,35 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         )
         assert _resolve_report_scope(owner_only) == (tenant_a, [])
 
-    def test_scheduled_reports_probe_requires_both_operator_and_row_gates(self):
-        with (
-            patch("extras.apps.report_designer_probe", return_value=ActivationState(True, True)),
-            patch("extras.apps.object_enabled_probe", return_value=lambda: ActivationState(True, True)),
-        ):
-            assert _scheduled_reports_probe() == ActivationState(True, True)
-        with (
-            patch("extras.apps.report_designer_probe", return_value=ActivationState(False, True)),
-            patch("extras.apps.object_enabled_probe", return_value=lambda: ActivationState(True, True)),
-        ):
-            assert _scheduled_reports_probe() == ActivationState(False, True)
-        with (
-            patch("extras.apps.report_designer_probe", return_value=ActivationState(True, False)),
-            patch("extras.apps.object_enabled_probe", return_value=lambda: ActivationState(False, True)),
-        ):
-            assert _scheduled_reports_probe() == ActivationState(False, True)
+    def test_report_template_persisted_filter_scope_uses_the_unscoped_through_manager(self):
+        queryset = Mock()
+        queryset.values_list.return_value = [3, 2, 3]
+        through_manager = Mock()
+        through_manager.filter.return_value = queryset
+        template = SimpleNamespace(
+            pk=27,
+            filter_tenants=SimpleNamespace(through=SimpleNamespace(_base_manager=through_manager)),
+        )
 
-    @override_settings(FEATURE_REPORT_DESIGNER=True, REPORT_DESIGNER_ENABLED=False)
+        assert ReportTemplate.persisted_filter_tenant_ids(template) == [2, 3]
+        through_manager.filter.assert_called_once_with(reporttemplate_id=27)
+        queryset.values_list.assert_called_once_with("tenant_id", flat=True)
+
+    def test_scheduled_reports_probe_is_only_the_active_schedule_row_probe(self):
+        row_probe = Mock(return_value=ActivationState(True, True))
+        with patch("extras.apps.object_enabled_probe", return_value=row_probe) as object_enabled_probe:
+            assert _scheduled_reports_probe() == ActivationState(True, True)
+        object_enabled_probe.assert_called_once_with("extras", "ScheduledReport", "is_active")
+        row_probe.assert_called_once_with()
+
+        from itambox.capabilities import registry
+
+        capability = registry.get("reporting.scheduled")
+        assert capability.limitations[0] == (
+            "The scheduled capability requires an active schedule row; deactivating a schedule pauses its delivery "
+            "without deleting the saved schedule."
+        )
+
     def test_report_views_cover_preview_permissions_and_rendering_seams(self):
         preview = ReportTemplatePreviewView()
         preview.request = SimpleNamespace(user=Mock(has_perm=Mock(side_effect=[False, True])))
@@ -730,6 +622,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         with patch("core.reports.build_report_context", side_effect=PermissionError):
             response = preview.post(request)
         assert response.status_code == 403
+        assert response.content == b"You may not view this report's data."
 
     def test_preview_rejects_unknown_columns_before_building_report_context(self):
         request = RequestFactory().post(
@@ -767,6 +660,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         template = SimpleNamespace(
             name="My Report",
             filter_tenants=SimpleNamespace(all=lambda: []),
+            persisted_filter_tenant_ids=lambda: [],
             report_type="asset_summary",
             advanced_mode=False,
             template_content="",
@@ -839,34 +733,24 @@ class ReportDesignerFilterTenantWriteTests(TestCase):
             instance=ReportTemplate.objects.get(pk=self.template.pk),
         )
 
-    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
-    def test_flag_off_blocks_grandfathered_filter_tenant_change_through_form_save(self):
+    def test_grandfathered_template_can_change_filter_tenant_through_form_save(self):
         form = self._form(self.tenant_b)
         assert form.is_valid()
-        with pytest.raises(ValidationError, match="grandfathered"):
-            form.save()
-        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_a.pk}
+        form.save()
+        self.template.refresh_from_db()
+        assert self.template.legacy_designer_grandfathered is True
+        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_b.pk}
 
-    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
-    def test_flag_off_blocks_grandfathered_filter_tenant_change_through_deferred_save_m2m(self):
+    def test_grandfathered_template_can_change_filter_tenant_through_deferred_save_m2m(self):
         form = self._form(self.tenant_b)
         assert form.is_valid()
         form.save(commit=False)
-        with pytest.raises(ValidationError, match="grandfathered"):
-            form.save_m2m()
-        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_a.pk}
+        form.save_m2m()
+        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_b.pk}
 
-    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
-    def test_flag_off_allows_noop_grandfathered_filter_tenant_save_m2m(self):
+    def test_grandfathered_template_can_save_unchanged_filter_tenants(self):
         form = self._form(self.tenant_a)
         assert form.is_valid()
         form.save(commit=False)
         form.save_m2m()
         assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_a.pk}
-
-    @override_settings(FEATURE_REPORT_DESIGNER=True, REPORT_DESIGNER_ENABLED=False)
-    def test_flag_on_allows_grandfathered_filter_tenant_change_through_form_save(self):
-        form = self._form(self.tenant_b)
-        assert form.is_valid()
-        form.save()
-        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_b.pk}

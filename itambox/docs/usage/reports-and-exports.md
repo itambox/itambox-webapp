@@ -143,32 +143,14 @@ external resources, unsafe CSS, and model/dunder access are not supported.
 system reports. They are used both for on-demand report generation and as
 the basis for scheduled reports.
 
-### Operator activation (Beta feature flag)
+### Stable availability
 
-The report designer is an **operator-level Beta feature flag**,
-`ITAMBOX_FEATURE_REPORT_DESIGNER`, **disabled by default**. The curated report
-catalogue is Stable and unaffected by the flag; the flag gates the designer
-authoring surfaces and scheduled delivery:
-
-- **Disabled (default):** designer and schedule navigation is hidden and their
-  routes return 404. Delivery is skipped for non-grandfathered templates. The
-  migration-managed bounded grandfathered set may continue rendering and
-  delivery while those templates remain **read-only**. Saved schedules are
-  retained, never deleted.
-- **Enabled:** authoring, editing, and scheduled delivery work normally.
-
-Before changing the flag, verify:
-
-1. The deployment is on a reviewed revision and the [backup and
-   restore](../operations/backup-restore.md) process is tested — templates and schedules are
-   database rows.
-2. The background worker (`qcluster`) is healthy: scheduled delivery depends on
-   a running worker, and a stopped worker silently skips runs.
-3. A flag change takes effect on application restart; test the change in a
-   non-production deployment first.
-4. The [capability contract](../operations/capability-maturity.md) grade: the designer is
-   **Beta** — its column, filter, and grouping model is expected to change, and
-   saved templates may need to be rebuilt after an upgrade.
+The **Report Designer** is **Stable** and always available. Users with the
+applicable permissions can use the template list, detail, edit, preview, and
+download surfaces; no activation setting is needed. See
+[Capability Maturity](../operations/capability-maturity.md) for the declared
+grade and activation model. The curated report catalogue is a separate Stable
+capability.
 
 ### Creating a Report Template
 
@@ -186,7 +168,31 @@ Navigate to **Extras → Report Templates** and click **Add**:
 | **Filter Tenants** | Limit data to selected tenants (blank = global aggregate) |
 | **Description** | Optional notes |
 
-Report providers declare the model-level view permissions relevant to their domain as contract metadata for auditing and future authorization surfaces. The current preview and download boundary remains the existing `extras.view_reporttemplate` permission plus report-designer capability; provider metadata does not silently revoke access from existing roles. Scheduled reports run in the trusted task context and retain their configured tenant scope.
+The applicable report and data permissions continue to apply to preview,
+download, and compilation. The Stable grade does not change those checks.
+
+### V1 template contract
+
+The Stable V1 contract freezes each template's report type, included columns,
+filters, and grouping. The column picker uses the selected provider's declared
+catalogue. The Asset Disposal report also offers `disposal_status`,
+`disposal_cancelled_at`, `disposal_cancelled_by`, and
+`disposal_cancellation_reason`. Unknown or non-canonical column keys are
+rejected when a template is saved. A canonical key that the selected provider
+does not support leaves that cell blank; an unsupported grouping falls back to
+the provider's default grouping.
+
+Templates marked as grandfathered by the migration keep their provenance
+marker and existing rendering behavior. They can now be edited like other
+templates after the supported upgrade.
+
+### Tenant scope authorization
+
+Compilation checks authorization for pinned tenant scopes. A single pinned
+tenant must be within the actor's reach. A scope pinned to multiple tenants
+requires `reports.view_cross_tenant_reports` for every pinned tenant. An
+unauthorized preview or download returns HTTP 403. Scheduled generation that
+fails this check is recorded as failed and is not delivered.
 
 ### Available Report Types
 
@@ -215,19 +221,37 @@ Warranty Expiration surfaces the linked warranty Supplier. Subscription Renewals
 | **Financial (Ledger)** | `financial` | Stone ledger with emphasised monetary totals and tabular figures |
 | **Minimal (Clean)** | `minimal` | Clean black-on-white, single indigo hairline — for forwarding, embedding, or printing |
 
+### Output window and disclosure
+
+Each report provider compiles at most 500 rows. Hardware Inventory applies
+that limit separately to accessories, consumables, and components. When a
+provider's window is capped, or an empty scope is rendered with sample data,
+the output identifies that it is truncated or a sample: HTML/PDF includes a
+notice banner, ordinary CSV appends a trailer row, XLSX appends a note row, and
+scheduled mail includes the notice. Download responses include the applicable
+`X-Report-Truncated`, `X-Report-Row-Window`, `X-Report-Total-Rows`, and
+`X-Report-Sample` headers.
+
+Machine-format exports (`machine_csv` and specification exports) contain no
+in-file disclosure rows and cover the compiled window. Their download
+responses still carry the applicable disclosure headers. Requesting
+`machine_csv` for a report without a machine-format export returns HTTP 400.
+
 ---
 
 ## Scheduled Reports
 
 **Scheduled Reports** automatically compile a Report Template on a recurring
-schedule and deliver the result via email or notification channels. This Beta
-surface shares the `ITAMBOX_FEATURE_REPORT_DESIGNER` gate with the report
-designer: when the flag is `False`, the menu and routes are hidden/closed and
-delivery is skipped for non-grandfathered templates. The migration-managed
-bounded grandfathered set may continue to render and deliver, while those
-templates remain read-only until the flag is enabled. Saved schedules are not
-deleted. Set the flag to `True` to author, edit, and use scheduled delivery
-normally again.
+schedule and deliver the result via email or notification channels. Scheduled
+Reports remain **Beta** and activate when at least one schedule row is active.
+Deactivating a schedule pauses its delivery without deleting the row. Delivery
+depends on a running `qcluster` worker. Upgrading a deployment that ran with
+the designer flag disabled pauses schedules that were being skipped instead of
+resuming them silently; see
+[Updating a deployment](../operations/upgrades.md) for the transition and how
+to resume a schedule. See
+[Capability Maturity](../operations/capability-maturity.md) for the declared
+grade and activation model.
 
 ### Creating a Scheduled Report
 
@@ -287,12 +311,11 @@ current approval.
 
 - Approving or revoking requires the `reports.view_cross_tenant_reports`
   permission on every tenant in scope; an approval by a principal whose reach
-  does not cover the full scope is refused instead of being stored and later
-  failing at delivery time.
-- Without a current approval, delivery of a cross-tenant schedule terminates
-  with an authorization error (`report.scope_unauthorized`) rather than
-  rendering unapproved tenant data. Changing the scope after an approval
-  invalidates it, as does revoking it.
+  does not cover the full scope is refused.
+- A current approval is required for a cross-tenant schedule. Generation also
+  checks authorization at compile time; an unauthorized generation is
+  recorded as failed and is not delivered. Changing the scope after an
+  approval invalidates it, as does revoking it.
 - Revocation keeps the approval history visible and marks it void; approving
   again records a fresh approval.
 

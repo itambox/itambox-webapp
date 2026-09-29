@@ -4,7 +4,7 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models.signals import post_migrate
 
-from core.features import object_enabled_probe, report_designer_probe
+from core.features import object_enabled_probe
 from core.schedules import register_schedule
 from itambox.capabilities import (
     ALWAYS_ON,
@@ -15,9 +15,7 @@ from itambox.capabilities import (
     OPT_IN,
     SOURCE_ALWAYS,
     SOURCE_OBJECT_ENABLED,
-    SOURCE_OPERATOR_FLAG,
     STABLE,
-    ActivationState,
     Capability,
 )
 from itambox.capabilities import (
@@ -38,13 +36,8 @@ WEBHOOK_RECOVERY_TASK_PATH = "extras.tasks.webhooks.recover_pending_webhook_deli
 
 
 def _scheduled_reports_probe():
-    """Report schedules only when the designer gate and a live row agree."""
-    designer = report_designer_probe()
-    scheduled = object_enabled_probe("extras", "ScheduledReport", "is_active")()
-    return ActivationState(
-        active=designer.active and scheduled.active,
-        value_present=designer.value_present or scheduled.value_present,
-    )
+    """Report schedules as active while at least one live schedule row is enabled."""
+    return object_enabled_probe("extras", "ScheduledReport", "is_active")()
 
 
 class ExtrasConfig(AppConfig):
@@ -180,17 +173,14 @@ class ExtrasConfig(AppConfig):
                 key="reporting.designer",
                 title="Report Designer",
                 owning_area="area:operations",
-                maturity=BETA,
+                maturity=STABLE,
                 security_critical=False,
-                activation=OPT_IN,
-                activation_probe=report_designer_probe,
-                activation_source=SOURCE_OPERATOR_FLAG,
+                activation=ALWAYS_ON,
+                activation_probe=None,
+                activation_source=SOURCE_ALWAYS,
                 owns=("extras.ReportTemplate",),
                 docs_url=DOCS,
-                limitations=(
-                    "The designer's column, filter, and grouping model is expected to change; "
-                    "saved templates may need to be rebuilt.",
-                ),
+                limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
             Capability(
@@ -201,13 +191,12 @@ class ExtrasConfig(AppConfig):
                 security_critical=False,
                 activation=OPT_IN,
                 activation_probe=_scheduled_reports_probe,
-                activation_source=SOURCE_OPERATOR_FLAG,
+                activation_source=SOURCE_OBJECT_ENABLED,
                 owns=("extras.ReportGenerationArchive", "extras.ScheduledReport"),
                 docs_url=DOCS,
                 limitations=(
-                    "The scheduled capability requires the operator flag ITAMBOX_FEATURE_REPORT_DESIGNER and an active "
-                    "schedule row; disabling the flag pauses delivery for non-grandfathered templates without deleting "
-                    "saved schedules, while the migration-managed bounded grandfathered set keeps rendering.",
+                    "The scheduled capability requires an active schedule row; deactivating a schedule pauses its "
+                    "delivery without deleting the saved schedule.",
                     "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
                     "Archive retention is not yet configurable per schedule.",
                 ),

@@ -127,6 +127,8 @@ class TenantNavigationTests(TestCase):
                 "extras:alertlog_list",
                 "extras:alertrule_list",
                 "extras:notificationchannel_list",
+                "extras:scheduledreport_list",
+                "extras:reporttemplate_list",
                 "objectchange_list",
                 "journalentry_list",
                 "job_list",

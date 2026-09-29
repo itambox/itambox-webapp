@@ -555,15 +555,6 @@ ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get("ITAMBOX_ALLOW_GLOBAL_CUSTODY_TE
 REQUIRE_CUSTODY_SIGNIN = os.environ.get("ITAMBOX_REQUIRE_CUSTODY_SIGNIN", "True") == "True"
 CUSTODY_SIGNING_SESSION_TTL = timedelta(minutes=30)
 
-# Operator-wide Beta report designer switch (issue #181), off by default.
-# The historical setting name remains as a test/runtime compatibility alias for
-# one release; deployments must use ITAMBOX_FEATURE_REPORT_DESIGNER.
-_designer_flag = os.environ.get("ITAMBOX_FEATURE_REPORT_DESIGNER")
-if _designer_flag is None:
-    _designer_flag = os.environ.get("ITAMBOX_REPORT_DESIGNER_ENABLED", "False")
-FEATURE_REPORT_DESIGNER = _designer_flag == "True"
-REPORT_DESIGNER_ENABLED = FEATURE_REPORT_DESIGNER
-
 # Server-side peppers used to HMAC-hash API tokens at rest (NetBox v4.5 style).
 # JSON object of {"<numeric id>": "<>=50-char secret>"}; the highest id hashes
 # new tokens, older ids remain valid so peppers can be rotated. When unset, the

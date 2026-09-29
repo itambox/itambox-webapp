@@ -16,7 +16,7 @@ from django.utils.translation import gettext as _
 from assets.models import Asset, AssetMaintenance
 from assets.models.lifecycle import AssetDisposal, Warranty
 from core.reports.charts import generate_doughnut_chart
-from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
+from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult, record_window_state
 from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.reports.registry import register_report_provider
 
@@ -465,6 +465,7 @@ class AssetDepreciationReportProvider(ReportDefinition):
         rows = list(self.build_rows(records, request))
         if not rows:
             return self.build_sample(request)
+        truncated, total_rows = record_window_state(queryset, records, self.row_limit)
         totals = None
         if request.template.include_summary_cards or request.template.include_distribution_chart:
             totals = _depreciation_totals(queryset, request.active_tenant)
@@ -474,6 +475,8 @@ class AssetDepreciationReportProvider(ReportDefinition):
             if request.template.include_summary_cards
             else [],
             chart_svg=self._chart_from_totals(request, totals) if request.template.include_distribution_chart else "",
+            truncated=truncated,
+            total_rows=total_rows,
         )
 
     def build_summary(self, queryset, request: ReportRequest):

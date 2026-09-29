@@ -33,6 +33,10 @@
                   <a href="{{ item.url }}"
                      class="py-1 text-reset text-decoration-none flex-fill text-wrap lh-sm csp-style-b5ad8c8a7c27"
                      {% if '/admin/' in item.url %}hx-boost="false"{% endif %}>{{ item.link_text }}</a>
+                  {% if item.beta %}
+                    <span class="badge bg-yellow-lt ms-1 flex-shrink-0"
+                          aria-label="{% translate 'Beta capability' %}"><span class="visually-hidden">{% translate "Maturity:" %}</span>{% translate "Beta" %}</span>
+                  {% endif %}
                   {% if buttons %}
                     <div class="btn-group ms-2 flex-shrink-0">
                       {% for button in buttons %}

@@ -1,7 +1,7 @@
 """Tests for the scheduled-report cross-tenant scope approval view (WP-9b)."""
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from core.tests.mixins import grant
@@ -11,7 +11,6 @@ from organization.models import Role, Tenant
 User = get_user_model()
 
 
-@override_settings(REPORT_DESIGNER_ENABLED=True)
 class ScheduledReportScopeApprovalViewTests(TestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Approval Tenant A", slug="approval-tenant-a")
@@ -232,12 +231,11 @@ class ScheduledReportScopeApprovalCapabilityGateTests(TestCase):
         )
         self.url = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": self.sched.pk})
 
-    @override_settings(REPORT_DESIGNER_ENABLED=False)
-    def test_route_is_closed_when_the_designer_capability_is_inactive(self):
+    def test_route_is_open_with_the_always_on_designer_capability(self):
         client = Client()
         client.force_login(self.admin)
         response = client.get(self.url)
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
 
 
 class ScheduledReportScopeBadgeTests(TestCase):

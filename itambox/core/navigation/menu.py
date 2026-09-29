@@ -422,13 +422,13 @@ MONITORING_MENU = Menu(
         ),
         MenuGroup(
             label=_("Reporting"),
-            beta=True,
             items=(
                 MenuItem(
                     link="extras:scheduledreport_list",
                     link_text=_("Scheduled Reports"),
                     permissions=["extras.view_scheduledreport"],
                     condition=_report_designer_active,
+                    beta=True,
                     buttons=(
                         MenuItemButton(
                             link="extras:scheduledreport_create",
