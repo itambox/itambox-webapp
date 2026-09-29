@@ -350,6 +350,11 @@ class TestNavigationMaturity:
         scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
         assert designer.condition(None) is True
         assert scheduled.condition(None) is True
+        # The promotion moves the Beta marker from the shared group to the one
+        # still-beta capability, so the group header no longer implies Beta.
+        assert reporting.beta is False
+        assert designer.beta is False
+        assert scheduled.beta is True
 
 
 DESIGNER_VIEWS = (
@@ -403,7 +408,8 @@ class TestReportDesignerStable:
     def test_the_report_template_surface_is_marked_stable(self):
         from extras.models import ReportTemplate
 
-        assert capability_notice(ReportTemplate)["maturity"] == STABLE
+        assert capability_notice(ReportTemplate) is None
+        assert registry.owner_of("extras.ReportTemplate").maturity == STABLE
 
 
 @pytest.mark.django_db

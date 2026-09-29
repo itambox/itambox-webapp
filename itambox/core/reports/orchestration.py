@@ -7,7 +7,8 @@ back.  Every decision about *what* a report contains belongs to the provider in
 the owning domain application.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.utils import timezone
@@ -151,6 +152,31 @@ def _report_specification_inputs(
     return tuple(filters), dict(definitions), tuple(references)
 
 
+@contextmanager
+def _report_compilation_scope(filter_tenants: Sequence[object]) -> Iterator[None]:
+    """Compile inside exactly the authorized constellation.
+
+    Every tenant-scoped manager truncates to the ambient request scope before
+    the provider's explicit ``scope_to_tenants`` filter can run, so a
+    constellation that differs from the ambient binding -- a pinned tenant
+    other than the active one, or a multi-tenant aggregation -- must compile
+    under an explicit scope or it would silently drop the other tenants' rows.
+    A single pinned tenant narrows the ambient binding to that tenant; an
+    aggregation suspends it entirely (managers stay unscoped and the explicit
+    authorized filter is the only boundary). The previous binding is restored
+    afterwards. An empty scope is the global-aggregation signal and keeps the
+    ambient behavior unchanged.
+    """
+    if not filter_tenants:
+        yield
+        return
+    # inline import: app-registry: the scope override is only needed while compiling.
+    from core.context import override_current_tenant_scope
+
+    with override_current_tenant_scope(filter_tenants[0] if len(filter_tenants) == 1 else None):
+        yield
+
+
 def build_report_context(
     template: object,
     active_tenant: object | None = None,
@@ -196,7 +222,11 @@ def build_report_context(
         specification_definitions=resolved_specification_definitions,
         specification_export_references=resolved_specification_export_references,
     )
-    result = provider.build(request)
+    # The ambient request binding would truncate the provider's scoped managers
+    # to a subset of an authorized constellation before its explicit filter can
+    # apply; this scope keeps the authorized constellation authoritative.
+    with _report_compilation_scope(filter_tenants):
+        result = provider.build(request)
     headers = headers_for(request.columns)
     grouped_data = _group_rows(result.rows, template.group_by_field)
     context_data = {

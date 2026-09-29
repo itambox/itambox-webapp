@@ -51,6 +51,9 @@ class MenuItem:
     # exists", per-tenant object-level checks). The item is hidden when the callable
     # returns False.
     condition: Callable | None = None
+    # Item-level Beta marker for groups that mix mature and beta capabilities;
+    # the menu template renders it as a badge next to the item label.
+    beta: bool = False
 
     def __post_init__(self):
         if self.link:

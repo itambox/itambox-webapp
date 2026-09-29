@@ -216,6 +216,19 @@ class ReportPinnedDownloadTests(SimpleTestCase):
         self.assertIn(b"tenant-2", response.content)
         self.assertIn(b"tenant-3", response.content)
 
+    def test_partially_deleted_constellation_fails_closed(self):
+        provider = _PinnedDownloadProvider()
+        # B survives the unscoped read; C was soft-deleted and drops out.
+        self.tenant_queryset.order_by.return_value = [self.tenant_b]
+        with self.assertLogs("extras.views", level="ERROR") as logs:
+            with self._patched_download(provider, authorized=True):
+                response = ReportTemplateDownloadView().get(SimpleNamespace(GET={"format": "csv"}), self.template.pk)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.content, b"You may not view this report's data.")
+        self.assertIn("soft-deleted; refusing compilation", "\n".join(logs.output))
+        self.assertIsNone(provider.request)
+
     def test_machine_csv_requires_an_export_and_csv_keeps_the_frozen_machine_export_path(self):
         absent_export_provider = _PinnedDownloadProvider(truncated=True, total_rows=600)
         template = _download_template([])

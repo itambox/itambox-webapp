@@ -1448,11 +1448,12 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         """Resolve the persisted constellation through unscoped reads.
 
         The ambient tenant would silently truncate the pinned scope and a
-        truncated constellation is a different report. Soft-deleted pinned
-        tenants drop out; an entirely dead constellation fails closed instead
-        of silently substituting the active tenant, mirroring the
-        scheduled-report scope resolver. Raises ``PermissionError`` for the
-        caller's 403 branch.
+        truncated constellation is a different report. A partially deleted
+        constellation fails closed instead of silently compiling a different
+        population, mirroring the scheduled-report scope resolver: the
+        persisted constellation is the report's identity, so dropping one
+        pinned tenant would change the requested reporting population. Raises
+        ``PermissionError`` for the caller's 403 branch.
         """
         pinned_ids = template.persisted_filter_tenant_ids()
         if not pinned_ids:
@@ -1462,12 +1463,12 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
 
         Tenant = django_apps.get_model("organization", "Tenant")
         filter_tenants = list(Tenant._base_manager.filter(pk__in=pinned_ids, deleted_at__isnull=True).order_by("pk"))
-        if not filter_tenants:
+        if len(filter_tenants) != len(set(pinned_ids)):
             logger.error(
-                "Report template scope tenants are all soft-deleted; refusing compilation",
+                "Report template scope tenants are soft-deleted; refusing compilation",
                 extra={"operation": "reports.download", "reporttemplate_id": template.pk},
             )
-            raise PermissionError("Report template scope tenants are all soft-deleted")
+            raise PermissionError("Report template scope tenants are soft-deleted")
         return filter_tenants
 
     def _machine_format_response(self, format_type, context_data, safe_name, stamp):
