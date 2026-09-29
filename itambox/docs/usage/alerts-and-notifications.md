@@ -8,6 +8,8 @@ end-of-life dates, and overdue audits — without having to check dashboards man
 > **Disclaimer:** Alerts are evaluated once per day by background workers
 > (`django-q2`). They are not real-time; the worst-case delay between a condition
 > being met and a notification being sent is the next daily evaluation run.
+> Evaluation is state-based, not event-based: a delayed or missed run is not
+> replayed, and the next successful run evaluates the full current state.
 
 ---
 
@@ -40,8 +42,10 @@ graph TD
 ```
 
 The whole pipeline lives in `extras/models.py` (models `AlertRule`,
-`NotificationChannel`, and `AlertLog`) and `core/events.py` (channel dispatch
-logic). Evaluation is triggered by a `django-q2` schedule, not by user actions.
+`NotificationChannel`, and `AlertLog`), `extras/tasks/alerts.py` (evaluation,
+dispatch scheduling, and pending-dispatch recovery) and `core/events.py` (the
+channel boundaries and typed delivery results). Evaluation is triggered by a
+`django-q2` schedule, not by user actions.
 
 ---
 
@@ -63,7 +67,7 @@ optionally dispatching notifications to its attached channels.
 | **Is Active** | Boolean | Inactive rules are skipped entirely during evaluation |
 | **Is Muted** | Boolean | Muted rules still create AlertLog entries but send **no** channel notifications |
 | **Renotify Interval Days** | Positive integer | How often to re-dispatch while an alert remains unresolved (`0` = notify once) |
-| **Channels** | M2M → `NotificationChannel` | Where to send notifications when the rule fires |
+| **Channels** | M2M → `NotificationChannel` | Where to send notifications when the rule fires — only enabled channels in the rule's own scope receive a dispatch |
 
 ### Alert types
 
@@ -81,6 +85,10 @@ optionally dispatching notifications to its attached channels.
 > `warranty_expiry`), the threshold is **days before the event**. For
 > `audit_overdue`, the threshold is **days past the scheduled end date**.
 > `low_stock` is an absolute quantity threshold.
+
+For `low_stock`, an item's own minimum quantity (`min_qty`) takes precedence
+over the rule's threshold value when it is set; the rule's threshold is the
+fallback for items without their own safety limit.
 
 ### Severity levels
 
@@ -142,8 +150,16 @@ to run once per day (e.g. at 08:00 UTC). The evaluation engine:
    statuses) scoped to the rule's tenant.
 3. Compares the current state against the threshold.
 4. Creates or updates `AlertLog` entries (see [Alert Log](#alert-log) below).
-5. If the rule is not muted and has channels attached, dispatches notifications
-   through each channel.
+5. If the rule is not muted and has at least one attached, enabled channel in
+   the rule's own scope, dispatches notifications through those channels.
+
+The `Daily Alert Rule Evaluation` schedule row is registered by the `extras` app
+from `post_migrate` (idempotently — repeated `migrate` runs or restarts never
+create duplicates), so a standard `qcluster` deployment needs no manual cron
+entry. Failed evaluation runs surface in the queue's failed-task list; a failed
+run is never silently swallowed. Runs that are delayed or missed (worker down,
+deployment window) are **not backfilled**: the next successful run evaluates the
+full current state.
 
 > [!IMPORTANT]
 > Because evaluation runs in a background worker context (no request user), the
@@ -157,6 +173,14 @@ Channel delivery follows an explicitly **single-attempt, best-effort policy**
 with a terminal failed state — there is **no automatic retry**:
 
 - Each planned dispatch runs **exactly one attempt** per attached channel.
+- The dispatch claim is atomic: when two parallel evaluations plan a dispatch
+  for the same alert state, exactly one claim wins and the other backs off
+  without sending — a repeated or overlapping evaluation cannot produce a
+  duplicate delivery for the same alert. A claimed dispatch owns its alert for
+  a claim lease (15 minutes): a parallel evaluation never re-dispatches an
+  in-flight attempt, while a crashed run's claim is recovered by a later
+  evaluation once the lease has expired. Completion metadata is fenced to the
+  owning delivery id, so a superseded run cannot overwrite a newer result.
 - The per-channel outcome is recorded as a typed result:
   `success`, `retryable` (transient-class failure, e.g. SMTP timeout or HTTP 5xx),
   or `terminal` (permanent failure, e.g. rejected credentials or 4xx response),
@@ -165,6 +189,10 @@ with a terminal failed state — there is **no automatic retry**:
   the boundary declared one.
 - A dispatch whose callback crashed before completing is recorded as
   `__dispatch__: terminal` with outcome `failed` — it is **not** retried.
+- A delivery is never reported as successful unless a channel boundary returned
+  an explicit success: unknown or malformed results are recorded as failures,
+  and a dispatch that was scheduled but never completed stays visible as
+  `pending`.
 - **No manual redelivery** exists: there is no UI action and no API endpoint to
   re-send a failed delivery, and nothing in the UI advertises one.
 - Re-notification is a *separate, deliberate* feature, not a retry: an alert
@@ -179,7 +207,7 @@ filter so operators can find alerts that fired but were **not** delivered:
 
 | Outcome | Meaning |
 |---|---|
-| `none` | No delivery planned (muted rule, no channels attached, or legacy row) |
+| `none` | No delivery planned (muted rule, no channels attached, every attached channel disabled, or legacy row) |
 | `pending` | Dispatch scheduled but never completed (e.g. worker stopped mid-run) |
 | `delivered` | At least one channel delivered successfully |
 | `failed` | Every attempted channel failed (typed failure stored per channel) |
@@ -197,6 +225,10 @@ derived once from the existing payloads during the migration. Historical
 deliveries keep their original per-channel records; no attempt history is
 fabricated for deliveries made before the upgrade.
 
+The Beta→Stable promotion itself adds no schema migration — it changes only the
+declared grade. Existing rules, channels, alert history, and delivery state are
+preserved exactly as they are.
+
 ---
 
 ## Notification Channels
@@ -212,7 +244,7 @@ many-to-many relationship.
 | Email | `email` | SMTP (global) | `recipients` — SMTP settings come from global `EmailSettings`, **not** per-channel config |
 | Slack | `slack` | Incoming Webhook | `webhook_url` |
 | Microsoft Teams | `teams` | Incoming Webhook | `webhook_url` |
-| In-App | `in_app` | Built-in | No config needed — alerts appear in the Alert Center bell icon |
+| In-App | `in_app` | Built-in | No config needed — alerts appear in the Alert Center bell icon. An optional `recipient_users` list can target specific users; each recipient must be inside the channel's scope (tenant members, or staff for a platform-wide channel) |
 
 ### Configuring an email channel
 
@@ -271,13 +303,23 @@ Alert Rule: "License Expiry — Adobe CC"
   └── Channels: [Email: IT Admins], [Slack: #licensing-alerts]
 ```
 
-Every channel attached to a rule receives the notification when the rule fires.
+Every **enabled** channel attached to a rule is consulted when the rule fires —
+and only channels in the rule's own scope: a tenant-scoped rule delivers through
+its own tenant's channels, a platform-wide rule through platform-wide channels.
+The rule form and the REST API reject out-of-scope attachments up front, and a
+dispatch never consults a channel outside the rule's scope, so a misconfigured
+attachment cannot leak one tenant's alerts into another tenant's destination. A
+disabled channel is skipped; if every attached channel is disabled, the alert
+records outcome `none` with an explicit reason instead of pretending it
+notified.
 
 ### Channel dispatch guarantees
 
 | Property | Behaviour |
 |---|---|
-| Delivery tracking | Each `AlertLog` records per-channel delivery status in `delivery_status` (`ok` / `failed` / error message) |
+| Delivery tracking | Each `AlertLog` records the typed per-channel result in `delivery_status` (`success` / `retryable` / `terminal`, with delivery identifier, attempt timestamp, and a safe message) |
+| Channel scope | A rule delivers only through channels of its own scope (tenant rule → its own tenant's channels; platform-wide rule → platform-wide channels). Out-of-scope attachments are rejected on save and never dispatched |
+| Enabled gate | Disabled channels are never contacted. If every attached channel is disabled, the dispatch records an explicit reason and outcome `none` — never a silent success |
 | SSRF protection | Outbound webhook URLs are validated at send time by `request_pinned` — DNS is resolved, the destination IP is pinned, redirects are not followed |
 | Delivery model | Synchronous, single-attempt best-effort. Failed channel notifications are **not** retried through `django-q2` or any other queue. A transient failure loses that channel's notification until the next renotify interval (which may be never) |
 | Timeout | Webhook requests time out after 10 seconds |
@@ -427,7 +469,8 @@ daily critical alert until the license is renewed.
 
 **I receive no email notifications**
 
-: Verify the Notification Channel is `enabled` and that the SMTP config is
+: Verify the Notification Channel is `enabled` (disabled channels are never
+  contacted by dispatch) and that the SMTP config is
   correct (host, port, credentials, TLS setting). Check the `delivery_status`
   field on the `AlertLog` — it records per-channel outcomes including error
   messages. Also confirm the rule is not muted (`is_muted = false`).
@@ -439,6 +482,15 @@ daily critical alert until the license is renewed.
   hostname at send time and pins the resolved IP; redirects are not followed.
   Test the webhook URL with `curl` from the ITAMbox server to rule out network
   issues.
+
+**A rule has channels attached but nothing is delivered**
+
+: Check each attached channel's **Enabled** flag and the rule's scope: a
+  disabled channel is never contacted, and only channels of the rule's own scope
+  can deliver (a tenant rule delivers through its own tenant's channels, a
+  platform-wide rule through platform-wide channels). The alert's delivery
+  outcome shows `none` with an explicit reason, and the rule form refuses
+  out-of-scope attachments when you save.
 
 **I see duplicate alert log entries**
 

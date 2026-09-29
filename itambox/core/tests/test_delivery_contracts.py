@@ -367,6 +367,7 @@ class DeliveryContractTests(TestCase):
 
     def test_alert_dispatch_records_no_channels_reason(self):
         queryset = MagicMock()
+        queryset.filter.return_value = queryset
         queryset.exists.return_value = False
         manager = MagicMock()
         manager.all.return_value = queryset
@@ -379,6 +380,7 @@ class DeliveryContractTests(TestCase):
     def test_alert_dispatch_isolates_unexpected_channel_exception(self):
         channel = SimpleNamespace(pk=23)
         queryset = MagicMock()
+        queryset.filter.return_value = queryset
         queryset.exists.return_value = True
         queryset.__iter__.return_value = iter([channel])
         manager = MagicMock()
@@ -402,6 +404,7 @@ class DeliveryContractTests(TestCase):
     def test_alert_dispatch_preserves_success_and_retryable_dispositions(self):
         channels = [SimpleNamespace(pk=23), SimpleNamespace(pk=29)]
         queryset = MagicMock()
+        queryset.filter.return_value = queryset
         queryset.exists.return_value = True
         queryset.__iter__.return_value = iter(channels)
         manager = MagicMock()

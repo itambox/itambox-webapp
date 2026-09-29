@@ -12576,6 +12576,22 @@ msgstr "Nächster Versuch"
 msgid "No channels attached to this rule"
 msgstr "Dieser Regel sind keine Kanäle zugeordnet"
 
+#, python-format
+msgid "Channel \"%(name)s\" cannot deliver for this rule: %(reason)s"
+msgstr "Der Kanal \"%(name)s\" kann für diese Regel nicht zugestellt werden: %(reason)s"
+
+msgid "Every attached channel is disabled"
+msgstr "Jeder zugeordnete Kanal ist deaktiviert"
+
+msgid "it belongs to a tenant; a platform-wide rule notifies only through platform-wide channels."
+msgstr "er gehört zu einem Mandanten; eine systemweite Regel benachrichtigt nur über systemweite Kanäle."
+
+msgid "it belongs to another tenant; a tenant rule notifies only through its own tenant's channels."
+msgstr "er gehört zu einem anderen Mandanten; eine Regel eines Mandanten benachrichtigt nur über die Kanäle ihres eigenen Mandanten."
+
+msgid "it is platform-wide; a tenant rule notifies only through its own tenant's channels."
+msgstr "er ist systemweit; eine Regel eines Mandanten benachrichtigt nur über die Kanäle ihres eigenen Mandanten."
+
 msgid "No delivery planned (muted rule or never dispatched)"
 msgstr "Keine Zustellung geplant (stummgeschaltete Regel oder noch nie versandt)"
 

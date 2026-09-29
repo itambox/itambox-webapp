@@ -150,7 +150,7 @@ ENUM_SOURCES = (
         "ALERT_TYPE_CHOICES",
         KIND_PAIRS,
         OPEN,
-        CLASS_BETA_ENABLED,
+        CLASS_STABLE,
     ),
     _enum(
         "extras.AlertRule.SEVERITY_CHOICES",
@@ -293,10 +293,7 @@ EXCLUDED_SETTINGS = {
 #: Stable slice that gains one cannot keep publishing "none".
 CAPABILITY_LIMITATIONS = {
     "alerting.inbox": (),
-    "alerting.rules": (
-        "Rule evaluation is daily, not continuous; thresholds are not evaluated on write.",
-        "Channel delivery failures are logged, not retried.",
-    ),
+    "alerting.rules": (),
     "automation.webhooks": (),
     "organization.role_grants": (),
     "organization.resource_grants": (),

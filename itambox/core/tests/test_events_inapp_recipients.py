@@ -48,3 +48,35 @@ class InAppChannelRecipientTests(TestCase):
     def test_member_of_other_tenant_is_not_notified(self):
         send_notification_to_channel(self.channel, "Subj", "Body")
         self.assertFalse(Notification.objects.filter(user=self.outsider).exists())
+
+    def test_explicit_recipients_are_bounded_by_the_channel_tenant(self):
+        self.channel.config = {"recipient_users": [self.outsider.pk, self.member.pk]}
+        self.channel.save()
+
+        send_notification_to_channel(self.channel, "Explicit", "Body")
+
+        self.assertTrue(Notification.objects.filter(user=self.member, subject="Explicit").exists())
+        self.assertFalse(Notification.objects.filter(user=self.outsider, subject="Explicit").exists())
+
+    def test_explicit_recipients_outside_the_tenant_are_skipped_entirely(self):
+        self.channel.config = {"recipient_users": [self.outsider.pk]}
+        self.channel.save()
+
+        send_notification_to_channel(self.channel, "Explicit", "Body")
+
+        self.assertFalse(Notification.objects.filter(subject="Explicit").exists())
+
+    def test_explicit_recipients_on_a_platform_channel_require_staff(self):
+        staff = User.objects.create_user(username="staffer", password="pw", is_active=True, is_staff=True)
+        platform_channel = NotificationChannel.objects.create(
+            name="Global Feed",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=None,
+        )
+        platform_channel.config = {"recipient_users": [staff.pk, self.member.pk]}
+        platform_channel.save()
+
+        send_notification_to_channel(platform_channel, "Explicit", "Body")
+
+        self.assertTrue(Notification.objects.filter(user=staff, subject="Explicit").exists())
+        self.assertFalse(Notification.objects.filter(user=self.member, subject="Explicit").exists())

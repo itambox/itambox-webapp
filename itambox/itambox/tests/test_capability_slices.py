@@ -46,7 +46,7 @@ DECLARED = {
     "reporting.designer": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.scheduled": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
     "alerting.inbox": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
-    "alerting.rules": (BETA, "enabled", SOURCE_OBJECT_ENABLED),
+    "alerting.rules": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "organization.resource_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "automation.webhooks": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
@@ -87,6 +87,17 @@ class TestDeclaredSlice:
 
     def test_the_seam_is_declared_stable_always_on_without_probe_or_limitations(self):
         capability = registry.get("procurement.requisition_seam")
+
+        assert (capability.maturity, capability.activation, capability.activation_source) == (
+            STABLE,
+            ALWAYS_ON,
+            SOURCE_ALWAYS,
+        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
+
+    def test_alert_rules_are_declared_stable_always_on_without_probe_or_limitations(self):
+        capability = registry.get("alerting.rules")
 
         assert (capability.maturity, capability.activation, capability.activation_source) == (
             STABLE,
@@ -163,6 +174,13 @@ class TestActivationDefaults:
         assert EventRule._base_manager.count() == 0
         assert WebhookEndpoint._base_manager.count() == 0
         assert registry.state("automation.webhooks") == ActivationState(active=True, value_present=True)
+
+    def test_alert_rules_are_active_with_zero_rows(self, db):
+        from extras.models import AlertRule, NotificationChannel
+
+        assert AlertRule._base_manager.count() == 0
+        assert NotificationChannel._base_manager.count() == 0
+        assert registry.state("alerting.rules") == ActivationState(active=True, value_present=True)
 
     def test_every_opt_in_capability_is_inert_on_a_fresh_deployment(self, db):
         """``db``: the object-backed probes must *answer* here, not fail closed.
@@ -321,31 +339,6 @@ class TestRegistrationIdempotence:
 class TestExistingDeploymentCompatibility:
     """An object-enabled Beta slice is inert on a fresh install and live on a used one."""
 
-    def test_an_object_enabled_capability_is_inactive_with_no_rows(self, db):
-        assert registry.state("alerting.rules") == ActivationState(active=False, value_present=False)
-
-    def test_an_existing_enabled_row_keeps_the_capability_active(self, db):
-        baker.make("extras.AlertRule", is_active=True)
-        state = registry.state("alerting.rules")
-        assert (state.active, state.value_present) == (True, True)
-
-    def test_rows_that_are_all_switched_off_read_as_configured_but_inactive(self, db):
-        baker.make("extras.AlertRule", is_active=False)
-        state = registry.state("alerting.rules")
-        assert (state.active, state.value_present) == (False, True)
-
-    def test_a_soft_deleted_row_is_not_configuration_at_all(self, db):
-        """The recycle bin is not a deployment state: a deleted rule configures nothing."""
-        rule = baker.make("extras.AlertRule", is_active=True)
-        rule.soft_delete()
-        assert registry.state("alerting.rules") == ActivationState(active=False, value_present=False)
-
-    def test_a_live_row_still_counts_beside_a_soft_deleted_one(self, db):
-        baker.make("extras.AlertRule", is_active=True).soft_delete()
-        baker.make("extras.AlertRule", is_active=True)
-        state = registry.state("alerting.rules")
-        assert (state.active, state.value_present) == (True, True)
-
     def test_scheduled_reports_are_inactive_until_an_active_schedule_row_exists(self, db):
         state = registry.state("reporting.scheduled")
 
@@ -407,6 +400,10 @@ class TestInactiveSafety:
     def test_the_seam_is_not_deactivatable(self):
         assert "procurement.requisition_seam" not in deactivatable_keys()
         assert registry.is_active("procurement.requisition_seam") is True
+
+    def test_alert_rules_are_not_deactivatable(self):
+        assert "alerting.rules" not in deactivatable_keys()
+        assert registry.is_active("alerting.rules") is True
 
     @pytest.mark.parametrize(
         "key",

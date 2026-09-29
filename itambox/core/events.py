@@ -269,6 +269,45 @@ def _send_email_notification(channel, subject, body):
     )
 
 
+def _resolve_in_app_recipients(channel):
+    """Resolve the in-app target users inside the channel's scope.
+
+    Explicit ``recipient_users`` in the channel config are bounded by the
+    channel's scope at delivery time: members of the channel's tenant, or
+    staff for a platform-wide channel. Users outside the scope are skipped
+    (issue #567 — enforced at delivery, not only in the form). Without an
+    explicit list, the channel's tenant members are notified, or global
+    staff for a platform-wide channel.
+    """
+    User = get_user_model()
+    user_ids = channel.config.get("recipient_users", [])
+    if user_ids:
+        recipients = User.objects.filter(pk__in=user_ids, is_active=True)
+        if channel.tenant_id:
+            recipients = recipients.filter(memberships__tenant_id=channel.tenant_id).distinct()
+        else:
+            recipients = recipients.filter(is_staff=True)
+        users = list(recipients)
+        if len(users) < len(set(user_ids)):
+            logger.warning(
+                "In-App channel '%s': %s configured recipient(s) did not resolve inside the channel scope.",
+                channel.name,
+                len(set(user_ids)) - len(users),
+            )
+        return users
+    if channel.tenant_id:
+        # Members of the channel's tenant (via Membership) — covers
+        # users with no AssetHolder profile, unlike the old
+        # asset_holder_profiles join.
+        return list(
+            User.objects.filter(
+                memberships__tenant_id=channel.tenant_id,
+                is_active=True,
+            ).distinct()
+        )
+    return list(User.objects.filter(is_staff=True, is_active=True))
+
+
 def send_notification_to_channel(channel: NotificationChannelRef, subject, body):
     """Deliver a notification via the given structural channel.
 
@@ -302,25 +341,7 @@ def send_notification_to_channel(channel: NotificationChannelRef, subject, body)
         return _send_email_notification(channel, subject, body)
 
     if channel_type == CHANNEL_TYPE_IN_APP:
-        User = get_user_model()
-
-        # Resolve target users: explicit list in config → tenant members → global staff
-        user_ids = channel.config.get("recipient_users", [])
-        if user_ids:
-            users = list(User.objects.filter(pk__in=user_ids, is_active=True))
-        elif channel.tenant_id:
-            # Members of the channel's tenant (via Membership) — covers
-            # users with no AssetHolder profile, unlike the old
-            # asset_holder_profiles join.
-            users = list(
-                User.objects.filter(
-                    memberships__tenant_id=channel.tenant_id,
-                    is_active=True,
-                ).distinct()
-            )
-        else:
-            users = list(User.objects.filter(is_staff=True, is_active=True))
-
+        users = _resolve_in_app_recipients(channel)
         if not users:
             logger.warning("In-App channel '%s': no recipients found, so notifications were not sent.", channel.name)
             return DeliveryResult(
