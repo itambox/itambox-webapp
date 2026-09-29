@@ -277,7 +277,7 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
             return Schedule.objects.create(
                 name=name,
                 func="extras.tasks.reports.generate_scheduled_report_task",
-                schedule_type=Schedule.DAILY,
+                schedule_type="D",  # Schedule.DAILY; historical models drop class constants.
             )
 
         self.suppressed_q = q_schedule("scheduled_report_suppressed")

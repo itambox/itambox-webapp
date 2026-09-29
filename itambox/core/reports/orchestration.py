@@ -162,19 +162,31 @@ def _report_compilation_scope(filter_tenants: Sequence[object]) -> Iterator[None
     other than the active one, or a multi-tenant aggregation -- must compile
     under an explicit scope or it would silently drop the other tenants' rows.
     A single pinned tenant narrows the ambient binding to that tenant; an
-    aggregation suspends it entirely (managers stay unscoped and the explicit
-    authorized filter is the only boundary). The previous binding is restored
-    afterwards. An empty scope is the global-aggregation signal and keeps the
-    ambient behavior unchanged.
+    aggregation suspends the ambient binding entirely and runs like a system
+    read -- scoped managers treat "no scope + an authenticated principal" as
+    a bug and fail closed to an empty queryset, so the principal is suspended
+    alongside the binding, and the explicit authorized filter is the only
+    boundary. The previous bindings are restored afterwards. An empty scope is
+    the global-aggregation signal and keeps the ambient behavior unchanged.
     """
     if not filter_tenants:
         yield
         return
     # inline import: app-registry: the scope override is only needed while compiling.
-    from core.context import override_current_tenant_scope
+    from core.context import get_current_user, override_current_tenant_scope, set_current_user
 
-    with override_current_tenant_scope(filter_tenants[0] if len(filter_tenants) == 1 else None):
-        yield
+    if len(filter_tenants) == 1:
+        with override_current_tenant_scope(filter_tenants[0]):
+            yield
+        return
+
+    previous_user = get_current_user()
+    with override_current_tenant_scope(None):
+        set_current_user(None)
+        try:
+            yield
+        finally:
+            set_current_user(previous_user)
 
 
 def build_report_context(

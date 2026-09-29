@@ -118,6 +118,10 @@ class CrossTenantCompilationScopeTests(TenantTestMixin, TestCase):
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
         self.asset_a = baker.make(Asset, tenant=self.tenant, asset_tag="A-1", status=self.status)
         self.asset_b = baker.make(Asset, tenant=self.tenant_b, asset_tag="B-1", status=self.status)
+        # A third tenant the principal is not authorized for: its rows must
+        # never appear in an authorized constellation's compile.
+        self.tenant_c = Tenant.objects.create(name="Tenant C", slug="cross-c")
+        self.asset_c = baker.make(Asset, tenant=self.tenant_c, asset_tag="C-1", status=self.status)
         self.template = ReportTemplate.objects.create(
             name="Cross Scope",
             report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
@@ -156,6 +160,7 @@ class CrossTenantCompilationScopeTests(TenantTestMixin, TestCase):
         self.set_active_tenant(self.tenant)
         tags = self._compile_tags(filter_tenants=[self.tenant, self.tenant_b], active_tenant=self.tenant)
         self.assertEqual(sorted(tags), ["A-1", "B-1"])
+        self.assertNotIn("C-1", tags)
 
     def test_worker_task_context_compiles_every_pinned_tenant(self):
         # The scheduled path compiles under a TaskContext bound to the
@@ -167,6 +172,7 @@ class CrossTenantCompilationScopeTests(TenantTestMixin, TestCase):
         with TaskContext(tenant_id=self.tenant.pk, user_id=self.tenant_user.pk):
             tags = self._compile_tags(filter_tenants=[self.tenant, self.tenant_b], active_tenant=self.tenant)
         self.assertEqual(sorted(tags), ["A-1", "B-1"])
+        self.assertNotIn("C-1", tags)
 
     def test_unauthorized_multi_tenant_compilation_fails_closed(self):
         plain_user = User.objects.create_user(username="plain-cross", password="password")
