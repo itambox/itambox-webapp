@@ -499,6 +499,72 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         line.refresh_from_db()
         self.assertEqual(line.qty_received, 0)
 
+    def test_web_receive_form_replay_books_exactly_once(self):
+        """The rendered form binds the receipt-state snapshot; replaying its submission books once.
+
+        Regression for the web flow: the snapshot must be captured when the form is prepared
+        and never regenerated during POST handling, or an HTTP replay would silently book the
+        same delivery again.
+        """
+        component = self._component("Web Replay RAM", "web-replay-ram")
+        purchase_order = self._draft_purchase_order("PO-WEB-REPLAY-001")
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            component=component,
+            qty_ordered=10,
+            unit_price="5.00",
+        )
+        self._open(purchase_order)
+        request = self._request(component=component, qty=10, status=RequestStatusChoices.PROCUREMENT)
+        FulfillmentLink.objects.create(
+            tenant=self.tenant,
+            asset_request=request,
+            purchase_order_line=line,
+            qty_allocated=10,
+            qty_received=0,
+        )
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+        url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": purchase_order.pk})
+        # Rendering the form is what binds the receipt-state snapshot for the submission below.
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        payload = {
+            "step": "1",
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-line_id": str(line.pk),
+            "form-0-qty_to_receive": "3",
+        }
+        first_response = self.client.post(url, payload, follow=True)
+        self.assertEqual(first_response.status_code, 200)
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 3)
+        self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 3)
+
+        # Replaying the identical HTTP submission refreshes nothing and books nothing.
+        replay_response = self.client.post(url, payload, follow=True)
+        self.assertEqual(replay_response.status_code, 200)
+        self.assertContains(replay_response, "changed since this receipt was prepared")
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 3)
+        self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 3)
+
+        # Re-rendering the form binds a fresh snapshot; the next submission is a genuine delivery.
+        self.assertEqual(self.client.get(url).status_code, 200)
+        third_response = self.client.post(url, payload, follow=True)
+        self.assertEqual(third_response.status_code, 200)
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 6)
+        self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 6)
+
 
 class CancellationReleaseTests(PartialReceiptFixture):
     def _cancel_request(self, request):

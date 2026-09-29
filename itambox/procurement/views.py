@@ -346,6 +346,12 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         po = self.get_object()
 
+        if self.request.method == "GET":
+            # Bind the receipt-state snapshot to this rendered form: submissions must submit
+            # the snapshot of the form they were prepared against, and POST handling never
+            # regenerates it (a replay would otherwise silently book additional stock).
+            self.request.session["receive_po_expected"] = {line.pk: line.qty_received for line in po.lines.all()}
+
         # Prepare initial data for Step 1 formset
         initial_data = []
         outstanding_lines = []
@@ -435,9 +441,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 for form in formset:
                     line_quantities[form.cleaned_data["line_id"]] = form.cleaned_data["qty_to_receive"]
 
-                # Snapshot the recorded receipt quantities this submission is prepared against;
-                # the service refuses stale submissions (replays / parallel duplicates).
-                line_expected = {line_id: po.lines.get(pk=line_id).qty_received for line_id in line_quantities}
+                # The receipt-state snapshot was captured when the form was rendered; processing
+                # never regenerates it from the database, so a replayed submission is refused.
+                line_expected = request.session.get("receive_po_expected", {})
+                line_expected = {int(k): int(v) for k, v in line_expected.items()}
 
                 # Check if any asset lines are being received
                 has_assets = False
@@ -459,9 +466,9 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                                 )
 
                 if has_assets:
-                    # Save quantities and the receipt-state snapshot for step 2
+                    # Save quantities for step 2; the receipt-state snapshot stays bound to the
+                    # rendered form (captured at GET) and is never refreshed during processing.
                     request.session["receive_po_quantities"] = line_quantities
-                    request.session["receive_po_expected"] = line_expected
 
                     # Initialize step 2 formset
                     DynamicAssetProvisionFormSet = formset_factory(

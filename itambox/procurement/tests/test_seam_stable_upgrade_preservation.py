@@ -285,3 +285,126 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
         out = StringIO()
         call_command("reconcile_procurement_legacy", stdout=out)
         self.assertIn("No legacy pledges", out.getvalue())
+
+    def test_legacy_reconciliation_excludes_completed_orders(self):
+        """A fully received historical order is completed history, not a dead pledge."""
+        _purchase_order, line = self._ordered_component_purchase_order("PO-UPGRADE-006", 10)
+        line.qty_received = 10
+        line.save(update_fields=["qty_received"])
+        request = self._beta_request(component=self.component, qty=10)
+        request.status = RequestStatusChoices.APPROVED
+        request.save(update_fields=["status"])
+        link = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=request, purchase_order_line=line, qty_allocated=10
+        )
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", stdout=out)
+        self.assertIn("Completed record stays untouched", out.getvalue())
+        self.assertNotIn("Legacy pledge", out.getvalue())
+        self.assertIn("No closable legacy pledges found.", out.getvalue())
+
+        call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
+        link = FulfillmentLink._base_manager.get(pk=link.pk)
+        self.assertIsNone(link.deleted_at)
+
+    def test_legacy_reconciliation_excludes_delivered_serialised_units(self):
+        """A request with an assigned asset carries delivery evidence and is preserved."""
+        purchase_order = PurchaseOrder.objects.create(
+            tenant=self.tenant,
+            order_number="PO-UPGRADE-007",
+            currency="EUR",
+            supplier=self.supplier,
+            destination_location=self.location,
+            created_by=self.actor,
+        )
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price="10.00",
+        )
+        approve_purchase_order(purchase_order)
+        order_purchase_order(purchase_order)
+
+        request = self._beta_request(asset_type=self.asset_type, qty=2)
+        request.status = RequestStatusChoices.APPROVED
+        request.save(update_fields=["status"])
+        delivered = Asset.objects.create(
+            name="Delivered serialised unit",
+            asset_type=self.asset_type,
+            serial_number="UPG-SN-7",
+            status=StatusLabel.objects.get(type="deployable"),
+            location=self.location,
+            supplier=self.supplier,
+            purchase_cost=line.unit_price,
+            currency="EUR",
+            purchase_date=timezone.now().date(),
+            order_number=purchase_order.order_number,
+            tenant=self.tenant,
+            purchase_order_line=line,
+        )
+        request.asset = delivered
+        request.save(update_fields=["asset"])
+        link = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=request, purchase_order_line=line, qty_allocated=2
+        )
+        line.qty_received = 1
+        line.save(update_fields=["qty_received"])
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", stdout=out)
+        self.assertIn("Completed record stays untouched", out.getvalue())
+        self.assertNotIn("Legacy pledge", out.getvalue())
+
+        call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
+        link = FulfillmentLink._base_manager.get(pk=link.pk)
+        self.assertIsNone(link.deleted_at)
+
+    def test_legacy_reconciliation_requires_review_without_sufficient_evidence(self):
+        """Ambiguous records are reported for operator review and never closed by the command."""
+        # No receipt at all on the line: the approval did not come from a receipt.
+        _purchase_order, line_a = self._ordered_component_purchase_order("PO-UPGRADE-008", 10)
+        request_a = self._beta_request(component=self.component, qty=10)
+        request_a.status = RequestStatusChoices.APPROVED
+        request_a.save(update_fields=["status"])
+        link_a = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=request_a, purchase_order_line=line_a, qty_allocated=10
+        )
+
+        # A partially received serialised line without a delivered asset.
+        purchase_order_b = PurchaseOrder.objects.create(
+            tenant=self.tenant,
+            order_number="PO-UPGRADE-009",
+            currency="EUR",
+            supplier=self.supplier,
+            destination_location=self.location,
+            created_by=self.actor,
+        )
+        line_b = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order_b,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price="10.00",
+        )
+        approve_purchase_order(purchase_order_b)
+        order_purchase_order(purchase_order_b)
+        request_b = self._beta_request(asset_type=self.asset_type, qty=2)
+        request_b.status = RequestStatusChoices.APPROVED
+        request_b.save(update_fields=["status"])
+        link_b = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=request_b, purchase_order_line=line_b, qty_allocated=2
+        )
+        line_b.qty_received = 1
+        line_b.save(update_fields=["qty_received"])
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", stdout=out)
+        self.assertEqual(out.getvalue().count("Needs operator review"), 2)
+        self.assertIn("No closable legacy pledges found.", out.getvalue())
+
+        call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
+        self.assertIsNone(FulfillmentLink._base_manager.get(pk=link_a.pk).deleted_at)
+        self.assertIsNone(FulfillmentLink._base_manager.get(pk=link_b.pk).deleted_at)

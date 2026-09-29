@@ -8,7 +8,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
-- `reconcile_procurement_legacy` reports pre-upgrade fulfilment pledges (requests that a partial receipt approved while delivered quantities were still untracked, with a blank `qty_received`) and softly closes them on explicit `--apply` without rewriting any recorded quantity, stock, or approval state; the affected units can be re-requested (issue #569).
+- `reconcile_procurement_legacy` reports pre-upgrade fulfilment pledges (requests that a partial receipt approved while delivered quantities were still untracked, with a blank `qty_received`); it distinguishes demonstrable candidates (partially received non-serialised lines without delivery evidence) from completed records (assigned asset or fully received line) and records requiring explicit operator review, and `--apply` only softly closes the candidates without rewriting any recorded quantity, stock, or approval state; the affected units can be re-requested (issue #569).
 
 ### Changed
 

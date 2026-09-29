@@ -353,11 +353,17 @@ purchase-order receipt approved while delivered quantities were still untracked 
 historical approval and a blank received quantity, and later receipts are deliberately
 never booked against it.
 
+The report distinguishes the remaining evidence: a request with an assigned asset or a
+fully received line is completed history and stays untouched; a partially received
+non-serialised line without delivery evidence is a demonstrable reconciliation candidate;
+anything else (no receipt on the line, or a serialised line without an assigned asset)
+needs explicit operator review and is never closed by the command.
+
 | | |
 |---|---|
 | **Usage** | `python manage.py reconcile_procurement_legacy [--apply]` |
-| **Production-safe** | Read-only by default (a dry-run report). `--apply` softly closes the reported dead pledges; recorded quantities, stock, and approval states are never rewritten. |
-| **When to use** | After upgrading a deployment that ran the Asset Request Procurement Seam while it was Beta: review the affected pledges and close the ones whose outstanding units will never arrive. Re-request the units if they are still needed. |
+| **Production-safe** | Read-only by default (a dry-run report). `--apply` only softly closes the demonstrable candidate pledges; completed records stay untouched, ambiguous records require explicit operator review, and recorded quantities, stock, and approval states are never rewritten. |
+| **When to use** | After upgrading a deployment that ran the Asset Request Procurement Seam while it was Beta: review the report, close the demonstrable candidates, and decide the review records manually. Re-request the units if they are still needed. |
 
 ### `rotate_encryption_keys`
 
