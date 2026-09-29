@@ -429,6 +429,9 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 context["formset"] = formset
                 context["lines_info"] = list(zip(lines_info, formset))
                 context["step"] = "2"
+                # Keep this operation's submitted snapshot: a corrected submission stays bound
+                # to the state it was prepared against and is refused if that state moved on.
+                context["expected_received_json"] = json.dumps({str(pk): qty for pk, qty in expected_received.items()})
                 return render(request, "procurement/purchaseorder_receive_step2.html", context)
 
         else:

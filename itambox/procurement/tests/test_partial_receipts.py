@@ -87,7 +87,7 @@ class PartialReceiptFixture(TestCase):
 
     def _form_receipt_state(self, response):
         """The receipt-state snapshot a rendered receive form binds into its submission."""
-        match = re.search(r'name="expected_received" value="([^"]*)"', response.content.decode())
+        match = re.search(r'name="expected_received"\s+value="([^"]*)"', response.content.decode())
         self.assertIsNotNone(match)
         return html.unescape(match.group(1))
 
@@ -673,6 +673,98 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         self.assertEqual(step_two_page.status_code, 200)
         self.assertTemplateUsed(step_two_page, "procurement/purchaseorder_receive_step2.html")
         self.assertEqual(self._form_receipt_state(step_two_page), step_one_payload["expected_received"])
+
+    def test_web_receive_form_invalid_step_two_keeps_the_submitted_snapshot(self):
+        """A corrected step-2 submission stays bound to the snapshot it was prepared against."""
+        purchase_order = self._draft_purchase_order("PO-WEB-INVALID-STEP2-001")
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price="5.00",
+        )
+        self._open(purchase_order)
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+        url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": purchase_order.pk})
+        first_get = self.client.get(url)
+        self.assertEqual(first_get.status_code, 200)
+
+        step_one_payload = {
+            "step": "1",
+            "expected_received": self._form_receipt_state(first_get),
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-line_id": str(line.pk),
+            "form-0-qty_to_receive": "2",
+        }
+        step_two_page = self.client.post(url, step_one_payload)
+        self.assertEqual(step_two_page.status_code, 200)
+        submitted_state = self._form_receipt_state(step_two_page)
+
+        # Someone else books a receipt for the shared line while the operator is still on the
+        # form: the state this operation was prepared against has moved on.
+        receive_purchase_order(
+            purchase_order,
+            {line.pk: 1},
+            self._serial_details(line, [99]),
+            expected_received={line.pk: 0},
+        )
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 1)
+
+        # An invalid step-2 submission re-renders with the submitted snapshot, not the current
+        # database state, so the corrected form cannot silently book against refreshed state.
+        invalid_payload = {
+            "step": "2",
+            "expected_received": submitted_state,
+            "form-TOTAL_FORMS": "2",
+            "form-INITIAL_FORMS": "2",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-line_id": str(line.pk),
+            "form-0-asset_tag": "DUPLICATE-TAG",
+            "form-0-name": "First",
+            "form-1-line_id": str(line.pk),
+            "form-1-asset_tag": "DUPLICATE-TAG",
+            "form-1-name": "Second",
+        }
+        rerendered = self.client.post(url, invalid_payload)
+        self.assertEqual(rerendered.status_code, 200)
+        self.assertTemplateUsed(rerendered, "procurement/purchaseorder_receive_step2.html")
+        self.assertEqual(self._form_receipt_state(rerendered), submitted_state)
+
+        # The corrected submission still carries the original snapshot and is refused.
+        corrected = self.client.post(
+            url,
+            {
+                "step": "2",
+                "expected_received": self._form_receipt_state(rerendered),
+                "form-TOTAL_FORMS": "2",
+                "form-INITIAL_FORMS": "2",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-line_id": str(line.pk),
+                "form-0-asset_tag": "TAG-A",
+                "form-0-name": "First",
+                "form-1-line_id": str(line.pk),
+                "form-1-asset_tag": "TAG-B",
+                "form-1-name": "Second",
+            },
+            follow=True,
+        )
+        self.assertEqual(corrected.status_code, 200)
+        self.assertContains(corrected, "changed since this receipt was prepared")
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 1)
+        self.assertEqual(Asset.objects.filter(purchase_order_line=line).count(), 1)
 
 
 class CancellationReleaseTests(PartialReceiptFixture):

@@ -12,7 +12,9 @@
           <p class="text-muted">{% translate "Specify the quantity to receive into stock at location:" %} <strong>{{ object.destination_location }}</strong>.</p>
           <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="expected_received" value="{{ expected_received_json }}">
+            <input type="hidden"
+                   name="expected_received"
+                   value="{{ expected_received_json }}">
             {{ formset.management_form }}
             <div class="table-responsive mt-3 mb-4">
               <table class="table table-vcenter table-striped card-table">
