@@ -267,11 +267,17 @@ class FulfillmentAttributionConcurrencyTests(TransactionTestCase):
         """Race of two identical submissions: only the first books a unit for the first
         outstanding request; the stale duplicate is refused. A later submission prepared
         against the fresh state completes the remaining request."""
+        requestable_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Attribution Serial Model",
+            slug="attribution-serial-model",
+            requestable=True,
+        )
         purchase_order = self._draft_purchase_order("PO-RACE-ATTR-002")
         line = PurchaseOrderLine.objects.create(
             tenant=self.tenant,
             purchase_order=purchase_order,
-            asset_type=self.asset_type,
+            asset_type=requestable_type,
             qty_ordered=2,
             unit_price="10.00",
         )
@@ -280,7 +286,7 @@ class FulfillmentAttributionConcurrencyTests(TransactionTestCase):
         parent = AssetRequest.objects.create(
             tenant=self.tenant,
             requester=self.requester,
-            asset_type=self.asset_type,
+            asset_type=requestable_type,
             qty=2,
             is_group=True,
             status=RequestStatusChoices.PROCUREMENT,
@@ -290,7 +296,7 @@ class FulfillmentAttributionConcurrencyTests(TransactionTestCase):
             child = AssetRequest(
                 tenant=self.tenant,
                 requester=self.requester,
-                asset_type=self.asset_type,
+                asset_type=requestable_type,
                 qty=1,
                 parent=parent,
                 status=RequestStatusChoices.PROCUREMENT,
