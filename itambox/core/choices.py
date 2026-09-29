@@ -25,11 +25,20 @@ class EventActionChoices(ChoiceSet):
     ACTION_CREATE = "create"
     ACTION_UPDATE = "update"
     ACTION_DELETE = "delete"
+    ACTION_RESTORE = "restore"
+    ACTION_CHECKOUT = "checkout"
+    ACTION_CHECKIN = "checkin"
 
     CHOICES = (
         (ACTION_CREATE, _("Create"), "success"),
         (ACTION_UPDATE, _("Update"), "info"),
         (ACTION_DELETE, _("Delete"), "danger"),
+        # Emitted on a soft-delete restore (set -> None), and on the asset
+        # checkout/checkin flows: the six-value V1 event vocabulary published
+        # for the webhook envelope's ``event`` field.
+        (ACTION_RESTORE, _("Restore"), "success"),
+        (ACTION_CHECKOUT, _("Checkout"), "warning"),
+        (ACTION_CHECKIN, _("Checkin"), "primary"),
     )
 
 

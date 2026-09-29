@@ -551,7 +551,6 @@ EXTRAS_MENU = Menu(
         ),
         MenuGroup(
             label=_("Automation"),
-            beta=True,
             items=(
                 MenuItem(
                     link="extras:webhookendpoint_list",

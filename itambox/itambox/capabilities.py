@@ -15,7 +15,12 @@ naming a domain application is a hard error -- see the private
 Three rules make the declarations trustworthy rather than decorative:
 
 * **Stable means always on.** A Stable capability carries no probe and cannot
-  report inactive. If a slice can be switched off, it is not Stable.
+  report inactive. If a slice can be switched off, it is not Stable. "Always
+  on" describes *availability*, not self-activation: the slice's surfaces are
+  always present, and any effect it gates on deliberate operator configuration
+  (a rule, an endpoint, a target) still requires that configuration first. A
+  provider of an external effect is therefore Stable and still dormant until
+  somebody creates and enables the object that causes the effect.
 * **Non-Stable means probed.** Beta and Experimental entries must say how a
   deployment turns them on, and must declare at least one limitation.
 * **Security-critical means undeactivatable.** An entry that guards a boundary

@@ -28,7 +28,7 @@ Track the purchasing lifecycle: Purchase Orders with approval workflows, Contrac
 Conduct hardware audits with barcode scanning, generate legally binding custody receipts with digital signatures, and schedule preventive maintenance. Custody receipts capture EULA acceptance with tamper-proof verification hashes.
 
 ### Extras & Customization
-Extend ITAMbox with custom fields, alert rules, webhooks, event-driven automation, saved filters, dashboards, export templates, label/QR code printing, and scheduled reports. **Curated Reports** and **Alerts and Notifications** are **Stable** capabilities; **Report Designer**, **Scheduled Reports**, **Alert Rules and Channels**, and **Webhooks and Event Rules** are **Beta**.
+Extend ITAMbox with custom fields, alert rules, webhooks, event-driven automation, saved filters, dashboards, export templates, label/QR code printing, and scheduled reports. **Curated Reports**, **Alerts and Notifications**, and **Webhooks and Event Rules** are **Stable** capabilities; **Report Designer**, **Scheduled Reports**, and **Alert Rules and Channels** are **Beta**. Webhooks and Event Rules are always available, but nothing is delivered until an endpoint and an event rule are deliberately created and enabled.
 
 ### Users & Authentication
 Manage Django user accounts, API tokens, role-based access control (RBAC), tenant memberships, and SSO integrations (LDAP, SAML, OIDC). SCIM 2.0 provisioning is available for identity-provider-driven user lifecycle management; **SCIM Provisioning** is a **Beta** capability.

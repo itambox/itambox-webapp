@@ -18,16 +18,27 @@ Security-critical capabilities (for example authorization and tenant resource
 grants) are always Stable-grade **and cannot be deactivated**: no configuration
 can switch the authorization path off.
 
+**Always on means always available.** A Stable grade promises that the
+capability's surfaces cannot be switched off by configuration; it does not
+promise that effects happen by themselves. A capability whose effect requires an
+operator-created object — a webhook endpoint, an event rule, a delivery target —
+remains completely dormant until that object exists and is enabled. Webhooks and
+Event Rules are the example: the capability is Stable and always available, and
+nothing is ever delivered until an administrator deliberately creates and
+enables an endpoint and a rule.
+
 ## Activation modes
 
 | Mode | How it is switched on | Example in this release |
 |---|---|---|
-| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Alerts and Notifications, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
+| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Alerts and Notifications, Webhooks and Event Rules, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
 | Opt-in through configuration | An operator sets an environment variable / setting; takes effect on restart. | Report Designer (`ITAMBOX_FEATURE_REPORT_DESIGNER`), Plugin System (`ITAMBOX_PLUGINS`), Asset Request auto-approval (`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`), Scheduled Reports (flag plus an active schedule row) |
-| Opt-in through an application object | An administrator creates or enables a record in the application. | Webhooks and Event Rules (an enabled `EventRule`), Alert Rules and Channels (an active `AlertRule`), SCIM Provisioning (a tenant-scoped API token with write access) |
+| Opt-in through an application object | An administrator creates or enables a record in the application. | Alert Rules and Channels (an active `AlertRule`), SCIM Provisioning (a tenant-scoped API token with write access) |
 
 A capability that is not switched on is reported as **inactive** — it keeps its
 declared grade, but contributes none of its surfaces until it is activated.
+Capabilities that are Stable cannot be switched off and are never reported
+inactive.
 
 ## Capabilities in this release
 
@@ -38,7 +49,7 @@ declared grade, but contributes none of its surfaces until it is activated.
 | Scheduled Reports | Beta | Opt-in: flag plus an active schedule row | [Reports & Exports](../usage/reports-and-exports.md) |
 | Alerts and Notifications | Stable | Enabled by default | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
 | Alert Rules and Channels | Beta | Opt-in: an active `AlertRule` | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
-| Webhooks and Event Rules | Beta | Opt-in: an enabled `EventRule` | [Webhooks & Automation](../usage/webhooks-and-automation.md) |
+| Webhooks and Event Rules | Stable | Enabled by default; delivery requires an enabled event rule and endpoint | [Webhooks & Automation](../usage/webhooks-and-automation.md) |
 | Role Grants | Stable | Enabled by default (security-critical) | — |
 | Tenant Resource Grants | Stable | Enabled by default (security-critical) | [Resource Grant Expiry](resource-grant-expiry.md) |
 | Purchase Orders and Contracts | Stable | Enabled by default | [Contracts & Purchase Orders](../usage/contracts-and-purchase-orders.md) |
@@ -61,7 +72,7 @@ python manage.py capabilities --format json
 ```text
 CAPABILITY                          CLASS    MODE       STATE     SOURCE          VALUE
 reporting.designer                  beta     opt-in     inactive  operator-flag   absent
-automation.webhooks                 beta     opt-in     inactive  object-enabled  absent
+automation.webhooks                 stable   always-on  active    always          present
 organization.resource_grants *      stable   always-on  active    always          present
 ```
 
