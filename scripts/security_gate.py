@@ -15,9 +15,10 @@ from typing import Any
 from urllib.parse import quote
 
 TRIVY_SEVERITIES = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
-# Lowest severity band that blocks a gate run. The release-image gates pass
-# ``--fail-on any`` so every unsuppressed, fix-available finding blocks; the
-# dependency-lock gates keep the ``high`` default.
+# Lowest severity band that blocks a gate run. The canonical dependency-lockfile
+# gates block unsuppressed MEDIUM findings and above (also the ``medium``
+# default); the release-image gates pass ``--fail-on any`` so every unsuppressed,
+# fix-available finding blocks.
 FAIL_ON_THRESHOLDS = {
     "high": frozenset({"HIGH", "CRITICAL"}),
     "medium": frozenset({"MEDIUM", "HIGH", "CRITICAL"}),
@@ -230,7 +231,7 @@ def evaluate_trivy(
     suppressions: list[dict[str, Any]],
     sarif_path: Path,
     expected_targets: set[str] | None = None,
-    fail_on: str = "high",
+    fail_on: str = "medium",
 ) -> GateResult:
     if fail_on not in FAIL_ON_THRESHOLDS:
         raise SecurityGateError(f"unknown fail-on policy {fail_on!r}")
@@ -261,16 +262,24 @@ def evaluate_trivy(
             visible.append(finding)
     counts = Counter(finding["severity"] for finding in visible)
     blocking = sum(counts[severity] for severity in FAIL_ON_THRESHOLDS[fail_on])
-    _write_sarif(sarif_path, visible)
+    _write_sarif(sarif_path, visible, expected_targets or set())
     return GateResult(blocking == 0, blocking, suppressed, dict(counts))
 
 
-def _sarif_target_uri(target: str) -> str:
-    """Return a relative URI that Code Scanning can bind to the checkout."""
+def _sarif_target_uri(target: str, repo_targets: set[str]) -> str:
+    """Return the artifact URI that Code Scanning resolves for a Trivy target.
+
+    Targets that are declared repository-relative scan inputs (``--expect-target``,
+    for example the canonical lockfiles) keep their genuine tracked path so Code
+    Scanning binds the alert to a real file. Targets that are not repository files
+    (for example release-image names) keep a namespaced synthetic URI.
+    """
+    if target in repo_targets:
+        return quote(target, safe="/._-~")
     return f"trivy-targets/{quote(target, safe='._-~')}"
 
 
-def _write_sarif(path: Path, findings: list[dict[str, str]]) -> None:
+def _write_sarif(path: Path, findings: list[dict[str, str]], repo_targets: set[str]) -> None:
     rules = {}
     results = []
     level = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning"}
@@ -288,7 +297,11 @@ def _write_sarif(path: Path, findings: list[dict[str, str]]) -> None:
                 "level": level.get(finding["severity"], "note"),
                 "message": {"text": f"{finding['package']} {finding['version']} ({finding['severity']})"},
                 "locations": [
-                    {"physicalLocation": {"artifactLocation": {"uri": _sarif_target_uri(finding["target"])}}}
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {"uri": _sarif_target_uri(finding["target"], repo_targets)}
+                        }
+                    }
                 ],
                 "properties": {"target": finding["target"]},
             }
@@ -336,7 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     trivy.add_argument("--report", action="append", required=True, type=Path)
     trivy.add_argument("--sarif", required=True, type=Path)
     trivy.add_argument("--expect-target", action="append", default=[])
-    trivy.add_argument("--fail-on", choices=("high", "medium", "any"), default="high")
+    trivy.add_argument("--fail-on", choices=("high", "medium", "any"), default="medium")
     gitleaks = subparsers.add_parser("gitleaks")
     gitleaks.add_argument("--report", required=True, type=Path)
     return parser

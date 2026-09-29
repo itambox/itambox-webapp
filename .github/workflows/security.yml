@@ -84,6 +84,7 @@ jobs:
             --expect-target "uv.lock" \
             --expect-target "itambox/package-lock.json" \
             --expect-target "itambox/tests/e2e/package-lock.json" \
+            --fail-on medium \
             --sarif "$RUNNER_TEMP/trivy-dependencies.sarif"
           status=$?
           set -e
