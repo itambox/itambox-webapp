@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -715,10 +716,10 @@ class ProcurementStatusTransitionTests(TestCase):
         approve_purchase_order(self.po)
         order_purchase_order(self.po)
 
-        # Setup session for step 2
+        # Setup session quantities for step 2; the receipt-state snapshot travels with the
+        # step-2 submission itself.
         session = self.client.session
         session["receive_po_quantities"] = {line.pk: 2}
-        session["receive_po_expected"] = {line.pk: 0}
         session.save()
 
         # Deployable status label is required by the receiving service
@@ -742,6 +743,7 @@ class ProcurementStatusTransitionTests(TestCase):
                 # Form 1: only line_id is submitted (simulating blank user input)
                 "form-1-line_id": line.pk,
                 "step": "2",
+                "expected_received": json.dumps({str(line.pk): 0}),
             },
         )
         # It should redirect to absolute URL on success

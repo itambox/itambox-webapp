@@ -408,3 +408,32 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
         call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
         self.assertIsNone(FulfillmentLink._base_manager.get(pk=link_a.pk).deleted_at)
         self.assertIsNone(FulfillmentLink._base_manager.get(pk=link_b.pk).deleted_at)
+
+    def test_legacy_reconciliation_preserves_pledges_the_received_units_could_cover(self):
+        """On a shared partial line, pledges the received quantity could cover stay untouched."""
+        _purchase_order, line = self._ordered_component_purchase_order("PO-UPGRADE-010", 10)
+        line.qty_received = 6
+        line.save(update_fields=["qty_received"])
+
+        covered_request = self._beta_request(component=self.component, qty=5)
+        covered_request.status = RequestStatusChoices.APPROVED
+        covered_request.save(update_fields=["status"])
+        covered_link = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=covered_request, purchase_order_line=line, qty_allocated=5
+        )
+
+        uncovered_request = self._beta_request(component=self.component, qty=8)
+        uncovered_request.status = RequestStatusChoices.APPROVED
+        uncovered_request.save(update_fields=["status"])
+        uncovered_link = FulfillmentLink.objects.create(
+            tenant=self.tenant, asset_request=uncovered_request, purchase_order_line=line, qty_allocated=8
+        )
+
+        out = StringIO()
+        call_command("reconcile_procurement_legacy", stdout=out)
+        self.assertEqual(out.getvalue().count("Needs operator review"), 1)
+        self.assertEqual(out.getvalue().count("Legacy pledge"), 1)
+
+        call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
+        self.assertIsNone(FulfillmentLink._base_manager.get(pk=covered_link.pk).deleted_at)
+        self.assertIsNotNone(FulfillmentLink._base_manager.get(pk=uncovered_link.pk).deleted_at)

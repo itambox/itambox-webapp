@@ -13,6 +13,7 @@
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="step" value="2">
+            <input type="hidden" name="expected_received" value="{{ expected_received_json }}">
             {{ formset.management_form }}
             <div class="table-responsive mt-3 mb-4">
               <table class="table table-vcenter table-striped card-table">

@@ -7,13 +7,16 @@ attributes quantities to an already-approved request (no fabricated history), so
 pledges can stay open forever.
 
 Only records that demonstrably match that defect signature are reconciliation
-candidates: a non-serialised line that was only partially received while the tracked
-quantity was still blank. Records that carry delivery evidence (an assigned asset or
-a fully received line) are completed history and stay untouched, and records without
-sufficient evidence require explicit operator review - the command never closes them.
-Dry-run by default; ``--apply`` only softly closes the candidate pledges. Request
-states, recorded quantities, and stock stay exactly as recorded, and the affected
-units can simply be re-requested if they are still needed.
+candidates: a pledge on a non-serialised line that was only partially received
+while the tracked quantity is blank and the line's recorded received quantity
+cannot cover the pledge's own allocation. Records that carry delivery evidence (an
+assigned asset or a fully received line) are completed history and stay untouched;
+pledges the received units could cover in full, lines without any receipt, and
+serialised lines without an assigned asset require explicit operator review - the
+command never closes them. Dry-run by default; ``--apply`` only softly closes the
+candidate pledges. Request states, recorded quantities, and stock stay exactly as
+recorded, and the affected units can simply be re-requested if they are still
+needed.
 """
 
 from django.core.management.base import BaseCommand
@@ -41,21 +44,25 @@ def _classify(link):
     if received >= line.qty_ordered:
         # The order was received in full; the approval cannot be shown to be premature.
         return COMPLETED
-    if received > 0:
-        # Partial receipt while the delivered quantity is untracked: the demonstrable
-        # signature of the pre-upgrade blanket approval.
-        return CANDIDATE
-    # Nothing was ever received on the line, so the approval did not come from a receipt.
-    return REVIEW
+    if received == 0:
+        # Nothing was ever received on the line, so the approval did not come from a receipt.
+        return REVIEW
+    if received >= link.qty_allocated:
+        # The received units on the shared line could cover this pledge in full; with per-link
+        # attribution untracked, it is not demonstrably undelivered.
+        return REVIEW
+    # The line's received quantity cannot cover this pledge's own allocation: the demonstrable
+    # signature of the pre-upgrade blanket approval.
+    return CANDIDATE
 
 
 class Command(BaseCommand):
     help = (
         "Report fulfilment links whose request was approved before any tracked receipt "
-        "(pre-upgrade pledges). Only demonstrable candidates (partially received lines "
-        "without delivery evidence) can be softly closed with --apply; completed records "
-        "stay untouched and ambiguous ones require explicit operator review. Historical "
-        "quantities and approval states are never rewritten."
+        "(pre-upgrade pledges). Only demonstrable candidates (pledges on partially received "
+        "non-serialised lines whose own allocation exceeds the line's received quantity) can be "
+        "softly closed with --apply; completed records stay untouched and ambiguous ones require "
+        "explicit operator review. Historical quantities and approval states are never rewritten."
     )
 
     def add_arguments(self, parser):

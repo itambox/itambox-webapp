@@ -353,11 +353,13 @@ purchase-order receipt approved while delivered quantities were still untracked 
 historical approval and a blank received quantity, and later receipts are deliberately
 never booked against it.
 
-The report distinguishes the remaining evidence: a request with an assigned asset or a
-fully received line is completed history and stays untouched; a partially received
-non-serialised line without delivery evidence is a demonstrable reconciliation candidate;
-anything else (no receipt on the line, or a serialised line without an assigned asset)
-needs explicit operator review and is never closed by the command.
+The report classifies each pledge individually by its remaining evidence: a request with
+an assigned asset or a fully received line is completed history and stays untouched; a
+pledge on a partially received non-serialised line is a demonstrable reconciliation
+candidate only when the line's recorded received quantity cannot cover the pledge's own
+allocated quantity; pledges the received units could cover in full, lines without any
+receipt, and serialised lines without an assigned asset need explicit operator review and
+are never closed by the command.
 
 | | |
 |---|---|

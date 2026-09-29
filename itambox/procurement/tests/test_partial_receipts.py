@@ -20,6 +20,8 @@ Semantics under test:
 """
 
 import datetime
+import html
+import re
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -82,6 +84,12 @@ class PartialReceiptFixture(TestCase):
     def _open(self, purchase_order):
         approve_purchase_order(purchase_order)
         order_purchase_order(purchase_order)
+
+    def _form_receipt_state(self, response):
+        """The receipt-state snapshot a rendered receive form binds into its submission."""
+        match = re.search(r'name="expected_received" value="([^"]*)"', response.content.decode())
+        self.assertIsNotNone(match)
+        return html.unescape(match.group(1))
 
     def _component(self, name, slug):
         category, _created = Category.objects.get_or_create(
@@ -531,11 +539,12 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         session.save()
 
         url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": purchase_order.pk})
-        # Rendering the form is what binds the receipt-state snapshot for the submission below.
-        self.assertEqual(self.client.get(url).status_code, 200)
+        first_get = self.client.get(url)
+        self.assertEqual(first_get.status_code, 200)
 
         payload = {
             "step": "1",
+            "expected_received": self._form_receipt_state(first_get),
             "form-TOTAL_FORMS": "1",
             "form-INITIAL_FORMS": "1",
             "form-MIN_NUM_FORMS": "0",
@@ -557,13 +566,113 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         self.assertEqual(line.qty_received, 3)
         self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 3)
 
-        # Re-rendering the form binds a fresh snapshot; the next submission is a genuine delivery.
-        self.assertEqual(self.client.get(url).status_code, 200)
-        third_response = self.client.post(url, payload, follow=True)
+        # A second render (another tab, a reload) must not revalidate the older submission.
+        second_get = self.client.get(url)
+        self.assertEqual(second_get.status_code, 200)
+        self.assertNotEqual(self._form_receipt_state(second_get), payload["expected_received"])
+        self.client.post(url, payload, follow=True)
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 3)
+        self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 3)
+
+        # The freshly rendered form is a new, genuine partial delivery and books normally.
+        fresh_payload = dict(payload, expected_received=self._form_receipt_state(second_get))
+        third_response = self.client.post(url, fresh_payload, follow=True)
         self.assertEqual(third_response.status_code, 200)
         line.refresh_from_db()
         self.assertEqual(line.qty_received, 6)
         self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 6)
+
+    def test_web_receive_form_snapshot_survives_renders_of_other_orders(self):
+        """Rendering another order's form neither invalidates nor revalidates this submission."""
+        component = self._component("Cross Form RAM", "cross-form-ram")
+        first_order = self._draft_purchase_order("PO-WEB-CROSS-001")
+        first_line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=first_order,
+            component=component,
+            qty_ordered=10,
+            unit_price="5.00",
+        )
+        self._open(first_order)
+        second_order = self._draft_purchase_order("PO-WEB-CROSS-002")
+        PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=second_order,
+            component=component,
+            qty_ordered=5,
+            unit_price="5.00",
+        )
+        self._open(second_order)
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+        first_url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": first_order.pk})
+        second_url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": second_order.pk})
+        first_get = self.client.get(first_url)
+        self.assertEqual(first_get.status_code, 200)
+
+        payload = {
+            "step": "1",
+            "expected_received": self._form_receipt_state(first_get),
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-line_id": str(first_line.pk),
+            "form-0-qty_to_receive": "3",
+        }
+
+        # Rendering a different order's form must not touch this submission's validity.
+        self.assertEqual(self.client.get(second_url).status_code, 200)
+        first_response = self.client.post(first_url, payload, follow=True)
+        self.assertEqual(first_response.status_code, 200)
+        first_line.refresh_from_db()
+        self.assertEqual(first_line.qty_received, 3)
+
+        # Its own snapshot is now stale, so replaying it stays refused.
+        self.client.post(first_url, payload, follow=True)
+        first_line.refresh_from_db()
+        self.assertEqual(first_line.qty_received, 3)
+
+    def test_web_receive_form_step_two_carries_the_submission_snapshot(self):
+        """The step-2 form keeps carrying the prepared snapshot of the same operation."""
+        purchase_order = self._draft_purchase_order("PO-WEB-STEP2-001")
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price="5.00",
+        )
+        self._open(purchase_order)
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+        url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": purchase_order.pk})
+        first_get = self.client.get(url)
+        self.assertEqual(first_get.status_code, 200)
+
+        step_one_payload = {
+            "step": "1",
+            "expected_received": self._form_receipt_state(first_get),
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-line_id": str(line.pk),
+            "form-0-qty_to_receive": "2",
+        }
+        step_two_page = self.client.post(url, step_one_payload)
+        self.assertEqual(step_two_page.status_code, 200)
+        self.assertTemplateUsed(step_two_page, "procurement/purchaseorder_receive_step2.html")
+        self.assertEqual(self._form_receipt_state(step_two_page), step_one_payload["expected_received"])
 
 
 class CancellationReleaseTests(PartialReceiptFixture):

@@ -279,9 +279,10 @@ Receipts are accounted per link: each link tracks its received quantity
 #### Receipt submissions: retries and duplicate protection
 
 Every receipt submission states the recorded receipt quantities it was prepared against:
-the receive form binds that snapshot when it is rendered and submits it with the actual
-submission (processing never refreshes it), and the REST
-receive action sends it as `expected_received` next to `line_quantities`. If any
+the receive form binds that snapshot into each rendered form and every submission carries
+its own copy, so a later render, another tab, or another order never changes an
+already-issued submission, and the REST receive action sends it as `expected_received`
+next to `line_quantities`. If any
 submitted line moved on since the snapshot, the whole submission is refused before
 anything mutates. Retries, double-clicks, replays, and parallel duplicates of the same
 operation therefore never book stock twice. Reload the receive form and submit against
@@ -293,13 +294,14 @@ genuine partial delivery and books normally.
 Requests that a partial receipt approved before receipt tracking existed keep their
 historical approval and their blank `qty_received`; the ledger never attributes later
 receipts to them, so the recorded history stays truthful. The
-`reconcile_procurement_legacy` management command classifies these records by their
-remaining evidence: completed records (an assigned asset or a fully received line) stay
-untouched, a partially received non-serialised line without delivery evidence is a
-demonstrable candidate that `--apply` softly closes without rewriting any quantity or
-approval state, and anything less conclusive is reported for explicit operator review
-and never closed by the command. If the outstanding units are still needed, request
-them again.
+`reconcile_procurement_legacy` management command classifies each pledge individually by
+its remaining evidence: completed records (an assigned asset or a fully received line)
+stay untouched; a pledge on a partially received non-serialised line is a demonstrable
+candidate that `--apply` softly closes without rewriting any quantity or approval state
+only when the line's recorded received quantity cannot cover the pledge's own allocated
+quantity; pledges the received units could cover in full, and anything else less
+conclusive, are reported for explicit operator review and never closed by the command.
+If the outstanding units are still needed, request them again.
 
 ### Key constraints
 
