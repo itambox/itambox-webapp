@@ -26,10 +26,10 @@ re-implementing either, so the drill states exactly what a deployment sees:
 """
 
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import mock
 
-from django.test import TestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django_q.conf import Conf
@@ -37,8 +37,14 @@ from django_q.models import Schedule
 from django_q.scheduler import scheduler
 from django_q.signing import SignedPackage
 
-from extras.models import NotificationChannel, ReportGenerationArchive, ReportTemplate, ScheduledReport
-from extras.tasks.reports import retry_failed_deliveries
+from extras.models import (
+    NotificationChannel,
+    ReportGenerationArchive,
+    ReportTemplate,
+    ScheduledReport,
+    ScheduledReportFire,
+)
+from extras.tasks.reports import _parse_intended_fire_at, retry_failed_deliveries
 from extras.views import handle_report_scheduling
 
 TASK_PATH = "extras.tasks.reports.generate_scheduled_report_task"
@@ -231,6 +237,9 @@ class ScheduledReportDowntimeDrillTests(TransactionTestCase):
         sched.refresh_from_db()
         self.assertEqual(sched.last_accepted_fire_at, newer_at)
         self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 2)
+        fires = ScheduledReportFire.objects.filter(schedule=sched).order_by("intended_fire_at")
+        self.assertEqual(fires.count(), 2)
+        self.assertEqual(str(fires.first()), f"{sched.pk}@{older_at:%Y-%m-%d %H:%M:%S}")
 
     def test_a_failed_delivery_is_recovered_by_retry_without_duplicate_sends(self):
         sched = self._hourly_schedule()
@@ -647,6 +656,472 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
             outcome = retry_failed_deliveries(sched)
         self.assertEqual(outcome.code, "retry.completed")
         self.assertEqual(email_retry.call_count, 1)
+
+    def _cross_tenant_recovery_schedule(self):
+        from django.contrib.auth import get_user_model
+
+        from extras.models import ScheduledReportScopeAuthorization
+        from organization.models import Tenant
+
+        tenant_a = Tenant.objects.create(name="Replay Scope A", slug="replay-scope-a")
+        tenant_b = Tenant.objects.create(name="Replay Scope B", slug="replay-scope-b")
+        actor = get_user_model().objects.create_superuser(
+            username="replay-scope-approver", password="password123", email="approver@example.com"
+        )
+        sched = ScheduledReport.objects.create(
+            name="Cross-tenant Replay Schedule",
+            report=self.template,
+            tenant=None,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        sched.filter_tenants.set([tenant_a, tenant_b])
+        ScheduledReportScopeAuthorization.approve(sched, actor)
+        return sched, tenant_a, tenant_b, actor
+
+    def _newest_archive(self, sched):
+        return ReportGenerationArchive.objects.filter(scheduled_report=sched).order_by("-generated_at").first()
+
+    def test_replay_refusal_tokens_are_recorded_per_target(self):
+        """Deleted, detached, disabled, malformed, and unknown targets all refuse."""
+        attached = NotificationChannel.objects.create(
+            name="Attached Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        detached = NotificationChannel.objects.create(
+            name="Detached Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        disabled = NotificationChannel.objects.create(
+            name="Disabled Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=False,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        deleted = NotificationChannel.objects.create(
+            name="Deleted Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        sched = ScheduledReport.objects.create(
+            name="Refusal Replay Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        sched.channels.set([attached, disabled, deleted])
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_partial")
+
+        NotificationChannel.objects.filter(pk=deleted.pk).update(deleted_at=timezone.now())
+        archive = self._newest_archive(sched)
+        archive.delivery_targets = [
+            {
+                "target": f"channel:{deleted.pk}",
+                "label": "Deleted",
+                "status": "failed",
+                "error": "channel.delivery_failed",
+            },
+            {
+                "target": f"channel:{detached.pk}",
+                "label": "Detached",
+                "status": "failed",
+                "error": "channel.delivery_failed",
+            },
+            {
+                "target": f"channel:{disabled.pk}",
+                "label": "Disabled",
+                "status": "failed",
+                "error": "channel.delivery_failed",
+            },
+            {
+                "target": "channel:not-a-number",
+                "label": "Malformed",
+                "status": "failed",
+                "error": "channel.delivery_failed",
+            },
+            {"target": "webhook:7", "label": "Unknown", "status": "failed", "error": "delivery_failed"},
+        ]
+        archive.delivery_status = "failed"
+        archive.save(update_fields=["delivery_targets", "delivery_status"])
+
+        with mock.patch("extras.tasks.reports.send_notification_to_channel") as sender:
+            outcome = retry_failed_deliveries(sched)
+
+        sender.assert_not_called()
+        self.assertEqual(outcome.code, "retry.partial")
+        self.assertEqual(outcome.retried, 5)
+        self.assertEqual(outcome.still_failed, 5)
+        archive.refresh_from_db()
+        by_target = {target["target"]: target for target in archive.delivery_targets}
+        self.assertEqual(by_target[f"channel:{deleted.pk}"]["error"], "channel.missing")
+        self.assertEqual(by_target[f"channel:{detached.pk}"]["error"], "channel.detached")
+        self.assertEqual(by_target[f"channel:{disabled.pk}"]["error"], "channel.disabled")
+        self.assertEqual(by_target["channel:not-a-number"]["error"], "channel.missing")
+        self.assertEqual(by_target["webhook:7"]["error"], "retry.unknown_target")
+
+    def test_replay_reconstructs_reduced_payloads_and_recorded_bodies(self):
+        """Legacy entries fall back to the reconstruction; partial payloads keep the recorded body."""
+        legacy = NotificationChannel.objects.create(
+            name="Legacy Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        partial = NotificationChannel.objects.create(
+            name="Partial Payload Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        sched = ScheduledReport.objects.create(
+            name="Payload Fallback Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        sched.channels.set([legacy, partial])
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_partial")
+
+        archive = self._newest_archive(sched)
+        archive.disclosure_text = "Internal use only"
+        archive.delivery_targets = [
+            {
+                "target": f"channel:{legacy.pk}",
+                "label": "Legacy",
+                "status": "failed",
+                "error": "channel.delivery_rejected",
+            },
+            {
+                "target": f"channel:{partial.pk}",
+                "label": "Partial",
+                "status": "failed",
+                "error": "channel.delivery_rejected",
+                "details": {"payload": {"body": "Recorded body"}},
+            },
+        ]
+        archive.delivery_status = "failed"
+        archive.save(update_fields=["delivery_targets", "delivery_status", "disclosure_text"])
+
+        with mock.patch("extras.tasks.reports.send_notification_to_channel", return_value=True) as sender:
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.completed")
+        self.assertEqual(sender.call_count, 2)
+        calls = {call.args[0].pk: call.args[1:] for call in sender.call_args_list}
+        subject_legacy, body_legacy = calls[legacy.pk]
+        self.assertEqual(subject_legacy, f"[Scheduled Report] {sched.name}")
+        self.assertIn("is being redelivered", body_legacy)
+        self.assertIn("Internal use only", body_legacy)
+        subject_partial, body_partial = calls[partial.pk]
+        self.assertEqual(subject_partial, f"[Scheduled Report] {sched.name}")
+        self.assertEqual(body_partial, "Recorded body")
+
+    def test_retry_email_failures_escalate_from_exception_to_success(self):
+        sched = ScheduledReport.objects.create(
+            name="Email Escalation Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "failed")
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", side_effect=RuntimeError("still down")):
+            first = retry_failed_deliveries(sched)
+        self.assertEqual(first.code, "retry.partial")
+        archive = self._newest_archive(sched)
+        archive.refresh_from_db()
+        email_target = next(target for target in archive.delivery_targets if target["target"] == "email")
+        self.assertEqual(email_target["error"], "email.delivery_failed")
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=False):
+            second = retry_failed_deliveries(sched)
+        self.assertEqual(second.code, "retry.partial")
+        archive.refresh_from_db()
+        email_target = next(target for target in archive.delivery_targets if target["target"] == "email")
+        self.assertEqual(email_target["error"], "email.delivery_rejected")
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "failed")
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True):
+            third = retry_failed_deliveries(sched)
+        self.assertEqual(third.code, "retry.completed")
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "success")
+
+    def test_retry_channel_failures_escalate_from_exception_to_success(self):
+        channel = NotificationChannel.objects.create(
+            name="Escalation Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        sched = ScheduledReport.objects.create(
+            name="Channel Escalation Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        sched.channels.set([channel])
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"), channel_result=False)
+        self.assertEqual(result.code, "report.delivery_failed")
+
+        with (
+            mock.patch("extras.tasks.reports._deliver_report_email", return_value=True),
+            mock.patch("extras.tasks.reports.send_notification_to_channel", side_effect=RuntimeError("channel down")),
+        ):
+            first = retry_failed_deliveries(sched)
+        self.assertEqual(first.code, "retry.partial")
+        archive = self._newest_archive(sched)
+        archive.refresh_from_db()
+        entry = next(target for target in archive.delivery_targets if target["target"] == f"channel:{channel.pk}")
+        self.assertEqual(entry["error"], "channel.delivery_failed")
+
+        with (
+            mock.patch("extras.tasks.reports._deliver_report_email", return_value=True),
+            mock.patch("extras.tasks.reports.send_notification_to_channel", return_value=False),
+        ):
+            second = retry_failed_deliveries(sched)
+        self.assertEqual(second.code, "retry.partial")
+        archive.refresh_from_db()
+        entry = next(target for target in archive.delivery_targets if target["target"] == f"channel:{channel.pk}")
+        self.assertEqual(entry["error"], "channel.delivery_rejected")
+
+        with (
+            mock.patch("extras.tasks.reports._deliver_report_email", return_value=True),
+            mock.patch("extras.tasks.reports.send_notification_to_channel", return_value=True),
+        ):
+            third = retry_failed_deliveries(sched)
+        self.assertEqual(third.code, "retry.completed")
+
+    def test_a_superseded_retry_completion_leaves_the_newer_state_in_place(self):
+        """A lease takeover mid-flight must not be clobbered by the stale attempt."""
+        sched = ScheduledReport.objects.create(
+            name="Superseded Claim Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+
+        def hijacked_delivery(sched_arg, template, output, recipients):
+            # A newer attempt took the claim over while this one was mid-flight.
+            ReportGenerationArchive.objects.filter(pk=archive.pk).update(
+                retry_claim_token="taken-over",
+                retry_claim_expires_at=timezone.now() + timedelta(minutes=10),
+            )
+            return True
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", side_effect=hijacked_delivery):
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.completed")
+        archive.refresh_from_db()
+        self.assertEqual(archive.retry_claim_token, "taken-over")
+        self.assertEqual([target["status"] for target in archive.delivery_targets], ["failed"])
+
+    def test_retry_reports_no_retained_output_for_unreadable_files(self):
+        sched = ScheduledReport.objects.create(
+            name="Unreadable Archive Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+        attachment = archive.file
+        attachment.file.storage.delete(attachment.file.name)
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True) as email_retry:
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.no_retained_output")
+        email_retry.assert_not_called()
+
+    def test_retry_legacy_archive_without_a_snapshot_uses_the_current_scope_check(self):
+        from extras.models import ScheduledReportScopeAuthorization
+
+        sched, _tenant_a, _tenant_b, actor = self._cross_tenant_recovery_schedule()
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+        archive.generation_scope = {}
+        archive.save(update_fields=["generation_scope"])
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True) as email_retry:
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.completed")
+        self.assertEqual(email_retry.call_count, 1)
+
+        authorization = ScheduledReportScopeAuthorization.objects.get(scheduled_report=sched)
+        authorization.revoked_at = timezone.now()
+        authorization.revoked_by = actor
+        authorization.save(update_fields=["revoked_at", "revoked_by"])
+        archive.refresh_from_db()
+        archive.delivery_targets = [
+            {
+                "target": "email",
+                "label": "Email",
+                "status": "failed",
+                "error": "email.delivery_failed",
+                "details": {"recipients": ["ops@example.com"]},
+            }
+        ]
+        archive.delivery_status = "failed"
+        archive.save(update_fields=["delivery_targets", "delivery_status"])
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True) as refused_retry:
+            refused = retry_failed_deliveries(sched)
+
+        self.assertEqual(refused.code, "retry.scope_unauthorized")
+        refused_retry.assert_not_called()
+
+    def test_retry_snapshot_scope_fails_closed_without_a_resolvable_scope(self):
+        sched, _tenant_a, _tenant_b, _actor = self._cross_tenant_recovery_schedule()
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+
+        with mock.patch("extras.tasks.reports._resolve_report_scope", return_value=None):
+            with_snapshot = retry_failed_deliveries(sched)
+        self.assertEqual(with_snapshot.code, "retry.scope_unauthorized")
+
+        archive.generation_scope = {}
+        archive.save(update_fields=["generation_scope"])
+        with mock.patch("extras.tasks.reports._resolve_report_scope", return_value=None):
+            legacy = retry_failed_deliveries(sched)
+        self.assertEqual(legacy.code, "retry.scope_unauthorized")
+
+    def test_retry_snapshot_scope_requires_the_same_active_tenant(self):
+        sched = ScheduledReport.objects.create(
+            name="Drifted Tenant Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+        archive.generation_scope = {
+            "active_tenant_id": 987654321,
+            "cross_tenant": False,
+            "data_tenant_ids": [987654321],
+        }
+        archive.save(update_fields=["generation_scope"])
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True) as email_retry:
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.scope_unauthorized")
+        email_retry.assert_not_called()
+
+    def test_retry_snapshot_scope_fails_closed_on_anomalies(self):
+        from organization.models import Tenant
+
+        sched, tenant_a, tenant_b, actor = self._cross_tenant_recovery_schedule()
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True) as email_retry:
+            cases = (
+                ({"active_tenant_id": None, "cross_tenant": True, "data_tenant_ids": ["junk"]}, "malformed ids"),
+                ({"active_tenant_id": None, "cross_tenant": True, "data_tenant_ids": []}, "no recorded tenants"),
+            )
+            for snapshot, label in cases:
+                with self.subTest(label):
+                    archive.generation_scope = snapshot
+                    archive.save(update_fields=["generation_scope"])
+                    outcome = retry_failed_deliveries(sched)
+                    self.assertEqual(outcome.code, "retry.scope_unauthorized")
+
+            with self.subTest("deactivated principal"):
+                archive.generation_scope = {
+                    "active_tenant_id": None,
+                    "cross_tenant": True,
+                    "data_tenant_ids": sorted([tenant_a.pk, tenant_b.pk]),
+                }
+                archive.save(update_fields=["generation_scope"])
+                actor.is_active = False
+                actor.save(update_fields=["is_active"])
+                outcome = retry_failed_deliveries(sched)
+                self.assertEqual(outcome.code, "retry.scope_unauthorized")
+                actor.is_active = True
+                actor.save(update_fields=["is_active"])
+
+            with self.subTest("soft-deleted tenant"):
+                Tenant.objects.filter(pk=tenant_b.pk).update(deleted_at=timezone.now())
+                outcome = retry_failed_deliveries(sched)
+                self.assertEqual(outcome.code, "retry.scope_unauthorized")
+
+        email_retry.assert_not_called()
+
+
+class IntendedFireParsingTests(SimpleTestCase):
+    """The scheduler-injected occurrence timestamp is parsed defensively."""
+
+    def test_parses_iso_strings_and_datetimes_and_ignores_garbage(self):
+        naive = datetime(2026, 9, 29, 12, 0, 0)
+        aware = timezone.make_aware(naive, timezone.get_current_timezone())
+
+        self.assertEqual(_parse_intended_fire_at(aware.isoformat()), aware)
+        self.assertEqual(_parse_intended_fire_at(aware), aware)
+        self.assertIsNone(_parse_intended_fire_at("not-a-timestamp"))
+
+        parsed_naive = _parse_intended_fire_at(naive)
+        self.assertTrue(timezone.is_aware(parsed_naive))
+        self.assertEqual(timezone.localtime(parsed_naive).replace(tzinfo=None), naive)
 
 
 class ScheduledReportOutcomeSeparationTests(TestCase):

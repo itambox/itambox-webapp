@@ -11,7 +11,7 @@ from django.apps import apps
 from django.test import TestCase
 from django_q.models import Schedule
 
-from core.schedules import register_schedule
+from core.schedules import register_schedule, remove_schedule
 
 CORE_FUNC = "extras.tasks.alerts.evaluate_alert_rules_task"
 WEBHOOK_RECOVERY_FUNC = "extras.tasks.webhooks.recover_pending_webhook_deliveries"
@@ -105,3 +105,39 @@ class AppConfigScheduleRegistrationTests(TestCase):
                 1,
                 msg=f"expected exactly one schedule row for {func}",
             )
+
+
+class RemoveScheduleHelperTests(TestCase):
+    """Name-keyed removal deletes exactly the matching rows and never raises."""
+
+    def setUp(self):
+        Schedule.objects.all().delete()
+
+    def test_name_filtered_removal_deletes_only_the_matching_row(self):
+        Schedule.objects.create(func=CORE_FUNC, name="scheduled_report_1", schedule_type=Schedule.DAILY)
+        Schedule.objects.create(func=CORE_FUNC, name="scheduled_report_2", schedule_type=Schedule.DAILY)
+
+        removed = remove_schedule(CORE_FUNC, name="scheduled_report_1")
+
+        self.assertEqual(removed, 1)
+        self.assertFalse(Schedule.objects.filter(func=CORE_FUNC, name="scheduled_report_1").exists())
+        self.assertTrue(Schedule.objects.filter(func=CORE_FUNC, name="scheduled_report_2").exists())
+
+    def test_unfiltered_removal_removes_every_row_for_the_func(self):
+        Schedule.objects.create(func=CORE_FUNC, name="scheduled_report_1", schedule_type=Schedule.DAILY)
+        Schedule.objects.create(func=CORE_FUNC, name="scheduled_report_2", schedule_type=Schedule.DAILY)
+
+        removed = remove_schedule(CORE_FUNC)
+
+        self.assertEqual(removed, 2)
+        self.assertFalse(Schedule.objects.filter(func=CORE_FUNC).exists())
+
+    def test_removal_is_idempotent_for_unknown_identities(self):
+        self.assertEqual(remove_schedule(CORE_FUNC, name="never-registered"), 0)
+        self.assertEqual(remove_schedule(CORE_FUNC, name="never-registered"), 0)
+
+    def test_removal_failures_are_swallowed_and_reported_as_zero(self):
+        self.assertEqual(remove_schedule(CORE_FUNC, using="not-a-database-alias"), 0)
+
+    def test_registration_failures_are_swallowed_and_return_none(self):
+        self.assertIsNone(register_schedule(CORE_FUNC, using="not-a-database-alias"))

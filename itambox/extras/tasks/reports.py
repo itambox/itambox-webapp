@@ -800,15 +800,26 @@ def _archived_cross_tenant_scope_is_authorized(sched, snapshot):
 
 
 def _output_from_archive(sched, archive):
-    """Rebuild the delivered output from the retained archive file."""
-    if archive.file is None:
-        return None
+    """Rebuild the delivered output from the retained archive file.
+
+    Callers guarantee a retained file; the storage backend does not guarantee
+    that the file is still readable, so a missing or unreadable object yields
+    ``None`` (reported as ``retry.no_retained_output``) instead of crashing
+    the recovery request.
+    """
     field_file = archive.file.file
-    field_file.open()
     try:
-        content = field_file.read()
-    finally:
-        field_file.close()
+        field_file.open()
+        try:
+            content = field_file.read()
+        finally:
+            field_file.close()
+    except OSError:
+        logger.warning(
+            "Retained archive output could not be read",
+            extra={"operation": "reports.delivery_retry", "scheduled_report_id": getattr(sched, "pk", None)},
+        )
+        return None
     if archive.format == ScheduledReport.FORMAT_HTML:
         return _ReportOutput(email_body=content.decode("utf-8"))
     return _ReportOutput(
@@ -847,18 +858,21 @@ def _claim_retry(archive):
     return token
 
 
-def _release_retry_claim(archive, token, *, delivery_targets=None, delivery_status=""):
+def _release_retry_claim(archive, token, *, delivery_targets, delivery_status):
     """Release the claim, writing the outcome only while the token still owns it.
 
     Returns ``False`` when the claim was superseded (the lease expired and a
     newer attempt took over); the caller then leaves the newer state in place
     instead of clobbering it with a stale ledger.
     """
-    updates = {"retry_claim_token": "", "retry_claim_expires_at": None}
-    if delivery_targets is not None:
-        updates["delivery_targets"] = delivery_targets
-        updates["delivery_status"] = delivery_status
-    return bool(ReportGenerationArchive._base_manager.filter(pk=archive.pk, retry_claim_token=token).update(**updates))
+    return bool(
+        ReportGenerationArchive._base_manager.filter(pk=archive.pk, retry_claim_token=token).update(
+            delivery_targets=delivery_targets,
+            delivery_status=delivery_status,
+            retry_claim_token="",
+            retry_claim_expires_at=None,
+        )
+    )
 
 
 def _recorded_detail(target, key, default=None):
@@ -884,8 +898,6 @@ def _retry_channel_body(sched, archive):
 
 def _retry_email_target(sched, output, recipients):
     """Re-attempt the aggregate email target; returns (ok, error_token)."""
-    if output is None:
-        return False, "retry.no_retained_output"
     if not recipients:
         return False, "email.no_recipients"
     try:
