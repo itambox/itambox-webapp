@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_noop
 
 from core.reports.charts import generate_doughnut_chart
 from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
@@ -60,6 +61,11 @@ class HardwareInventoryReportProvider(ReportDefinition):
     #: All three catalogues are shared-catalogue models: a null-tenant row is a
     #: global item that belongs in every tenant's stock report.
     allow_global_tenant = True
+    #: The window is per catalogue, not one first-N slice: the disclosed
+    #: numbers must describe that shape.
+    truncated_disclosure = gettext_noop(
+        "Each inventory catalogue lists at most %(limit)s rows; %(total)s rows match across all catalogues."
+    )
     default_columns = (
         "hw_item_type",
         "hw_name",
@@ -125,10 +131,15 @@ class HardwareInventoryReportProvider(ReportDefinition):
         if not rows:
             return self.build_sample(request)
         sku_counts = self._sku_counts(catalogues)
+        # The window is per catalogue: any catalogue that stops at the limit
+        # makes the whole output a capped window over the summed scope.
+        truncated = any(count > self.row_limit for count in sku_counts.values())
         return ReportResult(
             rows=rows,
             summary_cards=self._summary_cards(sku_counts, records, request),
             chart_svg=self._chart(sku_counts, request),
+            truncated=truncated,
+            total_rows=sum(sku_counts.values()) if truncated else None,
         )
 
     def _catalogue_records(self, catalogues):

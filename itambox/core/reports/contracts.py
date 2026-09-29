@@ -26,6 +26,19 @@ PUBLIC_REPORT_TYPES = (
 ROW_LIMIT = 500
 
 
+def record_window_state(queryset: object, records: Sequence[object], row_limit: int) -> tuple[bool, int | None]:
+    """``(truncated, total_rows)`` for a materialized record window.
+
+    A window shorter than the limit is never truncated and needs no count; a
+    full window gets one determinate count so the output surfaces can state
+    both numbers. The extra query runs only when the window is full.
+    """
+    if len(records) < row_limit:
+        return False, None
+    total_rows = queryset.count()
+    return total_rows > row_limit, total_rows
+
+
 @dataclass(frozen=True)
 class ReportRequest:
     """Immutable inputs for one report compilation.
@@ -63,6 +76,11 @@ class ReportResult:
     chart_svg: str = ""
     #: True when the scope held no data and the report shows its sample instead.
     is_sample: bool = False
+    #: True when the compiled window stopped at the provider's row limit.
+    truncated: bool = False
+    #: Determinate total matching rows when the compiled window was full
+    #: (``None`` when the scope fit entirely into the window).
+    total_rows: int | None = None
     #: Optional domain-owned machine export built from the authorized record set.
     specification_export: object | None = None
 
@@ -105,6 +123,12 @@ class ReportDefinition:
 
     #: Upper bound on the rows this report renders.
     row_limit: int = ROW_LIMIT
+
+    #: Sentence template for a capped window. The default describes a single
+    #: first-N slice; providers whose window is not one slice (hardware
+    #: inventory caps per catalogue) override it so the disclosed numbers stay
+    #: true.
+    truncated_disclosure = "Showing the first %(limit)s of %(total)s matching rows."
 
     #: Column key -> ``renderer(record, request)``, in row order.
     cells: Mapping[str, ReportCellRenderer] = {}
@@ -227,6 +251,7 @@ class ReportDefinition:
         queryset = self.get_queryset(request)
         records = list(queryset[: self.row_limit])
         rows = list(self.build_rows(records, request))
+        truncated, total_rows = record_window_state(queryset, records, self.row_limit)
         specification_export = None
         if request.specification_export_references:
             specification_export = self.build_specification_export(
@@ -242,6 +267,8 @@ class ReportDefinition:
             rows=rows,
             summary_cards=list(self.build_summary(queryset, request)),
             chart_svg=self.build_chart(queryset, records, request),
+            truncated=truncated,
+            total_rows=total_rows,
             specification_export=specification_export,
         )
 

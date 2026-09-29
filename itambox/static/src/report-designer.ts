@@ -111,7 +111,7 @@
             'subscription_name', 'supplier', 'agreement_entitled_quantity', 'billing_cycle', 'cost', 'end_date'
           ],
           'asset_maintenance': [
-            'maintenance_title', 'maintenance_asset', 'maintenance_type',
+            'maintenance_asset', 'maintenance_type',
             'maintenance_status', 'maintenance_cost', 'maintenance_start_date',
             'maintenance_completion_date', 'maintenance_downtime'
           ],
@@ -123,7 +123,7 @@
           ],
           'contract_renewals': ['contract_number', 'contract_name', 'contract_type', 'contract_status', 'contract_supplier', 'contract_start_date', 'contract_end_date', 'contract_renewal_date', 'contract_days_until_expiry', 'contract_cost', 'contract_billing_cycle', 'contract_auto_renew', 'contract_covered_assets', 'contract_sla_response_time', 'contract_sla_resolution_time', 'contract_coverage_hours'],
           'warranty_expiration': ['warranty_asset', 'warranty_type', 'warranty_supplier', 'warranty_start_date', 'warranty_end_date', 'warranty_days_remaining', 'warranty_status', 'warranty_cost', 'warranty_reference'],
-          'asset_disposal_eol': ['disposal_asset', 'disposal_date', 'disposal_method', 'disposal_sanitization_method', 'disposal_sanitization_certificate', 'disposal_sanitized_by', 'disposal_recipient', 'disposal_proceeds', 'disposal_weee_compliant', 'disposal_notes'],
+          'asset_disposal_eol': ['disposal_asset', 'disposal_status', 'disposal_cancelled_at', 'disposal_cancelled_by', 'disposal_cancellation_reason', 'disposal_date', 'disposal_method', 'disposal_sanitization_method', 'disposal_sanitization_certificate', 'disposal_sanitized_by', 'disposal_recipient', 'disposal_proceeds', 'disposal_weee_compliant', 'disposal_notes'],
           'hardware_inventory': ['hw_item_type', 'hw_name', 'hw_manufacturer', 'hw_category', 'hw_part_number', 'hw_total_stock', 'hw_available', 'hw_min_qty', 'hw_status'],
           'custody_compliance': ['custody_asset', 'custody_holder', 'custody_status', 'custody_accepted_date', 'custody_eula_version', 'custody_signature_provider', 'custody_qms_reference', 'custody_ip_address', 'custody_created_date']
         };

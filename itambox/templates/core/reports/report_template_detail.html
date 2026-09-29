@@ -40,7 +40,7 @@
 {% block content %}
   {% if legacy_designer_notice %}
     <div class="alert alert-warning" role="status">
-      {% translate "This template uses the legacy report designer and continues to render only because it was grandfathered during migration. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before editing it." %}
+      {% translate "This template was carried over unchanged by the report designer migration. It keeps its historical layout and renders like before; new templates use the current designer contract." %}
     </div>
   {% endif %}
   <div class="row g-3">

@@ -10,7 +10,6 @@ from django.utils.translation import gettext as _
 from core.context import get_current_user
 from core.csv_utils import safe_csv_filename
 from core.events import send_notification_to_channel
-from core.features import report_designer_probe
 from core.models import EmailSettings
 from core.reports import build_report_context
 from core.reports.rendering import render_report_csv, render_report_html
@@ -69,15 +68,19 @@ def _report_filename(template, extension):
     return f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.{extension}"
 
 
-def _attachment_email_body(format_name, template):
-    return _("Attached is the scheduled %(format)s report for '%(name)s', generated on %(timestamp)s UTC.") % {
+def _attachment_email_body(format_name, template, disclosure_text=""):
+    body = _("Attached is the scheduled %(format)s report for '%(name)s', generated on %(timestamp)s UTC.") % {
         "format": format_name,
         "name": template.name,
         "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",
     }
+    if disclosure_text:
+        body = f"{body}\n\n{disclosure_text}"
+    return body
 
 
 def _render_report_output(sched, template, headers, rows, context_data):
+    disclosure_text = context_data.get("disclosure_text", "")
     if sched.format == ScheduledReport.FORMAT_HTML:
         return _ReportOutput(email_body=_render_report_html(context_data, template))
 
@@ -86,7 +89,7 @@ def _render_report_output(sched, template, headers, rows, context_data):
         from core.reports.exporters import PDF_MIME, report_pdf_bytes
 
         return _ReportOutput(
-            email_body=_attachment_email_body("PDF", template),
+            email_body=_attachment_email_body("PDF", template, disclosure_text),
             attachment_content=report_pdf_bytes(_render_report_html(context_data, template)),
             attachment_filename=_report_filename(template, "pdf"),
             attachment_mime=PDF_MIME,
@@ -97,8 +100,10 @@ def _render_report_output(sched, template, headers, rows, context_data):
         from core.reports.exporters import XLSX_MIME, report_xlsx_bytes
 
         return _ReportOutput(
-            email_body=_attachment_email_body("XLSX", template),
-            attachment_content=report_xlsx_bytes(headers, rows, sheet_title=template.name),
+            email_body=_attachment_email_body("XLSX", template, disclosure_text),
+            attachment_content=report_xlsx_bytes(
+                headers, rows, sheet_title=template.name, disclosure_text=disclosure_text
+            ),
             attachment_filename=_report_filename(template, "xlsx"),
             attachment_mime=XLSX_MIME,
         )
@@ -110,9 +115,10 @@ def _render_report_output(sched, template, headers, rows, context_data):
             rows,
             summary_cards=context_data.get("summary_cards"),
             grouped_data=context_data.get("grouped_data"),
+            disclosure_text=disclosure_text,
         )
         return _ReportOutput(
-            email_body=_attachment_email_body("CSV", template),
+            email_body=_attachment_email_body("CSV", template, disclosure_text),
             attachment_content=csv_content,
             attachment_filename=_report_filename(template, "csv"),
             attachment_mime="text/csv",
@@ -186,7 +192,7 @@ def _deliver_report_email(sched, template, output, recipient_list=None):
     return True
 
 
-def _deliver_report_channels(sched, summary_cards, total_rows):
+def _deliver_report_channels(sched, summary_cards, total_rows, disclosure_text=""):
     report_subject = _("[Scheduled Report] %(name)s") % {"name": sched.name}
     card_lines = "\n".join("%s: %s" % (card.get("label"), card.get("value")) for card in (summary_cards or [])) or (
         _("Rows: %(n)s") % {"n": total_rows}
@@ -199,6 +205,8 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
         "format": sched.format.upper(),
         "summary": card_lines,
     }
+    if disclosure_text:
+        report_body = f"{report_body}\n{disclosure_text}"
     outcome = _DeliveryOutcome()
     for channel in sched.channels.all():
         if not channel.enabled:
@@ -413,7 +421,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
             else:
                 delivery.record_failure("email.delivery_rejected")
 
-    delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows)))
+    delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows), context_data.get("disclosure_text", "")))
     if delivery.failures:
         delivery_detail = "\n".join(delivery.failures)
         if archive_entry:
@@ -460,13 +468,6 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
             extra={"operation": "reports.generate", "scheduled_report_id": scheduled_report_id},
         )
         return TaskResult(TaskStatus.TERMINAL, "report.not_found")
-
-    if not report_designer_probe().active and not getattr(sched.report, "legacy_designer_grandfathered", False):
-        logger.warning(
-            "Report designer capability is inactive",
-            extra={"operation": "reports.generate", "scheduled_report_id": sched.pk},
-        )
-        return TaskResult(TaskStatus.SKIPPED, "report.capability_inactive")
 
     if not sched.is_active:
         logger.warning(

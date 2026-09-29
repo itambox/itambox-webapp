@@ -15,7 +15,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.csv_utils import csv_safe, safe_csv_filename
-from core.features import report_designer_probe
 from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
@@ -1653,66 +1652,44 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     def get_absolute_url(self):
         return reverse("extras:reporttemplate_detail", kwargs={"pk": self.pk})
 
-    _DESIGNER_DISABLED_MESSAGE = _(
-        "The report designer is disabled. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before enabling "
-        "legacy CSV mode, saving custom HTML, or editing a grandfathered template."
-    )
+    def persisted_filter_tenant_ids(self):
+        """Return the explicit persisted filter-scope ids without tenant scoping.
 
-    @classmethod
-    def _designer_write_fields(cls):
-        """Return concrete, user-editable fields covered by the write policy."""
-        return tuple(field for field in cls._meta.concrete_fields if field.editable and not field.primary_key)
+        Real model relations are read through their unscoped through-table
+        manager so an ambient tenant cannot silently truncate the persisted
+        constellation; lightweight test doubles use the relation's ``all()``
+        fallback. Mirrors ``ScheduledReport.persisted_scope_tenant_ids``.
+        """
+        through = getattr(self.filter_tenants, "through", None)
+        if through is not None:
+            return sorted(
+                set(
+                    through._base_manager.filter(reporttemplate_id=getattr(self, "pk", None)).values_list(
+                        "tenant_id", flat=True
+                    )
+                )
+            )
+        return sorted({tenant.pk for tenant in self.filter_tenants.all()})
 
     def _designer_persisted_state(self):
         if self.pk is None:
             return None
-        fields = self._designer_write_fields()
-        return (
-            type(self)
-            ._base_manager.filter(pk=self.pk)
-            .values(*(field.attname for field in fields), "legacy_designer_grandfathered")
-            .first()
-        )
+        return type(self)._base_manager.filter(pk=self.pk).values("legacy_designer_grandfathered").first()
 
-    def _designer_default_state(self):
-        state = {field.attname: field.get_default() for field in self._designer_write_fields()}
-        state["legacy_designer_grandfathered"] = False
-        return state
+    def _validate_designer_write(self, existing=None):
+        """Marker-only write policy for the legacy designer provenance.
 
-    def _validate_designer_write(self, existing=None, *, update_fields=None, enforce_marker=True):
-        if enforce_marker:
-            if self.legacy_designer_grandfathered and not existing:
-                raise ValidationError(_("The legacy designer marker is migration-managed and cannot be forged."))
-            if existing and existing["legacy_designer_grandfathered"] != self.legacy_designer_grandfathered:
-                raise ValidationError(_("The legacy designer marker is migration-managed and cannot be changed."))
-
-        if report_designer_probe().active:
-            return
-
-        previous = existing or self._designer_default_state()
-        fields = self._designer_write_fields()
-        if update_fields is not None:
-            update_fields = set(update_fields)
-            fields = tuple(field for field in fields if field.name in update_fields or field.attname in update_fields)
-        candidate = {field.attname: getattr(self, field.attname) for field in fields}
-        changed = {field.attname for field in fields if candidate[field.attname] != previous[field.attname]}
-        if not changed:
-            return
-
-        if previous["legacy_designer_grandfathered"]:
-            raise ValidationError(self._DESIGNER_DISABLED_MESSAGE)
-
-        previous_content = previous["template_content"] or ""
-        candidate_content = getattr(self, "template_content", "") or ""
-        content_changed = (
-            "template_content" in changed
-            and candidate_content != previous_content
-            and bool(previous_content.strip() or candidate_content.strip())
-        )
-        saving_nonempty_custom_html = bool(candidate_content.strip())
-        advanced_enabled = "advanced_mode" in changed and bool(self.advanced_mode and not previous["advanced_mode"])
-        if saving_nonempty_custom_html or content_changed or advanced_enabled:
-            raise ValidationError(self._DESIGNER_DISABLED_MESSAGE)
+        With the report designer promoted to Stable the capability is always
+        active, so the flag-gated write refusals (enabling legacy CSV mode,
+        saving custom HTML, editing grandfathered templates) no longer exist.
+        The one durable rule left: the migration-managed
+        ``legacy_designer_grandfathered`` marker confirms provenance and can
+        neither be forged on new rows nor changed on persisted rows.
+        """
+        if self.legacy_designer_grandfathered and not existing:
+            raise ValidationError(_("The legacy designer marker is migration-managed and cannot be forged."))
+        if existing and existing["legacy_designer_grandfathered"] != self.legacy_designer_grandfathered:
+            raise ValidationError(_("The legacy designer marker is migration-managed and cannot be changed."))
 
     def clean(self):
         super().clean()
@@ -1721,13 +1698,11 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             raise ValidationError(
                 {"included_columns": _("Unknown report columns: %(keys)s") % {"keys": ", ".join(unknown)}}
             )
-        if report_designer_probe().active:
-            return
-        self._validate_designer_write(self._designer_persisted_state(), enforce_marker=False)
+        self._validate_designer_write(self._designer_persisted_state())
 
     def save(self, *args, **kwargs):
         existing = self._designer_persisted_state()
-        self._validate_designer_write(existing, update_fields=kwargs.get("update_fields"))
+        self._validate_designer_write(existing)
         return super().save(*args, **kwargs)
 
 
