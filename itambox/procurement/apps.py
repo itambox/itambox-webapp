@@ -5,24 +5,13 @@ from django.conf import settings
 
 from itambox.capabilities import (
     ALWAYS_ON,
-    BETA,
     CAPABILITY_REGISTRY_DOC_URL,
     CONTRACT_VERSION,
-    ENABLED,
     SOURCE_ALWAYS,
-    SOURCE_CONFIGURED,
     STABLE,
-    ActivationState,
     Capability,
     registry,
 )
-
-
-def _asset_request_procurement_probe():
-    thresholds = getattr(settings, "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
-    if thresholds is None:
-        thresholds = getattr(settings, "REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
-    return ActivationState(active=bool(thresholds), value_present=thresholds is not None)
 
 
 def _warn_legacy_auto_approval_setting():
@@ -75,18 +64,14 @@ class ProcurementConfig(AppConfig):
                 key="procurement.requisition_seam",
                 title="Asset Request Procurement Seam",
                 owning_area="area:procurement",
-                maturity=BETA,
+                maturity=STABLE,
                 security_critical=False,
-                activation=ENABLED,
-                activation_probe=_asset_request_procurement_probe,
-                activation_source=SOURCE_CONFIGURED,
+                activation=ALWAYS_ON,
+                activation_probe=None,
+                activation_source=SOURCE_ALWAYS,
                 owns=("procurement.FulfillmentLink",),
                 docs_url=CAPABILITY_REGISTRY_DOC_URL,
-                limitations=(
-                    "The asset-request to purchase-order-line reservation flow is incomplete; "
-                    "partial fulfilment may need manual reconciliation.",
-                    "Auto-approval thresholds are process-wide, not per tenant.",
-                ),
+                limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
         )

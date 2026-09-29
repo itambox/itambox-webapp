@@ -6161,6 +6161,14 @@ msgstr "Bestellte Menge"
 msgid "Qty Received"
 msgstr "Erhaltene Menge"
 
+msgid ""
+"Quantity of this line's receipts attributed to this Asset Request. Null on "
+"links that predate receipt attribution."
+msgstr ""
+"Menge der Wareneingänge dieser Bestellposition, die dieser Asset-Anforderung "
+"zugeordnet sind. Null bei Verknüpfungen, die vor der Einführung der "
+"Mengenzuordnung entstanden sind."
+
 msgid "Unit Price"
 msgstr "Stückpreis"
 
@@ -12180,11 +12188,16 @@ msgstr "Asset-Anforderungen können nur mit Bestellungsentwürfen verknüpft wer
 msgid "Only approved Asset Requests can be linked to a purchase order."
 msgstr "Nur genehmigte Asset-Anforderungen können mit einer Bestellung verknüpft werden."
 
+msgid ""
+"This request asks for more than one serialised unit. Split it into request "
+"units before linking it to a purchase order."
+msgstr ""
+"Diese Anforderung umfasst mehr als eine serialisierte Einheit. Teilen Sie "
+"sie in Anforderungseinheiten auf, bevor Sie sie mit einer Bestellung "
+"verknüpfen."
+
 msgid "Purchase order no longer exists."
 msgstr "Die Bestellung existiert nicht mehr."
-
-msgid "Procurement is not configured for Asset Requests. Ask an administrator to enable it before continuing."
-msgstr "Die Beschaffung für Asset-Anforderungen ist nicht konfiguriert. Bitten Sie einen Administrator, sie zu aktivieren, bevor Sie fortfahren."
 
 msgid "You do not have permission to change this purchase order."
 msgstr "Sie sind nicht berechtigt, diese Bestellung zu ändern."

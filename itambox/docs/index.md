@@ -22,7 +22,7 @@ Maintain a software catalog and track license entitlements — seat counts, prod
 Manage recurring SaaS contracts with billing cycles, renewal tracking, shared Supplier records, and user seat allocations. Subscription seats roll up to linked license entitlements. The **SaaS Subscriptions** capability is **Stable** and always on.
 
 ### Procurement
-Track the purchasing lifecycle: Purchase Orders with approval workflows, Contracts with SLA tracking, and supplier management. POs support draft → approved → ordered → received states with segregation of duties. Purchase Orders and Contracts are a **Stable** capability; the opt-in Asset Request Procurement Seam remains **Beta**.
+Track the purchasing lifecycle: Purchase Orders with approval workflows, Contracts with SLA tracking, and supplier management. POs support draft → approved → ordered → received states with segregation of duties. Purchase Orders, Contracts, and the Asset Request Procurement Seam are **Stable** capabilities.
 
 ### Compliance
 Conduct hardware audits with barcode scanning, generate legally binding custody receipts with digital signatures, and schedule preventive maintenance. Custody receipts capture EULA acceptance with tamper-proof verification hashes.

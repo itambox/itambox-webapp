@@ -31,7 +31,7 @@ enables an endpoint and a rule.
 
 | Mode | How it is switched on | Example in this release |
 |---|---|---|
-| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Webhooks and Event Rules, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
+| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Webhooks and Event Rules, Purchase Orders and Contracts, Asset Request Procurement Seam, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
 | Opt-in through configuration | An operator sets an environment variable / setting; takes effect on restart. | Plugin System (`ITAMBOX_PLUGINS`), Asset Request auto-approval (`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`) |
 | Opt-in through an application object | An administrator creates or enables a record in the application. | Scheduled Reports (an active schedule row), Alert Rules and Channels (an active `AlertRule`), SCIM Provisioning (a tenant-scoped API token with write access) |
 
@@ -53,7 +53,7 @@ inactive.
 | Role Grants | Stable | Enabled by default (security-critical) | — |
 | Tenant Resource Grants | Stable | Enabled by default (security-critical) | [Resource Grant Expiry](resource-grant-expiry.md) |
 | Purchase Orders and Contracts | Stable | Enabled by default | [Contracts & Purchase Orders](../usage/contracts-and-purchase-orders.md) |
-| Asset Request Procurement Seam | Beta | Opt-in: `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` | [Asset Requests](../usage/asset-requests-and-reservations.md) |
+| Asset Request Procurement Seam | Stable | Always on | [Asset Requests](../usage/asset-requests-and-reservations.md) |
 | SaaS Subscriptions | Stable | Enabled by default | — |
 | SCIM Provisioning | Beta | Opt-in: tenant-scoped API token with write access | [SCIM Provisioning](../integration/scim.md) |
 | Plugin System | Experimental | Opt-in: `ITAMBOX_PLUGINS` | [Plugin guide](../plugins/getting_started.md) |

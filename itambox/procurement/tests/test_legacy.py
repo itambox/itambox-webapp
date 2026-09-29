@@ -67,7 +67,10 @@ class ProcurementStatusTransitionTests(TestCase):
         self.po.refresh_from_db()
         self.assertEqual(self.po.status, PurchaseOrder.STATUS_APPROVED)
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+    )
     def test_link_asset_request_to_purchase_order_creates_the_owned_fulfillment_graph(self):
         from procurement import services
 
@@ -79,7 +82,7 @@ class ProcurementStatusTransitionTests(TestCase):
             tenant=self.tenant,
             requester=self.user,
             asset_type=self.asset_type,
-            qty=2,
+            qty=1,
             status=RequestStatusChoices.APPROVED,
         )
 
@@ -89,14 +92,14 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(request.status, RequestStatusChoices.PROCUREMENT)
         self.assertEqual(link.tenant, self.tenant)
         self.assertEqual(link.asset_request, request)
-        self.assertEqual(link.qty_allocated, 2)
+        self.assertEqual(link.qty_allocated, 1)
+        self.assertEqual(link.qty_received, 0)
         self.assertEqual(link.purchase_order_line.tenant, self.tenant)
         self.assertEqual(link.purchase_order_line.purchase_order, self.po)
         self.assertEqual(link.purchase_order_line.asset_type, self.asset_type)
-        self.assertEqual(link.purchase_order_line.qty_ordered, 2)
+        self.assertEqual(link.purchase_order_line.qty_ordered, 1)
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
-    def test_link_asset_request_to_purchase_order_is_idempotent(self):
+    def test_link_refuses_multi_unit_serialised_requests(self):
         from procurement.services import link_asset_request_to_purchase_order
 
         self.po.tenant = self.tenant
@@ -109,6 +112,27 @@ class ProcurementStatusTransitionTests(TestCase):
             status=RequestStatusChoices.APPROVED,
         )
 
+        with self.assertRaisesMessage(ValidationError, "more than one serialised unit"):
+            link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
+
+        request.refresh_from_db()
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+        self.assertFalse(FulfillmentLink.objects.filter(asset_request=request).exists())
+        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
+
+    def test_link_asset_request_to_purchase_order_is_idempotent(self):
+        from procurement.services import link_asset_request_to_purchase_order
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        request = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=1,
+            status=RequestStatusChoices.APPROVED,
+        )
+
         first = link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
         second = link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
 
@@ -116,7 +140,6 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(FulfillmentLink.objects.filter(asset_request=request).count(), 1)
         self.assertEqual(PurchaseOrderLine.objects.filter(purchase_order=self.po).count(), 1)
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
     def test_multi_unit_asset_type_group_links_and_receives_each_child_idempotently(self):
         from procurement.services import (
             approve_purchase_order,
@@ -201,6 +224,11 @@ class ProcurementStatusTransitionTests(TestCase):
             [child.status for child in children].count(RequestStatusChoices.PROCUREMENT),
             1,
         )
+        first_link = FulfillmentLink.objects.get(asset_request=children[0])
+        second_link = FulfillmentLink.objects.get(asset_request=children[1])
+        self.assertEqual((first_link.qty_received, first_link.qty_allocated), (1, 1))
+        self.assertEqual((second_link.qty_received, second_link.qty_allocated), (0, 1))
+        self.assertFalse(second_link.fully_delivered)
 
         receive_purchase_order(
             self.po,
@@ -214,8 +242,10 @@ class ProcurementStatusTransitionTests(TestCase):
             child.refresh_from_db()
             self.assertEqual(child.status, RequestStatusChoices.APPROVED)
             self.assertIsNotNone(child.asset_id)
+            link = FulfillmentLink.objects.get(asset_request=child)
+            self.assertEqual(link.qty_received, 1)
+            self.assertTrue(link.fully_delivered)
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
     def test_cancelling_group_purchase_order_reverts_parent_and_children(self):
         from procurement.services import cancel_purchase_order, link_asset_request_to_purchase_order
 
@@ -257,7 +287,7 @@ class ProcurementStatusTransitionTests(TestCase):
         ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
         REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
     )
-    def test_unconfigured_asset_request_procurement_seam_is_inert(self):
+    def test_link_without_any_threshold_configuration_still_reserves_and_links(self):
         from procurement.services import link_asset_request_to_purchase_order
 
         self.po.tenant = self.tenant
@@ -269,15 +299,13 @@ class ProcurementStatusTransitionTests(TestCase):
             status=RequestStatusChoices.APPROVED,
         )
 
-        with self.assertRaisesMessage(ValidationError, "not configured"):
-            link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
+        link = link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
 
         request.refresh_from_db()
-        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
-        self.assertFalse(FulfillmentLink.objects.filter(asset_request=request).exists())
-        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
+        self.assertEqual(request.status, RequestStatusChoices.PROCUREMENT)
+        self.assertTrue(FulfillmentLink.objects.filter(pk=link.pk, asset_request=request).exists())
+        self.assertTrue(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
     def test_link_asset_request_to_purchase_order_rejects_foreign_request_id(self):
         from procurement.services import link_asset_request_to_purchase_order
 
@@ -299,7 +327,6 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertFalse(FulfillmentLink.objects.filter(asset_request=foreign_request).exists())
         self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
     def test_link_asset_request_to_purchase_order_rejects_tenantless_legacy_rows(self):
         from procurement.services import link_asset_request_to_purchase_order
 
@@ -317,7 +344,6 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertFalse(FulfillmentLink.objects.filter(asset_request=tenantless_request).exists())
         self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
 
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
     def test_link_asset_request_to_purchase_order_rejects_malformed_request_id(self):
         from procurement.services import link_asset_request_to_purchase_order
 

@@ -25,7 +25,6 @@ from itambox.capabilities import (
     EXPERIMENTAL,
     OPT_IN,
     SOURCE_ALWAYS,
-    SOURCE_CONFIGURED,
     SOURCE_OBJECT_ENABLED,
     SOURCE_OPERATOR_FLAG,
     ActivationState,
@@ -42,7 +41,7 @@ DOCS_ROOT = REPO_ROOT / "itambox" / "docs"
 DECLARED = {
     "subscriptions.tracking": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "procurement.core": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
-    "procurement.requisition_seam": (BETA, "enabled", SOURCE_CONFIGURED),
+    "procurement.requisition_seam": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.curated": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.designer": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.scheduled": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
@@ -77,6 +76,17 @@ class TestDeclaredSlice:
 
     def test_webhooks_are_declared_stable_always_on_without_probe_or_limitations(self):
         capability = registry.get("automation.webhooks")
+
+        assert (capability.maturity, capability.activation, capability.activation_source) == (
+            STABLE,
+            ALWAYS_ON,
+            SOURCE_ALWAYS,
+        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
+
+    def test_the_seam_is_declared_stable_always_on_without_probe_or_limitations(self):
+        capability = registry.get("procurement.requisition_seam")
 
         assert (capability.maturity, capability.activation, capability.activation_source) == (
             STABLE,
@@ -168,28 +178,28 @@ class TestActivationDefaults:
                 assert state.probe_error == "", capability.key
                 assert state.active is False, capability.key
 
-    def test_the_unconfigured_requisition_seam_is_inert(self):
+    def test_the_seam_is_active_without_any_threshold_configuration(self):
         state = registry.state("procurement.requisition_seam")
-        assert state == ActivationState(active=False, value_present=False)
+        assert state == ActivationState(active=True, value_present=True)
 
     @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
-    def test_the_configured_requisition_seam_reports_presence_without_values(self):
+    def test_threshold_configuration_no_longer_gates_the_seam(self):
         state = registry.state("procurement.requisition_seam")
         assert state == ActivationState(active=True, value_present=True)
         assert "accessory" not in repr(state)
         assert "consumable" not in repr(state)
 
     @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={})
-    def test_an_empty_threshold_object_is_present_but_keeps_the_seam_inactive(self):
+    def test_an_empty_threshold_object_keeps_the_seam_active(self):
         state = registry.state("procurement.requisition_seam")
 
-        assert state == ActivationState(active=False, value_present=True)
+        assert state == ActivationState(active=True, value_present=True)
 
     @override_settings(
         ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
         REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 2},
     )
-    def test_the_legacy_threshold_setting_keeps_the_seam_active_for_1x(self):
+    def test_the_legacy_threshold_setting_no_longer_gates_the_seam(self):
         state = registry.state("procurement.requisition_seam")
 
         assert state == ActivationState(active=True, value_present=True)
@@ -393,6 +403,10 @@ class TestInactiveSafety:
     def test_webhooks_are_not_deactivatable(self):
         assert "automation.webhooks" not in deactivatable_keys()
         assert registry.is_active("automation.webhooks") is True
+
+    def test_the_seam_is_not_deactivatable(self):
+        assert "procurement.requisition_seam" not in deactivatable_keys()
+        assert registry.is_active("procurement.requisition_seam") is True
 
     @pytest.mark.parametrize(
         "key",

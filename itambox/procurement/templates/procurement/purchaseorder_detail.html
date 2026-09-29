@@ -199,6 +199,8 @@
                     <th>{% translate "Request" %}</th>
                     <th>{% translate "Item" %}</th>
                     <th>{% translate "Status" %}</th>
+                    <th>{% translate "Received" %}</th>
+                    <th>{% translate "Outstanding" %}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -220,10 +222,18 @@
                       <td data-label="{% translate "Status" %}">
                         <span class="badge bg-primary-lt">{{ link.asset_request.get_status_display }}</span>
                       </td>
+                      <td data-label="{% translate "Received" %}">
+                        {% if link.received_attribution_tracked %}{{ link.qty_received }} / {{ link.qty_allocated }}
+                  {% else %}-{% endif %}
+                    </td>
+                  <td data-label="{% translate "Outstanding" %}">
+                    {% if link.received_attribution_tracked %}{{ link.qty_outstanding }}
+                  {% else %}-{% endif %}
+                    </td>
                     </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+                {% endfor %}
+              </tbody>
+            </table>
             </div>
           {% else %}
             <div class="text-center text-muted py-4">

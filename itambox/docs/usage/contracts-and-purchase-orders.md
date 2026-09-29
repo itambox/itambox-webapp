@@ -273,6 +273,9 @@ AssetRequest  ──→  FulfillmentLink  ──→  PurchaseOrderLine  ──�
 
 When the PO is received, the linked asset requests can be fulfilled.
 
+Receipts are accounted per link: each link tracks its received quantity
+(`qty_received`) and its still-open quantity (`qty_outstanding = qty_allocated − qty_received`). A received unit is allocated to one request; a request becomes `approved` only once its full reserved quantity has arrived, attributed oldest open request first. Surplus units beyond the reserved demand stay as free stock, links that predate receipt attribution report no delivered quantity until a fresh receipt completes them, and the PO detail page lists each link's received and outstanding quantities.
+
 ### Key constraints
 
 | Constraint | Enforcement |
