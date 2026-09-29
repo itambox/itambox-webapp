@@ -55,15 +55,15 @@
       "scope": "Curated report catalogue"
     },
     "reporting.designer": {
-      "activation": "opt-in",
-      "contract_class": "beta-opt-in",
-      "exclusions": "Column, filter, and grouping model is expected to change; saved templates may need rebuilding",
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
       "scope": "Saved report templates"
     },
     "reporting.scheduled": {
       "activation": "opt-in",
       "contract_class": "beta-opt-in",
-      "exclusions": "Requires `ITAMBOX_FEATURE_REPORT_DESIGNER=True` and at least one enabled schedule row; when false, the schedule surfaces are hidden/closed and delivery is skipped for non-grandfathered templates while the migration-managed bounded grandfathered set may continue; saved schedules are retained and grandfathered templates are read-only; delivery also depends on a running worker",
+      "exclusions": "Requires at least one enabled schedule row; deactivating a schedule pauses its delivery without deleting the saved schedule; delivery also depends on a running worker",
       "scope": "Scheduled reports and generation archive"
     },
     "subscriptions.tracking": {
@@ -196,6 +196,10 @@
       "warranty_cost",
       "warranty_reference",
       "disposal_asset",
+      "disposal_status",
+      "disposal_cancelled_at",
+      "disposal_cancelled_by",
+      "disposal_cancellation_reason",
       "disposal_date",
       "disposal_method",
       "disposal_sanitization_method",
@@ -676,7 +680,6 @@
     "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS",
     "ITAMBOX_REQUIRE_CUSTODY_SIGNIN",
     "ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES",
-    "ITAMBOX_FEATURE_REPORT_DESIGNER",
     "ITAMBOX_PLUGINS",
     "ITAMBOX_TENANT_LDAP_CONFIGS",
     "ITAMBOX_TENANT_SAML_CONFIGS",

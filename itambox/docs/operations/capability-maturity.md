@@ -31,9 +31,9 @@ enables an endpoint and a rule.
 
 | Mode | How it is switched on | Example in this release |
 |---|---|---|
-| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Alerts and Notifications, Webhooks and Event Rules, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
-| Opt-in through configuration | An operator sets an environment variable / setting; takes effect on restart. | Report Designer (`ITAMBOX_FEATURE_REPORT_DESIGNER`), Plugin System (`ITAMBOX_PLUGINS`), Asset Request auto-approval (`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`), Scheduled Reports (flag plus an active schedule row) |
-| Opt-in through an application object | An administrator creates or enables a record in the application. | Alert Rules and Channels (an active `AlertRule`), SCIM Provisioning (a tenant-scoped API token with write access) |
+| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Webhooks and Event Rules, Purchase Orders and Contracts, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
+| Opt-in through configuration | An operator sets an environment variable / setting; takes effect on restart. | Plugin System (`ITAMBOX_PLUGINS`), Asset Request auto-approval (`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`) |
+| Opt-in through an application object | An administrator creates or enables a record in the application. | Scheduled Reports (an active schedule row), Alert Rules and Channels (an active `AlertRule`), SCIM Provisioning (a tenant-scoped API token with write access) |
 
 A capability that is not switched on is reported as **inactive** — it keeps its
 declared grade, but contributes none of its surfaces until it is activated.
@@ -45,8 +45,8 @@ inactive.
 | Capability | Grade | Activation | Operator documentation |
 |---|---|---|---|
 | Curated Reports | Stable | Enabled by default | [Reports & Exports](../usage/reports-and-exports.md) |
-| Report Designer | Beta | Opt-in: `ITAMBOX_FEATURE_REPORT_DESIGNER` | [Reports & Exports](../usage/reports-and-exports.md) |
-| Scheduled Reports | Beta | Opt-in: flag plus an active schedule row | [Reports & Exports](../usage/reports-and-exports.md) |
+| Report Designer | Stable | Always on | [Reports & Exports](../usage/reports-and-exports.md) |
+| Scheduled Reports | Beta | Opt-in: an active schedule row | [Reports & Exports](../usage/reports-and-exports.md) |
 | Alerts and Notifications | Stable | Enabled by default | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
 | Alert Rules and Channels | Beta | Opt-in: an active `AlertRule` | [Alerts & Notifications](../usage/alerts-and-notifications.md) |
 | Webhooks and Event Rules | Stable | Enabled by default; delivery requires an enabled event rule and endpoint | [Webhooks & Automation](../usage/webhooks-and-automation.md) |
@@ -71,7 +71,7 @@ python manage.py capabilities --format json
 
 ```text
 CAPABILITY                          CLASS    MODE       STATE     SOURCE          VALUE
-reporting.designer                  beta     opt-in     inactive  operator-flag   absent
+reporting.designer                  stable   always-on  active    always          present
 automation.webhooks                 stable   always-on  active    always          present
 organization.resource_grants *      stable   always-on  active    always          present
 ```

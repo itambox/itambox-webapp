@@ -65,9 +65,10 @@ python manage.py capabilities
 ```
 
 - **Inactive, opt-in capability** — check the activation source: the
-  operator flag (`ITAMBOX_FEATURE_REPORT_DESIGNER`, `ITAMBOX_PLUGINS`,
+  configuration setting (`ITAMBOX_PLUGINS`,
   `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`) or the application object
-  (enabled `EventRule`, active `AlertRule`, SCIM token). See
+  (active Scheduled Report row, enabled `EventRule`, active `AlertRule`, SCIM
+  token). The Report Designer is always on and needs no setting. See
   [Capability Maturity](capability-maturity.md).
 - **`error` state** — the capability's probe could not run (for example the
   database is unreachable); the exception *type* is shown, never the message.
@@ -88,10 +89,10 @@ proposed for repair as `TenantResourceGrant` payloads via `--proposals`.
 
 ## 5. Reports, webhooks, and notifications
 
-- **Scheduled report did not arrive** — confirm the designer flag is enabled
-  (`ITAMBOX_FEATURE_REPORT_DESIGNER=True`), the worker is running, the
-  schedule row exists, and SMTP works (see below). A stopped worker is the
-  most common cause.
+- **Scheduled report did not arrive** — confirm the schedule row is active,
+  the `qcluster` worker is running, and SMTP works (see below). Scheduled
+  Reports require at least one active schedule row; the Report Designer needs
+  no setting. A stopped worker is the most common cause.
 - **Webhook not delivered** — deliveries are durable and recorded: open the
   endpoint's delivery history under **Extras → Webhooks → <endpoint>** for the
   attempt count, status, and latest outcome. Once the endpoint is fixed, a

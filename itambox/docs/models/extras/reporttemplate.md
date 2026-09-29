@@ -1,6 +1,6 @@
 # Report Templates
 
-A **Report Template** defines the visual configuration used to compile and export system data summaries. The built-in renderer is used by default for on-demand and scheduled reports. Custom HTML/Jinja is a Beta, sandboxed opt-in surface: it is available when the report-designer flag is enabled, and migration-managed bounded grandfathered templates may continue using it while the flag is disabled.
+A **Report Template** defines the visual configuration used to compile and export system data summaries. The built-in renderer is used by default for on-demand and scheduled reports. Custom HTML/Jinja runs in a sandbox with a limited context, autoescaping, and no model or object access. Grandfathered templates keep their existing rendering behavior after migration and can be edited like other templates.
 
 ## Attributes
 
@@ -19,5 +19,5 @@ A **Report Template** defines the visual configuration used to compile and expor
 
 ## Security Guardrails
 
-* **Built-in renderer and sandboxed opt-in**: Normal templates use the versioned system template and style presets. Custom HTML/Jinja is limited to the published context and sandbox, with autoescaping and no model/object access; it is available only while the operator flag is enabled or for migration-managed bounded grandfathered templates. Grandfathered templates are read-only while the flag is disabled.
+* **Built-in renderer and sandboxed custom HTML**: Normal templates use the versioned system template and style presets. Custom HTML/Jinja is limited to the published context and sandbox, with autoescaping and no model/object access. The migration-managed provenance marker remains in place for grandfathered templates; those templates can be edited after migration.
 * **Tenant scoping**: Report data is compiled under the active tenant and configured filter-tenant constellation.

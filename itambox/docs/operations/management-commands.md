@@ -45,7 +45,7 @@ exception *type* only.
 ```text
 $ python manage.py capabilities
 CAPABILITY                          CLASS   MODE        STATE    SOURCE          VALUE
-reporting.designer                  beta    opt-in      inactive operator-flag   absent
+reporting.designer                  stable  always-on   active   always          present
 organization.resource_grants *      stable  always-on   active   always          present
 ```
 
