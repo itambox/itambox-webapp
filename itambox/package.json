@@ -4,7 +4,7 @@
   "private": true,
   "overrides": {
     "nanoid": "3.3.18",
-    "undici": "6.28.0"
+    "undici": "6.28.1"
   },
   "description": "IT Asset Management System — static assets build pipeline",
   "scripts": {
