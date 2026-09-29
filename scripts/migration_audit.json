@@ -3319,6 +3319,50 @@
     },
     {
       "dependencies": [
+        "django_q.0019_alter_task_options_alter_ormq_key_alter_ormq_lock_and_more",
+        "extras.0122_journalentry_tenant_group",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0123_pause_flag_suppressed_report_schedules",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0123_pause_flag_suppressed_report_schedules.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Pauses registered, active, non-grandfathered report schedules once on deployments that ran the report designer disabled, so removing the feature flag cannot silently resume suppressed outbound deliveries; rows and history are preserved and re-enabling resumes deliberately."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "licenses.0100_issue88_shard_11_licenses_schema"
       ],
       "id": "inventory.0100_issue88_shard_12_inventory_schema",
@@ -5228,6 +5272,7 @@
     "extras.0116_asset_type_definition_cutover",
     "extras.0117_asset_type_definition_guards",
     "extras.0122_journalentry_tenant_group",
+    "extras.0123_pause_flag_suppressed_report_schedules",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -5272,6 +5317,7 @@
       "extras.0112_backfill_webhookdelivery_targets",
       "extras.0113_upgrade_legacy_webhook_retry_schedules",
       "extras.0115_asset_type_definition_conversion",
+      "extras.0123_pause_flag_suppressed_report_schedules",
       "subscriptions.0101_remove_subscription_auto_renewal_and_more",
       "subscriptions.0103_unified_vendor_cutover",
       "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
@@ -5307,7 +5353,7 @@
     "global_roots": [],
     "missing_replacement_targets": 0,
     "per_app_local_roots_and_leaves": {},
-    "post_transition_migrations": 45,
+    "post_transition_migrations": 46,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

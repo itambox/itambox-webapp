@@ -245,7 +245,11 @@ responses still carry the applicable disclosure headers. Requesting
 schedule and deliver the result via email or notification channels. Scheduled
 Reports remain **Beta** and activate when at least one schedule row is active.
 Deactivating a schedule pauses its delivery without deleting the row. Delivery
-depends on a running `qcluster` worker. See
+depends on a running `qcluster` worker. Upgrading a deployment that ran with
+the designer flag disabled pauses schedules that were being skipped instead of
+resuming them silently; see
+[Updating a deployment](../operations/upgrades.md) for the transition and how
+to resume a schedule. See
 [Capability Maturity](../operations/capability-maturity.md) for the declared
 grade and activation model.
 

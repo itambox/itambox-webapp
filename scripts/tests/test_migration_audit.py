@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 45)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 46)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -586,6 +586,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0116_asset_type_definition_cutover",
                 "extras.0117_asset_type_definition_guards",
                 "extras.0122_journalentry_tenant_group",
+                "extras.0123_pause_flag_suppressed_report_schedules",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",

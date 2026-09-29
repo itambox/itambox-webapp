@@ -1,10 +1,13 @@
 import importlib
+import os
+from contextlib import contextmanager
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.graph import MigrationGraph
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
+from django.utils import timezone
 
 
 class ReportDesignerMigrationTests(TransactionTestCase):
@@ -188,3 +191,185 @@ class ReportDesignerMigrationTests(TransactionTestCase):
             self.assertFalse(
                 forward_apps.get_model("extras", "ReportTemplate").objects.get(name=name).legacy_designer_grandfathered
             )
+
+
+class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
+    """F2 regression: removing the designer flag must not resume deliveries.
+
+    The removed worker guard skipped flag-disabled schedules without recording
+    any marker, so an upgrade would have silently resumed outbound delivery
+    for registered schedules. The 0123 migration pauses exactly that
+    population (registered, active, non-grandfathered) on deployments that ran
+    the designer disabled, and leaves every other population untouched.
+    """
+
+    reset_sequences = True
+    migrate_from = ("extras", "0122_journalentry_tenant_group")
+    migrate_to = ("extras", "0123_pause_flag_suppressed_report_schedules")
+    flag_names = ("ITAMBOX_FEATURE_REPORT_DESIGNER", "ITAMBOX_REPORT_DESIGNER_ENABLED")
+
+    def tearDown(self):
+        # Restore the shared test database to the migration leaf state so later
+        # tests never see a rehearsed (partially migrated) schema.
+        try:
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())
+        finally:
+            super().tearDown()
+
+    def _historical_executor(self):
+        # Keep this test focused on extras.0123; never reverse unrelated
+        # irreversible cutovers just to reach the historical report state.
+        executor = MigrationExecutor(connection)
+        loader = executor.loader
+        allowed = set(loader.graph.forwards_plan(self.migrate_to))
+        graph = MigrationGraph()
+        for key in allowed:
+            graph.add_node(key, loader.disk_migrations[key])
+        for key in allowed:
+            migration = loader.disk_migrations[key]
+            for dependency in migration.dependencies:
+                if dependency in allowed:
+                    graph.add_dependency(migration, key, dependency)
+        loader.graph = graph
+        return executor
+
+    @contextmanager
+    def _flag_env(self, value):
+        saved = {name: os.environ.get(name) for name in self.flag_names}
+        try:
+            for name in self.flag_names:
+                os.environ.pop(name, None)
+            if value is not None:
+                os.environ[self.flag_names[0]] = value
+            yield
+        finally:
+            for name, previous in saved.items():
+                if previous is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = previous
+
+    def _stage(self):
+        """Reset extras to 0122 and create the transition scenarios."""
+        MigrationRecorder(connection).record_unapplied("extras", "0123_pause_flag_suppressed_report_schedules")
+        self.executor = self._historical_executor()
+        self.executor.migrate([self.migrate_from])
+        old_apps = self.executor.loader.project_state([self.migrate_from]).apps
+        ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
+        ScheduledReport = old_apps.get_model("extras", "ScheduledReport")
+        Tenant = old_apps.get_model("organization", "Tenant")
+        Schedule = old_apps.get_model("django_q", "Schedule")
+        tenant = Tenant.objects.create(name="Transition Tenant", slug="transition-tenant")
+
+        suppressed_template = ReportTemplate.objects.create(
+            name="suppressed", report_type="asset_summary", tenant=tenant
+        )
+        grandfathered_template = ReportTemplate.objects.create(
+            name="grandfathered", report_type="asset_summary", tenant=tenant, legacy_designer_grandfathered=True
+        )
+        unscheduled_template = ReportTemplate.objects.create(
+            name="unscheduled", report_type="asset_summary", tenant=tenant
+        )
+        inactive_template = ReportTemplate.objects.create(name="inactive", report_type="asset_summary", tenant=tenant)
+
+        def q_schedule(name):
+            return Schedule.objects.create(
+                name=name,
+                func="extras.tasks.reports.generate_scheduled_report_task",
+                schedule_type=Schedule.DAILY,
+            )
+
+        self.suppressed_q = q_schedule("scheduled_report_suppressed")
+        self.grandfathered_q = q_schedule("scheduled_report_grandfathered")
+        self.inactive_q = q_schedule("scheduled_report_inactive")
+
+        # Flag-suppressed population: registered + active + non-grandfathered,
+        # with delivery history from before the flag was disabled.
+        self.suppressed = ScheduledReport.objects.create(
+            name="suppressed",
+            report=suppressed_template,
+            tenant=tenant,
+            is_active=True,
+            schedule=self.suppressed_q,
+            last_status="success",
+            last_run=timezone.now(),
+        )
+        # Kept delivering under the disabled flag.
+        self.grandfathered = ScheduledReport.objects.create(
+            name="grandfathered",
+            report=grandfathered_template,
+            tenant=tenant,
+            is_active=True,
+            schedule=self.grandfathered_q,
+        )
+        # Active but never registered: no django-q row, nothing fires.
+        self.unscheduled = ScheduledReport.objects.create(
+            name="unscheduled", report=unscheduled_template, tenant=tenant, is_active=True
+        )
+        # Already paused: stays exactly as the operator left it.
+        self.inactive = ScheduledReport.objects.create(
+            name="inactive",
+            report=inactive_template,
+            tenant=tenant,
+            is_active=False,
+            schedule=self.inactive_q,
+        )
+        connection.commit()
+        connection.close()
+
+    def _migrate_forward(self):
+        self.executor = self._historical_executor()
+        self.executor.migrate([self.migrate_to])
+        return self.executor.loader.project_state([self.migrate_to]).apps
+
+    def test_disabled_designer_pauses_registered_active_non_grandfathered_schedules(self):
+        self._stage()
+        with self._flag_env(None):
+            apps = self._migrate_forward()
+        ScheduledReport = apps.get_model("extras", "ScheduledReport")
+        Schedule = apps.get_model("django_q", "Schedule")
+
+        suppressed = ScheduledReport.objects.get(name="suppressed")
+        self.assertFalse(suppressed.is_active)
+        self.assertIsNone(suppressed.schedule_id)
+        # Historical state survives: delivery history is not rewritten.
+        self.assertEqual(suppressed.last_status, "success")
+        self.assertIsNotNone(suppressed.last_run)
+        self.assertFalse(Schedule.objects.filter(pk=self.suppressed_q.pk).exists())
+
+        grandfathered = ScheduledReport.objects.get(name="grandfathered")
+        self.assertTrue(grandfathered.is_active)
+        self.assertEqual(grandfathered.schedule_id, self.grandfathered_q.pk)
+        self.assertTrue(Schedule.objects.filter(pk=self.grandfathered_q.pk).exists())
+
+        unscheduled = ScheduledReport.objects.get(name="unscheduled")
+        self.assertTrue(unscheduled.is_active)
+        self.assertIsNone(unscheduled.schedule_id)
+
+        inactive = ScheduledReport.objects.get(name="inactive")
+        self.assertFalse(inactive.is_active)
+        self.assertEqual(inactive.schedule_id, self.inactive_q.pk)
+        self.assertTrue(Schedule.objects.filter(pk=self.inactive_q.pk).exists())
+
+    def test_enabled_designer_keeps_every_schedule_delivering(self):
+        self._stage()
+        with self._flag_env("True"):
+            apps = self._migrate_forward()
+        ScheduledReport = apps.get_model("extras", "ScheduledReport")
+        Schedule = apps.get_model("django_q", "Schedule")
+
+        suppressed = ScheduledReport.objects.get(name="suppressed")
+        self.assertTrue(suppressed.is_active)
+        self.assertEqual(suppressed.schedule_id, self.suppressed_q.pk)
+        self.assertTrue(Schedule.objects.filter(pk=self.suppressed_q.pk).exists())
+
+    def test_reverse_is_refused(self):
+        self._stage()
+        with self._flag_env(None):
+            self._migrate_forward()
+        connection.close()
+        self.executor = self._historical_executor()
+        with self.assertRaises(RuntimeError) as caught:
+            self.executor.migrate([self.migrate_from])
+        self.assertIn("issue565.report_schedule_transition.reverse_refused", str(caught.exception))
