@@ -8,6 +8,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from core.managers import get_current_tenant
 from extras.customfields import apply_custom_field_patch, custom_fields_for_model
 from extras.definition_contract import custom_field_definition_contract_errors
 from extras.models import (
@@ -546,8 +547,6 @@ class AlertRuleSerializer(BaseModelSerializer):
         if channels:
             tenant = attrs.get("tenant", getattr(self.instance, "tenant", None))
             if "tenant" not in attrs and self.instance is None:
-                from core.managers import get_current_tenant
-
                 tenant = get_current_tenant()
             errors = alert_rule_channel_scope_errors(channels, tenant.pk if tenant else None)
             if errors:

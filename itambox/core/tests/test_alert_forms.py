@@ -141,7 +141,9 @@ class AlertRuleFormChannelScopeTests(TestCase):
         super().setUp()
         from organization.models import Tenant
 
-        self.admin = User.objects.create_user(username="alert_form_admin", password="x", is_superuser=True, is_staff=True)
+        self.admin = User.objects.create_user(
+            username="alert_form_admin", password="x", is_superuser=True, is_staff=True
+        )
         _current_user.set(self.admin)
         self.tenant = Tenant.objects.create(name="Alert form tenant", slug="alert-form-tenant")
         self.platform_channel = NotificationChannel.objects.create(
@@ -179,7 +181,9 @@ class AlertRuleFormChannelScopeTests(TestCase):
     def test_tenant_rule_rejects_platform_wide_channel(self):
         from extras.forms import AlertRuleForm
 
-        form = AlertRuleForm(data=self._form_data("Tenant rule with global channel", self.platform_channel, self.tenant))
+        form = AlertRuleForm(
+            data=self._form_data("Tenant rule with global channel", self.platform_channel, self.tenant)
+        )
 
         self.assertFalse(form.is_valid())
         self.assertIn("cannot deliver for this rule", str(form.errors))
@@ -201,7 +205,9 @@ class AlertRuleFormChannelScopeTests(TestCase):
         )
         self.assertTrue(platform_form.is_valid(), platform_form.errors)
 
-        tenant_form = AlertRuleForm(data=self._form_data("Platform rule with tenant channel", self.tenant_channel, None))
+        tenant_form = AlertRuleForm(
+            data=self._form_data("Platform rule with tenant channel", self.tenant_channel, None)
+        )
         self.assertFalse(tenant_form.is_valid())
         self.assertIn("cannot deliver for this rule", str(tenant_form.errors))
         self.assertIn("channels", tenant_form.errors)
