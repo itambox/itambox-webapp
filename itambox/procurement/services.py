@@ -329,9 +329,13 @@ def _receive_asset_line(line, qty, details, po, deployable_status):
         if pair_idx < len(pairs):
             req, link = pairs[pair_idx]
             req.asset = asset
-            req.status = RequestStatusChoices.APPROVED
+            received = (link.qty_received or 0) + 1
+            # Approve only once the link's full pledged quantity has been received; a legacy
+            # multi-unit pledge keeps its first asset without fabricating a full delivery.
+            if received >= link.qty_allocated:
+                req.status = RequestStatusChoices.APPROVED
             req.save()
-            link.qty_received = (link.qty_received or 0) + 1
+            link.qty_received = received
             link.save(update_fields=["qty_received"])
             pair_idx += 1
     _approve_completed_group_parents([req for req, _ in pairs[:pair_idx]])

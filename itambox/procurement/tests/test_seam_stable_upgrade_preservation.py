@@ -9,6 +9,7 @@ pre-upgrade receipts. Untracked links simply complete on their next full
 receipt.
 """
 
+from decimal import Decimal
 from io import StringIO
 
 from django.contrib.auth import get_user_model
@@ -43,7 +44,7 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
         self.supplier = Supplier.objects.create(name="Seam upgrade supplier", slug="seam-upgrade-supplier")
         self.manufacturer = Manufacturer.objects.create(name="Seam upgrade maker", slug="seam-upgrade-maker")
         self.asset_type = AssetType.objects.create(
-            manufacturer=self.manufacturer, model="Seam upgrade model", slug="seam-upgrade-model"
+            manufacturer=self.manufacturer, model="Seam upgrade model", slug="seam-upgrade-model", requestable=True
         )
         self.actor = User.objects.create_superuser(
             username="seam-upgrade-admin", email="seam-upgrade@example.com", password="password"
@@ -57,7 +58,13 @@ class SeamUpgradePreservationTests(TenantTestMixin, TransactionTestCase):
 
     @staticmethod
     def _snapshot(row):
-        return {field.attname: getattr(row, field.attname) for field in row._meta.concrete_fields}
+        # Values may still be in-memory (strings) before a refresh; normalise Decimals so
+        # before/after snapshots compare by value regardless of load path.
+        snapshot = {}
+        for field in row._meta.concrete_fields:
+            value = getattr(row, field.attname)
+            snapshot[field.attname] = str(value) if isinstance(value, Decimal) else value
+        return snapshot
 
     def _ordered_component_purchase_order(self, number, qty_ordered):
         purchase_order = PurchaseOrder.objects.create(
