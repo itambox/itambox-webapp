@@ -241,6 +241,109 @@ class FindingPolicyTests(unittest.TestCase):
             # Informational severities stay retained in the SARIF upload.
             self.assertEqual(len(json.loads(sarif.read_text(encoding="utf-8"))["runs"][0]["results"]), 3)
 
+    def test_trivy_default_policy_blocks_medium_findings(self):
+        # Issue 568: the gate default is the canonical dependency-lockfile policy,
+        # so an invocation that forgets --fail-on cannot silently fall back to the
+        # old HIGH-only behavior.
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": "itambox/package-lock.json",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-85024",
+                            "PkgName": "undici",
+                            "InstalledVersion": "6.28.0",
+                            "Severity": "MEDIUM",
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            result = evaluate_trivy([report], [], Path(root) / "results.sarif")
+        self.assertFalse(result.passed)
+        self.assertEqual(result.blocking, 1)
+
+    def test_trivy_sarif_binds_declared_lockfile_targets_to_tracked_paths(self):
+        # Issue 568: findings on the canonical lockfiles must resolve to the real
+        # tracked file instead of a synthetic scanner-side directory prefix.
+        targets = ("uv.lock", "itambox/package-lock.json", "itambox/tests/e2e/package-lock.json")
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": target,
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": f"CVE-2026-{index:04d}",
+                            "PkgName": f"example{index}",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "MEDIUM",
+                        }
+                    ],
+                }
+                for index, target in enumerate(targets, start=1)
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            sarif = Path(root) / "results.sarif"
+            evaluate_trivy([report], [], sarif, expected_targets=set(targets))
+            results = json.loads(sarif.read_text(encoding="utf-8"))["runs"][0]["results"]
+
+        self.assertEqual(
+            [item["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] for item in results],
+            list(targets),
+        )
+        # Rule, package, version, severity and the original target stay attached.
+        for index, (item, target) in enumerate(zip(results, targets, strict=True), start=1):
+            self.assertEqual(item["ruleId"], f"CVE-2026-{index:04d}")
+            self.assertEqual(item["properties"]["target"], target)
+            self.assertEqual(item["message"]["text"], f"example{index} 1.0.0 (MEDIUM)")
+
+    def test_trivy_medium_finding_follows_governed_suppression_lifecycle(self):
+        # Issue 568: a reviewed suppression can defer a MEDIUM finding, but the
+        # governance dates keep applying to it like to every other suppression.
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": "itambox/package-lock.json",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-85024",
+                            "PkgName": "undici",
+                            "InstalledVersion": "6.28.0",
+                            "Severity": "MEDIUM",
+                        }
+                    ],
+                }
+            ],
+        }
+        scope = {"target": "itambox/package-lock.json", "package": "undici", "version": "6.28.0"}
+        with tempfile.TemporaryDirectory() as root:
+            manifest = Path(root) / "suppressions.json"
+            manifest.write_text(
+                json.dumps({"version": 1, "suppressions": [suppression(finding="CVE-2026-85024", scope=scope)]}),
+                encoding="utf-8",
+            )
+            result = evaluate_trivy([report], load_suppressions(manifest), Path(root) / "results.sarif")
+            self.assertTrue(result.passed)
+            self.assertEqual(result.suppressed, 1)
+
+        expired = suppression(
+            finding="CVE-2026-85024",
+            scope=scope,
+            review_on=(date.today() - timedelta(days=2)).isoformat(),
+            expires_on=(date.today() - timedelta(days=1)).isoformat(),
+        )
+        with tempfile.TemporaryDirectory() as root:
+            manifest = Path(root) / "suppressions.json"
+            manifest.write_text(json.dumps({"version": 1, "suppressions": [expired]}), encoding="utf-8")
+            with self.assertRaisesRegex(SecurityGateError, "expired"):
+                load_suppressions(manifest)
+
     def test_trivy_fail_on_any_respects_governed_suppressions(self):
         report = {
             "SchemaVersion": 2,
@@ -411,6 +514,44 @@ class SecurityGateCommandTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(self._run_trivy(root, report), 0)
 
+    def test_dependency_gate_blocks_unsuppressed_medium_and_passes_clean_scans(self):
+        # Issue 568 regression: an unsuppressed MEDIUM finding in a canonical
+        # lockfile must produce a nonzero dependency-gate result, while the same
+        # inputs with no findings must pass.
+        targets = ("uv.lock", "itambox/package-lock.json", "itambox/tests/e2e/package-lock.json")
+        medium = {
+            "SchemaVersion": 2,
+            "Results": [
+                {"Target": "uv.lock", "Vulnerabilities": []},
+                {
+                    "Target": "itambox/package-lock.json",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-85024",
+                            "PkgName": "undici",
+                            "InstalledVersion": "6.28.0",
+                            "Severity": "MEDIUM",
+                        }
+                    ],
+                },
+                {"Target": "itambox/tests/e2e/package-lock.json", "Vulnerabilities": []},
+            ],
+        }
+        clean = {"SchemaVersion": 2, "Results": [{"Target": target, "Vulnerabilities": []} for target in targets]}
+        expect = [argument for target in targets for argument in ("--expect-target", target)]
+        with tempfile.TemporaryDirectory() as root:
+            with redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(self._run_trivy(root, medium, "--fail-on", "medium", *expect), 1)
+            self.assertIn("blocking=1 suppressed=0 MEDIUM=1", output.getvalue())
+
+            with redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(self._run_trivy(root, clean, "--fail-on", "medium", *expect), 0)
+            self.assertIn("blocking=0", output.getvalue())
+
+            # The gate default applies the same policy when the flag is omitted.
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(self._run_trivy(root, medium, *expect), 1)
+
 
 class SecurityAutomationContractTests(unittest.TestCase):
     def test_security_workflow_covers_canonical_inputs_without_leaking_reports(self):
@@ -431,9 +572,12 @@ class SecurityAutomationContractTests(unittest.TestCase):
         self.assertIn("uv lock --check", workflow)
         self.assertIn("--include-dev-deps", workflow)
         self.assertEqual(workflow.count("--expect-target"), 3)
+        self.assertIn("--fail-on medium", workflow)
+        self.assertEqual(workflow.count("--fail-on medium"), 1)
 
     def test_release_rehearsal_scans_the_same_image_before_draft_creation(self):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count("--fail-on any"), 2)
         self.assertGreaterEqual(workflow.count("--ignore-unfixed"), 2)
         for image in ("itambox:release-rehearsal", "itambox:${RELEASE_VERSION}"):
             build = workflow.index(image)
