@@ -30,7 +30,6 @@ from assets.services.request_fulfillment import (
     request_fulfillment_labels,
 )
 from inventory.services import checkout_inventory_item
-from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.views.generic import (
     ObjectDeleteView,
@@ -40,6 +39,7 @@ from itambox.views.generic import (
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
 from organization.rbac import build_accessible_tenant_permissions_map
+from procurement.services import lock_unit_fulfillment_links, release_fulfillment_links
 
 
 def _claim_handover_note(actor, req) -> str:
@@ -243,7 +243,6 @@ class RequestDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["asset_request_procurement_enabled"] = registry.is_active("procurement.requisition_seam")
         context["claim_is_self_service"] = is_self_service_claim(self.request.user, self.object)
         if self.object.is_group:
             children = list(
@@ -371,6 +370,18 @@ class RequestCancelView(SimplePostView):
             raise PermissionDenied(_("You do not have permission to cancel this request."))
 
         with transaction.atomic():
+            # Deterministic global lock order: the unit's fulfilment links first, then the
+            # request rows (the same relative order as the receipt path), so a concurrent
+            # cancellation and receiving cannot deadlock.
+            candidate_unit_ids = [obj.pk]
+            if obj.is_group:
+                candidate_unit_ids.extend(
+                    obj.sub_requests.exclude(
+                        status__in=[RequestStatusChoices.CANCELLED, RequestStatusChoices.FULFILLED]
+                    ).values_list("pk", flat=True)
+                )
+            lock_unit_fulfillment_links(candidate_unit_ids)
+
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
             if obj.status not in [
                 RequestStatusChoices.PENDING,
@@ -389,12 +400,20 @@ class RequestCancelView(SimplePostView):
             obj.status = RequestStatusChoices.CANCELLED
             obj.save()
 
+            cancelled_units = [obj]
             if obj.is_group:
-                for child in obj.sub_requests.exclude(
-                    status__in=[RequestStatusChoices.CANCELLED, RequestStatusChoices.FULFILLED]
+                for child in (
+                    obj.sub_requests.select_for_update()
+                    .exclude(status__in=[RequestStatusChoices.CANCELLED, RequestStatusChoices.FULFILLED])
+                    .order_by("request_date", "pk")
                 ):
                     child.status = RequestStatusChoices.CANCELLED
                     child.save()
+                    cancelled_units.append(child)
+
+            # Unconsumed procurement links close with the cancelled units; received-quantity
+            # attribution stays recorded on the soft-deleted rows and the PO line is untouched.
+            release_fulfillment_links(cancelled_units)
 
         return {"message": _("Asset request cancelled successfully.")}
 

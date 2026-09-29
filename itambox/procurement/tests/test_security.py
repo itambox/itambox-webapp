@@ -727,16 +727,17 @@ class AssetRequestProcurementPermissionTests(TestCase):
         ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
         REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
     )
-    def test_unconfigured_seam_rolls_back_purchase_order_without_success_message(self):
+    def test_create_from_request_needs_no_threshold_configuration(self):
         self._login_to_tenant(self.admin)
 
-        response = self.client.post(self.create_from_request_url, self._payload("PO-SEAM-INACTIVE"))
+        response = self.client.post(self.create_from_request_url, self._payload("PO-SEAM-NEEDS-NO-SETTING"))
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        emitted_messages = [str(message) for message in get_messages(response.wsgi_request)]
-        self.assertFalse(any("Created" in message for message in emitted_messages))
-        self.assertFalse(PurchaseOrder.objects.filter(order_number="PO-SEAM-INACTIVE").exists())
-        self.assertFalse(FulfillmentLink.objects.filter(asset_request=self.asset_request).exists())
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        purchase_order = PurchaseOrder.objects.get(order_number="PO-SEAM-NEEDS-NO-SETTING")
+        link = FulfillmentLink.objects.select_related("purchase_order_line").get(asset_request=self.asset_request)
+        self.assertEqual(link.purchase_order_line.purchase_order, purchase_order)
+        self.asset_request.refresh_from_db()
+        self.assertEqual(self.asset_request.status, RequestStatusChoices.PROCUREMENT)
 
     @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
     def test_malformed_asset_request_id_fails_closed(self):
@@ -770,16 +771,7 @@ class AssetRequestProcurementPermissionTests(TestCase):
         ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
         REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
     )
-    def test_unconfigured_seam_hides_purchase_order_action(self):
-        self._login_to_tenant(self.admin)
-
-        response = self.client.get(reverse("assets:request_detail", kwargs={"pk": self.asset_request.pk}))
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotContains(response, "Create Purchase Order")
-
-    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
-    def test_configured_seam_shows_purchase_order_action_to_authorized_user(self):
+    def test_purchase_order_action_shows_without_any_threshold_configuration(self):
         self._login_to_tenant(self.admin)
 
         response = self.client.get(reverse("assets:request_detail", kwargs={"pk": self.asset_request.pk}))

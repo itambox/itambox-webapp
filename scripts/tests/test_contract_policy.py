@@ -905,6 +905,11 @@ class WordingScopeTests(unittest.TestCase):
         # declares no limitations, so its former exclusions text left the checked
         # wording scope entirely.
         self.assertNotIn("itambox/extras/apps.py: automation.webhooks limitations", limitation_sources)
+        # The Asset Request Procurement Seam graduated to Stable in the #569
+        # promotion: a Stable capability declares no limitations, so its former
+        # exclusions text left the checked wording scope entirely.
+        self.assertNotIn("itambox/procurement/apps.py: procurement.requisition_seam limitations", limitation_sources)
+
         # Alert Rules and Channels graduated to Stable in the #567 promotion:
         # a Stable capability declares no limitations, so its former exclusions
         # text left the checked wording scope entirely.

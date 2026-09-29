@@ -6,7 +6,6 @@ from django.utils.translation import gettext_lazy as _
 from assets.choices import RequestStatusChoices
 from assets.models import Asset, AssetRequest, StatusLabel
 from inventory.models import AccessoryStock, ComponentStock, ConsumableStock
-from itambox.capabilities import registry
 from procurement.models import FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 
 
@@ -113,6 +112,7 @@ def _create_fulfillment_link(po, asset_request, targets):
             asset_request=target,
             purchase_order_line=line,
             qty_allocated=target.qty,
+            qty_received=0,
         )
         link.full_clean()
         link.save()
@@ -128,10 +128,6 @@ def _create_fulfillment_link(po, asset_request, targets):
 @transaction.atomic
 def link_asset_request_to_purchase_order(po, asset_request_id, user):
     """Create the Procurement-owned fulfillment graph for an approved Asset Request."""
-    if not registry.is_active("procurement.requisition_seam"):
-        raise ValidationError(
-            _("Procurement is not configured for Asset Requests. Ask an administrator to enable it before continuing.")
-        )
     locked_po = _lock_purchase_order_for_asset_request(po)
     if user is None or not user.has_perm("procurement.change_purchaseorder", locked_po):
         raise PermissionDenied(_("You do not have permission to change this purchase order."))
@@ -142,6 +138,13 @@ def link_asset_request_to_purchase_order(po, asset_request_id, user):
     existing_link = _existing_fulfillment_link(asset_request, targets, locked_po)
     if existing_link is not None:
         return existing_link
+    if any(target.asset_type_id is not None and target.qty > 1 for target in targets):
+        raise ValidationError(
+            _(
+                "This request asks for more than one serialised unit. Split it into request "
+                "units before linking it to a purchase order."
+            )
+        )
     if locked_po.status != PurchaseOrder.STATUS_DRAFT:
         raise ValidationError(_("Asset Requests can be linked only to draft purchase orders."))
     if asset_request.status != RequestStatusChoices.APPROVED or any(
@@ -150,6 +153,48 @@ def link_asset_request_to_purchase_order(po, asset_request_id, user):
         raise ValidationError(_("Only approved Asset Requests can be linked to a purchase order."))
 
     return _create_fulfillment_link(locked_po, asset_request, targets)
+
+
+def lock_unit_fulfillment_links(asset_request_ids):
+    """Lock the live fulfilment links of the given request units in deterministic pk order.
+
+    Must be called inside an open transaction. Cancellation calls this BEFORE locking the
+    request rows so every transaction acquires these two lock classes in the same global
+    order as the receipt path (links, then requests); a concurrent cancellation and
+    receiving can then never deadlock.
+    """
+    request_ids = sorted({int(asset_request_id) for asset_request_id in asset_request_ids})
+    if not request_ids:
+        return []
+    return list(
+        FulfillmentLink._base_manager.select_for_update()
+        .filter(asset_request_id__in=request_ids, deleted_at__isnull=True)
+        .order_by("pk")
+    )
+
+
+@transaction.atomic
+def release_fulfillment_links(asset_requests):
+    """Close the fulfillment links of cancelled request units.
+
+    Received-quantity attribution stays recorded on the (soft-deleted) link rows, so the
+    delivered share of a cancelled request remains reconstructible, and the purchase order
+    line is left untouched for an explicit operator decision.
+    """
+    request_ids = [asset_request.pk for asset_request in asset_requests]
+    if not request_ids:
+        return 0
+    links = lock_unit_fulfillment_links(request_ids)
+    # Lock the request rows after their links (global order: links, then requests) so the
+    # relative acquisition order matches the receipt path.
+    list(
+        AssetRequest._base_manager.select_for_update()
+        .filter(pk__in=set(request_ids), deleted_at__isnull=True)
+        .order_by("request_date", "pk")
+    )
+    for link in links:
+        link.delete()
+    return len(links)
 
 
 def _lock_receipt_stock_rows(lines, line_quantities, location):
@@ -182,6 +227,57 @@ def _lock_receipt_stock_rows(lines, line_quantities, location):
     return stock_maps
 
 
+def _lock_line_fulfillment_links(line):
+    """Lock the line's live links and their requests in deterministic (request_date, pk) order."""
+    links = list(
+        FulfillmentLink._base_manager.select_for_update()
+        .filter(purchase_order_line=line, deleted_at__isnull=True)
+        .order_by("pk")
+    )
+    if not links:
+        return []
+    requests = {
+        request.pk: request
+        for request in AssetRequest._base_manager.select_for_update()
+        .filter(pk__in={link.asset_request_id for link in links}, deleted_at__isnull=True)
+        .order_by("request_date", "pk")
+    }
+    pairs = [(requests[link.asset_request_id], link) for link in links if link.asset_request_id in requests]
+    pairs.sort(key=lambda pair: (pair[0].request_date, pair[0].pk, pair[1].pk))
+    return pairs
+
+
+def _receivable_fulfillment_pairs(line):
+    """Live links whose request still awaits procurement, holds no asset, and has an outstanding quantity."""
+    return [
+        (request, link)
+        for request, link in _lock_line_fulfillment_links(line)
+        if request.status == RequestStatusChoices.PROCUREMENT and request.asset_id is None and link.qty_outstanding > 0
+    ]
+
+
+def _attribute_quantity_receipt(line, qty):
+    """Attribute a received quantity across the line's outstanding requests.
+
+    Only a request whose full pledged quantity has been received becomes approved; the
+    remaining quantity stays outstanding and every surplus unit remains free stock.
+    """
+    remaining = qty
+    touched = []
+    for request, link in _receivable_fulfillment_pairs(line):
+        if remaining <= 0:
+            break
+        attributed = min(link.qty_outstanding, remaining)
+        link.qty_received = (link.qty_received or 0) + attributed
+        link.save(update_fields=["qty_received"])
+        remaining -= attributed
+        if link.qty_outstanding == 0:
+            request.status = RequestStatusChoices.APPROVED
+            request.save(update_fields=["status"])
+        touched.append(request)
+    _approve_completed_group_parents(touched)
+
+
 def _approve_completed_group_parents(linked_requests):
     parent_ids = sorted({request.parent_id for request in linked_requests if request.parent_id is not None})
     if not parent_ids:
@@ -202,11 +298,146 @@ def _approve_completed_group_parents(linked_requests):
             parent.save(update_fields=["status"])
 
 
+def _receive_asset_line(line, qty, details, po, deployable_status):
+    """Materialise received serialised units and allocate them to outstanding request units."""
+    # Linked requests still awaiting procurement, in deterministic allocation order. A
+    # serialised request unit receives exactly one asset; it becomes approved only once
+    # its full pledged quantity has been received (multi-unit pledges are not linkable).
+    pairs = _receivable_fulfillment_pairs(line)
+    pair_idx = 0
+    for i in range(qty):
+        detail = details[i] if i < len(details) else {}
+        asset_name = detail.get("name") or str(line.asset_type)
+        if not asset_name:
+            asset_name = f"{line.asset_type.manufacturer.name} {line.asset_type.model}"
+        asset = Asset.objects.create(
+            name=asset_name.strip(),
+            asset_type=line.asset_type,
+            serial_number=detail.get("serial_number", "").strip() or "",
+            asset_tag=detail.get("asset_tag", "").strip() or "",  # If empty, save() auto-generates
+            status=deployable_status,
+            location=po.destination_location,
+            supplier=po.supplier,
+            purchase_cost=line.unit_price,
+            currency=po.currency,
+            purchase_date=timezone.now().date(),
+            order_number=po.order_number,
+            tenant=po.tenant,
+            purchase_order_line=line,
+        )
+        # Allocate this asset to the next request unit that still awaits procurement
+        if pair_idx < len(pairs):
+            req, link = pairs[pair_idx]
+            req.asset = asset
+            received = (link.qty_received or 0) + 1
+            # Approve only once the link's full pledged quantity has been received; a legacy
+            # multi-unit pledge keeps its first asset without fabricating a full delivery.
+            if received >= link.qty_allocated:
+                req.status = RequestStatusChoices.APPROVED
+            req.save()
+            link.qty_received = received
+            link.save(update_fields=["qty_received"])
+            pair_idx += 1
+    _approve_completed_group_parents([req for req, _ in pairs[:pair_idx]])
+
+
+def _group_details_by_line(asset_details):
+    """Group received-asset details by their purchase order line."""
+    details_by_line = {}
+    for detail in asset_details or []:
+        if not detail or "line_id" not in detail:
+            continue
+        details_by_line.setdefault(int(detail["line_id"]), []).append(detail)
+    return details_by_line
+
+
+def _receive_line(line, qty, details_by_line, po, deployable_status, stock_maps):
+    """Apply one line's receipt: guard the balance, dispatch by item type, record the line total."""
+    if qty <= 0:
+        return
+    if qty > line.qty_outstanding:
+        raise ValidationError(
+            _("Cannot receive %(qty)s for line %(line)s because only %(outstanding)s remain outstanding.")
+            % {"qty": qty, "line": line.pk, "outstanding": line.qty_outstanding}
+        )
+    if line.asset_type:
+        _receive_asset_line(line, qty, details_by_line.get(line.pk, []), po, deployable_status)
+    elif line.license:
+        _receive_license_line(line)
+    else:
+        _receive_stock_line(line, qty, stock_maps)
+    line.qty_received += qty
+    line.save(update_fields=["qty_received"])
+
+
+def _receive_stock_line(line, qty, stock_maps):
+    """Grow the locked stock row of a component, accessory, or consumable line."""
+    if line.component_id is not None:
+        stock = stock_maps[ComponentStock][line.component_id]
+    elif line.accessory_id is not None:
+        stock = stock_maps[AccessoryStock][line.accessory_id]
+    elif line.consumable_id is not None:
+        stock = stock_maps[ConsumableStock][line.consumable_id]
+    else:
+        return
+    stock.qty += qty
+    stock.save()
+    _attribute_quantity_receipt(line, qty)
+
+
+def _receive_license_line(line):
+    """Approve the line's linked license requests without touching seat entitlements."""
+    linked_requests = list(
+        AssetRequest.objects.filter(
+            fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
+        )
+        .select_for_update()
+        .order_by("request_date")
+    )
+    for req in linked_requests:
+        req.status = RequestStatusChoices.APPROVED
+        req.save()
+
+
+def _assert_receipt_state(lines, line_quantities, expected_received):
+    """Refuse stale receipt submissions before any mutation happens.
+
+    Called with the purchase order lines already locked, so a concurrent receipt that
+    committed first is visible here and its replay is refused deterministically.
+    """
+    for line in lines:
+        if line_quantities.get(line.pk, 0) <= 0:
+            continue
+        if line.pk not in expected_received:
+            raise ValidationError(
+                _(
+                    "The receipt submission does not state the recorded quantity it was prepared against for line "
+                    "%(line)s. Reload the receive form and submit again."
+                )
+                % {"line": line.pk}
+            )
+        expected = expected_received[line.pk]
+        if line.qty_received != expected:
+            raise ValidationError(
+                _(
+                    "The recorded quantity for line %(line)s changed since this receipt was prepared "
+                    "(expected %(expected)s, found %(found)s). Reload the receive form and submit again."
+                )
+                % {"line": line.pk, "expected": expected, "found": line.qty_received}
+            )
+
+
 @transaction.atomic
-def receive_purchase_order(po, line_quantities, asset_details=None):
+def receive_purchase_order(po, line_quantities, asset_details=None, *, expected_received):
     """
     line_quantities: dict of {line_id (int): qty_to_receive (int)}
     asset_details: list of dicts [{'line_id': int, 'serial_number': str, 'asset_tag': str, 'name': str}]
+    expected_received: dict of {line_id (int): qty_received (int)} this submission was prepared against.
+
+    Every submitted delivery must state the recorded receipt quantity it saw (the documented
+    retry contract): replays, parallel duplicates, and obsolete forms whose lines have moved
+    on are refused before anything mutates, so a repeated submission can never silently book
+    additional stock. Each accepted submission is a new partial delivery.
     """
     if po.status not in [PurchaseOrder.STATUS_ORDERED, PurchaseOrder.STATUS_PARTIAL]:
         raise ValidationError(
@@ -223,157 +454,14 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
     if not deployable_status:
         raise ValidationError(_("Deployable status label does not exist in the database."))
 
-    # Group asset details by line_id for quick lookup
-    details_by_line = {}
-    if asset_details:
-        for detail in asset_details:
-            if not detail or "line_id" not in detail:
-                continue
-            lid = int(detail["line_id"])
-            details_by_line.setdefault(lid, []).append(detail)
-
+    details_by_line = _group_details_by_line(asset_details)
     lines = list(po.lines.select_for_update().order_by("pk"))
+    _assert_receipt_state(lines, line_quantities, expected_received)
     stock_maps = _lock_receipt_stock_rows(lines, line_quantities, po.destination_location)
 
     for line in lines:
         qty = line_quantities.get(line.pk, 0)
-        if qty <= 0:
-            if line.qty_outstanding > 0:
-                any_outstanding = True
-            continue
-
-        if qty > line.qty_outstanding:
-            raise ValidationError(
-                _("Cannot receive %(qty)s for line %(line)s because only %(outstanding)s remain outstanding.")
-                % {"qty": qty, "line": line.pk, "outstanding": line.qty_outstanding}
-            )
-
-        if line.asset_type:
-            # Get details for this line
-            details = details_by_line.get(line.pk, [])
-
-            # Find any linked AssetRequests via FulfillmentLink
-            # We want to allocate the created assets to these requests
-            # We only select requests that are currently in 'procurement' status
-            linked_requests = list(
-                AssetRequest.objects.filter(
-                    fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
-                )
-                .select_for_update()
-                .order_by("request_date")
-            )
-
-            req_idx = 0
-            for i in range(qty):
-                # Get detail or empty dict
-                detail = details[i] if i < len(details) else {}
-
-                asset_name = detail.get("name") or str(line.asset_type)
-                if not asset_name:
-                    asset_name = f"{line.asset_type.manufacturer.name} {line.asset_type.model}"
-
-                # Create Asset
-                asset = Asset.objects.create(
-                    name=asset_name.strip(),
-                    asset_type=line.asset_type,
-                    serial_number=detail.get("serial_number", "").strip() or "",
-                    asset_tag=detail.get("asset_tag", "").strip() or "",  # If empty, save() auto-generates
-                    status=deployable_status,
-                    location=po.destination_location,
-                    supplier=po.supplier,
-                    purchase_cost=line.unit_price,
-                    currency=po.currency,
-                    purchase_date=timezone.now().date(),
-                    order_number=po.order_number,
-                    tenant=po.tenant,
-                    purchase_order_line=line,
-                )
-
-                # Try to allocate this asset to an outstanding request
-                if req_idx < len(linked_requests):
-                    req = linked_requests[req_idx]
-                    req.asset = asset
-                    req.status = RequestStatusChoices.APPROVED
-                    req.save()
-                    req_idx += 1
-            _approve_completed_group_parents(linked_requests)
-
-        elif line.component:
-            # Lock the stock row across the read-modify-write so concurrent receipts (or a
-            # concurrent checkout deduction) on the same component+location cannot lose an
-            # increment. Mirrors adjust_inventory_stock's locking discipline.
-            stock = stock_maps[ComponentStock][line.component_id]
-            stock.qty += qty
-            stock.save()
-
-            # Transition linked component requests to approved
-            linked_requests = list(
-                AssetRequest.objects.filter(
-                    fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
-                )
-                .select_for_update()
-                .order_by("request_date")
-            )
-            for req in linked_requests:
-                req.status = RequestStatusChoices.APPROVED
-                req.save()
-
-        elif line.accessory:
-            stock = stock_maps[AccessoryStock][line.accessory_id]
-            stock.qty += qty
-            stock.save()
-
-            # Transition linked accessory requests to approved
-            linked_requests = list(
-                AssetRequest.objects.filter(
-                    fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
-                )
-                .select_for_update()
-                .order_by("request_date")
-            )
-            for req in linked_requests:
-                req.status = RequestStatusChoices.APPROVED
-                req.save()
-
-        elif line.consumable:
-            stock = stock_maps[ConsumableStock][line.consumable_id]
-            stock.qty += qty
-            stock.save()
-
-            # Transition linked consumable requests to approved
-            linked_requests = list(
-                AssetRequest.objects.filter(
-                    fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
-                )
-                .select_for_update()
-                .order_by("request_date")
-            )
-            for req in linked_requests:
-                req.status = RequestStatusChoices.APPROVED
-                req.save()
-
-        elif line.license:
-            # License seats are an entitlement, not a quantity materialised from
-            # receipts: License.seats is the manually-entered number of seats the
-            # tenant is licensed for, so receiving a license PO line deliberately
-            # does NOT increment License.seats or any received-seat counter (unlike
-            # the asset/component/accessory/consumable branches above, which create
-            # assets or grow stock). Receiving only records line.qty_received (below)
-            # and transitions the linked requests from procurement to approved.
-            linked_requests = list(
-                AssetRequest.objects.filter(
-                    fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
-                )
-                .select_for_update()
-                .order_by("request_date")
-            )
-            for req in linked_requests:
-                req.status = RequestStatusChoices.APPROVED
-                req.save()
-
-        line.qty_received += qty
-        line.save(update_fields=["qty_received"])
-
+        _receive_line(line, qty, details_by_line, po, deployable_status, stock_maps)
         if line.qty_outstanding > 0:
             any_outstanding = True
 

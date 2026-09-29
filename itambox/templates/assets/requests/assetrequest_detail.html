@@ -28,7 +28,7 @@
       </button>
     {% endif %}
     {% can_asset_request_action request.user object "fulfill" as can_fulfill %}
-    {% if asset_request_procurement_enabled and perms.procurement.add_purchaseorder and can_fulfill and object.status == 'approved' and not object.asset and not object.parent_id %}
+    {% if perms.procurement.add_purchaseorder and can_fulfill and object.status == 'approved' and not object.asset and not object.parent_id %}
       <a href="{% url 'procurement:purchaseorder_create' %}?from_request={{ object.pk }}"
          class="btn btn-warning">
         <i class="mdi mdi-cart-plus"></i>
@@ -143,7 +143,12 @@
                         <a href="{{ link.purchase_order_line.purchase_order.get_absolute_url }}"
                            class="fw-bold">{{ link.purchase_order_line.purchase_order.order_number }}</a>
                         <span class="badge bg-purple-lt ms-1">{{ link.purchase_order_line.purchase_order.get_status_display }}</span>
-                      {% endfor %}
+                        <div class="text-muted small">
+                          {% if link.received_attribution_tracked %}
+                            {% translate "Received" %} {{ link.qty_received }} / {{ link.qty_allocated }}
+                      {% else %}-{% endif %}
+                        </div>
+                    {% endfor %}
                     {% elif object.status == 'procurement' %}
                       {% translate "Awaiting PO creation" %}
                     {% else %}

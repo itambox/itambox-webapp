@@ -60,11 +60,13 @@ non-negative `accessory` and/or `consumable` thresholds, for example
 `{"accessory": 3, "consumable": 5}`. A request is auto-approved at creation
 only when its quantity is within the configured threshold and sufficient stock
 exists. The persisted response notes record the automatic decision. Thresholds
-are process-wide rather than tenant-specific, so this seam remains Beta.
+are process-wide rather than tenant-specific, and they govern automatic
+approval only: sending a request to procurement and linking it to a purchase
+order is always available and does not depend on this setting.
 
 The legacy `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name remains a deprecated 1.x
 fallback and emits a startup warning. If neither name is configured, requests
-remain pending and the Asset Request procurement seam is inactive. Invalid
+are not auto-approved and stay pending. Invalid
 JSON, unknown keys, or boolean/negative thresholds do **not** fail soft: they
 abort startup with a configuration error, so verify the JSON syntax before
 deploying a change.

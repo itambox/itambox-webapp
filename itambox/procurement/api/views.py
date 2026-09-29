@@ -130,7 +130,11 @@ class PurchaseOrderViewSet(ITAMBoxModelViewSet):
             context={**self.get_serializer_context(), "purchase_order": purchase_order},
         )
         serializer.is_valid(raise_exception=True)
-        receive_purchase_order(purchase_order, serializer.validated_data["line_quantities"])
+        receive_purchase_order(
+            purchase_order,
+            serializer.validated_data["line_quantities"],
+            expected_received=serializer.validated_data["expected_received"],
+        )
         return Response({"message": f"Items received for Purchase Order {purchase_order.order_number}."})
 
     @extend_schema(

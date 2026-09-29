@@ -6230,6 +6230,10 @@ export interface components {
       line_quantities: {
         [key: string]: number;
       };
+      /** @description The recorded received quantity per line id this submission was prepared against. Stale submissions, replays, and parallel duplicates whose lines have moved on are refused. */
+      expected_received: {
+        [key: string]: number;
+      };
     };
     PurchaseOrderRequest: {
       order_number: string;

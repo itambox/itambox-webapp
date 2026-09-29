@@ -43,9 +43,9 @@
       "scope": "Purchase orders, order lines, contracts"
     },
     "procurement.requisition_seam": {
-      "activation": "enabled",
-      "contract_class": "beta-enabled",
-      "exclusions": "The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant.",
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
       "scope": "Asset Request fulfillment links"
     },
     "reporting.curated": {

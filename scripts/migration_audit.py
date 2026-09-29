@@ -57,6 +57,7 @@ POST_TRANSITION_MIGRATIONS = {
     "organization.0102_alter_tenantresourcegrant_options",
     "organization.0103_tenant_resource_grant_expiry",
     "procurement.0101_alter_purchaseorder_options",
+    "procurement.0102_fulfillmentlink_qty_received",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "subscriptions.0102_commercial_vendor_and_terms",
     "subscriptions.0103_unified_vendor_cutover",

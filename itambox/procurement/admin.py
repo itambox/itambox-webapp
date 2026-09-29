@@ -43,7 +43,7 @@ class PurchaseOrderLineAdmin(admin.ModelAdmin):
 
 @admin.register(FulfillmentLink)
 class FulfillmentLinkAdmin(admin.ModelAdmin):
-    list_display = ("asset_request", "purchase_order_line", "qty_allocated")
+    list_display = ("asset_request", "purchase_order_line", "qty_allocated", "qty_received")
 
 
 @admin.register(Contract)

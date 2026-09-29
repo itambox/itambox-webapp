@@ -7580,14 +7580,6 @@
       "count": 1
     },
     {
-      "path": "itambox/procurement/services.py",
-      "code": "C901",
-      "message": "'receive_purchase_order' is too complex (24)",
-      "source": "def receive_purchase_order(po, line_quantities, asset_details=None):",
-      "context": "Module:body/FunctionDef:receive_purchase_order:self",
-      "count": 1
-    },
-    {
       "path": "itambox/procurement/views.py",
       "code": "B905",
       "message": "`zip()` without an explicit `strict=` parameter.",

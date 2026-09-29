@@ -171,9 +171,19 @@ accessory, and consumable requests stay a single request with the requested
 quantity, even when the quantity is greater than 1.
 
 For a multi-unit Asset Type sent to procurement, ITAMbox creates one Purchase
-Order Line and reserves each unit for its child request. A partial receipt
-approves only the children that received assets; the parent stays in
-**Procurement** until every child has an asset.
+Order Line and reserves each unit for its child request. Each delivered unit is
+allocated to one child; a partial receipt approves only the children that
+received an asset, and the parent stays in **Procurement** until every child
+has an asset.
+
+Component, accessory, and consumable requests keep their requested quantity on
+a single request. A receipt attributes the delivered quantity to the oldest
+open request on the line first and approves that request only once its full
+quantity has arrived; units received beyond the reserved demand stay as free
+stock. Once a request has been sent to procurement, the request detail page
+shows the received and outstanding quantity for its purchase order, and
+cancelling the request releases its still-unreceived reservation while the
+delivered quantity stays on record.
 
 Group requests are useful for:
 
@@ -384,7 +394,9 @@ but it no longer participates in overlap checks. This means:
 : Check that `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` is configured with
   positive thresholds. Auto-approval only applies to accessories and
   consumables, and only when sufficient stock is available. Asset and
-  component requests always require manual approval.
+  component requests always require manual approval. The setting governs
+  automatic approval only: requests can always be sent to procurement
+  regardless of it.
 
 ### Reservations
 

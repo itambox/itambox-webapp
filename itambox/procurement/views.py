@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django.contrib import messages
@@ -346,6 +347,11 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         po = self.get_object()
 
+        # Bind the receipt-state snapshot into this rendered form: each submission carries its
+        # own copy of the state it was prepared against, and processing never regenerates it
+        # (a second render would otherwise silently revalidate an older, replayed submission).
+        context["expected_received_json"] = json.dumps({str(line.pk): line.qty_received for line in po.lines.all()})
+
         # Prepare initial data for Step 1 formset
         initial_data = []
         outstanding_lines = []
@@ -375,6 +381,9 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
             # Submitting Step 2 (Asset Provisioning)
             line_quantities = request.session.get("receive_po_quantities", {})
             line_quantities = {int(k): int(v) for k, v in line_quantities.items()}
+            # The snapshot travels with this form submission; the service refuses the
+            # submission if any line moved on since it was prepared (replay protection).
+            expected_received = self._parse_expected_received(request)
 
             # Count the total number of physical assets being received to initialize the formset correctly
             total_assets = 0
@@ -393,10 +402,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 
                 try:
                     asset_details = formset.cleaned_data
-                    receive_purchase_order(po, line_quantities, asset_details)
+                    receive_purchase_order(po, line_quantities, asset_details, expected_received=expected_received)
                     # Clear session
                     if "receive_po_quantities" in request.session:
-                        del request.session["receive_po_quantities"]
+                        request.session.pop("receive_po_quantities", None)
                     messages.success(request, _("Stock received and assets provisioned successfully."))
                     return redirect(po.get_absolute_url())
                 except Exception as e:
@@ -420,6 +429,9 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 context["formset"] = formset
                 context["lines_info"] = list(zip(lines_info, formset))
                 context["step"] = "2"
+                # Keep this operation's submitted snapshot: a corrected submission stays bound
+                # to the state it was prepared against and is refused if that state moved on.
+                context["expected_received_json"] = json.dumps({str(pk): qty for pk, qty in expected_received.items()})
                 return render(request, "procurement/purchaseorder_receive_step2.html", context)
 
         else:
@@ -429,6 +441,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 line_quantities = {}
                 for form in formset:
                     line_quantities[form.cleaned_data["line_id"]] = form.cleaned_data["qty_to_receive"]
+
+                # The snapshot travels with this form submission; processing never regenerates
+                # it from the database, so a replayed submission is refused.
+                line_expected = self._parse_expected_received(request)
 
                 # Check if any asset lines are being received
                 has_assets = False
@@ -450,7 +466,8 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                                 )
 
                 if has_assets:
-                    # Save quantities to session for step 2
+                    # Save quantities for step 2; the receipt-state snapshot travels with each
+                    # form submission instead of a shared session slot.
                     request.session["receive_po_quantities"] = line_quantities
 
                     # Initialize step 2 formset
@@ -468,13 +485,16 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                     context["formset"] = step2_formset
                     context["lines_info"] = list(zip(lines_info, step2_formset))
                     context["step"] = "2"
+                    # Carry this operation's snapshot into the step-2 form so its own submission
+                    # stays bound to the same prepared state.
+                    context["expected_received_json"] = json.dumps({str(pk): qty for pk, qty in line_expected.items()})
                     return render(request, "procurement/purchaseorder_receive_step2.html", context)
                 else:
                     # Call receiving service directly (only non-asset inventory items)
                     from .services import receive_purchase_order
 
                     try:
-                        receive_purchase_order(po, line_quantities, asset_details=None)
+                        receive_purchase_order(po, line_quantities, asset_details=None, expected_received=line_expected)
                         messages.success(request, _("Stock received successfully."))
                         return redirect(po.get_absolute_url())
                     except Exception as e:
@@ -498,6 +518,21 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 context["lines_and_forms"] = list(zip(outstanding_lines, formset))
                 context["step"] = "1"
                 return render(request, "procurement/purchaseorder_receive.html", context)
+
+    def _parse_expected_received(self, request):
+        """The receipt-state snapshot a receipt submission itself carries.
+
+        The snapshot is bound into every rendered form, so a submission always carries the
+        state it was prepared against: a later render, another tab, or another order can
+        never revalidate an older, replayed submission, and processing never regenerates
+        the snapshot from the database.
+        """
+        try:
+            raw = request.POST.get("expected_received", "")
+            state = json.loads(raw) if raw else {}
+            return {int(key): int(value) for key, value in state.items()}
+        except (AttributeError, TypeError, ValueError):
+            return {}
 
 
 # ---------------------------------------------------------------------------

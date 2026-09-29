@@ -386,6 +386,27 @@ class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
         verbose_name=_("Purchase Order Line"),
     )
     qty_allocated = models.PositiveIntegerField(default=1, verbose_name=_("Qty Allocated"))
+    qty_received = models.PositiveIntegerField(
+        null=True,
+        verbose_name=_("Qty Received"),
+        help_text=_(
+            "Quantity of this line's receipts attributed to this Asset Request. "
+            "Null on links that predate receipt attribution."
+        ),
+    )
+
+    @property
+    def received_attribution_tracked(self):
+        return self.qty_received is not None
+
+    @property
+    def qty_outstanding(self):
+        """Still-undelivered quantity for this link; untracked links count their full allocation."""
+        return max(0, self.qty_allocated - (self.qty_received or 0))
+
+    @property
+    def fully_delivered(self):
+        return self.received_attribution_tracked and self.qty_received >= self.qty_allocated
 
     def clean(self):
         super().clean()

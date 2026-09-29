@@ -271,7 +271,7 @@ class TestOperatorDiagnostics:
         assert "opt-in" in output
         assert "object-enabled" in output
         assert "operator-flag" in output
-        assert "configured" in output
+        assert "always" in output
 
     def test_the_command_reports_value_presence_not_the_value(self):
         with override_settings(PLUGINS=["demo_plugin_secret"]):

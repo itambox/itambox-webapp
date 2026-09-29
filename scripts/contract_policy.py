@@ -303,11 +303,7 @@ CAPABILITY_LIMITATIONS = {
         "Plugin code runs in-process with full database access and is not sandboxed.",
     ),
     "procurement.core": (),
-    "procurement.requisition_seam": (
-        "The asset-request to purchase-order-line reservation flow is incomplete; "
-        "partial fulfilment may need manual reconciliation.",
-        "Auto-approval thresholds are process-wide, not per tenant.",
-    ),
+    "procurement.requisition_seam": (),
     "reporting.curated": (),
     "reporting.designer": (),
     "reporting.scheduled": (

@@ -346,6 +346,27 @@ python manage.py purge_deleted --days 7 --dry-run
 
 ---
 
+### `reconcile_procurement_legacy`
+
+Report fulfilment pledges that predate receipt attribution: a request that a partial
+purchase-order receipt approved while delivered quantities were still untracked keeps its
+historical approval and a blank received quantity, and later receipts are deliberately
+never booked against it.
+
+The report classifies each pledge individually by its remaining evidence: a request with
+an assigned asset or a fully received line is completed history and stays untouched; a
+pledge on a partially received non-serialised line is a demonstrable reconciliation
+candidate only when the line's recorded received quantity cannot cover the pledge's own
+allocated quantity; pledges the received units could cover in full, lines without any
+receipt, and serialised lines without an assigned asset need explicit operator review and
+are never closed by the command.
+
+| | |
+|---|---|
+| **Usage** | `python manage.py reconcile_procurement_legacy [--apply]` |
+| **Production-safe** | Read-only by default (a dry-run report). `--apply` only softly closes the demonstrable candidate pledges; completed records stay untouched, ambiguous records require explicit operator review, and recorded quantities, stock, and approval states are never rewritten. |
+| **When to use** | After upgrading a deployment that ran the Asset Request Procurement Seam while it was Beta: review the report, close the demonstrable candidates, and decide the review records manually. Re-request the units if they are still needed. |
+
 ### `rotate_encryption_keys`
 
 Re-encrypt every encrypted database field with the current primary Fernet key. Used when rotating `ITAMBOX_FIELD_ENCRYPTION_KEYS`.

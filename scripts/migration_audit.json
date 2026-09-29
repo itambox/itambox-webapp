@@ -4418,6 +4418,46 @@
     },
     {
       "dependencies": [
+        "procurement.0101_alter_purchaseorder_options",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "procurement.0102_fulfillmentlink_qty_received",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/procurement/migrations/0102_fulfillmentlink_qty_received.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "core.0100_issue88_shard_08_core_schema"
       ],
       "id": "software.0100_issue88_shard_09_software_schema",
@@ -5278,6 +5318,7 @@
     "organization.0102_alter_tenantresourcegrant_options",
     "organization.0103_tenant_resource_grant_expiry",
     "procurement.0101_alter_purchaseorder_options",
+    "procurement.0102_fulfillmentlink_qty_received",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "subscriptions.0102_commercial_vendor_and_terms",
     "subscriptions.0103_unified_vendor_cutover",
@@ -5353,7 +5394,7 @@
     "global_roots": [],
     "missing_replacement_targets": 0,
     "per_app_local_roots_and_leaves": {},
-    "post_transition_migrations": 46,
+    "post_transition_migrations": 47,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
