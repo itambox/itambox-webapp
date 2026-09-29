@@ -726,3 +726,211 @@ class AlertDispatchConcurrencyTests(TransactionTestCase):
         self.assertEqual(alert.delivery_attempts, 1)
         self.assertEqual(alert.last_delivery_id, calls[0])
         self.assertEqual((alert.delivery_status or {}).get("__delivery_id__"), calls[0])
+
+    def test_in_flight_claim_is_not_recovered_by_a_parallel_evaluation(self):
+        """A pending marker whose claim is still fresh must not be re-dispatched.
+
+        The first evaluation claims its run and blocks inside the channel
+        sender; a second evaluation observing the same pending alert must back
+        off instead of planning and claiming a duplicate delivery.
+        """
+        import threading
+        from unittest.mock import patch
+
+        from django.db import connection
+
+        from extras.tasks.alerts import _renotify_when_due
+
+        tenant = Tenant.objects.create(name="In-flight Tenant", slug="in-flight-tenant")
+        rule = AlertRule.objects.create(
+            name="In-flight Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+            renotify_interval_days=1,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="in-flight",
+            message="in-flight",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "in-flight", "message": "in-flight"}
+        calls = []
+        calls_lock = threading.Lock()
+        sender_entered = threading.Event()
+        release_sender = threading.Event()
+
+        def blocking_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            with calls_lock:
+                calls.append(delivery_id)
+            sender_entered.set()
+            release_sender.wait(timeout=15)
+            return {"1": "ok"}
+
+        snapshot = AlertLog._base_manager.get(pk=alert.pk)
+        errors = []
+
+        def run_first_dispatch():
+            try:
+                _schedule_alert_dispatch(rule, match, snapshot, None)
+            except Exception as exc:  # pragma: no cover - surfaced via assertion below
+                errors.append(exc)
+            finally:
+                connection.close()
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=blocking_dispatch):
+            thread = threading.Thread(target=run_first_dispatch)
+            thread.start()
+            self.assertTrue(sender_entered.wait(timeout=10), "first dispatch must reach the sender")
+            try:
+                claimed = AlertLog._base_manager.get(pk=alert.pk)
+                # The first evaluation has claimed the run and is inside the sender.
+                self.assertEqual(claimed.delivery_attempts, 1)
+                self.assertEqual(claimed.delivery_status.get("__dispatch__"), "pending")
+                self.assertIn("__claimed_at__", claimed.delivery_status)
+                first_run_id = claimed.last_delivery_id
+                self.assertEqual(len(calls), 1)
+
+                # A parallel evaluation sees the same pending alert and must not
+                # plan or claim a second dispatch while the claim is in flight.
+                scheduled = set()
+                _renotify_when_due(rule, match, claimed, timezone.now(), ("key",), scheduled)
+                self.assertEqual(scheduled, set(), "an in-flight claim must not be re-dispatched")
+                still = AlertLog._base_manager.get(pk=alert.pk)
+                self.assertEqual(still.delivery_attempts, 1)
+                self.assertEqual(still.last_delivery_id, first_run_id)
+                self.assertEqual(len(calls), 1)
+            finally:
+                release_sender.set()
+            thread.join(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 1, "exactly one outbound delivery")
+        final = AlertLog._base_manager.get(pk=alert.pk)
+        self.assertEqual(final.delivery_attempts, 1)
+        self.assertEqual(final.last_delivery_id, calls[0])
+        self.assertEqual((final.delivery_status or {}).get("__delivery_id__"), calls[0])
+        self.assertEqual(final.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+
+    def test_stale_claim_is_recovered_after_the_lease(self):
+        """A crashed run's claim is still recovered once the lease expired."""
+        from unittest.mock import patch
+
+        from extras.tasks.alerts import _DISPATCH_CLAIM_LEASE, _renotify_when_due
+
+        tenant = Tenant.objects.create(name="Stale claim tenant", slug="stale-claim-tenant")
+        rule = AlertRule.objects.create(
+            name="Stale claim rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+            renotify_interval_days=1,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        stale_at = timezone.now() - _DISPATCH_CLAIM_LEASE - timezone.timedelta(minutes=5)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="stale",
+            message="stale",
+            content_type=content_type,
+            object_id=rule.pk,
+            delivery_status={
+                "__dispatch__": "pending",
+                "__delivery_id__": "dead-run",
+                "__claimed_at__": stale_at.isoformat(),
+            },
+            delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
+            delivery_attempts=1,
+            last_delivery_id="dead-run",
+            last_notified_at=stale_at,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "stale", "message": "stale"}
+        calls = []
+
+        def counting_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            calls.append(delivery_id)
+            return {"1": "ok"}
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=counting_dispatch):
+            scheduled = set()
+            _renotify_when_due(rule, match, alert, timezone.now(), ("key",), scheduled)
+
+        self.assertEqual(scheduled, {("key",)}, "a stale claim must be recovered")
+        self.assertEqual(len(calls), 1, "a crashed claim is recovered exactly once")
+        self.assertNotEqual(calls[0], "dead-run")
+        recovered = AlertLog._base_manager.get(pk=alert.pk)
+        self.assertEqual(recovered.last_delivery_id, calls[0])
+        self.assertEqual(recovered.delivery_attempts, 2)
+        self.assertEqual(recovered.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+
+    def test_completion_update_is_fenced_to_its_delivery_id(self):
+        """A superseded run must not overwrite a newer attempt's final state."""
+        import threading
+        from unittest.mock import patch
+
+        from django.db import connection
+
+        tenant = Tenant.objects.create(name="Fence Tenant", slug="fence-tenant")
+        rule = AlertRule.objects.create(
+            name="Fence Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="fence",
+            message="fence",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "fence", "message": "fence"}
+        calls = []
+        sender_entered = threading.Event()
+        release_sender = threading.Event()
+
+        def blocking_dispatch(rule_arg, match_arg, alert_log_arg, delivery_id=None):
+            calls.append(delivery_id)
+            sender_entered.set()
+            release_sender.wait(timeout=15)
+            return {"1": "ok"}
+
+        snapshot = AlertLog._base_manager.get(pk=alert.pk)
+        errors = []
+
+        def run_dispatch():
+            try:
+                _schedule_alert_dispatch(rule, match, snapshot, None)
+            except Exception as exc:  # pragma: no cover - surfaced via assertion below
+                errors.append(exc)
+            finally:
+                connection.close()
+
+        with patch("extras.tasks.alerts._dispatch_channels", side_effect=blocking_dispatch):
+            thread = threading.Thread(target=run_dispatch)
+            thread.start()
+            self.assertTrue(sender_entered.wait(timeout=10), "dispatch must reach the sender")
+            try:
+                # A newer attempt supersedes the in-flight run while it is
+                # blocked inside the sender (e.g. a takeover after the lease).
+                AlertLog._base_manager.filter(pk=alert.pk).update(
+                    last_delivery_id="successor-run",
+                    delivery_status={"__dispatch__": "pending", "__delivery_id__": "successor-run"},
+                )
+            finally:
+                release_sender.set()
+            thread.join(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 1)
+        fenced = AlertLog._base_manager.get(pk=alert.pk)
+        self.assertEqual(fenced.last_delivery_id, "successor-run")
+        self.assertEqual((fenced.delivery_status or {}).get("__delivery_id__"), "successor-run")
+        self.assertNotEqual(fenced.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)

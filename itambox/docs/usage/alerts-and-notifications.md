@@ -176,7 +176,11 @@ with a terminal failed state — there is **no automatic retry**:
 - The dispatch claim is atomic: when two parallel evaluations plan a dispatch
   for the same alert state, exactly one claim wins and the other backs off
   without sending — a repeated or overlapping evaluation cannot produce a
-  duplicate delivery for the same alert.
+  duplicate delivery for the same alert. A claimed dispatch owns its alert for
+  a claim lease (15 minutes): a parallel evaluation never re-dispatches an
+  in-flight attempt, while a crashed run's claim is recovered by a later
+  evaluation once the lease has expired. Completion metadata is fenced to the
+  owning delivery id, so a superseded run cannot overwrite a newer result.
 - The per-channel outcome is recorded as a typed result:
   `success`, `retryable` (transient-class failure, e.g. SMTP timeout or HTTP 5xx),
   or `terminal` (permanent failure, e.g. rejected credentials or 4xx response),

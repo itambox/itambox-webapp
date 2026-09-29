@@ -6,6 +6,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 
@@ -29,6 +30,11 @@ from licenses.models import License
 from subscriptions.models import Subscription
 
 logger = logging.getLogger(__name__)
+
+# A claimed dispatch owns its alert until the claim lease expires: longer than
+# any plausible channel send, short enough that a crashed run is still recovered
+# by a later evaluation without ever racing an active attempt (issue #567, WP4).
+_DISPATCH_CLAIM_LEASE = timezone.timedelta(minutes=15)
 
 
 def evaluate_alert_rules_task() -> int:
@@ -145,7 +151,11 @@ def _schedule_alert_dispatch(rule, match, alert_log, expected_prior_notified_at=
                     else Q(last_notified_at=expected_prior_notified_at)
                 )
                 claimed = AlertLog.unscoped.filter(Q(pk=alert_id) & prior_condition).update(
-                    delivery_status={"__dispatch__": "pending", "__delivery_id__": delivery_id},
+                    delivery_status={
+                        "__dispatch__": "pending",
+                        "__delivery_id__": delivery_id,
+                        "__claimed_at__": notified_at.isoformat(),
+                    },
                     delivery_attempts=F("delivery_attempts") + 1,
                     last_delivery_id=delivery_id,
                     delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
@@ -165,12 +175,21 @@ def _schedule_alert_dispatch(rule, match, alert_log, expected_prior_notified_at=
             logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
             delivery = {"__dispatch__": "terminal", "__delivery_id__": delivery_id}
         try:
-            AlertLog.unscoped.filter(pk=alert_id).update(
+            # Fence the completion to this run's own delivery id: a run that no
+            # longer owns the claim (superseded by a newer attempt) must not
+            # overwrite the newer result (issue #567, WP4).
+            completed = AlertLog.unscoped.filter(pk=alert_id, last_delivery_id=delivery_id).update(
                 delivery_status=delivery,
                 delivery_outcome=_delivery_outcome(delivery),
                 last_delivery_error=_delivery_error(delivery),
                 last_notified_at=notified_at,
             )
+            if not completed:
+                logger.info(
+                    "Alert delivery run %s for AlertLog %s no longer owns the alert; completion metadata not written.",
+                    delivery_id,
+                    alert_id,
+                )
         # broad except: task-isolation: metadata write failure must not abort later callbacks
         except Exception:
             # A metadata-write failure must not escape the on_commit callback:
@@ -314,9 +333,34 @@ def _create_or_adopt_alert_log(rule, match, ct, obj):
     return alert_log, True
 
 
+def _dispatch_claim_is_recoverable(delivery_status, last_notified_at, now):
+    """Whether a pending dispatch marker may be recovered by a new attempt.
+
+    An unclaimed marker (no claim time and no notification timestamp) is
+    recoverable immediately; a claimed marker stays owned by its run until the
+    claim lease expires, so a parallel evaluation never re-dispatches an
+    active attempt while a crashed run is still recovered by a later
+    evaluation (issue #567, WP4).
+    """
+    raw = (delivery_status or {}).get("__claimed_at__")
+    claimed_at = parse_datetime(raw) if isinstance(raw, str) else None
+    if claimed_at is None:
+        claimed_at = last_notified_at
+    if claimed_at is None:
+        return True
+    return now - claimed_at >= _DISPATCH_CLAIM_LEASE
+
+
 def _renotify_when_due(rule, match, existing, now, key, scheduled_dispatch_keys):
     """Retry a committed-but-undelivered alert, or re-notify on cadence."""
-    pending = (existing.delivery_status or {}).get("__dispatch__") == "pending"
+    status = existing.delivery_status or {}
+    pending = status.get("__dispatch__") == "pending"
+    if pending and not _dispatch_claim_is_recoverable(status, existing.last_notified_at, now):
+        logger.info(
+            "AlertLog %s has a claimed dispatch in flight; a parallel evaluation will not re-dispatch it.",
+            existing.pk,
+        )
+        return
     ref = existing.last_notified_at or existing.created_at
     due = ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days)
     if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:

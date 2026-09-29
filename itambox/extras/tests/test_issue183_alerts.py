@@ -366,11 +366,11 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
 
         first.refresh_from_db()
         second.refresh_from_db()
-        # The failed claim write is contained: the first dispatch is recorded
-        # as a terminal crash, and the second callback still runs fully.
-        self.assertEqual(first.delivery_status["__dispatch__"], "terminal")
-        self.assertIn("__delivery_id__", first.delivery_status)
-        self.assertEqual(first.delivery_outcome, AlertLog.DELIVERY_OUTCOME_FAILED)
+        # The failed claim write is contained: the run that could not claim its
+        # alert records nothing (the completion write is fenced to the owning
+        # delivery id), and the second callback still runs fully.
+        self.assertEqual(first.delivery_status, {})
+        self.assertEqual(first.delivery_outcome, AlertLog.DELIVERY_OUTCOME_NONE)
         self.assertEqual(second.delivery_status["7"], "ok")
         self.assertEqual(second.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
 
