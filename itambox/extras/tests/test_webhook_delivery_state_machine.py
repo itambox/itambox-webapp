@@ -633,7 +633,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(payload["event"], "test")
         self.assertEqual(payload["model"], "extras.WebhookEndpoint")
         self.assertEqual(payload["object_id"], self.endpoint.pk)
-        self.assertEqual(payload["data"], {})
+        self.assertEqual(payload["data"], {"app_label": "extras", "model_name": "webhookendpoint"})
         self.assertEqual(delivery.status, WebhookDelivery.STATUS_SUCCESS)
 
     def test_test_send_retry_preserves_payload_timestamp(self):

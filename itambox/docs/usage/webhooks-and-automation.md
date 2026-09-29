@@ -4,12 +4,17 @@ ITAMbox can push real-time event notifications to external systems through
 **Webhook Endpoints** and **Event Rules**. Together they let you trigger
 automations in Slack, Teams, CI/CD pipelines, custom integrations, or any
 HTTP-speaking service whenever an asset, license, contract, or other tracked
-object is created, updated, or deleted.
+object is created, updated, deleted, restored, checked out, or checked in.
 
 > **Disclaimer:** Webhook delivery is asynchronous — events are enqueued via
 > `django-q2` and dispatched by background workers. The worst-case delay is
 > the time it takes the next worker cycle to pick up the task. For instant
 > delivery keep your worker pool responsive and monitor the task queue.
+
+> **Stability:** Webhooks and Event Rules are a **Stable** capability; the
+> envelope contract below is graded Stable. Delivery itself stays opt-in at the
+> object level — nothing is ever sent until you deliberately create and enable a
+> Webhook Endpoint and an Event Rule.
 
 ---
 
@@ -32,9 +37,9 @@ graph TD
     L --> M[send_webhook_task]
     M --> N{Response?}
     N -->|2xx| O[Done ✓]
-    N -->|4xx| P[Final failure — no retry]
-    N -->|5xx / error| Q{Attempts < retry_count?}
-    Q -->|Yes| R[Schedule retry with backoff]
+    N -->|4xx (not 429)| P[Final failure — no retry]
+    N -->|429 / 5xx / error| Q{Attempts < retry_count?}
+    Q -->|Yes| R[Retry scheduled: backoff, or Retry-After for 429]
     Q -->|No| S[All attempts exhausted]
 
     style A fill:#4a5568,stroke:#718096,color:#fff
@@ -108,7 +113,9 @@ retry policy:
 | Scenario | Behaviour |
 |---|---|
 | **2xx response** | Success — done. |
-| **4xx response** (400–499) | **Final failure.** Client errors (bad request, auth failure, not found) are never retried — fix the payload or credentials and re-send manually. |
+| **3xx response** (redirect) | **Final failure.** Redirects are never followed (the pinned SSRF-safe transport refuses to re-target a request); the delivery is recorded as failed without retrying — point the endpoint directly at its final location. |
+| **429 response** (rate limited) | **Retried** within the retry budget. A valid `Retry-After` header (delta-seconds or HTTP-date, capped at 300 seconds) sets the next attempt's delay; `Retry-After: 0` is honoured as an immediately due retry; without a header the endpoint's normal backoff applies. |
+| **4xx response** (400–499, except 429) | **Final failure.** Client errors (bad request, auth failure, not found) are never retried — fix the payload or credentials and re-send manually. |
 | **5xx response** (500–599) | Retried up to `retry_count` times, with capped exponential backoff and ±20% jitter. |
 | **Connection error** (DNS, timeout, TLS) | Same as 5xx — retried. |
 | **SSRF guard rejection** | **Final failure** — blocked URLs are never retried. |
@@ -116,7 +123,10 @@ retry policy:
 Retries with a positive backoff use a one-shot `django-q2` `Schedule` row.
 The first retry starts at `retry_backoff` seconds, then the delay doubles for
 each later retry, is capped at 3600 seconds, and receives ±20% jitter (with a
-minimum positive delay of one second). A zero-backoff retry is immediately due;
+minimum positive delay of one second). A 429 response with a valid `Retry-After`
+header schedules the next attempt at the requested delay (capped at 300 seconds)
+instead of the computed backoff, even when the endpoint's `retry_backoff` is
+`0`; a zero delay retries immediately. A zero-backoff retry is immediately due;
 its durable delivery row remains recoverable if broker publication fails. The
 schedule means positive delays are honoured even if the worker pool is busy.
 
@@ -143,11 +153,20 @@ Every enqueued webhook has a durable delivery record. Its lifecycle is:
 The record keeps the stable delivery ID, the last attempt number, response code,
 safe error classification, attempt timestamps, and the next retry time. The
 retry budget is `retry_count`: there is one initial attempt followed by up to
-that many retries. Connection failures and server-side failures are retryable
-under the shared integration error contract. HTTP 4xx responses and SSRF guard
+that many retries. Connection failures, server-side failures, and rate limiting
+(HTTP 429) are retryable under the shared integration error contract; pending
+rate-limited attempts are classified `integration.rate_limited`, and a 429 with
+a valid `Retry-After` header schedules the next attempt at the requested delay,
+capped at 300 seconds. HTTP 4xx responses other than 429 and SSRF guard
 rejections are terminal and are not retried. Retry delays use exponential
 backoff beginning at `retry_backoff`, doubling per retry, capped at 3600
 seconds, with ±20% jitter (and a minimum delay of one second).
+
+Identity promises: `event_id` identifies the domain event and never changes;
+`delivery_id` stays stable across the retries of one delivery; a manual
+redelivery creates a new delivery with a new `delivery_id` and links to its
+source through `redelivered_from`. The durable record keeps the current attempt
+count and the latest outcome — not a per-attempt history.
 
 Delivery history is deliberately **not backfilled**. Records and history begin
 when this delivery tracking capability is upgraded; earlier webhook attempts
@@ -160,9 +179,11 @@ delivery is pending or has a retry scheduled for the future. A redelivered test
 send remains marked as a test send.
 
 Operators can send a test webhook from an endpoint. A test delivery has no
-event record and sends the normal v1 envelope with an `event` value of `test`,
-the endpoint model marker, and an empty data object. It uses the endpoint's
-normal retry policy and is included in delivery history.
+event record and sends the normal v1 envelope with the reserved `event` value
+`test` (deliberately outside the six event actions), the endpoint model marker,
+and the same minimal `data` metadata (`app_label`, `model_name`) as event
+deliveries. It uses the endpoint's normal retry policy and is included in
+delivery history.
 
 System-wide endpoint deliveries require platform authorization to view or
 operate. Tenant operators see only delivery records for their own tenant;
@@ -183,7 +204,7 @@ retry policy. For an event-driven test instead:
    ```
    or
    ```
-   Webhook https://example.com/hook returned 403 — not retrying (4xx is final)
+   Webhook https://example.com/hook returned 403 — not retrying (403 is final)
    ```
 4. Delete the test rule and test object.
 
@@ -193,8 +214,8 @@ retry policy. For an event-driven test instead:
 
 An **Event Rule** defines *when* a webhook fires. It watches a Django model
 (e.g. `Asset`, `License`, `Contract`) for lifecycle events (`create`, `update`,
-`delete`, `restore`) and triggers an action — either a webhook or an in-app
-notification.
+`delete`, `restore`, `checkout`, `checkin`) and triggers an action — either a
+webhook or an in-app notification.
 
 ### Creating an event rule
 
@@ -205,7 +226,7 @@ notification.
 |---|---|---|
 | **Name** | Yes | Descriptive name, e.g. `Asset Created → Teams` |
 | **Model** | Yes | The Django model to watch. Only models that emit events are listed (anything inheriting `ChangeLoggingMixin`). |
-| **Events** | Yes | JSON list of event types: `["create"]`, `["create", "update"]`, `["delete"]`, `["restore"]` |
+| **Events** | Yes | The change types that trigger the rule: any of `create`, `update`, `delete`, `restore`, `checkout`, `checkin`. |
 | **Action Type** | Yes | `Webhook` (calls an endpoint) or `Notification` (in-app alert) |
 | **Webhook** | Cond. | The Webhook Endpoint to call. Required when action type is `Webhook`. |
 | **Conditions** | No | Preserved JSON conditions; authored conditions are read-only and withdrawn for 1.0 (see below) |
@@ -233,6 +254,16 @@ for the fail-closed behavior and the upgrade report.
 | `update` | An existing object is saved (any field change) |
 | `delete` | An object is soft-deleted (`deleted_at` set) |
 | `restore` | A soft-deleted object is restored (`deleted_at` cleared) |
+| `checkout` | An asset is checked out — an `AssetAssignment` is created |
+| `checkin` | An asset is checked in — the active `AssetAssignment` is closed |
+
+These six values are the complete V1 event vocabulary, and they are what the
+persisted `Event.ACTION_CHOICES`, the published `core.EventActionChoices` enum,
+the rule form, and this documentation all agree on. A change that sets the
+soft-delete marker dispatches `delete`, a change that clears it dispatches
+`restore`; every other tracked change dispatches `update`. The vocabulary is
+open: a minor release may publish an additional value, and consumers should
+treat an unrecognized `event` value as opaque rather than failing.
 
 > **Note:** Internal operational models (`Event`, `ObjectChange`,
 > `JournalEntry`, `Notification`, `Job`, `ReportGenerationArchive`) are
@@ -342,7 +373,7 @@ A standard webhook payload (non-Slack, non-Teams) looks like:
 | `delivery_id` | A UUID for one delivery. It remains stable across retries of that delivery. |
 | `attempt` | One-based attempt number. The initial send is `1`; each retry increments it. |
 | `tenant` | The owning tenant primary key, or `null` for a tenant-less object. It is derived from the object, not ambient request context. |
-| `event` | The event action — `create`, `update`, `delete`, or `restore` |
+| `event` | The event action — `create`, `update`, `delete`, `restore`, `checkout`, or `checkin` |
 | `model` | Fully-qualified Django model reference (`<app_label>.<model_name>`) |
 | `object_id` | The primary key of the affected object |
 | `timestamp` | ISO 8601 timestamp of when the event was created |
@@ -357,12 +388,16 @@ still carry the same `schema_version`, `event_id`, `delivery_id`, `attempt`, and
 ### Envelope version and compatibility
 
 This is webhook envelope **v1**, independent of the ITAMbox product release.
-The generic top-level field set is frozen for v1 even while the capability is
-Beta; changing that field set requires a new integer `schema_version`. The
-event-specific contents of `data` are not a frozen schema. Slack and Teams keep
-the five identity/version fields listed above but use reduced vendor-specific
-bodies. Consumers must select a decoder by `schema_version` and reject versions
-they do not support rather than interpreting them as v1.
+The generic top-level field set is frozen for v1; changing that field set
+requires a new integer `schema_version`. The six-value `event` vocabulary is
+published and open: a minor release may add a value, and consumers must treat
+an unrecognized value as opaque rather than failing. `data` carries at minimum
+`app_label` and `model_name` — that minimal metadata is the explicit V1
+promise; v1 promises no other member and no object snapshot, additional members
+may appear, and consumers must tolerate them. Slack and Teams keep the five
+identity/version fields listed above but use reduced vendor-specific bodies.
+Consumers must select a decoder by `schema_version` and reject versions they do
+not support rather than interpreting them as v1.
 
 The v1 additions are compatible with consumers that ignore unknown JSON
 members, but strict JSON validators or schemas that reject additional properties
@@ -405,7 +440,7 @@ python manage.py eventrule_withdrawn_report
   - The Webhook Endpoint is **enabled** (`enabled = true`).
   - The Event Rule is **enabled**.
   - The rule's `Events` list includes the event type you're expecting
-    (`create`, `update`, `delete`, `restore`).
+    (`create`, `update`, `delete`, `restore`, `checkout`, `checkin`).
   - The rule's `Model` matches the object you're modifying.
   - The object actually emits events (internal models like `Event` and
     `ObjectChange` are excluded).
@@ -419,12 +454,21 @@ python manage.py eventrule_withdrawn_report
 
 **Delivery fails with a 4xx status**
 
-: 4xx errors are **final** — the system does not retry them. Common causes:
+: 4xx errors other than `429` are **final** — the system does not retry them.
+  Common causes:
   - `401` / `403`: The `Authorization` header or webhook URL token is invalid.
   - `404`: The destination URL is wrong or the endpoint was deleted.
   - `400`: The payload format doesn't match the receiver's expectations.
 
   Fix the configuration and trigger a new event to re-send.
+
+**Delivery fails with a 429 status**
+
+: `429` is rate limiting, not a terminal error: the delivery is retried within
+  the retry budget, and a valid `Retry-After` header delays the next attempt
+  (capped at 300 seconds). If attempts keep getting `429` responses, the
+  delivery exhausts its budget and ends as `dead` — raise the endpoint's
+  `retry_count` or lower the receiver's rate limiting.
 
 **Delivery fails with a 5xx status or connection error**
 

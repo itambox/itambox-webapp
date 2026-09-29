@@ -14611,7 +14611,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: extras_event_rules_create
       tags:
@@ -14675,7 +14675,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_event_rules_update_bulk
       tags:
@@ -14739,7 +14739,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_event_rules_partial_update_bulk
       tags:
@@ -14802,7 +14802,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_event_rules_destroy_bulk
       tags:
@@ -14844,7 +14844,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/event-rules/{id}/:
     get:
       operationId: extras_event_rules_retrieve
@@ -14892,7 +14892,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_event_rules_update
       parameters:
@@ -14969,7 +14969,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_event_rules_partial_update
       parameters:
@@ -15045,7 +15045,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_event_rules_destroy
       parameters:
@@ -15100,7 +15100,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/journal-entries/:
     get:
       operationId: extras_journal_entries_list
@@ -17058,7 +17058,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: extras_webhook_endpoints_create
       tags:
@@ -17122,7 +17122,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_webhook_endpoints_update_bulk
       tags:
@@ -17186,7 +17186,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_webhook_endpoints_partial_update_bulk
       tags:
@@ -17249,7 +17249,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_webhook_endpoints_destroy_bulk
       tags:
@@ -17291,7 +17291,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/webhook-endpoints/{id}/:
     get:
       operationId: extras_webhook_endpoints_retrieve
@@ -17339,7 +17339,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: extras_webhook_endpoints_update
       parameters:
@@ -17416,7 +17416,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: extras_webhook_endpoints_partial_update
       parameters:
@@ -17492,7 +17492,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: extras_webhook_endpoints_destroy
       parameters:
@@ -17547,7 +17547,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/extras/webhook-endpoints/{id}/test/:
     post:
       operationId: extras_webhook_endpoints_test_create

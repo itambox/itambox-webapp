@@ -207,7 +207,7 @@ ENUM_SOURCES = (
         "CHOICES",
         KIND_PAIRS,
         OPEN,
-        CLASS_BETA_OPT_IN,
+        CLASS_STABLE,
     ),
 )
 
@@ -300,14 +300,7 @@ CAPABILITY_LIMITATIONS = {
         "Rule evaluation is daily, not continuous; thresholds are not evaluated on write.",
         "Channel delivery failures are logged, not retried.",
     ),
-    "automation.webhooks": (
-        "Event-specific data contents are not frozen. Slack and Teams use reduced vendor-specific "
-        "envelopes without X-Hub-Signature-256 but retain schema_version, event_id, delivery_id, "
-        "attempt, and tenant.",
-        "Delivery is at-least-once: one durable row keeps the current attempt count and latest "
-        "outcome, consumers must deduplicate, and manual redelivery requires a retained source event "
-        "with no pending or future-retry work live.",
-    ),
+    "automation.webhooks": (),
     "organization.role_grants": (),
     "organization.resource_grants": (),
     "platform.plugins": (

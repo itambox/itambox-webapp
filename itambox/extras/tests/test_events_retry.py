@@ -1,8 +1,10 @@
 """send_webhook_task retry behaviour on the durable-delivery model (issue #445)."""
 
 import ast
+import datetime
 import json
 import uuid
+from email.utils import format_datetime
 from unittest.mock import MagicMock, patch
 from uuid import UUID
 
@@ -193,3 +195,257 @@ class WebhookRetryTestCase(TransactionTestCase):
         retry = ast.literal_eval(kw["kwargs"])
         self.assertEqual(retry["assertions"]["webhook_endpoint_id"], delivery.endpoint_id)
         self.assertNotIn("secret", retry["assertions"])
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_retries(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=60)
+        resp = MagicMock(status_code=429)
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        retry = ast.literal_eval(mock_schedule.objects.create.call_args.kwargs["kwargs"])
+        self.assertEqual(retry["attempt"], 1)
+        self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_with_retry_after_seconds_schedules_delay(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=60)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "30"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+        now = timezone.now()
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        next_run = mock_schedule.objects.create.call_args.kwargs["next_run"]
+        self.assertGreaterEqual(next_run, now + datetime.timedelta(seconds=29))
+        self.assertLessEqual(next_run, now + datetime.timedelta(seconds=32))
+        retry = ast.literal_eval(mock_schedule.objects.create.call_args.kwargs["kwargs"])
+        self.assertEqual(retry["attempt"], 1)
+        self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_with_retry_after_seconds_schedules_delay_even_with_zero_endpoint_backoff(
+        self, mock_schedule, mock_async, mock_request_pinned
+    ):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=0)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "30"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+        now = timezone.now()
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        next_run = mock_schedule.objects.create.call_args.kwargs["next_run"]
+        self.assertGreaterEqual(next_run, now + datetime.timedelta(seconds=29))
+        self.assertLessEqual(next_run, now + datetime.timedelta(seconds=32))
+        retry = ast.literal_eval(mock_schedule.objects.create.call_args.kwargs["kwargs"])
+        self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_with_http_date_retry_after_schedules(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=0)
+        now = timezone.now()
+        retry_at = (now + datetime.timedelta(seconds=120)).astimezone(datetime.timezone.utc).replace(microsecond=0)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": format_datetime(retry_at, usegmt=True)}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        next_run = mock_schedule.objects.create.call_args.kwargs["next_run"]
+        self.assertGreaterEqual(next_run, now + datetime.timedelta(seconds=118))
+        self.assertLessEqual(next_run, now + datetime.timedelta(seconds=122))
+        self.assertEqual(next_run.utcoffset(), datetime.timedelta(0))
+        retry = ast.literal_eval(mock_schedule.objects.create.call_args.kwargs["kwargs"])
+        self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_retry_after_is_clamped_to_300_seconds(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=0)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "99999"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+        now = timezone.now()
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        next_run = mock_schedule.objects.create.call_args.kwargs["next_run"]
+        self.assertGreaterEqual(next_run, now + datetime.timedelta(seconds=299))
+        self.assertLessEqual(next_run, now + datetime.timedelta(seconds=302))
+        retry = ast.literal_eval(mock_schedule.objects.create.call_args.kwargs["kwargs"])
+        self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_invalid_retry_after_falls_back_to_backoff(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=60)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "not-a-number"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+        now = timezone.now()
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        next_run = mock_schedule.objects.create.call_args.kwargs["next_run"]
+        self.assertGreaterEqual(next_run, now + datetime.timedelta(seconds=47))
+        self.assertLessEqual(next_run, now + datetime.timedelta(seconds=73))
+        retry = ast.literal_eval(mock_schedule.objects.create.call_args.kwargs["kwargs"])
+        self.assertEqual(retry["assertions"]["delivery_pk"], delivery.pk)
+
+        mock_schedule.reset_mock()
+        mock_async.reset_mock()
+        delivery, assertions = self._plan(retry_backoff=0)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "not-a-number"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_schedule.objects.create.assert_not_called()
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args.kwargs["attempt"], 1)
+        delivery.refresh_from_db()
+        self.assertLessEqual(delivery.next_retry_at, timezone.now())
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    def test_429_without_retry_after_zero_backoff_retries_immediately(self, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=0)
+        resp = MagicMock(status_code=429)
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args.kwargs["attempt"], 1)
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_FAILED)
+        self.assertLessEqual(delivery.next_retry_at, timezone.now())
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_with_retry_after_zero_retries_immediately(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=60)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "0"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_schedule.objects.create.assert_not_called()
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args.kwargs["attempt"], 1)
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_FAILED)
+        self.assertEqual(delivery.error_class, "integration.rate_limited")
+        self.assertLessEqual(delivery.next_retry_at, timezone.now())
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    def test_3xx_redirects_are_terminal_never_success(self, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        for status_code in (301, 302, 307):
+            with self.subTest(status_code=status_code):
+                delivery, assertions = self._plan()
+                resp = MagicMock(status_code=status_code)
+                resp.raise_for_status.return_value = None
+                mock_request_pinned.return_value = resp
+
+                send_webhook_task(assertions=assertions, attempt=0)
+
+                mock_async.assert_not_called()
+                delivery.refresh_from_db()
+                self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+                self.assertEqual(delivery.response_code, status_code)
+                self.assertEqual(delivery.error_class, "integration.request_rejected")
+                self.assertIsNone(delivery.next_retry_at)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
+    def test_429_budget_exhausted_goes_dead(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_count=2, retry_backoff=60)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "30"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=2)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_not_called()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+        self.assertEqual(delivery.error_class, "integration.retry_budget_exhausted")
+        self.assertIsNone(delivery.next_retry_at)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    def test_429_records_rate_limited_error_class(self, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=0)
+        resp = MagicMock(status_code=429)
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_async.assert_called_once()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_FAILED)
+        self.assertEqual(delivery.error_class, "integration.rate_limited")

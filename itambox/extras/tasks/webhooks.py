@@ -13,9 +13,11 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import random
 from collections.abc import Mapping
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from uuid import UUID, uuid4
 
 import requests
@@ -28,6 +30,7 @@ from django_q.models import Schedule
 from django_q.tasks import async_task
 
 from core.crypto import encrypt_string, get_fernet
+from core.errors import MAX_RETRY_AFTER_SECONDS
 from core.events import DeliveryDisposition, DeliveryResult, delivery_log_context, delivery_log_message
 from extras.models import Event, WebhookDelivery, WebhookEndpoint
 
@@ -45,6 +48,7 @@ _SAFE_IDENTITY_MESSAGE = "Webhook delivery was rejected."
 _CONFIGURATION_ERROR_CLASS = "integration.configuration"
 _REQUEST_ERROR_CLASS = "integration.request_rejected"
 _UNAVAILABLE_ERROR_CLASS = "integration.unavailable"
+_RATE_LIMITED_ERROR_CLASS = "integration.rate_limited"
 _RETRY_EXHAUSTED_ERROR_CLASS = "integration.retry_budget_exhausted"
 _IDENTITY_ERROR_CLASS = "integration.delivery_identity_rejected"
 
@@ -128,6 +132,29 @@ def _webhook_envelope(*, event_id, delivery_id, attempt, tenant_id):
 def _safe_response_code(response) -> int | None:
     status_code = getattr(response, "status_code", None)
     return status_code if isinstance(status_code, int) and status_code > 0 else None
+
+
+def _parse_retry_after(value: str | None) -> float | None:
+    """Return a finite, capped Retry-After delay for delta-seconds or HTTP-date values."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed_seconds = float(value)
+    except (TypeError, ValueError, OverflowError):
+        try:
+            retry_at = parsedate_to_datetime(value)
+        except (TypeError, ValueError, OverflowError, IndexError):
+            return None
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=datetime.timezone.utc)
+        try:
+            parsed_seconds = (retry_at - timezone.now()).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    if not math.isfinite(parsed_seconds):
+        return None
+    return min(max(0.0, parsed_seconds), MAX_RETRY_AFTER_SECONDS)
 
 
 def backoff_seconds(attempt: int, retry_backoff: int) -> float:
@@ -476,6 +503,7 @@ def _finish_delivery(
     retry_count: int,
     retry_backoff: int,
     retry_kwargs: dict[str, object] | None,
+    retry_after_seconds: float | None = None,
 ) -> DeliveryResult:
     immediate_retry_kwargs: dict[str, object] | None = None
     with transaction.atomic():
@@ -558,52 +586,72 @@ def _finish_delivery(
             )
 
         delivery.status = "failed"
-        delivery.error_class = _UNAVAILABLE_ERROR_CLASS
+        delivery.error_class = result.error_class or _UNAVAILABLE_ERROR_CLASS
         delivery.error_message = _SAFE_UNAVAILABLE_MESSAGE
-        if retry_backoff > 0:
-            delay = backoff_seconds(delivery.attempt, retry_backoff)
-            delivery.next_retry_at = now + datetime.timedelta(seconds=delay)
-            delivery.save(
-                update_fields=[
-                    "status",
-                    "response_code",
-                    "error_class",
-                    "error_message",
-                    "next_retry_at",
-                    "claim_token",
-                    "claim_expires_at",
-                    "updated_at",
-                ]
-            )
-            if retry_kwargs is not None:
-                Schedule.objects.create(
-                    func=WEBHOOK_TASK_PATH,
-                    kwargs=repr(retry_kwargs),
-                    schedule_type=Schedule.ONCE,
-                    next_run=delivery.next_retry_at,
-                )
-        else:
-            # A zero-backoff retry is still durable: persist it as immediately
-            # due before broker publication. If publication fails, the recovery
-            # coordinator can select the failed row and republish its identity.
-            delivery.next_retry_at = now
-            delivery.save(
-                update_fields=[
-                    "status",
-                    "response_code",
-                    "error_class",
-                    "error_message",
-                    "next_retry_at",
-                    "claim_token",
-                    "claim_expires_at",
-                    "updated_at",
-                ]
-            )
-            immediate_retry_kwargs = retry_kwargs
+        immediate_retry_kwargs = _schedule_failed_retry(
+            delivery,
+            now=now,
+            retry_after_seconds=retry_after_seconds,
+            retry_backoff=retry_backoff,
+            retry_kwargs=retry_kwargs,
+        )
 
     if immediate_retry_kwargs is not None:
         _enqueue_immediate_retry(delivery_pk, immediate_retry_kwargs)
     return result
+
+
+def _save_failed_delivery(delivery) -> None:
+    delivery.save(
+        update_fields=[
+            "status",
+            "response_code",
+            "error_class",
+            "error_message",
+            "next_retry_at",
+            "claim_token",
+            "claim_expires_at",
+            "updated_at",
+        ]
+    )
+
+
+def _schedule_failed_retry(
+    delivery,
+    *,
+    now,
+    retry_after_seconds: float | None,
+    retry_backoff: int,
+    retry_kwargs: dict[str, object] | None,
+) -> dict[str, object] | None:
+    """Persist the failed row's next attempt; return kwargs for an immediate retry.
+
+    An immediately due retry — no backoff, or an explicit zero ``Retry-After``
+    that overrides the endpoint backoff — is still durable: persist it as
+    immediately due before broker publication. If publication fails, the
+    recovery coordinator can select the failed row and republish its identity.
+    """
+    if retry_after_seconds is not None:
+        delay = retry_after_seconds
+    elif retry_backoff > 0:
+        delay = backoff_seconds(delivery.attempt, retry_backoff)
+    else:
+        delay = None
+
+    if delay is None or delay <= 0:
+        delivery.next_retry_at = now
+        _save_failed_delivery(delivery)
+        return retry_kwargs
+    delivery.next_retry_at = now + datetime.timedelta(seconds=delay)
+    _save_failed_delivery(delivery)
+    if retry_kwargs is not None:
+        Schedule.objects.create(
+            func=WEBHOOK_TASK_PATH,
+            kwargs=repr(retry_kwargs),
+            schedule_type=Schedule.ONCE,
+            next_run=delivery.next_retry_at,
+        )
+    return None
 
 
 def _dispatch_webhook_request(
@@ -724,7 +772,9 @@ def send_webhook_task(
             "model": "extras.WebhookEndpoint",
             "object_id": plan.event_object_id,
             "timestamp": plan.event_timestamp_iso,
-            "data": {},
+            # The reserved test send of the endpoint itself keeps the minimal
+            # V1 ``data`` metadata promise (app_label/model_name).
+            "data": {"app_label": "extras", "model_name": "webhookendpoint"},
         }
         response = _dispatch_webhook_request(
             target_kind=target_kind,
@@ -745,34 +795,17 @@ def send_webhook_task(
         )
 
         response_code = _safe_response_code(response)
-        if response_code is not None and 400 <= response_code < 500:
-            logger.warning("%s disposition=terminal reason=http_4xx", delivery_log_message(context))
-            result = DeliveryResult(
-                operation,
-                DeliveryDisposition.TERMINAL,
-                True,
-                _SAFE_REJECTED_MESSAGE,
-                _REQUEST_ERROR_CLASS,
-            )
-            return _finish_delivery(
-                delivery_pk=delivery.pk,
-                claim_token=claim_token,
-                result=result,
-                response_code=response_code,
-                retry_count=plan.retry_count,
-                retry_backoff=plan.retry_backoff,
-                retry_kwargs=None,
-            )
-        response.raise_for_status()
-        logger.info("%s disposition=success", delivery_log_message(context))
-        return _finish_delivery(
-            delivery_pk=delivery.pk,
+        return _settle_webhook_response(
+            delivery,
+            plan=plan,
+            parsed=parsed,
             claim_token=claim_token,
-            result=DeliveryResult(operation, DeliveryDisposition.SUCCESS),
+            attempt=attempt,
             response_code=response_code,
-            retry_count=plan.retry_count,
-            retry_backoff=plan.retry_backoff,
-            retry_kwargs=None,
+            response=response,
+            context=context,
+            actor_id=actor_id,
+            request_id=request_id,
         )
 
     except ValidationError:
@@ -792,27 +825,15 @@ def send_webhook_task(
     except requests.RequestException as exc:
         exception_response = getattr(exc, "response", None)
         response_code = response_code or _safe_response_code(exception_response)
-        if attempt >= plan.retry_count:
-            logger.error("%s disposition=retryable reason=attempt_limit", delivery_log_message(context))
-            result = DeliveryResult(
-                operation,
-                DeliveryDisposition.RETRYABLE,
-                error_class=_RETRY_EXHAUSTED_ERROR_CLASS,
-            )
-            retry_kwargs = None
-        else:
-            logger.warning(
-                "%s disposition=retryable action=retry attempt=%d retry_count=%d",
-                delivery_log_message(context),
-                delivery.attempt,
-                plan.retry_count,
-            )
-            result = DeliveryResult(
-                operation,
-                DeliveryDisposition.RETRYABLE,
-                error_class=_UNAVAILABLE_ERROR_CLASS,
-            )
-            retry_kwargs = _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id)
+        _log_retry_disposition(context, exhausted=attempt >= plan.retry_count, delivery=delivery, plan=plan)
+        result, retry_kwargs = _retryable_settlement(
+            plan=plan,
+            delivery=delivery,
+            attempt=attempt,
+            parsed=parsed,
+            actor_id=actor_id,
+            request_id=request_id,
+        )
         return _finish_delivery(
             delivery_pk=delivery.pk,
             claim_token=claim_token,
@@ -830,20 +851,14 @@ def send_webhook_task(
             delivery_log_message(context),
             type(exc).__name__,
         )
-        if attempt >= plan.retry_count:
-            result = DeliveryResult(
-                operation,
-                DeliveryDisposition.RETRYABLE,
-                error_class=_RETRY_EXHAUSTED_ERROR_CLASS,
-            )
-            retry_kwargs = None
-        else:
-            result = DeliveryResult(
-                operation,
-                DeliveryDisposition.RETRYABLE,
-                error_class=_UNAVAILABLE_ERROR_CLASS,
-            )
-            retry_kwargs = _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id)
+        result, retry_kwargs = _retryable_settlement(
+            plan=plan,
+            delivery=delivery,
+            attempt=attempt,
+            parsed=parsed,
+            actor_id=actor_id,
+            request_id=request_id,
+        )
         return _finish_delivery(
             delivery_pk=delivery.pk,
             claim_token=claim_token,
@@ -853,6 +868,178 @@ def send_webhook_task(
             retry_backoff=plan.retry_backoff,
             retry_kwargs=retry_kwargs,
         )
+
+
+def _log_retry_disposition(context, *, exhausted: bool, delivery, plan) -> None:
+    if exhausted:
+        logger.error("%s disposition=retryable reason=attempt_limit", delivery_log_message(context))
+    else:
+        logger.warning(
+            "%s disposition=retryable action=retry attempt=%d retry_count=%d",
+            delivery_log_message(context),
+            delivery.attempt,
+            plan.retry_count,
+        )
+
+
+def _retryable_settlement(
+    *,
+    plan,
+    delivery,
+    attempt: int,
+    parsed: WebhookDeliveryAssertions,
+    actor_id: int | None,
+    request_id: str | None,
+) -> tuple[DeliveryResult, dict[str, object] | None]:
+    if attempt >= plan.retry_count:
+        return (
+            DeliveryResult("webhook.deliver", DeliveryDisposition.RETRYABLE, error_class=_RETRY_EXHAUSTED_ERROR_CLASS),
+            None,
+        )
+    return (
+        DeliveryResult("webhook.deliver", DeliveryDisposition.RETRYABLE, error_class=_UNAVAILABLE_ERROR_CLASS),
+        _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id),
+    )
+
+
+def _finish_rate_limited(
+    delivery,
+    *,
+    plan,
+    parsed: WebhookDeliveryAssertions,
+    claim_token: UUID,
+    attempt: int,
+    response_code: int | None,
+    retry_after_header: str | None,
+    context,
+    actor_id: int | None,
+    request_id: str | None,
+) -> DeliveryResult:
+    retry_after_seconds = _parse_retry_after(retry_after_header)
+    if attempt >= plan.retry_count:
+        logger.error(
+            "%s disposition=retryable action=attempt_limit reason=http_429",
+            delivery_log_message(context),
+        )
+        retry_kwargs = None
+    else:
+        logger.warning(
+            "%s disposition=retryable action=retry reason=http_429 attempt=%d retry_count=%d",
+            delivery_log_message(context),
+            delivery.attempt,
+            plan.retry_count,
+        )
+        retry_kwargs = _retry_kwargs(parsed, delivery, actor_id=actor_id, request_id=request_id)
+    return _finish_delivery(
+        delivery_pk=delivery.pk,
+        claim_token=claim_token,
+        result=DeliveryResult(
+            "webhook.deliver",
+            DeliveryDisposition.RETRYABLE,
+            error_class=_RATE_LIMITED_ERROR_CLASS,
+        ),
+        response_code=response_code,
+        retry_count=plan.retry_count,
+        retry_backoff=plan.retry_backoff,
+        retry_kwargs=retry_kwargs,
+        retry_after_seconds=retry_after_seconds,
+    )
+
+
+def _settle_webhook_response(
+    delivery,
+    *,
+    plan,
+    parsed: WebhookDeliveryAssertions,
+    claim_token: UUID,
+    attempt: int,
+    response_code: int | None,
+    response,
+    context,
+    actor_id: int | None,
+    request_id: str | None,
+) -> DeliveryResult:
+    if response_code == 429:
+        return _finish_rate_limited(
+            delivery,
+            plan=plan,
+            parsed=parsed,
+            claim_token=claim_token,
+            attempt=attempt,
+            response_code=response_code,
+            retry_after_header=getattr(response, "headers", {}).get("Retry-After"),
+            context=context,
+            actor_id=actor_id,
+            request_id=request_id,
+        )
+    if response_code is not None and 300 <= response_code < 400:
+        # Redirects are never followed (pinned SSRF-safe transport); a redirect
+        # answer is recorded as a terminal non-delivery, never as success.
+        logger.warning("%s disposition=terminal reason=http_3xx", delivery_log_message(context))
+        result = DeliveryResult(
+            "webhook.deliver",
+            DeliveryDisposition.TERMINAL,
+            True,
+            _SAFE_REJECTED_MESSAGE,
+            _REQUEST_ERROR_CLASS,
+        )
+        return _finish_delivery(
+            delivery_pk=delivery.pk,
+            claim_token=claim_token,
+            result=result,
+            response_code=response_code,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
+            retry_kwargs=None,
+        )
+    if response_code is not None and 400 <= response_code < 500:
+        logger.warning("%s disposition=terminal reason=http_4xx", delivery_log_message(context))
+        result = DeliveryResult(
+            "webhook.deliver",
+            DeliveryDisposition.TERMINAL,
+            True,
+            _SAFE_REJECTED_MESSAGE,
+            _REQUEST_ERROR_CLASS,
+        )
+        return _finish_delivery(
+            delivery_pk=delivery.pk,
+            claim_token=claim_token,
+            result=result,
+            response_code=response_code,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
+            retry_kwargs=None,
+        )
+    response.raise_for_status()
+    if response_code is not None and not 200 <= response_code < 300:
+        # Defensive: success is reserved for explicit 2xx answers.
+        logger.error("%s disposition=terminal reason=unexpected_status", delivery_log_message(context))
+        result = DeliveryResult(
+            "webhook.deliver",
+            DeliveryDisposition.TERMINAL,
+            True,
+            _SAFE_REJECTED_MESSAGE,
+            _REQUEST_ERROR_CLASS,
+        )
+        return _finish_delivery(
+            delivery_pk=delivery.pk,
+            claim_token=claim_token,
+            result=result,
+            response_code=response_code,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
+            retry_kwargs=None,
+        )
+    logger.info("%s disposition=success", delivery_log_message(context))
+    return _finish_delivery(
+        delivery_pk=delivery.pk,
+        claim_token=claim_token,
+        result=DeliveryResult("webhook.deliver", DeliveryDisposition.SUCCESS),
+        response_code=response_code,
+        retry_count=plan.retry_count,
+        retry_backoff=plan.retry_backoff,
+        retry_kwargs=None,
+    )
 
 
 def _load_delivery_for_actor(delivery_pk: int, actor_id: int | None):

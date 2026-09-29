@@ -901,7 +901,10 @@ class WordingScopeTests(unittest.TestCase):
             capability for capability in policy.derived_capabilities(REPO_ROOT) if capability.limitations
         ]
         self.assertEqual(len(limitation_sources), len(declared_with_limitations))
-        self.assertIn("itambox/extras/apps.py: automation.webhooks limitations", limitation_sources)
+        # Webhooks graduated to Stable in the #566 promotion: a Stable capability
+        # declares no limitations, so its former exclusions text left the checked
+        # wording scope entirely.
+        self.assertNotIn("itambox/extras/apps.py: automation.webhooks limitations", limitation_sources)
         for capability in declared_with_limitations:
             with self.subTest(capability=capability.key):
                 joined = " ".join(

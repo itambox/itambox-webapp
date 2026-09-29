@@ -50,7 +50,7 @@ DECLARED = {
     "alerting.rules": (BETA, "enabled", SOURCE_OBJECT_ENABLED),
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "organization.resource_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
-    "automation.webhooks": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
+    "automation.webhooks": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "users.scim_provisioning": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
     "platform.plugins": (EXPERIMENTAL, OPT_IN, SOURCE_OPERATOR_FLAG),
 }
@@ -74,6 +74,17 @@ class TestDeclaredSlice:
         capability = registry.get(key)
         expected = DECLARED[key]
         assert (capability.maturity, capability.activation, capability.activation_source) == expected
+
+    def test_webhooks_are_declared_stable_always_on_without_probe_or_limitations(self):
+        capability = registry.get("automation.webhooks")
+
+        assert (capability.maturity, capability.activation, capability.activation_source) == (
+            STABLE,
+            ALWAYS_ON,
+            SOURCE_ALWAYS,
+        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
 
     def test_only_authorization_boundaries_are_security_critical(self):
         critical = {capability.key for capability in registry.all() if capability.security_critical}
@@ -135,6 +146,13 @@ class TestActivationDefaults:
         for capability in registry.all():
             if capability.maturity == STABLE:
                 assert registry.is_active(capability.key) is True, capability.key
+
+    def test_webhooks_are_active_with_zero_rows(self, db):
+        from extras.models import EventRule, WebhookEndpoint
+
+        assert EventRule._base_manager.count() == 0
+        assert WebhookEndpoint._base_manager.count() == 0
+        assert registry.state("automation.webhooks") == ActivationState(active=True, value_present=True)
 
     def test_every_opt_in_capability_is_inert_on_a_fresh_deployment(self, db):
         """``db``: the object-backed probes must *answer* here, not fail closed.
@@ -291,31 +309,31 @@ class TestRegistrationIdempotence:
 
 
 class TestExistingDeploymentCompatibility:
-    """An opt-in slice is inert on a fresh install and live on a used one."""
+    """An object-enabled Beta slice is inert on a fresh install and live on a used one."""
 
     def test_an_object_enabled_capability_is_inactive_with_no_rows(self, db):
-        assert registry.state("automation.webhooks") == ActivationState(active=False, value_present=False)
+        assert registry.state("alerting.rules") == ActivationState(active=False, value_present=False)
 
     def test_an_existing_enabled_row_keeps_the_capability_active(self, db):
-        baker.make("extras.EventRule", enabled=True)
-        state = registry.state("automation.webhooks")
+        baker.make("extras.AlertRule", is_active=True)
+        state = registry.state("alerting.rules")
         assert (state.active, state.value_present) == (True, True)
 
     def test_rows_that_are_all_switched_off_read_as_configured_but_inactive(self, db):
-        baker.make("extras.EventRule", enabled=False)
-        state = registry.state("automation.webhooks")
+        baker.make("extras.AlertRule", is_active=False)
+        state = registry.state("alerting.rules")
         assert (state.active, state.value_present) == (False, True)
 
     def test_a_soft_deleted_row_is_not_configuration_at_all(self, db):
         """The recycle bin is not a deployment state: a deleted rule configures nothing."""
-        rule = baker.make("extras.EventRule", enabled=True)
+        rule = baker.make("extras.AlertRule", is_active=True)
         rule.soft_delete()
-        assert registry.state("automation.webhooks") == ActivationState(active=False, value_present=False)
+        assert registry.state("alerting.rules") == ActivationState(active=False, value_present=False)
 
     def test_a_live_row_still_counts_beside_a_soft_deleted_one(self, db):
-        baker.make("extras.EventRule", enabled=True).soft_delete()
-        baker.make("extras.EventRule", enabled=True)
-        state = registry.state("automation.webhooks")
+        baker.make("extras.AlertRule", is_active=True).soft_delete()
+        baker.make("extras.AlertRule", is_active=True)
+        state = registry.state("alerting.rules")
         assert (state.active, state.value_present) == (True, True)
 
     @override_settings(REPORT_DESIGNER_ENABLED=False)
@@ -374,6 +392,10 @@ class TestInactiveSafety:
         # broken. Without database access every row-counting probe would error
         # too and this isolation would go unproven.
         assert [other for other, row in rows.items() if other != key and row["probe_error"]] == []
+
+    def test_webhooks_are_not_deactivatable(self):
+        assert "automation.webhooks" not in deactivatable_keys()
+        assert registry.is_active("automation.webhooks") is True
 
     @pytest.mark.parametrize(
         "key",

@@ -248,21 +248,14 @@ class ExtrasConfig(AppConfig):
                 key="automation.webhooks",
                 title="Webhooks and Event Rules",
                 owning_area="area:operations",
-                maturity=BETA,
+                maturity=STABLE,
                 security_critical=False,
-                activation=OPT_IN,
-                activation_probe=object_enabled_probe("extras", "EventRule", "enabled"),
-                activation_source=SOURCE_OBJECT_ENABLED,
+                activation=ALWAYS_ON,
+                activation_probe=None,
+                activation_source=SOURCE_ALWAYS,
                 owns=("extras.EventRule", "extras.WebhookEndpoint"),
                 docs_url=DOCS,
-                limitations=(
-                    "Event-specific data contents are not frozen. Slack and Teams use reduced vendor-specific "
-                    "envelopes without X-Hub-Signature-256 but retain schema_version, event_id, delivery_id, "
-                    "attempt, and tenant.",
-                    "Delivery is at-least-once: one durable row keeps the current attempt count and latest "
-                    "outcome, consumers must deduplicate, and manual redelivery requires a retained source event "
-                    "with no pending or future-retry work live.",
-                ),
+                limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
         )

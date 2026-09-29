@@ -13,9 +13,9 @@
       "scope": "Alert rules and notification channels"
     },
     "automation.webhooks": {
-      "activation": "opt-in",
-      "contract_class": "beta-opt-in",
-      "exclusions": "Event-specific data contents are not frozen; Slack/Teams use reduced vendor-specific envelopes without X-Hub-Signature-256 but retain schema_version/event_id/delivery_id/attempt/tenant. Delivery is at-least-once, retains only the current attempt count/latest outcome, requires consumer deduplication, and manual redelivery requires a retained source event with no pending or future-retry work live",
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
       "scope": "Event rules and webhook endpoints"
     },
     "organization.resource_grants": {
@@ -92,7 +92,10 @@
     "core.EventActionChoices": [
       "create",
       "update",
-      "delete"
+      "delete",
+      "restore",
+      "checkout",
+      "checkin"
     ],
     "core.ObjectChangeActionChoices": [
       "create",
