@@ -372,6 +372,49 @@ class WebhookRetryTestCase(TransactionTestCase):
     @patch("core.http.request_pinned")
     @patch("extras.tasks.webhooks.async_task")
     @patch("extras.tasks.webhooks.Schedule")
+    def test_429_with_retry_after_zero_retries_immediately(self, mock_schedule, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        delivery, assertions = self._plan(retry_backoff=60)
+        resp = MagicMock(status_code=429)
+        resp.headers = {"Retry-After": "0"}
+        resp.raise_for_status.return_value = None
+        mock_request_pinned.return_value = resp
+
+        send_webhook_task(assertions=assertions, attempt=0)
+
+        mock_schedule.objects.create.assert_not_called()
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args.kwargs["attempt"], 1)
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_FAILED)
+        self.assertEqual(delivery.error_class, "integration.rate_limited")
+        self.assertLessEqual(delivery.next_retry_at, timezone.now())
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    def test_3xx_redirects_are_terminal_never_success(self, mock_async, mock_request_pinned):
+        from extras.tasks.webhooks import send_webhook_task
+
+        for status_code in (301, 302, 307):
+            with self.subTest(status_code=status_code):
+                delivery, assertions = self._plan()
+                resp = MagicMock(status_code=status_code)
+                resp.raise_for_status.return_value = None
+                mock_request_pinned.return_value = resp
+
+                send_webhook_task(assertions=assertions, attempt=0)
+
+                mock_async.assert_not_called()
+                delivery.refresh_from_db()
+                self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+                self.assertEqual(delivery.response_code, status_code)
+                self.assertEqual(delivery.error_class, "integration.request_rejected")
+                self.assertIsNone(delivery.next_retry_at)
+
+    @patch("core.http.request_pinned")
+    @patch("extras.tasks.webhooks.async_task")
+    @patch("extras.tasks.webhooks.Schedule")
     def test_429_budget_exhausted_goes_dead(self, mock_schedule, mock_async, mock_request_pinned):
         from extras.tasks.webhooks import send_webhook_task
 

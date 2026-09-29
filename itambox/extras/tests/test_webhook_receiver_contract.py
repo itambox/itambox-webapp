@@ -16,7 +16,7 @@ from core.managers import set_current_membership, set_current_tenant
 from core.tests.mixins import TenantTestMixin
 from extras.models import Event, EventRule, WebhookDelivery, WebhookEndpoint
 from extras.services.events import dispatch_event
-from extras.tasks.webhooks import redeliver_webhook_delivery, send_webhook_task
+from extras.tasks.webhooks import redeliver_webhook_delivery, send_webhook_task, send_webhook_test
 from organization.models import Location, Tenant
 
 User = get_user_model()
@@ -198,3 +198,23 @@ class WebhookReceiverContractTests(TenantTestMixin, TransactionTestCase):
             (payload["event_id"], payload["delivery_id"], payload["attempt"]) for payload in payloads
         }
         self.assertEqual(len(receiver_dedupe_keys), 3)
+
+    def test_test_send_keeps_v1_shape_with_reserved_event_value(self):
+        with patch("extras.tasks.webhooks.async_task") as async_task:
+            delivery = send_webhook_test(self.endpoint.pk, actor_id=self.actor.pk)
+            task_args, task_kwargs = async_task.call_args
+        self.assertTrue(delivery.test_send)
+        self.assertIsNone(delivery.event_id)
+
+        with patch("core.http.request_pinned", return_value=self._response()) as request_pinned:
+            result = send_webhook_task(task_args[1], **task_kwargs)
+
+        self.assertEqual(result.disposition.value, "success")
+        payload = json.loads(request_pinned.call_args.kwargs["data"])
+        self.assertEqual(set(payload), V1_ENVELOPE_MEMBERS)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["event"], "test")
+        self.assertNotIn(payload["event"], V1_EVENT_ACTIONS)
+        self.assertEqual(payload["model"], "extras.WebhookEndpoint")
+        self.assertEqual(payload["object_id"], self.endpoint.pk)
+        self.assertEqual(payload["data"], {"app_label": "extras", "model_name": "webhookendpoint"})

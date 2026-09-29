@@ -113,7 +113,8 @@ retry policy:
 | Scenario | Behaviour |
 |---|---|
 | **2xx response** | Success — done. |
-| **429 response** (rate limited) | **Retried** within the retry budget. A valid `Retry-After` header (delta-seconds or HTTP-date, capped at 300 seconds) sets the next attempt's delay; without one the endpoint's normal backoff applies. |
+| **3xx response** (redirect) | **Final failure.** Redirects are never followed (the pinned SSRF-safe transport refuses to re-target a request); the delivery is recorded as failed without retrying — point the endpoint directly at its final location. |
+| **429 response** (rate limited) | **Retried** within the retry budget. A valid `Retry-After` header (delta-seconds or HTTP-date, capped at 300 seconds) sets the next attempt's delay; `Retry-After: 0` is honoured as an immediately due retry; without a header the endpoint's normal backoff applies. |
 | **4xx response** (400–499, except 429) | **Final failure.** Client errors (bad request, auth failure, not found) are never retried — fix the payload or credentials and re-send manually. |
 | **5xx response** (500–599) | Retried up to `retry_count` times, with capped exponential backoff and ±20% jitter. |
 | **Connection error** (DNS, timeout, TLS) | Same as 5xx — retried. |
@@ -125,9 +126,9 @@ each later retry, is capped at 3600 seconds, and receives ±20% jitter (with a
 minimum positive delay of one second). A 429 response with a valid `Retry-After`
 header schedules the next attempt at the requested delay (capped at 300 seconds)
 instead of the computed backoff, even when the endpoint's `retry_backoff` is
-`0`. A zero-backoff retry is immediately due; its durable delivery row remains
-recoverable if broker publication fails. The schedule means positive delays are
-honoured even if the worker pool is busy.
+`0`; a zero delay retries immediately. A zero-backoff retry is immediately due;
+its durable delivery row remains recoverable if broker publication fails. The
+schedule means positive delays are honoured even if the worker pool is busy.
 
 > [!IMPORTANT]
 > The endpoint target is snapshotted into the durable delivery before enqueue.
@@ -178,9 +179,11 @@ delivery is pending or has a retry scheduled for the future. A redelivered test
 send remains marked as a test send.
 
 Operators can send a test webhook from an endpoint. A test delivery has no
-event record and sends the normal v1 envelope with an `event` value of `test`,
-the endpoint model marker, and an empty data object. It uses the endpoint's
-normal retry policy and is included in delivery history.
+event record and sends the normal v1 envelope with the reserved `event` value
+`test` (deliberately outside the six event actions), the endpoint model marker,
+and the same minimal `data` metadata (`app_label`, `model_name`) as event
+deliveries. It uses the endpoint's normal retry policy and is included in
+delivery history.
 
 System-wide endpoint deliveries require platform authorization to view or
 operate. Tenant operators see only delivery records for their own tenant;

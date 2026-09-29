@@ -626,18 +626,19 @@ def _schedule_failed_retry(
 ) -> dict[str, object] | None:
     """Persist the failed row's next attempt; return kwargs for an immediate retry.
 
-    A zero-backoff retry is still durable: persist it as immediately due before
-    broker publication. If publication fails, the recovery coordinator can
-    select the failed row and republish its identity.
+    An immediately due retry — no backoff, or an explicit zero ``Retry-After``
+    that overrides the endpoint backoff — is still durable: persist it as
+    immediately due before broker publication. If publication fails, the
+    recovery coordinator can select the failed row and republish its identity.
     """
-    if retry_after_seconds is not None and retry_after_seconds > 0:
+    if retry_after_seconds is not None:
         delay = retry_after_seconds
     elif retry_backoff > 0:
         delay = backoff_seconds(delivery.attempt, retry_backoff)
     else:
         delay = None
 
-    if delay is None:
+    if delay is None or delay <= 0:
         delivery.next_retry_at = now
         _save_failed_delivery(delivery)
         return retry_kwargs
@@ -771,7 +772,9 @@ def send_webhook_task(
             "model": "extras.WebhookEndpoint",
             "object_id": plan.event_object_id,
             "timestamp": plan.event_timestamp_iso,
-            "data": {},
+            # The reserved test send of the endpoint itself keeps the minimal
+            # V1 ``data`` metadata promise (app_label/model_name).
+            "data": {"app_label": "extras", "model_name": "webhookendpoint"},
         }
         response = _dispatch_webhook_request(
             target_kind=target_kind,
@@ -969,6 +972,26 @@ def _settle_webhook_response(
             actor_id=actor_id,
             request_id=request_id,
         )
+    if response_code is not None and 300 <= response_code < 400:
+        # Redirects are never followed (pinned SSRF-safe transport); a redirect
+        # answer is recorded as a terminal non-delivery, never as success.
+        logger.warning("%s disposition=terminal reason=http_3xx", delivery_log_message(context))
+        result = DeliveryResult(
+            "webhook.deliver",
+            DeliveryDisposition.TERMINAL,
+            True,
+            _SAFE_REJECTED_MESSAGE,
+            _REQUEST_ERROR_CLASS,
+        )
+        return _finish_delivery(
+            delivery_pk=delivery.pk,
+            claim_token=claim_token,
+            result=result,
+            response_code=response_code,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
+            retry_kwargs=None,
+        )
     if response_code is not None and 400 <= response_code < 500:
         logger.warning("%s disposition=terminal reason=http_4xx", delivery_log_message(context))
         result = DeliveryResult(
@@ -988,6 +1011,25 @@ def _settle_webhook_response(
             retry_kwargs=None,
         )
     response.raise_for_status()
+    if response_code is not None and not 200 <= response_code < 300:
+        # Defensive: success is reserved for explicit 2xx answers.
+        logger.error("%s disposition=terminal reason=unexpected_status", delivery_log_message(context))
+        result = DeliveryResult(
+            "webhook.deliver",
+            DeliveryDisposition.TERMINAL,
+            True,
+            _SAFE_REJECTED_MESSAGE,
+            _REQUEST_ERROR_CLASS,
+        )
+        return _finish_delivery(
+            delivery_pk=delivery.pk,
+            claim_token=claim_token,
+            result=result,
+            response_code=response_code,
+            retry_count=plan.retry_count,
+            retry_backoff=plan.retry_backoff,
+            retry_kwargs=None,
+        )
     logger.info("%s disposition=success", delivery_log_message(context))
     return _finish_delivery(
         delivery_pk=delivery.pk,
