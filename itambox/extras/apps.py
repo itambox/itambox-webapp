@@ -11,7 +11,6 @@ from itambox.capabilities import (
     BETA,
     CAPABILITY_REGISTRY_DOC_URL,
     CONTRACT_VERSION,
-    ENABLED,
     OPT_IN,
     SOURCE_ALWAYS,
     SOURCE_OBJECT_ENABLED,

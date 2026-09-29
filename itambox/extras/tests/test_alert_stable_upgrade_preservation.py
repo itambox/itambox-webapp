@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from django.contrib.contenttypes.models import ContentType
 from django.test import TransactionTestCase
-from django.utils import timezone
 
 from assets.models import Manufacturer
 from core.events import DeliveryDisposition, DeliveryResult
