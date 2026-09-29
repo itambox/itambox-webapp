@@ -48694,7 +48694,16 @@ components:
           additionalProperties:
             type: integer
             minimum: 0
+        expected_received:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+          description: The recorded received quantity per line id this submission
+            was prepared against. Stale submissions, replays, and parallel duplicates
+            whose lines have moved on are refused.
       required:
+      - expected_received
       - line_quantities
     PurchaseOrderRequest:
       type: object
