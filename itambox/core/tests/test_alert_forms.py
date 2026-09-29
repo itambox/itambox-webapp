@@ -197,18 +197,10 @@ class AlertRuleFormChannelScopeTests(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_platform_wide_rule_accepts_only_platform_wide_channel(self):
+    def test_platform_wide_rule_cannot_be_saved_without_tenant(self):
         from extras.forms import AlertRuleForm
 
-        platform_form = AlertRuleForm(
-            data=self._form_data("Platform rule with global channel", self.platform_channel, None)
-        )
-        self.assertTrue(platform_form.is_valid(), platform_form.errors)
+        form = AlertRuleForm(data=self._form_data("Platform rule without tenant", self.platform_channel, None))
 
-        tenant_form = AlertRuleForm(
-            data=self._form_data("Platform rule with tenant channel", self.tenant_channel, None)
-        )
-        self.assertFalse(tenant_form.is_valid())
-        self.assertIn("cannot deliver for this rule", str(tenant_form.errors))
-        self.assertIn("channels", tenant_form.errors)
-        self.assertIn("cannot deliver for this rule", " ".join(tenant_form.errors.get("channels", [])))
+        self.assertFalse(form.is_valid())
+        self.assertIn("tenant", form.errors)

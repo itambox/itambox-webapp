@@ -519,25 +519,31 @@ class AlertRuleChannelScopeValidationTests(APITestCase):
             tenant=self.tenant,
         )
         self.rule.channels.add(self.channel)
+        self.superuser = User.objects.create_superuser(
+            username="alert-scope-super", email="alert-scope-super@example.com", password="pw"
+        )
 
     def tearDown(self):
         _reset_scope()
 
-    def _login_to_tenant(self):
-        self.client.force_login(self.member)
+    def _login_to_tenant(self, user=None):
+        self.client.force_login(user or self.member)
         session = self.client.session
         session["active_tenant_id"] = self.tenant.pk
         session.save()
 
     @staticmethod
-    def _create_payload(name, channel_id):
-        return {
+    def _create_payload(name, channel_id, tenant_id=None):
+        payload = {
             "name": name,
             "alert_type": AlertRule.ALERT_TYPE_LOW_STOCK,
             "threshold_value": 5,
             "severity": AlertRule.SEVERITY_WARNING,
             "channel_ids": [channel_id],
         }
+        if tenant_id is not None:
+            payload["tenant"] = tenant_id
+        return payload
 
     @staticmethod
     def _etag(rule):
@@ -559,13 +565,16 @@ class AlertRuleChannelScopeValidationTests(APITestCase):
         self.assertEqual(set(created.channels.values_list("pk", flat=True)), {self.channel.pk})
 
     def test_create_with_platform_channel_is_rejected_without_creating_rule(self):
-        self._login_to_tenant()
+        # The superuser field scope includes platform-wide channels, so the write
+        # reaches the serializer's channel-scope guard; a tenant member's field
+        # queryset already excludes the platform channel (covered separately).
+        self._login_to_tenant(self.superuser)
         name = "Alert scope rejected platform channel"
         before = AlertRule._base_manager.count()
 
         response = self.client.post(
             reverse("api:extras_api:alertrule-list"),
-            data=self._create_payload(name, self.platform_channel.pk),
+            data=self._create_payload(name, self.platform_channel.pk, self.tenant.pk),
             format="json",
         )
 
@@ -575,7 +584,7 @@ class AlertRuleChannelScopeValidationTests(APITestCase):
         self.assertFalse(AlertRule._base_manager.filter(name=name).exists())
 
     def test_patch_to_platform_channel_is_rejected_and_keeps_attachment(self):
-        self._login_to_tenant()
+        self._login_to_tenant(self.superuser)
 
         response = self.client.patch(
             reverse("api:extras_api:alertrule-detail", kwargs={"pk": self.rule.pk}),
@@ -588,3 +597,36 @@ class AlertRuleChannelScopeValidationTests(APITestCase):
         self.assertIn("cannot deliver for this rule", str(response.data))
         self.rule.refresh_from_db()
         self.assertEqual(set(self.rule.channels.values_list("pk", flat=True)), {self.channel.pk})
+
+    def test_create_with_platform_channel_is_rejected_for_a_tenant_member(self):
+        self._login_to_tenant()
+        name = "Alert scope member platform channel"
+        before = AlertRule._base_manager.count()
+
+        response = self.client.post(
+            reverse("api:extras_api:alertrule-list"),
+            data=self._create_payload(name, self.platform_channel.pk),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(AlertRule._base_manager.count(), before)
+        self.assertFalse(AlertRule._base_manager.filter(name=name).exists())
+
+    def test_create_platform_rule_with_tenant_channel_is_rejected(self):
+        # An omitted tenant on a superuser create yields a platform-wide rule
+        # (mirrors ``_tenant_create_kwargs``); its channels must be
+        # platform-wide as well, so the tenant channel is rejected.
+        self._login_to_tenant(self.superuser)
+        name = "Alert scope platform rule tenant channel"
+        before = AlertRule._base_manager.count()
+
+        response = self.client.post(
+            reverse("api:extras_api:alertrule-list"),
+            data=self._create_payload(name, self.channel.pk),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("cannot deliver for this rule", str(response.data))
+        self.assertEqual(AlertRule._base_manager.count(), before)

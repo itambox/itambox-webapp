@@ -7,8 +7,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from core.tests.mixins import grant
 from extras.models import AlertLog, AlertRule
-from organization.models import Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -116,7 +117,9 @@ class AlertRuleRunNowViewTests(TestCase):
         self.assertIn("login", response.url)
 
     def test_without_change_permission_the_action_is_denied(self):
+        role = Role.objects.create(tenant=self.tenant, name="Alert viewer role", permissions=[])
         user = User.objects.create_user(username="alertviewer", password="x", email="viewer@example.com")
+        grant(user, self.tenant, role)
         response = self._client_for(user).post(self.url)
         self.assertEqual(response.status_code, 403)
 
