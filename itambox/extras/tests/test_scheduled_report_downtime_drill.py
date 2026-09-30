@@ -18,6 +18,11 @@ re-implementing either, so the drill states exactly what a deployment sees:
 * **Suppressed schedules stay suppressed** — an inactive schedule whose
   registration row leaked (delete interrupted) is skipped with a task result,
   even if the row is due; nothing is delivered.
+* **Summary fencing** — overlapping occurrences are allowed, but schedule-level
+  summary writes (``last_status``/``last_run_archive``) are fenced to the newest
+  started run: a slower older run finishing late keeps its own archive and
+  ledger yet can never overwrite a newer run's summary or retry binding, and a
+  retry completion is fenced to its archive still being the newest binding.
 * **Recovery** — a failed delivery leaves a per-target ledger and is recovered
   through ``Retry delivery``, which re-contacts only the failed targets with
   the recorded original recipients, email subject/body, and notification
@@ -51,7 +56,11 @@ from extras.models import (
     ScheduledReport,
     ScheduledReportFire,
 )
-from extras.tasks.reports import _parse_intended_fire_at, retry_failed_deliveries
+from extras.tasks.reports import (
+    _parse_intended_fire_at,
+    _process_scheduled_report,
+    retry_failed_deliveries,
+)
 from extras.views import handle_report_scheduling
 
 TASK_PATH = "extras.tasks.reports.generate_scheduled_report_task"
@@ -1270,6 +1279,143 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
         self.assertEqual(archive.error_message, "report.generation_failed")
         # No retry binding is kept for the failed run.
         self.assertIsNone(sched.last_run_archive_id)
+
+    def test_a_slower_older_run_never_overwrites_the_newer_summary(self):
+        sched = ScheduledReport.objects.create(
+            name="Overlap Summary Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        # Run B (the newer started run) completes first, with success.
+        result_b, _channel = self._deliver_once(sched, email_effect=True)
+        self.assertEqual(result_b.code, "report.completed")
+        sched.refresh_from_db()
+        newer_start = sched.last_run
+        newer_archive = sched.last_run_archive
+        self.assertEqual(sched.last_status, "success")
+        self.assertIsNotNone(newer_archive)
+
+        # Run A overlapped: its start marker is older than B's, and it only
+        # finishes now, with a delivery failure. Its own archive and ledger
+        # must be complete, but the schedule summary must keep B's state.
+        older_started_at = newer_start - timedelta(minutes=5)
+        with mock.patch(
+            "extras.tasks.reports._deliver_report_email",
+            side_effect=RuntimeError("smtp down"),
+        ):
+            success = _process_scheduled_report(sched, self.tenant, [], run_started_at=older_started_at)
+
+        self.assertFalse(success)
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_run, newer_start)
+        self.assertEqual(sched.last_status, "success")
+        self.assertEqual(sched.last_run_archive_id, newer_archive.pk)
+        self.assertFalse(sched.delivery_retryable)
+        older_archive = (
+            ReportGenerationArchive.objects.filter(scheduled_report=sched).exclude(pk=newer_archive.pk).get()
+        )
+        # The older run's own archive and per-target ledger are complete.
+        self.assertEqual(older_archive.delivery_status, "failed")
+        self.assertEqual([target["status"] for target in older_archive.delivery_targets], ["failed"])
+
+    def test_an_older_runs_generation_failure_cannot_reset_the_newer_summary(self):
+        sched = ScheduledReport.objects.create(
+            name="Overlap Failure Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result_b, _channel = self._deliver_once(sched, email_effect=True)
+        self.assertEqual(result_b.code, "report.completed")
+        sched.refresh_from_db()
+        newer_start = sched.last_run
+        newer_archive = sched.last_run_archive
+        self.assertEqual(sched.last_status, "success")
+
+        older_started_at = newer_start - timedelta(minutes=5)
+        with mock.patch(
+            "extras.tasks.reports._render_report_output",
+            side_effect=RuntimeError("render blew up"),
+        ):
+            result_a = _process_scheduled_report(sched, self.tenant, [], run_started_at=older_started_at)
+
+        self.assertEqual(result_a.code, "report.generation_failed")
+        sched.refresh_from_db()
+        # The older failed run neither resets the start marker nor clears the
+        # newer run's status, retry binding, or its sole archive.
+        self.assertEqual(sched.last_run, newer_start)
+        self.assertEqual(sched.last_status, "success")
+        self.assertEqual(sched.last_run_archive_id, newer_archive.pk)
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 1)
+
+    def test_a_retry_completion_cannot_overwrite_a_newer_runs_summary(self):
+        channel = NotificationChannel.objects.create(
+            name="Retry Fence Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        sched = ScheduledReport.objects.create(
+            name="Retry Fence Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        sched.channels.add(channel)
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"), channel_result=False)
+        self.assertEqual(result.code, "report.delivery_failed")
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "failed")
+        retry_archive = self._newest_archive(sched)
+
+        # While the retry is in flight, a newer run completes and rebinds the
+        # summary to its own archive and status.
+        rebound = []
+
+        def rebinding_delivery(sched_arg, template, output, recipients, subject=None, body=None):
+            newer_archive = ReportGenerationArchive.objects.create(
+                scheduled_report=sched,
+                format=ScheduledReport.FORMAT_HTML,
+                status="success",
+                tenant=self.tenant,
+            )
+            ScheduledReport.objects.filter(pk=sched.pk).update(
+                last_run=timezone.now(),
+                last_run_archive=newer_archive,
+                last_status="success",
+            )
+            rebound.append(newer_archive)
+            return True
+
+        with (
+            mock.patch("extras.tasks.reports._deliver_report_email", side_effect=rebinding_delivery),
+            mock.patch("extras.tasks.reports.send_notification_to_channel", return_value=False),
+        ):
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.partial")
+        sched.refresh_from_db()
+        # The retry keeps its own archive and ledger, but the schedule summary
+        # belongs to the newer run.
+        self.assertEqual(sched.last_status, "success")
+        self.assertEqual(sched.last_run_archive_id, rebound[0].pk)
+        retry_archive.refresh_from_db()
+        self.assertEqual(retry_archive.delivery_status, "partial")
+        self.assertFalse(retry_archive.retry_claim_token)
 
 
 class IntendedFireParsingTests(SimpleTestCase):

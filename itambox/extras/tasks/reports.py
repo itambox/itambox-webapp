@@ -543,7 +543,13 @@ def _generation_scope_snapshot(sched, active_tenant, filter_tenants):
     }
 
 
-def _process_scheduled_report(sched, active_tenant, filter_tenants):
+def _process_scheduled_report(sched, active_tenant, filter_tenants, *, run_started_at):
+    """Run one occurrence end to end under its own start marker.
+
+    ``run_started_at`` fences every schedule-level summary write: overlapping
+    occurrences are allowed, and only a run that is still the newest started
+    one may move ``last_status``/``last_run_archive`` forward.
+    """
     archive_entry = None
     try:
         template = sched.report
@@ -575,9 +581,11 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
         )
         sched.last_status = f"{status.value}: report.generation_failed"
         # A failed run retains no deliverable archive: clear the retry binding
-        # so Retry delivery can never resurrect an older report.
+        # so Retry delivery can never resurrect an older report. The write is
+        # fenced to the newest started run, so a slower older run can never
+        # reset a newer run's status, binding, or start marker.
         sched.last_run_archive = None
-        sched.save()
+        _persist_summary_state(sched, run_started_at)
         if archive_entry:
             archive_entry.status = "failed"
             archive_entry.error_message = "report.generation_failed"
@@ -615,7 +623,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
                 delivery.record_failure("email.delivery_rejected", target=DELIVERY_TARGET_EMAIL, details=email_details)
 
     delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows), context_data.get("disclosure_text", "")))
-    _persist_delivery_outcome(sched, archive_entry, delivery)
+    _persist_delivery_outcome(sched, archive_entry, delivery, run_started_at)
     if delivery.failures:
         logger.warning(
             "Scheduled report completed with delivery failures",
@@ -648,19 +656,41 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
     )
 
 
-def _persist_delivery_outcome(sched, archive_entry, delivery):
+def _persist_summary_state(sched, run_started_at):
+    """Write the schedule-level summary only while this run is the newest.
+
+    Overlapping occurrences are part of the contract, so ``last_status`` and
+    ``last_run_archive`` may only move forward: the write is fenced to the
+    run's own start marker (``last_run == run_started_at``). An older run
+    finishing late still writes its own archive and ledger, but never
+    overwrites the summary state of a run that started after it.
+    """
+    written = ScheduledReport._base_manager.filter(pk=sched.pk, last_run=run_started_at).update(
+        last_status=sched.last_status,
+        last_run_archive=sched.last_run_archive,
+    )
+    if not written:
+        logger.info(
+            "Skipped scheduled report summary write: a newer run has started",
+            extra={"operation": "reports.generate", "scheduled_report_id": sched.pk},
+        )
+    return bool(written)
+
+
+def _persist_delivery_outcome(sched, archive_entry, delivery, run_started_at):
     """Persist the delivery-stage outcome beside (never inside) generation fields.
 
     ``last_status`` carries the stable run outcome token only — detail is never
     truncated into it. The archive row keeps the per-target ledger, so compile,
     storage, and channel-delivery outcomes stay separable, and ``Retry
-    delivery`` can re-attempt exactly the failed targets.
+    delivery`` can re-attempt exactly the failed targets. The summary write is
+    fenced to the newest started run (see ``_persist_summary_state``).
     """
     sched.last_status = "success" if not delivery.failures else delivery.status
     # Bind Retry delivery to this run's archive; a run without a retained
     # archive (``save_to_archive`` off) clears it explicitly.
     sched.last_run_archive = archive_entry
-    sched.save(update_fields=["last_status", "last_run_archive"])
+    _persist_summary_state(sched, run_started_at)
     if archive_entry:
         archive_entry.delivery_status = delivery.status
         archive_entry.delivery_targets = delivery.targets
@@ -740,9 +770,15 @@ def generate_scheduled_report_task(scheduled_report_id: int, intended_fire_at: s
             "Generating scheduled report",
             extra={**ctx.log_context, "scheduled_report_id": sched.pk},
         )
-        sched.last_run = timezone.now()
-        sched.save()
-        return _process_scheduled_report(sched, active_tenant, filter_tenants)
+        # The start marker fences every later summary write: overlapping
+        # occurrences are allowed, and only a run that is still the newest
+        # started one may move the schedule-level status and retry binding.
+        # Keep the write narrow so stale in-memory values cannot leak back
+        # over a newer run's summary state.
+        run_started_at = timezone.now()
+        sched.last_run = run_started_at
+        sched.save(update_fields=["last_run"])
+        return _process_scheduled_report(sched, active_tenant, filter_tenants, run_started_at=run_started_at)
 
 
 @dataclass
@@ -1029,7 +1065,9 @@ def _complete_retry_claim(sched, archive, token, ledger):
 
     The write is fenced to the owning token; when the claim was superseded
     (the lease expired and a newer attempt took over), the newer state is left
-    in place and only a warning is recorded.
+    in place and only a warning is recorded. The schedule-level status is
+    additionally fenced to this archive still being the newest run's binding,
+    so a retry can never overwrite a newer run's summary.
     """
     all_ok = all(target.get("status") == "ok" for target in ledger)
     any_ok = any(target.get("status") == "ok" for target in ledger)
@@ -1042,9 +1080,19 @@ def _complete_retry_claim(sched, archive, token, ledger):
         return False
     archive.delivery_status = new_status
     archive.delivery_targets = ledger
+    # The schedule-level status moves only while this archive is still the
+    # newest run's binding; a newer completed run owns the summary.
     if sched.last_status != new_status:
-        sched.last_status = new_status
-        sched.save(update_fields=["last_status"])
+        written = ScheduledReport._base_manager.filter(pk=sched.pk, last_run_archive=archive).update(
+            last_status=new_status
+        )
+        if written:
+            sched.last_status = new_status
+        else:
+            logger.info(
+                "Skipped retry summary write: a newer run owns the schedule state",
+                extra={"operation": "reports.delivery_retry", "scheduled_report_id": sched.pk},
+            )
     return True
 
 
