@@ -123,7 +123,7 @@ ENUM_SOURCES = (
         "FORMAT_CHOICES",
         KIND_PAIRS,
         OPEN,
-        CLASS_BETA_ENABLED,
+        CLASS_STABLE,
     ),
     _enum(
         "extras.ReportTemplate.REPORT_TYPE_CHOICES",
@@ -306,12 +306,7 @@ CAPABILITY_LIMITATIONS = {
     "procurement.requisition_seam": (),
     "reporting.curated": (),
     "reporting.designer": (),
-    "reporting.scheduled": (
-        "The scheduled capability requires an active schedule row; deactivating a schedule pauses its "
-        "delivery without deleting the saved schedule.",
-        "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
-        "Archive retention is not yet configurable per schedule.",
-    ),
+    "reporting.scheduled": (),
     "subscriptions.tracking": (),
     "users.scim_provisioning": (),
 }

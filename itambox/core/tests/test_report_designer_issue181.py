@@ -15,7 +15,6 @@ from core.reports.rendering import (
     render_report_csv,
     render_report_html,
 )
-from extras.apps import _scheduled_reports_probe
 from extras.forms import ReportTemplateForm
 from extras.models import ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
 from extras.tasks.reports import (
@@ -30,7 +29,6 @@ from extras.tasks.reports import (
     generate_scheduled_report_task,
 )
 from extras.views import ReportTemplateDetailView, ReportTemplateDownloadView, ReportTemplatePreviewView
-from itambox.capabilities import ActivationState
 from organization.models import Tenant
 
 
@@ -368,11 +366,16 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         tenant_b = SimpleNamespace(pk=2, id=2)
         authorized_principal_id = 99
         expected_result = SimpleNamespace(status="success")
-        manager = Mock()
-        manager.get.return_value = schedule
+        # The start-marker write bypasses the tenant-scoping default manager
+        # via ``_base_manager`` (a ModelBase property that cannot be patched
+        # directly), so the class reference itself is mocked; the conditional
+        # update chain reports one row moved.
+        scheduled_report = Mock()
+        scheduled_report.objects.get.return_value = schedule
+        scheduled_report._base_manager.filter.return_value.filter.return_value.update.return_value = 1
 
         with (
-            patch("extras.tasks.reports.ScheduledReport.objects", manager),
+            patch("extras.tasks.reports.ScheduledReport", scheduled_report),
             patch("extras.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
             patch("extras.tasks.reports._resolve_scope_authorization", return_value=authorized_principal_id),
             patch("extras.tasks.reports._scope_requires_authorization", return_value=True),
@@ -388,7 +391,9 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             all_accessible=True,
             operation="reports.generate",
         )
-        process_report.assert_called_once_with(schedule, tenant_a, [tenant_a, tenant_b])
+        process_report.assert_called_once_with(
+            schedule, tenant_a, [tenant_a, tenant_b], run_started_at=schedule.last_run
+        )
 
     @staticmethod
     def _persisted_template_state(**overrides):
@@ -571,20 +576,17 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         through_manager.filter.assert_called_once_with(reporttemplate_id=27)
         queryset.values_list.assert_called_once_with("tenant_id", flat=True)
 
-    def test_scheduled_reports_probe_is_only_the_active_schedule_row_probe(self):
-        row_probe = Mock(return_value=ActivationState(True, True))
-        with patch("extras.apps.object_enabled_probe", return_value=row_probe) as object_enabled_probe:
-            assert _scheduled_reports_probe() == ActivationState(True, True)
-        object_enabled_probe.assert_called_once_with("extras", "ScheduledReport", "is_active")
-        row_probe.assert_called_once_with()
+    def test_scheduled_reports_promotion_drops_the_row_probe_and_limitations(self):
+        """The scheduled slice is Stable/always-on; the row probe is gone."""
+        from extras import apps as extras_apps
+
+        assert not hasattr(extras_apps, "_scheduled_reports_probe")
 
         from itambox.capabilities import registry
 
         capability = registry.get("reporting.scheduled")
-        assert capability.limitations[0] == (
-            "The scheduled capability requires an active schedule row; deactivating a schedule pauses its delivery "
-            "without deleting the saved schedule."
-        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
 
     def test_report_views_cover_preview_permissions_and_rendering_seams(self):
         preview = ReportTemplatePreviewView()

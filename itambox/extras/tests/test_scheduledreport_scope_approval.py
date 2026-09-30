@@ -231,7 +231,7 @@ class ScheduledReportScopeApprovalCapabilityGateTests(TestCase):
         )
         self.url = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": self.sched.pk})
 
-    def test_route_is_open_with_the_always_on_designer_capability(self):
+    def test_route_is_open_with_the_stable_scheduled_capability(self):
         client = Client()
         client.force_login(self.admin)
         response = client.get(self.url)

@@ -180,14 +180,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/schedules.py",
-      "scope": "FunctionDef:register_schedule",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "2072cdf3a2389c77c4a3c8c120a0118cc8ff52286d78883c7f45410197f366a5",
-      "count": 1
-    },
-    {
       "path": "itambox/core/serialization.py",
       "scope": "FunctionDef:serialize_object",
       "handler_type": "Exception",
@@ -337,14 +329,6 @@
       "handler_type": "Exception",
       "classification": "raise",
       "body_sha256": "8e97f1fc4773f3016fa5292e2eef34c93937418be727cbe9529fcb66ca2901de",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/models.py",
-      "scope": "ClassDef:ScheduledReport/FunctionDef:delete",
-      "handler_type": "Exception",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
       "count": 1
     },
     {

@@ -242,12 +242,12 @@ responses still carry the applicable disclosure headers. Requesting
 ## Scheduled Reports
 
 **Scheduled Reports** automatically compile a Report Template on a recurring
-schedule and deliver the result via email or notification channels. Scheduled
-Reports remain **Beta** and activate when at least one schedule row is active.
-Deactivating a schedule pauses its delivery without deleting the row. Delivery
-depends on a running `qcluster` worker. Upgrading a deployment that ran with
-the designer flag disabled pauses schedules that were being skipped instead of
-resuming them silently; see
+schedule and deliver the result via email or notification channels. The
+capability is **Stable** and always available; the only setup it needs is a
+schedule. Deactivating a schedule pauses its delivery without deleting the
+row. Delivery depends on a running `qcluster` worker. Upgrading a deployment
+that ran with the designer flag disabled pauses schedules that were being
+skipped instead of resuming them silently; see
 [Updating a deployment](../operations/upgrades.md) for the transition and how
 to resume a schedule. See
 [Capability Maturity](../operations/capability-maturity.md) for the declared
@@ -301,6 +301,48 @@ can be attached to one or more **Notification Channels** (configured under
 Extras → Notification Channels). This enables delivery to webhooks, Slack,
 Microsoft Teams, or other integrated platforms.
 
+### Scheduling Contract
+
+The Stable scheduling contract is frozen for V1:
+
+| Aspect | Behavior |
+|--------|----------|
+| Frequencies | Once, hourly, daily, weekly, biweekly, monthly, quarterly, yearly, and custom cron. |
+| Cron validation | A custom cron expression is validated when the schedule is saved; an invalid expression is rejected. |
+| Time zone | All cadence math runs in the deployment's cluster time zone (the Django `TIME_ZONE` setting). Daily, weekly, monthly, and quarterly cadences keep their local wall-clock time across daylight-saving changes; monthly, quarterly, and yearly cadences clamp to month end (the 31st becomes the 28th in February). |
+| Missed runs | If the worker was down while occurrences came due, each scheduling pass replays the oldest missed occurrence once before advancing the cadence, so a backlog is worked off one occurrence per pass and never floods the queue. |
+| Next run | The list view shows the next scheduled execution per active schedule, calculated from the stored start time and cadence. |
+| Schedule changes | Editing a schedule's cadence re-anchors the next run from the start time; editing only metadata (for example recipients) keeps the live next run. Deactivating removes the background row; reactivating re-registers it with a fresh anchor. |
+| Concurrent runs | Occurrences are independent: a run that is still executing when the next occurrence comes due does not block it, and each run is identified by its intended occurrence time, which is what deduplicates redelivery. |
+| Redelivery and limits | A redelivery of the same occurrence is a recorded no-op and idempotency is tracked per occurrence, so an out-of-order replay (a newer occurrence accepted first) never discards an older one, and a stuck or crashed run is never dispatched twice. If a run stops after claiming its occurrence, that occurrence is not re-run automatically: the archive and the run status show how far it got, **Retry delivery** recovers failed deliveries, and the next occurrence runs normally. The contract prioritizes never sending a duplicate over guaranteed completion. |
+
+### Delivery Outcomes and Retry
+
+Each run is observable per stage:
+
+- **Generation and archive**: the run either compiles and archives (when
+  **Save To Archive** is on) or records a generation failure. A failed
+  generation attempts no delivery at all.
+- **Delivery ledger**: the archive row of a run carries a per-target ledger:
+  one aggregate entry for the email recipients and one entry per attached
+  notification channel, each marked delivered or failed. The schedule list
+  shows the run outcome (`success`, `partial`, or `failed`).
+- **Retry delivery**: the action appears for schedules whose latest run ended
+  `partial` or `failed` (a generation failure is recovered with **Run now**).
+  It re-attempts exactly the targets recorded as failed, never
+  re-sends targets that already succeeded, and contacts the recorded original
+  recipients, email subject/body, and notification payloads even if the
+  schedule was edited since. It is refused while the schedule is inactive, and
+  it re-checks the archived run's generation scope against the standing
+  approval before contacting anything, so a later scope change cannot
+  legitimize an older export. The retry replays the newest run's own archive
+  only: a run that retained no archived output is refused instead of
+  redelivering an older report — use **Run now** to generate a fresh run.
+  Parallel retry requests are serialized by an exclusive, self-expiring claim;
+  the fan-out renews it before every target, aborts once it was lost, and
+  outbound attempts are bounded, so overlap is limited to a single in-flight
+  send (best-effort duplicate suppression).
+
 ### Cross-Tenant Scope Approvals
 
 A schedule whose **Filter Tenants** scope spans more than one tenant compiles
@@ -315,7 +357,10 @@ current approval.
 - A current approval is required for a cross-tenant schedule. Generation also
   checks authorization at compile time; an unauthorized generation is
   recorded as failed and is not delivered. Changing the scope after an
-  approval invalidates it, as does revoking it.
+  approval invalidates it, as does revoking it; **Retry delivery** re-checks
+  the archived run's generation scope against the standing approval before it
+  re-contacts any failed target, so a narrowed re-approval never authorizes an
+  older, broader export.
 - Revocation keeps the approval history visible and marks it void; approving
   again records a fresh approval.
 
@@ -326,7 +371,8 @@ Each scheduled report tracks execution state:
 | Attribute | Description |
 |-----------|-------------|
 | **Last Run** | Timestamp of the most recent execution |
-| **Last Status** | `success` or `failed` — check this after the first run to confirm delivery |
+| **Last Status** | Run outcome token: `success`, `partial`, or `failed`; a failed compilation appends the `report.generation_failed` detail |
+| **Next Run** | Next scheduled execution for active schedules |
 
 When a Scheduled Report is deleted, its linked background task schedule is
 automatically cleaned up to prevent orphaned cron jobs.

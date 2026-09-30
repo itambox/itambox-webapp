@@ -487,6 +487,12 @@ Q_CLUSTER = {
     # daily schedule CoreConfig registers in core/apps.py, so list_failed_tasks
     # stays complete for recent failures without unbounded growth.
     "save_limit": -1,
+    # Frozen V1 scheduled-report contract: after worker downtime the scheduler
+    # replays the OLDEST missed occurrence, one replay per scheduling pass,
+    # until the schedule catches up, and each occurrence is delivered at most
+    # once. Pinned explicitly so a future library default cannot silently
+    # change the documented replay behavior.
+    "catch_up": True,
 }
 
 import sys

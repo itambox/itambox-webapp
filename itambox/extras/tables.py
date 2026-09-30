@@ -4,6 +4,7 @@ from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 from django.middleware.csrf import get_token
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
@@ -726,7 +727,15 @@ class ScheduledReportTable(BaseTable):
     is_active = BooleanColumn()
     last_run = tables.DateTimeColumn(format="Y-m-d H:i:s")
     last_status = tables.Column()
+    next_run = tables.Column(verbose_name=_("Next run"), orderable=False, empty_values=())
     scope = tables.Column(accessor="pk", verbose_name=_("Scope"), orderable=False, empty_values=())
+
+    def render_next_run(self, record):
+        """Show the registered next occurrence; dormant schedules have none."""
+        schedule = record.schedule
+        if schedule is None or schedule.next_run is None:
+            return format_html('<span class="text-muted">{}</span>', TABLE_EMPTY_VALUE)
+        return timezone.localtime(schedule.next_run).strftime("%Y-%m-%d %H:%M:%S")
 
     def render_scope(self, record, value):
         try:
@@ -787,6 +796,16 @@ class ScheduledReportTable(BaseTable):
                     <span class="ms-1 d-none d-md-inline">{{ run_now }}</span>
                 </button>
             </form>
+            {% if record.delivery_retryable %}
+            <form method="post" action="{% url 'extras:scheduledreport_retry_delivery' record.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-warning d-flex align-items-center" title="{{ retry_delivery }}">
+                    <i class="mdi mdi-refresh"></i>
+                    <span class="ms-1 d-none d-md-inline">{{ retry_delivery }}</span>
+                </button>
+            </form>
+            {% endif %}
             <a class="btn btn-sm btn-outline-secondary btn-icon"
                href="{% url 'extras:scheduledreport_update' record.pk %}"
                title="{{ edit }}">
@@ -799,7 +818,12 @@ class ScheduledReportTable(BaseTable):
             </a>
         </div>
         """,
-        extra_context={"run_now": _("Run now"), "edit": _("Edit"), "delete": _("Delete")},
+        extra_context={
+            "run_now": _("Run now"),
+            "retry_delivery": _("Retry delivery"),
+            "edit": _("Edit"),
+            "delete": _("Delete"),
+        },
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
@@ -821,6 +845,7 @@ class ScheduledReportTable(BaseTable):
             "is_active",
             "last_run",
             "last_status",
+            "next_run",
             "scope",
             "actions",
         )
@@ -833,6 +858,7 @@ class ScheduledReportTable(BaseTable):
             "is_active",
             "last_run",
             "last_status",
+            "next_run",
             "scope",
             "actions",
         )

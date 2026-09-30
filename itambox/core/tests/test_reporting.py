@@ -6,7 +6,7 @@ from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import translation
+from django.utils import timezone, translation
 from django_q.models import Schedule
 
 from core.tasks.utils import TaskResult, TaskStatus
@@ -222,7 +222,15 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(send_channel.call_count, 2)
         archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
         self.assertEqual(archive.status, "success")
-        self.assertEqual(archive.error_message, "channel.delivery_rejected")
+        # The compile/archive stage succeeded; the delivery stage carries its
+        # own ledger instead of overloading the generation error field.
+        self.assertEqual(archive.error_message, "")
+        self.assertEqual(archive.delivery_status, "partial")
+        self.assertEqual(sorted(target["status"] for target in archive.delivery_targets), ["failed", "ok"])
+        failed_entry = next(target for target in archive.delivery_targets if target["status"] == "failed")
+        self.assertEqual(failed_entry["error"], "channel.delivery_rejected")
+        healthy_entry = next(target for target in archive.delivery_targets if target["status"] == "ok")
+        self.assertEqual(healthy_entry["target"], f"channel:{healthy_channel.pk}")
 
     def test_delivery_outcome_marks_all_failures_as_failed(self):
         outcome = _DeliveryOutcome()
@@ -235,7 +243,8 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_delivery_outcome_tracks_success_and_partial(self):
         outcome = _DeliveryOutcome()
-        self.assertEqual(outcome.status, "success")
+        # Attempting nothing at all is a recorded "none", never a silent success.
+        self.assertEqual(outcome.status, "none")
         outcome.record_success()
         outcome.record_failure("one channel failed")
         self.assertEqual(outcome.status, "partial")
@@ -277,7 +286,11 @@ class ScheduledReportingAndAlertsTests(TestCase):
         with patch("extras.tasks.reports.send_notification_to_channel") as send_channel:
             outcome = _deliver_report_channels(sched, [], 0)
             send_channel.assert_not_called()
-        self.assertEqual(outcome.status, "success")
+        # A disabled channel is never contacted; with no enabled targets the
+        # delivery stage records "none" instead of a false success.
+        self.assertEqual(outcome.status, "none")
+        self.assertEqual(outcome.attempted, 0)
+        self.assertEqual(outcome.targets, [])
 
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""
@@ -360,7 +373,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             format=ScheduledReport.FORMAT_HTML,
             save_to_archive=False,
         )
-        sched.last_status = "delivery_failed: slack down"
+        sched.last_status = "failed"
         sched.save(update_fields=["last_status"])
         self.client.force_login(self.user)
 
@@ -547,10 +560,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_channel_delivery_reports_partial_failures_and_skips_disabled_channels(self):
         channels = [
-            SimpleNamespace(name="email", enabled=True),
-            SimpleNamespace(name="disabled", enabled=False),
-            SimpleNamespace(name="webhook", enabled=True),
-            SimpleNamespace(name="slack", enabled=True),
+            SimpleNamespace(pk=1, name="email", enabled=True),
+            SimpleNamespace(pk=2, name="disabled", enabled=False),
+            SimpleNamespace(pk=3, name="webhook", enabled=True),
+            SimpleNamespace(pk=4, name="slack", enabled=True),
         ]
         sched = SimpleNamespace(
             name="Channel report",
@@ -566,16 +579,36 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(outcome.attempted, 3)
         self.assertEqual(outcome.succeeded, 1)
         self.assertEqual(outcome.status, "partial")
-        self.assertEqual(len(outcome.failures), 2)
+        self.assertEqual(outcome.failures, ["channel.delivery_failed", "channel.delivery_rejected"])
+        # The per-target ledger carries channel identity, so a retry can
+        # re-attempt exactly the failed channels.
+        self.assertEqual(
+            [(target["target"], target["status"], target["error"]) for target in outcome.targets],
+            [
+                ("channel:1", "ok", ""),
+                ("channel:3", "failed", "channel.delivery_failed"),
+                ("channel:4", "failed", "channel.delivery_rejected"),
+            ],
+        )
 
     def test_scheduled_delivery_email_exception_is_observable(self):
-        sched = SimpleNamespace(
+        sched = ScheduledReport.objects.create(
             name="Email failure",
             report=self.template,
-            last_status="",
-            save=MagicMock(),
+            tenant=self.tenant,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="a@example.com",
+            save_to_archive=True,
+            is_active=True,
         )
-        archive = MagicMock()
+        archive = ReportGenerationArchive.objects.create(
+            scheduled_report=sched,
+            format=ScheduledReport.FORMAT_HTML,
+            status="running",
+            tenant=self.tenant,
+        )
+        run_started_at = timezone.now()
+        ScheduledReport.objects.filter(pk=sched.pk).update(last_run=run_started_at)
         output = _ReportOutput(email_body="body")
         with (
             patch("extras.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
@@ -585,33 +618,58 @@ class ScheduledReportingAndAlertsTests(TestCase):
             patch("extras.tasks.reports._deliver_report_email", side_effect=RuntimeError("smtp down")),
             patch("extras.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
         ):
-            success = _process_scheduled_report(sched, self.tenant, [])
+            success = _process_scheduled_report(sched, self.tenant, [], run_started_at=run_started_at)
 
         self.assertFalse(success)
+        sched.refresh_from_db()
         self.assertEqual(sched.last_status, "failed")
-        self.assertEqual(archive.error_message, "email.delivery_failed")
+        self.assertEqual(sched.last_run_archive_id, archive.pk)
+        archive.refresh_from_db()
+        self.assertEqual(archive.delivery_status, "failed")
+        self.assertEqual(
+            archive.delivery_targets,
+            [
+                {
+                    "target": "email",
+                    "label": "email",
+                    "status": "failed",
+                    "error": "email.delivery_failed",
+                    "retried": False,
+                    "details": {
+                        "recipients": ["a@example.com"],
+                        "payload": {"subject": "[Scheduled Report] Email failure", "body": "body"},
+                    },
+                }
+            ],
+        )
 
     def test_scheduled_delivery_false_email_is_observable(self):
-        sched = SimpleNamespace(
+        sched = ScheduledReport.objects.create(
             name="False email delivery",
             report=self.template,
-            last_status="",
-            save=MagicMock(),
+            tenant=self.tenant,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="a@example.com",
+            save_to_archive=False,
+            is_active=True,
         )
-        archive = None
+        run_started_at = timezone.now()
+        ScheduledReport.objects.filter(pk=sched.pk).update(last_run=run_started_at)
         output = _ReportOutput(email_body="body")
         with (
             patch("extras.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
             patch("extras.tasks.reports._render_report_output", return_value=output),
-            patch("extras.tasks.reports._archive_report_output", return_value=archive),
+            patch("extras.tasks.reports._archive_report_output", return_value=None),
             patch("extras.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
             patch("extras.tasks.reports._deliver_report_email", return_value=False),
             patch("extras.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
         ):
-            success = _process_scheduled_report(sched, self.tenant, [])
+            success = _process_scheduled_report(sched, self.tenant, [], run_started_at=run_started_at)
 
         self.assertFalse(success)
-        self.assertEqual(sched.last_status, "delivery_failed: email.delivery_rejected")
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "failed")
+        self.assertIsNone(sched.last_run_archive_id)
 
 
 class ScheduledReportScopeAuthorizationTests(TestCase):
@@ -729,7 +787,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         )
         self.assertEqual(authorization.scope_tenant_ids, [self.tenant_a.pk, self.tenant_b.pk])
 
-        def process(sched, active_tenant, filter_tenants):
+        def process(sched, active_tenant, filter_tenants, run_started_at=None):
             self.assertEqual(get_current_user().pk, authorized_user.pk)
             self.assertIsNone(get_current_tenant())
             self.assertTrue(get_current_all_accessible())
@@ -764,7 +822,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
 
         self.sched.filter_tenants.clear()
 
-        def process(sched, active_tenant, filter_tenants):
+        def process(sched, active_tenant, filter_tenants, run_started_at=None):
             self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
             self.assertFalse(get_current_all_accessible())
             self.assertEqual(filter_tenants, [])
@@ -807,7 +865,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
         self.sched.filter_tenants.clear()
 
-        def process(sched, active_tenant, filter_tenants):
+        def process(sched, active_tenant, filter_tenants, run_started_at=None):
             self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
             self.assertEqual(filter_tenants, [])
             return TaskResult(TaskStatus.SUCCESS, "report.completed")
@@ -828,7 +886,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         ScheduledReportScopeAuthorization.approve(self.sched, self.user)
         self.sched.filter_tenants.clear()
 
-        def process(sched, active_tenant, filter_tenants):
+        def process(sched, active_tenant, filter_tenants, run_started_at=None):
             self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
             self.assertFalse(get_current_all_accessible())
             self.assertEqual(filter_tenants, [])

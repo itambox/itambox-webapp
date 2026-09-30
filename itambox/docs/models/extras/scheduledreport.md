@@ -13,7 +13,8 @@ A **Scheduled Report** configures periodic background compilation of a Report Te
 | **Frequency** | The frequency of the scheduled report. | Choice | Yes |
 | **Is Active** | Active schedules are evaluated by workers. | Boolean | Yes |
 | **Last Run** | Timestamp of last execution. | DateTime | No |
-| **Last Status** | Execution outcome summary (`success` or `failed`). | String | No |
+| **Last Run Archive** | Archive of the newest completed run; **Retry delivery** re-sends exactly this archive and refuses when the newest run retained none. | Foreign Key | No |
+| **Last Status** | Run outcome token (`success`, `partial`, or `failed`; a failed compilation appends `report.generation_failed`). | String | No |
 | **Name** | Display name of the scheduled job. | String | Yes |
 | **Recipients** | Comma-separated list of target email addresses. | Text | Yes |
 | **Report** | The Report Template to compile. | Foreign Key | Yes |

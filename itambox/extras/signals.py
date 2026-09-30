@@ -15,7 +15,8 @@ from django.utils.translation import gettext_lazy as _
 
 from core.mixins import SoftDeleteMixin
 from core.models import ChangeLoggingMixin, Notification
-from extras.models import ObjectWatch
+from core.schedules import SCHEDULED_REPORT_TASK_PATH, remove_schedule
+from extras.models import ObjectWatch, ScheduledReport
 from extras.services.events import dispatch_event
 
 logger = logging.getLogger(__name__)
@@ -224,3 +225,16 @@ def _notify_watchers(sender, instance, action):
     if notifications:
         # One INSERT for the surviving watchers instead of O(watchers) round-trips.
         Notification.objects.bulk_create(notifications)
+
+
+# -- Scheduled-report registration cleanup ------------------------------------
+# The domain model cannot import the platform scheduler directly (R-X3), and a
+# queryset delete never runs ``ScheduledReport.delete()``, so the name-keyed
+# registration removal lives here: it fires for every deletion path (instance,
+# queryset, admin bulk) under the same advisory lock registration uses.
+_SCHEDULED_REPORT_CLEANUP_UID = "extras.signals.remove_scheduled_report_registration.v1"
+
+
+@receiver(post_delete, sender=ScheduledReport, dispatch_uid=_SCHEDULED_REPORT_CLEANUP_UID)
+def remove_scheduled_report_registration(sender, instance, **kwargs):
+    remove_schedule(SCHEDULED_REPORT_TASK_PATH, name=f"scheduled_report_{instance.pk}")

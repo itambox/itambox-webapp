@@ -423,7 +423,7 @@ class ReportDisclosureTests(SimpleTestCase):
         self.assertEqual(worksheet.cell(row=4, column=1).value, disclosure)
         self.assertTrue(worksheet.cell(row=4, column=1).font.italic)
 
-        mail_body = _attachment_email_body("CSV", SimpleNamespace(name="Assets"), disclosure)
+        mail_body = _attachment_email_body("CSV", "Assets", disclosure_text=disclosure)
         self.assertTrue(mail_body.endswith(f"\n\n{disclosure}"))
 
         response = _apply_report_disclosure_headers(

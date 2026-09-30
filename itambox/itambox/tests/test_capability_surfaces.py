@@ -20,8 +20,8 @@ from django.test import RequestFactory, override_settings
 
 from itambox.api.openapi import CapabilityAwareAutoSchema
 from itambox.capabilities import ALWAYS_ON, BETA, EXPERIMENTAL, SOURCE_ALWAYS, STABLE, registry
-from itambox.tests.capability_harness import deactivated, probe_failing
-from itambox.views.generic.capability_notices import capability_notice
+from itambox.tests.capability_harness import deactivatable_keys, deactivated, probe_failing
+from itambox.views.generic.capability_notices import NOTICE_FIELDS, capability_notice
 
 #: Stand-ins for a DRF viewset and its queryset: the schema class only ever
 #: reads ``view.queryset.model``, so there is nothing else to imitate.
@@ -30,18 +30,58 @@ _StubView = namedtuple("_StubView", "queryset")
 _APP_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _model_for_reference(reference):
+    """The model class a registry ``owns`` reference names, or ``None``.
+
+    Capabilities also own non-model references (API surfaces, doc namespaces),
+    so the ownership walk has to ask the app registry instead of assuming.
+    """
+    from django.apps import apps as app_registry
+
+    app_label, _, object_name = reference.partition(".")
+    try:
+        return app_registry.get_model(app_label, object_name)
+    except LookupError:
+        return None
+
+
 class TestSurfaceMarker:
     """U2: a non-Stable model carries its owning capability's marker."""
 
-    def test_a_beta_owned_model_yields_a_notice(self):
-        from extras.models import ScheduledReport
+    def test_owned_model_notices_follow_the_declared_maturity(self):
+        """U2: a model's marker is its owning capability's declared grade.
 
-        notice = capability_notice(ScheduledReport)
-        assert notice["key"] == "reporting.scheduled"
-        assert notice["maturity"] == BETA
-        assert notice["title"]
-        assert notice["docs_url"].endswith(".md")
-        assert notice["limitations"]
+        Subject and expectation come from the registry: which capability is
+        still settling changes with every promotion, so a pinned example goes
+        stale the moment the next slice stabilizes. Every owned model is
+        walked; non-Stable owners must mark their models, Stable owners must
+        not, and the published notice never carries the probe.
+        """
+        owned_models = 0
+        for capability in registry.all():
+            for reference in capability.owns:
+                model = _model_for_reference(reference)
+                if model is None:
+                    continue
+                owned_models += 1
+                notice = capability_notice(model)
+                if capability.maturity == STABLE:
+                    assert notice is None, reference
+                    continue
+                assert notice is not None, reference
+                assert notice["key"] == capability.key
+                assert notice["maturity"] == capability.maturity
+                assert notice["title"]
+                assert notice["docs_url"].endswith(".md")
+                assert notice["limitations"]
+                assert "activation_probe" not in notice
+        assert owned_models > 0, "the ownership walk resolved no model references"
+
+    def test_stable_scheduled_models_yield_no_notice(self):
+        from extras.models import ReportGenerationArchive, ScheduledReport
+
+        assert capability_notice(ScheduledReport) is None
+        assert capability_notice(ReportGenerationArchive) is None
 
     def test_a_stable_owned_model_yields_no_notice(self):
         from procurement.models import PurchaseOrder
@@ -70,34 +110,40 @@ class TestSurfaceMarker:
         assert notice["maturity"] == EXPERIMENTAL
 
     def test_a_notice_never_carries_the_probe_or_a_value(self):
-        from extras.models import ScheduledReport
-
-        notice = capability_notice(ScheduledReport)
-        assert "activation_probe" not in notice
-        assert set(notice) == {"key", "title", "maturity", "activation", "docs_url", "limitations"}
+        # The production field set is closed: the probe, its observed value,
+        # the owning area, and the owned references never reach a template.
+        assert "activation_probe" not in NOTICE_FIELDS
+        assert "value_present" not in NOTICE_FIELDS
+        notice = _notice_for_key("users.scim_provisioning")
+        assert set(notice) == set(NOTICE_FIELDS)
 
     def test_a_deactivated_capability_still_marks_its_surface(self):
-        """Inactive is not invisible: the grade is a property of the contract."""
-        from extras.models import ScheduledReport
+        """Inactive is not invisible: the grade is a property of the contract.
 
-        with deactivated("reporting.scheduled"):
-            assert capability_notice(ScheduledReport)["maturity"] == BETA
+        The subjects come from the harness: every capability that can be
+        observed inactive is proven, so the latest promotion cannot leave a
+        pinned example behind that no longer deactivates.
+        """
+        keys = deactivatable_keys()
+        assert keys
+        for key in keys:
+            with deactivated(key):
+                assert _notice_for_key(key)["maturity"] == registry.get(key).maturity
 
     def test_the_notice_survives_a_failing_probe(self):
-        from extras.models import ScheduledReport
-
-        with probe_failing("reporting.scheduled"):
-            assert capability_notice(ScheduledReport)["key"] == "reporting.scheduled"
+        keys = deactivatable_keys()
+        assert keys
+        for key in keys:
+            with probe_failing(key):
+                assert _notice_for_key(key)["key"] == key
 
 
 class TestBannerTemplate:
     def test_the_banner_names_the_capability_and_links_its_document(self):
-        html = render_to_string(
-            "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("reporting.scheduled")},
-        )
+        notice = _settling_beta_notice()
+        html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert "Beta" in html
-        assert "Scheduled" in html
+        assert notice["title"] in html
         assert "capability-maturity" in html
 
     def test_the_contract_link_is_excluded_from_boost(self):
@@ -108,19 +154,19 @@ class TestBannerTemplate:
         """
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("reporting.scheduled")},
+            {"capability_notice": _settling_beta_notice()},
         )
         assert 'hx-boost="false"' in html
 
     def test_the_banner_renders_the_declared_limitations(self):
-        notice = _notice_for_key("reporting.scheduled")
+        notice = _settling_beta_notice()
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert notice["limitations"][0] in html
 
     def test_the_beta_banner_is_a_polite_live_region_with_a_label(self):
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("reporting.scheduled")},
+            {"capability_notice": _settling_beta_notice()},
         )
         assert 'role="status"' in html
         assert 'aria-live="polite"' in html
@@ -281,10 +327,15 @@ class TestOperatorDiagnostics:
         assert "demo_plugin_secret" not in output
 
     def test_a_failing_probe_is_reported_by_type_only(self):
-        with probe_failing("reporting.scheduled"):
-            output = _run_command()
-        assert "RuntimeError" in output
-        assert "hunter2" not in output
+        # Every capability that can be observed inactive is proven; the command
+        # must surface the failure as its exception type, never its text.
+        keys = deactivatable_keys()
+        assert keys
+        for key in keys:
+            with probe_failing(key):
+                output = _run_command()
+            assert "RuntimeError" in output
+            assert "hunter2" not in output
 
     def test_the_command_can_emit_json_rows(self):
         rows = _run_command("--format", "json")
@@ -357,11 +408,11 @@ class TestNavigationMaturity:
         scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
         assert designer.condition(None) is True
         assert scheduled.condition(None) is True
-        # The promotion moves the Beta marker from the shared group to the one
-        # still-beta capability, so the group header no longer implies Beta.
+        # Every reporting slice is Stable now, so neither the group header nor
+        # any item carries the Beta marker.
         assert reporting.beta is False
         assert designer.beta is False
-        assert scheduled.beta is True
+        assert scheduled.beta is False
 
 
 DESIGNER_VIEWS = (
@@ -386,6 +437,8 @@ SCHEDULED_REPORT_VIEWS = (
     "ScheduledReportDeleteView",
     "ScheduledReportBulkDeleteView",
     "ReportTriggerImmediateView",
+    "ScheduledReportRetryDeliveryView",
+    "ScheduledReportScopeApprovalView",
 )
 
 
@@ -420,15 +473,15 @@ class TestReportDesignerStable:
 
 
 @pytest.mark.django_db
-class TestScheduledReportRoutesUseDesignerCapability:
-    """Designer promotion leaves the scheduled route capability binding intact."""
+class TestScheduledReportRoutesUseTheScheduledCapability:
+    """The scheduled routes bind to the scheduled capability, not the designer."""
 
     @pytest.mark.parametrize("view_name", SCHEDULED_REPORT_VIEWS)
-    def test_every_scheduled_report_route_names_the_designer_capability(self, view_name):
-        assert _designer_view(view_name).capability_key == "reporting.designer"
+    def test_every_scheduled_report_route_names_the_scheduled_capability(self, view_name):
+        assert _designer_view(view_name).capability_key == "reporting.scheduled"
 
     @pytest.mark.parametrize("view_name", ("ScheduledReportListView", "ScheduledReportBulkDeleteView"))
-    def test_scheduled_routes_are_open_with_the_always_on_designer(self, view_name):
+    def test_scheduled_routes_are_open_with_the_stable_capability(self, view_name):
         assert _gate_outcome(view_name) != "Http404"
 
 
@@ -468,6 +521,24 @@ def _notice_for_key(key):
         "activation": capability.activation,
         "docs_url": capability.docs_url,
         "limitations": capability.limitations,
+    }
+
+
+def _settling_beta_notice():
+    """A Beta-grade notice for the banner contract.
+
+    No capability settles as Beta anymore, so no registry entry renders the
+    Beta banner: its Beta-specific contract (grade text, limitations, dismiss
+    control) is pinned with this explicit notice, while the registry-backed
+    rendering stays covered by the experimental entry.
+    """
+    return {
+        **_notice_for_key("platform.plugins"),
+        "key": "example.settling",
+        "title": "Example Settling Capability",
+        "maturity": BETA,
+        "docs_url": "operations/capability-maturity.md",
+        "limitations": ("Interfaces may still change until the capability stabilises.",),
     }
 
 
