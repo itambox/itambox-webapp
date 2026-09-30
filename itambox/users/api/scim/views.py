@@ -66,6 +66,23 @@ def _retry_tenant_correlated_user(tenant, username, external_id):
     return correlated.user
 
 
+def _lock_tenant_scim_user(user, tenant, *, require_membership=True):
+    """Reload ``user`` under a row lock before any tenant lifecycle mutation.
+
+    Serializes concurrent lifecycle calls on the same identity the way the provider
+    mount does: the request-entry object must never be trusted for the global-flag
+    mirror, or a racing deactivate/reactivate pair can converge on a state neither
+    request asked for. Call inside ``transaction.atomic()``.
+    """
+    try:
+        locked = type(user)._base_manager.select_for_update().get(pk=user.pk)
+    except User.DoesNotExist as exc:
+        raise SCIMPatchError("SCIM user was deleted", status_code=404) from exc
+    if require_membership and not Membership.objects.filter(user=locked, tenant=tenant).exists():
+        raise SCIMPatchError("SCIM user is not a member of this tenant", status_code=404)
+    return locked
+
+
 def link_or_create_assetholder(user, tenant):
     email = user.email
     upn = email or user.username
@@ -306,6 +323,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
             else:
                 try:
                     with transaction.atomic():
+                        # Serialize with concurrent lifecycle calls on the same identity
+                        # (same user-row lock as PUT/PATCH).
+                        user = _lock_tenant_scim_user(user, self.tenant, require_membership=False)
                         # SCIM provisions identity only: a bare membership with NO RoleGrant
                         # rows — permissions are granted in-app.
                         Membership.objects.create(
@@ -321,7 +341,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                         sync_user_global_active(user)
                 except IntegrityError:
                     user = _retry_tenant_correlated_user(self.tenant, username, external_id)
-                    sync_user_global_active(user)
+                    with transaction.atomic():
+                        user = _lock_tenant_scim_user(user, self.tenant, require_membership=False)
+                        sync_user_global_active(user)
                     response_status = status.HTTP_200_OK
         else:
             try:
@@ -375,7 +397,11 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         carries only the attributes the request supplied (``UNSET`` otherwise)
         from the one frozen request subset both mounts accept.
 
-        A SCIM token is bound to exactly one tenant.
+        A SCIM token is bound to exactly one tenant. Concurrent lifecycle calls
+        serialize on the user row: the request-entry object is replaced by a fresh
+        ``select_for_update()`` reload (the same strategy the provider mount applies),
+        so the global-flag mirror always recomputes from membership state this request
+        actually observed.
 
         - ``active`` is applied PER-TENANT: it (de)activates this tenant's membership only.
           A multi-tenant user is therefore never globally locked out by one tenant's token
@@ -391,6 +417,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
           a user whose sole membership is this tenant, and collide as a SCIM ``uniqueness``
           conflict instead of surfacing as a server error. (DELETE still drops the membership.)
         """
+        user = _lock_tenant_scim_user(user, self.tenant)
         has_other = Membership.objects.filter(user=user).exclude(tenant=self.tenant).exists()
 
         if patch.active is not UNSET:
@@ -453,6 +480,9 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def delete(self, request, pk, *args, **kwargs):
         user = get_scim_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), pk)
         with transaction.atomic():
+            # Same serialization as PUT/PATCH: lock the user row before touching the
+            # membership so a racing reactivation cannot interleave with this removal.
+            user = _lock_tenant_scim_user(user, self.tenant, require_membership=False)
             # Remove only the membership for the current tenant. Delete per-instance
             # so each removal is change-logged (QuerySet.delete() bypasses
             # ChangeLoggingMixin / SoftDeleteMixin entirely).

@@ -139,6 +139,19 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+def _lock_provider_scim_user(user):
+    """Reload ``user`` under a row lock before a provider lifecycle mutation.
+
+    Same strategy as ``apply_provider_user_patch``: DELETE and the POST reprovision
+    sync must observe committed state, not the request-entry object. Call inside
+    ``transaction.atomic()``.
+    """
+    try:
+        return type(user)._base_manager.select_for_update().get(pk=user.pk)
+    except UserModel.DoesNotExist as exc:
+        raise SCIMPatchError("SCIM user was deleted", status_code=404) from exc
+
+
 @extend_schema_view(
     get=scim_schema.SCIM_PROVIDER_USER_LIST,
     post=scim_schema.SCIM_PROVIDER_USER_CREATE,
@@ -277,6 +290,9 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
             else:
                 try:
                     with transaction.atomic():
+                        # Serialize with concurrent lifecycle calls on the same identity
+                        # (same user-row lock as PATCH).
+                        user = _lock_provider_scim_user(user)
                         # SCIM provisions identity only: a bare membership at the managing
                         # tenant with NO RoleGrant rows — zero permissions and zero reach
                         # until granted in-app.
@@ -292,7 +308,9 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                         sync_user_global_active(user)
                 except IntegrityError:
                     user = self._retry_correlated_user(username, external_id)
-                    sync_user_global_active(user)
+                    with transaction.atomic():
+                        user = _lock_provider_scim_user(user)
+                        sync_user_global_active(user)
                     response_status = status.HTTP_200_OK
         else:
             try:
@@ -390,6 +408,9 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def delete(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         user = get_scim_object_or_404(self._staff_queryset(), pk)
         with transaction.atomic():
+            # Serialize with concurrent lifecycle calls on the same identity (the same
+            # user-row lock the provider PATCH service takes).
+            user = _lock_provider_scim_user(user)
             # Remove only the membership at this managing tenant. Delete per-instance so
             # each removal is change-logged (QuerySet.delete() bypasses
             # ChangeLoggingMixin). Deleting the membership CASCADEs its RoleGrant
