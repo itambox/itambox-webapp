@@ -220,11 +220,8 @@ def _render_report_output(sched, template, headers, rows, context_data):
 
     if sched.format == ScheduledReport.FORMAT_CSV:
         csv_content = render_report_csv(
-            template,
             headers,
             rows,
-            summary_cards=context_data.get("summary_cards"),
-            grouped_data=context_data.get("grouped_data"),
             disclosure_text=disclosure_text,
         )
         return _ReportOutput(

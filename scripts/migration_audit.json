@@ -3491,6 +3491,49 @@
     },
     {
       "dependencies": [
+        "extras.0126_scheduledreport_last_run_archive",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0127_retire_report_designer_legacy",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0127_retire_report_designer_legacy.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Refuses live templates using the unsupported legacy CSV shape before dropping both retired fields; canonical rows and custom HTML are preserved, and reverse requires restore-first rollback."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "licenses.0100_issue88_shard_11_licenses_schema"
       ],
       "id": "inventory.0100_issue88_shard_12_inventory_schema",
@@ -5444,6 +5487,7 @@
     "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
     "extras.0125_scheduled_report_fire_records_retry_hardening",
     "extras.0126_scheduledreport_last_run_archive",
+    "extras.0127_retire_report_designer_legacy",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -5492,6 +5536,7 @@
       "extras.0123_pause_flag_suppressed_report_schedules",
       "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
       "extras.0125_scheduled_report_fire_records_retry_hardening",
+      "extras.0127_retire_report_designer_legacy",
       "subscriptions.0101_remove_subscription_auto_renewal_and_more",
       "subscriptions.0103_unified_vendor_cutover",
       "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
@@ -5527,7 +5572,7 @@
     "global_roots": [],
     "missing_replacement_targets": 0,
     "per_app_local_roots_and_leaves": {},
-    "post_transition_migrations": 50,
+    "post_transition_migrations": 51,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

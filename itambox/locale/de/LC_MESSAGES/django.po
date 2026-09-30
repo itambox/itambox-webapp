@@ -12430,15 +12430,6 @@ msgstr "Letzter Zustellfehler"
 msgid "Last Delivery ID"
 msgstr "Letzte Zustellungs-ID"
 
-msgid "Legacy CSV Shape"
-msgstr "Altes CSV-Format"
-
-msgid "Legacy Designer Grandfathered"
-msgstr "Bestandsschutz für alten Designer"
-
-msgid "Migration-managed marker for bounded legacy scheduled templates."
-msgstr "Durch Migrationen verwaltete Markierung für begrenzte alte geplante Vorlagen."
-
 msgid "Next Retry At"
 msgstr "Nächster Versuch am"
 
@@ -12520,12 +12511,6 @@ msgstr "Mandantenermittlung"
 msgid "Test Send"
 msgstr "Testversand"
 
-msgid "The legacy designer marker is migration-managed and cannot be changed."
-msgstr "Die Markierung des alten Designers wird durch Migrationen verwaltet und kann nicht geändert werden."
-
-msgid "The legacy designer marker is migration-managed and cannot be forged."
-msgstr "Die Markierung des alten Designers wird durch Migrationen verwaltet und kann nicht vorgetäuscht werden."
-
 msgid "This schedule has no cross-tenant scope approval to revoke."
 msgstr "Für diesen Zeitplan gibt es keine Genehmigung eines mandantenübergreifenden Geltungsbereichs, die widerrufen werden könnte."
 
@@ -12538,9 +12523,6 @@ msgstr "Typisierte Fehlerklasse (oder Disposition) der letzten fehlgeschlagenen 
 #, python-format
 msgid "Unknown report columns: %(keys)s"
 msgstr "Unbekannte Berichtsspalten: %(keys)s"
-
-msgid "Use the legacy summary CSV shape; this does not enable custom HTML execution."
-msgstr "Verwendet das alte CSV-Zusammenfassungsformat; die Ausführung von benutzerdefiniertem HTML wird dadurch nicht aktiviert."
 
 msgid "Webhook Deliveries"
 msgstr "Webhook-Zustellungen"
@@ -13239,9 +13221,6 @@ msgstr "Diese Regel wird nicht ausgeführt."
 
 msgid "This schedule is single-tenant and does not require a cross-tenant scope approval."
 msgstr "Dieser Zeitplan ist auf einen einzelnen Mandanten beschränkt und erfordert keine Genehmigung eines mandantenübergreifenden Geltungsbereichs."
-
-msgid "This template was carried over unchanged by the report designer migration. It keeps its historical layout and renders like before; new templates use the current designer contract."
-msgstr "Diese Vorlage wurde unverändert von der Migration des Berichts-Designers übernommen. Sie behält ihr bisheriges Layout und rendert wie zuvor; neue Vorlagen folgen dem aktuellen Designer-Vertrag."
 
 msgid "Until"
 msgstr "Bis"

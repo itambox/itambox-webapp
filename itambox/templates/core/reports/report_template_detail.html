@@ -38,11 +38,6 @@
   </div>
 {% endblock %}
 {% block content %}
-  {% if legacy_designer_notice %}
-    <div class="alert alert-warning" role="status">
-      {% translate "This template was carried over unchanged by the report designer migration. It keeps its historical layout and renders like before; new templates use the current designer contract." %}
-    </div>
-  {% endif %}
   <div class="row g-3">
     <!-- Left Column: Details -->
     <div class="col-md-5">

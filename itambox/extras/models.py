@@ -1619,21 +1619,10 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             ("minimal", _("Minimal (Clean)")),
         ],
     )
-    advanced_mode = models.BooleanField(
-        default=False,
-        verbose_name=_("Legacy CSV Shape"),
-        help_text=_("Use the legacy summary CSV shape; this does not enable custom HTML execution."),
-    )
     template_content = models.TextField(
         blank=True,
         verbose_name=_("Custom HTML Template"),
         help_text=_("Optional sandboxed Jinja2 custom HTML template."),
-    )
-    legacy_designer_grandfathered = models.BooleanField(
-        default=False,
-        editable=False,
-        verbose_name=_("Legacy Designer Grandfathered"),
-        help_text=_("Migration-managed marker for bounded legacy scheduled templates."),
     )
 
     class Meta:
@@ -1671,26 +1660,6 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             )
         return sorted({tenant.pk for tenant in self.filter_tenants.all()})
 
-    def _designer_persisted_state(self):
-        if self.pk is None:
-            return None
-        return type(self)._base_manager.filter(pk=self.pk).values("legacy_designer_grandfathered").first()
-
-    def _validate_designer_write(self, existing=None):
-        """Marker-only write policy for the legacy designer provenance.
-
-        With the report designer promoted to Stable the capability is always
-        active, so the flag-gated write refusals (enabling legacy CSV mode,
-        saving custom HTML, editing grandfathered templates) no longer exist.
-        The one durable rule left: the migration-managed
-        ``legacy_designer_grandfathered`` marker confirms provenance and can
-        neither be forged on new rows nor changed on persisted rows.
-        """
-        if self.legacy_designer_grandfathered and not existing:
-            raise ValidationError(_("The legacy designer marker is migration-managed and cannot be forged."))
-        if existing and existing["legacy_designer_grandfathered"] != self.legacy_designer_grandfathered:
-            raise ValidationError(_("The legacy designer marker is migration-managed and cannot be changed."))
-
     def clean(self):
         super().clean()
         unknown = unknown_column_keys(self.included_columns)
@@ -1698,12 +1667,6 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             raise ValidationError(
                 {"included_columns": _("Unknown report columns: %(keys)s") % {"keys": ", ".join(unknown)}}
             )
-        self._validate_designer_write(self._designer_persisted_state())
-
-    def save(self, *args, **kwargs):
-        existing = self._designer_persisted_state()
-        self._validate_designer_write(existing)
-        return super().save(*args, **kwargs)
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
