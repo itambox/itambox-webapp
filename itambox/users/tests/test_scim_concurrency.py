@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import threading
 import time
+from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import close_old_connections, connection, connections, transaction
 from django.test import Client
 from django.urls import reverse
@@ -24,6 +26,9 @@ from django.utils import timezone
 
 from core.tests.mixins import grant
 from organization.models import Membership, Role, Tenant
+from users.api.scim.provider_patch import SCIMPatchError
+from users.api.scim.provider_views import _lock_provider_scim_user
+from users.api.scim.views import _lock_tenant_scim_user
 from users.models import GroupMembership, Token, UserGroup
 
 User = get_user_model()
@@ -239,6 +244,147 @@ def test_concurrent_tenant_deactivate_reactivate_keep_global_flag_consistent():
         membership = Membership.objects.get(user=user, tenant=tenant)
         any_active = Membership.objects.filter(user=user, is_active=True).exists()
         assert user.is_active == any_active, (membership.is_active, user.is_active)
+
+
+def test_lock_helpers_fail_closed_when_identity_vanished():
+    """A lifecycle request admitted for an identity that disappears before the locked
+    reload must fail closed with a SCIM 404; the tenant helper additionally rechecks
+    the membership after waiting on the lock."""
+    assert connection.vendor == "postgresql"
+    tenant, _token = tenant_fixture("race-gone")
+    other_tenant = Tenant.objects.create(name="Race gone other", slug="race-gone-other")
+    user = User.objects.create_user(username="race.gone@contoso.onmicrosoft.com")
+    Membership.objects.create(user=user, tenant=tenant, is_active=True)
+    ghost_pk = user.pk
+    user.delete()
+
+    with pytest.raises(SCIMPatchError) as excinfo:
+        with transaction.atomic():
+            _lock_tenant_scim_user(User(pk=ghost_pk), tenant)
+    assert excinfo.value.status_code == 404
+
+    survivor = User.objects.create_user(username="race.survivor@contoso.onmicrosoft.com")
+    Membership.objects.create(user=survivor, tenant=other_tenant, is_active=True)
+    with pytest.raises(SCIMPatchError) as excinfo:
+        with transaction.atomic():
+            _lock_tenant_scim_user(survivor, tenant)
+    assert excinfo.value.status_code == 404
+
+    provider_ghost_pk = User.objects.create_user(username="race.provider-gone@contoso.onmicrosoft.com").pk
+    User.objects.filter(pk=provider_ghost_pk).delete()
+    with pytest.raises(SCIMPatchError) as excinfo:
+        with transaction.atomic():
+            _lock_provider_scim_user(User(pk=provider_ghost_pk))
+    assert excinfo.value.status_code == 404
+
+
+def test_tenant_post_retry_reconciles_when_racer_commits_membership_first():
+    """Deterministic replay of the POST lost-update race: the competing membership
+    lands between the request's lookups and the create, so the create raises
+    IntegrityError and the retry path must reconcile the identity under the
+    user-row lock (200 replay). Only the two prologue lookups are served pre-race
+    snapshots; the retry lookup and the create hit the real database."""
+    assert connection.vendor == "postgresql"
+    tenant, token = tenant_fixture("race-retry")
+    username = "race.retry@contoso.onmicrosoft.com"
+    external_id = "aa1f0000-race-4000-8000-000000000005"
+    user = User.objects.create_user(username=username)
+    Membership.objects.create(user=user, tenant=tenant, is_active=True, external_id=external_id)
+    url = reverse("api:scim:user-list", kwargs={"tenant_slug": tenant.slug})
+
+    real_filter = Membership.objects.filter
+    real_select_related = Membership.objects.select_related
+    retry_lookups = {"count": 0}
+
+    def pre_race_filter(*args, **kwargs):
+        queryset = real_filter(*args, **kwargs)
+        if "user" in kwargs and "tenant" in kwargs:
+            return queryset.none()
+        return queryset
+
+    def pre_race_select_related(*args, **kwargs):
+        retry_lookups["count"] += 1
+        queryset = real_select_related(*args, **kwargs)
+        if retry_lookups["count"] == 1:
+            return queryset.none()
+        return queryset
+
+    with (
+        mock.patch.object(Membership.objects, "select_related", new=pre_race_select_related),
+        mock.patch.object(Membership.objects, "filter", new=pre_race_filter),
+    ):
+        response = Client().post(
+            url, entra_payload(username, external_id), content_type=JSON, **provision_headers(token)
+        )
+
+    assert response.status_code == 200, response.content
+    assert retry_lookups["count"] >= 2, "the retry path never ran its correlated lookup"
+    assert Membership.objects.filter(user=user, tenant=tenant).count() == 1
+    user.refresh_from_db()
+    any_active = Membership.objects.filter(user=user, is_active=True).exists()
+    assert user.is_active == any_active
+
+
+def test_provider_post_retry_reconciles_when_racer_commits_membership_first():
+    """Provider-mount mirror of the tenant POST retry race: after the IntegrityError,
+    the retry sync must run under the same user-row lock (200 replay)."""
+    assert connection.vendor == "postgresql"
+    provider, token = provider_fixture("race-prov-retry")
+    username = "race.retry.provider@contoso.onmicrosoft.com"
+    external_id = "aa1f0000-race-4000-8000-000000000006"
+    user = User.objects.create_user(username=username)
+    Membership.objects.create(user=user, tenant=provider, is_active=True, external_id=external_id)
+    url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": provider.slug})
+
+    real_filter = Membership.objects.filter
+    real_select_related = Membership.objects.select_related
+    retry_lookups = {"count": 0}
+
+    def pre_race_filter(*args, **kwargs):
+        queryset = real_filter(*args, **kwargs)
+        if "user" in kwargs and "tenant" in kwargs:
+            return queryset.none()
+        return queryset
+
+    def pre_race_select_related(*args, **kwargs):
+        retry_lookups["count"] += 1
+        queryset = real_select_related(*args, **kwargs)
+        if retry_lookups["count"] == 1:
+            return queryset.none()
+        return queryset
+
+    with (
+        mock.patch.object(Membership.objects, "select_related", new=pre_race_select_related),
+        mock.patch.object(Membership.objects, "filter", new=pre_race_filter),
+    ):
+        response = Client().post(
+            url, entra_payload(username, external_id), content_type=JSON, **provision_headers(token)
+        )
+
+    assert response.status_code == 200, response.content
+    assert retry_lookups["count"] >= 2, "the retry path never ran its correlated lookup"
+    assert Membership.objects.filter(user=user, tenant=provider).count() == 1
+    user.refresh_from_db()
+    any_active = Membership.objects.filter(user=user, is_active=True).exists()
+    assert user.is_active == any_active
+
+
+def test_scim_error_envelope_maps_django_validation_errors():
+    """Django-level validation failures bubbling out of a SCIM request must render as
+    the SCIM error envelope with 400 (defensive branch shared by both mounts)."""
+    assert connection.vendor == "postgresql"
+    tenant, token = tenant_fixture("race-validation")
+    url = reverse("api:scim:user-list", kwargs={"tenant_slug": tenant.slug})
+    payload = entra_payload("race.validation@contoso.onmicrosoft.com", "aa1f0000-race-4000-8000-000000000007")
+    with mock.patch(
+        "users.api.scim.views.parse_user_resource", side_effect=DjangoValidationError("invalid user document")
+    ):
+        response = Client().post(url, payload, content_type=JSON, **provision_headers(token))
+
+    assert response.status_code == 400, response.content
+    body = response.json()
+    assert body["schemas"] == ["urn:ietf:params:scim:api:messages:2.0:Error"]
+    assert body["status"] == "400"
 
 
 def test_tenant_patch_waits_for_the_user_row_lock_before_mutating():
