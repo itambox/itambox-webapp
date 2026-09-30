@@ -332,9 +332,7 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
             self.assertIn(column, self._columns(archive_table))
         self.assertIn(FIRE_TABLE, self._tables())
         self.assertIn("last_run_archive_id", self._columns(SCHEDULE_TABLE))
-        bound_report = self.executor.loader.project_state([self.migrate_to]).apps.get_model(
-            "extras", "ScheduledReport"
-        )
+        bound_report = self.executor.loader.project_state([self.migrate_to]).apps.get_model("extras", "ScheduledReport")
         self.assertIsNone(bound_report.objects.get(pk=self.legacy_schedule.pk).last_run_archive_id)
         Schedule = self.executor.loader.project_state([self.migrate_to]).apps.get_model("django_q", "Schedule")
         self.assertEqual(Schedule.objects.get(pk=self.legacy_row.pk).intended_date_kwarg, FIRE_KWARG)

@@ -1107,14 +1107,10 @@ def retry_failed_deliveries(sched):
         # Read the binding fresh: the caller's instance may predate the last
         # run, and the recovery must bind to the CURRENT run's archive.
         archive_id = (
-            ScheduledReport._base_manager.filter(pk=sched.pk)
-            .values_list("last_run_archive_id", flat=True)
-            .first()
+            ScheduledReport._base_manager.filter(pk=sched.pk).values_list("last_run_archive_id", flat=True).first()
         )
         if archive_id is not None:
-            archive = ReportGenerationArchive._base_manager.filter(
-                pk=archive_id, scheduled_report_id=sched.pk
-            ).first()
+            archive = ReportGenerationArchive._base_manager.filter(pk=archive_id, scheduled_report_id=sched.pk).first()
     if archive is None or archive.file is None:
         return _RetryOutcome("retry.no_archive")
     failed_targets = [target for target in (archive.delivery_targets or []) if target.get("status") != "ok"]
