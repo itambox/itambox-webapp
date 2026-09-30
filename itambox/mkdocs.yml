@@ -173,7 +173,7 @@ nav:
       - Bulk CSV Import Guide: 'integration/bulk_import_guide.md'
       - Migrate from Snipe-IT: 'integration/migrate-from-snipe-it.md'
       - Discovery Sync (Intune): 'integration/discovery-sync.md'
-      - SCIM Provisioning (Beta): 'integration/scim.md'
+      - SCIM Provisioning: 'integration/scim.md'
       - Plugin Development:
           - Getting Started: 'plugins/getting_started.md'
           - Extension Hooks: 'plugins/hooks.md'

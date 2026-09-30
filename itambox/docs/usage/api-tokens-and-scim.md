@@ -220,10 +220,12 @@ owner and is no longer visible in the previous owner's queries.
 
 ## SCIM 2.0 Provisioning
 
-!!! warning "Status: Beta"
-    SCIM behaviour and schema extensions may change during the prerelease
-    series. Pin the deployed revision and test identity-provider mappings
-    before enabling automatic provisioning.
+!!! info "Status: Stable"
+    The SCIM subset documented here and in the [integration
+    guide](../integration/scim.md) is the frozen Stable contract. Nothing
+    provisions automatically: provisioning starts only when an administrator
+    deliberately mints a scope-bound, write-enabled token and an identity
+    provider calls the mounts.
 
 ITAMbox implements [SCIM 2.0](https://datatracker.ietf.org/doc/html/rfc7644)
 Users and Groups resources for automated identity lifecycle management. SCIM
@@ -240,8 +242,9 @@ SCIM provisioning in ITAMbox operates at two scopes:
 | **Tenant** | `/api/tenants/<tenant_slug>/scim/v2/` | Provision users into a specific tenant. Read tenant-owned groups (read-only). |
 | **Provider** | `/api/providers/<provider_slug>/scim/v2/` | Provision provider-staff users and manage provider-owned groups. |
 
-Both scopes expose the standard SCIM endpoints: `ServiceProviderConfig`,
-`Users`, `Users/<id>`, `Groups`, and `Groups/<id>`.
+Both scopes serve exactly these routes: `ServiceProviderConfig`, `Users`,
+`Users/<id>`, `Groups`, and `Groups/<id>`. The `ResourceTypes` and `Schemas`
+discovery endpoints are not served.
 
 ### Authentication
 
@@ -264,7 +267,7 @@ For a non-superuser service account, ensure:
 |---|---|---|---|---|
 | Tenant `Users` | Yes | Yes | Yes | Yes (membership removal; user deactivates when no memberships remain) |
 | Tenant `Groups` | No | Yes | No | No |
-| Provider `Users` | Yes | While membership active | While membership active | Yes (membership removal; user deactivates when no memberships remain) |
+| Provider `Users` | Yes | Yes (also while inactive) | Yes (also while inactive) | Yes (membership removal; user deactivates when no memberships remain) |
 | Provider `Groups` | Yes | Yes | Yes | Yes |
 
 > [!IMPORTANT]
@@ -272,6 +275,13 @@ For a non-superuser service account, ensure:
 > users remain explicit in-app operations. Provider Groups require the
 > corresponding `users` Group permissions and may include only active staff
 > of that provider tenant.
+
+Both scopes share one strict request parser: the same document shapes are
+accepted, and the same shapes are rejected with SCIM error envelopes.
+Unmanaged attributes (such as `displayName`) are explicit no-ops in `PATCH`,
+and unsupported operations or paths answer `400` errors instead of silently
+doing nothing. The [integration guide](../integration/scim.md) publishes the
+exact operation and path matrix.
 
 ### Connecting Microsoft Entra ID
 
@@ -292,17 +302,24 @@ For a non-superuser service account, ensure:
 |---|---|---|
 | `userPrincipalName` | `userName` | Login username |
 | `mail` | `emails[type eq "work"].value` | Primary email |
-| `displayName` | `displayName` | Display value |
+| `displayName` | `displayName` | Accepted and skipped as an unmanaged attribute |
 | `givenName` | `name.givenName` | Given name |
 | `surname` | `name.familyName` | Family name |
-| `accountEnabled` | `active` | Deactivation removes the resource from provider detail operations |
+| `accountEnabled` | `active` | Suspends or restores this scope's membership; see reactivation below |
 
-### Limitation: Reactivation After Deactivation
+### Reactivation and deprovisioning
 
-When a provider User is set to `active=false` via SCIM, the provider SCIM
-endpoint returns `404` for that user and cannot reactivate, inspect, or delete
-the resource. To manage the user through SCIM again, reactivate the provider
-membership in ITAMbox first.
+Setting a User to `active=false` suspends only this scope's membership;
+memberships in other tenants or providers are untouched. The resource stays
+addressable while inactive: `GET` and `PATCH` keep working on both scopes, so
+an identity provider can inspect and re-enable a user with `active=true`
+directly through SCIM. When the last active membership is suspended the
+account can no longer authenticate anywhere; reactivating restores login.
+
+`DELETE` removes this scope's membership and the user is deactivated globally
+only when no membership remains anywhere. A later `POST` with the same
+`userName` and `externalId` re-provisions the membership and restores login
+without a manual account edit.
 
 ### Current Limitations
 
@@ -311,17 +328,20 @@ membership in ITAMbox first.
   management.
 - **Sorting** — not supported.
 - **List pagination** — capped at 200 resources per request.
-- **Provider filtering** — Provider User and Group list endpoints do not apply
-  SCIM `filter` parameters. Verify your IdP can operate with paged, unfiltered
-  lists before enabling automatic provisioning.
+- **Filtering** — list endpoints apply a single-expression `filter` subset
+  (`attribute operator value` with `eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`,
+  `lt`, `le`, `pr`); logical operators and multi-expression filters are
+  rejected. See the [integration guide](../integration/scim.md) for the
+  filterable attributes.
+- **ETags** — SCIM resources carry no `ETag`/`If-Match` handling.
 - **Provider Group membership sync** — skips users who are not active staff of
   that provider. Provision Users first.
 
 > [!NOTE]
-> The `ServiceProviderConfig` endpoint currently overstates provider filtering
-> support and advertises HTTP Basic authentication. Use **Bearer token
-> authentication only** and treat provider filtering as unsupported until the
-> implementation and metadata agree.
+> `ServiceProviderConfig` truthfully advertises the implemented subset:
+> `patch` and `filter` (200-resource maximum) supported, `bulk`,
+> `changePassword`, `sort`, and `etag` unsupported, and OAuth Bearer as the
+> only authentication scheme.
 
 For the full SCIM specification details including endpoint schemas, operation
 semantics, and provider-specific configuration, see the dedicated SCIM

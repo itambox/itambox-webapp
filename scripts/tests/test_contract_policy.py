@@ -206,7 +206,7 @@ class DerivationSurfaceTests(unittest.TestCase):
         self.assertEqual(by_key["organization.role_grants"].security_critical, True)
         self.assertEqual(by_key["organization.resource_grants"].security_critical, True)
         self.assertEqual(by_key["platform.plugins"].maturity, "experimental")
-        self.assertEqual(by_key["users.scim_provisioning"].activation, "opt-in")
+        self.assertEqual(by_key["users.scim_provisioning"].activation, "always-on")
 
     def test_the_capability_vocabulary_is_read_from_the_registry_module(self):
         """The constant names in an ``apps.py`` mean whatever the registry says."""

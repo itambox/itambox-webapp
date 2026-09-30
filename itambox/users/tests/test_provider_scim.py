@@ -129,6 +129,38 @@ class ProviderSCIMProvisioningTests(TestCase):
         response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {self.weak_token.key}")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_read_only_and_expired_tokens_fail_closed_on_provider_mount(self):
+        """Provider SCIM enforces token semantics the same way: a read-only token may
+        read but not write; an expired token may do neither, and nothing is created."""
+        list_url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
+        read_only = Token.objects.create(
+            user=self.admin_user,
+            tenant=self.provider,
+            write_enabled=False,
+            expires=timezone.now() + timezone.timedelta(days=1),
+        )
+        read_only_headers = {"HTTP_AUTHORIZATION": f"Bearer {read_only.key}"}
+        self.assertEqual(self.client.get(list_url, **read_only_headers).status_code, status.HTTP_200_OK)
+        response = self.client.post(
+            list_url,
+            data={
+                "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+                "userName": "readonly-prov@msp.com",
+            },
+            content_type="application/json",
+            **read_only_headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(User.objects.filter(username="readonly-prov@msp.com").exists())
+
+        expired = Token.objects.create(
+            user=self.admin_user,
+            tenant=self.provider,
+            expires=timezone.now() - timezone.timedelta(hours=1),
+        )
+        expired_headers = {"HTTP_AUTHORIZATION": f"Bearer {expired.key}"}
+        self.assertEqual(self.client.get(list_url, **expired_headers).status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_group_endpoints_require_method_specific_group_permissions(self):
         role = Role.objects.create(
             tenant=self.provider,
@@ -357,6 +389,66 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertFalse(Membership.objects.filter(user=user, tenant=self.provider).exists())
         # The User row survives.
         self.assertTrue(User.objects.filter(scim_id=pk).exists())
+
+    def test_provision_deprovision_reprovision_restores_login(self):
+        """The lifecycle round trip for a solely-provisioned provider identity: create,
+        deactivate, reactivate, full de-provision (DELETE) and re-provision restore the
+        membership and login without a manual is_active flip on the surviving User row."""
+        list_url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
+        payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            "externalId": "entra-object-lifecycle-prov",
+            "userName": "prov.lifecycle@msp.com",
+            "name": {"givenName": "Prov", "familyName": "Life"},
+            "emails": [{"value": "prov.lifecycle@msp.com", "type": "work"}],
+            "active": True,
+        }
+        created = self.client.post(list_url, data=payload, content_type="application/json", **self.auth_headers)
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        scim_id = created.json()["id"]
+        user = User.objects.get(scim_id=scim_id)
+
+        detail_url = reverse(
+            "api:provider_scim:user-detail", kwargs={"provider_slug": self.provider.slug, "pk": scim_id}
+        )
+
+        def patch_active(active):
+            return self.client.patch(
+                detail_url,
+                data={
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                    "Operations": [{"op": "replace", "path": "active", "value": active}],
+                },
+                content_type="application/json",
+                **self.auth_headers,
+            )
+
+        # Deactivate: sole membership suspended, so the global account mirrors it;
+        # the resource stays addressable while inactive.
+        response = patch_active(False)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.json()["active"])
+        self.assertFalse(User.objects.get(pk=user.pk).is_active)
+        self.assertEqual(self.client.get(detail_url, **self.auth_headers).status_code, status.HTTP_200_OK)
+
+        response = patch_active(True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(User.objects.get(pk=user.pk).is_active)
+
+        # Full de-provision: the membership is removed; the account is left deactivated.
+        response = self.client.delete(detail_url, **self.auth_headers)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Membership.objects.filter(user=user, tenant=self.provider).exists())
+        self.assertFalse(User.objects.get(pk=user.pk).is_active)
+
+        # Re-provision: same userName + externalId correlate to the surviving row; the
+        # membership returns active and login works again without manual intervention.
+        again = self.client.post(list_url, data=payload, content_type="application/json", **self.auth_headers)
+        self.assertIn(again.status_code, (status.HTTP_200_OK, status.HTTP_201_CREATED))
+        membership = Membership.objects.get(user=user, tenant=self.provider)
+        self.assertTrue(membership.is_active)
+        self.assertEqual(membership.external_id, "entra-object-lifecycle-prov")
+        self.assertTrue(User.objects.get(pk=user.pk).is_active)
 
     # ---- Groups -------------------------------------------------------------------------
 

@@ -73,9 +73,9 @@
       "scope": "Suppliers, subscriptions, assignments"
     },
     "users.scim_provisioning": {
-      "activation": "opt-in",
-      "contract_class": "beta-opt-in",
-      "exclusions": "PATCH semantics and filtering are partial; the tenant mount provisions Users and exposes Groups read-only, only provider mounts provision Groups",
+      "activation": "always-on",
+      "contract_class": "stable",
+      "exclusions": "none",
       "scope": "Tenant- and provider-scoped SCIM mounts"
     }
   },

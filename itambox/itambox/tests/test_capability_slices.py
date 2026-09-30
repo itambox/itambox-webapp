@@ -8,14 +8,12 @@ is harmless, and that the deprecated app-level adapters still answer.
 
 import json
 import sys
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
 from django.apps import apps
 from django.conf import settings
 from django.test import override_settings
-from django.utils import timezone
 from model_bakery import baker
 
 from core.features import BETA, STABLE, is_beta_module, module_maturity
@@ -50,7 +48,7 @@ DECLARED = {
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "organization.resource_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "automation.webhooks": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
-    "users.scim_provisioning": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
+    "users.scim_provisioning": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "platform.plugins": (EXPERIMENTAL, OPT_IN, SOURCE_OPERATOR_FLAG),
 }
 
@@ -98,6 +96,17 @@ class TestDeclaredSlice:
 
     def test_alert_rules_are_declared_stable_always_on_without_probe_or_limitations(self):
         capability = registry.get("alerting.rules")
+
+        assert (capability.maturity, capability.activation, capability.activation_source) == (
+            STABLE,
+            ALWAYS_ON,
+            SOURCE_ALWAYS,
+        )
+        assert capability.activation_probe is None
+        assert capability.limitations == ()
+
+    def test_scim_provisioning_is_declared_stable_always_on_without_probe_or_limitations(self):
+        capability = registry.get("users.scim_provisioning")
 
         assert (capability.maturity, capability.activation, capability.activation_source) == (
             STABLE,
@@ -182,6 +191,12 @@ class TestActivationDefaults:
         assert NotificationChannel._base_manager.count() == 0
         assert registry.state("alerting.rules") == ActivationState(active=True, value_present=True)
 
+    def test_scim_provisioning_is_active_with_zero_rows(self, db):
+        from users.models import Token
+
+        assert Token._base_manager.count() == 0
+        assert registry.state("users.scim_provisioning") == ActivationState(active=True, value_present=True)
+
     def test_every_opt_in_capability_is_inert_on_a_fresh_deployment(self, db):
         """``db``: the object-backed probes must *answer* here, not fail closed.
 
@@ -250,55 +265,30 @@ class TestActivationDefaults:
 
 
 @pytest.mark.django_db
-class TestSCIMActivationSource:
-    """What actually switches SCIM provisioning on for a deployment.
+class TestSCIMStableActivation:
+    """SCIM provisioning is active on every deployment, without any credential.
 
-    There is no SCIM settings key to read. Both SCIM mounts authenticate a
-    ``Bearer`` API token scoped to the tenant named in the URL, so the token is
-    the activation source and these tests pin the probe to it: present once an
-    operator has minted the credential, active only while one of them could
-    drive a provisioning write right now.
+    The capability no longer observes the operator's bearer tokens: the mounts
+    are part of the declared Stable contract, so activation depends on nothing
+    an operator has to configure. Minting or revoking a token therefore changes
+    nothing about the grade; the token still governs what a request may do.
     """
 
-    def test_a_deployment_with_no_token_reports_nothing_configured(self):
-        assert registry.state("users.scim_provisioning") == ActivationState(active=False, value_present=False)
+    def test_a_deployment_with_no_token_is_active(self):
+        assert registry.state("users.scim_provisioning") == ActivationState(active=True, value_present=True)
 
     def test_no_scim_settings_key_is_consulted(self):
-        """The old probe read a setting that has never existed in this project."""
+        """There is no settings gate for SCIM, and the registry reads none."""
         assert not hasattr(settings, "TENANT_SCIM_CONFIGS")
 
-    def test_a_write_enabled_tenant_token_activates_scim(self):
-        baker.make("users.Token", write_enabled=True)
-        state = registry.state("users.scim_provisioning")
-        assert (state.active, state.value_present) == (True, True)
+    def test_minting_or_revoking_a_token_changes_nothing_about_activation(self):
+        token = baker.make("users.Token", write_enabled=True)
+        assert registry.state("users.scim_provisioning") == ActivationState(active=True, value_present=True)
+        token.write_enabled = False
+        token.save(update_fields=["write_enabled"])
+        assert registry.state("users.scim_provisioning") == ActivationState(active=True, value_present=True)
 
-    def test_a_read_only_token_is_configured_but_cannot_provision(self):
-        baker.make("users.Token", write_enabled=False)
-        state = registry.state("users.scim_provisioning")
-        assert (state.active, state.value_present) == (False, True)
-
-    def test_an_expired_token_no_longer_activates_scim(self):
-        baker.make("users.Token", write_enabled=True, expires=timezone.now() - timedelta(days=1))
-        state = registry.state("users.scim_provisioning")
-        assert (state.active, state.value_present) == (False, True)
-
-    def test_a_token_held_by_a_deactivated_account_does_not_activate_scim(self):
-        baker.make("users.Token", write_enabled=True, user__is_active=False)
-        state = registry.state("users.scim_provisioning")
-        assert (state.active, state.value_present) == (False, True)
-
-    def test_a_token_in_a_soft_deleted_tenant_is_not_configuration_at_all(self):
-        """The soft-delete boundary holds: a recycled workspace configures nothing."""
-        baker.make("users.Token", write_enabled=True, tenant__deleted_at=timezone.now())
-        assert registry.state("users.scim_provisioning") == ActivationState(active=False, value_present=False)
-
-    def test_a_live_tenant_token_is_seen_from_outside_any_tenant_context(self):
-        """No tenant is in scope during diagnostics, and the answer is still yes."""
-        baker.make("users.Token", write_enabled=True)
-        rows = {row["key"]: row for row in registry.diagnostics()}
-        assert rows["users.scim_provisioning"]["active"] is True
-
-    def test_the_probe_publishes_no_part_of_the_credential(self):
+    def test_the_diagnostics_row_never_reads_credential_material(self):
         token = baker.make("users.Token", write_enabled=True)
         row = next(row for row in registry.diagnostics() if row["key"] == "users.scim_provisioning")
         rendered = repr(registry.state("users.scim_provisioning")) + repr(row)
@@ -404,6 +394,10 @@ class TestInactiveSafety:
     def test_alert_rules_are_not_deactivatable(self):
         assert "alerting.rules" not in deactivatable_keys()
         assert registry.is_active("alerting.rules") is True
+
+    def test_scim_provisioning_is_not_deactivatable(self):
+        assert "users.scim_provisioning" not in deactivatable_keys()
+        assert registry.is_active("users.scim_provisioning") is True
 
     @pytest.mark.parametrize(
         "key",

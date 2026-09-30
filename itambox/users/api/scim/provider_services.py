@@ -147,6 +147,20 @@ def sync_provider_group_members(
     return _sync_provider_group_members(tenant, group, member_ids, actor=actor)
 
 
+def sync_user_global_active(user) -> None:
+    """Mirror ``User.is_active`` to "has any active membership anywhere".
+
+    The shared lifecycle rule for both SCIM mounts: clears login only when the
+    user is fully de-provisioned, never from one tenant while another remains.
+    The POST provisioning paths also call it so that reprovisioning a previously
+    fully de-provisioned identity restores the flag without a manual step.
+    """
+    any_active = Membership.objects.filter(user=user, is_active=True).exists()
+    if user.is_active != any_active:
+        user.is_active = any_active
+        user.save(update_fields=["is_active"])
+
+
 def _apply_provider_user_active_state(user, tenant, active) -> None:
     if active is UNSET:
         return
@@ -154,13 +168,7 @@ def _apply_provider_user_active_state(user, tenant, active) -> None:
     if membership is not None and membership.is_active != active:
         membership.is_active = active
         membership.save(update_fields=["is_active"])
-
-    # Mirror the global flag to "has any active membership anywhere": clear login only
-    # when the user is fully de-provisioned, never from one tenant while another remains.
-    any_active = Membership.objects.filter(user=user, is_active=True).exists()
-    if user.is_active != any_active:
-        user.is_active = any_active
-        user.save(update_fields=["is_active"])
+    sync_user_global_active(user)
 
 
 def _save_provider_user_external_id(user, tenant, external_id) -> None:
