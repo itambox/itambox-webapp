@@ -592,11 +592,15 @@ class KitCheckoutOwnerPreselectionTests(KitOwnerScopeBase):
         self.assertIn("tenant", form.fields)
         self.assertTrue(form.fields["tenant"].required)
         content = response.content.decode()
+        # Scope the option checks to the tenant select: a global substring
+        # check collides whenever another select (e.g. the status options)
+        # renders the same primary key value.
+        tenant_select = content.split('name="tenant"', 1)[1].split("</select>", 1)[0]
         # Native + rendered preselection of the owning tenant.
         self.assertEqual(str(form["tenant"].value()), str(self.tenant.pk))
-        self.assertIn('<option value="%s" selected' % self.tenant.pk, content)
+        self.assertIn('<option value="%s" selected' % self.tenant.pk, tenant_select)
         # The candidate set stays the owner: scope and permissions unchanged.
-        self.assertNotIn('<option value="%s"' % self.other.pk, content)
+        self.assertNotIn('<option value="%s"' % self.other.pk, tenant_select)
         # The owner's dependent choices are populated without any change event.
         self.assertIn(OWNER_HOLDER_UPN, content)
         self.assertIn(self.location.name, content)

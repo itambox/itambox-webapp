@@ -386,7 +386,9 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             all_accessible=True,
             operation="reports.generate",
         )
-        process_report.assert_called_once_with(schedule, tenant_a, [tenant_a, tenant_b])
+        process_report.assert_called_once_with(
+            schedule, tenant_a, [tenant_a, tenant_b], run_started_at=schedule.last_run
+        )
 
     @staticmethod
     def _persisted_template_state(**overrides):
