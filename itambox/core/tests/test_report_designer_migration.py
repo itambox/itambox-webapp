@@ -249,7 +249,9 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
     the designer disabled, and leaves every other population untouched.
     """
 
-    reset_sequences = True
+    # Sequences are intentionally not reset here: the seeded system schedules
+    # are re-created by post-migrate handlers after every flush, so a
+    # reset-to-1 would collide with the ids they have already re-issued.
     migrate_from = ("extras", "0122_journalentry_tenant_group")
     migrate_to = ("extras", "0123_pause_flag_suppressed_report_schedules")
     flag_names = ("ITAMBOX_FEATURE_REPORT_DESIGNER", "ITAMBOX_REPORT_DESIGNER_ENABLED")
@@ -467,7 +469,10 @@ class ReportDesignerRetirementMigrationTests(TransactionTestCase):
         _ensure_retired_report_designer_columns()
 
     def _create_beta_templates(self):
-        Tenant = self.executor.loader.project_state([self.migrate_from]).apps.get_model("organization", "Tenant")
+        # Derive the tenant from the same era snapshot as the report model; a
+        # second project_state call would build different model classes and the
+        # tenant foreign key would reject them.
+        Tenant = self.ReportTemplate._meta.apps.get_model("organization", "Tenant")
         self.tenant = Tenant._base_manager.create(name="Issue 586 Tenant", slug="issue-586-tenant")
 
         def create(name, **fields):
