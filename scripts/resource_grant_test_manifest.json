@@ -55,6 +55,7 @@
     "itambox/extras/tests/test_webhook_receiver_contract.py",
     "itambox/extras/tests/test_webhook_stable_inertness.py",
     "itambox/extras/tests/test_webhook_stable_upgrade_preservation.py",
+    "itambox/inventory/tests/test_kit_owner_scope.py",
     "itambox/itambox/tests/test_capability_slices.py",
     "itambox/itambox/tests/test_capability_surfaces.py",
     "itambox/itambox/tests/test_generic_detail_providers.py",
