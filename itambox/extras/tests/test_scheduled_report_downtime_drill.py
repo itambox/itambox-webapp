@@ -20,9 +20,16 @@ re-implementing either, so the drill states exactly what a deployment sees:
   even if the row is due; nothing is delivered.
 * **Recovery** — a failed delivery leaves a per-target ledger and is recovered
   through ``Retry delivery``, which re-contacts only the failed targets with
-  the recorded original recipients and payloads, re-validates the archived
-  generation scope first, refuses inactive schedules, and claims the attempt
-  atomically so two parallel requests deliver exactly once.
+  the recorded original recipients, email subject/body, and notification
+  payloads, re-validates the archived generation scope first, refuses inactive
+  schedules, and replays exactly the newest run's own archive (a run that
+  retained none is refused instead of falling back to an older report). The
+  attempt is claimed atomically, the fan-out renews the lease before every
+  target and aborts once the lease was lost, and outbound attempts are
+  bounded — overlap is limited to a single in-flight send (best-effort
+  duplicate suppression).
+* **Storage-failure archival** — a file-write failure after the archive row
+  was created marks that archive failed instead of leaving it running.
 """
 
 from contextlib import contextmanager
@@ -484,7 +491,7 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
         self.assertEqual(retry_body, recorded_body)
         self.assertNotIn("is being redelivered", retry_body)
 
-    def test_concurrent_retries_deliver_exactly_once(self):
+    def test_concurrent_retries_are_serialized_by_the_exclusive_claim(self):
         sched = ScheduledReport.objects.create(
             name="Concurrent Retry Schedule",
             report=self.template,
@@ -500,7 +507,7 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
 
         nested = {}
 
-        def deliver_and_race(sched_arg, template, output, recipients):
+        def deliver_and_race(sched_arg, template, output, recipients, subject=None, body=None):
             # While this attempt is in flight, a parallel request arrives with
             # the same failed ledger.
             nested["outcome"] = retry_failed_deliveries(sched)
@@ -945,7 +952,7 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
         self.assertEqual(result.code, "report.delivery_failed")
         archive = self._newest_archive(sched)
 
-        def hijacked_delivery(sched_arg, template, output, recipients):
+        def hijacked_delivery(sched_arg, template, output, recipients, subject=None, body=None):
             # A newer attempt took the claim over while this one was mid-flight.
             ReportGenerationArchive.objects.filter(pk=archive.pk).update(
                 retry_claim_token="taken-over",
@@ -1106,6 +1113,163 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
                 self.assertEqual(outcome.code, "retry.scope_unauthorized")
 
         email_retry.assert_not_called()
+
+    def test_retry_is_refused_when_the_failed_run_retained_no_archive(self):
+        # Run A is archived and fails delivery; then ``save_to_archive`` is
+        # switched off, so run B fails without creating an archive. Retry
+        # must never fall back to re-sending run A's older report.
+        sched = ScheduledReport.objects.create(
+            name="Unarchived Recovery Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        first_archive = self._newest_archive(sched)
+        self.assertIsNotNone(first_archive)
+
+        sched.save_to_archive = False
+        sched.save(update_fields=["save_to_archive"])
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        # The unarchived run created nothing: the first archive stays alone.
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 1)
+
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "failed")
+        # The last run left no archive, so the recovery action is withheld
+        # and the service refuses instead of re-sending the older report.
+        self.assertIsNone(sched.last_run_archive_id)
+        self.assertFalse(sched.delivery_retryable)
+        with mock.patch("extras.tasks.reports._deliver_report_email", return_value=True) as email_retry:
+            outcome = retry_failed_deliveries(sched)
+        self.assertEqual(outcome.code, "retry.no_archive")
+        email_retry.assert_not_called()
+        first_archive.refresh_from_db()
+        # Run A's archive and its ledger are untouched by the refused retry.
+        self.assertEqual(first_archive.delivery_status, "failed")
+
+    def test_retry_aborts_the_fan_out_when_its_claim_lease_is_stolen(self):
+        channel = NotificationChannel.objects.create(
+            name="Lease Steal Channel",
+            channel_type=NotificationChannel.TYPE_EMAIL,
+            enabled=True,
+            tenant=self.tenant,
+            config={"recipients": "ops@example.com"},
+        )
+        sched = ScheduledReport.objects.create(
+            name="Lease Renewal Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        sched.channels.add(channel)
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"), channel_result=False)
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+
+        def stealing_delivery(sched_arg, template, output, recipients, subject=None, body=None):
+            # A newer attempt takes the claim over while this delivery is in
+            # flight; the next lease renewal must notice and abort.
+            ReportGenerationArchive.objects.filter(pk=archive.pk).update(
+                retry_claim_token="taken-over",
+                retry_claim_expires_at=timezone.now() + timedelta(minutes=10),
+            )
+            return True
+
+        with (
+            mock.patch("extras.tasks.reports._deliver_report_email", side_effect=stealing_delivery),
+            mock.patch("extras.tasks.reports.send_notification_to_channel", return_value=True) as channel_send,
+        ):
+            outcome = retry_failed_deliveries(sched)
+
+        # The email went out (its renewal preceded the steal); the channel
+        # fan-out is aborted because the lease was lost.
+        self.assertEqual(outcome.code, "retry.partial")
+        self.assertEqual(outcome.retried, 1)
+        channel_send.assert_not_called()
+        archive.refresh_from_db()
+        self.assertEqual(archive.retry_claim_token, "taken-over")
+        # The superseded attempt leaves the newer state in place.
+        self.assertEqual([target["status"] for target in archive.delivery_targets], ["failed", "failed"])
+
+    def test_retry_replays_the_recorded_email_subject_and_body(self):
+        sched = ScheduledReport.objects.create(
+            name="Payload Replay Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        result, _channel = self._deliver_once(sched, email_effect=RuntimeError("smtp down"))
+        self.assertEqual(result.code, "report.delivery_failed")
+        archive = self._newest_archive(sched)
+        recorded = next(
+            target["details"]["payload"] for target in archive.delivery_targets if target["target"] == "email"
+        )
+        self.assertIn("Payload Replay Schedule", recorded["subject"])
+        self.assertTrue(recorded["body"])
+
+        # The schedule is edited after the failed run; the retry must still
+        # send the recorded original subject and body.
+        sched.name = "Renamed After Failure"
+        sched.save(update_fields=["name"])
+
+        captured = {}
+
+        def capturing_delivery(sched_arg, template, output, recipients, subject=None, body=None):
+            captured["subject"] = subject
+            captured["body"] = body
+            return True
+
+        with mock.patch("extras.tasks.reports._deliver_report_email", side_effect=capturing_delivery):
+            outcome = retry_failed_deliveries(sched)
+
+        self.assertEqual(outcome.code, "retry.completed")
+        self.assertEqual(captured["subject"], recorded["subject"])
+        self.assertEqual(captured["body"], recorded["body"])
+        self.assertIn("Payload Replay Schedule", captured["subject"])
+        self.assertNotIn("Renamed After Failure", captured["subject"])
+
+    def test_storage_failure_marks_the_created_archive_failed(self):
+        sched = ScheduledReport.objects.create(
+            name="Storage Failure Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        with mock.patch(
+            "extras.tasks.reports.FileAttachment.objects.create",
+            side_effect=RuntimeError("disk full"),
+        ):
+            result, channel = self._deliver_once(sched, email_effect=True)
+
+        self.assertEqual(result.code, "report.generation_failed")
+        channel.assert_not_called()
+        sched.refresh_from_db()
+        self.assertTrue(sched.last_status.endswith("report.generation_failed"))
+        # The persisted archive is marked failed instead of staying running.
+        archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
+        self.assertEqual(archive.status, "failed")
+        self.assertEqual(archive.error_message, "report.generation_failed")
+        # No retry binding is kept for the failed run.
+        self.assertIsNone(sched.last_run_archive_id)
 
 
 class IntendedFireParsingTests(SimpleTestCase):

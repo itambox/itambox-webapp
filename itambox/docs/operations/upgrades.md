@@ -101,9 +101,9 @@ The upgrade also arms the delivery improvements before the first fire:
    keyword argument, so a broker redelivery is recognized as a duplicate from
    the first fire after the upgrade instead of dispatching a second delivery.
 2. Duplicate registration rows for one schedule (possible before registrations
-   were race-safe) are collapsed onto the surviving row, with the schedule's
-   reference re-pointed first; activation state, delivery history, and other
-   schedules are untouched.
+   were race-safe) are collapsed onto the row the schedule references (falling
+   back to the oldest), with references to a removed duplicate re-pointed;
+   activation state, delivery history, and other schedules are untouched.
 3. Archive rows gain the per-target delivery ledger; rows from before the
    upgrade keep a blank ledger and are never rewritten.
 4. Each schedule's newest accepted occurrence is registered as a fire record,
@@ -112,11 +112,16 @@ The upgrade also arms the delivery improvements before the first fire:
 5. Archive rows gain the generation-scope snapshot (the tenant scope a
    retained file is valid under) and the retry-claim columns; rows from before
    the upgrade keep empty values and are never rewritten.
+6. Schedules gain the retry binding that ties **Retry delivery** to the archive
+   of the newest completed run; rows from before the upgrade keep an unbound
+   (null) reference, so their retry action stays unavailable until the next
+   completed run and old failures are recovered with **Run now** instead of a
+   stale redelivery.
 
 ### Rollback
 
-The migrations reverse cleanly: the ledger, snapshot, and claim columns are
-dropped, the fire records are removed with the table that carried them, and
+The migrations reverse cleanly: the ledger, snapshot, claim, and retry-binding
+columns are dropped, the fire records are removed with the table that carried them, and
 the injected task keyword argument is cleared again, because the predecessor
 task signature does not accept it. A code-only rollback without the schema
 rollback would leave the keyword argument in place and fail every report fire,

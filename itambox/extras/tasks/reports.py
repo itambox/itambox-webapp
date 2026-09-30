@@ -3,9 +3,10 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, get_connection
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -41,6 +42,11 @@ DELIVERY_TARGET_EMAIL = "email"
 #: behind by an interrupted request is recoverable after the lease expires,
 #: and two parallel requests can never both contact the same failed targets.
 RETRY_CLAIM_LEASE = timedelta(minutes=15)
+
+#: Bounded outbound attempt for the aggregate email: one attempt must not be
+#: able to outlive the claim lease above, so a hung SMTP conversation cannot
+#: silently overlap a second retry attempt.
+EMAIL_ATTEMPT_TIMEOUT_SECONDS = 60
 
 
 def _channel_target_key(channel):
@@ -243,31 +249,41 @@ def _archive_report_output(sched, template, output, active_tenant, disclosure_te
         disclosure_text=disclosure_text or "",
         generation_scope=generation_scope or {},
     )
-    if sched.format == ScheduledReport.FORMAT_HTML:
-        content_bytes = output.email_body.encode("utf-8")
-        mime = "text/html"
-        filename = _report_filename(template, "html")
-    else:
-        if output.attachment_content is None:
-            raise ValueError("Scheduled report produced no attachment content")
-        content_bytes = (
-            output.attachment_content.encode("utf-8")
-            if isinstance(output.attachment_content, str)
-            else output.attachment_content
-        )
-        mime = output.attachment_mime or "application/octet-stream"
-        filename = output.attachment_filename
+    try:
+        if sched.format == ScheduledReport.FORMAT_HTML:
+            content_bytes = output.email_body.encode("utf-8")
+            mime = "text/html"
+            filename = _report_filename(template, "html")
+        else:
+            if output.attachment_content is None:
+                raise ValueError("Scheduled report produced no attachment content")
+            content_bytes = (
+                output.attachment_content.encode("utf-8")
+                if isinstance(output.attachment_content, str)
+                else output.attachment_content
+            )
+            mime = output.attachment_mime or "application/octet-stream"
+            filename = output.attachment_filename
 
-    content_file = ContentFile(content_bytes, name=filename)
-    file_attach = FileAttachment.objects.create(
-        content_object=archive_entry,
-        file=content_file,
-        name=filename,
-        mime_type=mime,
-    )
-    archive_entry.file = file_attach
-    archive_entry.status = "success"
-    archive_entry.save()
+        content_file = ContentFile(content_bytes, name=filename)
+        file_attach = FileAttachment.objects.create(
+            content_object=archive_entry,
+            file=content_file,
+            name=filename,
+            mime_type=mime,
+        )
+        archive_entry.file = file_attach
+        archive_entry.status = "success"
+        archive_entry.save()
+    # broad except: boundary-isolation: storage back ends raise implementation-specific failures
+    except Exception:
+        # A persisted running archive must never survive a failed file write:
+        # mark it failed before the task error is classified, so the archive
+        # state matches the schedule's reported generation outcome.
+        archive_entry.status = "failed"
+        archive_entry.error_message = "report.generation_failed"
+        archive_entry.save(update_fields=["status", "error_message"])
+        raise
     return archive_entry
 
 
@@ -275,7 +291,11 @@ def _resolve_report_recipients(sched):
     return [recipient.strip() for recipient in sched.recipients.split(",") if recipient.strip()]
 
 
-def _deliver_report_email(sched, template, output, recipient_list=None):
+def _report_email_subject(sched):
+    return _("[Scheduled Report] %(name)s") % {"name": sched.name}
+
+
+def _deliver_report_email(sched, template, output, recipient_list=None, subject=None, body=None):
     recipient_list = _resolve_report_recipients(sched) if recipient_list is None else recipient_list
     if not recipient_list:
         return False
@@ -285,8 +305,8 @@ def _deliver_report_email(sched, template, output, recipient_list=None):
         raise ValidationError(_("SMTP Outbound Email is disabled in settings."))
 
     email = EmailMessage(
-        subject=_("[Scheduled Report] %(name)s") % {"name": sched.name},
-        body=output.email_body,
+        subject=subject if subject is not None else _report_email_subject(sched),
+        body=body if body is not None else output.email_body,
         from_email=email_config.from_address,
         to=recipient_list,
     )
@@ -294,6 +314,7 @@ def _deliver_report_email(sched, template, output, recipient_list=None):
         email.content_subtype = "html"
     elif output.attachment_content:
         email.attach(output.attachment_filename, output.attachment_content, output.attachment_mime)
+    email.connection = get_connection(timeout=getattr(settings, "EMAIL_TIMEOUT", None) or EMAIL_ATTEMPT_TIMEOUT_SECONDS)
     email.send(fail_silently=False)
     return True
 
@@ -553,6 +574,9 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
             },
         )
         sched.last_status = f"{status.value}: report.generation_failed"
+        # A failed run retains no deliverable archive: clear the retry binding
+        # so Retry delivery can never resurrect an older report.
+        sched.last_run_archive = None
         sched.save()
         if archive_entry:
             archive_entry.status = "failed"
@@ -562,9 +586,14 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
 
     delivery = _DeliveryOutcome()
     recipients = _resolve_report_recipients(sched)
-    # Record the original recipients on the email target so Retry delivery
-    # re-contacts exactly the recorded targets, not a since-edited list.
-    email_details = {"recipients": recipients}
+    # Record the original recipients and the exact sent payload on the email
+    # target so Retry delivery re-contacts the recorded targets and replays
+    # the first attempt's subject and body, not a reconstruction from a
+    # since-edited schedule.
+    email_details = {
+        "recipients": recipients,
+        "payload": {"subject": _report_email_subject(sched), "body": output.email_body},
+    }
     if recipients:
         try:
             delivered = _deliver_report_email(sched, template, output, recipients)
@@ -628,7 +657,10 @@ def _persist_delivery_outcome(sched, archive_entry, delivery):
     delivery`` can re-attempt exactly the failed targets.
     """
     sched.last_status = "success" if not delivery.failures else delivery.status
-    sched.save(update_fields=["last_status"])
+    # Bind Retry delivery to this run's archive; a run without a retained
+    # archive (``save_to_archive`` off) clears it explicitly.
+    sched.last_run_archive = archive_entry
+    sched.save(update_fields=["last_status", "last_run_archive"])
     if archive_entry:
         archive_entry.delivery_status = delivery.status
         archive_entry.delivery_targets = delivery.targets
@@ -840,8 +872,10 @@ def _claim_retry(archive):
 
     Mirrors the alert-dispatch claim lease: the claim is an atomic conditional
     UPDATE, so two parallel ``Retry delivery`` requests can never both read
-    the same failed targets and both deliver, and a claim left behind by an
-    interrupted request is recoverable once the lease expires.
+    the same failed targets, and a claim left behind by an interrupted request
+    is recoverable once the lease expires. The fan-out renews the lease before
+    every target and aborts once the claim was lost, which bounds overlap to a
+    single in-flight attempt.
     """
     token = uuid.uuid4().hex
     now = timezone.now()
@@ -856,6 +890,19 @@ def _claim_retry(archive):
     archive.retry_claim_token = token
     archive.retry_claim_expires_at = expires_at
     return token
+
+
+def _renew_retry_claim(archive, token):
+    """Extend the claim lease before the next outbound attempt.
+
+    Returns ``False`` when the lease was already taken over by a newer
+    attempt; the caller must then stop the remaining fan-out instead of
+    sending more targets a parallel attempt may also be delivering.
+    """
+    renewed = ReportGenerationArchive._base_manager.filter(pk=archive.pk, retry_claim_token=token).update(
+        retry_claim_expires_at=timezone.now() + RETRY_CLAIM_LEASE
+    )
+    return bool(renewed)
 
 
 def _release_retry_claim(archive, token, *, delivery_targets, delivery_status):
@@ -896,12 +943,19 @@ def _retry_channel_body(sched, archive):
     return body
 
 
-def _retry_email_target(sched, output, recipients):
-    """Re-attempt the aggregate email target; returns (ok, error_token)."""
+def _retry_email_target(sched, output, recipients, payload=None):
+    """Re-attempt the aggregate email target; returns (ok, error_token).
+
+    The recorded original subject and body are replayed when the failed
+    attempt captured them; entries without a recorded payload (pre-promotion
+    rows) fall back to the reconstructed subject and body.
+    """
     if not recipients:
         return False, "email.no_recipients"
+    subject = payload.get("subject") if isinstance(payload, dict) else None
+    body = payload.get("body") if isinstance(payload, dict) else None
     try:
-        delivered = _deliver_report_email(sched, sched.report, output, recipients)
+        delivered = _deliver_report_email(sched, sched.report, output, recipients, subject=subject, body=body)
     # broad except: boundary-isolation: SMTP providers expose implementation-specific delivery failures
     except Exception as error:
         logger.error(
@@ -967,7 +1021,7 @@ def _retry_channel_target(sched, archive, target_key, target=None):
 
 
 def _retry_subject(sched):
-    return _("[Scheduled Report] %(name)s") % {"name": sched.name}
+    return _report_email_subject(sched)
 
 
 def _complete_retry_claim(sched, archive, token, ledger):
@@ -999,10 +1053,36 @@ def _retry_failed_target(sched, archive, output, target):
     target_key = target.get("target", "")
     if target_key == DELIVERY_TARGET_EMAIL:
         recipients = _recorded_detail(target, "recipients") or []
-        return _retry_email_target(sched, output, recipients)
+        return _retry_email_target(sched, output, recipients, payload=_recorded_detail(target, "payload"))
     if target_key.startswith("channel:"):
         return _retry_channel_target(sched, archive, target_key, target)
     return False, "retry.unknown_target"
+
+
+def _retry_failed_targets(sched, archive, output, failed_targets, token):
+    """Re-attempt the recorded failed targets under the claim lease.
+
+    Returns ``(retried, claim_lost)``: how many targets were actually
+    contacted, and whether the lease was lost mid-fan-out (the caller then
+    stops and leaves the newer attempt's state in place).
+    """
+    retried = 0
+    for target in failed_targets:
+        if not _renew_retry_claim(archive, token):
+            logger.warning(
+                "Retry attempt lost its delivery claim lease; aborting the remaining fan-out",
+                extra={"operation": "reports.delivery_retry", "scheduled_report_id": sched.pk},
+            )
+            return retried, True
+        ok, error_token = _retry_failed_target(sched, archive, output, target)
+        retried += 1
+        target["retried"] = True
+        if ok:
+            target["status"] = "ok"
+            target["error"] = ""
+        else:
+            target["error"] = error_token
+    return retried, False
 
 
 def retry_failed_deliveries(sched):
@@ -1014,11 +1094,27 @@ def retry_failed_deliveries(sched):
     before anything leaves the system (a later scope change or revocation
     must not legitimize an older export), a paused schedule is refused, the
     recorded original targets and payloads are replayed, and a lease-fenced
-    claim makes two parallel attempts deliver exactly once. Without a
-    retained archive output there is nothing to redeliver — ``Run now``
-    re-runs the schedule instead.
+    claim serializes parallel attempts: the fan-out renews the lease before
+    every target and aborts once the lease was lost to a newer attempt, and
+    outbound attempts are bounded, so overlap is limited to a single in-flight
+    send (best-effort duplicate suppression) instead of an open-ended window.
+    The replayed archive is the newest run's own archive (``last_run_archive``);
+    a run that retained no archive is refused instead of falling back to an
+    older one — ``Run now`` re-runs the schedule instead.
     """
-    archive = ReportGenerationArchive._base_manager.filter(scheduled_report=sched).order_by("-generated_at").first()
+    archive = None
+    if sched.pk is not None:
+        # Read the binding fresh: the caller's instance may predate the last
+        # run, and the recovery must bind to the CURRENT run's archive.
+        archive_id = (
+            ScheduledReport._base_manager.filter(pk=sched.pk)
+            .values_list("last_run_archive_id", flat=True)
+            .first()
+        )
+        if archive_id is not None:
+            archive = ReportGenerationArchive._base_manager.filter(
+                pk=archive_id, scheduled_report_id=sched.pk
+            ).first()
     if archive is None or archive.file is None:
         return _RetryOutcome("retry.no_archive")
     failed_targets = [target for target in (archive.delivery_targets or []) if target.get("status") != "ok"]
@@ -1048,37 +1144,27 @@ def retry_failed_deliveries(sched):
         )
         return _RetryOutcome("retry.in_progress")
 
-    retried = 0
-    still_failed = 0
-    for target in failed_targets:
-        ok, error_token = _retry_failed_target(sched, archive, output, target)
-        retried += 1
-        target["retried"] = True
-        if ok:
-            target["status"] = "ok"
-            target["error"] = ""
-        else:
-            target["error"] = error_token
-            still_failed += 1
-
+    retried, claim_lost = _retry_failed_targets(sched, archive, output, failed_targets, token)
     ledger = list(archive.delivery_targets or [])
     _complete_retry_claim(sched, archive, token, ledger)
+    if claim_lost and retried == 0:
+        return _RetryOutcome("retry.in_progress")
+    failed_after = [target for target in ledger if target.get("status") != "ok"]
     logger.info(
         "Retried scheduled report deliveries",
         extra={
             "operation": "reports.delivery_retry",
             "scheduled_report_id": sched.pk,
             "retried": retried,
-            "still_failed": still_failed,
+            "still_failed": len(failed_after),
         },
     )
-    failed_after = [target for target in ledger if target.get("status") != "ok"]
     detail = "; ".join(
         f"{target.get('label') or target.get('target')}: {target.get('error')}" for target in failed_after
     )
     return _RetryOutcome(
-        "retry.completed" if still_failed == 0 else "retry.partial",
+        "retry.completed" if not failed_after else "retry.partial",
         retried=retried,
-        still_failed=still_failed,
+        still_failed=len(failed_after),
         detail=detail,
     )

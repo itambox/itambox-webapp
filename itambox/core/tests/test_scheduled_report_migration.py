@@ -1,9 +1,11 @@
 """Upgrade/rollback rehearsal for the Scheduled Reports Stable promotion.
 
 The 0124 transition must preserve every pre-promotion population while it
-backfills the fire-identity kwarg and reconciles duplicate registration rows;
-0125 then registers the newest accepted occurrence as a fire record and adds
-the delivery-retry hardening columns to the generation archive.
+backfills the fire-identity kwarg and reconciles duplicate registration rows
+onto the row the schedule references; 0125 then registers the newest accepted
+occurrence as a fire record and adds the delivery-retry hardening columns to
+the generation archive; 0126 binds Retry delivery to the newest run's archive
+without backfilling pre-promotion rows.
 The rehearsal drives a real ``MigrationExecutor`` against the shared test
 schema: stage at 0123, build the pre-upgrade state, migrate forward, and
 inspect the post-upgrade state through historical models, then verify the
@@ -20,16 +22,18 @@ from django.utils import timezone
 REPORT_TASK_PATH = "extras.tasks.reports.generate_scheduled_report_task"
 FIRE_KWARG = "intended_fire_at"
 FIRE_IDENTITY_MIGRATION = ("extras", "0124_scheduled_report_fire_identity_delivery_outcomes")
+HARDENING_MIGRATION = ("extras", "0125_scheduled_report_fire_records_retry_hardening")
 ARCHIVE_TABLE = "extras_reportgenerationarchive"
 FIRE_TABLE = "extras_scheduledreportfire"
+SCHEDULE_TABLE = "extras_scheduledreport"
 
 
 class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
-    """Upgrade evidence for 0124 and 0125 (fire identity, ledger, retry hardening)."""
+    """Upgrade evidence for 0124-0126 (fire identity, ledger, retry hardening and binding)."""
 
     reset_sequences = True
     migrate_from = ("extras", "0123_pause_flag_suppressed_report_schedules")
-    migrate_to = ("extras", "0125_scheduled_report_fire_records_retry_hardening")
+    migrate_to = ("extras", "0126_scheduledreport_last_run_archive")
 
     def tearDown(self):
         # Restore the shared test database to the leaf state so later tests
@@ -60,14 +64,16 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         recorder = MigrationRecorder(connection)
         if "delivery_status" in self._columns(ARCHIVE_TABLE):
             # An earlier interrupted rehearsal can leave the physical schema
-            # ahead of the recorder. Align both transitions as applied so the
-            # backward migration below really reverses them instead of
-            # tripping over already-existing columns.
+            # ahead of the recorder. Align each transition as applied to the
+            # columns it added so the backward migration below really reverses
+            # them instead of tripping over already-existing columns.
             applied = recorder.applied_migrations()
             for key in (self.migrate_from, FIRE_IDENTITY_MIGRATION):
                 if key not in applied:
                     recorder.record_applied(*key)
-            if "generation_scope" in self._columns(ARCHIVE_TABLE) and self.migrate_to not in applied:
+            if "generation_scope" in self._columns(ARCHIVE_TABLE) and HARDENING_MIGRATION not in applied:
+                recorder.record_applied(*HARDENING_MIGRATION)
+            if "last_run_archive_id" in self._columns(SCHEDULE_TABLE) and self.migrate_to not in applied:
                 recorder.record_applied(*self.migrate_to)
         self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
@@ -134,6 +140,15 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
             last_run=None,
         )
 
+        # Unreferenced duplicates (no ScheduledReport references either row):
+        # the oldest row survives deterministically.
+        self.orphan_a = self.Schedule.objects.create(
+            name="scheduled_report_orphan", func=REPORT_TASK_PATH, schedule_type="H", intended_date_kwarg=""
+        )
+        self.orphan_b = self.Schedule.objects.create(
+            name="scheduled_report_orphan", func=REPORT_TASK_PATH, schedule_type="H", intended_date_kwarg=""
+        )
+
         # A paused (dormant) schedule: must stay paused and un-resumed.
         self.paused_q = self.Schedule.objects.create(
             name="scheduled_report_paused",
@@ -198,7 +213,7 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         self.assertEqual(row.schedule_type, "H")
         self.assertEqual(row.repeats, -1)
 
-    def test_upgrade_collapses_duplicate_rows_and_repoints_the_schedule(self):
+    def test_upgrade_keeps_the_referenced_row_when_collapsing_duplicates(self):
         self._stage()
         apps = self._migrate_forward()
         Schedule = apps.get_model("django_q", "Schedule")
@@ -207,18 +222,31 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         rows = list(Schedule.objects.filter(name="scheduled_report_dup"))
         self.assertEqual(len(rows), 1)
         keeper = rows[0]
-        self.assertEqual(keeper.pk, self.dup_a.pk)
+        # The referenced row survives: it carries the live next_run/cadence
+        # state, and an older unreferenced duplicate must never replace the
+        # schedule the operator is running.
+        self.assertEqual(keeper.pk, self.dup_b.pk)
         self.assertEqual(keeper.intended_date_kwarg, FIRE_KWARG)
-        self.assertFalse(Schedule.objects.filter(pk=self.dup_b.pk).exists())
+        self.assertFalse(Schedule.objects.filter(pk=self.dup_a.pk).exists())
 
-        # The schedule FK was re-pointed at the surviving row.
+        # The schedule FK still points at the surviving, referenced row.
         schedule = ScheduledReport.objects.get(pk=self.dup_schedule.pk)
         self.assertEqual(schedule.schedule_id, keeper.pk)
-        # Deactivating the duplicates did not touch activation state or history.
+        # Collapsing the duplicates did not touch activation state or history.
         self.assertTrue(schedule.is_active)
         self.assertEqual(schedule.last_status, "success")
         # Foreign rows are never collapsed.
         self.assertTrue(Schedule.objects.filter(pk=self.foreign_row.pk).exists())
+
+    def test_upgrade_collapses_unreferenced_duplicates_onto_the_oldest(self):
+        self._stage()
+        apps = self._migrate_forward()
+        Schedule = apps.get_model("django_q", "Schedule")
+
+        rows = list(Schedule.objects.filter(name="scheduled_report_orphan"))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].pk, self.orphan_a.pk)
+        self.assertFalse(Schedule.objects.filter(pk=self.orphan_b.pk).exists())
 
     def test_upgrade_preserves_paused_state_approvals_and_archives(self):
         self._stage()
@@ -236,6 +264,10 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
 
         # Fire identity is not backfilled with a synthetic time.
         self.assertIsNone(ScheduledReport.objects.get(pk=self.legacy_schedule.pk).last_accepted_fire_at)
+        # The retry binding is not backfilled either: legacy rows keep a null
+        # archive reference so their retry action cannot fire against an
+        # older archived report.
+        self.assertIsNone(ScheduledReport.objects.get(pk=self.legacy_schedule.pk).last_run_archive_id)
 
         # Approval and archive records survive with unchanged semantics.
         approval = Authorization.objects.get(pk=self.approval.pk)
@@ -299,6 +331,11 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         for column in ("generation_scope", "retry_claim_token", "retry_claim_expires_at"):
             self.assertIn(column, self._columns(archive_table))
         self.assertIn(FIRE_TABLE, self._tables())
+        self.assertIn("last_run_archive_id", self._columns(SCHEDULE_TABLE))
+        bound_report = self.executor.loader.project_state([self.migrate_to]).apps.get_model(
+            "extras", "ScheduledReport"
+        )
+        self.assertIsNone(bound_report.objects.get(pk=self.legacy_schedule.pk).last_run_archive_id)
         Schedule = self.executor.loader.project_state([self.migrate_to]).apps.get_model("django_q", "Schedule")
         self.assertEqual(Schedule.objects.get(pk=self.legacy_row.pk).intended_date_kwarg, FIRE_KWARG)
 
@@ -311,6 +348,7 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         self.assertNotIn("delivery_status", self._columns(archive_table))
         self.assertNotIn("generation_scope", self._columns(archive_table))
         self.assertNotIn("retry_claim_token", self._columns(archive_table))
+        self.assertNotIn("last_run_archive_id", self._columns(SCHEDULE_TABLE))
         self.assertNotIn(FIRE_TABLE, self._tables())
         Schedule = self.executor.loader.project_state([self.migrate_from]).apps.get_model("django_q", "Schedule")
         self.assertEqual(Schedule.objects.get(pk=self.legacy_row.pk).intended_date_kwarg, "")
@@ -320,6 +358,7 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         Schedule = apps.get_model("django_q", "Schedule")
         self.assertEqual(Schedule.objects.get(pk=self.legacy_row.pk).intended_date_kwarg, FIRE_KWARG)
         self.assertIn("delivery_status", self._columns(archive_table))
+        self.assertIn("last_run_archive_id", self._columns(SCHEDULE_TABLE))
         self.assertIn(FIRE_TABLE, self._tables())
         ScheduledReport = apps.get_model("extras", "ScheduledReport")
         self.assertTrue(ScheduledReport.objects.get(pk=self.legacy_schedule.pk).is_active)

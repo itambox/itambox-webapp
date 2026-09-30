@@ -54,6 +54,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0123_pause_flag_suppressed_report_schedules",
     "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
     "extras.0125_scheduled_report_fire_records_retry_hardening",
+    "extras.0126_scheduledreport_last_run_archive",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",

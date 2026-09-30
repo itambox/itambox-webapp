@@ -15461,13 +15461,6 @@ msgstr "Bis %(date)s"
 msgid "Valid until %(date)s"
 msgstr "Gültig bis %(date)s"
 
-#: itambox/itambox/procurement/services.py
-msgid "The receipt submission does not state the recorded quantity it was prepared against for line %(line)s. Reload the receive form and submit again."
-msgstr "Die Wareneingangsübermittlung enthält für Position %(line)s keine Angabe der aufgefundenen Empfangsmenge. Bitte das Wareneingangsformular neu laden und erneut absenden."
-
-#: itambox/itambox/procurement/services.py
-msgid "The recorded quantity for line %(line)s changed since this receipt was prepared (expected %(expected)s, found %(found)s). Reload the receive form and submit again."
-msgstr "Die erfasste Menge für Position %(line)s hat sich seit Vorbereitung dieses Wareneingangs geändert (erwartet %(expected)s, vorgefunden %(found)s). Bitte das Wareneingangsformular neu laden und erneut absenden."
 
 #: itambox/extras/models.py
 msgid "Delivery Targets"
@@ -15606,3 +15599,20 @@ msgstr "Erneute Zustellung für '%(name)s' läuft bereits; der laufende Versuch 
 #, python-format
 msgid "Retry delivery for '%(name)s' was refused: the schedule is inactive; reactivate it before retrying its delivery."
 msgstr "Erneute Zustellung für '%(name)s' wurde abgelehnt: Der Zeitplan ist inaktiv; aktivieren Sie ihn erneut, bevor Sie die Zustellung wiederholen."
+
+#: itambox/itambox/procurement/services.py
+msgid "The receipt submission does not state the recorded quantity it was prepared against for line %(line)s. Reload the receive form and submit again."
+msgstr "Die Wareneingangsübermittlung enthält für Position %(line)s keine Angabe der aufgefundenen Empfangsmenge. Bitte das Wareneingangsformular neu laden und erneut absenden."
+
+#: itambox/itambox/procurement/services.py
+msgid "The recorded quantity for line %(line)s changed since this receipt was prepared (expected %(expected)s, found %(found)s). Reload the receive form and submit again."
+msgstr "Die erfasste Menge für Position %(line)s hat sich seit Vorbereitung dieses Wareneingangs geändert (erwartet %(expected)s, vorgefunden %(found)s). Bitte das Wareneingangsformular neu laden und erneut absenden."
+
+#: itambox/extras/models.py
+msgid "Last Run Archive"
+msgstr "Archiv des letzten Laufs"
+
+
+#: itambox/extras/models.py
+msgid "Output archive retained by the newest completed run. Retry delivery re-sends exactly this archive; a run that retained none clears the reference, so an older archived report is never redelivered in its place."
+msgstr "Die im neuesten abgeschlossenen Lauf aufbewahrte Ausgabe. Die erneute Zustellung sendet genau dieses Archiv erneut; ein Lauf ohne aufbewahrtes Archiv löscht die Referenz, sodass ein älterer archivierter Bericht niemals an dessen Stelle erneut zugestellt wird."

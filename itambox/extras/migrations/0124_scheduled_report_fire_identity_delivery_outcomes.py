@@ -22,9 +22,11 @@ The reconciliation is deliberately non-destructive and upgrade-only:
 * every existing report schedule row gains the ``intended_fire_at`` kwarg so
   the fire-identity claim works from the first fire after the upgrade;
 * duplicate registration rows for one schedule name (possible before the
-  advisory-locked registration) are collapsed onto the surviving row, with any
-  ``ScheduledReport`` FK re-pointed first, so the duplicates can no longer
-  double-fire deliveries;
+  advisory-locked registration) are collapsed onto the row the schedule
+  references (falling back to the oldest), with ``ScheduledReport`` rows that
+  referenced a removed duplicate re-pointed, so the duplicates can no longer
+  double-fire deliveries and the active scheduling state is never replaced by
+  a stale duplicate;
 * nothing is activated, no ``is_active`` flag is touched, no ``next_run`` is
   backfilled, and no delivery state is rewritten — dormant or paused schedules
   stay exactly as the operator left them.
@@ -61,17 +63,30 @@ def reconcile_report_schedule_rows(apps, schema_editor):
     for row in rows:
         by_name.setdefault(row.name, []).append(row)
     for name, group in by_name.items():
-        keeper, duplicates = group[0], group[1:]
-        if duplicates:
-            duplicate_ids = [row.pk for row in duplicates]
-            ScheduledReport.objects.using(using).filter(schedule_id__in=duplicate_ids).update(schedule_id=keeper.pk)
-            Schedule.objects.using(using).filter(pk__in=duplicate_ids).delete()
-            logger.warning(
-                "Collapsed %d duplicate scheduled-report registration row(s) for %s onto %s",
-                len(duplicate_ids),
-                name,
-                keeper.pk,
-            )
+        if len(group) < 2:
+            continue
+        group_ids = [row.pk for row in group]
+        referenced_ids = set(
+            ScheduledReport.objects.using(using)
+            .filter(schedule_id__in=group_ids)
+            .values_list("schedule_id", flat=True)
+        )
+        # Prefer the row the report actually references as the survivor: the
+        # referenced row carries the live next_run/cadence state, and
+        # collapsing a report onto an older duplicate could silently replace
+        # the schedule the operator is running with a stale one.
+        keeper = next((row for row in group if row.pk in referenced_ids), group[0])
+        removed_ids = [row.pk for row in group if row.pk != keeper.pk]
+        # Re-point only the reports whose referenced row is being removed; the
+        # keeper keeps its reference (and its scheduling state) untouched.
+        ScheduledReport.objects.using(using).filter(schedule_id__in=removed_ids).update(schedule_id=keeper.pk)
+        Schedule.objects.using(using).filter(pk__in=removed_ids).delete()
+        logger.warning(
+            "Collapsed %d duplicate scheduled-report registration row(s) for %s onto %s",
+            len(removed_ids),
+            name,
+            keeper.pk,
+        )
 
     # Backfill the fire-identity kwarg on every row that fires the report task
     # (not only the name-prefixed ones), so redelivery is a no-op from the

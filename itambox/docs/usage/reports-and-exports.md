@@ -331,14 +331,17 @@ Each run is observable per stage:
   `partial` or `failed` (a generation failure is recovered with **Run now**).
   It re-attempts exactly the targets recorded as failed, never
   re-sends targets that already succeeded, and contacts the recorded original
-  recipients and payloads even if the schedule was edited since. It is refused
-  while the schedule is inactive, and it re-checks the archived run's
-  generation scope against the standing approval before contacting anything,
-  so a later scope change cannot legitimize an older export. Two parallel
-  retry requests deliver exactly once: the attempt holds an exclusive claim
-  that expires by itself if the request is interrupted. Without a retained
-  archived output there is nothing to redeliver; use **Run now** to generate a
-  fresh run.
+  recipients, email subject/body, and notification payloads even if the
+  schedule was edited since. It is refused while the schedule is inactive, and
+  it re-checks the archived run's generation scope against the standing
+  approval before contacting anything, so a later scope change cannot
+  legitimize an older export. The retry replays the newest run's own archive
+  only: a run that retained no archived output is refused instead of
+  redelivering an older report — use **Run now** to generate a fresh run.
+  Parallel retry requests are serialized by an exclusive, self-expiring claim;
+  the fan-out renews it before every target, aborts once it was lost, and
+  outbound attempts are bounded, so overlap is limited to a single in-flight
+  send (best-effort duplicate suppression).
 
 ### Cross-Tenant Scope Approvals
 

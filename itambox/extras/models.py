@@ -1815,6 +1815,20 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
             "idempotency is enforced by the fire records, where a redelivered occurrence is an exact-match no-op."
         ),
     )
+    last_run_archive = models.ForeignKey(
+        "ReportGenerationArchive",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        verbose_name=_("Last Run Archive"),
+        help_text=_(
+            "Output archive retained by the newest completed run. Retry delivery re-sends exactly this "
+            "archive; a run that retained none clears the reference, so an older archived report is never "
+            "redelivered in its place."
+        ),
+    )
 
     class Meta:
         ordering = ["name"]
@@ -1835,9 +1849,14 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         the run and are recovered with ``Run now``; this only marks runs whose
         generation succeeded but whose delivery fan-out did not fully succeed,
         including legacy rows that still carry the pre-promotion
-        ``delivery_`` status text.
+        ``delivery_`` status text. The action binds to the archive of the
+        last run (``last_run_archive``): when that run retained no archive,
+        retrying is refused so an older archived report can never be
+        re-sent in its place.
         """
         if not self.is_active:
+            return False
+        if self.last_run_archive_id is None:
             return False
         return self.last_status in ("partial", "failed") or self.last_status.startswith("delivery_")
 
