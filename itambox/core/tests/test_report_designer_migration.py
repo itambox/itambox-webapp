@@ -10,17 +10,60 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 
+def _ensure_retired_report_designer_columns():
+    """Reconcile the columns the 0127 retirement removes at the migration head.
+
+    The 0105 and 0123 rehearsals below stage their scenarios on the schema of
+    their era, which still carries ``advanced_mode`` and
+    ``legacy_designer_grandfathered`` physically. The retirement migration
+    removes both columns at the head, so restore them explicitly (idempotent,
+    mirroring 0105's own persistent-field reconciliation) before rehearsing.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS advanced_mode boolean DEFAULT FALSE")
+        cursor.execute("UPDATE extras_reporttemplate SET advanced_mode = FALSE WHERE advanced_mode IS NULL")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET DEFAULT FALSE")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET NOT NULL")
+        cursor.execute(
+            "ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS legacy_designer_grandfathered"
+            " boolean DEFAULT FALSE"
+        )
+        cursor.execute(
+            "UPDATE extras_reporttemplate SET legacy_designer_grandfathered = FALSE"
+            " WHERE legacy_designer_grandfathered IS NULL"
+        )
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET DEFAULT FALSE")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET NOT NULL")
+    connection.commit()
+
+
+def _restore_migration_head():
+    """Return the shared test database to the true head after a rehearsal.
+
+    A rehearsal that moved the schema below the head leaves the retirement
+    migration recorded as applied while its columns linger and rows still
+    record the removed legacy CSV shape. Clear the rehearsed flag and the
+    simulated audit history that would restore it, then re-run the retirement
+    migration so the database ends at the real migration head.
+    """
+    _ensure_retired_report_designer_columns()
+    with connection.cursor() as cursor:
+        cursor.execute("UPDATE extras_reporttemplate SET advanced_mode = FALSE")
+        cursor.execute("DELETE FROM core_objectchange")
+    connection.commit()
+    MigrationRecorder(connection).record_unapplied("extras", "0127_retire_report_designer_legacy")
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
 class ReportDesignerMigrationTests(TransactionTestCase):
     reset_sequences = True
     migrate_from = ("extras", "0102_alter_event_action")
     migrate_to = ("extras", "0105_reporttemplate_advanced_mode_and_more")
 
     def tearDown(self):
-        # Restore the shared test database to the migration leaf state so later
-        # tests never see a rehearsed (partially migrated) schema.
         try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())
+            _restore_migration_head()
         finally:
             super().tearDown()
 
@@ -44,6 +87,9 @@ class ReportDesignerMigrationTests(TransactionTestCase):
     def setUp(self):
         super().setUp()
         MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
+        # 0105's reverse resets the marker before its own schema reconciliation,
+        # so the rehearsal must start from the era's physical columns.
+        _ensure_retired_report_designer_columns()
         self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
@@ -209,11 +255,8 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
     flag_names = ("ITAMBOX_FEATURE_REPORT_DESIGNER", "ITAMBOX_REPORT_DESIGNER_ENABLED")
 
     def tearDown(self):
-        # Restore the shared test database to the migration leaf state so later
-        # tests never see a rehearsed (partially migrated) schema.
         try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())
+            _restore_migration_head()
         finally:
             super().tearDown()
 
@@ -255,6 +298,8 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
         MigrationRecorder(connection).record_unapplied("extras", "0123_pause_flag_suppressed_report_schedules")
         self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
+        # The 0122-era scenario rows still write the retired columns on create.
+        _ensure_retired_report_designer_columns()
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
         ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
         ScheduledReport = old_apps.get_model("extras", "ScheduledReport")
@@ -419,9 +464,7 @@ class ReportDesignerRetirementMigrationTests(TransactionTestCase):
         self.executor.migrate([self.migrate_from])
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
         self.ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
-        with connection.schema_editor() as schema_editor:
-            for field_name in ("advanced_mode", "legacy_designer_grandfathered"):
-                schema_editor.add_field(self.ReportTemplate, self.ReportTemplate._meta.get_field(field_name))
+        _ensure_retired_report_designer_columns()
 
     def _create_beta_templates(self):
         Tenant = self.executor.loader.project_state([self.migrate_from]).apps.get_model("organization", "Tenant")

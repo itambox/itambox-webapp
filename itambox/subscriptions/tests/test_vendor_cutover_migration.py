@@ -4,12 +4,39 @@ import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.graph import MigrationGraph
+from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 from django.utils import timezone
 
 MIGRATE_FROM = ("subscriptions", "0102_commercial_vendor_and_terms")
 ASSET_STATE = ("assets", "0121_supplier_scoping_and_commercial_fields")
 MIGRATE_TO = ("subscriptions", "0103_unified_vendor_cutover")
+
+
+def _ensure_retired_report_designer_columns():
+    """Reconcile the columns the 0127 retirement removes at the migration head.
+
+    The rehearsal state still carries ``advanced_mode`` and
+    ``legacy_designer_grandfathered`` physically, and the era's ReportTemplate
+    model writes them on create. Restore them explicitly (idempotent,
+    mirroring 0105's own persistent-field reconciliation).
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS advanced_mode boolean DEFAULT FALSE")
+        cursor.execute("UPDATE extras_reporttemplate SET advanced_mode = FALSE WHERE advanced_mode IS NULL")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET DEFAULT FALSE")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET NOT NULL")
+        cursor.execute(
+            "ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS legacy_designer_grandfathered"
+            " boolean DEFAULT FALSE"
+        )
+        cursor.execute(
+            "UPDATE extras_reporttemplate SET legacy_designer_grandfathered = FALSE"
+            " WHERE legacy_designer_grandfathered IS NULL"
+        )
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET DEFAULT FALSE")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET NOT NULL")
+    connection.commit()
 
 
 @pytest.mark.serial_only
@@ -19,6 +46,8 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
         self.addCleanup(self._restore_leaf)
         self.executor = self._scoped_executor()
         self.executor.migrate([MIGRATE_FROM, ASSET_STATE])
+        # The rehearsal state still carries the retired designer columns.
+        _ensure_retired_report_designer_columns()
         old_apps = self.executor.loader.project_state([MIGRATE_FROM, ASSET_STATE]).apps
 
         Provider = old_apps.get_model("subscriptions", "Provider")
@@ -471,6 +500,11 @@ class UnifiedVendorCutoverMigrationTests(TransactionTestCase):
 
     @staticmethod
     def _restore_leaf():
+        # Re-run the retirement migration above the rehearsal so the columns it
+        # removes at the head do not linger once the rehearsal moved the schema
+        # below the head.
+        _ensure_retired_report_designer_columns()
+        MigrationRecorder(connection).record_unapplied("extras", "0127_retire_report_designer_legacy")
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
 
@@ -727,6 +761,8 @@ class UnifiedVendorCutoverDanglingReferenceTests(TransactionTestCase):
         self.addCleanup(self._restore_leaf)
         self.executor = self._scoped_executor()
         self.executor.migrate([MIGRATE_FROM, ASSET_STATE])
+        # The rehearsal state still carries the retired designer columns.
+        _ensure_retired_report_designer_columns()
         old_apps = self.executor.loader.project_state([MIGRATE_FROM, ASSET_STATE]).apps
 
         Provider = old_apps.get_model("subscriptions", "Provider")
@@ -797,6 +833,11 @@ class UnifiedVendorCutoverDanglingReferenceTests(TransactionTestCase):
 
     @staticmethod
     def _restore_leaf():
+        # Re-run the retirement migration above the rehearsal so the columns it
+        # removes at the head do not linger once the rehearsal moved the schema
+        # below the head.
+        _ensure_retired_report_designer_columns()
+        MigrationRecorder(connection).record_unapplied("extras", "0127_retire_report_designer_legacy")
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
 
