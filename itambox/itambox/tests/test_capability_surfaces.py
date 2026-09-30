@@ -21,7 +21,7 @@ from django.test import RequestFactory, override_settings
 from itambox.api.openapi import CapabilityAwareAutoSchema
 from itambox.capabilities import ALWAYS_ON, BETA, EXPERIMENTAL, SOURCE_ALWAYS, STABLE, registry
 from itambox.tests.capability_harness import deactivated, probe_failing
-from itambox.views.generic.capability_notices import capability_notice
+from itambox.views.generic.capability_notices import NOTICE_FIELDS, capability_notice
 
 #: Stand-ins for a DRF viewset and its queryset: the schema class only ever
 #: reads ``view.queryset.model``, so there is nothing else to imitate.
@@ -30,18 +30,52 @@ _StubView = namedtuple("_StubView", "queryset")
 _APP_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _model_for_reference(reference):
+    """The model class a registry ``owns`` reference names, or ``None``.
+
+    Capabilities also own non-model references (API surfaces, doc namespaces),
+    so the ownership walk has to ask the app registry instead of assuming.
+    """
+    from django.apps import apps as app_registry
+
+    app_label, _, object_name = reference.partition(".")
+    try:
+        return app_registry.get_model(app_label, object_name)
+    except LookupError:
+        return None
+
+
 class TestSurfaceMarker:
     """U2: a non-Stable model carries its owning capability's marker."""
 
-    def test_a_beta_owned_model_yields_a_notice(self):
-        from procurement.models import FulfillmentLink
+    def test_owned_model_notices_follow_the_declared_maturity(self):
+        """U2: a model's marker is its owning capability's declared grade.
 
-        notice = capability_notice(FulfillmentLink)
-        assert notice["key"] == "procurement.requisition_seam"
-        assert notice["maturity"] == BETA
-        assert notice["title"]
-        assert notice["docs_url"].endswith(".md")
-        assert notice["limitations"]
+        Subject and expectation come from the registry: which capability is
+        still settling changes with every promotion, so a pinned example goes
+        stale the moment the next slice stabilizes. Every owned model is
+        walked; non-Stable owners must mark their models, Stable owners must
+        not, and the published notice never carries the probe.
+        """
+        owned_models = 0
+        for capability in registry.all():
+            for reference in capability.owns:
+                model = _model_for_reference(reference)
+                if model is None:
+                    continue
+                owned_models += 1
+                notice = capability_notice(model)
+                if capability.maturity == STABLE:
+                    assert notice is None, reference
+                    continue
+                assert notice is not None, reference
+                assert notice["key"] == capability.key
+                assert notice["maturity"] == capability.maturity
+                assert notice["title"]
+                assert notice["docs_url"].endswith(".md")
+                assert notice["limitations"]
+                assert "activation_probe" not in notice
+        assert owned_models > 0, "the ownership walk resolved no model references"
 
     def test_stable_scheduled_models_yield_no_notice(self):
         from extras.models import ReportGenerationArchive, ScheduledReport
@@ -76,24 +110,21 @@ class TestSurfaceMarker:
         assert notice["maturity"] == EXPERIMENTAL
 
     def test_a_notice_never_carries_the_probe_or_a_value(self):
-        from procurement.models import FulfillmentLink
-
-        notice = capability_notice(FulfillmentLink)
-        assert "activation_probe" not in notice
-        assert set(notice) == {"key", "title", "maturity", "activation", "docs_url", "limitations"}
+        # The production field set is closed: the probe, its observed value,
+        # the owning area, and the owned references never reach a template.
+        assert "activation_probe" not in NOTICE_FIELDS
+        assert "value_present" not in NOTICE_FIELDS
+        notice = _notice_for_key("users.scim_provisioning")
+        assert set(notice) == set(NOTICE_FIELDS)
 
     def test_a_deactivated_capability_still_marks_its_surface(self):
         """Inactive is not invisible: the grade is a property of the contract."""
-        from procurement.models import FulfillmentLink
-
-        with deactivated("procurement.requisition_seam"):
-            assert capability_notice(FulfillmentLink)["maturity"] == BETA
+        with deactivated("users.scim_provisioning"):
+            assert _notice_for_key("users.scim_provisioning")["maturity"] == BETA
 
     def test_the_notice_survives_a_failing_probe(self):
-        from procurement.models import FulfillmentLink
-
-        with probe_failing("procurement.requisition_seam"):
-            assert capability_notice(FulfillmentLink)["key"] == "procurement.requisition_seam"
+        with probe_failing("users.scim_provisioning"):
+            assert _notice_for_key("users.scim_provisioning")["key"] == "users.scim_provisioning"
 
 
 class TestBannerTemplate:
