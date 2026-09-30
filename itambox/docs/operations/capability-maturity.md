@@ -28,15 +28,19 @@ and always available, and nothing is ever delivered until an administrator
 deliberately creates and enables an endpoint and a rule. Alert Rules and
 Channels behave the same way: nothing is notified until an administrator
 deliberately creates an active rule with attached, enabled channels, and no
-rule or channel is ever provisioned or enabled automatically.
+rule or channel is ever provisioned or enabled automatically. SCIM
+Provisioning behaves the same way: the mounts are Stable and always
+available, and nothing is ever provisioned until an administrator
+deliberately mints a scope-bound, write-enabled token and an identity
+provider calls the mounts.
 
 ## Activation modes
 
 | Mode | How it is switched on | Example in this release |
 |---|---|---|
-| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Alert Rules and Channels, Webhooks and Event Rules, Purchase Orders and Contracts, Asset Request Procurement Seam, SaaS Subscriptions, Role Grants, Tenant Resource Grants |
+| Enabled by default | Part of every deployment; no action needed. | Curated Reports, Report Designer, Alerts and Notifications, Alert Rules and Channels, Webhooks and Event Rules, Purchase Orders and Contracts, Asset Request Procurement Seam, SaaS Subscriptions, SCIM Provisioning, Role Grants, Tenant Resource Grants |
 | Opt-in through configuration | An operator sets an environment variable / setting; takes effect on restart. | Plugin System (`ITAMBOX_PLUGINS`), Asset Request auto-approval (`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`) |
-| Opt-in through an application object | An administrator creates or enables a record in the application. | Scheduled Reports (an active schedule row), SCIM Provisioning (a tenant-scoped API token with write access) |
+| Opt-in through an application object | An administrator creates or enables a record in the application. | Scheduled Reports (an active schedule row) |
 
 A capability that is not switched on is reported as **inactive** — it keeps its
 declared grade, but contributes none of its surfaces until it is activated.
@@ -58,7 +62,7 @@ inactive.
 | Purchase Orders and Contracts | Stable | Enabled by default | [Contracts & Purchase Orders](../usage/contracts-and-purchase-orders.md) |
 | Asset Request Procurement Seam | Stable | Always on | [Asset Requests](../usage/asset-requests-and-reservations.md) |
 | SaaS Subscriptions | Stable | Enabled by default | — |
-| SCIM Provisioning | Beta | Opt-in: tenant-scoped API token with write access | [SCIM Provisioning](../integration/scim.md) |
+| SCIM Provisioning | Stable | Always on; provisioning requires an administrator-configured identity provider and a scoped, write-enabled token | [SCIM Provisioning](../integration/scim.md) |
 | Plugin System | Experimental | Opt-in: `ITAMBOX_PLUGINS` | [Plugin guide](../plugins/getting_started.md) |
 
 ## Verifying the declared state
@@ -78,6 +82,7 @@ reporting.designer                  stable   always-on  active    always        
 automation.webhooks                 stable   always-on  active    always          present
 alerting.rules                      stable   always-on  active    always          present
 organization.resource_grants *      stable   always-on  active    always          present
+users.scim_provisioning             stable   always-on  active    always          present
 ```
 
 (* marks security-critical capabilities, which cannot be deactivated.)

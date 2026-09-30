@@ -67,8 +67,7 @@ python manage.py capabilities
 - **Inactive, opt-in capability** — check the activation source: the
   configuration setting (`ITAMBOX_PLUGINS`,
   `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`) or the application object
-  (active Scheduled Report row, enabled `EventRule`, active `AlertRule`, SCIM
-  token). The Report Designer is always on and needs no setting. See
+  (active Scheduled Report row, enabled `EventRule`, active `AlertRule`). The Report Designer is always on and needs no setting. See
   [Capability Maturity](capability-maturity.md).
 - **`error` state** — the capability's probe could not run (for example the
   database is unreachable); the exception *type* is shown, never the message.

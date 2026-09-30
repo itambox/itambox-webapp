@@ -269,9 +269,11 @@ class TestOperatorDiagnostics:
     def test_the_command_reports_mode_source_and_state(self):
         output = _run_command()
         assert "opt-in" in output
-        assert "object-enabled" in output
-        assert "operator-flag" in output
-        assert "always" in output
+        # Derive the declared source kinds: a kind is asserted while a capability
+        # still declares it, so promoting the last capability of a kind does not
+        # pin this test to a vanished example.
+        for source in sorted({capability.activation_source for capability in registry.all()}):
+            assert source in output
 
     def test_the_command_reports_value_presence_not_the_value(self):
         with override_settings(PLUGINS=["demo_plugin_secret"]):
@@ -323,7 +325,7 @@ class TestOpenAPIMaturity:
 
         assert settings.REST_FRAMEWORK["DEFAULT_SCHEMA_CLASS"].endswith("CapabilityAwareAutoSchema")
 
-    def test_every_generated_scim_operation_is_annotated_beta(self):
+    def test_every_generated_scim_operation_is_annotated_stable(self):
         from drf_spectacular.generators import SchemaGenerator
 
         schema = SchemaGenerator().get_schema(request=None, public=True)
@@ -336,7 +338,7 @@ class TestOpenAPIMaturity:
         ]
 
         assert len(operations) == 26
-        assert {operation.get("x-itambox-maturity") for operation in operations} == {BETA}
+        assert {operation.get("x-itambox-maturity") for operation in operations} == {STABLE}
 
 
 @pytest.mark.serial_only

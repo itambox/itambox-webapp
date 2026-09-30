@@ -33808,7 +33808,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroupListResponse'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: scim_provider_groups_create
       parameters:
@@ -33877,7 +33877,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroup'
           description: An existing SCIM group was correlated.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/providers/{provider_slug}/scim/v2/Groups/{id}:
     get:
       operationId: scim_provider_group_retrieve
@@ -33936,7 +33936,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroup'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: scim_provider_group_replace
       parameters:
@@ -34006,7 +34006,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroup'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: scim_provider_group_update
       parameters:
@@ -34075,7 +34075,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroup'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: scim_provider_group_delete
       parameters:
@@ -34129,7 +34129,7 @@ paths:
           description: The request conflicts with an existing SCIM resource.
         '204':
           description: SCIM resource deleted.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/providers/{provider_slug}/scim/v2/ServiceProviderConfig:
     get:
       operationId: scim_provider_service_provider_config_retrieve
@@ -34181,7 +34181,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMServiceProviderConfig'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/providers/{provider_slug}/scim/v2/Users:
     get:
       operationId: scim_provider_users_list
@@ -34247,7 +34247,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUserListResponse'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: scim_provider_users_create
       parameters:
@@ -34316,7 +34316,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: An existing SCIM user was correlated.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/providers/{provider_slug}/scim/v2/Users/{id}:
     get:
       operationId: scim_provider_user_retrieve
@@ -34375,7 +34375,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: scim_provider_user_replace
       parameters:
@@ -34445,7 +34445,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: scim_provider_user_update
       parameters:
@@ -34514,7 +34514,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: scim_provider_user_delete
       parameters:
@@ -34568,7 +34568,7 @@ paths:
           description: The request conflicts with an existing SCIM resource.
         '204':
           description: SCIM resource deleted.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/schema/:
     get:
       operationId: schema_retrieve
@@ -36979,7 +36979,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroupListResponse'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: scim_tenant_groups_create
       parameters:
@@ -37024,7 +37024,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMError'
           description: The request conflicts with an existing SCIM resource.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/tenants/{tenant_slug}/scim/v2/Groups/{id}:
     get:
       operationId: scim_tenant_group_retrieve
@@ -37083,7 +37083,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMGroup'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: scim_tenant_group_replace
       parameters:
@@ -37135,7 +37135,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMError'
           description: The request conflicts with an existing SCIM resource.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: scim_tenant_group_update
       parameters:
@@ -37198,7 +37198,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMError'
           description: The request conflicts with an existing SCIM resource.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: scim_tenant_group_delete
       parameters:
@@ -37250,7 +37250,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMError'
           description: The request conflicts with an existing SCIM resource.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/tenants/{tenant_slug}/scim/v2/ServiceProviderConfig:
     get:
       operationId: scim_tenant_service_provider_config_retrieve
@@ -37302,7 +37302,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMServiceProviderConfig'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/tenants/{tenant_slug}/scim/v2/Users:
     get:
       operationId: scim_tenant_users_list
@@ -37368,7 +37368,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUserListResponse'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     post:
       operationId: scim_tenant_users_create
       parameters:
@@ -37437,7 +37437,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: An existing SCIM user was correlated.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/tenants/{tenant_slug}/scim/v2/Users/{id}:
     get:
       operationId: scim_tenant_user_retrieve
@@ -37496,7 +37496,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     put:
       operationId: scim_tenant_user_replace
       parameters:
@@ -37566,7 +37566,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     patch:
       operationId: scim_tenant_user_update
       parameters:
@@ -37635,7 +37635,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SCIMUser'
           description: SCIM operation succeeded.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
     delete:
       operationId: scim_tenant_user_delete
       parameters:
@@ -37689,7 +37689,7 @@ paths:
           description: The request conflicts with an existing SCIM resource.
         '204':
           description: SCIM resource deleted.
-      x-itambox-maturity: beta
+      x-itambox-maturity: stable
   /api/users/:
     get:
       operationId: users_retrieve

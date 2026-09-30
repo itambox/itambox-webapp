@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.exceptions import APIException
 
 from core.tests.mixins import grant
 from organization.models import Membership, Role, Tenant
@@ -445,6 +445,56 @@ class SCIMIdentityContractTests(TestCase):
         )
         self.assertEqual(not_equal_response.status_code, status.HTTP_200_OK)
 
+    def test_external_id_scope_is_per_mount(self):
+        """externalId uniqueness and correlation are scoped to one tenant/provider: the
+        same value reused by another mount neither collides nor resolves across mounts."""
+        shared_external_id = "shared-directory-id-0001"
+        payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            "externalId": shared_external_id,
+            "userName": "scope-a@corp.example",
+            "emails": [{"value": "scope-a@corp.example", "type": "work"}],
+            "active": True,
+        }
+        tenant_list_url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant_a.slug})
+        provider_list_url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
+
+        created_a = self.client.post(
+            tenant_list_url, data=payload, content_type="application/json", **self.headers(self.tenant_token)
+        )
+        self.assertEqual(created_a.status_code, status.HTTP_201_CREATED)
+
+        # The provider mount provisions a different user reusing the same externalId value.
+        provider_payload = {**payload, "userName": "scope-p@corp.example"}
+        created_p = self.client.post(
+            provider_list_url,
+            data=provider_payload,
+            content_type="application/json",
+            **self.headers(self.provider_token),
+        )
+        self.assertEqual(created_p.status_code, status.HTTP_201_CREATED)
+
+        # Filtering by externalId resolves only the mount's own row.
+        filter_query = f"?filter=externalId eq {shared_external_id!r}"
+        tenant_rows = self.client.get(f"{tenant_list_url}{filter_query}", **self.headers(self.tenant_token)).json()
+        self.assertEqual([row["userName"] for row in tenant_rows["Resources"]], ["scope-a@corp.example"])
+        provider_rows = self.client.get(
+            f"{provider_list_url}{filter_query}", **self.headers(self.provider_token)
+        ).json()
+        self.assertEqual([row["userName"] for row in provider_rows["Resources"]], ["scope-p@corp.example"])
+
+        # A second tenant cannot correlate against the first tenant's externalId either.
+        tenant_b_url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant_b.slug})
+        created_b = self.client.post(
+            tenant_b_url,
+            data={**payload, "userName": "scope-b@corp.example"},
+            content_type="application/json",
+            **self.headers(self.tenant_b_token),
+        )
+        self.assertEqual(created_b.status_code, status.HTTP_201_CREATED)
+        rows_b = self.client.get(f"{tenant_b_url}{filter_query}", **self.headers(self.tenant_b_token)).json()
+        self.assertEqual([row["userName"] for row in rows_b["Resources"]], ["scope-b@corp.example"])
+
     def test_oversized_legacy_identifiers_fail_closed(self):
         oversized = "9" * 5000
         for value in (oversized, "9223372036854775808"):
@@ -468,12 +518,12 @@ class SCIMIdentityContractTests(TestCase):
         self.assertEqual(response.json()["schemas"], ["urn:ietf:params:scim:api:messages:2.0:Error"])
 
     def test_external_id_validation_conflicts_and_patch_paths(self):
-        from users.api.scim.views import _normalize_external_id
+        from users.api.scim.provider_patch import parse_external_id
 
         invalid_values = (123, "   ", "x" * 256, "bad\x00id")
         for value in invalid_values:
-            with self.subTest(value=repr(value)), self.assertRaises(ValidationError):
-                _normalize_external_id(value)
+            with self.subTest(value=repr(value)), self.assertRaises(SCIMPatchError):
+                parse_external_id(value)
 
         user = User.objects.create_user(username="external-id-patch-user")
         membership = grant(user, self.tenant_a, self.tenant_role).membership

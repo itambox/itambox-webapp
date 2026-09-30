@@ -150,3 +150,40 @@ class SCIMRolePermissionAuthorizationTests(TestCase):
         url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class SCIMErrorEnvelopeLeakageTests(TestCase):
+    """WP4 (#571): rejected credentials are never reflected back in SCIM errors."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Echo Corp", slug="echo-corp")
+
+    def test_unknown_credential_is_not_echoed(self):
+        url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant.slug})
+        probe = "scim-echo-probe-0123456789abcdef"
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {probe}")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn(probe, response.content.decode())
+
+    def test_expired_credential_is_not_echoed(self):
+        owner = User.objects.create_user(username="echo-owner", email="echo@x.com")
+        role = Role.objects.create(
+            tenant=self.tenant, name="Provisioner", permissions=["organization.change_membership"]
+        )
+        grant(owner, self.tenant, role)
+        expired = Token.objects.create(
+            user=owner, tenant=self.tenant, expires=timezone.now() - timezone.timedelta(hours=1)
+        )
+        url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant.slug})
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {expired.key}")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn(expired.key, response.content.decode())
+        self.assertIn("detail", response.json())
+
+    def test_provider_mount_does_not_echo_credentials(self):
+        provider = Tenant.objects.create(name="Echo MSP", slug="echo-msp", is_provider=True)
+        url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": provider.slug})
+        probe = "scim-echo-probe-fedcba9876543210"
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {probe}")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn(probe, response.content.decode())

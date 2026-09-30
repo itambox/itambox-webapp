@@ -313,11 +313,7 @@ CAPABILITY_LIMITATIONS = {
         "Archive retention is not yet configurable per schedule.",
     ),
     "subscriptions.tracking": (),
-    "users.scim_provisioning": (
-        "Spec compliance gaps remain: PATCH semantics and filtering are partial.",
-        "Tenant endpoints provision Users and expose Groups read-only; "
-        "only provider-scoped endpoints provision Groups.",
-    ),
+    "users.scim_provisioning": (),
 }
 
 CAPABILITY_APP_CONFIG_GLOB = "itambox/*/apps.py"

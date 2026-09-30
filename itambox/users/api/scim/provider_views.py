@@ -38,6 +38,7 @@ from users.api.scim.provider_services import (
     ensure_provider_group_name_available,
     save_provider_group,
     sync_provider_group_members,
+    sync_user_global_active,
 )
 from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
 from users.models import User as UserModel
@@ -285,8 +286,13 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                             is_active=active,
                             external_id=external_id,
                         )
+                        # Reprovisioning reconciles the global account flag: an active
+                        # re-provision restores the login a full de-provision correctly
+                        # cleared, with no manual intervention.
+                        sync_user_global_active(user)
                 except IntegrityError:
                     user = self._retry_correlated_user(username, external_id)
+                    sync_user_global_active(user)
                     response_status = status.HTTP_200_OK
         else:
             try:

@@ -495,6 +495,171 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(solo.username, "solo_renamed")
         self.assertFalse(solo.is_active)
 
+    def test_scim_sole_membership_lifecycle_deprovision_and_reprovision(self):
+        """The frozen lifecycle for a solely-provisioned identity: deactivate suspends
+        the membership AND the global account (login blocked), the resource stays
+        addressable while inactive, reactivation restores both, full de-provision
+        removes the membership, and a re-provision POST restores login without any
+        manual is_active step."""
+        from core.auth import MembershipBackend
+
+        backend = MembershipBackend()
+        create_url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant.slug})
+        payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            "externalId": "entra-object-lifecycle-1",
+            "userName": "lifecycle@acme.com",
+            "name": {"givenName": "Life", "familyName": "Cycle"},
+            "emails": [{"value": "lifecycle@acme.com", "type": "work"}],
+            "active": True,
+        }
+        created = self.client.post(create_url, data=payload, content_type="application/json", **self.auth_headers)
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        scim_id = created.json()["id"]
+        user = User.objects.get(scim_id=scim_id)
+        grant(user, self.tenant, self.role_member)
+
+        detail_url = reverse("api:scim:user-detail", kwargs={"tenant_slug": self.tenant.slug, "pk": scim_id})
+
+        def patch_active(active):
+            return self.client.patch(
+                detail_url,
+                data={
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                    "Operations": [{"op": "replace", "path": "active", "value": active}],
+                },
+                content_type="application/json",
+                **self.auth_headers,
+            )
+
+        self.assertTrue(User.objects.get(pk=user.pk).is_active)
+
+        # Deactivate: the sole membership is suspended, so the global account mirrors it.
+        response = patch_active(False)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.json()["active"])
+        self.assertFalse(Membership.objects.get(user=user, tenant=self.tenant).is_active)
+        self.assertFalse(User.objects.get(pk=user.pk).is_active)
+        self.assertFalse(backend.has_perm(User.objects.get(pk=user.pk), "extras.view_dashboard", obj=self.tenant))
+
+        # An inactive resource stays addressable: GET returns it with active=false.
+        response = self.client.get(detail_url, **self.auth_headers)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.json()["active"])
+
+        # Reactivate: membership, login and access come back.
+        response = patch_active(True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Membership.objects.get(user=user, tenant=self.tenant).is_active)
+        self.assertTrue(User.objects.get(pk=user.pk).is_active)
+        self.assertTrue(backend.has_perm(User.objects.get(pk=user.pk), "extras.view_dashboard", obj=self.tenant))
+
+        # Full de-provision: the membership is removed; the User row survives, deactivated.
+        response = self.client.delete(detail_url, **self.auth_headers)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Membership.objects.filter(user=user, tenant=self.tenant).exists())
+        self.assertTrue(User.objects.filter(pk=user.pk).exists())
+        self.assertFalse(User.objects.get(pk=user.pk).is_active)
+        self.assertEqual(self.client.get(detail_url, **self.auth_headers).status_code, status.HTTP_404_NOT_FOUND)
+
+        # Re-provision: the POST correlation path restores the membership and login.
+        # (SCIM provisioning is identity-only: it re-creates no in-app role grants,
+        # but it must not leave the account locked behind a manual is_active flip.)
+        again = self.client.post(create_url, data=payload, content_type="application/json", **self.auth_headers)
+        self.assertIn(again.status_code, (status.HTTP_200_OK, status.HTTP_201_CREATED))
+        membership = Membership.objects.get(user=user, tenant=self.tenant)
+        self.assertTrue(membership.is_active)
+        self.assertEqual(membership.external_id, "entra-object-lifecycle-1")
+        self.assertTrue(User.objects.get(pk=user.pk).is_active)
+
+    def test_tenant_patch_is_strict_and_shares_the_provider_subset(self):
+        """The tenant mount accepts exactly the provider mount's PATCH subset:
+        unsupported operations and paths are explicit 400s (previously silent
+        no-ops), bracketed work-email paths now apply, and the unmanaged
+        displayName/userType attributes stay explicit skips."""
+        user = User.objects.create_user(username="strict", email="strict@acme.com")
+        grant(user, self.tenant, self.role_member)
+        detail_url = reverse("api:scim:user-detail", kwargs={"tenant_slug": self.tenant.slug, "pk": user.scim_id})
+
+        def patch(operations):
+            return self.client.patch(
+                detail_url,
+                data={
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                    "Operations": operations,
+                },
+                content_type="application/json",
+                **self.auth_headers,
+            )
+
+        response = patch([{"op": "bogus", "path": "active", "value": True}])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unsupported SCIM PATCH operation", response.json()["detail"])
+        self.assertEqual(response.json()["status"], "400")
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+
+        response = patch([{"op": "remove", "path": "active"}])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unsupported SCIM PATCH path", response.json()["detail"])
+
+        response = patch([{"op": "replace", "path": "userType", "value": "Employee"}])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = patch([{"op": "replace", "path": "displayName", "value": "Strict User"}])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = patch([{"op": "replace", "path": 'emails[type eq "work"].value', "value": "work@acme.com"}])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.email, "work@acme.com")
+
+    def test_tenant_rename_onto_an_existing_username_is_a_uniqueness_conflict(self):
+        """A SCIM rename fails closed when the target username is taken: 409 with
+        scimType=uniqueness, and the losing user keeps its old identity."""
+        first = User.objects.create_user(username="collide-one", email="one@acme.com")
+        grant(first, self.tenant, self.role_member)
+        second = User.objects.create_user(username="collide-two", email="two@acme.com")
+        grant(second, self.tenant, self.role_member)
+
+        detail_url = reverse("api:scim:user-detail", kwargs={"tenant_slug": self.tenant.slug, "pk": second.scim_id})
+        response = self.client.patch(
+            detail_url,
+            data={
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [{"op": "replace", "path": "userName", "value": "collide-one"}],
+            },
+            content_type="application/json",
+            **self.auth_headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.json()["scimType"], "uniqueness")
+        second.refresh_from_db()
+        self.assertEqual(second.username, "collide-two")
+        self.assertEqual(second.email, "two@acme.com")
+
+    def test_scim_writes_require_a_write_enabled_token(self):
+        """A read-only token can still read SCIM but must not provision, and no
+        identity may be created through it."""
+        read_only = Token.objects.create(
+            user=self.admin_user,
+            tenant=self.tenant,
+            write_enabled=False,
+            expires=timezone.now() + timezone.timedelta(days=1),
+        )
+        headers = {"HTTP_AUTHORIZATION": f"Bearer {read_only.key}"}
+        list_url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant.slug})
+        self.assertEqual(self.client.get(list_url, **headers).status_code, status.HTTP_200_OK)
+
+        payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            "userName": "readonly-write@acme.com",
+            "emails": [{"value": "readonly-write@acme.com", "type": "work"}],
+        }
+        response = self.client.post(list_url, data=payload, content_type="application/json", **headers)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(User.objects.filter(username="readonly-write@acme.com").exists())
+
     def test_scim_group_post_is_rejected(self):
         """Read-only tenant SCIM cannot create groups or provision foreign users."""
         foreign_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
@@ -565,3 +730,21 @@ class SCIMServiceProviderConfigAccuracyTests(SCIMProvisioningTests):
         self.assertNotEqual(
             meta_after["lastModified"], meta_after["created"], "lastModified must differ from created after mutation"
         )
+
+    def test_frozen_capability_matrix_is_advertised(self):
+        """The advertised document is exactly the frozen subset: PATCH and filter are
+        supported (filter maxResults 200); Bulk, ETag, sorting and password changes are
+        not implemented and must stay advertised as unsupported. Exactly one
+        authentication scheme (Bearer) is advertised."""
+        response = self.client.get(self.config_url, **self.auth_headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        self.assertTrue(data["patch"]["supported"])
+        self.assertTrue(data["filter"]["supported"])
+        self.assertEqual(data["filter"]["maxResults"], 200)
+        self.assertFalse(data["bulk"]["supported"])
+        self.assertFalse(data["changePassword"]["supported"])
+        self.assertFalse(data["sort"]["supported"])
+        self.assertFalse(data["etag"]["supported"])
+        self.assertEqual([scheme["type"] for scheme in data["authenticationSchemes"]], ["oauthbearertoken"])

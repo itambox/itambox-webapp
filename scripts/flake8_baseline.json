@@ -7894,22 +7894,6 @@
     {
       "path": "itambox/users/api/scim/views.py",
       "code": "C901",
-      "message": "'SCIMUserDetailView.patch' is too complex (26)",
-      "source": "    def patch(self, request, pk, *args, **kwargs):",
-      "context": "Module:body/ClassDef:SCIMUserDetailView:body/FunctionDef:patch:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/views.py",
-      "code": "C901",
-      "message": "'SCIMUserListView.post' is too complex (18)",
-      "source": "    def post(self, request, *args, **kwargs):",
-      "context": "Module:body/ClassDef:SCIMUserListView:body/FunctionDef:post:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/views.py",
-      "code": "C901",
       "message": "'link_or_create_assetholder' is too complex (11)",
       "source": "def link_or_create_assetholder(user, tenant):",
       "context": "Module:body/FunctionDef:link_or_create_assetholder:self",
