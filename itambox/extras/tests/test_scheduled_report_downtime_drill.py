@@ -20,9 +20,12 @@ re-implementing either, so the drill states exactly what a deployment sees:
   even if the row is due; nothing is delivered.
 * **Summary fencing** — overlapping occurrences are allowed, but schedule-level
   summary writes (``last_status``/``last_run_archive``) are fenced to the newest
-  started run: a slower older run finishing late keeps its own archive and
-  ledger yet can never overwrite a newer run's summary or retry binding, and a
-  retry completion is fenced to its archive still being the newest binding.
+  started run: the shared start marker only ever moves forward in one atomic
+  conditional update (a delayed older occurrence attempting to persist its
+  start after a newer one updates zero rows and keeps running), so a slower
+  older run finishing late keeps its own archive and ledger yet can never
+  overwrite a newer run's summary or retry binding, and a retry completion is
+  fenced to its archive still being the newest binding.
 * **Recovery** — a failed delivery leaves a per-target ledger and is recovered
   through ``Retry delivery``, which re-contacts only the failed targets with
   the recorded original recipients, email subject/body, and notification
@@ -1322,6 +1325,38 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
         # The older run's own archive and per-target ledger are complete.
         self.assertEqual(older_archive.delivery_status, "failed")
         self.assertEqual([target["status"] for target in older_archive.delivery_targets], ["failed"])
+
+    def test_an_older_start_attempt_never_rewinds_the_newer_start_marker(self):
+        sched = ScheduledReport.objects.create(
+            name="Start Marker Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency=ScheduledReport.FREQUENCY_DAILY,
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="ops@example.com",
+            save_to_archive=True,
+            is_active=True,
+        )
+        # Run B (newer) persisted its start marker first.
+        newer_start = timezone.now()
+        ScheduledReport.objects.filter(pk=sched.pk).update(last_run=newer_start)
+
+        # Run A started earlier but only now attempts to persist its (older)
+        # start marker. The marker only moves forward: A's conditional update
+        # affects zero rows, A still runs for its own archive and ledger, and
+        # its stale marker keeps every later summary write fenced off.
+        older_start = newer_start - timedelta(minutes=5)
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        with (
+            mock.patch("extras.tasks.reports.timezone.now", return_value=older_start),
+            mock.patch("extras.tasks.reports._process_scheduled_report", return_value=True) as process,
+        ):
+            self.assertTrue(generate_scheduled_report_task(sched.pk))
+
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_run, newer_start)
+        self.assertEqual(process.call_args.kwargs["run_started_at"], older_start)
 
     def test_an_older_runs_generation_failure_cannot_reset_the_newer_summary(self):
         sched = ScheduledReport.objects.create(

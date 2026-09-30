@@ -366,11 +366,16 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         tenant_b = SimpleNamespace(pk=2, id=2)
         authorized_principal_id = 99
         expected_result = SimpleNamespace(status="success")
-        manager = Mock()
-        manager.get.return_value = schedule
+        # The start-marker write bypasses the tenant-scoping default manager
+        # via ``_base_manager`` (a ModelBase property that cannot be patched
+        # directly), so the class reference itself is mocked; the conditional
+        # update chain reports one row moved.
+        scheduled_report = Mock()
+        scheduled_report.objects.get.return_value = schedule
+        scheduled_report._base_manager.filter.return_value.filter.return_value.update.return_value = 1
 
         with (
-            patch("extras.tasks.reports.ScheduledReport.objects", manager),
+            patch("extras.tasks.reports.ScheduledReport", scheduled_report),
             patch("extras.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
             patch("extras.tasks.reports._resolve_scope_authorization", return_value=authorized_principal_id),
             patch("extras.tasks.reports._scope_requires_authorization", return_value=True),

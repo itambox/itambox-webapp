@@ -773,11 +773,22 @@ def generate_scheduled_report_task(scheduled_report_id: int, intended_fire_at: s
         # The start marker fences every later summary write: overlapping
         # occurrences are allowed, and only a run that is still the newest
         # started one may move the schedule-level status and retry binding.
-        # Keep the write narrow so stale in-memory values cannot leak back
-        # over a newer run's summary state.
+        # The marker only ever moves forward, in one atomic conditional
+        # update: when a delayed older occurrence persists its start after a
+        # newer one already did, it updates zero rows, still runs for its own
+        # archive and ledger, and its stale marker fails every later summary
+        # fence. Keep the write narrow so stale in-memory values cannot leak
+        # back over a newer run's summary state.
         run_started_at = timezone.now()
-        sched.last_run = run_started_at
-        sched.save(update_fields=["last_run"])
+        marker_moved = (
+            ScheduledReport._base_manager.filter(pk=sched.pk)
+            .filter(Q(last_run__isnull=True) | Q(last_run__lt=run_started_at))
+            .update(last_run=run_started_at)
+        )
+        if marker_moved:
+            # Mirror the persisted marker for in-memory readers; a losing
+            # (older) start attempt keeps whatever it already fetched.
+            sched.last_run = run_started_at
         return _process_scheduled_report(sched, active_tenant, filter_tenants, run_started_at=run_started_at)
 
 

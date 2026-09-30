@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from assets.models import Supplier
 from core.models import ObjectChange
-from extras.models import ReportTemplate, ScheduledReport
+from extras.models import ReportGenerationArchive, ReportTemplate, ScheduledReport
 from extras.tasks.reports import generate_scheduled_report_task
 from subscriptions.models import (
     Subscription,
@@ -30,8 +30,11 @@ User = get_user_model()
 
 
 class ScheduledReportTaskAuditTests(TransactionTestCase):
-    """generate_scheduled_report_task must now log its sched.save() as an
-    ObjectChange (it runs inside TaskContext)."""
+    """generate_scheduled_report_task must run inside TaskContext so the model
+    saves it performs are recorded as ObjectChange rows. The per-run archive is
+    such a save; the schedule's own start marker and summary writes are
+    deliberate atomic queryset updates (overlap race fences), so the
+    ScheduledReport itself gains no ObjectChange rows from a run."""
 
     def test_scheduled_report_run_logs_object_change(self):
         from organization.models import Tenant
@@ -47,15 +50,16 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
             report=template,
             tenant=tenant,
             format=ScheduledReport.FORMAT_HTML,
-            save_to_archive=False,
+            save_to_archive=True,
             recipients="",
             is_active=True,
         )
 
         sched_ct = ContentType.objects.get_for_model(ScheduledReport)
+        archive_ct = ContentType.objects.get_for_model(ReportGenerationArchive)
         # Fixture creation above happened outside any task/request context, so it
-        # was NOT logged. Baseline should therefore be zero for this object.
-        baseline = ObjectChange.objects.filter(changed_object_type=sched_ct, changed_object_id=sched.pk).count()
+        # was NOT logged. Baselines should therefore be zero for these objects.
+        sched_baseline = ObjectChange.objects.filter(changed_object_type=sched_ct, changed_object_id=sched.pk).count()
 
         result = generate_scheduled_report_task(sched.pk)
         self.assertTrue(result)
@@ -64,13 +68,21 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
         self.assertIsNotNone(sched.last_run)
         self.assertEqual(sched.last_status, "success")
 
-        after = ObjectChange.objects.filter(changed_object_type=sched_ct, changed_object_id=sched.pk).count()
+        # The run's model saves (the generation archive row) are audited...
+        archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
+        archive_changes = ObjectChange.objects.filter(
+            changed_object_type=archive_ct, changed_object_id=archive.pk
+        ).count()
         self.assertGreater(
-            after,
-            baseline,
-            "generate_scheduled_report_task should record an ObjectChange for "
-            "the ScheduledReport save (now running inside TaskContext).",
+            archive_changes,
+            0,
+            "generate_scheduled_report_task should record ObjectChange rows for "
+            "the saves it performs (running inside TaskContext).",
         )
+        # ...while the schedule's race-fenced marker/summary writes are atomic
+        # queryset updates and deliberately not model saves.
+        sched_after = ObjectChange.objects.filter(changed_object_type=sched_ct, changed_object_id=sched.pk).count()
+        self.assertEqual(sched_after, sched_baseline)
 
 
 class SubscriptionExpiryTaskAuditTests(TransactionTestCase):
