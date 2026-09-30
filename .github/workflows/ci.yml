@@ -26,7 +26,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
         env:
           POSTGRES_DB: itambox_ci
           POSTGRES_USER: itambox_ci
@@ -558,6 +558,10 @@ jobs:
         run: |
           uv run --locked --no-sync python scripts/check_local_imports.py
 
+      - name: Check release image pinning policy
+        run: |
+          uv run --locked --no-sync python scripts/check_image_pins.py
+
       # Blocking over both graphs from the first run: a cycle or a cross-layer
       # edge that only exists once function-body imports are counted is still a
       # real runtime coupling. A model importing presentation is the one finding
@@ -747,7 +751,7 @@ jobs:
       reason: ${{ steps.relevance.outputs.reason }}
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
         env:
           POSTGRES_DB: itambox_ci
           POSTGRES_USER: itambox_ci

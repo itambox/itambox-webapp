@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -21,7 +22,7 @@ def test_e2e_uses_a_hosted_postgresql_service():
 
     assert "runs-on: ubuntu-latest" in workflow
     assert "services:" in workflow
-    assert "image: postgres:16" in workflow
+    assert re.search(r"(?m)^\s*image:\s+postgres:16@sha256:[0-9a-f]{64}\s*$", workflow)
     assert "5432:5432" in workflow
     assert "pg_isready" in workflow
     assert "Start PostgreSQL in the runner network namespace" not in workflow
