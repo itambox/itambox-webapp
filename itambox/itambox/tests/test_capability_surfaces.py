@@ -20,7 +20,7 @@ from django.test import RequestFactory, override_settings
 
 from itambox.api.openapi import CapabilityAwareAutoSchema
 from itambox.capabilities import ALWAYS_ON, BETA, EXPERIMENTAL, SOURCE_ALWAYS, STABLE, registry
-from itambox.tests.capability_harness import deactivated, probe_failing
+from itambox.tests.capability_harness import deactivatable_keys, deactivated, probe_failing
 from itambox.views.generic.capability_notices import NOTICE_FIELDS, capability_notice
 
 #: Stand-ins for a DRF viewset and its queryset: the schema class only ever
@@ -118,23 +118,32 @@ class TestSurfaceMarker:
         assert set(notice) == set(NOTICE_FIELDS)
 
     def test_a_deactivated_capability_still_marks_its_surface(self):
-        """Inactive is not invisible: the grade is a property of the contract."""
-        with deactivated("users.scim_provisioning"):
-            assert _notice_for_key("users.scim_provisioning")["maturity"] == BETA
+        """Inactive is not invisible: the grade is a property of the contract.
+
+        The subjects come from the harness: every capability that can be
+        observed inactive is proven, so the latest promotion cannot leave a
+        pinned example behind that no longer deactivates.
+        """
+        keys = deactivatable_keys()
+        assert keys
+        for key in keys:
+            with deactivated(key):
+                assert _notice_for_key(key)["maturity"] == registry.get(key).maturity
 
     def test_the_notice_survives_a_failing_probe(self):
-        with probe_failing("users.scim_provisioning"):
-            assert _notice_for_key("users.scim_provisioning")["key"] == "users.scim_provisioning"
+        keys = deactivatable_keys()
+        assert keys
+        for key in keys:
+            with probe_failing(key):
+                assert _notice_for_key(key)["key"] == key
 
 
 class TestBannerTemplate:
     def test_the_banner_names_the_capability_and_links_its_document(self):
-        html = render_to_string(
-            "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("users.scim_provisioning")},
-        )
+        notice = _settling_beta_notice()
+        html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert "Beta" in html
-        assert "SCIM" in html
+        assert notice["title"] in html
         assert "capability-maturity" in html
 
     def test_the_contract_link_is_excluded_from_boost(self):
@@ -145,19 +154,19 @@ class TestBannerTemplate:
         """
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("users.scim_provisioning")},
+            {"capability_notice": _settling_beta_notice()},
         )
         assert 'hx-boost="false"' in html
 
     def test_the_banner_renders_the_declared_limitations(self):
-        notice = _notice_for_key("users.scim_provisioning")
+        notice = _settling_beta_notice()
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert notice["limitations"][0] in html
 
     def test_the_beta_banner_is_a_polite_live_region_with_a_label(self):
         html = render_to_string(
             "generic/includes/beta_banner.html",
-            {"capability_notice": _notice_for_key("users.scim_provisioning")},
+            {"capability_notice": _settling_beta_notice()},
         )
         assert 'role="status"' in html
         assert 'aria-live="polite"' in html
@@ -318,10 +327,15 @@ class TestOperatorDiagnostics:
         assert "demo_plugin_secret" not in output
 
     def test_a_failing_probe_is_reported_by_type_only(self):
-        with probe_failing("users.scim_provisioning"):
-            output = _run_command()
-        assert "RuntimeError" in output
-        assert "hunter2" not in output
+        # Every capability that can be observed inactive is proven; the command
+        # must surface the failure as its exception type, never its text.
+        keys = deactivatable_keys()
+        assert keys
+        for key in keys:
+            with probe_failing(key):
+                output = _run_command()
+            assert "RuntimeError" in output
+            assert "hunter2" not in output
 
     def test_the_command_can_emit_json_rows(self):
         rows = _run_command("--format", "json")
@@ -507,6 +521,24 @@ def _notice_for_key(key):
         "activation": capability.activation,
         "docs_url": capability.docs_url,
         "limitations": capability.limitations,
+    }
+
+
+def _settling_beta_notice():
+    """A Beta-grade notice for the banner contract.
+
+    No capability settles as Beta anymore, so no registry entry renders the
+    Beta banner: its Beta-specific contract (grade text, limitations, dismiss
+    control) is pinned with this explicit notice, while the registry-backed
+    rendering stays covered by the experimental entry.
+    """
+    return {
+        **_notice_for_key("platform.plugins"),
+        "key": "example.settling",
+        "title": "Example Settling Capability",
+        "maturity": BETA,
+        "docs_url": "operations/capability-maturity.md",
+        "limitations": ("Interfaces may still change until the capability stabilises.",),
     }
 
 

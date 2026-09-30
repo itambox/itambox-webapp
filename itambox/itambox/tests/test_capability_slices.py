@@ -16,14 +16,13 @@ from django.conf import settings
 from django.test import override_settings
 from model_bakery import baker
 
-from core.features import BETA, STABLE, is_beta_module, module_maturity
+from core.features import STABLE, is_beta_module, module_maturity
 from itambox.apps import _plugin_activation_probe
 from itambox.capabilities import (
     ALWAYS_ON,
     EXPERIMENTAL,
     OPT_IN,
     SOURCE_ALWAYS,
-    SOURCE_OBJECT_ENABLED,
     SOURCE_OPERATOR_FLAG,
     ActivationState,
     registry,
@@ -342,47 +341,6 @@ class TestRegistrationIdempotence:
             assert not set(dropped) & set(registry.keys())
             app_config._register_capabilities()
             assert set(dropped) <= set(registry.keys())
-
-
-class TestExistingDeploymentCompatibility:
-    """An object-enabled Beta slice is inert on a fresh install and live on a used one."""
-
-    def test_scim_provisioning_is_inert_until_a_credential_exists(self, db):
-        state = registry.state("users.scim_provisioning")
-
-        assert (state.active, state.value_present) == (False, False)
-
-    def test_an_unusable_scim_credential_configures_without_activating_provisioning(self, db):
-        from users.models import Token
-
-        tenant = baker.make("organization.Tenant")
-        user = baker.make("users.User", is_active=True)
-        Token.objects.create(
-            user=user,
-            tenant=tenant,
-            write_enabled=True,
-            expires=timezone.now() - timedelta(hours=1),
-        )
-
-        state = registry.state("users.scim_provisioning")
-
-        assert (state.active, state.value_present) == (False, True)
-
-    def test_a_usable_scim_credential_activates_provisioning(self, db):
-        from users.models import Token
-
-        tenant = baker.make("organization.Tenant")
-        user = baker.make("users.User", is_active=True)
-        Token.objects.create(
-            user=user,
-            tenant=tenant,
-            write_enabled=True,
-            expires=timezone.now() + timedelta(days=1),
-        )
-
-        state = registry.state("users.scim_provisioning")
-
-        assert (state.active, state.value_present) == (True, True)
 
 
 class TestInactiveSafety:
