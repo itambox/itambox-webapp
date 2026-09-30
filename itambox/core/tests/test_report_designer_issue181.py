@@ -484,7 +484,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         detail.get_object = Mock(return_value=detail_template)
         with patch("extras.views.ObjectDetailView.get_context_data", return_value={}):
             context = detail.get_context_data()
-        assert context["schedules"] is detail_template.schedules
+        assert context["schedules"] is detail_template.schedules.all.return_value
 
         template = SimpleNamespace(
             name="My Report",

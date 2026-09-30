@@ -42,10 +42,12 @@ class ReportCustomHTMLRemovalTests(SimpleTestCase):
         )
         self.assertIn("&lt;report&gt;", rendered)
 
+        # Sandboxed attribute access yields an unsafe undefined first; the
+        # SecurityError surfaces as soon as the blocked value is used.
         with self.assertRaises(SecurityError):
             render_report_html(
                 {"report_name": "Report"},
-                SimpleNamespace(template_content="{{ report_name.__class__ }}"),
+                SimpleNamespace(template_content="{{ report_name.__class__.mro }}"),
             )
 
     def test_preview_srcdoc_is_sandboxed_and_error_text_is_escaped(self):
