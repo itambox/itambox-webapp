@@ -155,7 +155,6 @@ def _download_template(pinned_ids):
         included_columns=["asset_tag"],
         group_by_field="",
         style_preset="default",
-        advanced_mode=False,
         template_content="",
         persisted_filter_tenant_ids=Mock(return_value=pinned_ids),
     )
@@ -408,9 +407,7 @@ class ReportDisclosureTests(SimpleTestCase):
         )
         self.assertIn('<div class="disclosure">Showing the first 500 of 600 matching rows.</div>', polished)
 
-        csv_text = render_report_csv(
-            SimpleNamespace(advanced_mode=False), ["Asset Tag"], [], disclosure_text=disclosure
-        )
+        csv_text = render_report_csv(["Asset Tag"], [], disclosure_text=disclosure)
         self.assertEqual(list(csv.reader(io.StringIO(csv_text)))[-2:], [[], [disclosure]])
 
         from openpyxl import load_workbook
@@ -438,31 +435,10 @@ class ReportDisclosureTests(SimpleTestCase):
         )
         self.assertEqual(sample_response["X-Report-Sample"], "true")
 
-    def test_legacy_csv_totals_use_summary_counts_but_sample_cards_fall_back_to_rendered_count(self):
-        rows = [{"Asset Tag": "A-1"}, {"Asset Tag": "A-2"}]
-        hardware_csv = render_report_csv(
-            SimpleNamespace(advanced_mode=True, report_type="asset_summary"),
-            [],
-            rows,
-            summary_cards=[{"label": "Total Hardware Assets", "value": "120"}],
-        )
-        self.assertIn("Total Hardware Assets,120", hardware_csv)
+    def test_canonical_csv_uses_selected_columns_and_sanitizes_formula_cells(self):
+        csv_text = render_report_csv(["Asset Tag"], [{"Asset Tag": "=SUM(A1)"}])
 
-        subscription_csv = render_report_csv(
-            SimpleNamespace(advanced_mode=True, report_type="subscription_renewals"),
-            [],
-            rows,
-            summary_cards=[{"label": "Active Subscriptions", "value": "84"}],
-        )
-        self.assertIn("Active Subscriptions,84", subscription_csv)
-
-        sample_csv = render_report_csv(
-            SimpleNamespace(advanced_mode=True, report_type="subscription_renewals"),
-            [],
-            rows[:1],
-            summary_cards=[{"label": "Active Subscriptions", "value": "1 (Mock)"}],
-        )
-        self.assertIn("Active Subscriptions,1", sample_csv)
+        self.assertEqual(list(csv.reader(io.StringIO(csv_text))), [["Asset Tag"], ["'=SUM(A1)"]])
 
 
 class ReportColumnParityTests(SimpleTestCase):

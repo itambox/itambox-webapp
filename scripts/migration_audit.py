@@ -55,6 +55,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
     "extras.0125_scheduled_report_fire_records_retry_hardening",
     "extras.0126_scheduledreport_last_run_archive",
+    "extras.0127_retire_report_designer_legacy",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -333,6 +334,16 @@ SEMANTIC_DISPOSITIONS = {
         ),
         {
             "extras.0125_scheduled_report_fire_records_retry_hardening",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Refuses live templates using the unsupported legacy CSV shape before dropping both retired fields; "
+            "canonical rows and custom HTML are preserved, and reverse requires restore-first rollback."
+        ),
+        {
+            "extras.0127_retire_report_designer_legacy",
         },
     ),
 }

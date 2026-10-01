@@ -68,11 +68,13 @@ skipping:
    keeps running, nothing changes) from a disabled one; application code
    ignores the variable afterwards, and it can be removed then.
 2. On a deployment that ran the designer disabled, the transition pauses
-   registered, active, non-grandfathered schedules that were being skipped:
+   registered, active schedules outside the migration-managed delivery
+   exception set that were being skipped:
    their django-q row is removed and `is_active` is cleared, while the row, its
    configuration, and its `last_run`/`last_status` history are preserved.
-   Grandfathered templates kept delivering under the disabled flag and are not
-   touched; already-inactive or unregistered schedules are not touched either.
+   The exception set kept delivering under the disabled flag; its provenance
+   marker is retired by the later #586 transition below. Already-inactive or
+   unregistered schedules are not touched either.
 3. Review **Extras → Scheduled Reports** after the upgrade and re-enable the
    schedules that should resume; reactivating a schedule re-registers its
    django-q row through the normal save path.
@@ -84,6 +86,32 @@ re-arm deliveries nobody consented to. Roll back by restoring the database
 backup taken before the upgrade, or leave the paused schedules in place and
 re-enable them explicitly; a code-only rollback keeps the paused state, which
 the predecessor application treats as an ordinary inactive schedule.
+
+## Report Designer schema retirement (#586)
+
+The Report Designer now has one canonical schema. Before upgrading, resolve any
+live template that still uses the removed Legacy CSV Shape. The `0127`
+migration scans live rows and refuses before changing the schema if any remain;
+the error lists every affected template as `<name> (pk=<pk>)`. On the
+pre-upgrade deployment, clear the old shape for those records through the form
+or Django shell:
+
+```python
+from extras.models import ReportTemplate
+
+ReportTemplate._base_manager.filter(deleted_at__isnull=True, advanced_mode=True).update(advanced_mode=False)
+```
+
+Templates with the default CSV shape and templates whose only special state
+was the provenance marker need no rewrite. The migration drops that marker and
+the old shape field; canonical selected-column CSV applies to every template
+after the upgrade. Custom HTML in `template_content` is preserved and remains
+sandboxed.
+
+The reverse is refused because the removed column values cannot be
+reconstructed. Roll back by restoring the pre-upgrade database backup first,
+then roll back the application code; do not use a schema reverse for this
+migration.
 
 ## Scheduled Reports promotion (#570)
 

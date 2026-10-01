@@ -807,7 +807,6 @@ class ReportTemplateDetailView(CapabilityRequiredMixin, ObjectDetailView):
         obj = self.get_object()
         context["title"] = _("Report Template: %(name)s") % {"name": obj.name}
         context["schedules"] = obj.schedules.all()
-        context["legacy_designer_notice"] = bool(obj.legacy_designer_grandfathered)
         return context
 
 
@@ -1409,7 +1408,6 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             or request.POST.get("include_distribution_chart") == "true"
         )
         group_by_field = request.POST.get("group_by_field", "")
-        advanced_mode = request.POST.get("advanced_mode") in ("on", "true", "1")
         template_content = request.POST.get("template_content", "")
         description = request.POST.get("description", "")
 
@@ -1443,7 +1441,6 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             include_distribution_chart=include_distribution_chart,
             group_by_field=group_by_field,
             style_preset=style_preset,
-            advanced_mode=advanced_mode,
             template_content=template_content,
         )
 
@@ -1548,11 +1545,8 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             if format_type == "csv":
                 response = HttpResponse(
                     render_report_csv(
-                        template,
                         headers,
                         rows,
-                        _summary_cards,
-                        _grouped_data,
                         disclosure_text=context_data.get("disclosure_text", ""),
                     ),
                     content_type="text/csv",

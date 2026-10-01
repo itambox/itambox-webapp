@@ -37,12 +37,46 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
 
     def tearDown(self):
         # Restore the shared test database to the leaf state so later tests
-        # never see a rehearsed (partially migrated) schema.
+        # never see a rehearsed (partially migrated) schema. Re-run the
+        # retirement migration above the 0126 rehearsal so the columns it
+        # removes at the head do not linger once the rehearsal moved the
+        # schema back below the head.
         try:
+            self._ensure_retired_report_designer_columns()
+            MigrationRecorder(connection).record_unapplied("extras", "0127_retire_report_designer_legacy")
             executor = MigrationExecutor(connection)
             executor.migrate(executor.loader.graph.leaf_nodes())
         finally:
             super().tearDown()
+
+    def _ensure_retired_report_designer_columns(self):
+        """Reconcile the columns the 0127 retirement removes at the migration head.
+
+        The 0123 rehearsal below stages its scenarios on the schema of its era,
+        which still carries the two retired columns physically, and the
+        0123-era model writes them on create. Restore them explicitly
+        (idempotent, mirroring 0105's own persistent-field reconciliation).
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS advanced_mode boolean DEFAULT FALSE"
+            )
+            cursor.execute("UPDATE extras_reporttemplate SET advanced_mode = FALSE WHERE advanced_mode IS NULL")
+            cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET DEFAULT FALSE")
+            cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET NOT NULL")
+            cursor.execute(
+                "ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS legacy_designer_grandfathered"
+                " boolean DEFAULT FALSE"
+            )
+            cursor.execute(
+                "UPDATE extras_reporttemplate SET legacy_designer_grandfathered = FALSE"
+                " WHERE legacy_designer_grandfathered IS NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET DEFAULT FALSE"
+            )
+            cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET NOT NULL")
+        connection.commit()
 
     def _historical_executor(self):
         executor = MigrationExecutor(connection)
@@ -84,6 +118,8 @@ class ScheduledReportFireIdentityTransitionTests(TransactionTestCase):
         self.Tenant = old_apps.get_model("organization", "Tenant")
         self.Schedule = old_apps.get_model("django_q", "Schedule")
 
+        # The 0123-era model still writes the retired designer columns on create.
+        self._ensure_retired_report_designer_columns()
         tenant = self.Tenant.objects.create(name="Rehearsal Tenant", slug="rehearsal-tenant")
         report = old_apps.get_model("extras", "ReportTemplate").objects.create(
             name="rehearsal", report_type="asset_summary", tenant=tenant

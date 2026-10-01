@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 50)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 51)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -590,6 +590,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0124_scheduled_report_fire_identity_delivery_outcomes",
                 "extras.0125_scheduled_report_fire_records_retry_hardening",
                 "extras.0126_scheduledreport_last_run_archive",
+                "extras.0127_retire_report_designer_legacy",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
@@ -655,6 +656,20 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(
             replacement_extension["operations"]["BtreeGistExtension"]["count"],
             1,
+        )
+        report_template_retirement = next(
+            migration
+            for migration in inventory["migrations"]
+            if migration["id"] == "extras.0127_retire_report_designer_legacy"
+        )
+        self.assertEqual(report_template_retirement["operations"]["RunPython"]["with_reverse"], 1)
+        self.assertIn(
+            "extras.0127_retire_report_designer_legacy",
+            inventory["reviewed_semantics"]["upgrade_only"],
+        )
+        self.assertEqual(
+            SEMANTIC_DISPOSITIONS["extras.0127_retire_report_designer_legacy"]["disposition"],
+            "upgrade-only",
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["blockers"],

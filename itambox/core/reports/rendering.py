@@ -119,29 +119,8 @@ def _append_csv_disclosure(writer, disclosure_text):
     writer.writerow([csv_safe(disclosure_text)])
 
 
-def _card_value(summary_cards, label):
-    for card in summary_cards or []:
-        if card.get("label") == label:
-            return card.get("value", "")
-    return ""
-
-
-def _numeric_card_total(summary_cards, label, fallback):
-    """A summary card's count when it is a plain number, else ``fallback``.
-
-    The legacy CSV shape labels its metric lines with whole-scope numbers; the
-    summary cards carry them. Sample cards read like ``1 (Mock)`` and keep the
-    rendered-window fallback, so only determinate counts switch the number.
-    """
-    value = _card_value(summary_cards, label)
-    try:
-        return int(str(value).strip())
-    except (TypeError, ValueError):
-        return fallback
-
-
-def render_report_csv(template, headers, rows, summary_cards=None, grouped_data=None, disclosure_text=""):
-    """Render the stable visual CSV or the historical legacy CSV shape.
+def render_report_csv(headers, rows, disclosure_text=""):
+    """Render the canonical columns and append any sample/truncation disclosure.
 
     ``disclosure_text`` is appended as a clearly separated trailer row when
     the compiled window was capped or the report shows its sample, so the
@@ -149,62 +128,8 @@ def render_report_csv(template, headers, rows, summary_cards=None, grouped_data=
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    if not getattr(template, "advanced_mode", False):
-        writer.writerow(headers)
-        for row in rows:
-            writer.writerow([csv_safe(row.get(header, "-")) for header in headers])
-        _append_csv_disclosure(writer, disclosure_text)
-        return buffer.getvalue()
-
-    total_rows = len(rows)
-    total_active = _numeric_card_total(summary_cards, _("Active Subscriptions"), total_rows)
-    acquisition_display = _card_value(summary_cards, _("Total Acquisition Sum"))
-    monthly_spend_display = _card_value(summary_cards, _("Est. Monthly Spend"))
-    grouped_data = grouped_data or {}
-
-    if template.report_type == "asset_summary":
-        writer.writerow(["Metric", "Value"])
-        writer.writerow(
-            ["Total Hardware Assets", _numeric_card_total(summary_cards, _("Total Hardware Assets"), total_rows)]
-        )
-        writer.writerow(["Total Acquisition Sum", acquisition_display])
-        writer.writerow([])
-        writer.writerow(["Location", "Allocated Count"])
-        for group, group_rows in grouped_data.items():
-            writer.writerow([csv_safe(group), len(group_rows)])
-    elif template.report_type == "license_utilization":
-        writer.writerow(["License", "Software", "Total Seats", "Assigned Seats", "Available Seats", "Utilization Rate"])
-        for row in rows:
-            writer.writerow(
-                [
-                    csv_safe(row.get(_("License Name"))),
-                    csv_safe(row.get(_("Software"))),
-                    row.get(_("Total Seats")),
-                    row.get(_("Assigned Seats")),
-                    row.get(_("Available Seats")),
-                    row.get(_("Utilization Rate")),
-                ]
-            )
-    elif template.report_type == "subscription_renewals":
-        writer.writerow(["Active Subscriptions", total_active])
-        writer.writerow(["Est. Monthly Spend", monthly_spend_display])
-        writer.writerow([])
-        writer.writerow(["Subscription", "Supplier", "Billing Cycle", "Cost", "End Date"])
-        for row in rows:
-            writer.writerow(
-                [
-                    csv_safe(row.get(_("Subscription Name"))),
-                    csv_safe(row.get(_("Supplier"))),
-                    csv_safe(row.get(_("Billing Cycle"))),
-                    row.get(_("Cost")),
-                    row.get(_("End Date")),
-                ]
-            )
-    else:
-        # Legacy mode was never defined for newer providers; keep their normal
-        # canonical-column CSV rather than inventing a new shape.
-        writer.writerow(headers)
-        for row in rows:
-            writer.writerow([csv_safe(row.get(header, "-")) for header in headers])
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow([csv_safe(row.get(header, "-")) for header in headers])
     _append_csv_disclosure(writer, disclosure_text)
     return buffer.getvalue()

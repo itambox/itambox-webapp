@@ -93,7 +93,7 @@ ITAMbox is licensed under Apache 2.0 and designed to run on infrastructure you c
 > [!IMPORTANT]
 > This repository is pre-release. `1.0.0-beta.3` is current version metadata for the public beta. The feature scope for 1.0 is frozen, but APIs, migrations, routes, configuration, and capabilities marked **Beta** may still change before the first stable release. Use ITAMbox for evaluation and controlled pilot deployments with tested backups, and review the [capability maturity guide](itambox/docs/operations/capability-maturity.md) before relying on pre-release functionality.
 
-The Beta report-template designer is opt-in. Set `ITAMBOX_FEATURE_REPORT_DESIGNER=True` before enabling authoring or scheduled delivery; with the flag disabled, designer and schedule surfaces remain closed, delivery is skipped for non-grandfathered templates, and the migration-managed grandfathered set may continue rendering and delivery while grandfathered templates remain read-only. Saved schedules and the curated catalogue are preserved.
+The Report Designer is Stable and available in every deployment. CSV exports use each template's selected columns, and custom HTML/Jinja templates remain supported in a restricted sandbox. All templates use the same canonical schema and rendering path.
 
 Maturity is declared per capability rather than per module — see the [capability maturity guide](itambox/docs/operations/capability-maturity.md) for the public grades, activation modes, and known limitations. Tenant Resource Grants are a Stable, security-critical capability whose expiry and recovery behavior is documented in the [resource grant expiry runbook](itambox/docs/operations/resource-grant-expiry.md). SCIM is Beta, and the plugin system is Experimental.
 

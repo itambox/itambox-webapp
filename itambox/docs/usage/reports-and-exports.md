@@ -182,9 +182,10 @@ rejected when a template is saved. A canonical key that the selected provider
 does not support leaves that cell blank; an unsupported grouping falls back to
 the provider's default grouping.
 
-Templates marked as grandfathered by the migration keep their provenance
-marker and existing rendering behavior. They can now be edited like other
-templates after the supported upgrade.
+CSV exports always contain the selected columns and compiled rows, followed
+by a disclosure row when the output is sample-only or truncated. Optional
+custom HTML/Jinja templates remain supported through the restricted rendering
+sandbox.
 
 ### Tenant scope authorization
 

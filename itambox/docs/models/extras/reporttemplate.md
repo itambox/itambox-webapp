@@ -1,6 +1,6 @@
 # Report Templates
 
-A **Report Template** defines the visual configuration used to compile and export system data summaries. The built-in renderer is used by default for on-demand and scheduled reports. Custom HTML/Jinja runs in a sandbox with a limited context, autoescaping, and no model or object access. Grandfathered templates keep their existing rendering behavior after migration and can be edited like other templates.
+A **Report Template** defines the visual configuration used to compile and export system data summaries. CSV exports use the template's selected columns. The built-in HTML renderer is used by default for on-demand and scheduled reports. Optional custom HTML/Jinja runs in a sandbox with a limited context, autoescaping, and no model or object access.
 
 ## Attributes
 
@@ -19,5 +19,5 @@ A **Report Template** defines the visual configuration used to compile and expor
 
 ## Security Guardrails
 
-* **Built-in renderer and sandboxed custom HTML**: Normal templates use the versioned system template and style presets. Custom HTML/Jinja is limited to the published context and sandbox, with autoescaping and no model/object access. The migration-managed provenance marker remains in place for grandfathered templates; those templates can be edited after migration.
+* **Canonical CSV and sandboxed custom HTML**: CSV output contains the selected columns and compiled rows. HTML uses the versioned system template and style presets unless custom HTML/Jinja is supplied; custom templates are limited to the published context and sandbox, with autoescaping and no model/object access.
 * **Tenant scoping**: Report data is compiled under the active tenant and configured filter-tenant constellation.

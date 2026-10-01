@@ -12,7 +12,6 @@ from core.reports.columns import headers_for, label_for
 from core.reports.rendering import (
     _custom_context,
     _safe_custom_value,
-    render_report_csv,
     render_report_html,
 )
 from extras.forms import ReportTemplateForm
@@ -33,12 +32,14 @@ from organization.models import Tenant
 
 
 class ReportDesignerIssue181ContractTests(SimpleTestCase):
-    def test_model_and_form_keep_legacy_fields_but_marker_is_not_editable(self):
+    def test_model_and_form_keep_custom_html_but_retire_legacy_fields(self):
         fields = {field.name: field for field in ReportTemplate._meta.get_fields()}
-        assert {"advanced_mode", "template_content", "legacy_designer_grandfathered"} <= set(fields)
-        assert fields["legacy_designer_grandfathered"].editable is False
+        assert "template_content" in fields
+        assert "advanced_mode" not in fields
+        assert "legacy_designer_grandfathered" not in fields
         form = ReportTemplateForm()
-        assert {"advanced_mode", "template_content"} <= set(form.fields)
+        assert "template_content" in form.fields
+        assert "advanced_mode" not in form.fields
         assert "legacy_designer_grandfathered" not in form.fields
 
     def test_unknown_columns_are_rejected_with_machine_key(self):
@@ -66,7 +67,6 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         template = SimpleNamespace(
             name="safe",
             template_content="{{ request.COOKIES|default('missing') }}|{{ report_name }}",
-            legacy_designer_grandfathered=True,
         )
         rendered = render_report_html(
             {"report_name": "safe", "request": SimpleNamespace(COOKIES={"sessionid": "secret"})}, template
@@ -74,10 +74,9 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         assert "secret" not in rendered
         assert "missing" in rendered
 
-    def test_html_execution_is_independent_from_legacy_csv_shape(self):
+    def test_custom_html_renders_for_scheduled_delivery(self):
         template = SimpleNamespace(
             name="custom",
-            advanced_mode=False,
             template_content="<h1>{{ report_name }}</h1>",
         )
         output = _render_report_output(
@@ -89,28 +88,10 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
         )
         assert output.email_body == "<h1>custom</h1>"
 
-    def test_grandfathered_html_continues_to_render_for_scheduled_delivery(self):
-        template = SimpleNamespace(
-            name="grandfathered",
-            advanced_mode=False,
-            template_content="<h1>{{ report_name }}</h1>",
-            legacy_designer_grandfathered=True,
-        )
-        output = _render_report_output(
-            SimpleNamespace(format=ScheduledReport.FORMAT_HTML),
-            template,
-            [],
-            [],
-            {"report_name": "grandfathered", "summary_cards": [], "grouped_data": {}},
-        )
-        assert output.email_body == "<h1>grandfathered</h1>"
-
-    def test_scheduled_delivery_renders_non_grandfathered_custom_html(self):
+    def test_scheduled_delivery_renders_custom_html(self):
         template = SimpleNamespace(
             name="inactive",
-            advanced_mode=True,
             template_content="<h1>{{ report_name }}</h1>",
-            legacy_designer_grandfathered=False,
         )
         output = _render_report_output(
             SimpleNamespace(format=ScheduledReport.FORMAT_HTML),
@@ -148,30 +129,6 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
             call("reports.view_cross_tenant_reports", obj=tenant_b),
         ]
 
-    def test_legacy_csv_shape_does_not_require_custom_html(self):
-        template = SimpleNamespace(
-            name="legacy csv",
-            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            advanced_mode=True,
-            template_content="",
-        )
-        output = _render_report_output(
-            SimpleNamespace(format=ScheduledReport.FORMAT_CSV),
-            template,
-            ["Asset Tag"],
-            [{"Asset Tag": "A-1"}],
-            {
-                "report_name": "legacy csv",
-                "summary_cards": [
-                    {"label": "Total Hardware Assets", "value": "1"},
-                    {"label": "Total Acquisition Sum", "value": "$0.00"},
-                ],
-                "grouped_data": {"Berlin": [{"Asset Tag": "A-1"}]},
-            },
-        )
-        assert output.attachment_content.startswith("Metric,Value")
-        assert "Total Hardware Assets,1" in output.attachment_content
-
 
 class ReportDesignerIssue181CoverageTests(SimpleTestCase):
     def test_columns_resolve_only_canonical_keys(self):
@@ -197,69 +154,13 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         assert context == {"report_name": "safe", "request": None}
 
     def test_custom_html_renders_with_autoescape_and_empty_custom_html_uses_curated_fallback(self):
-        template = SimpleNamespace(template_content="<p>{{ report_name }}</p>", legacy_designer_grandfathered=False)
+        template = SimpleNamespace(template_content="<p>{{ report_name }}</p>")
         rendered = render_report_html({"report_name": "<safe>"}, template)
         assert "&lt;safe&gt;" in rendered
 
         template.template_content = ""
         fallback = render_report_html({"report_name": "curated"}, template)
         assert "curated" in fallback
-
-    def test_csv_renderer_covers_stable_and_each_legacy_report_shape(self):
-        stable = SimpleNamespace(advanced_mode=False)
-        stable_csv = render_report_csv(stable, ["Asset Tag"], [{"Asset Tag": "=SUM(A1)"}])
-        assert "'" in stable_csv
-
-        asset = SimpleNamespace(advanced_mode=True, report_type="asset_summary")
-        asset_csv = render_report_csv(
-            asset,
-            [],
-            [{"Asset Tag": "A-1"}],
-            summary_cards=[{"label": "Total Acquisition Sum", "value": "$10"}],
-            grouped_data={"Berlin": [{"Asset Tag": "A-1"}]},
-        )
-        assert "Total Hardware Assets,1" in asset_csv
-        assert "Berlin,1" in asset_csv
-
-        license_template = SimpleNamespace(advanced_mode=True, report_type="license_utilization")
-        license_csv = render_report_csv(
-            license_template,
-            [],
-            [
-                {
-                    "License Name": "Office",
-                    "Software": "Suite",
-                    "Total Seats": 10,
-                    "Assigned Seats": 6,
-                    "Available Seats": 4,
-                    "Utilization Rate": "60%",
-                }
-            ],
-        )
-        assert "License,Software,Total Seats" in license_csv
-        assert "Office,Suite,10,6,4,60%" in license_csv
-
-        subscription_template = SimpleNamespace(advanced_mode=True, report_type="subscription_renewals")
-        subscription_csv = render_report_csv(
-            subscription_template,
-            [],
-            [
-                {
-                    "Subscription Name": "Cloud",
-                    "Supplier": "Acme",
-                    "Billing Cycle": "Monthly",
-                    "Cost": 12,
-                    "End Date": "2027-01-01",
-                }
-            ],
-            summary_cards=[{"label": "Est. Monthly Spend", "value": "$12"}],
-        )
-        assert "Active Subscriptions,1" in subscription_csv
-        assert "Cloud,Acme,Monthly,12,2027-01-01" in subscription_csv
-
-        unknown_template = SimpleNamespace(advanced_mode=True, report_type="new_provider")
-        unknown_csv = render_report_csv(unknown_template, ["Asset Tag"], [{"Asset Tag": "A-2"}])
-        assert unknown_csv.startswith("Asset Tag")
 
     def test_scope_helpers_fail_closed_for_invalid_approvals(self):
         tenant_a = SimpleNamespace(pk=1)
@@ -338,7 +239,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
     def test_generate_task_stops_for_unauthorized_scope(self):
         broad_schedule = SimpleNamespace(
             pk=2,
-            report=SimpleNamespace(legacy_designer_grandfathered=False),
+            report=SimpleNamespace(),
             is_active=True,
         )
         manager = Mock()
@@ -358,7 +259,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
     def test_generate_task_uses_authorized_principal_without_ambient_tenant_for_broad_scope(self):
         schedule = SimpleNamespace(
             pk=3,
-            report=SimpleNamespace(legacy_designer_grandfathered=False),
+            report=SimpleNamespace(),
             is_active=True,
             save=Mock(),
         )
@@ -395,77 +296,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             schedule, tenant_a, [tenant_a, tenant_b], run_started_at=schedule.last_run
         )
 
-    @staticmethod
-    def _persisted_template_state(**overrides):
-        state = {
-            "name": "template",
-            "description": "",
-            "tenant_id": None,
-            "report_type": ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            "included_columns": [],
-            "include_summary_cards": True,
-            "include_distribution_chart": False,
-            "group_by_field": "",
-            "style_preset": "default",
-            "advanced_mode": False,
-            "template_content": "",
-            "legacy_designer_grandfathered": False,
-        }
-        state.update(overrides)
-        return state
-
-    def test_report_template_write_guard_only_freezes_grandfathered_marker(self):
-        active_template = ReportTemplate(name="active", included_columns=[])
-        assert active_template.clean() is None
-
-        existing_query = Mock()
-        existing_query.values.return_value.first.return_value = self._persisted_template_state(
-            name="grandfathered",
-            advanced_mode=True,
-            template_content="<p>old</p>",
-            legacy_designer_grandfathered=True,
-        )
-        edited = ReportTemplate(
-            pk=5,
-            name="grandfathered",
-            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            included_columns=[],
-            advanced_mode=True,
-            template_content="<p>edited</p>",
-            legacy_designer_grandfathered=True,
-        )
-        with patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query):
-            assert edited.clean() is None
-            with patch.object(ChangeLoggingMixin, "save") as parent_save:
-                edited.save()
-            parent_save.assert_called_once()
-
-        forged = ReportTemplate(name="forged", included_columns=[], legacy_designer_grandfathered=True)
-        with pytest.raises(ValidationError, match="cannot be forged"):
-            forged.save()
-
-        changed_marker = ReportTemplate(
-            pk=5,
-            name="marker",
-            included_columns=[],
-            legacy_designer_grandfathered=False,
-        )
-        marker_query = Mock()
-        marker_query.values.return_value.first.return_value = {
-            "advanced_mode": False,
-            "template_content": "",
-            "legacy_designer_grandfathered": True,
-        }
-        with patch.object(ReportTemplate._base_manager, "filter", return_value=marker_query):
-            with pytest.raises(ValidationError, match="cannot be changed"):
-                changed_marker.save()
-
-    def test_non_grandfathered_custom_html_can_be_edited(self):
-        existing_query = Mock()
-        existing_query.values.return_value.first.return_value = self._persisted_template_state(
-            name="custom html",
-            template_content="<p>old</p>",
-        )
+    def test_custom_html_can_be_edited(self):
         template = ReportTemplate(
             pk=5,
             name="custom html",
@@ -473,10 +304,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             included_columns=[],
             template_content="<p>new</p>",
         )
-        with (
-            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
-            patch.object(ChangeLoggingMixin, "save") as parent_save,
-        ):
+        with patch.object(ChangeLoggingMixin, "save") as parent_save:
             assert template.clean() is None
             template.save()
         parent_save.assert_called_once()
@@ -602,7 +430,6 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
                 "report_type": "asset_summary",
                 "included_columns": ["asset_tag"],
                 "include_summary_cards": "true",
-                "advanced_mode": "1",
                 "template_content": "<h1>{{ report_name }}</h1>",
                 "description": "preview",
             },
@@ -653,18 +480,17 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
 
     def test_report_template_detail_and_download_cover_csv_html_and_pdf(self):
         detail = ReportTemplateDetailView()
-        detail_template = SimpleNamespace(name="Legacy", legacy_designer_grandfathered=True, schedules=Mock())
+        detail_template = SimpleNamespace(name="Report", schedules=Mock())
         detail.get_object = Mock(return_value=detail_template)
         with patch("extras.views.ObjectDetailView.get_context_data", return_value={}):
             context = detail.get_context_data()
-        assert context["legacy_designer_notice"] is True
+        assert context["schedules"] is detail_template.schedules.all.return_value
 
         template = SimpleNamespace(
             name="My Report",
             filter_tenants=SimpleNamespace(all=lambda: []),
             persisted_filter_tenant_ids=lambda: [],
             report_type="asset_summary",
-            advanced_mode=False,
             template_content="",
         )
         build_context = (["Asset Tag"], [{"Asset Tag": "A-1"}], [], {}, "", {"report_name": "My Report"})
@@ -699,17 +525,15 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         assert pdf_response["Content-Disposition"].startswith("inline;")
 
 
-class ReportDesignerFilterTenantWriteTests(TestCase):
+class ReportTemplateFilterTenantWriteTests(TestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Filter Tenant A", slug="filter-tenant-a")
         self.tenant_b = Tenant.objects.create(name="Filter Tenant B", slug="filter-tenant-b")
         self.template = ReportTemplate.objects.create(
-            name="Grandfathered Filter Template",
+            name="Filter Template",
             report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
             tenant=self.tenant_a,
         )
-        ReportTemplate._base_manager.filter(pk=self.template.pk).update(legacy_designer_grandfathered=True)
-        self.template.refresh_from_db()
         self.template.filter_tenants.add(self.tenant_a)
         self.admin = SimpleNamespace(is_superuser=True, is_staff=True)
         self.current_user = patch("extras.forms.get_current_user", return_value=self.admin)
@@ -727,7 +551,6 @@ class ReportDesignerFilterTenantWriteTests(TestCase):
                 "include_distribution_chart": "",
                 "group_by_field": "",
                 "style_preset": self.template.style_preset,
-                "advanced_mode": "",
                 "template_content": "",
                 "tenant": str(self.tenant_a.pk),
                 "filter_tenants": [str(filter_tenant.pk)],
@@ -735,22 +558,21 @@ class ReportDesignerFilterTenantWriteTests(TestCase):
             instance=ReportTemplate.objects.get(pk=self.template.pk),
         )
 
-    def test_grandfathered_template_can_change_filter_tenant_through_form_save(self):
+    def test_template_can_change_filter_tenant_through_form_save(self):
         form = self._form(self.tenant_b)
         assert form.is_valid()
         form.save()
         self.template.refresh_from_db()
-        assert self.template.legacy_designer_grandfathered is True
         assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_b.pk}
 
-    def test_grandfathered_template_can_change_filter_tenant_through_deferred_save_m2m(self):
+    def test_template_can_change_filter_tenant_through_deferred_save_m2m(self):
         form = self._form(self.tenant_b)
         assert form.is_valid()
         form.save(commit=False)
         form.save_m2m()
         assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_b.pk}
 
-    def test_grandfathered_template_can_save_unchanged_filter_tenants(self):
+    def test_template_can_save_unchanged_filter_tenants(self):
         form = self._form(self.tenant_a)
         assert form.is_valid()
         form.save(commit=False)

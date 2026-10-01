@@ -10,17 +10,60 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 
+def _ensure_retired_report_designer_columns():
+    """Reconcile the columns the 0127 retirement removes at the migration head.
+
+    The 0105 and 0123 rehearsals below stage their scenarios on the schema of
+    their era, which still carries ``advanced_mode`` and
+    ``legacy_designer_grandfathered`` physically. The retirement migration
+    removes both columns at the head, so restore them explicitly (idempotent,
+    mirroring 0105's own persistent-field reconciliation) before rehearsing.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS advanced_mode boolean DEFAULT FALSE")
+        cursor.execute("UPDATE extras_reporttemplate SET advanced_mode = FALSE WHERE advanced_mode IS NULL")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET DEFAULT FALSE")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN advanced_mode SET NOT NULL")
+        cursor.execute(
+            "ALTER TABLE extras_reporttemplate ADD COLUMN IF NOT EXISTS legacy_designer_grandfathered"
+            " boolean DEFAULT FALSE"
+        )
+        cursor.execute(
+            "UPDATE extras_reporttemplate SET legacy_designer_grandfathered = FALSE"
+            " WHERE legacy_designer_grandfathered IS NULL"
+        )
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET DEFAULT FALSE")
+        cursor.execute("ALTER TABLE extras_reporttemplate ALTER COLUMN legacy_designer_grandfathered SET NOT NULL")
+    connection.commit()
+
+
+def _restore_migration_head():
+    """Return the shared test database to the true head after a rehearsal.
+
+    A rehearsal that moved the schema below the head leaves the retirement
+    migration recorded as applied while its columns linger and rows still
+    record the removed legacy CSV shape. Clear the rehearsed flag and the
+    simulated audit history that would restore it, then re-run the retirement
+    migration so the database ends at the real migration head.
+    """
+    _ensure_retired_report_designer_columns()
+    with connection.cursor() as cursor:
+        cursor.execute("UPDATE extras_reporttemplate SET advanced_mode = FALSE")
+        cursor.execute("DELETE FROM core_objectchange")
+    connection.commit()
+    MigrationRecorder(connection).record_unapplied("extras", "0127_retire_report_designer_legacy")
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
 class ReportDesignerMigrationTests(TransactionTestCase):
     reset_sequences = True
     migrate_from = ("extras", "0102_alter_event_action")
     migrate_to = ("extras", "0105_reporttemplate_advanced_mode_and_more")
 
     def tearDown(self):
-        # Restore the shared test database to the migration leaf state so later
-        # tests never see a rehearsed (partially migrated) schema.
         try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())
+            _restore_migration_head()
         finally:
             super().tearDown()
 
@@ -44,6 +87,9 @@ class ReportDesignerMigrationTests(TransactionTestCase):
     def setUp(self):
         super().setUp()
         MigrationRecorder(connection).record_unapplied("extras", "0113_upgrade_legacy_webhook_retry_schedules")
+        # 0105's reverse resets the marker before its own schema reconciliation,
+        # so the rehearsal must start from the era's physical columns.
+        _ensure_retired_report_designer_columns()
         self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
@@ -203,17 +249,16 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
     the designer disabled, and leaves every other population untouched.
     """
 
-    reset_sequences = True
+    # Sequences are intentionally not reset here: the seeded system schedules
+    # are re-created by post-migrate handlers after every flush, so a
+    # reset-to-1 would collide with the ids they have already re-issued.
     migrate_from = ("extras", "0122_journalentry_tenant_group")
     migrate_to = ("extras", "0123_pause_flag_suppressed_report_schedules")
     flag_names = ("ITAMBOX_FEATURE_REPORT_DESIGNER", "ITAMBOX_REPORT_DESIGNER_ENABLED")
 
     def tearDown(self):
-        # Restore the shared test database to the migration leaf state so later
-        # tests never see a rehearsed (partially migrated) schema.
         try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())
+            _restore_migration_head()
         finally:
             super().tearDown()
 
@@ -255,6 +300,8 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
         MigrationRecorder(connection).record_unapplied("extras", "0123_pause_flag_suppressed_report_schedules")
         self.executor = self._historical_executor()
         self.executor.migrate([self.migrate_from])
+        # The 0122-era scenario rows still write the retired columns on create.
+        _ensure_retired_report_designer_columns()
         old_apps = self.executor.loader.project_state([self.migrate_from]).apps
         ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
         ScheduledReport = old_apps.get_model("extras", "ScheduledReport")
@@ -373,3 +420,202 @@ class FlagSuppressedScheduleTransitionTests(TransactionTestCase):
         with self.assertRaises(RuntimeError) as caught:
             self.executor.migrate([self.migrate_from])
         self.assertIn("issue565.report_schedule_transition.reverse_refused", str(caught.exception))
+
+
+class ReportDesignerRetirementMigrationTests(TransactionTestCase):
+    """Rehearse issue #586 over the beta-era report-template schema."""
+
+    reset_sequences = True
+    migrate_from = ("extras", "0126_scheduledreport_last_run_archive")
+    migrate_to = ("extras", "0127_retire_report_designer_legacy")
+    migration_name = "0127_retire_report_designer_legacy"
+    report_name_prefix = "issue586-retirement-"
+
+    def setUp(self):
+        super().setUp()
+        self._restore_predecessor_schema()
+        self._create_beta_templates()
+
+    def tearDown(self):
+        try:
+            self._allow_forward_for_test_rows()
+            connection.close()
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())
+        finally:
+            super().tearDown()
+
+    def _historical_executor(self):
+        executor = MigrationExecutor(connection)
+        loader = executor.loader
+        allowed = set(loader.graph.forwards_plan(self.migrate_to))
+        graph = MigrationGraph()
+        for key in allowed:
+            graph.add_node(key, loader.disk_migrations[key])
+        for key in allowed:
+            migration = loader.disk_migrations[key]
+            for dependency in migration.dependencies:
+                if dependency in allowed:
+                    graph.add_dependency(migration, key, dependency)
+        loader.graph = graph
+        return executor
+
+    def _restore_predecessor_schema(self):
+        MigrationRecorder(connection).record_unapplied("extras", self.migration_name)
+        self.executor = self._historical_executor()
+        self.executor.migrate([self.migrate_from])
+        old_apps = self.executor.loader.project_state([self.migrate_from]).apps
+        self.ReportTemplate = old_apps.get_model("extras", "ReportTemplate")
+        _ensure_retired_report_designer_columns()
+
+    def _create_beta_templates(self):
+        # Derive the tenant from the same era snapshot as the report model; a
+        # second project_state call would build different model classes and the
+        # tenant foreign key would reject them.
+        Tenant = self.ReportTemplate._meta.apps.get_model("organization", "Tenant")
+        self.tenant = Tenant._base_manager.create(name="Issue 586 Tenant", slug="issue-586-tenant")
+
+        def create(name, **fields):
+            fields.setdefault("report_type", "asset_summary")
+            fields.setdefault("tenant", self.tenant)
+            return self.ReportTemplate._base_manager.create(name=f"{self.report_name_prefix}{name}", **fields)
+
+        self.canonical = create("canonical")
+        self.custom_html = create("custom-html", template_content="<h1>{{ report_name }}</h1>")
+        self.marked = create("marked", legacy_designer_grandfathered=True)
+        self.unsupported_a = create("unsupported-a", advanced_mode=True)
+        self.unsupported_b = create("unsupported-b", advanced_mode=True)
+        self.deleted_unsupported = create("deleted-unsupported", advanced_mode=True, deleted_at=timezone.now())
+        connection.commit()
+        connection.close()
+        self.executor = self._historical_executor()
+
+    def _allow_forward_for_test_rows(self):
+        with connection.cursor() as cursor:
+            columns = {
+                column.name
+                for column in connection.introspection.get_table_description(cursor, "extras_reporttemplate")
+            }
+            if "advanced_mode" in columns:
+                cursor.execute(
+                    "UPDATE extras_reporttemplate SET advanced_mode = FALSE WHERE name LIKE %s",
+                    [f"{self.report_name_prefix}%"],
+                )
+        connection.commit()
+
+    def _migrate_forward(self):
+        connection.close()
+        self.executor = self._historical_executor()
+        self.executor.migrate([self.migrate_to])
+        return self.executor.loader.project_state([self.migrate_to]).apps
+
+    def _column_names(self):
+        with connection.cursor() as cursor:
+            return {
+                column.name
+                for column in connection.introspection.get_table_description(cursor, "extras_reporttemplate")
+            }
+
+    def test_live_legacy_csv_shapes_refuse_before_schema_or_data_changes(self):
+        before = list(
+            self.ReportTemplate._base_manager.filter(name__startswith=self.report_name_prefix)
+            .order_by("name", "pk")
+            .values_list(
+                "pk",
+                "name",
+                "advanced_mode",
+                "template_content",
+                "legacy_designer_grandfathered",
+                "deleted_at",
+            )
+        )
+
+        with self.assertRaises(RuntimeError) as caught:
+            self._migrate_forward()
+
+        message = str(caught.exception)
+        self.assertTrue(message.startswith("issue586.report_designer_legacy.legacy_csv_shape_unsupported"))
+        first = f"{self.unsupported_a.name} (pk={self.unsupported_a.pk})"
+        second = f"{self.unsupported_b.name} (pk={self.unsupported_b.pk})"
+        self.assertIn(first, message)
+        self.assertIn(second, message)
+        self.assertLess(message.index(first), message.index(second))
+        self.assertNotIn(self.deleted_unsupported.name, message)
+        self.assertTrue({"advanced_mode", "legacy_designer_grandfathered"} <= self._column_names())
+        self.assertEqual(
+            list(
+                self.ReportTemplate._base_manager.filter(name__startswith=self.report_name_prefix)
+                .order_by("name", "pk")
+                .values_list(
+                    "pk",
+                    "name",
+                    "advanced_mode",
+                    "template_content",
+                    "legacy_designer_grandfathered",
+                    "deleted_at",
+                )
+            ),
+            before,
+        )
+        self.assertFalse(
+            MigrationRecorder(connection).migration_qs.filter(app="extras", name=self.migration_name).exists()
+        )
+
+    def test_refused_migration_retries_after_resolving_flags_and_keeps_canonical_data(self):
+        with self.assertRaises(RuntimeError):
+            self._migrate_forward()
+
+        self.ReportTemplate._base_manager.filter(pk__in=[self.unsupported_a.pk, self.unsupported_b.pk]).update(
+            advanced_mode=False
+        )
+        apps = self._migrate_forward()
+        ReportTemplate = apps.get_model("extras", "ReportTemplate")
+        rows = {row.name: row for row in ReportTemplate._base_manager.filter(name__startswith=self.report_name_prefix)}
+
+        self.assertEqual(rows[self.canonical.name].template_content, "")
+        self.assertEqual(rows[self.custom_html.name].template_content, "<h1>{{ report_name }}</h1>")
+        self.assertEqual(rows[self.marked.name].template_content, "")
+        self.assertNotIn("advanced_mode", {field.name for field in ReportTemplate._meta.local_fields})
+        self.assertNotIn("legacy_designer_grandfathered", {field.name for field in ReportTemplate._meta.local_fields})
+        self.assertIn("template_content", {field.name for field in ReportTemplate._meta.local_fields})
+        self.assertFalse({"advanced_mode", "legacy_designer_grandfathered"} & self._column_names())
+
+    def test_soft_deleted_legacy_csv_shape_does_not_block_migration(self):
+        self.ReportTemplate._base_manager.filter(pk__in=[self.unsupported_a.pk, self.unsupported_b.pk]).update(
+            advanced_mode=False
+        )
+
+        apps = self._migrate_forward()
+        ReportTemplate = apps.get_model("extras", "ReportTemplate")
+
+        self.assertFalse({"advanced_mode", "legacy_designer_grandfathered"} & self._column_names())
+        self.assertTrue(ReportTemplate._base_manager.filter(pk=self.deleted_unsupported.pk).exists())
+        self.assertTrue(
+            ReportTemplate._base_manager.filter(pk=self.deleted_unsupported.pk, deleted_at__isnull=False).exists()
+        )
+
+    def test_empty_report_table_migrates_cleanly_to_the_new_head(self):
+        self.ReportTemplate._base_manager.filter(name__startswith=self.report_name_prefix).delete()
+
+        apps = self._migrate_forward()
+
+        ReportTemplate = apps.get_model("extras", "ReportTemplate")
+        self.assertFalse(ReportTemplate._base_manager.filter(name__startswith=self.report_name_prefix).exists())
+        self.assertFalse({"advanced_mode", "legacy_designer_grandfathered"} & self._column_names())
+
+    def test_reverse_is_refused_and_schema_stays_at_the_new_head(self):
+        self.ReportTemplate._base_manager.filter(pk__in=[self.unsupported_a.pk, self.unsupported_b.pk]).update(
+            advanced_mode=False
+        )
+        self._migrate_forward()
+        connection.close()
+        self.executor = self._historical_executor()
+
+        with self.assertRaises(RuntimeError) as caught:
+            self.executor.migrate([self.migrate_from])
+
+        self.assertTrue(str(caught.exception).startswith("issue586.report_designer_legacy.reverse_refused"))
+        self.assertFalse({"advanced_mode", "legacy_designer_grandfathered"} & self._column_names())
+        self.assertTrue(
+            MigrationRecorder(connection).migration_qs.filter(app="extras", name=self.migration_name).exists()
+        )
