@@ -49,7 +49,9 @@ Prepare:
    [Backup and restore](backup-restore.md): PostgreSQL dump, media archive,
    runtime environment/secrets, checksums, and the matching source or image.
 5. The same immutable PostgreSQL image digest (therefore the exact same server
-   version) and required extensions for both paths.
+   version) and required extensions for both paths. Use the complete `db.image`
+   reference from the candidate checkout's `docker-compose.yml` as the approved
+   value; see the [release image policy](release-image-policy.md).
 6. Four explicit synthetic canaries in one tenant in the predecessor database:
    - a license with a non-empty encrypted product key;
    - email settings with a non-empty encrypted SMTP password;
@@ -110,7 +112,8 @@ export PREDECESSOR_CHECKOUT="$DRILL_RUNTIME_DIR/predecessor"
 export CANDIDATE_CHECKOUT="$DRILL_RUNTIME_DIR/candidate"
 export PREDECESSOR_IMAGE="itambox-drill-predecessor:$PREDECESSOR_REVISION"
 export CANDIDATE_IMAGE="itambox-drill-candidate:$CANDIDATE_REVISION"
-export POSTGRES_IMAGE='postgres@sha256:<approved-postgres-16-digest>'
+# Copy the exact tag-and-digest value from db.image in docker-compose.yml.
+export POSTGRES_IMAGE='postgres:16@sha256:<approved-postgres-16-index-digest>'
 export UPGRADE_OVERRIDE="$DRILL_RUNTIME_DIR/upgrade-image.yml"
 export FRESH_OVERRIDE="$DRILL_RUNTIME_DIR/fresh-image.yml"
 export ROLLBACK_OVERRIDE="$DRILL_RUNTIME_DIR/rollback-image.yml"

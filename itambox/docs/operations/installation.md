@@ -28,6 +28,10 @@ gh attestation verify "oci://ghcr.io/itambox/itambox-webapp@<digest>" \
 
 The remaining sections build the stack from source, which stays the supported path for auditing or customizing the build.
 
+The build bases and bundled PostgreSQL and Valkey services use reviewed
+tag-and-digest pins. For the update procedure or managed-service override, see
+the [release image policy](release-image-policy.md).
+
 ## Prerequisites
 
 - Docker Engine 24 or newer with Docker Compose v2.24.4 or newer

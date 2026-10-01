@@ -75,7 +75,7 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${ITAMBOX_DB_USER:-itambox}
@@ -96,7 +96,7 @@ services:
   # Valkey — the Linux Foundation's BSD-3 fork of Redis (Redis relicensed to
   # SSPL/RSALv2 in 2024). Drop-in: same wire protocol, same django-redis client.
   valkey:
-    image: valkey/valkey:8-alpine
+    image: valkey/valkey:8-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]

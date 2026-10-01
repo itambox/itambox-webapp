@@ -59,7 +59,6 @@ class E2EWorkflowTopologyTests(unittest.TestCase):
             "PLAYWRIGHT_JSON_OUTPUT_NAME",
             "fetch-depth: 0",
             "seed_data --force",
-            "mock-oauth2-server:6.0.0@sha256:",
             "::add-mask::",
             "npx playwright install --with-deps chromium",
             "E2E_NO_WEBSERVER",
@@ -69,6 +68,7 @@ class E2EWorkflowTopologyTests(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, execution)
+        self.assertRegex(execution, r"mock-oauth2-server:6\.0\.0@sha256:[0-9a-f]{64}(?:\s|$)")
         self.assertNotIn("npm test\n", execution)
 
     def test_pull_request_uses_raw_head_checkout_and_independent_identity_inputs(self):

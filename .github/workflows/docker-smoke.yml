@@ -3,6 +3,13 @@ name: Docker Compose Smoke Test
 on:
   push:
     branches: [master, main]
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "Dockerfile"
+      - "scripts/docker-smoke-test.sh"
+      - "scripts/tests/test_docker_smoke_helpers.sh"
+      - ".github/workflows/docker-smoke.yml"
   workflow_dispatch:
 
 permissions:

@@ -76,6 +76,10 @@ docker run --name itambox-postgres-dev --rm -d \
   postgres:16
 ```
 
+This throwaway local-development database deliberately keeps the floating tag;
+production Compose and release images follow the
+[release image policy](itambox/docs/operations/release-image-policy.md).
+
 Build the frontend and initialize the application:
 
 ```bash

@@ -1,7 +1,7 @@
 # ==============================================================================
 # ITAMbox Automated Dependabot Configuration
 # ==============================================================================
-# Automates weekly dependency scans for Python, npm, and GitHub Actions.
+# Automates weekly dependency scans for Python, npm, container images, and GitHub Actions.
 # ==============================================================================
 
 version: 2
@@ -10,6 +10,24 @@ updates:
   # ecosystem updates pyproject.toml and uv.lock together, which the pip
   # ecosystem does not (its PRs break `uv sync --locked` builds).
   - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
       interval: "weekly"

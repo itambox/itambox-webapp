@@ -198,14 +198,14 @@ class ReleaseAutomationContractTests(unittest.TestCase):
 
     def test_runtime_image_explicitly_installs_ca_certificates(self):
         dockerfile = (REPOSITORY_ROOT / "Dockerfile").read_text(encoding="utf-8")
-        runtime_stage = dockerfile.rsplit("FROM python:3.12-slim-bookworm", 1)[1]
+        runtime_stage = re.split(r"FROM python:3\.12-slim-bookworm@sha256:[0-9a-fA-F]{64}", dockerfile)[-1]
         install_block = runtime_stage.split("RUN apt-get update", 1)[1].split("&& rm -rf /var/lib/apt/lists/*", 1)[0]
 
         self.assertIn("ca-certificates", install_block)
 
     def test_runtime_image_explicitly_installs_openssl_and_tzdata(self):
         dockerfile = (REPOSITORY_ROOT / "Dockerfile").read_text(encoding="utf-8")
-        runtime_stage = dockerfile.rsplit("FROM python:3.12-slim-bookworm", 1)[1]
+        runtime_stage = re.split(r"FROM python:3\.12-slim-bookworm@sha256:[0-9a-fA-F]{64}", dockerfile)[-1]
         install_block = runtime_stage.split("RUN apt-get update", 1)[1].split("&& rm -rf /var/lib/apt/lists/*", 1)[0]
 
         for package in ("openssl", "libssl3", "tzdata"):
