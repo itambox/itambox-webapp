@@ -2,13 +2,13 @@
   "schema_version": 1,
   "canonical_python": "3.12",
   "canonical_platform": "linux",
-  "django_version": "5.2.16",
+  "django_version": "5.2.17",
   "djangorestframework_version": "3.17.2",
   "drf_spectacular_version": "0.29.0",
   "pyyaml_version": "6.0.3",
   "python_hash_seed": "0",
   "settings_sha256": "2ce0635fcf88a90b6c482782e5c6cf60c6f34620375fa62d92e8ce998410b2d2",
-  "policy_sha256": "7650911a882d4098d0b2524d22a49ab229bff1641b19d5c4578f5373a186933f",
+  "policy_sha256": "afba23c7c9ea9fe4b217e800833b6c0d9c9029176bbdc4a712e20df0c221e5d4",
   "diagnostics": [
     {
       "severity": "warning",
