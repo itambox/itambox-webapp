@@ -14,8 +14,7 @@ from assets.models import Asset, StatusLabel
 from assets.models.choices import DataSanitizationMethodChoices, DisposalMethodChoices
 from assets.models.lifecycle import AssetDisposal
 from assets.services import cancel_asset_disposal
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from organization.models import Tenant
 
@@ -52,7 +51,7 @@ class DisposalReportEffectiveTotalsTests(TenantTestMixin, TestCase):
         return record
 
     def _cards(self):
-        _headers, rows, cards, _grouped, chart_svg, _context = build_report_context(
+        _headers, rows, cards, _grouped, chart_svg, _context = compile_report_with_system_authorization(
             self.template, active_tenant=self.tenant
         )
         return {card["label"]: card["value"] for card in cards}, rows, chart_svg

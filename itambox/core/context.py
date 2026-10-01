@@ -132,6 +132,23 @@ class SystemAuthorizationContext:
         )
 
 
+def has_valid_system_authorization(*, tenant_id: int, permission: str, operation: str) -> bool:
+    """Whether the active task scope has issued this exact authorization tuple."""
+    current_request_id = _request_id.get()
+    if _system_authorization_scope.get() is None or current_request_id is None:
+        return False
+    return any(
+        isinstance(authorization, SystemAuthorizationContext)
+        and authorization.is_valid_for(
+            tenant_id=tenant_id,
+            permission=permission,
+            operation=operation,
+            request_id=current_request_id,
+        )
+        for authorization in _issued_system_authorizations.get()
+    )
+
+
 def _issue_system_authorization(*, tenant_id, permission, operation, reason, request_id, issuer):
     if (
         issuer is None

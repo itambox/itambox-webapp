@@ -3959,22 +3959,6 @@
       "path": "itambox/core/tests/test_report_hardware_inventory.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from core.reports import build_report_context",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.tests.mixins import TenantTestMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
       "source": "from django.test import TestCase",
       "context": "Module:body",
       "count": 1

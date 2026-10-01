@@ -138,7 +138,7 @@ class TriggerDeliveryDetailTests(TestCase):
         self.client.force_login(self.user)
 
     def _trigger(self, *, status, archive=None, success=True):
-        def side_effect(sched_pk):
+        def side_effect(sched_pk, invoked_by_user_id=None):
             ScheduledReport.objects.filter(pk=sched_pk).update(last_status=status)
             return success
 

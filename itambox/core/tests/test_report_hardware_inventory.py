@@ -3,7 +3,7 @@
 from django.test import TestCase
 from django.utils.translation import gettext as _
 
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 
 
 class HardwareInventoryReportTests(TenantTestMixin, TestCase):
@@ -22,7 +22,9 @@ class HardwareInventoryReportTests(TenantTestMixin, TestCase):
             report_type=ReportTemplate.REPORT_TYPE_HARDWARE_INVENTORY,
             tenant=self.tenant,
         )
-        headers, rows, cards, grouped, chart, ctx = build_report_context(tpl, active_tenant=self.tenant)
+        headers, rows, cards, grouped, chart, ctx = compile_report_with_system_authorization(
+            tpl, active_tenant=self.tenant
+        )
 
         names = [r.get(_("Name")) for r in rows]
         self.assertIn("USB-C Dock", names)
@@ -38,8 +40,6 @@ from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
 from compliance.models import CustodyReceipt
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from organization.models import AssetHolder, Tenant
 

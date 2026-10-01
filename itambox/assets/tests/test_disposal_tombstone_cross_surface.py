@@ -18,8 +18,7 @@ from model_bakery import baker
 from assets.models import Asset, AssetDisposal, DisposalMethodChoices, StatusLabel
 from assets.services import dispose_asset
 from core.models import ObjectChange
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from organization.models import Tenant
 
@@ -131,7 +130,9 @@ class TombstoneCrossSurfaceTests(TenantTestMixin, TestCase):
             include_distribution_chart=True,
             tenant=self.tenant,
         )
-        _headers, rows, cards, _grouped, chart_svg, _context = build_report_context(template, active_tenant=self.tenant)
+        _headers, rows, cards, _grouped, chart_svg, _context = compile_report_with_system_authorization(
+            template, active_tenant=self.tenant
+        )
         return rows, {card["label"]: card["value"] for card in cards}, chart_svg
 
     def test_report_treats_an_active_tombstone_as_active(self):

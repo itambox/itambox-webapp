@@ -4,11 +4,43 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from core.context import get_current_user
 from core.managers import get_current_membership, get_current_tenant, set_current_membership, set_current_tenant
 from core.mfa import role_is_privileged
+from core.reports import build_report_context, get_report_provider
+from core.reports.orchestration import REPORT_COMPILATION_OPERATION
+from core.tasks.context import TaskContext
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
 
 User = get_user_model()
+
+
+def compile_report_with_system_authorization(template, *args, **kwargs):
+    """Compile a single-tenant test report under an explicit system grant.
+
+    Tests with an authenticated principal use the real principal path. This
+    helper exists for legacy characterization tests that compile directly
+    without a request principal.
+    """
+    current_user = get_current_user()
+    if current_user is not None and getattr(current_user, "is_authenticated", False):
+        return build_report_context(template, *args, **kwargs)
+
+    active_tenant = kwargs.get("active_tenant")
+    filter_tenants = kwargs.get("filter_tenants")
+    tenants = tuple(filter_tenants or ()) or ((active_tenant,) if active_tenant is not None else ())
+    if len(tenants) != 1 or getattr(tenants[0], "pk", None) is None:
+        return build_report_context(template, *args, **kwargs)
+
+    with TaskContext(tenant_id=tenants[0].pk, user_id=None, operation="test.reports.compile") as task_context:
+        provider = get_report_provider(template.report_type)
+        for permission in provider.required_permissions():
+            task_context.authorize_system(
+                permission=permission,
+                operation=REPORT_COMPILATION_OPERATION,
+                reason="Report compilation test authorization",
+            )
+        return build_report_context(template, *args, **kwargs)
 
 
 def grant(

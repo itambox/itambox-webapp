@@ -15,8 +15,7 @@ from assets.models import Asset, StatusLabel
 from assets.models.choices import DataSanitizationMethodChoices, DisposalMethodChoices
 from assets.models.lifecycle import AssetDisposal
 from assets.services import cancel_asset_disposal
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from organization.models import Tenant
 
@@ -62,7 +61,7 @@ class DisposalReportStatusVisibilityTests(TenantTestMixin, TestCase):
         raise AssertionError(f"no report row for {tag}: {[row.get('Asset') for row in rows]}")
 
     def _context(self, template=None):
-        _headers, rows, cards, _grouped, chart_svg, _context = build_report_context(
+        _headers, rows, cards, _grouped, chart_svg, _context = compile_report_with_system_authorization(
             template or self.template, active_tenant=self.tenant
         )
         return rows, {card["label"]: card["value"] for card in cards}, chart_svg

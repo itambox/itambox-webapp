@@ -9,8 +9,7 @@ from django.urls import reverse
 from assets.models import Asset, AssetType, Manufacturer
 from assets.services.specification_consumers.contracts import FieldFilter, FieldReference
 from assets.services.specification_consumers.query import apply_specification_filters
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from extras.services.specifications.codecs import SAFE_INTEGER_MAX, SAFE_INTEGER_MIN
 from organization.models import Tenant
@@ -183,7 +182,7 @@ class T23PostgreSQLConsumerTests(TenantTestMixin, TestCase):
 
     def test_report_registry_scopes_before_filter_and_export(self):
         specification_filter = FieldFilter(self.asset_reference, "eq", "24.000")
-        headers, rows, _cards, _grouped, _chart, context = build_report_context(
+        headers, rows, _cards, _grouped, _chart, context = compile_report_with_system_authorization(
             self.template,
             active_tenant=self.tenant,
             specification_filters=(specification_filter,),

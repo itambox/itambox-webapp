@@ -1208,7 +1208,7 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
         sched = get_object_or_404(ScheduledReport, pk=pk)
 
         # Trigger report generation synchronously for immediate visual feedback in the UI
-        success = generate_scheduled_report_task(sched.pk)
+        success = generate_scheduled_report_task(sched.pk, invoked_by_user_id=request.user.pk)
         sched.refresh_from_db()
         status = sched.last_status or ""
         if status == "partial":

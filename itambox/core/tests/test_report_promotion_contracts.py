@@ -4,16 +4,35 @@ import csv
 import io
 from contextlib import ExitStack, contextmanager
 from datetime import datetime
+from datetime import timezone as dt_timezone
 from types import SimpleNamespace
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.test import SimpleTestCase
 
 from assets.reports import AssetDepreciationReportProvider
-from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult, record_window_state
+from core.context import set_current_all_accessible, set_current_tenant, set_current_tenant_group
+from core.reports.contracts import (
+    ReportDefinition,
+    ReportPermissionDenied,
+    ReportRequest,
+    ReportResult,
+    record_window_state,
+)
 from core.reports.exporters import report_xlsx_bytes
-from core.reports.orchestration import _resolve_report_scope, build_report_context
+from core.reports.orchestration import (
+    REPORT_COMPILATION_OPERATION,
+    _enforce_report_provider_permissions,
+    _global_report_permissions_cover,
+    _live_tenant_ids,
+    _principal_covers_report_permissions,
+    _report_compilation_authorized,
+    _resolve_report_scope,
+    build_report_context,
+)
+from core.reports.registry import get_report_provider
 from core.reports.rendering import render_report_csv, render_report_html
 from extras.forms import ReportTemplateForm
 from extras.tasks.reports import _attachment_email_body
@@ -67,7 +86,7 @@ class ReportCompileScopeAuthorizationTests(SimpleTestCase):
             patch("itambox.middleware.get_current_user", return_value=self.user),
             patch("core.tasks.context.TaskContext") as task_context,
         ):
-            with self.assertRaisesRegex(PermissionError, "reports.view_cross_tenant_reports"):
+            with self.assertRaisesRegex(ReportPermissionDenied, "reports.view_cross_tenant_reports"):
                 _resolve_report_scope(self.tenant_a, [self.tenant_a, self.tenant_b])
 
         self.assertEqual(
@@ -108,8 +127,13 @@ class ReportCompileScopeAuthorizationTests(SimpleTestCase):
                 (None, [self.tenant_a, self.tenant_b]),
             ):
                 with self.subTest(active_tenant=active_tenant, pinned=pinned):
-                    with self.assertRaises(PermissionError):
+                    with self.assertRaises(ReportPermissionDenied):
                         _resolve_report_scope(active_tenant, pinned)
+
+    def test_unresolvable_pinned_tenant_entry_is_refused(self):
+        with patch("core.reports.orchestration.get_current_user", return_value=self.user):
+            with self.assertRaises(ReportPermissionDenied):
+                _resolve_report_scope(None, [SimpleNamespace(pk=None)])
 
     def test_empty_scope_is_global_only_for_permission_holders(self):
         self.user.has_perm.return_value = True
@@ -181,6 +205,8 @@ class ReportPinnedDownloadTests(SimpleTestCase):
             patch("core.reports.orchestration.get_current_user", return_value=self.user),
             patch("core.reports.orchestration.accessible_tenant_ids", return_value=set()),
             patch("core.reports.orchestration._tenant_scope_reach_is_valid", return_value=authorized),
+            # Domain permission enforcement has separate coverage; these cases verify the pinned scope machinery.
+            patch("core.reports.orchestration._enforce_report_provider_permissions"),
             patch("core.reports.orchestration.get_report_provider", return_value=provider),
         )
 
@@ -351,6 +377,8 @@ class ReportDisclosureTests(SimpleTestCase):
             style_preset="default",
         )
         with (
+            # Domain permission enforcement has separate coverage; this case verifies disclosure assembly.
+            patch("core.reports.orchestration._enforce_report_provider_permissions"),
             patch("core.reports.orchestration.get_current_user", return_value=None),
             patch("core.reports.orchestration.get_report_provider", return_value=Provider()),
         ):
@@ -367,6 +395,8 @@ class ReportDisclosureTests(SimpleTestCase):
                 return ReportResult(rows=[{"Asset Tag": "A-1"}], is_sample=True)
 
         with (
+            # Domain permission enforcement has separate coverage; this case verifies disclosure assembly.
+            patch("core.reports.orchestration._enforce_report_provider_permissions"),
             patch("core.reports.orchestration.get_current_user", return_value=None),
             patch("core.reports.orchestration.get_report_provider", return_value=SampleProvider()),
         ):
@@ -375,6 +405,497 @@ class ReportDisclosureTests(SimpleTestCase):
         self.assertFalse(sample_context["truncated"])
         self.assertIsNone(sample_context["total_rows"])
         self.assertIn("sample data", sample_context["disclosure_text"])
+
+
+class _ScopeQuery(list):
+    """Queryset stand-in: iterable of tenants, chained ``filter`` returns itself."""
+
+    def filter(self, *args, **kwargs):
+        return self
+
+
+class _UnreadableIdentity:
+    """Principal stand-in whose ``pk`` cannot be resolved for logging."""
+
+    is_authenticated = True
+    is_active = True
+    is_superuser = False
+
+    @property
+    def pk(self):
+        raise RuntimeError("unreadable pk")
+
+
+class _UnreadableTenant:
+    """Tenant stand-in whose ``pk`` cannot be resolved for logging."""
+
+    @property
+    def pk(self):
+        raise RuntimeError("unreadable pk")
+
+
+class _UnreadableReportProvider:
+    """Provider stand-in whose ``report_type`` cannot be resolved for logging."""
+
+    @property
+    def report_type(self):
+        raise RuntimeError("unreadable report type")
+
+    def required_permissions(self):
+        return ("assets.view_asset",)
+
+
+class ReportProviderDomainPermissionTests(SimpleTestCase):
+    def setUp(self):
+        self.tenant_a = SimpleNamespace(pk=1)
+        self.tenant_b = SimpleNamespace(pk=2)
+        self.tenant_c = SimpleNamespace(pk=3)
+        self.user = Mock(pk=41, is_authenticated=True, is_active=True, is_superuser=False)
+
+    def test_hardware_inventory_requires_every_declared_permission(self):
+        provider = get_report_provider("hardware_inventory")
+        permissions = provider.required_permissions()
+        self.assertEqual(len(permissions), 3)
+        held_permissions = set(permissions) - {"inventory.view_component"}
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                side_effect=lambda _user, _tenant, declared: all(
+                    permission in held_permissions for permission in declared
+                ),
+            ),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [self.tenant_a], self.tenant_a)
+
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration._principal_covers_report_permissions", return_value=True),
+        ):
+            _enforce_report_provider_permissions(provider, [self.tenant_a], self.tenant_a)
+
+    def test_each_pinned_tenant_is_checked_and_one_missing_permission_denies(self):
+        provider = get_report_provider("asset_summary")
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                side_effect=[True, False],
+            ) as check,
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [self.tenant_a, self.tenant_b], self.tenant_c)
+
+        self.assertEqual([item.args[1] for item in check.call_args_list], [self.tenant_a, self.tenant_b])
+
+    def test_per_tenant_resolver_failures_are_denials(self):
+        with patch("core.tasks.context.TaskContext", side_effect=PermissionDenied):
+            self.assertFalse(_principal_covers_report_permissions(self.user, self.tenant_a, ("assets.view_asset",)))
+
+        bound_user = Mock(pk=self.user.pk, is_authenticated=True, is_active=True)
+        task_context = MagicMock()
+        task_context.return_value.__enter__.return_value = Mock()
+        with (
+            patch("core.tasks.context.TaskContext", task_context),
+            patch("core.reports.orchestration.get_current_user", return_value=bound_user),
+        ):
+            self.assertTrue(
+                _principal_covers_report_permissions(
+                    self.user,
+                    self.tenant_a,
+                    ("assets.view_asset", "assets.view_asset"),
+                )
+            )
+        task_context.assert_called_once_with(tenant_id=1, user_id=self.user.pk, operation="reports.permissions")
+        self.assertEqual(bound_user.has_perm.call_count, 2)
+        self.assertTrue(all(item.kwargs["obj"] is self.tenant_a for item in bound_user.has_perm.call_args_list))
+
+    def test_active_superuser_passes_and_inactive_superuser_fails(self):
+        provider = get_report_provider("asset_summary")
+        active_superuser = SimpleNamespace(pk=7, is_authenticated=True, is_active=True, is_superuser=True)
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=active_superuser),
+            patch("core.reports.orchestration._principal_covers_report_permissions") as check,
+        ):
+            _enforce_report_provider_permissions(provider, [], self.tenant_a)
+        check.assert_not_called()
+
+        inactive_superuser = SimpleNamespace(pk=8, is_authenticated=True, is_active=False, is_superuser=True)
+        with patch("core.reports.orchestration.get_current_user", return_value=inactive_superuser):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], self.tenant_a)
+
+    def test_actorless_single_tenant_requires_each_exact_system_authorization(self):
+        provider = get_report_provider("hardware_inventory")
+        permissions = provider.required_permissions()
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=None),
+            patch("core.reports.orchestration.has_valid_system_authorization", return_value=False),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], self.tenant_a)
+
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=None),
+            patch("core.reports.orchestration.has_valid_system_authorization", return_value=True) as check,
+        ):
+            _enforce_report_provider_permissions(provider, [], self.tenant_a)
+        self.assertEqual(
+            check.call_args_list,
+            [
+                call(
+                    tenant_id=self.tenant_a.pk,
+                    permission=permission,
+                    operation=REPORT_COMPILATION_OPERATION,
+                )
+                for permission in permissions
+            ],
+        )
+
+        # An unresolvable actorless tenant identity never authorizes.
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=None),
+            patch("core.reports.orchestration.has_valid_system_authorization", return_value=True),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], _UnreadableTenant())
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], SimpleNamespace(pk=None))
+
+        # A crashing system-authorization validator denies.
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=None),
+            patch(
+                "core.reports.orchestration.has_valid_system_authorization",
+                side_effect=RuntimeError("validator failed"),
+            ),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], self.tenant_a)
+
+    def test_actorless_multi_tenant_and_global_scopes_are_denied(self):
+        provider = get_report_provider("asset_summary")
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=None),
+            patch("core.reports.orchestration.has_valid_system_authorization", return_value=True),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [self.tenant_a, self.tenant_b], self.tenant_a)
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+    def test_global_aggregation_requires_all_live_tenants_and_unexpired_grants(self):
+        tenant_query = Mock()
+        tenant_query.values_list.return_value = (1, 2)
+        tenant_model_value = SimpleNamespace(_base_manager=SimpleNamespace(filter=Mock(return_value=tenant_query)))
+        permissions = ("assets.view_asset",)
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                return_value={1: (frozenset(permissions), None), 2: (frozenset(permissions), None)},
+            ),
+        ):
+            self.assertTrue(_global_report_permissions_cover(self.user, permissions))
+
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                return_value={1: (frozenset(permissions), None), 2: (frozenset(), None)},
+            ),
+        ):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+        expiry = datetime(2025, 1, 1, tzinfo=dt_timezone.utc)
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch("core.reports.orchestration.timezone.now", return_value=datetime(2026, 1, 1, tzinfo=dt_timezone.utc)),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                return_value={1: (frozenset(permissions), None), 2: (frozenset(permissions), expiry)},
+            ),
+        ):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+        tenant_query.values_list.return_value = ()
+        with patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+        tenant_query.values_list.side_effect = RuntimeError("tenant enumeration failed")
+        with patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+        tenant_query.values_list.side_effect = None
+        tenant_query.values_list.return_value = (1, 2)
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                side_effect=RuntimeError("permission map failed"),
+            ),
+        ):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                return_value=["not", "a", "mapping"],
+            ),
+        ):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                return_value={1: "unshaped", 2: (frozenset(permissions), None)},
+            ),
+        ):
+            self.assertFalse(_global_report_permissions_cover(self.user, permissions))
+
+    def test_unscoped_non_superuser_scope_is_unrepresentable_and_denies(self):
+        """A non-superuser without a resolved scope reads no rows; never widen to live tenants."""
+        provider = get_report_provider("asset_summary")
+        tenant_model_value = Mock()
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", tenant_model_value),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+        tenant_model_value.assert_not_called()
+
+        active_superuser = SimpleNamespace(pk=7, is_authenticated=True, is_active=True, is_superuser=True)
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=active_superuser),
+            patch("core.reports.orchestration.tenant_model", tenant_model_value),
+        ):
+            _enforce_report_provider_permissions(provider, [], None)
+        tenant_model_value.assert_not_called()
+
+    def test_all_accessible_scope_checks_only_the_reachable_tenants(self):
+        """The "all accessible tenants" scope resolves like the managers: A+B, never a foreign C."""
+        provider = get_report_provider("asset_summary")
+        tenant_query = _ScopeQuery([self.tenant_a, self.tenant_b])
+        tenant_model_value = SimpleNamespace(_base_manager=SimpleNamespace(filter=Mock(return_value=tenant_query)))
+        self.addCleanup(set_current_all_accessible, False)
+        set_current_all_accessible(True)
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch("core.reports.orchestration.accessible_tenant_ids", return_value={1, 2}),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                return_value=True,
+            ) as check,
+        ):
+            _enforce_report_provider_permissions(provider, [], None)
+        self.assertEqual([item.args[1] for item in check.call_args_list], [self.tenant_a, self.tenant_b])
+
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch("core.reports.orchestration.accessible_tenant_ids", return_value={1, 2}),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                side_effect=[True, False],
+            ),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch("core.reports.orchestration.accessible_tenant_ids", return_value={1, 2}),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                side_effect=RuntimeError("resolver crash"),
+            ),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+    def test_tenant_group_scope_checks_only_the_reachable_subtree_tenants(self):
+        """A tenant-group scope resolves to the accessible tenants of its live subtree."""
+        provider = get_report_provider("asset_summary")
+        group = SimpleNamespace(pk=7)
+        tenant_query = _ScopeQuery([self.tenant_a, self.tenant_b])
+        tenant_model_value = SimpleNamespace(_base_manager=SimpleNamespace(filter=Mock(return_value=tenant_query)))
+        self.addCleanup(set_current_tenant_group, None)
+        set_current_tenant_group(group)
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch("core.reports.orchestration.accessible_tenant_ids", return_value={1, 2, 3}),
+            patch("core.reports.orchestration.get_descendant_tenant_group_ids", return_value={7, 8}) as subtree,
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                return_value=True,
+            ) as check,
+        ):
+            _enforce_report_provider_permissions(provider, [], None)
+        subtree.assert_called_once_with(7, live_only=True)
+        self.assertEqual([item.args[1] for item in check.call_args_list], [self.tenant_a, self.tenant_b])
+
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch("core.reports.orchestration.accessible_tenant_ids", return_value={1, 2, 3}),
+            patch("core.reports.orchestration.get_descendant_tenant_group_ids", return_value={7, 8}),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                side_effect=[True, False],
+            ),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+    def test_principal_coverage_identity_and_bound_resolution_edges(self):
+        """Unresolvable identities and bound principals fail closed."""
+        task_context = MagicMock()
+        task_context.return_value.__enter__.return_value = Mock()
+        self.assertFalse(
+            _principal_covers_report_permissions(_UnreadableIdentity(), self.tenant_a, ("assets.view_asset",))
+        )
+        self.assertFalse(_principal_covers_report_permissions(self.user, _UnreadableTenant(), ("assets.view_asset",)))
+        self.assertFalse(
+            _principal_covers_report_permissions(self.user, SimpleNamespace(pk=None), ("assets.view_asset",))
+        )
+        self.assertFalse(
+            _principal_covers_report_permissions(SimpleNamespace(pk=None), self.tenant_a, ("assets.view_asset",))
+        )
+
+        for bound_user in (
+            None,
+            SimpleNamespace(is_authenticated=False, is_active=True),
+            SimpleNamespace(is_authenticated=True, is_active=False),
+        ):
+            with (
+                patch("core.tasks.context.TaskContext", task_context),
+                patch("core.reports.orchestration.get_current_user", return_value=bound_user),
+            ):
+                self.assertFalse(_principal_covers_report_permissions(self.user, self.tenant_a, ("assets.view_asset",)))
+
+        failing_user = Mock(pk=41, is_authenticated=True, is_active=True)
+        failing_user.has_perm.side_effect = RuntimeError("permission backend failed")
+        with (
+            patch("core.tasks.context.TaskContext", task_context),
+            patch("core.reports.orchestration.get_current_user", return_value=failing_user),
+        ):
+            self.assertFalse(_principal_covers_report_permissions(self.user, self.tenant_a, ("assets.view_asset",)))
+
+    def test_denial_logging_tolerates_unreadable_identities(self):
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=_UnreadableIdentity()),
+            patch("core.reports.orchestration._principal_covers_report_permissions", return_value=False),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(_UnreadableReportProvider(), [], _UnreadableTenant())
+
+    def test_conflicting_ambient_scope_states_fail_closed(self):
+        provider = get_report_provider("asset_summary")
+        self.addCleanup(set_current_tenant, None)
+        self.addCleanup(set_current_all_accessible, False)
+        set_current_tenant(self.tenant_a)
+        set_current_all_accessible(True)
+        with patch("core.reports.orchestration.get_current_user", return_value=self.user):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+    def test_ambient_tenant_scope_is_checked_without_arguments(self):
+        provider = get_report_provider("asset_summary")
+        self.addCleanup(set_current_tenant, None)
+        set_current_tenant(self.tenant_a)
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch(
+                "core.reports.orchestration._principal_covers_report_permissions",
+                return_value=True,
+            ) as check,
+        ):
+            _enforce_report_provider_permissions(provider, [], None)
+        self.assertEqual([item.args[1] for item in check.call_args_list], [self.tenant_a])
+
+    def test_aggregate_scope_resolution_failures_fail_closed(self):
+        provider = get_report_provider("asset_summary")
+        self.addCleanup(set_current_all_accessible, False)
+        set_current_all_accessible(True)
+        broken_model = SimpleNamespace(
+            _base_manager=SimpleNamespace(filter=Mock(side_effect=RuntimeError("enumeration failed")))
+        )
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=broken_model),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+        empty_model = SimpleNamespace(_base_manager=SimpleNamespace(filter=Mock(return_value=_ScopeQuery([]))))
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch("core.reports.orchestration.tenant_model", return_value=empty_model),
+            patch("core.reports.orchestration.accessible_tenant_ids", return_value={1}),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+        with (
+            patch("core.reports.orchestration.get_current_user", return_value=self.user),
+            patch(
+                "core.reports.orchestration.get_current_scope_conflict",
+                side_effect=RuntimeError("conflict probe failed"),
+            ),
+        ):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], None)
+
+    def test_global_authorization_path_enumerates_live_tenants(self):
+        """The truly global path keeps the live-tenant evaluation (defense in depth)."""
+        tenant_query = Mock()
+        tenant_query.values_list.return_value = (1, 2)
+        tenant_model_value = SimpleNamespace(_base_manager=SimpleNamespace(filter=Mock(return_value=tenant_query)))
+        permissions = ("assets.view_asset",)
+        with (
+            patch("core.reports.orchestration.tenant_model", return_value=tenant_model_value),
+            patch(
+                "core.reports.orchestration.build_accessible_tenant_permissions_map",
+                return_value={1: (frozenset(permissions), None), 2: (frozenset(permissions), None)},
+            ),
+        ):
+            authorized, live_ids = _report_compilation_authorized(
+                user=self.user,
+                principal_resolved=True,
+                principal_active=True,
+                principal_superuser=False,
+                scope_tenants=(),
+                permissions=permissions,
+            )
+        self.assertTrue(authorized)
+        self.assertEqual(live_ids, (1, 2))
+
+        with patch("core.reports.orchestration.tenant_model", side_effect=RuntimeError("enumeration failed")):
+            self.assertEqual(_live_tenant_ids(), ())
+
+    def test_empty_declaration_and_principal_resolver_error_deny(self):
+        provider = Mock(report_type="empty_provider")
+        provider.required_permissions.return_value = ()
+        with patch("core.reports.orchestration.get_current_user", return_value=self.user):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], self.tenant_a)
+
+        provider.required_permissions.return_value = ("assets.view_asset",)
+        with patch("core.reports.orchestration.get_current_user", side_effect=RuntimeError("resolver failed")):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], self.tenant_a)
+
+        provider.required_permissions.side_effect = RuntimeError("declaration failed")
+        with patch("core.reports.orchestration.get_current_user", return_value=self.user):
+            with self.assertRaises(ReportPermissionDenied):
+                _enforce_report_provider_permissions(provider, [], self.tenant_a)
 
     def test_html_csv_xlsx_mail_and_download_headers_carry_disclosure(self):
         disclosure = "Showing <first> 2 of 6 rows & matching records."

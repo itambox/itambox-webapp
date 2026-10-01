@@ -52,6 +52,9 @@ from django_q.models import Schedule
 from django_q.scheduler import scheduler
 from django_q.signing import SignedPackage
 
+from core.reports import get_report_provider
+from core.reports.orchestration import REPORT_COMPILATION_OPERATION
+from core.tasks.context import TaskContext
 from extras.models import (
     NotificationChannel,
     ReportGenerationArchive,
@@ -79,6 +82,26 @@ def queue_mode():
     redelivery behavior is exercised as deployed.
     """
     with mock.patch.object(Conf, "SYNC", False):
+        yield
+
+
+@contextmanager
+def _system_report_run(template, tenant):
+    """Bind a sanctioned actorless system run for direct worker drills.
+
+    The summary-fencing drills call ``_process_scheduled_report`` directly to
+    simulate an overlapping older occurrence; that step compiles through the
+    central provider-domain permission check, so it carries the same explicit
+    system authorizations the scheduled task issues for an unattended
+    single-tenant run.
+    """
+    with TaskContext(tenant_id=tenant.pk, user_id=None) as task:
+        for permission in get_report_provider(template.report_type).required_permissions():
+            task.authorize_system(
+                permission=permission,
+                operation=REPORT_COMPILATION_OPERATION,
+                reason="Downtime drill system run",
+            )
         yield
 
 
@@ -1307,9 +1330,12 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
         # finishes now, with a delivery failure. Its own archive and ledger
         # must be complete, but the schedule summary must keep B's state.
         older_started_at = newer_start - timedelta(minutes=5)
-        with mock.patch(
-            "extras.tasks.reports._deliver_report_email",
-            side_effect=RuntimeError("smtp down"),
+        with (
+            mock.patch(
+                "extras.tasks.reports._deliver_report_email",
+                side_effect=RuntimeError("smtp down"),
+            ),
+            _system_report_run(self.template, self.tenant),
         ):
             success = _process_scheduled_report(sched, self.tenant, [], run_started_at=older_started_at)
 
@@ -1377,9 +1403,12 @@ class ScheduledReportDeliveryRecoveryTests(TestCase):
         self.assertEqual(sched.last_status, "success")
 
         older_started_at = newer_start - timedelta(minutes=5)
-        with mock.patch(
-            "extras.tasks.reports._render_report_output",
-            side_effect=RuntimeError("render blew up"),
+        with (
+            mock.patch(
+                "extras.tasks.reports._render_report_output",
+                side_effect=RuntimeError("render blew up"),
+            ),
+            _system_report_run(self.template, self.tenant),
         ):
             result_a = _process_scheduled_report(sched, self.tenant, [], run_started_at=older_started_at)
 

@@ -18,8 +18,7 @@ from assets.models import Asset, StatusLabel
 from assets.models.choices import DataSanitizationMethodChoices, DisposalMethodChoices
 from assets.models.lifecycle import AssetDisposal
 from assets.services import cancel_asset_disposal
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 
 EXPECTED_GERMAN = {
@@ -151,7 +150,7 @@ class DisposalReportGermanHeaderTests(TenantTestMixin, TestCase):
             included_columns=["disposal_asset", "disposal_cancellation_reason"],
         )
         with translation.override("de"):
-            headers, rows, *_rest = build_report_context(template, active_tenant=self.tenant)
+            headers, rows, *_rest = compile_report_with_system_authorization(template, active_tenant=self.tenant)
         self.assertIn("Stornogrund der Entsorgung", headers)
         self.assertNotIn("K\u00fcndigungsgrund", headers)
         self.assertEqual(rows[0]["Stornogrund der Entsorgung"], "falsch erfasst")
