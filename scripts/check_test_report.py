@@ -17,6 +17,12 @@ It fails closed on every shape where a green tick would be misleading:
 * Skipped tests are ratcheted against ``MAX_SKIPPED_TESTS``. A skip is a test
   that silently did not run, so raising the allowance is a reviewed code change
   with a stated reason -- never something a branch can do to itself.
+* An expected failure (``xfail``) is NOT a skip: it ran, and failed as declared.
+  pytest writes it to JUnit as ``<skipped type="pytest.xfail">``, so it is
+  recognised by that type and counted separately. The journey suite
+  (``itambox/tests/journeys``) relies on this. Strictness is enforced where it
+  belongs, in pytest (``xfail_strict = true``): a test that unexpectedly passes is
+  recorded as a failure, which this gate already refuses.
 * The number of tests that actually ran is ratcheted against the reviewed
   baseline in ``scripts/suite_baseline.json``. "More than zero tests ran" is a
   far weaker claim than it looks: a collection error in one package, a renamed
@@ -61,6 +67,9 @@ SUITE_SCHEMA_VERSION = 1
 # allowed to skip and why, in review, in this file.
 MAX_SKIPPED_TESTS = 0
 
+# pytest's JUnit writer records an expected failure as <skipped type="pytest.xfail">.
+XFAIL_JUNIT_TYPE = "pytest.xfail"
+
 # Published for visibility only -- crossing it never fails the gate.
 SLOW_TEST_SECONDS = 5.0
 DEFAULT_SLOWEST = 20
@@ -71,12 +80,29 @@ class TestCase:
         self.name = name
         self.classname = classname
         self.time = time
-        self.outcome = outcome  # passed | failed | error | skipped
+        self.outcome = outcome  # passed | failed | error | skipped | xfailed
         self.message = message
 
     @property
     def label(self):
         return f"{self.classname}::{self.name}" if self.classname else self.name
+
+
+def _classify_element(element):
+    """Outcome and message of one ``<testcase>``; an xfail is its own outcome, never a skip."""
+    for tag in ("failure", "error", "skipped"):
+        child = element.find(tag)
+        if child is None:
+            continue
+        message = (child.get("message") or "").strip()
+        if tag == "error":
+            return "error", message
+        if tag == "failure":
+            return "failed", message
+        if (child.get("type") or "") == XFAIL_JUNIT_TYPE:
+            return "xfailed", message
+        return "skipped", message
+    return "passed", ""
 
 
 def load_report(report_path):
@@ -98,14 +124,7 @@ def load_report(report_path):
 
     cases = []
     for element in tree.getroot().iter("testcase"):
-        outcome = "passed"
-        message = ""
-        for tag in ("failure", "error", "skipped"):
-            child = element.find(tag)
-            if child is not None:
-                outcome = "error" if tag == "error" else ("failed" if tag == "failure" else "skipped")
-                message = (child.get("message") or "").strip()
-                break
+        outcome, message = _classify_element(element)
         try:
             duration = float(element.get("time") or 0.0)
         except ValueError:
@@ -248,7 +267,7 @@ def handle_write(args, executed):
 
 
 def summarise(cases):
-    counts = {"passed": 0, "failed": 0, "error": 0, "skipped": 0}
+    counts = {"passed": 0, "failed": 0, "error": 0, "skipped": 0, "xfailed": 0}
     for case in cases:
         counts[case.outcome] += 1
     counts["total"] = len(cases)
@@ -261,7 +280,7 @@ def format_summary(counts, slowest, slow_cases):
         "### Test run",
         "",
         f"{counts['total']} test(s) · {counts['passed']} passed · {counts['failed']} failed · "
-        f"{counts['error']} error(s) · {counts['skipped']} skipped · "
+        f"{counts['error']} error(s) · {counts['skipped']} skipped · {counts['xfailed']} expected failure(s) · "
         f"{counts['wall_seconds']:.1f}s of accumulated test time (complete serial suite)",
         "",
         f"#### Slowest {len(slowest)} test(s)",
@@ -395,6 +414,7 @@ def main(argv=None):
     print(
         f"test report: {counts['total']} test(s), {counts['passed']} passed, "
         f"{counts['failed']} failed, {counts['error']} error(s), {counts['skipped']} skipped, "
+        f"{counts['xfailed']} expected failure(s), "
         f"{counts['wall_seconds']:.1f}s accumulated."
     )
     if slowest:

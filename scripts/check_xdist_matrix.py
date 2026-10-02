@@ -45,8 +45,31 @@ class TestCase:
 
     def __init__(self, label, outcome, message=""):
         self.label = label
-        self.outcome = outcome  # passed | failed | error | skipped
+        self.outcome = outcome  # passed | failed | error | skipped | xfailed
         self.message = message
+
+
+# pytest's JUnit writer records an expected failure as <skipped type="pytest.xfail">. It ran and
+# failed as declared, so it is not a silent skip (see check_test_report.py); an unexpected pass is
+# recorded as a <failure> because the repository sets xfail_strict.
+XFAIL_JUNIT_TYPE = "pytest.xfail"
+
+
+def _classify_element(element):
+    """Outcome and message of one ``<testcase>``; an xfail is its own outcome, never a skip."""
+    for tag in ("failure", "error", "skipped"):
+        child = element.find(tag)
+        if child is None:
+            continue
+        message = (child.get("message") or "").strip()
+        if tag == "error":
+            return "error", message
+        if tag == "failure":
+            return "failed", message
+        if (child.get("type") or "") == XFAIL_JUNIT_TYPE:
+            return "xfailed", message
+        return "skipped", message
+    return "passed", ""
 
 
 def load_report(report_path):
@@ -61,14 +84,7 @@ def load_report(report_path):
 
     cases = []
     for element in tree.getroot().iter("testcase"):
-        outcome = "passed"
-        message = ""
-        for tag in ("failure", "error", "skipped"):
-            child = element.find(tag)
-            if child is not None:
-                outcome = "error" if tag == "error" else ("failed" if tag == "failure" else "skipped")
-                message = (child.get("message") or "").strip()
-                break
+        outcome, message = _classify_element(element)
         classname = element.get("classname") or ""
         name = element.get("name") or "<unnamed>"
         cases.append(TestCase(f"{classname}::{name}" if classname else name, outcome, message))
@@ -81,7 +97,7 @@ def summarize(reports):
     """Per-report outcome counts, keyed by report path."""
     summary = {}
     for path, cases in reports.items():
-        counts = {"passed": 0, "failed": 0, "error": 0, "skipped": 0}
+        counts = {"passed": 0, "failed": 0, "error": 0, "skipped": 0, "xfailed": 0}
         for case in cases:
             counts[case.outcome] += 1
         summary[path] = counts
@@ -185,13 +201,16 @@ def main(argv=None):
     first = counts[args.xdist[0]]
     print(
         f"xdist matrix: {len(args.xdist)} iteration(s), {first['passed']} passed "
-        f"({first['failed']} failed, {first['error']} error(s), {first['skipped']} skipped) per iteration, "
+        f"({first['failed']} failed, {first['error']} error(s), {first['skipped']} skipped, "
+        f"{first['xfailed']} expected failure(s)) per iteration, "
         f"identical node IDs across all iterations",
         end="",
     )
     if serial_paths:
         serial_counts = summarize({path: reports[path] for path in serial_paths})
-        serial_total = sum(c["passed"] + c["failed"] + c["error"] + c["skipped"] for c in serial_counts.values())
+        serial_total = sum(
+            c["passed"] + c["failed"] + c["error"] + c["skipped"] + c["xfailed"] for c in serial_counts.values()
+        )
         print(f", serial-only lane: {serial_total} test(s), disjoint from the parallel lane", end="")
     print(".")
     return 0

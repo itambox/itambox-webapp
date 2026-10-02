@@ -23,7 +23,10 @@ def write_junit(path, cases, tests_attr=None):
     for label, outcome in cases.items():
         classname, _, name = label.rpartition("::")
         case = ElementTree.SubElement(suite, "testcase", {"classname": classname, "name": name, "time": "0.01"})
-        if outcome != "passed":
+        if outcome == "xfailed":
+            # pytest records an expected failure as <skipped type="pytest.xfail">.
+            ElementTree.SubElement(case, "skipped", {"type": "pytest.xfail", "message": f"known: {label}"})
+        elif outcome != "passed":
             # pytest's JUnit writer emits <failure>, not <failed>; the helper
             # must write the same tags the gate reads.
             tag = "failure" if outcome == "failed" else outcome
@@ -114,6 +117,30 @@ class MatrixParityTests(unittest.TestCase):
     def test_skipped_case_fails_the_matrix(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = write_junit(Path(tmp) / "xdist-1.xml", {"a.tests.test_x::TestA::test_one": "skipped"})
+            self.assertEqual(run_gate([path]), 1)
+
+
+class ExpectedFailureTests(unittest.TestCase):
+    def test_xfail_is_recorded_as_an_expected_failure_not_a_skip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_junit(Path(tmp) / "xdist-1.xml", {"a.tests.test_x::TestA::test_known": "xfailed"})
+            self.assertEqual(load_report(path)[0].outcome, "xfailed")
+
+    def test_xfail_does_not_fail_the_matrix_in_either_lane(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            xdist = write_junit(
+                Path(tmp) / "xdist-1.xml",
+                {"a.tests.test_x::TestA::test_ok": "passed", "a.tests.test_x::TestA::test_known": "xfailed"},
+            )
+            serial = write_junit(Path(tmp) / "serial.xml", {"a.tests.test_y::TestB::test_race": "xfailed"})
+            self.assertEqual(run_gate([xdist], [serial]), 0)
+
+    def test_a_real_skip_still_fails_beside_an_xfail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_junit(
+                Path(tmp) / "xdist-1.xml",
+                {"a.tests.test_x::TestA::test_known": "xfailed", "a.tests.test_x::TestA::test_skip": "skipped"},
+            )
             self.assertEqual(run_gate([path]), 1)
 
 

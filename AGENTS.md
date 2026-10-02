@@ -396,6 +396,22 @@ The canonical API implementation lives in `itambox/api/`. All app-level API code
 
 `CSPMiddleware` (`itambox/middleware.py`) sets the CSP header. Inline scripts use the per-request `request.csp_nonce`; `script-src` has no `'unsafe-inline'`. Browser styles use the same nonce through `style-src`/`style-src-elem`, while `style-src-attr 'none'` blocks every inline `style=` attribute. Authored HTML/Python emitters and TS/JS DOM-style writes are checked by `scripts/check_inline_styles.py`; static rules live in authored CSS/SCSS and genuinely dynamic rules use the nonce-aware helpers in `core/html_styles.py`. The only source exceptions are documented PDF/standalone emitters in that gate.
 
+## Business invariants
+
+The gates above constrain code shape; none of them checks that two modules agree on a business fact. These invariants are the facts agents must keep when touching the named areas. Each one is enforced by a journey test in `itambox/tests/journeys/` (see "Journey guardrail suite" under "Testing conventions"), not by lint.
+
+- **A custody receipt belongs to one assignment.** Check-in or reassignment ends the receipt's right to be accepted; a former holder never signs. A holder without a tenant membership can still sign their own receipt (no 500).
+- **Purchase-order transitions lock the PO row.** Approve, order, receive, cancel and reopen all `select_for_update` the `PurchaseOrder` and re-read `status` under the lock. Cancel → reopen → relink yields one line per request unit.
+- **Import never updates without `change_<model>`.** An `add`-only role creates rows; it cannot rewrite one by `id`. Lifecycle models (custody receipts, asset assignments) are not importable at all.
+- **Lifecycle rows are written only by their services.** Assignments, custody receipts, disposals and seat assignments are created and ended by `assets.services`, `compliance.services`, and the like -- never by import, a serializer, GraphQL, or a management command writing the model directly.
+- **Authorization uses `user.has_perm` (role grants), never Django `user_permissions` directly.** Permissions come from `Role`/`RoleGrant` through `TenantMembershipBackend`. Code that reads `user.user_permissions` or `groups__permissions` silently locks out every role-based user. Tests grant through roles, never superusers or `user_permissions`.
+- **A deleted or deprovisioned person's obligations stay visible.** SCIM DELETE or soft-deleting a holder must not hide assets, receipts, reservations or seats they still carry; the holder and its offboarding report stay reachable. Identity is never linked by guesswork (a holder is not bound to a login by email alone when its UPN differs).
+- **A reservation holds an asset against every checkout target**, not only people: a location or asset checkout during another holder's active reservation is refused.
+- **Every audited mutation leaves an `ObjectChange`, and every logged delete emits an `Event`.** That includes cascaded soft-delete children and management commands (wrap them in `TaskContext`).
+- **GraphQL is read-only.** No mutation operation is accepted; writes go through the service-backed REST/UI paths.
+
+When you change behaviour in one of these areas, run `uv run --locked --group dev pytest tests/journeys` and flip the matching journey from `xfail` to passing in the same change.
+
 ## Architecture: GraphQL
 
 GraphQL uses **graphene-django** (not Strawberry). Each exposed app declares `Query`/`Mutation` classes in `<app>/schema.py`; the root schema in `core/schema.py` combines them (currently `assets`, `inventory`, `licenses`, `software`, `subscriptions`) plus any plugin schema (a plugin opts in via a `graphql_schema` attr on its app config). The endpoint is served by `core/views/graphql.py` — a `GraphQLView` subclass wired through `TenantMiddleware`/`CurrentUserMiddleware` and token auth, with **query-complexity guards**: a depth limit plus a field/alias-count validator (`field_count_limit_validator`) that stops alias-amplification DoS (`a1: assets(...) a2: assets(...) …`). To expose a new app: add `<app>/schema.py` with `Query`/`Mutation`, then add those to the bases in `core/schema.py`. Coverage is tested by `test_graphql.py`, `test_graphql_adversarial.py`, and `test_sec_graphql.py`.
@@ -453,6 +469,16 @@ Reads `.env` from `BASE_DIR` or `BASE_DIR/../` at startup (hand-rolled parser; n
 Rate limiting (`RATELIMIT_CACHE`) and SAML replay protection both read through the Django cache. Under multi-worker gunicorn a per-process `locmem` cache silently breaks them: login/throttle counters become per-worker (so the effective limit is `RATELIMIT_LIMIT × workers`) and SAML assertion replay protection only dedupes within a single worker. Set `ITAMBOX_CACHE_BACKEND=redis` (+ `ITAMBOX_REDIS_URL`, pointing at Valkey/Redis) so all workers share one counter store. `core/settings/prod.py` logs a loud warning at startup when `CACHE_BACKEND=locmem` in production.
 
 ## Testing conventions
+
+### Journey guardrail suite
+
+`itambox/tests/journeys/` holds one module per cross-module journey (custody, procurement, identity, import, reservation, events, audit, catalogue, GraphQL). Each test asserts the **correct** behaviour end to end. While the owning defect is open the test carries `@pytest.mark.xfail(strict=True, reason="... (#NNN)")` naming the issue that fixes it; the fixing change deletes the marker. `xfail_strict = true` in `pyproject.toml` makes an unexpectedly passing test fail the run, and `scripts/check_test_report.py` counts expected failures separately so they are not treated as skipped tests.
+
+Rules for journey tests:
+
+- Grant permissions **through roles** (`JourneyMixin.make_member`, `TenantTestMixin.client_login_to_tenant`, `grant`). Never use superusers or Django `user_permissions` -- the catalogue permission defect hid behind exactly that.
+- The suite runs in the parallel lane. A test that needs real concurrency (two threads) is `serial_only` and uses `TransactionTestCase`.
+- A journey test fails for the stated reason: check that it reaches the assertion about the invariant, not an unrelated setup error, before parking it behind `xfail`.
 
 - Use `TenantTestMixin` (`core/tests/mixins.py`) for any test that touches tenant-scoped models. It provides `setup_tenant_context()`, `set_active_tenant()`, and a `tenant_context()` context manager.
 - `model_bakery` recipes are in `core/tests/baker_recipes.py`.
