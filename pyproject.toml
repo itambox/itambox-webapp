@@ -119,6 +119,9 @@ python_files = ["tests.py", "test_*.py"]
 # `-n auto` over the whole suite remains banned.
 addopts = ["--tb=short", "-p", "no:warnings", "--reuse-db", "--no-cov-on-fail"]
 markers = ["serial_only: test requires an isolated serial lane (races, migrations, or global seed state)"]
+# An expected failure that starts passing is a failure: the journey suite (itambox/tests/journeys)
+# parks open defects behind xfail and the fixing change must delete the marker.
+xfail_strict = true
 norecursedirs = [".venv", "scratch", "node_modules", ".git", ".agents", ".*"]
 
 [tool.coverage.run]

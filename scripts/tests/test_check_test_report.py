@@ -18,14 +18,19 @@ from scripts.check_test_report import (
 )
 
 
-def testcase(name, classname="assets.tests.test_api.TestAssets", time="0.10", outcome=None, message=""):
-    """One ``<testcase>`` element in the shape pytest's --junitxml writes."""
+def testcase(name, classname="assets.tests.test_api.TestAssets", time="0.10", outcome=None, message="", kind=None):
+    """One ``<testcase>`` element in the shape pytest's --junitxml writes.
+
+    ``kind`` is the JUnit ``type`` attribute; pytest writes ``pytest.xfail`` there.
+    """
     attributes = 'classname="%s" name="%s" time="%s"' % (classname, name, time)
     if outcome is None:
         return "    <testcase %s />" % attributes
-    return ('    <testcase %s>\n      <%s message="%s">recorded detail for %s</%s>\n    </testcase>') % (
+    type_attribute = ' type="%s"' % kind if kind else ""
+    return ('    <testcase %s>\n      <%s%s message="%s">recorded detail for %s</%s>\n    </testcase>') % (
         attributes,
         outcome,
+        type_attribute,
         message,
         name,
         outcome,
@@ -135,6 +140,57 @@ class ReportParsingTests(unittest.TestCase):
             self.assertEqual(counts["failed"], 1)
             self.assertEqual(counts["skipped"], 1)
             self.assertEqual(counts["wall_seconds"], 2.25)
+
+
+class ExpectedFailureTests(unittest.TestCase):
+    """The journey suite's strict xfails are executed tests, not silent skips."""
+
+    def test_an_xfail_is_counted_as_an_expected_failure_not_a_skip(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(
+                temporary_directory,
+                [
+                    testcase("test_ok"),
+                    testcase("test_known_defect", outcome="skipped", message="owned by #602", kind="pytest.xfail"),
+                ],
+            )
+
+            counts = summarise(load_report(path))
+
+            self.assertEqual(counts["skipped"], 0)
+            self.assertEqual(counts["xfailed"], 1)
+            status, stdout, stderr = run_main(["--report", str(path)])
+            self.assertEqual(status, 0, stderr)
+            self.assertIn("0 skipped, 1 expected failure(s)", stdout)
+
+    def test_a_real_skip_still_fails_beside_an_xfail(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(
+                temporary_directory,
+                [
+                    testcase("test_known_defect", outcome="skipped", message="owned by #602", kind="pytest.xfail"),
+                    testcase("test_really_skipped", outcome="skipped", message="no reason"),
+                ],
+            )
+
+            status, _, stderr = run_main(["--report", str(path)])
+
+            self.assertEqual(status, 1)
+            self.assertIn("1 skipped test(s) exceed the allowance", stderr)
+            self.assertIn("test_really_skipped", stderr)
+            self.assertNotIn("test_known_defect", stderr)
+
+    def test_an_unexpectedly_passing_strict_xfail_is_a_failure(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(
+                temporary_directory,
+                [testcase("test_fixed_early", outcome="failure", message="[XPASS(strict)] owned by #602")],
+            )
+
+            status, _, stderr = run_main(["--report", str(path)])
+
+            self.assertEqual(status, 1)
+            self.assertIn("test_fixed_early", stderr)
 
 
 class ShardedReportTests(unittest.TestCase):
