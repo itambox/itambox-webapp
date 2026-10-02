@@ -292,6 +292,15 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         gate = step_named(load_steps(), "Check the exception policy gate")
         self.assertIn("scripts/check_exception_policy.py", gate.get("run", ""))
 
+    def test_the_escape_hatch_gate_runs_in_ci(self):
+        gate = step_named(load_steps(), "Check the escape-hatch policy gate")
+        self.assertIn("scripts/check_escape_hatches.py", gate.get("run", ""))
+
+    def test_pre_commit_runs_the_same_escape_hatch_gate(self):
+        config = PRE_COMMIT_PATH.read_text(encoding="utf-8")
+        self.assertIn("id: escape-hatch-policy", config)
+        self.assertIn("entry: python scripts/check_escape_hatches.py", config)
+
     def test_pre_commit_runs_the_same_exception_gate(self):
         config = PRE_COMMIT_PATH.read_text(encoding="utf-8")
         self.assertIn("id: exception-policy", config)

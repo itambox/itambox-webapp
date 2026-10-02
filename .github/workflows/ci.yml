@@ -599,6 +599,13 @@ jobs:
         run: |
           uv run --locked --no-sync python scripts/check_exception_policy.py
 
+      # Unscoped managers, single-provider slots and source-text tests; broad
+      # `except` handlers stay with the exception gate above. The suite backing
+      # this gate runs by discovery in the `test` job above.
+      - name: Check the escape-hatch policy gate
+        run: |
+          uv run --locked --no-sync python scripts/check_escape_hatches.py
+
   template-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15

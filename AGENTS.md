@@ -223,6 +223,23 @@ without a recognised category always fails and can never be baselined. The gate
 refuses to run outside canonical Python 3.12. `itambox/` and `scripts/` are
 scanned; migrations, vendored trees, and test modules are excluded.
 
+### Lint: escape hatches (AST policy gate)
+```bash
+# From the repository root -- blocking gate, same command CI and pre-commit run:
+python scripts/check_escape_hatches.py          # or: make escape-hatch-check
+
+# After deliberately removing occurrences, regenerate on canonical Python 3.12:
+python scripts/check_escape_hatches.py --write-baseline
+```
+Holds three bypass patterns against `scripts/escape_hatch_baseline.json`, a
+schema-v1 identity baseline keyed by rule, path, enclosing scope path, and the
+normalised expression (never a line number); a SHA-256 policy fingerprint binds it
+to the rules, categories, and layers. A new occurrence is a regression unless it
+carries an in-place `# <rule>: <category>: <reason>` annotation; a removed one makes
+the baseline stale. Existing occurrences are baselined and may only shrink. The gate
+refuses to run outside canonical Python 3.12; its behavioural suite is
+`scripts/tests/test_check_escape_hatches.py`. See "Escape-hatch policy" below.
+
 ### Lint: architecture boundaries (AST policy gate)
 ```bash
 # From the repository root -- blocking gate, same command CI and pre-commit run:
@@ -353,6 +370,16 @@ from itambox.middleware import get_current_user
 ```
 
 `scripts/check_local_imports.py` enforces this as a blocking, AST-based gate (see "Lint: local imports" above). The full policy — grammar, scope, ratchet semantics, and how to pay down baselined debt — is in [python-import-policy.md](https://github.com/itambox/design-docs/blob/main/development/python-import-policy.md).
+
+### Escape-hatch policy
+
+Three patterns route around an invariant without any other gate noticing. Each needs an in-place annotation naming a category and a reason, placed on the statement's own line or in the comment block directly above it:
+
+- `_base_manager` / `all_objects` in views, forms, serializers and services: `# unscoped: <category>: <reason>`. Categories: `tenant-resolution`, `recycle-bin`, `cross-tenant`, `row-lock`, `system-task`. Prefer the tenant-scoped default manager; models, managers and the kernel own scoping and are out of scope.
+- A new `SingleProviderSlot` instance: `# provider-slot: <category>: <reason>`. Categories: `plugin-seam`, `multi-implementation`. A slot with one implementation and no second supplier is indirection, not a seam.
+- `inspect.getsource` / `ast.parse` in a test module: `# source-text: <category>: <reason>`. Categories: `static-contract`, `tooling`. Assert behaviour, not source text; `scripts/tests` is exempt because the repository gates are AST tools.
+
+Broad `except Exception` / `except BaseException` handlers are not repeated here: `scripts/check_exception_policy.py` already ratchets them against `scripts/exception_baseline.json` with its own categorised annotations.
 
 ## Architecture: layers and dependency direction
 

@@ -71,6 +71,13 @@ repos:
         language_version: python3.12
         pass_filenames: false
         always_run: true
+      - id: escape-hatch-policy
+        name: escape hatches (blocking policy gate)
+        entry: python scripts/check_escape_hatches.py
+        language: python
+        language_version: python3.12
+        pass_filenames: false
+        always_run: true
       # The one hook that needs the full dev environment: the django-stubs mypy
       # plugin imports the settings module. It is slower than the AST-only
       # hooks above, and that cost is deliberate rather than hidden -- a typed
