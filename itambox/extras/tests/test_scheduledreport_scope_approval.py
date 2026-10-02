@@ -1,11 +1,14 @@
 """Tests for the scheduled-report cross-tenant scope approval view (WP-9b)."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from core.tasks.utils import TaskStatus
 from core.tests.mixins import grant
-from extras.models import ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
+from extras.models import ReportGenerationArchive, ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
 from organization.models import Role, Tenant
 
 User = get_user_model()
@@ -80,6 +83,138 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         self.assertEqual(authorization.scope_tenant_ids, [self.tenant_a.pk, self.tenant_b.pk])
         self.assertIsNone(authorization.revoked_at)
         self.assertIsNone(authorization.revoked_by)
+
+    def test_approved_broad_run_denies_when_approver_lacks_report_domain_permission(self):
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        self.sched.recipients = "broad-run@example.test"
+        self.sched.save_to_archive = True
+        self.sched.save(update_fields=["recipients", "save_to_archive"])
+        ScheduledReportScopeAuthorization.approve(self.sched, self.operator)
+        with (
+            patch("extras.tasks.reports._deliver_report_email") as deliver_email,
+            patch("extras.tasks.reports._deliver_report_channels") as deliver_channels,
+        ):
+            result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.permission_denied")
+        self.assertTrue(result.user_visible)
+        self.sched.refresh_from_db()
+        self.assertEqual(self.sched.last_status, "terminal: report.permission_denied")
+        self.assertIsNone(self.sched.last_run_archive)
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=self.sched).count(), 0)
+        deliver_email.assert_not_called()
+        deliver_channels.assert_not_called()
+
+    def test_run_now_broad_denies_invoker_without_scope_reach(self):
+        """A broad Run now is evaluated as the invoker, not as the stored approver."""
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        self.sched.recipients = "broad-run-now@example.test"
+        self.sched.save_to_archive = True
+        self.sched.save(update_fields=["recipients", "save_to_archive"])
+        capable = User.objects.create_user(username="scope-capable-approver", password="password123")
+        for tenant in (self.tenant_a, self.tenant_b):
+            grant(
+                capable,
+                tenant,
+                Role.objects.create(
+                    tenant=tenant,
+                    name=f"Capable Approver {tenant.slug}",
+                    permissions=["reports.view_cross_tenant_reports", "assets.view_asset"],
+                ),
+            )
+        ScheduledReportScopeAuthorization.approve(self.sched, capable)
+
+        invoker = User.objects.create_user(username="scope-run-now-invoker", password="password123")
+        grant(
+            invoker,
+            self.tenant_a,
+            Role.objects.create(
+                tenant=self.tenant_a,
+                name="Run Now Schedule Viewer",
+                permissions=["extras.view_scheduledreport"],
+            ),
+        )
+        with (
+            patch("extras.tasks.reports._deliver_report_email") as deliver_email,
+            patch("extras.tasks.reports._deliver_report_channels") as deliver_channels,
+        ):
+            result = generate_scheduled_report_task(self.sched.pk, invoked_by_user_id=invoker.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.permission_denied")
+        self.assertTrue(result.user_visible)
+        self.sched.refresh_from_db()
+        self.assertEqual(self.sched.last_status, "terminal: report.permission_denied")
+        self.assertIsNone(self.sched.last_run_archive)
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=self.sched).count(), 0)
+        deliver_email.assert_not_called()
+        deliver_channels.assert_not_called()
+
+    def test_run_now_broad_domain_gate_evaluates_the_invoking_user(self):
+        """The invoker's domain permission decides, even when the approver holds it."""
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        self.sched.recipients = "broad-run-now-domain@example.test"
+        self.sched.save_to_archive = True
+        self.sched.save(update_fields=["recipients", "save_to_archive"])
+        capable = User.objects.create_user(username="scope-capable-approver-domain", password="password123")
+        for tenant in (self.tenant_a, self.tenant_b):
+            grant(
+                capable,
+                tenant,
+                Role.objects.create(
+                    tenant=tenant,
+                    name=f"Capable Approver {tenant.slug}",
+                    permissions=["reports.view_cross_tenant_reports", "assets.view_asset"],
+                ),
+            )
+        ScheduledReportScopeAuthorization.approve(self.sched, capable)
+
+        invoker = User.objects.create_user(username="scope-run-now-cross-tenant", password="password123")
+        for tenant in (self.tenant_a, self.tenant_b):
+            grant(
+                invoker,
+                tenant,
+                Role.objects.create(
+                    tenant=tenant,
+                    name=f"Invoker Cross Scope {tenant.slug}",
+                    permissions=["reports.view_cross_tenant_reports"],
+                ),
+            )
+        with (
+            patch("extras.tasks.reports._deliver_report_email") as deliver_email,
+            patch("extras.tasks.reports._deliver_report_channels") as deliver_channels,
+        ):
+            result = generate_scheduled_report_task(self.sched.pk, invoked_by_user_id=invoker.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.permission_denied")
+        self.assertTrue(result.user_visible)
+        self.sched.refresh_from_db()
+        self.assertEqual(self.sched.last_status, "terminal: report.permission_denied")
+        self.assertIsNone(self.sched.last_run_archive)
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=self.sched).count(), 0)
+        deliver_email.assert_not_called()
+        deliver_channels.assert_not_called()
+
+    def test_invalid_run_now_invoker_is_denied_before_fire_claim(self):
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        inactive = User.objects.create_user(username="inactive-run-now", password="password123", is_active=False)
+        for principal_id in (inactive.pk, 999999):
+            with self.subTest(principal_id=principal_id), patch("extras.tasks.reports._claim_fire") as claim_fire:
+                result = generate_scheduled_report_task(
+                    self.sched.pk,
+                    intended_fire_at="2026-01-01T12:00:00+00:00",
+                    invoked_by_user_id=principal_id,
+                )
+            self.assertEqual(result.status, TaskStatus.TERMINAL)
+            self.assertEqual(result.code, "report.permission_denied")
+            self.assertTrue(result.user_visible)
+            claim_fire.assert_not_called()
 
     def test_approve_post_refreshes_a_stale_scope(self):
         self._client_for(self.admin).post(self.url, {"action": "approve"})

@@ -19,8 +19,7 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel, Supplier
 from assets.models.choices import WarrantyTypeChoices
 from assets.models.lifecycle import Warranty
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from organization.models import Tenant
 
@@ -116,7 +115,9 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
     def test_row_content_and_non_usd_money(self):
         """Active EUR warranty row is present with its supplier and a non-'$' cost."""
         self.clear_tenant_context()
-        _, rows, summary_cards, _, chart_svg, _ = build_report_context(self.template, active_tenant=self.tenant)
+        _, rows, summary_cards, _, chart_svg, _ = compile_report_with_system_authorization(
+            self.template, active_tenant=self.tenant
+        )
 
         # Verify the active warranty row exists with correct fields.
         active_rows = [r for r in rows if r.get("Supplier") == "Dell ProSupport"]
@@ -143,7 +144,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
     def test_summary_cards_counts(self):
         """Summary cards correctly reflect total / expiring / expired counts."""
         self.clear_tenant_context()
-        _, _, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
+        _, _, summary_cards, *_ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         card_map = {c["label"]: c["value"] for c in summary_cards}
 
         self.assertEqual(card_map["Total Warranties"], "3")
@@ -153,7 +154,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
     def test_tenant_scoping_excludes_other_tenant(self):
         """Warranties belonging to a different tenant do not appear in the rows."""
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
+        _, rows, summary_cards, *_ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         suppliers = [r.get("Supplier") for r in rows]
         self.assertNotIn("HP Care", suppliers, "Other-tenant warranty must not leak into report")
         references = [r.get("Reference") for r in rows]
@@ -165,7 +166,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
     def test_expiring_soon_row_status(self):
         """The expiring-soon warranty row has Status == 'Expiring Soon'."""
         self.clear_tenant_context()
-        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         expiring_rows = [r for r in rows if r.get("Supplier") == "ExtendedCo"]
         self.assertEqual(len(expiring_rows), 1)
         self.assertEqual(expiring_rows[0]["Status"], "Expiring Soon")
@@ -173,7 +174,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
     def test_expired_row_status_and_negative_days(self):
         """The expired warranty row has Status == 'Expired', negative Days Remaining, and no supplier."""
         self.clear_tenant_context()
-        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         expired_rows = [r for r in rows if r.get("Reference") == "REF-003"]
         self.assertEqual(len(expired_rows), 1)
         self.assertEqual(expired_rows[0]["Status"], "Expired")
@@ -184,7 +185,7 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
     def test_distribution_chart_generated(self):
         """include_distribution_chart=True produces a non-empty SVG string."""
         self.clear_tenant_context()
-        _, _, _, _, chart_svg, _ = build_report_context(self.template, active_tenant=self.tenant)
+        _, _, _, _, chart_svg, _ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         self.assertTrue(bool(chart_svg), "Expected a non-empty chart SVG")
 
     def test_removed_warranty_provider_key_cannot_be_saved(self):
@@ -224,6 +225,6 @@ class WarrantyExpirationReportTests(TenantTestMixin, TestCase):
         )
         stale = ReportTemplate._base_manager.get(pk=stale.pk)
 
-        headers, rows, *_ = build_report_context(stale, active_tenant=self.tenant)
+        headers, rows, *_ = compile_report_with_system_authorization(stale, active_tenant=self.tenant)
         self.assertEqual(headers, ["Asset", "Status"])
         self.assertEqual(list(rows[0]), ["Asset", "Status", "_group_by"])

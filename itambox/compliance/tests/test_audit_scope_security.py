@@ -28,7 +28,7 @@ from compliance.audit_services import (
     rehome_audit_session_mismatches,
 )
 from compliance.models import AssetAudit, AuditSession
-from core.context import set_current_tenant
+from core.context import _request_id, has_valid_system_authorization, set_current_tenant
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Location, Role, Tenant
@@ -219,6 +219,76 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 system_authorization=authorization,
             )
             self.assertEqual(set(result.values_list("pk", flat=True)), {self.asset_a.pk})
+
+    def test_system_authorization_validation_helper_requires_exact_live_binding(self):
+        permission = "compliance.view_auditsession"
+        operation = "compliance.audit.expected_assets"
+        self.assertFalse(
+            has_valid_system_authorization(
+                tenant_id=self.tenant_a.pk,
+                permission=permission,
+                operation=operation,
+            )
+        )
+        with TaskContext(tenant_id=self.tenant_a.pk, user_id=None) as task:
+            self.assertFalse(
+                has_valid_system_authorization(
+                    tenant_id=self.tenant_a.pk,
+                    permission=permission,
+                    operation=operation,
+                )
+            )
+            task.authorize_system(
+                permission=permission,
+                operation=operation,
+                reason="Validation helper test",
+            )
+            self.assertTrue(
+                has_valid_system_authorization(
+                    tenant_id=self.tenant_a.pk,
+                    permission=permission,
+                    operation=operation,
+                )
+            )
+            self.assertFalse(
+                has_valid_system_authorization(
+                    tenant_id=self.tenant_b.pk,
+                    permission=permission,
+                    operation=operation,
+                )
+            )
+            self.assertFalse(
+                has_valid_system_authorization(
+                    tenant_id=self.tenant_a.pk,
+                    permission="compliance.change_auditsession",
+                    operation=operation,
+                )
+            )
+            self.assertFalse(
+                has_valid_system_authorization(
+                    tenant_id=self.tenant_a.pk,
+                    permission=permission,
+                    operation="compliance.audit.other",
+                )
+            )
+            request_id_token = _request_id.set(None)
+            try:
+                self.assertFalse(
+                    has_valid_system_authorization(
+                        tenant_id=self.tenant_a.pk,
+                        permission=permission,
+                        operation=operation,
+                    )
+                )
+            finally:
+                _request_id.reset(request_id_token)
+        self.assertFalse(
+            has_valid_system_authorization(
+                tenant_id=self.tenant_a.pk,
+                permission=permission,
+                operation=operation,
+            )
+        )
 
     def test_global_system_authorization_is_rejected(self):
         global_session = AuditSession.objects.create(

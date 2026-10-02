@@ -89,14 +89,29 @@ class ReportResult:
         self.summary_cards = list(self.summary_cards)
 
 
+class ReportPermissionDenied(PermissionError):
+    """Central report authorization denied a provider permission.
+
+    Raised when the acting principal does not hold the provider's declared
+    permission(s) on every tenant in the effective compile scope. It remains a
+    ``PermissionError`` so interactive surfaces keep their existing 403
+    mapping; scheduled runs record the distinct ``report.permission_denied``
+    outcome.
+    """
+
+
 class ReportDefinition:
     """Base contract implemented by a domain report provider.
 
     A provider owns one report identifier end to end: which records it reads,
     how a row and a summary card render, and what the report shows while its
-    scope is still empty. Permission declarations are retained as domain
-    metadata for audit and future authorization surfaces; ``tenant_field``
-    and ``allow_global_tenant`` are the tenant policy :meth:`scope_to_tenants`
+    scope is still empty. ``build_report_context`` centrally enforces every
+    declared permission on every tenant in the effective compile scope; all
+    declarations are required. An empty declaration or any unresolved or
+    missing authorization fails closed. Active superusers pass. An actorless
+    single-tenant scheduled compile must carry explicit system authorizations.
+    ``tenant_field`` and
+    ``allow_global_tenant`` are the tenant policy :meth:`scope_to_tenants`
     applies, and ``cells`` is both a row's content and its column order.
 
     Providers are registered once and shared across threads, so they must stay
@@ -108,7 +123,9 @@ class ReportDefinition:
     report_type: str
 
     #: The model permission(s) this report's data belongs to,
-    #: ``app_label.codename``. A multi-model provider may require more than one.
+    #: ``app_label.codename``. Every declaration is required (all-or-deny)
+    #: for every tenant of the effective scope by ``build_report_context``.
+    #: A multi-model provider may require more than one.
     permission: str | tuple[str, ...]
 
     #: Queryset path from the reported model to its owning tenant.
@@ -162,8 +179,9 @@ class ReportDefinition:
         """Restrict a queryset to the report's tenant scope.
 
         ``filter_tenants`` wins when the template pins a constellation,
-        otherwise the active tenant does.  With neither, the caller has already
-        passed the cross-tenant permission gate and the queryset stays global.
+        otherwise the active tenant does.  With neither, the caller has passed
+        the cross-tenant gate and the central provider-domain permission check,
+        so the queryset stays global.
         """
         field_path = tenant_field or self.tenant_field
         if request.filter_tenants:

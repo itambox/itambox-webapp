@@ -1,9 +1,11 @@
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage, get_connection
@@ -16,7 +18,9 @@ from core.context import get_current_user
 from core.csv_utils import safe_csv_filename
 from core.events import send_notification_to_channel
 from core.models import EmailSettings
-from core.reports import build_report_context
+from core.reports import build_report_context, get_report_provider
+from core.reports.contracts import ReportPermissionDenied
+from core.reports.orchestration import REPORT_COMPILATION_OPERATION
 from core.reports.rendering import render_report_csv, render_report_html
 from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error
@@ -568,26 +572,26 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants, *, run_start
     # broad except: task-isolation: one scheduled report failure must not abort the worker batch
     except Exception as error:
         status = classify_task_error(error)
+        failure_code = (
+            "report.permission_denied" if isinstance(error, ReportPermissionDenied) else "report.generation_failed"
+        )
         logger.error(
             "Scheduled report generation failed",
             extra={
                 "operation": "reports.generate",
                 "scheduled_report_id": getattr(sched, "pk", None),
                 "exception_type": type(error).__name__,
+                "failure_code": failure_code,
             },
         )
-        sched.last_status = f"{status.value}: report.generation_failed"
+        sched.last_status = f"{status.value}: {failure_code}"
         # A failed run retains no deliverable archive: clear the retry binding
         # so Retry delivery can never resurrect an older report. The write is
         # fenced to the newest started run, so a slower older run can never
         # reset a newer run's status, binding, or start marker.
         sched.last_run_archive = None
         _persist_summary_state(sched, run_started_at)
-        if archive_entry:
-            archive_entry.status = "failed"
-            archive_entry.error_message = "report.generation_failed"
-            archive_entry.save()
-        return TaskResult(status, "report.generation_failed", user_visible=True)
+        return TaskResult(status, failure_code, user_visible=True)
 
     delivery = _DeliveryOutcome()
     recipients = _resolve_report_recipients(sched)
@@ -694,7 +698,173 @@ def _persist_delivery_outcome(sched, archive_entry, delivery, run_started_at):
         archive_entry.save(update_fields=["delivery_status", "delivery_targets"])
 
 
-def generate_scheduled_report_task(scheduled_report_id: int, intended_fire_at: str | None = None) -> TaskResult:
+def _run_scheduled_report_in_context(
+    sched: ScheduledReport,
+    active_tenant: object | None,
+    filter_tenants: Sequence[object] | None,
+    *,
+    scope_authorized_user_id: int | None,
+    invoked_by_user_id: int | None,
+    scope_requires_authorization: bool,
+) -> TaskResult:
+    """Bind one report run and compile it, mapping task-principal failures to denial.
+
+    The acting principal is the user who triggered an interactive ``Run now``:
+    their tenant reach and the provider's declared domain permissions are what
+    the compile is evaluated against, never the schedule's recorded scope
+    approver. Unattended runs fall back to the recorded scope approver, and an
+    actorless single-tenant run stays on the explicit system path.
+    """
+    acting_user_id = invoked_by_user_id if invoked_by_user_id is not None else scope_authorized_user_id
+    task_context = TaskContext(
+        tenant_id=(
+            None if scope_requires_authorization or active_tenant is None else getattr(active_tenant, "id", None)
+        ),
+        user_id=acting_user_id,
+        operation="reports.generate",
+        all_accessible=scope_requires_authorization,
+    )
+    try:
+        ctx = task_context.__enter__()
+    # broad except: boundary-isolation: task principal or tenant resolution failures must deny scheduled compilation
+    except Exception as error:
+        logger.warning(
+            "Scheduled report task scope could not be authorized",
+            extra={
+                "operation": "reports.permissions",
+                "scheduled_report_id": sched.pk,
+                "principal_id": acting_user_id,
+                "exception_type": type(error).__name__,
+            },
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.permission_denied", user_visible=True)
+
+    try:
+        if ctx.user is None:
+            try:
+                provider = get_report_provider(sched.report.report_type)
+                for permission in provider.required_permissions():
+                    ctx.authorize_system(
+                        permission=permission,
+                        operation=REPORT_COMPILATION_OPERATION,
+                        reason=f"Scheduled report {str(sched.pk)[:12]} system compilation",
+                    )
+            # broad except: boundary-isolation: failed system authorization must be recorded by central denial
+            except Exception as error:
+                logger.warning(
+                    "Scheduled report system authorization could not be issued",
+                    extra={
+                        "operation": "reports.permissions",
+                        "scheduled_report_id": sched.pk,
+                        "exception_type": type(error).__name__,
+                    },
+                )
+        logger.info(
+            "Generating scheduled report",
+            extra={**ctx.log_context, "scheduled_report_id": sched.pk},
+        )
+        # The start marker fences every later summary write: overlapping
+        # occurrences are allowed, and only a run that is still the newest
+        # started one may move the schedule-level status and retry binding.
+        # The marker only ever moves forward, in one atomic conditional
+        # update: when a delayed older occurrence persists its start after a
+        # newer one already did, it updates zero rows, still runs for its own
+        # archive and ledger, and its stale marker fails every later summary
+        # fence. Keep the write narrow so stale in-memory values cannot leak
+        # back over a newer run's summary state.
+        run_started_at = timezone.now()
+        marker_moved = (
+            ScheduledReport._base_manager.filter(pk=sched.pk)
+            .filter(Q(last_run__isnull=True) | Q(last_run__lt=run_started_at))
+            .update(last_run=run_started_at)
+        )
+        if marker_moved:
+            # Mirror the persisted marker for in-memory readers; a losing
+            # (older) start attempt keeps whatever it already fetched.
+            sched.last_run = run_started_at
+        return _process_scheduled_report(sched, active_tenant, filter_tenants, run_started_at=run_started_at)
+    finally:
+        task_context.__exit__(None, None, None)
+
+
+@dataclass
+class _ScheduledScopeAuthorization:
+    """Resolved generation scope plus its execution-time authorization state."""
+
+    active_tenant: object | None
+    filter_tenants: Sequence[object] | None
+    scope_authorized_user_id: int | None
+    scope_requires_authorization: bool
+
+
+def _run_now_invoker_denial(sched: ScheduledReport, invoked_by_user_id: int) -> TaskResult | None:
+    """Deny when the recorded Run-now principal is missing, inactive, or unresolvable."""
+    try:
+        invoked_by_user = get_user_model()._base_manager.filter(pk=invoked_by_user_id).first()
+        invoker_is_active = invoked_by_user is not None and invoked_by_user.is_active
+    # broad except: boundary-isolation: Run now principal lookup errors must deny schedule execution
+    except Exception as error:
+        logger.warning(
+            "Scheduled report Run now principal could not be resolved",
+            extra={
+                "operation": "reports.permissions",
+                "scheduled_report_id": sched.pk,
+                "principal_id": invoked_by_user_id,
+                "exception_type": type(error).__name__,
+            },
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.permission_denied", user_visible=True)
+    if invoker_is_active:
+        return None
+    logger.warning(
+        "Scheduled report Run now principal is missing or inactive",
+        extra={
+            "operation": "reports.permissions",
+            "scheduled_report_id": sched.pk,
+            "principal_id": invoked_by_user_id,
+        },
+    )
+    return TaskResult(TaskStatus.TERMINAL, "report.permission_denied", user_visible=True)
+
+
+def _resolve_authorized_scheduled_scope(sched: ScheduledReport) -> _ScheduledScopeAuthorization | TaskResult:
+    """Resolve the generation scope and re-validate its execution-time authorization."""
+    scope = _resolve_report_scope(sched)
+    if scope is None:
+        return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
+    active_tenant, filter_tenants = scope
+    if not filter_tenants and _approved_scope_tenants_removed(sched):
+        # Soft-deleting a tenant strips its through rows, so an approved
+        # broad scope silently collapses to the owner tenant. Fail closed
+        # instead of substituting owner data. A deliberate wind-back (the
+        # stored tenants are still live) runs single-tenant below.
+        logger.error(
+            "Scheduled report approved scope tenants were removed; refusing owner fallback",
+            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
+    scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
+    scope_requires_authorization = _scope_requires_authorization(active_tenant, filter_tenants)
+    if scope_requires_authorization and scope_authorized_user_id is None:
+        logger.warning(
+            "Scheduled report has no current durable authorization for its broad tenant scope",
+            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.scope_unauthorized", user_visible=True)
+    return _ScheduledScopeAuthorization(
+        active_tenant=active_tenant,
+        filter_tenants=filter_tenants,
+        scope_authorized_user_id=scope_authorized_user_id,
+        scope_requires_authorization=scope_requires_authorization,
+    )
+
+
+def generate_scheduled_report_task(
+    scheduled_report_id: int,
+    intended_fire_at: str | None = None,
+    *,
+    invoked_by_user_id: int | None = None,
+) -> TaskResult:
     """Compile and deliver one scheduled report inside a tenant-scoped task context.
 
     ``intended_fire_at`` is injected by the django-q scheduler (through the
@@ -722,6 +892,11 @@ def generate_scheduled_report_task(scheduled_report_id: int, intended_fire_at: s
         )
         return TaskResult(TaskStatus.SKIPPED, "report.inactive")
 
+    if invoked_by_user_id is not None:
+        denial = _run_now_invoker_denial(sched, invoked_by_user_id)
+        if denial is not None:
+            return denial
+
     fire_at = _parse_intended_fire_at(intended_fire_at)
     if fire_at is not None and not _claim_fire(sched, fire_at):
         logger.info(
@@ -734,59 +909,17 @@ def generate_scheduled_report_task(scheduled_report_id: int, intended_fire_at: s
         )
         return TaskResult(TaskStatus.SKIPPED, "report.fire_already_accepted")
 
-    scope = _resolve_report_scope(sched)
-    if scope is None:
-        return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
-    active_tenant, filter_tenants = scope
-    if not filter_tenants and _approved_scope_tenants_removed(sched):
-        # Soft-deleting a tenant strips its through rows, so an approved
-        # broad scope silently collapses to the owner tenant. Fail closed
-        # instead of substituting owner data. A deliberate wind-back (the
-        # stored tenants are still live) runs single-tenant below.
-        logger.error(
-            "Scheduled report approved scope tenants were removed; refusing owner fallback",
-            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
-        )
-        return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
-    scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
-    scope_requires_authorization = _scope_requires_authorization(active_tenant, filter_tenants)
-    if scope_requires_authorization and scope_authorized_user_id is None:
-        logger.warning(
-            "Scheduled report has no current durable authorization for its broad tenant scope",
-            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
-        )
-        return TaskResult(TaskStatus.TERMINAL, "report.scope_unauthorized", user_visible=True)
-
-    with TaskContext(
-        tenant_id=None if scope_requires_authorization else active_tenant.id if active_tenant else None,
-        user_id=scope_authorized_user_id,
-        operation="reports.generate",
-        all_accessible=scope_requires_authorization,
-    ) as ctx:
-        logger.info(
-            "Generating scheduled report",
-            extra={**ctx.log_context, "scheduled_report_id": sched.pk},
-        )
-        # The start marker fences every later summary write: overlapping
-        # occurrences are allowed, and only a run that is still the newest
-        # started one may move the schedule-level status and retry binding.
-        # The marker only ever moves forward, in one atomic conditional
-        # update: when a delayed older occurrence persists its start after a
-        # newer one already did, it updates zero rows, still runs for its own
-        # archive and ledger, and its stale marker fails every later summary
-        # fence. Keep the write narrow so stale in-memory values cannot leak
-        # back over a newer run's summary state.
-        run_started_at = timezone.now()
-        marker_moved = (
-            ScheduledReport._base_manager.filter(pk=sched.pk)
-            .filter(Q(last_run__isnull=True) | Q(last_run__lt=run_started_at))
-            .update(last_run=run_started_at)
-        )
-        if marker_moved:
-            # Mirror the persisted marker for in-memory readers; a losing
-            # (older) start attempt keeps whatever it already fetched.
-            sched.last_run = run_started_at
-        return _process_scheduled_report(sched, active_tenant, filter_tenants, run_started_at=run_started_at)
+    authorization = _resolve_authorized_scheduled_scope(sched)
+    if isinstance(authorization, TaskResult):
+        return authorization
+    return _run_scheduled_report_in_context(
+        sched,
+        authorization.active_tenant,
+        authorization.filter_tenants,
+        scope_authorized_user_id=authorization.scope_authorized_user_id,
+        invoked_by_user_id=invoked_by_user_id,
+        scope_requires_authorization=authorization.scope_requires_authorization,
+    )
 
 
 @dataclass

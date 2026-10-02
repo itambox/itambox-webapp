@@ -17,9 +17,16 @@ from core.reports import (
     register_report_provider,
 )
 from core.reports.columns import headers_for
-from core.reports.contracts import PUBLIC_REPORT_TYPES, ReportDefinition, ReportRequest, ReportResult
+from core.reports.contracts import (
+    PUBLIC_REPORT_TYPES,
+    ReportDefinition,
+    ReportPermissionDenied,
+    ReportRequest,
+    ReportResult,
+)
 from core.reports.formatting import _format_per_currency, _money, _record_currency
-from core.tests.mixins import TenantTestMixin
+from core.tasks.context import TaskContext
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from organization.models import Location, Site
 
@@ -140,6 +147,22 @@ class ReportProviderContractTests(SimpleTestCase):
         provider = get_report_provider(ReportTemplate.REPORT_TYPE_ASSET_SUMMARY)
         self.assertEqual(provider.required_permissions(), ("assets.view_asset",))
 
+    def test_hardware_inventory_keeps_all_three_domain_permissions(self):
+        provider = get_report_provider(ReportTemplate.REPORT_TYPE_HARDWARE_INVENTORY)
+        self.assertEqual(
+            provider.required_permissions(),
+            (
+                "inventory.view_accessory",
+                "inventory.view_consumable",
+                "inventory.view_component",
+            ),
+        )
+
+    def test_required_permission_normalization_stays_unchanged(self):
+        provider = ReportDefinition()
+        provider.permission = ("assets.view_asset", "inventory.view_accessory")
+        self.assertEqual(provider.required_permissions(), ("assets.view_asset", "inventory.view_accessory"))
+
     def test_build_report_context_rejects_unknown_report_type(self):
         template = ReportTemplate(
             name="Unknown Type",
@@ -147,7 +170,7 @@ class ReportProviderContractTests(SimpleTestCase):
             included_columns=[],
         )
         with self.assertRaises(ValueError):
-            build_report_context(template, active_tenant=object())
+            compile_report_with_system_authorization(template, active_tenant=object())
 
     def test_headers_for_resolves_lazy_labels_to_plain_strings(self):
         headers = headers_for(["asset_tag", "name", "not_a_column"])
@@ -191,11 +214,51 @@ class ReportProviderEmptyScopeTests(TenantTestMixin, TestCase):
                     include_distribution_chart=True,
                 )
                 with self.tenant_context(self.tenant):
-                    _headers, rows, summary_cards, _grouped, _chart, _context = build_report_context(
-                        template, active_tenant=self.tenant
+                    _headers, rows, summary_cards, _grouped, _chart, _context = (
+                        compile_report_with_system_authorization(template, active_tenant=self.tenant)
                     )
                 self.assertTrue(rows)
                 self.assertTrue(summary_cards)
+
+    def test_actorless_single_tenant_compile_without_system_authorization_is_denied(self):
+        provider = get_report_provider("asset_summary")
+        template = ReportTemplate(
+            name="Unapproved system compile",
+            report_type=provider.report_type,
+            included_columns=list(provider.default_columns),
+        )
+        with TaskContext(tenant_id=self.tenant.pk, user_id=None):
+            with self.assertRaises(ReportPermissionDenied):
+                build_report_context(template, active_tenant=self.tenant)
+
+    def test_hardware_inventory_permission_subset_matrix_requires_all_three(self):
+        from core.context import set_current_user
+
+        provider = get_report_provider("hardware_inventory")
+        permissions = provider.required_permissions()
+        self.set_active_tenant(self.tenant)
+        set_current_user(self.tenant_user)
+        template = ReportTemplate.objects.create(
+            name="Hardware Inventory Permission Matrix",
+            report_type=provider.report_type,
+            tenant=self.tenant,
+        )
+
+        for held_permissions in (
+            (),
+            *(tuple(permission for permission in permissions if permission != missing) for missing in permissions),
+        ):
+            with self.subTest(held_permissions=held_permissions):
+                self.tenant_role.permissions = list(held_permissions)
+                self.tenant_role.save(update_fields=["permissions"])
+                with self.assertRaises(ReportPermissionDenied):
+                    build_report_context(template, active_tenant=self.tenant)
+
+        self.tenant_role.permissions = list(permissions)
+        self.tenant_role.save(update_fields=["permissions"])
+        headers, rows, *_ = build_report_context(template, active_tenant=self.tenant)
+        self.assertTrue(headers)
+        self.assertTrue(rows)
 
 
 class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
@@ -258,7 +321,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         )
 
         with self.tenant_context(self.tenant), translation.override("en"):
-            headers, rows, summary_cards, _grouped, chart_svg, _context = build_report_context(
+            headers, rows, summary_cards, _grouped, chart_svg, _context = compile_report_with_system_authorization(
                 template, active_tenant=self.tenant
             )
 
@@ -291,7 +354,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
             group_by_field="status",
         )
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, rows, summary_cards, grouped_data, chart_svg, _context = build_report_context(
+            _headers, rows, summary_cards, grouped_data, chart_svg, _context = compile_report_with_system_authorization(
                 template, active_tenant=self.tenant
             )
 
@@ -302,7 +365,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
 
         template.group_by_field = "location"
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, _rows, _cards, grouped_by_location, _chart, _context = build_report_context(
+            _headers, _rows, _cards, grouped_by_location, _chart, _context = compile_report_with_system_authorization(
                 template, active_tenant=self.tenant
             )
         self.assertEqual(set(grouped_by_location), {"Group HQ", "Unassigned"})
@@ -330,7 +393,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         )
         self.clear_tenant_context()
         with translation.override("en"):
-            _headers, rows, _cards, _grouped, _chart, _context = build_report_context(
+            _headers, rows, _cards, _grouped, _chart, _context = compile_report_with_system_authorization(
                 template, active_tenant=None, filter_tenants=[other_tenant]
             )
         self.assertEqual([row["Asset Tag"] for row in rows], ["SCOPE-OTHER"])

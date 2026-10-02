@@ -417,6 +417,8 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         assert capability.limitations == ()
 
     def test_report_views_cover_preview_permissions_and_rendering_seams(self):
+        from core.reports.contracts import ReportPermissionDenied
+
         preview = ReportTemplatePreviewView()
         preview.request = SimpleNamespace(user=Mock(has_perm=Mock(side_effect=[False, True])))
         assert preview.has_permission() is True
@@ -448,7 +450,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         assert response.content == b"<h1>preview</h1>"
         render.assert_called_once()
 
-        with patch("core.reports.build_report_context", side_effect=PermissionError):
+        with patch("core.reports.build_report_context", side_effect=ReportPermissionDenied("domain permission")):
             response = preview.post(request)
         assert response.status_code == 403
         assert response.content == b"You may not view this report's data."
@@ -479,6 +481,8 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         build_context.assert_not_called()
 
     def test_report_template_detail_and_download_cover_csv_html_and_pdf(self):
+        from core.reports.contracts import ReportPermissionDenied
+
         detail = ReportTemplateDetailView()
         detail_template = SimpleNamespace(name="Report", schedules=Mock())
         detail.get_object = Mock(return_value=detail_template)
@@ -523,6 +527,14 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             pdf_response = ReportTemplateDownloadView().get(SimpleNamespace(GET={"format": "pdf", "print": "true"}), 1)
         assert pdf_response["Content-Type"].startswith("application/pdf")
         assert pdf_response["Content-Disposition"].startswith("inline;")
+
+        with (
+            patch("extras.views.get_object_or_404", return_value=template),
+            patch("extras.views.get_current_tenant", return_value=None),
+            patch("core.reports.build_report_context", side_effect=ReportPermissionDenied("domain permission")),
+        ):
+            denied_response = ReportTemplateDownloadView().get(SimpleNamespace(GET={"format": "csv"}), 1)
+        assert denied_response.status_code == 403
 
 
 class ReportTemplateFilterTenantWriteTests(TestCase):

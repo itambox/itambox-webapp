@@ -5,7 +5,7 @@ import io
 from django.test import TestCase
 
 from core.reports.exporters import report_pdf_bytes, report_xlsx_bytes
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 
 
 class ReportExporterUnitTests(TestCase):
@@ -37,7 +37,6 @@ class ReportExportIntegrationTests(TenantTestMixin, TestCase):
 
     def test_compile_then_xlsx_contains_real_asset(self):
         from assets.models import Asset, AssetRole, StatusLabel
-        from core.reports import build_report_context
         from extras.models import ReportTemplate
 
         status = StatusLabel.objects.create(name="Deployed Exp", slug="deployed-exp", type="deployed", color="28a745")
@@ -58,7 +57,7 @@ class ReportExportIntegrationTests(TenantTestMixin, TestCase):
             tenant=self.tenant,
             included_columns=["asset_tag", "name", "purchase_cost"],
         )
-        headers, rows, *_ = build_report_context(tpl, active_tenant=self.tenant)
+        headers, rows, *_ = compile_report_with_system_authorization(tpl, active_tenant=self.tenant)
 
         data = report_xlsx_bytes(headers, rows, sheet_title=tpl.name)
         from openpyxl import load_workbook

@@ -14,8 +14,8 @@ from django.utils import translation
 
 from assets.models import Manufacturer, Supplier
 from core.management.commands._seed.organizations import _seed_saas_suppliers
-from core.reports import build_report_context, get_report_provider
-from core.tests.mixins import TenantTestMixin
+from core.reports import get_report_provider
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
 from licenses.models import License, LicenseTypeChoices
 from organization.models import TenantGroup
@@ -241,8 +241,8 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                     include_distribution_chart=True,
                 )
                 with translation.override("en"):
-                    headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
-                        template, active_tenant=self.tenant
+                    headers, rows, summary_cards, grouped_data, chart_svg, context_data = (
+                        compile_report_with_system_authorization(template, active_tenant=self.tenant)
                     )
 
                 self.assertEqual(headers, expected["headers"])
@@ -284,7 +284,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
         )
 
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, _rows, summary_cards, _grouped, _chart, _context = build_report_context(
+            _headers, _rows, summary_cards, _grouped, _chart, _context = compile_report_with_system_authorization(
                 template, active_tenant=self.tenant
             )
 
@@ -324,7 +324,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
             include_distribution_chart=False,
         )
         with self.tenant_context(self.tenant), translation.override("en"):
-            headers, rows, *_ = build_report_context(template, active_tenant=self.tenant)
+            headers, rows, *_ = compile_report_with_system_authorization(template, active_tenant=self.tenant)
 
         self.assertEqual(subscription.total_seats, 115, "Fixture: linked licenses must total 115 seats")
         self.assertEqual(
@@ -382,7 +382,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
             include_distribution_chart=False,
         )
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, rows, *_ = build_report_context(template, active_tenant=self.tenant)
+            _headers, rows, *_ = compile_report_with_system_authorization(template, active_tenant=self.tenant)
 
         entitlement_by_name = {row["Subscription Name"]: row["Agreement Entitled Quantity"] for row in rows}
         self.assertEqual(unset_subscription.total_seats, 115, "Fixture: linked licenses total 115 seats")

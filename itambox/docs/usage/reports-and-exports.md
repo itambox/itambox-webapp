@@ -165,11 +165,17 @@ Navigate to **Extras → Report Templates** and click **Add**:
 | **Include Distribution Chart** | Embed a distribution chart in the HTML report |
 | **Group By Field** | Optional column to group grid rows under (e.g. `location`, `status`) |
 | **Style Preset** | Visual layout for HTML/PDF renders |
-| **Filter Tenants** | Limit data to selected tenants (blank = global aggregate) |
+| **Filter Tenants** | Limit data to selected tenants (blank = aggregate within the effective scope) |
 | **Description** | Optional notes |
 
-The applicable report and data permissions continue to apply to preview,
-download, and compilation. The Stable grade does not change those checks.
+Each report provider declares the domain permissions for its data, and the
+compiler enforces all declared permissions for every tenant in the effective
+compile scope. For example, Hardware Inventory requires access to accessories,
+consumables, and components. Missing or unresolved authorization fails closed.
+This applies centrally to preview, download, and scheduled compilation. A
+denied preview or download returns HTTP 403. A denied scheduled run records
+`terminal: report.permission_denied`, creates no archive, and sends no report.
+The Stable grade does not change these checks.
 
 ### V1 template contract
 
@@ -189,11 +195,33 @@ sandbox.
 
 ### Tenant scope authorization
 
-Compilation checks authorization for pinned tenant scopes. A single pinned
-tenant must be within the actor's reach. A scope pinned to multiple tenants
-requires `reports.view_cross_tenant_reports` for every pinned tenant. An
-unauthorized preview or download returns HTTP 403. Scheduled generation that
-fails this check is recorded as failed and is not delivered.
+The pinned-scope reach check and the report's domain permissions are separate
+checks. A single pinned tenant must be within the actor's reach. A scope pinned
+to multiple tenants requires `reports.view_cross_tenant_reports` for every
+pinned tenant, then every declared report permission for every pinned tenant.
+An aggregate compile without a pinned scope is evaluated against the same
+effective tenant scope the scoped querysets read: the canonical accessible set
+under **All accessible tenants**, or the accessible tenants of the active
+tenant group. Every declared report permission is required for every tenant in
+that effective scope; a member context that resolves no scope reads no rows
+and fails closed. Only a truly global (unscoped) context is evaluated against
+every live tenant. Tenant reach, `reports.view_cross_tenant_reports`, and
+Report Template permissions do not grant access to report domain data by
+themselves.
+
+An active superuser passes the domain permission check. `Run now` always
+evaluates the user who triggered it: their tenant reach for the persisted
+scope and the provider's declared domain permissions both decide, for
+single-tenant and broad schedules alike, and a stored scope approver never
+widens what an interactive run may compile. An unattended broad run evaluates
+its recorded scope approver. An unattended single-tenant scheduled run has no
+acting user and compiles only under explicit system authorizations for the
+provider's declared permissions. Missing or unresolved authorization fails
+closed.
+Preview and download denials return HTTP 403. A denied scheduled run records
+`terminal: report.permission_denied`, creates no archive, and is not delivered.
+This is an intentional access change for principals who previously had report
+template or schedule access without the required domain permissions.
 
 ### Available Report Types
 
@@ -356,12 +384,12 @@ current approval.
   permission on every tenant in scope; an approval by a principal whose reach
   does not cover the full scope is refused.
 - A current approval is required for a cross-tenant schedule. Generation also
-  checks authorization at compile time; an unauthorized generation is
-  recorded as failed and is not delivered. Changing the scope after an
-  approval invalidates it, as does revoking it; **Retry delivery** re-checks
-  the archived run's generation scope against the standing approval before it
-  re-contacts any failed target, so a narrowed re-approval never authorizes an
-  older, broader export.
+  checks authorization at compile time; an unauthorized generation records
+  `terminal: report.permission_denied` and is not delivered. Changing the
+  scope after an approval invalidates it, as does revoking it; **Retry
+  delivery** re-checks the archived run's generation scope against the
+  standing approval before it re-contacts any failed target, so a narrowed
+  re-approval never authorizes an older, broader export.
 - Revocation keeps the approval history visible and marks it void; approving
   again records a fresh approval.
 

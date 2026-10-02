@@ -3,12 +3,13 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone, translation
 from django_q.models import Schedule
 
+from core.reports.contracts import ReportPermissionDenied
 from core.tasks.utils import TaskResult, TaskStatus
 from extras.models import (
     NotificationChannel,
@@ -25,8 +26,11 @@ from extras.tasks.reports import (
     _process_scheduled_report,
     _render_report_output,
     _ReportOutput,
+    _resolve_authorized_scheduled_scope,
     _resolve_report_recipients,
     _resolve_report_scope,
+    _run_now_invoker_denial,
+    _run_scheduled_report_in_context,
 )
 
 User = get_user_model()
@@ -168,6 +172,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             tenant=self.tenant,
             frequency="once",
             format=ScheduledReport.FORMAT_HTML,
+            recipients="report-denial@example.test",
             save_to_archive=True,
         )
 
@@ -183,6 +188,38 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(result.code, "report.generation_failed")
         sched.refresh_from_db()
         self.assertEqual(sched.last_status, "terminal: report.generation_failed")
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
+        deliver_email.assert_not_called()
+        deliver_channels.assert_not_called()
+        archive_output.assert_not_called()
+
+    def test_report_permission_denial_has_distinct_terminal_outcome_without_archive_or_delivery(self):
+        from extras.tasks.reports import generate_scheduled_report_task
+
+        sched = ScheduledReport.objects.create(
+            name="Domain Permission Denial Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            recipients="report-denial@example.test",
+            save_to_archive=True,
+        )
+
+        with (
+            patch("extras.tasks.reports.build_report_context", side_effect=ReportPermissionDenied("denied")),
+            patch("extras.tasks.reports._deliver_report_email") as deliver_email,
+            patch("extras.tasks.reports._deliver_report_channels") as deliver_channels,
+            patch("extras.tasks.reports._archive_report_output") as archive_output,
+        ):
+            result = generate_scheduled_report_task(sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.permission_denied")
+        self.assertTrue(result.user_visible)
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "terminal: report.permission_denied")
+        self.assertIsNone(sched.last_run_archive)
         self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
         deliver_email.assert_not_called()
         deliver_channels.assert_not_called()
@@ -311,11 +348,11 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
 
         # Test direct compilation of context
-        from core.reports import build_report_context
+        from core.tests.mixins import compile_report_with_system_authorization
 
         with translation.override("en"):
-            headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
-                self.template, active_tenant=self.tenant
+            headers, rows, summary_cards, grouped_data, chart_svg, context_data = (
+                compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
             )
 
         self.assertIn("Total Hardware Assets", [c["label"] for c in summary_cards])
@@ -386,7 +423,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_new_report_types_compilation(self):
         """Test that the new report types compile context and preview successfully."""
-        from core.reports import build_report_context
+        from core.tests.mixins import compile_report_with_system_authorization
 
         # 1. Test asset_depreciation
         deprec_template = ReportTemplate.objects.create(
@@ -403,7 +440,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_with_system_authorization(
             deprec_template, active_tenant=self.tenant
         )
         self.assertIn("Total Depreciable Assets", [c["label"] for c in summary_cards])
@@ -425,7 +462,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_with_system_authorization(
             software_template, active_tenant=self.tenant
         )
         self.assertIn("Total Software Products", [c["label"] for c in summary_cards])
@@ -1017,3 +1054,146 @@ class ReportCrossTenantPermissionTests(TestCase):
             _resolve_report_scope(self.tenant_a, None),
             "holder should keep filter_tenants=None for global aggregation",
         )
+
+
+class ScheduledReportWorkerGuardTests(TestCase):
+    """Fail-closed principal and scope guards in the scheduled-report worker."""
+
+    def test_context_entry_failure_denies_the_run(self):
+        sched = SimpleNamespace(pk=17)
+        task_context = MagicMock()
+        task_context.return_value.__enter__.side_effect = PermissionDenied("scope refused")
+        with patch("extras.tasks.reports.TaskContext", task_context):
+            result = _run_scheduled_report_in_context(
+                sched,
+                SimpleNamespace(id=5, pk=5),
+                None,
+                scope_authorized_user_id=None,
+                invoked_by_user_id=41,
+                scope_requires_authorization=False,
+            )
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.permission_denied")
+
+    def test_system_authorization_issuance_failure_continues_to_processing(self):
+        sched = SimpleNamespace(pk=17, report=SimpleNamespace(report_type="asset_summary"))
+        ctx = MagicMock()
+        ctx.user = None
+        ctx.log_context = {}
+        ctx.authorize_system.side_effect = RuntimeError("issuance failed")
+        task_context = MagicMock()
+        task_context.return_value.__enter__.return_value = ctx
+        processed = TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
+        provider = MagicMock()
+        provider.required_permissions.return_value = ("assets.view_asset",)
+        with (
+            patch("extras.tasks.reports.TaskContext", task_context),
+            patch("extras.tasks.reports.get_report_provider", return_value=provider),
+            patch("extras.tasks.reports._process_scheduled_report", return_value=processed),
+        ):
+            result = _run_scheduled_report_in_context(
+                sched,
+                None,
+                None,
+                scope_authorized_user_id=None,
+                invoked_by_user_id=None,
+                scope_requires_authorization=False,
+            )
+        self.assertIs(result, processed)
+
+    def test_broad_run_binds_the_invoking_user_over_the_stored_approver(self):
+        sched = SimpleNamespace(pk=17)
+        task_context = MagicMock()
+        task_context.return_value.__enter__.return_value = MagicMock()
+        processed = TaskResult(TaskStatus.SUCCESS, "report.completed")
+        with (
+            patch("extras.tasks.reports.TaskContext", task_context),
+            patch("extras.tasks.reports._process_scheduled_report", return_value=processed),
+        ):
+            result = _run_scheduled_report_in_context(
+                sched,
+                None,
+                [SimpleNamespace(id=1, pk=1)],
+                scope_authorized_user_id=41,
+                invoked_by_user_id=42,
+                scope_requires_authorization=True,
+            )
+        self.assertIs(result, processed)
+        self.assertEqual(task_context.call_args.kwargs["user_id"], 42)
+
+    def test_unattended_broad_run_keeps_the_stored_approver(self):
+        sched = SimpleNamespace(pk=17)
+        task_context = MagicMock()
+        task_context.return_value.__enter__.return_value = MagicMock()
+        processed = TaskResult(TaskStatus.SUCCESS, "report.completed")
+        with (
+            patch("extras.tasks.reports.TaskContext", task_context),
+            patch("extras.tasks.reports._process_scheduled_report", return_value=processed),
+        ):
+            result = _run_scheduled_report_in_context(
+                sched,
+                None,
+                [SimpleNamespace(id=1, pk=1)],
+                scope_authorized_user_id=41,
+                invoked_by_user_id=None,
+                scope_requires_authorization=True,
+            )
+        self.assertIs(result, processed)
+        self.assertEqual(task_context.call_args.kwargs["user_id"], 41)
+
+    def test_actorless_single_tenant_run_binds_no_user(self):
+        sched = SimpleNamespace(pk=17, report=SimpleNamespace(report_type="asset_summary"))
+        ctx = MagicMock()
+        ctx.user = None
+        task_context = MagicMock()
+        task_context.return_value.__enter__.return_value = ctx
+        processed = TaskResult(TaskStatus.SUCCESS, "report.completed")
+        provider = MagicMock()
+        provider.required_permissions.return_value = ("assets.view_asset",)
+        with (
+            patch("extras.tasks.reports.TaskContext", task_context),
+            patch("extras.tasks.reports.get_report_provider", return_value=provider),
+            patch("extras.tasks.reports._process_scheduled_report", return_value=processed),
+        ):
+            result = _run_scheduled_report_in_context(
+                sched,
+                SimpleNamespace(id=5, pk=5),
+                None,
+                scope_authorized_user_id=None,
+                invoked_by_user_id=None,
+                scope_requires_authorization=False,
+            )
+        self.assertIs(result, processed)
+        self.assertIsNone(task_context.call_args.kwargs["user_id"])
+
+    def test_run_now_invoker_denial_paths(self):
+        sched = SimpleNamespace(pk=17)
+        with patch("extras.tasks.reports.get_user_model") as user_model:
+            user_model.return_value._base_manager.filter.side_effect = RuntimeError("lookup failed")
+            result = _run_now_invoker_denial(sched, 41)
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.permission_denied")
+
+        with patch("extras.tasks.reports.get_user_model") as user_model:
+            user_model.return_value._base_manager.filter.return_value.first.return_value = None
+            result = _run_now_invoker_denial(sched, 41)
+        self.assertEqual(result.code, "report.permission_denied")
+
+        with patch("extras.tasks.reports.get_user_model") as user_model:
+            user_model.return_value._base_manager.filter.return_value.first.return_value = SimpleNamespace(
+                is_active=False
+            )
+            result = _run_now_invoker_denial(sched, 41)
+        self.assertEqual(result.code, "report.permission_denied")
+
+        with patch("extras.tasks.reports.get_user_model") as user_model:
+            user_model.return_value._base_manager.filter.return_value.first.return_value = SimpleNamespace(
+                is_active=True
+            )
+            self.assertIsNone(_run_now_invoker_denial(sched, 41))
+
+    def test_scope_resolution_returning_none_yields_scope_missing(self):
+        with patch("extras.tasks.reports._resolve_report_scope", return_value=None):
+            result = _resolve_authorized_scheduled_scope(SimpleNamespace(pk=17))
+        self.assertIsInstance(result, TaskResult)
+        self.assertEqual(result.code, "report.scope_missing")

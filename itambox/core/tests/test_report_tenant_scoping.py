@@ -21,8 +21,7 @@ from django.utils import timezone
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
-from core.reports import build_report_context
-from core.tests.mixins import TenantTestMixin, grant
+from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization, grant
 from extras.models import ReportTemplate
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, Role, Tenant
@@ -54,7 +53,7 @@ class LicenseUtilizationReportTests(TenantTestMixin, TestCase):
 
     def test_assigned_seats_excludes_soft_deleted(self):
         self.clear_tenant_context()
-        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         row = next(r for r in rows if r.get("License Name") == "Acme EA")
         self.assertEqual(row["Assigned Seats"], "2")  # not 3
         self.assertEqual(row["Available Seats"], "8")  # 10 - 2
@@ -86,7 +85,7 @@ class SoftwareInventoryReportTests(TenantTestMixin, TestCase):
 
     def test_inventory_scoped_to_report_tenant(self):
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
+        _, rows, summary_cards, *_ = compile_report_with_system_authorization(self.template, active_tenant=self.tenant)
         names = [r.get("Software Product") for r in rows]
         self.assertIn("SoftA", names)
         self.assertNotIn("SoftB", names)
@@ -109,10 +108,16 @@ class CrossTenantCompilationScopeTests(TenantTestMixin, TestCase):
     """
 
     def setUp(self):
-        self.setup_tenant_context(name="Tenant A", slug="cross-a", permissions=["reports.view_cross_tenant_reports"])
+        self.setup_tenant_context(
+            name="Tenant A",
+            slug="cross-a",
+            permissions=["reports.view_cross_tenant_reports", "assets.view_asset"],
+        )
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="cross-b")
         role_b = Role.objects.create(
-            tenant=self.tenant_b, name="Cross Role", permissions=["reports.view_cross_tenant_reports"]
+            tenant=self.tenant_b,
+            name="Cross Role",
+            permissions=["reports.view_cross_tenant_reports", "assets.view_asset"],
         )
         grant(self.tenant_user, self.tenant_b, role_b)
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
@@ -144,7 +149,7 @@ class CrossTenantCompilationScopeTests(TenantTestMixin, TestCase):
         previous_user = get_current_user()
         set_current_user(user if user is not None else self.tenant_user)
         try:
-            _, rows, *_ = build_report_context(
+            _, rows, *_ = compile_report_with_system_authorization(
                 self.template, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
         finally:
