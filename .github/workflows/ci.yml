@@ -558,6 +558,11 @@ jobs:
         run: |
           uv run --locked --no-sync python scripts/check_local_imports.py
 
+      # The suite backing this gate runs by discovery in the `test` job above.
+      - name: Check the escape-hatch policy gate
+        run: |
+          uv run --locked --no-sync python scripts/check_escape_hatches.py
+
       - name: Check release image pinning policy
         run: |
           uv run --locked --no-sync python scripts/check_image_pins.py
