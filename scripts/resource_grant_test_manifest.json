@@ -639,6 +639,7 @@
     "scripts/tests/test_architecture_policy.py",
     "scripts/tests/test_certify_e2e_run.py",
     "scripts/tests/test_check_architecture.py",
+    "scripts/tests/test_check_escape_hatches.py",
     "scripts/tests/test_check_image_pins.py",
     "scripts/tests/test_check_registry_image.py",
     "scripts/tests/test_check_test_report.py",
