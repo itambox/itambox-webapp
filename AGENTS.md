@@ -223,6 +223,24 @@ without a recognised category always fails and can never be baselined. The gate
 refuses to run outside canonical Python 3.12. `itambox/` and `scripts/` are
 scanned; migrations, vendored trees, and test modules are excluded.
 
+### Lint: escape hatches (AST policy gate)
+```bash
+# From the repository root -- blocking gate, same command CI and pre-commit run:
+uv run --locked --only-group dev python scripts/check_escape_hatches.py
+
+# After paying down debt or annotating occurrences, regenerate on canonical Python 3.12:
+uv run --locked --only-group dev python scripts/check_escape_hatches.py --write-baseline
+```
+A new occurrence of a pattern that bypasses an invariant needs an in-place
+reason or the gate fails (see "Escape-hatch policy" below). Existing
+occurrences are frozen in `scripts/escape_hatch_baseline.json`, a schema-v1
+identity baseline keyed by rule, path, enclosing scope path, and the normalised
+expression -- never by line number -- bound to the effective rules by a SHA-256
+policy fingerprint. New identities are regressions and `--write-baseline`
+refuses them; removed or annotated ones make the baseline stale and must be
+regenerated in the same reviewed change, so paid-down debt never becomes
+headroom. The gate refuses to run outside canonical Python 3.12.
+
 ### Lint: architecture boundaries (AST policy gate)
 ```bash
 # From the repository root -- blocking gate, same command CI and pre-commit run:
@@ -353,6 +371,29 @@ from itambox.middleware import get_current_user
 ```
 
 `scripts/check_local_imports.py` enforces this as a blocking, AST-based gate (see "Lint: local imports" above). The full policy — grammar, scope, ratchet semantics, and how to pay down baselined debt — is in [python-import-policy.md](https://github.com/itambox/design-docs/blob/main/development/python-import-policy.md).
+
+### Escape-hatch policy
+
+Three patterns step around tenant scoping, the provider seam, or the behaviour
+of the code under test. A new occurrence is justified in place as
+`# <rule>: <reason>` on the statement's own line(s) or in the comment block
+directly above it, or it fails `scripts/check_escape_hatches.py`:
+
+| Rule | Pattern | Where it applies |
+|---|---|---|
+| `unscoped` | `X._base_manager` / `X.all_objects` | production views, forms, serializers and services (path contains a `view(s)`, `form(s)`, `serializer(s)` or `service(s)` component) |
+| `provider-slot` | a new `SingleProviderSlot` instance | production code |
+| `source-text` | `inspect.getsource` / `ast.parse` | test modules, except `scripts/tests` |
+
+```python
+# unscoped: restore flow must see soft-deleted rows regardless of the active tenant
+row = Thing._base_manager.get(pk=pk)
+```
+
+Prefer the scoped manager, a service helper, or a behavioural assertion over an
+annotation. Broad `except Exception` handlers are not part of this gate: they
+are ratcheted by `scripts/check_exception_policy.py`, and bare `except:` is
+refused by flake8 E722.
 
 ## Architecture: layers and dependency direction
 

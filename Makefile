@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline architecture-issues typecheck lint lint-templates lint-styles inline-style-check localization-check format format-check format-templates format-styles e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline escape-hatch-check architecture-check architecture-baseline architecture-issues typecheck lint lint-templates lint-styles inline-style-check localization-check format format-check format-templates format-styles e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -107,6 +107,9 @@ exception-check:
 # security-sensitive silent handlers even in write mode.
 exception-baseline:
 	PYTHONPATH= $(UV_DEV) python scripts/check_exception_policy.py --write-baseline
+
+escape-hatch-check:
+	PYTHONPATH= $(UV_DEV) python scripts/check_escape_hatches.py
 
 architecture-check:
 	PYTHONPATH= $(UV_DEV) python scripts/check_architecture.py

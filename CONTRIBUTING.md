@@ -144,6 +144,7 @@ uv run --locked --group dev pre-commit run --all-files
 make format-check
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 uv run --locked --only-group dev python scripts/check_local_imports.py
+uv run --locked --only-group dev python scripts/check_escape_hatches.py
 uv run --locked --only-group dev python scripts/check_architecture.py
 make typecheck
 ```
