@@ -197,6 +197,7 @@ class _HatchCollector(ast.NodeVisitor):
     def visit_Name(self, node):
         if self.check_source_text and self._is_source_text(node):
             self._record(RULE_SOURCE_TEXT, node)
+        self.generic_visit(node)
 
 
 def _statement_comment(lines, statement):
@@ -317,6 +318,20 @@ def _validate_baseline_header(raw, expected_policy_fingerprint):
         raise PolicyError("baseline policy_sha256 does not match the effective escape-hatch policy")
 
 
+def _validate_row(index, row):
+    if not isinstance(row, dict) or set(row) != {"rule", "path", "context", "statement", "count"}:
+        raise PolicyError(f"baseline finding {index} has invalid fields")
+    count = row["count"]
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        raise PolicyError(f"baseline finding {index} has invalid count")
+    values = (row["rule"], row["path"], row["context"], row["statement"])
+    if not all(isinstance(value, str) for value in values):
+        raise PolicyError(f"baseline finding {index} has non-string identity")
+    if values[0] not in RULES:
+        raise PolicyError(f"baseline finding {index} names unknown rule {values[0]!r}")
+    return values
+
+
 def load_baseline(baseline_path, expected_policy_fingerprint):
     try:
         raw = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
@@ -329,21 +344,11 @@ def load_baseline(baseline_path, expected_policy_fingerprint):
 
     baseline = collections.Counter()
     ordered_identities = []
-    required = {"rule", "path", "context", "statement", "count"}
     for index, row in enumerate(rows):
-        if not isinstance(row, dict) or set(row) != required:
-            raise PolicyError(f"baseline finding {index} has invalid fields")
-        count = row["count"]
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise PolicyError(f"baseline finding {index} has invalid count")
-        values = (row["rule"], row["path"], row["context"], row["statement"])
-        if not all(isinstance(value, str) for value in values):
-            raise PolicyError(f"baseline finding {index} has non-string identity")
-        if values[0] not in RULES:
-            raise PolicyError(f"baseline finding {index} names unknown rule {values[0]!r}")
+        values = _validate_row(index, row)
         if values in baseline:
             raise PolicyError(f"baseline finding {index} duplicates an identity")
-        baseline[values] = count
+        baseline[values] = row["count"]
         ordered_identities.append(values)
     if ordered_identities != sorted(ordered_identities):
         raise PolicyError("baseline findings must be sorted by identity")
