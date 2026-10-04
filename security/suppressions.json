@@ -482,6 +482,25 @@
         "https://github.com/itambox/itambox-webapp/issues/479",
         "https://github.com/itambox/itambox-webapp/issues/510"
       ]
+    },
+    {
+      "id": "SEC-627-TRIVY-001",
+      "tool": "trivy",
+      "finding": "CVE-2026-93687",
+      "reason": "braces 3.0.3 is the newest npm release (2024-05-21) and the advisory records no first patched version, so no bump can clear the finding; the package is development-toolchain-only (npm dev flag, pulled in by chokidar and micromatch) and no untrusted input reaches it. Time-boxed; tracked for removal in #627.",
+      "owner": "@itambox",
+      "scope": {
+        "target": "itambox/package-lock.json",
+        "package": "braces",
+        "version": "3.0.3"
+      },
+      "review_on": "2026-11-02",
+      "expires_on": "2026-11-16",
+      "references": [
+        "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+        "https://github.com/micromatch/braces/issues/70",
+        "https://github.com/itambox/itambox-webapp/issues/627"
+      ]
     }
   ]
 }
