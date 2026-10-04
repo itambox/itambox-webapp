@@ -54,6 +54,13 @@ repos:
         language_version: python3.12
         pass_filenames: false
         always_run: true
+      - id: escape-hatch-policy
+        name: escape hatches (blocking policy gate)
+        entry: python scripts/check_escape_hatches.py
+        language: python
+        language_version: python3.12
+        pass_filenames: false
+        always_run: true
       # Whole-graph analysis, so it cannot take filenames: a per-file
       # invocation would build a different graph on every commit and report
       # different findings each time.

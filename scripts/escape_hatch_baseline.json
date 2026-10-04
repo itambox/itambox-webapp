@@ -1,0 +1,2142 @@
+{
+  "schema_version": 1,
+  "canonical_python": "3.12",
+  "policy_sha256": "d43680f43f330c6a5d0265dcd1eb4b7b8efe68f8b5086a847ab684b28ed8af66",
+  "findings": [
+    {
+      "rule": "provider-slot",
+      "path": "itambox/core/identity_provisioning.py",
+      "context": "",
+      "statement": "_SingleProviderSlot[IdentityProvisioner]('identity provisioner')",
+      "count": 1
+    },
+    {
+      "rule": "provider-slot",
+      "path": "itambox/core/restore_authority.py",
+      "context": "",
+      "statement": "_SingleProviderSlot[RestoreAuthorityValidator]('restore-authority validator')",
+      "count": 1
+    },
+    {
+      "rule": "provider-slot",
+      "path": "itambox/core/tenant_access.py",
+      "context": "",
+      "statement": "SingleProviderSlot[TenantAccessPolicy]('tenant access policy')",
+      "count": 1
+    },
+    {
+      "rule": "provider-slot",
+      "path": "itambox/inventory/models_kit_checkout.py",
+      "context": "",
+      "statement": "SingleProviderSlot[KitCheckoutProvider]('inventory kit checkout')",
+      "count": 1
+    },
+    {
+      "rule": "provider-slot",
+      "path": "itambox/software/models_reconciliation.py",
+      "context": "",
+      "statement": "SingleProviderSlot[SoftwareReconciliationProvider]('software reconciliation')",
+      "count": 1
+    },
+    {
+      "rule": "provider-slot",
+      "path": "itambox/subscriptions/models_seat_usage.py",
+      "context": "",
+      "statement": "SingleProviderSlot[SubscriptionSeatUsageProvider]('subscription seat usage')",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_canonical_vocabulary_runtime.py",
+      "context": "FunctionDef:_demo_asset_type_source",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_canonical_vocabulary_runtime.py",
+      "context": "FunctionDef:_demo_asset_type_source",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:DashboardAndResidualImportTests/FunctionDef:_function_source",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:DashboardAndResidualImportTests/FunctionDef:test_issue_447_residual_imports_are_module_top",
+      "statement": "ast.parse",
+      "count": 3
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:TenantResourceGrantBoundaryTests/FunctionDef:test_assignment_mutation_surfaces_call_canonical_services",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:TenantResourceGrantBoundaryTests/FunctionDef:test_assignment_write_capabilities_stay_on_sanctioned_seams",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:TenantResourceGrantBoundaryTests/FunctionDef:test_capability_gate_rejects_qualified_permits_and_kwargs_forwarding",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:TenantResourceGrantBoundaryTests/FunctionDef:test_internal_cascade_and_overallocation_capabilities_stay_on_exact_seams",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "ClassDef:TenantResourceGrantBoundaryTests/FunctionDef:test_production_shared_resource_id_calls_stay_inside_canonical_resolver",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "FunctionDef:_assignment_write_violations",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "FunctionDef:_edges",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_import_boundaries.py",
+      "context": "FunctionDef:_resource_grant_boundary_violations",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue443_ldap_adapter.py",
+      "context": "ClassDef:LDAPAdapterRestartTests/FunctionDef:test_production_owner_is_sdk_free_and_has_no_legacy_organization_edges",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue443_ldap_batch.py",
+      "context": "ClassDef:LDAPBatchRestartTests/FunctionDef:test_command_owner_is_batch_only_and_calls_concrete_service_module",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue443_ports_lifecycle.py",
+      "context": "ClassDef:Issue443PortSurfaceTests/FunctionDef:test_sdk_free_dto_and_literal_surface_is_exact",
+      "statement": "inspect.getsource",
+      "count": 2
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue443_saml_adapter.py",
+      "context": "ClassDef:SAMLAdapterContractTests/FunctionDef:test_production_adapter_has_no_domain_model_form_or_legacy_provisioning_edge",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue445_import_probes.py",
+      "context": "FunctionDef:_literal_producer_paths",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue445_security_contracts.py",
+      "context": "ClassDef:Issue445DeliveryPrimitiveSecurityTests/FunctionDef:test_core_events_has_no_extras_domain_import",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue445_security_contracts.py",
+      "context": "ClassDef:Issue445DeliveryPrimitiveSecurityTests/FunctionDef:test_core_events_has_no_extras_domain_import",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue445_security_contracts.py",
+      "context": "ClassDef:Issue445DeliveryPrimitiveSecurityTests/FunctionDef:test_structural_channel_vocabulary_matches_domain_choices",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue445_task_context_wrapper.py",
+      "context": "ClassDef:Issue445TaskContextWrapperTests/FunctionDef:test_task_context_source_is_domain_blind",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue445_task_context_wrapper.py",
+      "context": "ClassDef:Issue445TaskContextWrapperTests/FunctionDef:test_task_context_source_is_domain_blind",
+      "statement": "inspect.getsource",
+      "count": 2
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue446_boundaries.py",
+      "context": "ClassDef:Issue446ModuleBoundaryRedTests/FunctionDef:test_compliance_model_has_no_actorless_expected_assets_property",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue446_boundaries.py",
+      "context": "ClassDef:Issue446ModuleBoundaryRedTests/FunctionDef:test_production_consumers_do_not_read_raw_reconciliation_rows",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue446_boundaries.py",
+      "context": "ClassDef:Issue446ModuleBoundaryRedTests/FunctionDef:test_raw_report_rows_ast_guard_catches_direct_and_aliased_reads",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_issue446_boundaries.py",
+      "context": "FunctionDef:_has_import_from",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_oidc_phase_b.py",
+      "context": "ClassDef:OIDCPhaseBPortContractTests/FunctionDef:test_adapter_has_no_direct_organization_or_legacy_provisioning_ownership",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_oidc_phase_b.py",
+      "context": "ClassDef:OIDCPhaseBPortContractTests/FunctionDef:test_phase_b_source_has_one_binding_lock_and_no_user_lock",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_oidc_phase_b.py",
+      "context": "ClassDef:OIDCPhaseBPortContractTests/FunctionDef:test_phase_b_source_has_one_binding_lock_and_no_user_lock",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_phase0_import_search.py",
+      "context": "ClassDef:SearchLookupAllowlistTests/FunctionDef:test_iregex_and_regex_not_allowed",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_phase0_import_search.py",
+      "context": "ClassDef:SearchLookupAllowlistTests/FunctionDef:test_iregex_and_regex_not_allowed",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_provider_discovery_call_time.py",
+      "context": "ClassDef:ProviderDiscoveryArchitectureTests/FunctionDef:test_provider_discovery_has_no_direct_organization_model_import",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/core/tests/test_report_custom_html_removal.py",
+      "context": "ClassDef:ReportCustomHTMLRemovalTests/FunctionDef:test_preview_scope_requires_superuser_for_posted_tenant_selection",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/extras/tests/test_issue445_event_semantics.py",
+      "context": "ClassDef:Issue445EventSemanticsTests/FunctionDef:test_rule_processing_boundary_never_calls_logger_exception",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/itambox/tests/test_generic_presentation_registry.py",
+      "context": "ClassDef:TestLifecycleAndSnapshots/FunctionDef:test_importing_registry_does_not_populate_apps_or_import_a_domain",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_guard_restore_owner.py",
+      "context": "ClassDef:GenericRestorePortTests/FunctionDef:test_generic_restore_has_only_the_named_port_import",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_guard_restore_owner.py",
+      "context": "ClassDef:GenericRestorePortTests/FunctionDef:test_generic_restore_has_only_the_named_port_import",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_guard_restore_owner.py",
+      "context": "ClassDef:GuardOwnerSurfaceTests/FunctionDef:test_owner_does_not_import_integration_guard_or_membership_backend",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_guard_restore_owner.py",
+      "context": "ClassDef:RestoreAuthorityDispatchTests/FunctionDef:test_singleton_is_preconstructed_and_annotated",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_identity_service.py",
+      "context": "ClassDef:LoggingAndFailureContractTests/FunctionDef:test_service_contract_has_no_direct_any_and_documents_oidc_binding_handoff",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_identity_service.py",
+      "context": "ClassDef:LoggingAndFailureContractTests/FunctionDef:test_service_contract_has_no_direct_any_and_documents_oidc_binding_handoff",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_identity_service_concurrency.py",
+      "context": "ClassDef:IdentityServiceConcurrencyTests/FunctionDef:test_required_contention_pollers_have_no_positive_duration_waits",
+      "statement": "ast.parse",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_permission_parity.py",
+      "context": "FunctionDef:test_role_name_contract_is_local_and_does_not_import_missing_port",
+      "statement": "inspect.getsource",
+      "count": 1
+    },
+    {
+      "rule": "source-text",
+      "path": "itambox/organization/tests/test_issue443_permission_parity.py",
+      "context": "FunctionDef:test_semantic_targets_are_presentation_free_and_policy_does_not_import_forms",
+      "statement": "inspect.getsource",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/api/serializer_mixins.py",
+      "context": "ClassDef:CanonicalSpecificationSerializerMixin/FunctionDef:_persist_native_update",
+      "statement": "type(current)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/api/serializers.py",
+      "context": "ClassDef:AssetSerializer/FunctionDef:create",
+      "statement": "Asset._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/api/serializers.py",
+      "context": "ClassDef:AssetSerializer/FunctionDef:update",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/api/serializers.py",
+      "context": "ClassDef:AssetTypeSerializer/FunctionDef:create",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/api/serializers.py",
+      "context": "ClassDef:AssetTypeSerializer/FunctionDef:update",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/api/views.py",
+      "context": "ClassDef:SpecificationCommandUpdateMixin/FunctionDef:_lock_command_libraries",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/asset_form.py",
+      "context": "ClassDef:AssetForm/FunctionDef:_persist_native_update",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/asset_form.py",
+      "context": "ClassDef:AssetForm/FunctionDef:_save_pending_m2m",
+      "statement": "Asset._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/asset_form.py",
+      "context": "ClassDef:AssetForm/FunctionDef:save",
+      "statement": "Asset._base_manager",
+      "count": 3
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/assettype_form.py",
+      "context": "ClassDef:AssetTypeForm/FunctionDef:_command_create",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/assettype_form.py",
+      "context": "ClassDef:AssetTypeForm/FunctionDef:_persist_native_update",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/assettype_form.py",
+      "context": "ClassDef:AssetTypeForm/FunctionDef:_save_pending_m2m",
+      "statement": "AssetType.all_objects",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/assettype_form.py",
+      "context": "ClassDef:AssetTypeForm/FunctionDef:save",
+      "statement": "AssetType.all_objects",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/bulk_scan_forms.py",
+      "context": "ClassDef:BulkTenantSelectionMixin/FunctionDef:__init__",
+      "statement": "Tenant._base_manager",
+      "count": 3
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/bulk_scan_forms.py",
+      "context": "FunctionDef:bulk_tenant_queryset",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/episode_form.py",
+      "context": "ClassDef:RepairEpisodeForm/FunctionDef:__init__",
+      "statement": "Asset.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/forms/fields.py",
+      "context": "FunctionDef:selectable_episodes",
+      "statement": "RepairEpisode.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:_active_disposal_error",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:cancel_asset_disposal",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:cancel_asset_disposal",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:checkout_asset",
+      "statement": "AssetReservation.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:dispose_asset",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:update_asset_disposal",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/__init__.py",
+      "context": "FunctionDef:update_asset_disposal",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/request_fulfillment.py",
+      "context": "FunctionDef:_evidence_candidates",
+      "statement": "ObjectChange._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/request_fulfillment.py",
+      "context": "FunctionDef:_manually_complete_group",
+      "statement": "AssetRequest._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/request_fulfillment.py",
+      "context": "FunctionDef:_validate_checkout_binding",
+      "statement": "ObjectChange._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/request_fulfillment.py",
+      "context": "FunctionDef:_validate_checkout_binding",
+      "statement": "model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/request_fulfillment.py",
+      "context": "FunctionDef:request_fulfillment_labels",
+      "statement": "AssetRequest._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specification_writers.py",
+      "context": "FunctionDef:_lock_and_authorize_generic_owner",
+      "statement": "owner.__class__._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specification_writers.py",
+      "context": "FunctionDef:apply_asset_specification_patch",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specification_writers.py",
+      "context": "FunctionDef:authorize_generic_owner_scope",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specification_writers.py",
+      "context": "FunctionDef:merge_generic_asset_data",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_command_support.py",
+      "context": "FunctionDef:reload_actor",
+      "statement": "user_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_composition_commands.py",
+      "context": "FunctionDef:_lock_category_owner",
+      "statement": "Category.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_composition_commands.py",
+      "context": "FunctionDef:_lock_type_owner",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_available_category",
+      "statement": "Category.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_available_manufacturer",
+      "statement": "Manufacturer.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_explicit_slug_conflict_issue",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_lock_asset_type",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_lock_category",
+      "statement": "Category.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_lock_create_references",
+      "statement": "AssetRole.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_lock_create_references",
+      "statement": "Depreciation.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_lock_create_references",
+      "statement": "Tag.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_lock_manufacturer",
+      "statement": "Manufacturer.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_preview_apply_locked",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_preview_reference_issues",
+      "statement": "AssetRole.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_preview_reference_issues",
+      "statement": "Depreciation.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_create_commands.py",
+      "context": "FunctionDef:_tags_exist",
+      "statement": "Tag.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_history_commands.py",
+      "context": "FunctionDef:_cleanup_asset_locked",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_history_commands.py",
+      "context": "FunctionDef:_cleanup_type_locked",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_history_commands.py",
+      "context": "FunctionDef:_preliminary_asset_type_ids",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_history_commands.py",
+      "context": "FunctionDef:_preview_asset_locked",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/_history_commands.py",
+      "context": "FunctionDef:_preview_type_locked",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/commands.py",
+      "context": "FunctionDef:_asset_destination_type_id",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/commands.py",
+      "context": "FunctionDef:_preliminary_asset_type_ids",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/commands.py",
+      "context": "FunctionDef:_update_asset_locked",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/commands.py",
+      "context": "FunctionDef:_update_asset_type_locked",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/specifications/loader.py",
+      "context": "FunctionDef:relevant_library_ids",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/timeline.py",
+      "context": "FunctionDef:_collect_asset_events",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/timeline.py",
+      "context": "FunctionDef:_collect_episode_events",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/timeline.py",
+      "context": "FunctionDef:_status_labels",
+      "statement": "StatusLabel.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/application.py",
+      "context": "FunctionDef:_catalogue_reference_issues",
+      "statement": "model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/application.py",
+      "context": "FunctionDef:_definition_exists",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/application.py",
+      "context": "FunctionDef:_definition_exists",
+      "statement": "Category.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/application.py",
+      "context": "FunctionDef:_definition_exists",
+      "statement": "Manufacturer.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/application.py",
+      "context": "FunctionDef:_reload_library_actor",
+      "statement": "get_user_model()._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/application.py",
+      "context": "FunctionDef:_require_reference_permission",
+      "statement": "model.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/writing.py",
+      "context": "ClassDef:_WriteContext/FunctionDef:retire_missing",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/writing.py",
+      "context": "ClassDef:_WriteContext/FunctionDef:write_asset_types",
+      "statement": "AssetType.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/writing.py",
+      "context": "ClassDef:_WriteContext/FunctionDef:write_references",
+      "statement": "Category.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/services/type_library/writing.py",
+      "context": "ClassDef:_WriteContext/FunctionDef:write_references",
+      "statement": "Manufacturer.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/views/asset_views.py",
+      "context": "ClassDef:AssetDetailView/FunctionDef:get_context_data",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/views/bulk_scan_views.py",
+      "context": "FunctionDef:asset_action_payload",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/views/disposal_views.py",
+      "context": "ClassDef:AssetDisposalCancelView",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/views/disposal_views.py",
+      "context": "ClassDef:AssetDisposalDetailView",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/assets/views/disposal_views.py",
+      "context": "ClassDef:AssetDisposalListView",
+      "statement": "AssetDisposal.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/api/serializers.py",
+      "context": "ClassDef:AssetAuditSerializer",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/api/serializers.py",
+      "context": "ClassDef:AuditSessionSerializer/FunctionDef:validate",
+      "statement": "AuditSession._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/api/views.py",
+      "context": "ClassDef:AuditSessionViewSet/FunctionDef:perform_update",
+      "statement": "AuditSession._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_all_expected_assets",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_authorize_system_session",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_canonical_missing_status",
+      "statement": "StatusLabel._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_classify_authorized",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_expected_assets_for_tenants",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_frozen_rehome_location",
+      "statement": "Location._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_lock_and_validate_scan_asset",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_lock_audit_session",
+      "statement": "AuditSession._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_lock_close_assets",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:_read_v1_report",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:authorized_scan_assets_queryset",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:flag_missing_assets",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/audit_services.py",
+      "context": "FunctionDef:rehome_audit_session_mismatches",
+      "statement": "Asset._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/views.py",
+      "context": "FunctionDef:_lock_custody_signing_session",
+      "statement": "CustodySigningSession._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/compliance/views.py",
+      "context": "FunctionDef:_resolve_custody_signing_session",
+      "statement": "CustodySigningSession._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/api/views.py",
+      "context": "FunctionDef:_delivery_queryset_for_user",
+      "statement": "WebhookDelivery._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/services/_definition_command_support.py",
+      "context": "FunctionDef:reload_actor",
+      "statement": "user_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/services/events.py",
+      "context": "FunctionDef:_eligible_rules",
+      "statement": "EventRule._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/services/events.py",
+      "context": "FunctionDef:_legacy_retry_policy",
+      "statement": "WebhookEndpoint._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/services/events.py",
+      "context": "FunctionDef:_send_webhook",
+      "statement": "WebhookDelivery._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/services/events.py",
+      "context": "FunctionDef:process_event_rules",
+      "statement": "Event._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/views.py",
+      "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:_persisted_scope_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/views.py",
+      "context": "ClassDef:ScheduledReportScopeApprovalView/FunctionDef:_scope_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/views.py",
+      "context": "ClassDef:ScheduledReportScopeApprovalView/FunctionDef:_stored_scope_tenant_names",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/extras/webhook_views.py",
+      "context": "FunctionDef:_webhook_deliveries_visible_to",
+      "statement": "WebhookDelivery._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/accessory_forms.py",
+      "context": "ClassDef:AccessoryCheckoutForm/FunctionDef:clean",
+      "statement": "AccessoryStock._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/base_forms.py",
+      "context": "ClassDef:BaseCheckoutForm/FunctionDef:__init__",
+      "statement": "Location._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/base_forms.py",
+      "context": "ClassDef:BaseCheckoutForm/FunctionDef:_shared_pool_location_ids",
+      "statement": "stock_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/component_forms.py",
+      "context": "ClassDef:ComponentAllocationForm/FunctionDef:__init__",
+      "statement": "Location._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/component_forms.py",
+      "context": "ClassDef:ComponentCheckoutForm/FunctionDef:clean",
+      "statement": "ComponentStock._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/consumable_forms.py",
+      "context": "ClassDef:ConsumableCheckoutForm/FunctionDef:clean",
+      "statement": "ConsumableStock._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/kit_forms.py",
+      "context": "FunctionDef:kit_target_tenant_queryset",
+      "statement": "Tenant._base_manager",
+      "count": 3
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/forms/kit_forms.py",
+      "context": "FunctionDef:tenant_group_tenant_ids",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:_authorized_return_assignment",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:_authorized_return_assignment",
+      "statement": "assignment_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:_checkin_assignment",
+      "statement": "stock_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:_license_pools",
+      "statement": "License.all_objects",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:_stock_pools",
+      "statement": "assignment_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:_stock_pools",
+      "statement": "stock_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:checkout_inventory_item",
+      "statement": "Location._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:checkout_inventory_item",
+      "statement": "stock_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:checkout_inventory_item",
+      "statement": "type(item)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:create_component_allocation",
+      "statement": "type(component)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:purge_inventory_assignment",
+      "statement": "model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:recipient_assignment_union",
+      "statement": "assignment_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:resolve_grant_for_checkout",
+      "statement": "stock_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:shared_stock_union",
+      "statement": "stock_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:update_component_allocation",
+      "statement": "ComponentAllocation._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:update_component_allocation",
+      "statement": "type(component)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:validate_checkout_targets",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/services.py",
+      "context": "FunctionDef:validate_checkout_targets",
+      "statement": "type(target)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/views/accessory_views.py",
+      "context": "ClassDef:AccessoryCheckoutView/FunctionDef:get_queryset",
+      "statement": "Accessory._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/views/component_views.py",
+      "context": "ClassDef:ComponentCheckoutView/FunctionDef:get_queryset",
+      "statement": "Component._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/inventory/views/consumable_views.py",
+      "context": "ClassDef:ConsumableCheckoutView/FunctionDef:get_queryset",
+      "statement": "Consumable._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/list_.py",
+      "context": "ClassDef:ObjectListView/FunctionDef:_get_recycle_bin_queryset",
+      "statement": "model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/mixins.py",
+      "context": "FunctionDef:lock_unmanaged_definition",
+      "statement": "type(obj)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/related_objects.py",
+      "context": "ClassDef:RelatedObjectProvider/FunctionDef:_annotate",
+      "statement": "type(self.obj)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/restore.py",
+      "context": "ClassDef:ObjectBulkPurgeView/FunctionDef:post",
+      "statement": "self.model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/restore.py",
+      "context": "ClassDef:ObjectBulkRestoreView/FunctionDef:post",
+      "statement": "self.model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/restore.py",
+      "context": "ClassDef:ObjectPurgeView/FunctionDef:has_permission",
+      "statement": "self.model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/itambox/views/generic/restore.py",
+      "context": "ClassDef:ObjectRestoreView/FunctionDef:has_permission",
+      "statement": "self.model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/api/serializers.py",
+      "context": "ClassDef:TenantResourceGrantAuditSerializer/FunctionDef:_current_delete_change",
+      "statement": "ObjectChange._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/api/serializers.py",
+      "context": "ClassDef:TenantResourceGrantAuditSerializer/FunctionDef:_current_evidence",
+      "statement": "TenantResourceGrantExpiryRevocation._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/api/serializers.py",
+      "context": "ClassDef:TenantResourceGrantAuditSerializer/FunctionDef:_current_raw_evidence",
+      "statement": "TenantResourceGrantExpiryRevocation._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/api/views.py",
+      "context": "ClassDef:TenantResourceGrantAuditViewSet",
+      "statement": "TenantResourceGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/api/views.py",
+      "context": "ClassDef:TenantResourceGrantAuditViewSet/FunctionDef:get_queryset",
+      "statement": "TenantResourceGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:ManagedRoleGrantForm",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:ManagedRoleGrantForm",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:ManagedRoleGrantForm",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:ManagedRoleGrantForm/FunctionDef:__init__",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:MembershipBulkRoleForm",
+      "statement": "Role._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:MembershipForm",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:MembershipForm/FunctionDef:__init__",
+      "statement": "Tenant._base_manager",
+      "count": 4
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/membership_form.py",
+      "context": "ClassDef:MembershipForm/FunctionDef:_technician_preset_rows",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/resource_grant_form.py",
+      "context": "ClassDef:TenantResourceGrantForm/FunctionDef:__init__",
+      "statement": "Tenant._base_manager",
+      "count": 3
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/forms/tenant_form.py",
+      "context": "ClassDef:TenantForm/FunctionDef:__init__",
+      "statement": "Tenant._base_manager",
+      "count": 3
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_authorization_evidence",
+      "statement": "GroupMembership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_authorization_evidence",
+      "statement": "RoleGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_authorization_evidence",
+      "statement": "RoleGrantScope._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_authorization_evidence",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_authorization_evidence",
+      "statement": "UserGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_fresh_live_descendant_tenant_group_ids",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_live_tenant_ids",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_load_group_topology",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_load_membership_evidence",
+      "statement": "Membership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_reload_actor",
+      "statement": "user_model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_select_requested_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/access_scope.py",
+      "context": "FunctionDef:_select_requested_tenants",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_all_customer_holders",
+      "statement": "AssetHolder._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_create_holder",
+      "statement": "AssetHolder._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_create_membership",
+      "statement": "Membership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_create_role",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_ensure_directory_grant",
+      "statement": "RoleGrant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_ensure_own_scope",
+      "statement": "RoleGrantScope._base_manager",
+      "count": 3
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_find_role",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_get_or_create_directory_role",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_holder_candidates",
+      "statement": "AssetHolder._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_holder_collision_re_read",
+      "statement": "AssetHolder._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_lock_existing_user",
+      "statement": "User._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_lock_grants",
+      "statement": "RoleGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_lock_group_memberships",
+      "statement": "GroupMembership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_lock_memberships",
+      "statement": "Membership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_lock_roles",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_lock_scopes",
+      "statement": "RoleGrantScope._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/identity_provisioning.py",
+      "context": "FunctionDef:_reconcile_customer_grants",
+      "statement": "RoleGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/resource_access.py",
+      "context": "FunctionDef:_resource_grant_container_ids",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/resource_access.py",
+      "context": "FunctionDef:visible_to_containers",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/resource_grants.py",
+      "context": "FunctionDef:_delete_change_for_grant",
+      "statement": "ObjectChange._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/resource_grants.py",
+      "context": "FunctionDef:restore_resource_grant",
+      "statement": "TenantResourceGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/resource_grants.py",
+      "context": "FunctionDef:revoke_resource_grant",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/resource_grants.py",
+      "context": "FunctionDef:revoke_resource_grant",
+      "statement": "TenantResourceGrant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/role_grant_validation.py",
+      "context": "FunctionDef:_has_live_tenant_group_scope",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/role_grant_validation.py",
+      "context": "FunctionDef:_validate_explicit_managed_scope",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/rolegrants.py",
+      "context": "FunctionDef:_group_expansion",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/rolegrants.py",
+      "context": "FunctionDef:assignable_roles_qs",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/rolegrants.py",
+      "context": "FunctionDef:managed_target_tenants_qs",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_principal_grants",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_principal_grants",
+      "statement": "RoleGrant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_principal_grants",
+      "statement": "RoleGrantScope._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_provider_groups",
+      "statement": "UserGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_provider_principals",
+      "statement": "GroupMembership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_provider_principals",
+      "statement": "Membership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_provider_principals",
+      "statement": "User._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/services/tenant_onboarding.py",
+      "context": "FunctionDef:_lock_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/context_processors.py",
+      "context": "FunctionDef:_all_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/context_processors.py",
+      "context": "FunctionDef:_direct_membership_tenant_ids",
+      "statement": "Membership._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/context_processors.py",
+      "context": "FunctionDef:_grouped_managed_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/context_processors.py",
+      "context": "FunctionDef:_grouped_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/context_processors.py",
+      "context": "FunctionDef:_own_tenants",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/membership_views.py",
+      "context": "ClassDef:MembershipCreateView/FunctionDef:_authorized_tenant",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/membership_views.py",
+      "context": "ClassDef:MembershipListView/FunctionDef:_context_tenant_ids",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/membership_views.py",
+      "context": "ClassDef:MembershipListView/FunctionDef:get_queryset",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/provider_views.py",
+      "context": "ClassDef:TechnicianQuickAddView/FunctionDef:get",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/provider_views.py",
+      "context": "FunctionDef:_provider_tenants_with_perm",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/resource_grant_views.py",
+      "context": "ClassDef:TenantResourceGrantCreateView/FunctionDef:_resolve_pool",
+      "statement": "model._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/resource_grant_views.py",
+      "context": "ClassDef:TenantResourceGrantExpiryRunDetailView/FunctionDef:get_context_data",
+      "statement": "TenantResourceGrantExpiryRevocation._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/resource_grant_views.py",
+      "context": "FunctionDef:_run_owner_ids",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/role_views.py",
+      "context": "ClassDef:RoleEditView/FunctionDef:get_form_kwargs",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/role_views.py",
+      "context": "FunctionDef:_roles_visible_in",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/tenant_views.py",
+      "context": "ClassDef:TenantDetailView/FunctionDef:get_context_data",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/organization/views/tenant_views.py",
+      "context": "ClassDef:TenantManagedTenantsTabView/FunctionDef:get",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_approve_completed_group_parents",
+      "statement": "AssetRequest._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_existing_fulfillment_link",
+      "statement": "FulfillmentLink._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_lock_asset_request_for_purchase_order",
+      "statement": "AssetRequest._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_lock_fulfillment_targets",
+      "statement": "AssetRequest._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_lock_line_fulfillment_links",
+      "statement": "AssetRequest._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_lock_line_fulfillment_links",
+      "statement": "FulfillmentLink._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:_lock_purchase_order_for_asset_request",
+      "statement": "PurchaseOrder._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:approve_purchase_order",
+      "statement": "PurchaseOrder._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:lock_unit_fulfillment_links",
+      "statement": "FulfillmentLink._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/procurement/services.py",
+      "context": "FunctionDef:release_fulfillment_links",
+      "statement": "AssetRequest._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/subscriptions/seat_services.py",
+      "context": "FunctionDef:count_assigned_seats",
+      "statement": "LicenseSeatAssignment._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/api/scim/provider_services.py",
+      "context": "FunctionDef:apply_provider_user_patch",
+      "statement": "type(user)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/api/scim/provider_views.py",
+      "context": "ClassDef:SCIMProviderMixin/FunctionDef:initial",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/api/scim/provider_views.py",
+      "context": "FunctionDef:_lock_provider_scim_user",
+      "statement": "type(user)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/api/scim/views.py",
+      "context": "ClassDef:SCIMTenantMixin/FunctionDef:initial",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/api/scim/views.py",
+      "context": "FunctionDef:_lock_tenant_scim_user",
+      "statement": "type(user)._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm/FunctionDef:__init__",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm/FunctionDef:__init__",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm/FunctionDef:__init__",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:GroupManagedRoleGrantForm/FunctionDef:clean",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:UserGroupForm",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:UserGroupForm",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:UserGroupForm/FunctionDef:__init__",
+      "statement": "Role._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/forms.py",
+      "context": "ClassDef:UserGroupForm/FunctionDef:__init__",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/services.py",
+      "context": "FunctionDef:_accessible_group_ids",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/services.py",
+      "context": "FunctionDef:_resolve_group_workspace",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/services.py",
+      "context": "FunctionDef:_resolve_group_workspace",
+      "statement": "TenantGroup._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/services.py",
+      "context": "FunctionDef:_resolve_tenant_workspace",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/services.py",
+      "context": "FunctionDef:workspace_choices",
+      "statement": "Tenant._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/services.py",
+      "context": "FunctionDef:workspace_choices",
+      "statement": "TenantGroup._base_manager",
+      "count": 2
+    },
+    {
+      "rule": "unscoped",
+      "path": "itambox/users/views.py",
+      "context": "FunctionDef:_group_admin_tenant_ids",
+      "statement": "Tenant._base_manager",
+      "count": 1
+    }
+  ]
+}
