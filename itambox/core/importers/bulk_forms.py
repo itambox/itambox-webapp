@@ -11,10 +11,11 @@ import yaml
 from django import forms
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ValidationError
-from django.db import models, transaction
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id, get_current_tenant, get_current_user
+from core.data_transfer import policy_for
 
 logger = logging.getLogger(__name__)
 
@@ -68,61 +69,14 @@ IMPORT_EXCLUDED_FIELDS = frozenset(
 )
 
 
-# Models that are NOT user-importable/exportable: generated logs, system records,
-# and complex config (JSON / secrets / relations) that is managed in the UI rather
-# than via bulk CSV. Drives the import-view gate AND the nav/list import+export
-# buttons from one source so they never drift. Everything else is importable.
-IMPORT_EXCLUDED_MODELS = frozenset(
-    {
-        # Generated / log / system data
-        "core.objectchange",
-        "core.notification",
-        "core.job",
-        "extras.alertlog",
-        "extras.event",
-        "extras.journalentry",
-        # Alerting / reporting configuration
-        "extras.alertrule",
-        "extras.notificationchannel",
-        "extras.scheduledreport",
-        "extras.reporttemplate",
-        # Other config (relations / JSON / secrets)
-        "extras.eventrule",
-        "extras.webhookendpoint",
-        "extras.dashboard",
-        # Authentication and canonical RBAC aggregates. The generic importer is an
-        # UPSERT surface built from raw model fields; using it here would bypass
-        # RoleForm/MembershipForm escalation checks, group provenance, scoped-grant
-        # validation, and User privilege controls. These objects are administered
-        # only through their security-aware UI/API/directory workflows.
-        "organization.membership",
-        "organization.role",
-        "organization.rolegrant",
-        "organization.rolegrantscope",
-        "organization.tenantresourcegrant",
-        "users.groupmembership",
-        "users.token",
-        "users.user",
-        "users.usergroup",
-    }
-)
+class ImportNotAllowed(Exception):
+    """The model has no curated, declared import form (undeclared means denied)."""
 
 
-def is_model_importable(model):
-    """True unless the model is a generated log or UI-only config (see
-    IMPORT_EXCLUDED_MODELS). Single source for the import-view gate and the
-    import/export buttons in the nav and list header."""
-    if model is None:
-        return False
-    label = f"{model._meta.app_label}.{model._meta.model_name}"
-    return label not in IMPORT_EXCLUDED_MODELS
-
-
-# Registry of curated BulkImportForms keyed by model, so the single
-# GenericObjectImportView (/import/<app>/<model>/) can serve domain-accurate
-# field lists without a per-app view subclass. Populated lazily on first lookup.
+# Registry of curated BulkImportForms keyed by model. A model is importable only
+# when it is registered here AND declared ``import_=True`` in
+# ``core.data_transfer.DECLARATIONS``; there is no reflection-built fallback.
 _IMPORT_FORM_REGISTRY = {}
-_IMPORT_FORMS_LOADED = True
 
 
 def register_import_form(form_cls):
@@ -133,42 +87,27 @@ def register_import_form(form_cls):
 
 
 def get_registered_import_form(model):
-    """Return the curated BulkImportForm for *model*, or None for the dynamic path."""
+    """Return the curated BulkImportForm for *model*, or None."""
     return _IMPORT_FORM_REGISTRY.get(model)
 
 
-def get_import_form_class(model):
-    """Return the curated or dynamic import form for ``model``.
+def is_model_importable(model):
+    """True only for a model declared importable that also has a curated form.
 
-    Curated forms are registered by their owning domain app during
-    ``AppConfig.ready``. The service never discovers domain modules itself;
-    background workers can therefore use this factory without importing views
-    or presentation packages.
+    Single source for the import view, the background task, and the import
+    button in the nav and list header. Export visibility is a separate
+    declaration (``core.data_transfer``).
     """
-    registered = get_registered_import_form(model)
-    if registered is not None:
-        return registered
+    if model is None or not policy_for(model).import_:
+        return False
+    return get_registered_import_form(model) is not None
 
-    dynamic_required_fields = []
-    dynamic_optional_fields = []
-    for field in model._meta.fields:
-        if field.primary_key or field.auto_created or not field.editable:
-            continue
-        if field.name in IMPORT_EXCLUDED_FIELDS:
-            continue
-        if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
-            dynamic_required_fields.append(field.name)
-        else:
-            dynamic_optional_fields.append(field.name)
 
-    target_model = model
-
-    class DynamicBulkImportForm(BulkImportForm):
-        model = target_model
-        required_fields = dynamic_required_fields
-        optional_fields = dynamic_optional_fields
-
-    return DynamicBulkImportForm
+def get_import_form_class(model):
+    """Return the curated import form for ``model`` or raise ``ImportNotAllowed``."""
+    if not is_model_importable(model):
+        raise ImportNotAllowed(getattr(getattr(model, "_meta", None), "label_lower", repr(model)))
+    return get_registered_import_form(model)
 
 
 def _model_has_concrete_field(model, name):
@@ -223,6 +162,14 @@ class BulkImportForm(forms.Form):
     model = None
     required_fields = []
     optional_fields = []
+    # Updates are opt-in. ``update_key`` names the model fields that identify an
+    # existing row (a natural key, never the raw pk). A row whose key matches an
+    # in-scope object updates it, and only for an actor holding ``change_<model>``
+    # on that object. Without a key every row creates a new object.
+    update_key = ()
+    # The authenticated actor of the import. Set by the task; an unset actor can
+    # never update.
+    actor = None
 
     active_tab = forms.CharField(widget=forms.HiddenInput(), initial="upload", required=False)
     import_format = forms.ChoiceField(
@@ -414,18 +361,13 @@ class BulkImportForm(forms.Form):
         mapped = self.map_row(row)
         self._validate_row(mapped, row_number)
 
-        pk_name = self.model._meta.pk.name
-        pk_val = mapped.get(pk_name)
-        if pk_val:
-            try:
-                instance = self.model.objects.get(pk=pk_val)
-                if hasattr(instance, "snapshot"):
-                    instance.snapshot()
-                for key, val in mapped.items():
-                    if key != pk_name:
-                        setattr(instance, key, val)
-            except self.model.DoesNotExist:
-                raise ValidationError(_("Object with ID {id} does not exist").format(id=pk_val)) from None
+        instance = self._find_existing(mapped)
+        if instance is not None:
+            self._authorize_update(instance)
+            if hasattr(instance, "snapshot"):
+                instance.snapshot()
+            for key, val in mapped.items():
+                setattr(instance, key, val)
         else:
             instance = self._create_instance(mapped)
 
@@ -433,22 +375,42 @@ class BulkImportForm(forms.Form):
             instance.full_clean()
         instance.save()
 
+    def _key_attnames(self):
+        return [self.model._meta.get_field(name).attname for name in self.update_key]
+
+    def _find_existing(self, mapped):
+        """Return the in-scope object matching the declared natural key, or None."""
+        if not self.update_key:
+            return None
+        lookup = {}
+        for attname in self._key_attnames():
+            if attname not in mapped:
+                return None
+            lookup[attname] = mapped[attname]
+        matches = list(self.model.objects.filter(**lookup)[:2])
+        if len(matches) > 1:
+            raise ValidationError(_("More than one existing object matches the update key."))
+        return matches[0] if matches else None
+
+    def _authorize_update(self, instance):
+        meta = self.model._meta
+        perm = f"{meta.app_label}.change_{meta.model_name}"
+        actor = self.actor
+        if actor is None or not actor.has_perm(perm, instance):
+            raise ValidationError(_("You do not have permission to update existing objects."))
+
     def map_row(self, row):
         """Map an import row dict to model field values.
 
         Scalar columns are passed through (stripped); ForeignKey columns are
-        resolved to a PK by id / slug / name (see ``resolve_related``). Subclasses
-        rarely need to override this — declare ``required_fields`` /
-        ``optional_fields`` and let the base handle mapping.
+        resolved to a PK by id / slug / name (see ``resolve_related``). The pk
+        column is never mapped: an ``id`` column (as written by an export) is
+        ignored, and updates match on ``update_key`` only. Subclasses rarely
+        need to override this: declare ``required_fields`` / ``optional_fields``.
         """
         mapped = {}
         if not self.model:
             return mapped
-
-        pk_name = self.model._meta.pk.name
-        pk_val = row.get("id") or row.get(pk_name)
-        if pk_val and str(pk_val).strip():
-            mapped[pk_name] = str(pk_val).strip()
 
         for k in self.field_names:
             if k not in row or row[k] is None:
@@ -459,7 +421,7 @@ class BulkImportForm(forms.Form):
             try:
                 field = self.model._meta.get_field(k)
             except FieldDoesNotExist:
-                # Not a real field on this model — skip rather than crash on save.
+                # Not a real field on this model: skip rather than crash on save.
                 continue
             if field.is_relation and field.many_to_one:
                 mapped[field.attname] = resolve_related(field.related_model, val)
@@ -469,13 +431,13 @@ class BulkImportForm(forms.Form):
 
     def _validate_row(self, mapped_data, row_number):
         """Validate a mapped row. Override for custom validation."""
-        for field in self.required_fields:
-            # When updating an existing object (PK is provided), required fields are not strictly required to be re-supplied
-            pk_name = self.model._meta.pk.name if self.model else "id"
-            if pk_name in mapped_data:
-                continue
-            if not mapped_data.get(field):
-                raise ValidationError(_('Row %(row)s: "%(field)s" is required.') % {"row": row_number, "field": field})
+        for name in self.required_fields:
+            try:
+                key = self.model._meta.get_field(name).attname if self.model else name
+            except FieldDoesNotExist:
+                key = name
+            if not mapped_data.get(key):
+                raise ValidationError(_('Row %(row)s: "%(field)s" is required.') % {"row": row_number, "field": name})
 
     def _create_instance(self, mapped_data):
         """Create a model instance from mapped data. Override in subclass."""

@@ -966,14 +966,6 @@
     {
       "path": "itambox/assets/tests/test_import_export.py",
       "code": "B907",
-      "message": "'self.asset2.pk' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "yaml_data = f\"\"\"\n- id: \"{self.asset2.pk}\"\n  name: \"Asset Beta Updated\"\n  asset_tag: \"TAG-002-UPDATED\"\n\"\"\"",
-      "context": "Module:body/ClassDef:AdvancedImportExportTestCase:body/FunctionDef:test_yaml_import_upsert_existing:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_import_export.py",
-      "code": "B907",
       "message": "'self.asset_type.pk' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "yaml_content = f\"\"\"\n- name: \"Asset Epsilon\"\n  asset_tag: \"TAG-005\"\n  status: \"{self.status.pk}\"\n  asset_type: \"{self.asset_type.pk}\"\n\"\"\".encode(\"utf-8\")",
       "context": "Module:body/ClassDef:AdvancedImportExportTestCase:body/FunctionDef:test_yaml_import_file_upload_preview_and_confirm:body",
@@ -4424,14 +4416,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "from .models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.forms.import_forms import is_model_importable",
       "context": "Module:body",
       "count": 1
     },

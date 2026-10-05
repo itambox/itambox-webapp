@@ -75,6 +75,10 @@ class _ImportField:
 
 
 class _ImportMeta:
+    app_label = "kernelleaves"
+    model_name = "importmodel"
+    label_lower = "kernelleaves.importmodel"
+
     def __init__(self, fields):
         self.fields = fields
         self.pk = next(field for field in fields if field.primary_key)
@@ -84,6 +88,18 @@ class _ImportMeta:
             if field.name == name:
                 return field
         raise FieldDoesNotExist(name)
+
+
+class _ImportKeyManager:
+    """Manager stand-in whose ``filter`` yields the matching rows (a plain list)."""
+
+    def __init__(self, *rows):
+        self.rows = list(rows)
+        self.filter_calls = []
+
+    def filter(self, **kwargs):
+        self.filter_calls.append(kwargs)
+        return self.rows
 
 
 class _ImportRelatedManager:
@@ -452,30 +468,93 @@ class KernelImportLeafTests(SimpleTestCase):
 
         form = ImportForm()
         mapped = form.map_row({"id": "7", "name": " Asset ", "owner": "17", "not_a_field": "ignored"})
-        self.assertEqual(mapped, {"id": "7", "name": "Asset", "owner_id": 17})
+        # The pk column is never mapped: updates match on the declared natural key only.
+        self.assertEqual(mapped, {"name": "Asset", "owner_id": 17})
 
     def test_import_row_create_update_and_validation_paths(self):
         class ImportForm(BulkImportForm):
             model = _ImportModel
             required_fields = ["name"]
+            update_key = ("name",)
 
         form = ImportForm()
+        form.actor = mock.Mock(has_perm=mock.Mock(return_value=True))
+
         created = _ImportModel()
         form._create_instance = mock.Mock(return_value=created)
+        _ImportModel.objects = _ImportKeyManager()
         form._import_row({"name": "Asset"}, 2)
         self.assertTrue(created.cleaned)
         self.assertTrue(created.saved)
 
         updated = _ImportModel()
-        _ImportModel.objects = _ImportRelatedManager(updated)
-        form._import_row({"id": "7", "name": "Updated"}, 3)
+        _ImportModel.objects = _ImportKeyManager(updated)
+        form._import_row({"name": "Updated", "slug": "ignored-not-declared"}, 3)
         self.assertTrue(updated.snapshotted)
         self.assertTrue(updated.saved)
+        form.actor.has_perm.assert_called_once()
+        self.assertEqual(updated.name, "Updated")
 
         with self.assertRaises(ValidationError):
             form._validate_row({}, 4)
         with self.assertRaises(NotImplementedError):
             BulkImportForm().import_data()
+
+    def test_update_requires_a_permitted_actor(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+            update_key = ("name",)
+
+        existing = _ImportModel(name="Original")
+        _ImportModel.objects = _ImportKeyManager(existing)
+
+        anonymous = ImportForm()
+        with self.assertRaisesRegex(ValidationError, "permission to update"):
+            anonymous._import_row({"name": "Original"}, 2)
+
+        denied = ImportForm()
+        denied.actor = mock.Mock(has_perm=mock.Mock(return_value=False))
+        with self.assertRaisesRegex(ValidationError, "permission to update"):
+            denied._import_row({"name": "Original"}, 3)
+        self.assertFalse(existing.saved)
+        self.assertFalse(existing.snapshotted)
+
+    def test_ambiguous_update_key_is_rejected(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+            update_key = ("name",)
+
+        _ImportModel.objects = _ImportKeyManager(_ImportModel(name="a"), _ImportModel(name="a"))
+        form = ImportForm()
+        form.actor = mock.Mock(has_perm=mock.Mock(return_value=True))
+        with self.assertRaisesRegex(ValidationError, "More than one"):
+            form._import_row({"name": "a"}, 2)
+
+    def test_form_without_update_key_never_updates(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+
+        existing = _ImportModel(name="Original")
+        _ImportModel.objects = _ImportKeyManager(existing)
+        form = ImportForm()
+        created = _ImportModel()
+        form._create_instance = mock.Mock(return_value=created)
+        form._import_row({"id": "1", "name": "Original"}, 2)
+        self.assertTrue(created.saved)
+        self.assertFalse(existing.saved)
+
+    def test_required_foreign_key_is_satisfied_by_its_mapped_attname(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name", "owner"]
+
+        form = ImportForm()
+        form._validate_row({"name": "x", "owner_id": 17}, 2)
+        with self.assertRaisesRegex(ValidationError, '"owner" is required'):
+            form._validate_row({"name": "x"}, 3)
 
     def test_import_data_collects_validation_and_unexpected_row_errors(self):
         class ImportForm(BulkImportForm):
@@ -494,14 +573,11 @@ class KernelImportLeafTests(SimpleTestCase):
         empty = ImportForm()
         self.assertEqual(empty.import_data().imported_count, 0)
 
-    def test_import_row_handles_missing_object_and_plain_instances(self):
+    def test_import_row_handles_plain_instances(self):
         class ImportForm(BulkImportForm):
             model = _ImportModel
 
         form = ImportForm()
-        _ImportModel.objects = _ImportRelatedManager()
-        with self.assertRaisesRegex(ValidationError, "does not exist"):
-            form._import_row({"id": "99"}, 2)
 
         class PlainInstance:
             def __init__(self):
@@ -530,63 +606,43 @@ class KernelImportLeafTests(SimpleTestCase):
             bulk_forms._IMPORT_FORM_REGISTRY.clear()
             bulk_forms._IMPORT_FORM_REGISTRY.update(previous)
 
-    def test_import_model_policy_handles_missing_and_sensitive_models(self):
+    def test_import_model_policy_is_an_allowlist(self):
+        from django.apps import apps
+
         self.assertFalse(is_model_importable(None))
-        self.assertFalse(
-            is_model_importable(SimpleNamespace(_meta=SimpleNamespace(app_label="users", model_name="user")))
-        )
-        self.assertTrue(
-            is_model_importable(SimpleNamespace(_meta=SimpleNamespace(app_label="assets", model_name="asset")))
-        )
+        self.assertTrue(is_model_importable(apps.get_model("assets", "asset")))
+        for label in ("users.user", "assets.assetassignment", "compliance.custodyreceipt", "organization.tenant"):
+            with self.subTest(label=label):
+                self.assertFalse(is_model_importable(apps.get_model(label)))
 
-    def test_dynamic_import_form_excludes_framework_fields_and_keeps_required_fields(self):
-        class FakeModel:
-            pass
+    def test_undeclared_model_has_no_import_form(self):
+        from core.importers.bulk_forms import ImportNotAllowed
 
-        def field_type(name, **kwargs):
-            values = {
-                "name": name,
-                "primary_key": False,
-                "auto_created": False,
-                "editable": True,
-                "blank": False,
-                "null": False,
-                "default": models.NOT_PROVIDED,
-            }
-            values.update(kwargs)
-            return SimpleNamespace(**values)
+        with self.assertRaises(ImportNotAllowed):
+            get_import_form_class(_ImportModel)
 
-        FakeModel._meta = SimpleNamespace(
-            fields=[
-                field_type("id", primary_key=True),
-                field_type("name"),
-                field_type("description", blank=True, null=True),
-                field_type("created_at"),
-                field_type("computed", editable=False),
-            ]
-        )
-        fake_model = FakeModel
-        form_class = get_import_form_class(fake_model)
-        self.assertEqual(form_class.required_fields, ["name"])
-        self.assertEqual(form_class.optional_fields, ["description"])
-        self.assertIs(form_class.model, fake_model)
-
-    def test_registered_import_form_wins_over_dynamic_form(self):
+    def test_registered_form_for_an_undeclared_model_is_still_denied(self):
         from core.importers import bulk_forms
 
-        model = object()
+        model = _ImportModel
         previous = bulk_forms._IMPORT_FORM_REGISTRY.copy()
         try:
-            model_for_registry = model
 
             class CuratedForm(BulkImportForm):
-                model = model_for_registry
+                pass
 
+            CuratedForm.model = model
             register_import_form(CuratedForm)
-            self.assertIs(get_import_form_class(model), CuratedForm)
+            self.assertFalse(is_model_importable(model))
         finally:
             bulk_forms._IMPORT_FORM_REGISTRY.clear()
             bulk_forms._IMPORT_FORM_REGISTRY.update(previous)
+
+    def test_registered_import_form_is_returned_for_a_declared_model(self):
+        from django.apps import apps
+
+        form = get_import_form_class(apps.get_model("assets", "manufacturer"))
+        self.assertEqual(form.model._meta.label_lower, "assets.manufacturer")
 
     def test_related_resolution_checks_id_exact_case_insensitive_and_fallback(self):
         class RelatedMeta:

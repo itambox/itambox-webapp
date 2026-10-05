@@ -123,19 +123,18 @@ class TestImportRowContract(TenantTestMixin):
         assert message in str(form.non_field_errors())
         assert SECRET not in str(form.errors)
 
-    def test_upsert_calls_snapshot_full_clean_and_save(self):
+    def test_update_calls_snapshot_full_clean_and_save(self):
         instance = MagicMock()
-        model = MagicMock()
-        model._meta.pk.name = "id"
-        model.objects.get.return_value = instance
-        model.DoesNotExist = type("DoesNotExist", (Exception,), {})
         form = _ConditionalImportForm()
-        form.model = model
-        form.map_row = MagicMock(return_value={"id": "7", "name": "updated"})
+        form.actor = MagicMock()
+        form.actor.has_perm.return_value = True
+        form.map_row = MagicMock(return_value={"name": "updated"})
         form._validate_row = MagicMock()
+        form._find_existing = MagicMock(return_value=instance)
 
-        form._import_row({"id": "7"}, 2)
+        form._import_row({"name": "updated"}, 2)
 
+        form.actor.has_perm.assert_called_once_with("assets.change_manufacturer", instance)
         instance.snapshot.assert_called_once_with()
         instance.full_clean.assert_called_once_with()
         instance.save.assert_called_once_with()

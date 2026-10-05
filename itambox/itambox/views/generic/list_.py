@@ -9,6 +9,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import override
 from django.views.generic import ListView
 
+from core.data_transfer import policy_for
 from core.features import STABLE
 from core.forms.import_forms import is_model_importable
 from itambox.registry import registry
@@ -214,7 +215,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         # logs or UI-only config). Importable models import via the single
         # centralized route /import/<app>/<model>/.
         importable = is_model_importable(model)
-        context["can_export"] = importable
+        context["can_export"] = policy_for(model).export
         context["import_url"] = None
         # The generic importer binds its background job to ``active_tenant`` and
         # has no tenant picker. Keep it concrete-scope-only until it can carry

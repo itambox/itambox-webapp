@@ -69,6 +69,8 @@ def import_csv_task(
 
                 form = ImportFormClass()
                 form._rows_data = rows_data
+                # Updates are authorized per object against the importing actor.
+                form.actor = ctx.user
 
                 job.append_log("Validating and importing records inside transaction...")
 

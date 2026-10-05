@@ -133,7 +133,8 @@ class TopologyMutationBoundaryTests(APITestCase):
                     },
                 )
             ).status_code,
-            403,
+            # Not an allowlisted import model: the route does not exist for anyone.
+            404,
         )
 
         deleted_group = TenantGroup.objects.create(
@@ -337,7 +338,9 @@ class TopologyMutationBoundaryTests(APITestCase):
         self.assertEqual(target_role.tenant, self.tenant)
         self.assertFalse(target_role.shared_with_managed)
 
-    def test_generic_tenant_import_is_superuser_only(self):
+    def test_generic_tenant_import_is_not_available_to_anyone(self):
+        # Tenant topology (group, managed_by, is_provider) is written only through
+        # TenantForm and the API; the generic importer has no tenant form at all.
         import_url = reverse(
             "generic_import",
             kwargs={
@@ -346,10 +349,10 @@ class TopologyMutationBoundaryTests(APITestCase):
             },
         )
         self.login_operator()
-        self.assertEqual(self.client.get(import_url).status_code, 403)
+        self.assertEqual(self.client.get(import_url).status_code, 404)
 
         self.client.force_login(self.superuser)
-        self.assertEqual(self.client.get(import_url).status_code, 200)
+        self.assertEqual(self.client.get(import_url).status_code, 404)
 
     def test_tenant_api_rejects_group_for_non_superuser(self):
         self.login_operator()

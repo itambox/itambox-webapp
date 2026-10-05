@@ -28,14 +28,6 @@ from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
 
-SUPERUSER_ONLY_IMPORT_MODELS = frozenset(
-    {
-        # The generic form bypasses TenantForm, so reserve imports that can write
-        # management topology (group / managed_by / is_provider) for superusers.
-        "organization.tenant",
-    }
-)
-
 
 class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateView):
     model_form = None
@@ -43,8 +35,6 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
 
     def has_permission(self):
         model = self._get_model()
-        if model._meta.label_lower in SUPERUSER_ONLY_IMPORT_MODELS and not self.request.user.is_superuser:
-            return False
         # Imports currently bind the background job and task to active_tenant;
         # never expose that write path from an aggregate or tenant-group scope.
         if not self.request.user.is_superuser and getattr(self.request, "active_tenant", None) is None:
@@ -261,7 +251,7 @@ class GenericObjectImportView(ObjectImportView):
             model = apps.get_model(app_label, model_name)
         except LookupError:
             raise Http404 from None
-        # Generated logs and UI-only config are not importable, even by direct URL.
+        # Only models with a declared, curated import form are importable, even by direct URL.
         if not is_model_importable(model):
             raise Http404
         return model
