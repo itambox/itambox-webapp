@@ -77,33 +77,10 @@ def checkout_asset(
         # evidence row) must still make the asset unassignable.
         _assert_no_active_disposal(asset)
 
-        # Reservation guard: if the asset is reserved for a *different* holder during
-        # the checkout window, block the checkout to preserve the reservation.
-        if holder:
-            from assets.models import AssetReservation, ReservationStatusChoices
-
-            today = datetime.date.today()
-            blocking = (
-                AssetReservation.all_objects.select_for_update()
-                .filter(
-                    asset=asset,
-                    status__in=[
-                        ReservationStatusChoices.ACTIVE,
-                        ReservationStatusChoices.PENDING,
-                    ],
-                    start_date__lte=today,
-                    end_date__gte=today,
-                )
-                .exclude(reserved_for=holder)
-                .first()
-            )
-            if blocking:
-                raise ValidationError(
-                    _(
-                        "Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder."
-                    )
-                    % {"holder": blocking.reserved_for, "date": blocking.end_date}
-                )
+        # Reservation guard: while another holder's reservation window is open,
+        # the asset may only go to the reserved holder; location and asset
+        # targets are refused outright.
+        _assert_not_reserved_for_other(asset, holder)
 
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes="Auto-checkin for reassignment")
@@ -420,6 +397,27 @@ def _active_disposal_error(asset: Asset) -> ValidationError | None:
         _("Asset '%(asset)s' already has an active disposal record. Cancel that disposal before recording a new one.")
         % {"asset": asset}
     )
+
+
+def _assert_not_reserved_for_other(asset: Asset, holder: AssetHolder | None) -> None:
+    """Refuse a checkout that would bypass an active or pending reservation window."""
+    from assets.models import AssetReservation, ReservationStatusChoices
+
+    today = datetime.date.today()
+    blocking_qs = AssetReservation.all_objects.select_for_update().filter(
+        asset=asset,
+        status__in=[ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING],
+        start_date__lte=today,
+        end_date__gte=today,
+    )
+    if holder:
+        blocking_qs = blocking_qs.exclude(reserved_for=holder)
+    blocking = blocking_qs.first()
+    if blocking:
+        raise ValidationError(
+            _("Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder.")
+            % {"holder": blocking.reserved_for, "date": blocking.end_date}
+        )
 
 
 def _assert_no_active_disposal(asset: Asset) -> None:
