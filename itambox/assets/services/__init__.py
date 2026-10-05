@@ -84,25 +84,24 @@ def checkout_asset(
         from assets.models import AssetReservation, ReservationStatusChoices
 
         today = datetime.date.today()
-        blocking = (
-            AssetReservation.all_objects.select_for_update()
-            .filter(
-                asset=asset,
-                status__in=[
-                    ReservationStatusChoices.ACTIVE,
-                    ReservationStatusChoices.PENDING,
-                ],
-                start_date__lte=today,
-                end_date__gte=today,
-            )
-            .exclude(reserved_for=holder)
-            .first()
+        blocking_qs = AssetReservation.all_objects.select_for_update().filter(
+            asset=asset,
+            status__in=[
+                ReservationStatusChoices.ACTIVE,
+                ReservationStatusChoices.PENDING,
+            ],
+            start_date__lte=today,
+            end_date__gte=today,
         )
+        if holder:
+            # The reserved holder is the only target allowed through the
+            # window; a reservation without a holder has no one to honour, so
+            # it blocks every target.
+            blocking_qs = blocking_qs.exclude(reserved_for=holder)
+        blocking = blocking_qs.first()
         if blocking:
             raise ValidationError(
-                _(
-                    "Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder."
-                )
+                _("Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder.")
                 % {"holder": blocking.reserved_for, "date": blocking.end_date}
             )
 
