@@ -1,7 +1,8 @@
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.db import transaction
 
 from core.crypto import decrypt_string, encrypt_string
+from core.tasks.management import SystemTaskCommand
 
 
 def encrypted_field_specs():
@@ -24,7 +25,7 @@ def encrypted_field_specs():
     ]
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Re-encrypt every encrypted field with the current primary key (key rotation)."
 
     def add_arguments(self, parser):

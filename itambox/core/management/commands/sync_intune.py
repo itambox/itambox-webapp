@@ -24,17 +24,18 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 
 from assets.tasks.intune_sync import sync_tenant_intune
 from core.models import Job
+from core.tasks.management import SystemTaskCommand
 from organization.models import Tenant
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Sync managed devices from Microsoft Intune for a specific tenant."
 
     def add_arguments(self, parser):
