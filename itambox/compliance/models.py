@@ -150,6 +150,9 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
         "signature_canvas",
     ]
 
+    # Version label stamped on every signed receipt. The EULA text is snapshotted per receipt
+    # (eula_text); custody templates carry no version, so the label is deliberately constant.
+    EULA_VERSION = "1.0"
     STATUS_PENDING = "pending"
     STATUS_ACCEPTED = "accepted"
     STATUS_DECLINED = "declined"
@@ -182,7 +185,6 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     eula_text = models.TextField(blank=True, verbose_name=_("EULA Text"))
     disclaimer = models.TextField(blank=True, verbose_name=_("Disclaimer"))
     qms_reference = models.CharField(max_length=100, blank=True, verbose_name=_("QMS Reference"))
-    accepted = models.BooleanField(default=False, verbose_name=_("Accepted"))
     accepted_date = models.DateTimeField(null=True, blank=True, verbose_name=_("Accepted Date"))
     acceptance_method = models.CharField(max_length=50, default="link", verbose_name=_("Acceptance Method"))
     acceptance_status = models.CharField(
@@ -201,10 +203,15 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
         blank=True, verbose_name=_("Signature Canvas"), help_text=_("Base64 canvas stroke vector string representation")
     )
     signed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Signed At"))
-    eula_version = models.CharField(max_length=10, default="1.0", verbose_name=_("EULA Version"))
+    eula_version = models.CharField(max_length=10, default=EULA_VERSION, verbose_name=_("EULA Version"))
     created_date = models.DateTimeField(auto_now_add=True, null=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP Address"))
     user_agent = models.TextField(blank=True, verbose_name=_("User Agent"))
+
+    @property
+    def accepted(self):
+        """Read-only view of ``acceptance_status``; the status is the single source of truth."""
+        return self.acceptance_status == self.STATUS_ACCEPTED
 
     class Meta:
         ordering = ("-signed_at",)

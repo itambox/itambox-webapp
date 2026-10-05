@@ -20,14 +20,14 @@ When an asset is checked out with **Require Acceptance** active, a Custody Recei
 | --- | --- | --- | --- |
 | **Acceptance Method** | The acceptance method of the custody receipt. | String | Yes |
 | **Acceptance Status** | The signature status (`pending`, `accepted`, or `declined`). | Selection | Yes |
-| **Accepted** | The accepted of the custody receipt. | Boolean | Yes |
+| **Accepted** | Read-only; true exactly when the Acceptance Status is `accepted`. Derived, not stored. | Boolean | No |
 | **Accepted Date** | The accepted date of the custody receipt. | Date Time | No |
 | **Asset** | The physical hardware checked out. | Foreign Key | Yes |
 | **Created Date** | The created date of the custody receipt. | Date Time | No |
 | **Custody Template** | The Custody Template rules used to generate this receipt. | Foreign Key | No |
 | **Disclaimer** | The disclaimer of the custody receipt. | Text | No |
 | **EULA Text** | The exact copy of the legal terms signed by the user. | Text | No |
-| **EULA Version** | Version tag (e.g., `1.0`) of the signed terms. | String | Yes |
+| **EULA Version** | Version label stamped at signing. Constant (`1.0`) by design: the signed terms themselves are snapshotted in EULA Text, and custody templates carry no version. | String | Yes |
 | **Holder** | The user or contractor taking custody. | Foreign Key | Yes |
 | **IP Address** | The IP address of the device used to sign the receipt. | IP Address | No |
 | **Qms Reference** | The qms reference of the custody receipt. | String | No |

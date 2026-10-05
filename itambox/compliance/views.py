@@ -5,6 +5,7 @@ import re
 from datetime import timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -356,11 +357,10 @@ def _process_custody_post(request, token, receipt, signing_session=None):
         signature_data = request.POST.get("signature_canvas")
         if action == "decline":
             consumed_at = timezone.now()
-            receipt.accepted = False
             receipt.accepted_date = None
             receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
             receipt.signed_at = None
-            receipt.save(update_fields=["accepted", "accepted_date", "acceptance_status", "signed_at", "updated_at"])
+            receipt.save(update_fields=["accepted_date", "acceptance_status", "signed_at", "updated_at"])
             _consume_custody_signing_session(
                 signing_session,
                 outcome=CustodySigningSession.OUTCOME_DECLINED,
@@ -390,7 +390,6 @@ def _process_custody_post(request, token, receipt, signing_session=None):
         timestamp_str = signed_at.isoformat()
         raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
         verification_hash = hashlib.sha256(raw_to_hash.encode("utf-8")).hexdigest()
-        receipt.accepted = True
         receipt.accepted_date = signed_at
         receipt.acceptance_method = "digital"
         receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
@@ -398,7 +397,7 @@ def _process_custody_post(request, token, receipt, signing_session=None):
         receipt.signature_data = signature_data
         receipt.signature_hash = verification_hash
         receipt.verification_hash = verification_hash
-        receipt.eula_version = "1.0"
+        receipt.eula_version = CustodyReceipt.EULA_VERSION
         receipt.signed_at = signed_at
         receipt.save()
         _consume_custody_signing_session(
@@ -444,9 +443,7 @@ def custody_eula_sign(request, token):
         return expired_response
     asset = receipt.asset
 
-    from django.conf import settings
-
-    require_signin = getattr(settings, "REQUIRE_CUSTODY_SIGNIN", False)
+    require_signin = settings.REQUIRE_CUSTODY_SIGNIN
     if require_signin and not request.user.is_authenticated:
         from django.contrib.auth.views import redirect_to_login
 

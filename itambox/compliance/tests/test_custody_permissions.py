@@ -99,15 +99,13 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
         self.assertNotContains(pending_response, self.receipt.token)
 
         self.receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
-        self.receipt.accepted = False
-        self.receipt.save(update_fields=["acceptance_status", "accepted"])
+        self.receipt.save(update_fields=["acceptance_status"])
         declined_response = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt.pk}))
         self.assertContains(declined_response, "Declined")
         self.assertContains(declined_response, "declined this custody transfer")
 
         signed_at = timezone.now()
         self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-        self.receipt.accepted = True
         self.receipt.signed_at = signed_at
         self.receipt.acceptance_method = "checkbox"
         self.receipt.verification_hash = "obvious-test-verification-hash"
@@ -230,6 +228,16 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
 
 
 class CustodyPermissionPolicyTests(TestCase):
+    def test_accepted_is_derived_from_acceptance_status(self):
+        self.assertNotIn("accepted", {field.name for field in CustodyReceipt._meta.get_fields()})
+        receipt = CustodyReceipt(acceptance_status=CustodyReceipt.STATUS_PENDING)
+        self.assertFalse(receipt.accepted)
+        receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.assertTrue(receipt.accepted)
+
+    def test_eula_version_default_is_the_declared_constant(self):
+        self.assertEqual(CustodyReceipt._meta.get_field("eula_version").default, CustodyReceipt.EULA_VERSION)
+
     @override_settings(ITAMBOX_BASE_URL="https://public.example.test/")
     def test_configured_handoff_base_url_rejects_trailing_slash(self):
         errors = run_checks(tags=["security"])
