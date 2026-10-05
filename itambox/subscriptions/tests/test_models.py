@@ -16,6 +16,7 @@ from model_bakery import baker
 from assets.models import Asset, Supplier
 from core.managers import set_current_all_accessible, set_current_tenant, set_current_tenant_group
 from core.models import Notification
+from core.tasks.context import TaskContext
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, CostCenter, Location, Site, Tenant, TenantGroup
 from procurement.models import Contract
@@ -96,7 +97,8 @@ class SubscriptionSeatRollupTests(TestCase):
         sub.suspend()
         self.assertEqual((sub.total_seats, sub.assigned_seats, sub.available_seats), (4, 2, 2))
 
-        asset.delete()
+        with TaskContext(operation="test.subscription_seat_rollup.soft_delete_asset"):
+            asset.delete()
         self.assertEqual(sub.assigned_seats, 1)
 
         holder.tenant = other_tenant

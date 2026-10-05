@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from core.tasks.context import TaskContext
 from core.tasks.utils import TaskStatus
 from core.tests.mixins import grant
 from extras.models import ReportGenerationArchive, ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
@@ -294,7 +295,8 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         self.assertContains(response, "Some tenants in this scope are no longer available")
 
     def test_approve_refused_when_a_scope_tenant_is_soft_deleted(self):
-        self.tenant_b.delete()
+        with TaskContext(operation="test.scope_approval.soft_delete_tenant"):
+            self.tenant_b.delete()
         response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
         self.assertContains(response, "does not need cross-tenant scope approval")

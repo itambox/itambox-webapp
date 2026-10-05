@@ -71,8 +71,8 @@ class ManagementCommandsTestCase(TransactionTestCase):
         self.assertIn("Job processing complete", self.stdout.getvalue())
 
     def test_every_mutating_management_command_uses_system_task_context(self):
-        """Every project command is classified: mutating commands enter the
-        actorless system-task context, read-only commands stay plain."""
+        """Every project command is classified: mutating commands run on the
+        SystemTaskCommand base, read-only commands stay plain."""
         mutating_commands = {
             "bind_oidc_identity",
             "import_snipeit",
