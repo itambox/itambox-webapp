@@ -9,6 +9,7 @@ from django.utils import timezone
 from assets.choices import RequestStatusChoices
 from assets.models import AssetRequest, AssetType, Manufacturer, StatusLabel, Supplier
 from core.currency import CURRENCY_CHOICES
+from core.tasks.context import TaskContext
 from inventory.models import Accessory, AccessoryStock, Consumable, ConsumableStock
 from licenses.models import License
 from organization.models import Location, Site, Tenant
@@ -416,7 +417,11 @@ class ProcurementStatusTransitionTests(TestCase):
         PurchaseOrderLine.objects.create(
             purchase_order=self.po, asset_type=self.asset_type, qty_ordered=1, unit_price=10.00
         )
-        self.po.delete()
+        # A soft delete cascades audit entries for the collected children, which
+        # the change-logging layer only tolerates inside an execution context;
+        # mirror the request scope a production delete always runs in.
+        with TaskContext(operation="procurement.test_legacy.stale_delete"):
+            self.po.delete()
 
         with self.assertRaisesMessage(ValidationError, "Purchase order no longer exists"):
             approve_purchase_order(self.po)
