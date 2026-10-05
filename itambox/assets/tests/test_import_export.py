@@ -209,76 +209,41 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertIn("/jobs/", response.url)
         self.assertTrue(Asset.objects.filter(asset_tag="TAG-005").exists())
 
-    def test_csv_import_upsert_existing(self):
-        csv_data = f"""id,name,asset_tag
-{self.asset1.pk},Asset Alpha Updated,TAG-001-UPDATED"""
+    def _run_import(self, text, import_format="csv"):
         import_url = reverse("generic_import", kwargs={"app_label": "assets", "model_name": "asset"})
-
-        post_data = {
-            "active_tab": "editor",
-            "import_format": "csv",
-            "delimiter": ",",
-            "import_text": csv_data,
-            "_preview": "1",
-        }
-        response = self.client.post(import_url, post_data)
+        payload = {"active_tab": "editor", "import_format": import_format, "import_text": text, "_preview": "1"}
+        if import_format == "csv":
+            payload["delimiter"] = ","
+        response = self.client.post(import_url, payload)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Asset Alpha Updated")
-        self.assertContains(response, "TAG-001-UPDATED")
-
         response = self.client.post(import_url, {"_confirm": "1"})
         self.assertEqual(response.status_code, 302)
         self.assertIn("/jobs/", response.url)
+
+    def test_csv_import_updates_existing_by_asset_tag(self):
+        self._run_import("name,asset_tag\nAsset Alpha Updated,TAG-001")
 
         self.asset1.refresh_from_db()
         self.assertEqual(self.asset1.name, "Asset Alpha Updated")
-        self.assertEqual(self.asset1.asset_tag, "TAG-001-UPDATED")
+        self.assertEqual(self.asset1.asset_tag, "TAG-001")
         self.assertEqual(Asset.objects.count(), 2)
 
-    def test_yaml_import_upsert_existing(self):
-        yaml_data = f"""
-- id: "{self.asset2.pk}"
-  name: "Asset Beta Updated"
-  asset_tag: "TAG-002-UPDATED"
-"""
-        import_url = reverse("generic_import", kwargs={"app_label": "assets", "model_name": "asset"})
-
-        post_data = {"active_tab": "editor", "import_format": "yaml", "import_text": yaml_data, "_preview": "1"}
-        response = self.client.post(import_url, post_data)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Asset Beta Updated")
-        self.assertContains(response, "TAG-002-UPDATED")
-
-        response = self.client.post(import_url, {"_confirm": "1"})
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/jobs/", response.url)
+    def test_yaml_import_updates_existing_by_asset_tag(self):
+        self._run_import('- name: "Asset Beta Updated"\n  asset_tag: "TAG-002"\n', import_format="yaml")
 
         self.asset2.refresh_from_db()
         self.assertEqual(self.asset2.name, "Asset Beta Updated")
-        self.assertEqual(self.asset2.asset_tag, "TAG-002-UPDATED")
         self.assertEqual(Asset.objects.count(), 2)
 
-    def test_import_upsert_nonexistent_id_error(self):
-        csv_data = """id,name,asset_tag
-99999,Asset Phantom,TAG-999"""
-        import_url = reverse("generic_import", kwargs={"app_label": "assets", "model_name": "asset"})
+    def test_import_id_column_is_ignored_and_never_selects_a_row(self):
+        # An exported file carries ``id``; it must not address an existing row.
+        self._run_import(
+            f"id,name,asset_tag,status,asset_type\n{self.asset1.pk},Asset Hijack,TAG-NEW,{self.status.pk},{self.asset_type.pk}"
+        )
 
-        post_data = {
-            "active_tab": "editor",
-            "import_format": "csv",
-            "delimiter": ",",
-            "import_text": csv_data,
-            "_preview": "1",
-        }
-        response = self.client.post(import_url, post_data)
-        self.assertEqual(response.status_code, 200)
-
-        response = self.client.post(import_url, {"_confirm": "1"})
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/jobs/", response.url)
-
-        from core.models import Job
-
-        job = Job.objects.latest("created")
-        self.assertEqual(job.status, Job.STATUS_FAILED)
-        self.assertIn("does not exist", job.logs)
+        self.asset1.refresh_from_db()
+        self.assertEqual(self.asset1.name, "Asset Alpha")
+        self.assertEqual(self.asset1.asset_tag, "TAG-001")
+        created = Asset.objects.get(asset_tag="TAG-NEW")
+        self.assertNotEqual(created.pk, self.asset1.pk)
+        self.assertEqual(created.name, "Asset Hijack")

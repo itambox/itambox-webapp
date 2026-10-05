@@ -15,6 +15,8 @@ from organization.models import AssetHolder, Location
 @register_import_form
 class AssetBulkImportForm(BulkImportForm):
     model = Asset
+    # Updates match an existing asset by its tag (unique per tenant).
+    update_key = ("asset_tag",)
     # asset_tag is auto-generated when blank (AssetTagSequence), so it is optional.
     required_fields = ["name"]
     optional_fields = [
@@ -42,6 +44,7 @@ class AssetTypeBulkImportForm(BulkImportForm):
 @register_import_form
 class ManufacturerBulkImportForm(BulkImportForm):
     model = Manufacturer
+    update_key = ("name",)
     required_fields = ["name"]
     optional_fields = ["slug", "description"]
 
@@ -87,5 +90,6 @@ class LocationBulkImportForm(BulkImportForm):
 @register_import_form
 class AssetHolderBulkImportForm(BulkImportForm):
     model = AssetHolder
+    update_key = ("upn",)
     required_fields = ["first_name", "last_name", "upn"]
     optional_fields = ["email", "description", "comments"]

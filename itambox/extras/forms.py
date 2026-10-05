@@ -462,7 +462,7 @@ class SavedFilterFilterForm(FilterForm):
 
 import json as _json
 
-from core.forms.import_forms import is_model_importable
+from core.data_transfer import policy_for
 from core.validators import validate_external_url
 from itambox.middleware import get_current_user
 
@@ -498,7 +498,7 @@ def logged_content_types():
 
 
 def exportable_content_types():
-    """ContentTypes whose model is user-exportable (see ``is_model_importable``).
+    """ContentTypes whose model is declared exportable (``core.data_transfer``).
 
     An ExportTemplate pointed at a generated-log / UI-only model could never be
     reached from a list view's export menu, so constraining the dropdown to real
@@ -511,7 +511,7 @@ def exportable_content_types():
         model = ct.model_class()
         if model is None:
             continue
-        if is_model_importable(model):
+        if policy_for(model).export:
             ids.append(ct.id)
     return ContentType.objects.filter(id__in=ids).order_by("app_label", "model")
 

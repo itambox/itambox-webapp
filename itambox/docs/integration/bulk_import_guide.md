@@ -66,26 +66,30 @@ When importing data, relational fields (e.g., `site` on Location, `manufacturer`
 | `hq-office` | Site with `slug` = `"HQ-Office"` (case-insensitive fallback) |
 | `Headquarters` | Site with `name` = `"Headquarters"` |
 
-## In-place Updates (UPSERT)
+## In-place Updates
 
-The import system supports **UPSERT** (Update + Insert) functionality. By including the primary key column in your import file, you can update existing records instead of creating duplicates.
+Import updates an existing record only when the form declares an **update key**, a natural key that identifies the record (never the internal `id`). A row whose key matches an existing record in your tenant scope updates it; every other row creates a new record. An `id` column, for example from an export, is ignored.
 
-### How UPSERT Works
+| Model | Update key |
+|-------|-----------|
+| **Asset** | `asset_tag` |
+| **Manufacturer** | `name` |
+| **Asset Holder** | `upn` |
 
-- **Include `id` column**: If you include the `id` column in your CSV/YAML and the value matches an existing record's ID, that record will be **updated** with the new values.
-- **Exclude `id` column**: If you omit the `id` column, all rows will be treated as **new records** and inserted.
-- **Primary Key Name**: For models where the primary key is not `id` (e.g., `username` for Asset Holder), use that field name instead.
+All other importable models only create records.
+
+### Permissions
+
+Creating records requires the `add` permission. A row that would **update** an existing record additionally requires the `change` permission on that specific record. Without it the row fails with "You do not have permission to update existing objects" and nothing is written.
 
 ### Example: Updating an Asset
 
 ```csv
-id,name,asset_tag,serial_number,notes
-101,Server-01,SRV-001,SN123456,Updated notes
+name,asset_tag,serial_number,notes
+Server-01,SRV-001,SN123456,Updated notes
 ```
 
-This will update Asset with ID `101` with the new `name`, `asset_tag`, `serial_number`, and `notes`.
-
-> **Note**: If the `id` value does not match any existing record, the row will be treated as a new insert.
+If an asset tagged `SRV-001` exists, it is updated with the new `name`, `serial_number`, and `notes`; otherwise a new asset is created.
 
 ## Asynchronous Background Processing
 
@@ -242,9 +246,9 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 
 ---
 
-## Dynamic Import Path for All Importable Models
+## Import Path
 
-Every model in ITAMbox that is not explicitly excluded can be imported via the generic import path:
+Importable models are served by one generic route:
 
 ```
 /import/<app_label>/<model_name>/
@@ -259,18 +263,10 @@ For example:
 - `/import/organization/location/` — Locations
 - `/import/organization/assetholder/` — Asset Holders
 - `/import/licenses/license/` — Licenses
+- `/import/subscriptions/subscription/` — Subscriptions
 
-This single view (`GenericObjectImportView`) serves **all** importable models — you do not need a per-model view. The curated import forms registered in `assets/forms/import_forms.py` provide domain-accurate field lists for each model automatically.
+### Allowlist
 
-### Excluded Models
+Import is an **allowlist**. A model is importable only when it is declared importable in `core/data_transfer.py` and has a curated import form registered with `@register_import_form`; a contract test keeps both in lockstep and fails for any model without an explicit declaration. Every other model, including everything not listed above, answers **404** on the import route.
 
-Some models are excluded from bulk import because they represent generated logs, system records, or complex configuration managed exclusively through the UI or API. These are defined in `IMPORT_EXCLUDED_MODELS` (in `core/forms/import_forms.py`) and return a **404** if accessed via the generic import path:
-
-| App | Excluded Models |
-|-----|----------------|
-| `core` | `objectchange`, `notification`, `job` |
-| `extras` | `alertlog`, `event`, `journalentry`, `alertrule`, `notificationchannel`, `scheduledreport`, `reporttemplate`, `eventrule`, `webhookendpoint`, `dashboard` |
-| `organization` | `membership`, `role`, `rolegrant`, `rolegrantscope`, `tenantresourcegrant` |
-| `users` | `groupmembership`, `token`, `user`, `usergroup` |
-
-> **Rule of thumb**: If a model is **not** in the table above, it is importable via `/import/<app_label>/<model_name>/`.
+Records that a workflow owns (assignments, custody receipts, signing sessions, disposals, seat and stock assignments), authentication and access-control data, and system or generated records are never importable. Create them through their screens or the API so their lifecycle rules apply.

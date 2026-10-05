@@ -7,7 +7,6 @@ presentation code out of the worker-facing service.
 
 from core.importers.bulk_forms import (
     IMPORT_EXCLUDED_FIELDS,
-    IMPORT_EXCLUDED_MODELS,
     MAX_IMPORT_ROWS,
     BulkImportForm,
     ImportResult,
@@ -20,7 +19,6 @@ from core.importers.bulk_forms import (
 
 __all__ = [
     "IMPORT_EXCLUDED_FIELDS",
-    "IMPORT_EXCLUDED_MODELS",
     "MAX_IMPORT_ROWS",
     "BulkImportForm",
     "ImportResult",
