@@ -74,6 +74,19 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
         self.client_login_to_tenant(user, self.tenant, role_permissions=list(permissions))
         return user
 
+    def test_accepted_filter_follows_acceptance_status(self):
+        from compliance.filters import CustodyReceiptFilterSet
+
+        self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt.save(update_fields=["acceptance_status"])
+        queryset = CustodyReceipt.objects.filter(pk__in=[self.receipt.pk, self.other_receipt.pk])
+
+        accepted = CustodyReceiptFilterSet({"accepted": "true"}, queryset=queryset).qs
+        not_accepted = CustodyReceiptFilterSet({"accepted": "false"}, queryset=queryset).qs
+
+        self.assertEqual(list(accepted.values_list("pk", flat=True)), [self.receipt.pk])
+        self.assertEqual(list(not_accepted.values_list("pk", flat=True)), [self.other_receipt.pk])
+
     def test_pending_receipt_has_no_signed_timestamp(self):
         self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_PENDING)
         self.assertIsNone(self.receipt.signed_at)
