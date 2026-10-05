@@ -209,7 +209,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     user_agent = models.TextField(blank=True, verbose_name=_("User Agent"))
 
     @property
-    def accepted(self):
+    def accepted(self) -> bool:
         """Read-only view of ``acceptance_status``; the status is the single source of truth."""
         return self.acceptance_status == self.STATUS_ACCEPTED
 
