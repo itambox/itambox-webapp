@@ -210,7 +210,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
 
     @property
     def accepted(self) -> bool:
-        """Read-only view of ``acceptance_status``; the status is the single source of truth."""
+        # Derived from acceptance_status (the single source of truth); a comment, not a docstring, keeps it out of the OpenAPI text.
         return self.acceptance_status == self.STATUS_ACCEPTED
 
     class Meta:
