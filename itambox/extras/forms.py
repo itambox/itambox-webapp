@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from core.data_transfer import policy_for
 from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
 
@@ -462,7 +463,6 @@ class SavedFilterFilterForm(FilterForm):
 
 import json as _json
 
-from core.data_transfer import policy_for
 from core.validators import validate_external_url
 from itambox.middleware import get_current_user
 
