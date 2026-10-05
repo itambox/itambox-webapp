@@ -4,22 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 67144,
-    "covered_lines": 59491,
-    "line_rate": 88.6,
-    "num_branches": 19128,
-    "covered_branches": 14675,
-    "branch_rate": 76.72,
+    "num_statements": 66949,
+    "covered_lines": 59381,
+    "line_rate": 88.7,
+    "num_branches": 19022,
+    "covered_branches": 14612,
+    "branch_rate": 76.82,
     "excluded_lines": 48,
-    "measured_files": 634
+    "measured_files": 631
   },
   "decline_justification": {
-    "reason": "the report designer legacy grandfathering retirement (#586) deleted the legacy rendering, model and view branches; per-file against the main lane artifact: core/reports/rendering.py -41 statements/-20 branches, extras/models.py -16/-6, extras/views.py -2/0, net -59/-26. Rates moved to 88.60/76.72; the smaller sizes are re-recorded deliberately.",
-    "previous_line_rate": 88.61,
-    "previous_branch_rate": 76.76,
+    "reason": "Removed dead provider-slot indirection (kit checkout, seat usage, software reconciliation), the issue-445 cutover verifier and the unreachable license-line receipt branch (#615). The deleted modules were measured code, so measured files, statements and branches fall with them; the new totals are taken from the hosted run's lane artifact for this head.",
+    "previous_line_rate": 88.6,
+    "previous_branch_rate": 76.72,
     "previous_excluded_lines": 48,
     "previous_measured_files": 634,
-    "previous_num_statements": 67203,
-    "previous_num_branches": 19154
+    "previous_num_statements": 67144,
+    "previous_num_branches": 19128
   }
 }
