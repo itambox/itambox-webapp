@@ -25,27 +25,6 @@
       "count": 1
     },
     {
-      "rule": "provider-slot",
-      "path": "itambox/inventory/models_kit_checkout.py",
-      "context": "",
-      "statement": "SingleProviderSlot[KitCheckoutProvider]('inventory kit checkout')",
-      "count": 1
-    },
-    {
-      "rule": "provider-slot",
-      "path": "itambox/software/models_reconciliation.py",
-      "context": "",
-      "statement": "SingleProviderSlot[SoftwareReconciliationProvider]('software reconciliation')",
-      "count": 1
-    },
-    {
-      "rule": "provider-slot",
-      "path": "itambox/subscriptions/models_seat_usage.py",
-      "context": "",
-      "statement": "SingleProviderSlot[SubscriptionSeatUsageProvider]('subscription seat usage')",
-      "count": 1
-    },
-    {
       "rule": "source-text",
       "path": "itambox/core/tests/test_canonical_vocabulary_runtime.py",
       "context": "FunctionDef:_demo_asset_type_source",
@@ -1968,13 +1947,6 @@
       "path": "itambox/procurement/services.py",
       "context": "FunctionDef:release_fulfillment_links",
       "statement": "AssetRequest._base_manager",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
-      "path": "itambox/subscriptions/seat_services.py",
-      "context": "FunctionDef:count_assigned_seats",
-      "statement": "LicenseSeatAssignment._base_manager",
       "count": 1
     },
     {

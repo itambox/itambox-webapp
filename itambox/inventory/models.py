@@ -30,7 +30,6 @@ from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, Stan
 
 from .abstract_models import AbstractAssignment, AbstractInventoryItem, AbstractStock
 from .models_assignment_write import assignment_hard_purge_is_permitted
-from .models_kit_checkout import checkout_kit
 from .models_stock import adjust_inventory_stock
 
 
@@ -699,34 +698,6 @@ class Kit(
 
     def get_absolute_url(self):
         return reverse("inventory:kit_detail", kwargs={"pk": self.pk})
-
-    def checkout_to_holder(
-        self,
-        holder,
-        source_location,
-        user=None,
-        *,
-        system_authorizations=None,
-        selected_assets=None,
-        expected_checkin=None,
-        checkout_date=None,
-        status=None,
-        is_loan=False,
-        due_date=None,
-    ):
-        return checkout_kit(
-            self,
-            holder=holder,
-            source_location=source_location,
-            user=user,
-            system_authorizations=system_authorizations,
-            selected_assets=selected_assets,
-            expected_checkin=expected_checkin,
-            checkout_date=checkout_date,
-            status=status,
-            is_loan=is_loan,
-            due_date=due_date,
-        )
 
 
 class KitItem(ChangeLoggingMixin, BaseModel):
