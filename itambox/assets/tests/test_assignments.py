@@ -24,6 +24,7 @@ class AssetAssignmentTestCase(TestCase):
     def setUp(self):
         self.user = baker.make(User, is_superuser=True, is_staff=True)
         self.status = baker.make(StatusLabel, type="deployable")
+        baker.make(StatusLabel, type="deployed", name="Deployed")
 
         self.host_laptop = baker.make(Asset, name="Developer Laptop", status=self.status, tenant=None)
         self.peripheral_monitor = baker.make(Asset, name="External Monitor", status=self.status, tenant=None)
