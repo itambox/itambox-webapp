@@ -284,9 +284,11 @@ class AssetAssignmentTestCase(TestCase):
         """
         Verify that changing between different status labels of the same meta-type is allowed.
         """
-        # Create or fetch two deployed status labels
-        reserved_status, _ = StatusLabel.objects.get_or_create(name="Reserved", defaults={"type": "deployed"})
-        in_use_status, _ = StatusLabel.objects.get_or_create(name="In Use", defaults={"type": "deployed"})
+        # Create or fetch two deployable status labels
+        reserved_status, _ = StatusLabel.objects.get_or_create(
+            name="Reserved Deployable", defaults={"type": "deployable"}
+        )
+        in_use_status, _ = StatusLabel.objects.get_or_create(name="In Use Deployable", defaults={"type": "deployable"})
 
         # Set initial status
         self.peripheral_monitor.status = reserved_status

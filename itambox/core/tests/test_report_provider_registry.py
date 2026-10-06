@@ -8,7 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase
 from django.utils import translation
 
-from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from assets.models.lifecycle import Warranty
 from assets.services import checkout_asset
 from core.reports import (

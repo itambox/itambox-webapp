@@ -175,7 +175,7 @@ class SeedAssetsMixin:
         )
 
     def _seed_assets(self):
-        from assets.models import Asset, AssetAssignment, AssetTagSequence
+        from assets.models import Asset, AssetTagSequence
         from compliance.models import CustodyReceipt, CustodyTemplate
         from software.models import InstalledSoftware
 
@@ -410,15 +410,17 @@ class SeedAssetsMixin:
             if tags:
                 asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
             if status_slug == "in-use" and (holder or location):
+                if holder:
+                    checkout_notes = "Provisioned by Northwind service desk."
+                else:
+                    checkout_notes = "Deployed to site infrastructure."
                 with TaskContext(tenant_id=tenant.pk, user_id=self._provisioner.pk):
                     checkout_asset(
                         asset,
                         holder=holder,
                         location=location,
                         user=self._provisioner,
-                        notes="Provisioned by Northwind service desk."
-                        if holder
-                        else "Deployed to site infrastructure.",
+                        notes=checkout_notes,
                         _suppress_custody_receipt=True,
                     )
                 asset.refresh_from_db()

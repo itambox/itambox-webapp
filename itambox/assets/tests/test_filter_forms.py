@@ -1,8 +1,7 @@
 from django.test import TestCase
-from django.urls import reverse
 
 from assets.forms.filter_forms import AssetFilterForm
-from assets.models import Asset, AssetAssignment, AssetType, Category, Manufacturer, StatusLabel, Supplier
+from assets.models import Asset, AssetType, Category, Manufacturer, StatusLabel, Supplier
 from assets.services import checkout_asset
 from extras.models import Tag
 from organization.models import AssetHolder, Location, Site, Tenant

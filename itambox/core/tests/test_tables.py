@@ -10,7 +10,6 @@ from model_bakery import baker
 
 from assets.models import (
     Asset,
-    AssetAssignment,
     AssetRole,
     StatusLabel,
     Warranty,

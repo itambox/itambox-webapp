@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from model_bakery import baker
 
-from assets.models import Asset, AssetAssignment, StatusLabel
+from assets.models import Asset, StatusLabel
 from assets.services import checkout_asset
 from compliance.models import CustodyReceipt, CustodyTemplate
 from core.management.commands._seed.access import _technician_permissions

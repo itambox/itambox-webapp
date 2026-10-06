@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 from django.test import TestCase
 from django.urls import reverse
 
-from assets.models import Asset, AssetAssignment, AssetRole, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from assets.services import checkout_asset
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder

@@ -58,7 +58,7 @@ class LicenseViewTests(TestCase):
         """The ?tab=seats pane renders seat assignments, and the Asset Holder
         column resolves: directly for holder-seats, and via the asset's current
         holder for asset-seats."""
-        from assets.models import Asset, AssetAssignment, StatusLabel
+        from assets.models import Asset, StatusLabel
         from assets.services import checkout_asset
         from organization.models import AssetHolder
 

@@ -415,6 +415,60 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         """Return the canonical URL for the asset."""
         return reverse("assets:asset_detail", kwargs={"pk": self.pk})
 
+    def _validate_assignment_status(self):
+        if self.status_id and self.status.type == StatusTypeChoices.DEPLOYED:
+            operation = getattr(self, "_asset_status_transition", None)
+            if not self.pk or (not self.has_active_assignment and operation != "checkout"):
+                raise ValidationError(_("The deployed status is managed by checkout and check-in."))
+        if (
+            self.pk
+            and self.has_active_assignment
+            and (not self.status_id or self.status.type != StatusTypeChoices.DEPLOYED)
+        ):
+            raise ValidationError(_("An active assignment requires the asset to have deployed status."))
+
+    @staticmethod
+    def _is_managed_deployed_transition(operation, old_type, new_type):
+        return (
+            operation == "checkout"
+            and new_type == StatusTypeChoices.DEPLOYED
+            and old_type != StatusTypeChoices.DEPLOYED
+        ) or (
+            operation == "checkin" and old_type == StatusTypeChoices.DEPLOYED and new_type != StatusTypeChoices.DEPLOYED
+        )
+
+    def _validate_disposal_status_transition(self, old_type, new_type):
+        if old_type != StatusTypeChoices.ARCHIVED or new_type == StatusTypeChoices.ARCHIVED:
+            return
+        if self.disposals(manager="all_objects").filter(cancelled_at__isnull=True).exists():
+            raise ValidationError(
+                _(
+                    "This asset has an active disposal record. Cancel the disposal "
+                    "before moving it out of the archived state."
+                )
+            )
+
+    def _validate_status_transition(self):
+        if not self.pk or not self.status_id:
+            return
+        old_asset = Asset._base_manager.filter(pk=self.pk).first()
+        if not old_asset or not old_asset.status_id or old_asset.status_id == self.status_id:
+            return
+        old_type = old_asset.status.type
+        new_type = self.status.type
+        operation = getattr(self, "_asset_status_transition", None)
+        managed_transition = self._is_managed_deployed_transition(operation, old_type, new_type)
+        uses_deployed_status = old_type == StatusTypeChoices.DEPLOYED or new_type == StatusTypeChoices.DEPLOYED
+        if uses_deployed_status and not managed_transition:
+            raise ValidationError(_("The deployed status is managed by checkout and check-in."))
+        AssetStateMachine.validate_transition(
+            old_type,
+            new_type,
+            self.has_active_assignment,
+            managed_deployed_transition=managed_transition,
+        )
+        self._validate_disposal_status_transition(old_type, new_type)
+
     def clean(self):
         super().clean()
 
@@ -436,63 +490,8 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
             if fk_errors:
                 raise ValidationError(fk_errors)
 
-        if self.status_id and self.status.type == StatusTypeChoices.DEPLOYED:
-            operation = getattr(self, "_asset_status_transition", None)
-            if not self.pk or (not self.has_active_assignment and operation != "checkout"):
-                raise ValidationError(_("The deployed status is managed by checkout and check-in."))
-        if (
-            self.pk
-            and self.has_active_assignment
-            and (not self.status_id or self.status.type != StatusTypeChoices.DEPLOYED)
-        ):
-            raise ValidationError(_("An active assignment requires the asset to have deployed status."))
-
-        if self.pk and self.status_id:
-            # Integrity checks must see the row as stored, not through the current
-            # request's tenant/soft-delete lens — otherwise a context mismatch
-            # (background task, cross-tenant admin) silently skips the state machine.
-            old_asset = Asset._base_manager.filter(pk=self.pk).first()
-            if old_asset and old_asset.status_id and old_asset.status_id != self.status_id:
-                old_type = old_asset.status.type
-                new_type = self.status.type
-                operation = getattr(self, "_asset_status_transition", None)
-                uses_deployed_status = old_type == StatusTypeChoices.DEPLOYED or new_type == StatusTypeChoices.DEPLOYED
-                managed_transition = (
-                    operation == "checkout"
-                    and new_type == StatusTypeChoices.DEPLOYED
-                    and old_type != StatusTypeChoices.DEPLOYED
-                ) or (
-                    operation == "checkin"
-                    and old_type == StatusTypeChoices.DEPLOYED
-                    and new_type != StatusTypeChoices.DEPLOYED
-                )
-                if uses_deployed_status and not managed_transition:
-                    raise ValidationError(_("The deployed status is managed by checkout and check-in."))
-                active_assignment = self.has_active_assignment
-                AssetStateMachine.validate_transition(
-                    old_type,
-                    new_type,
-                    active_assignment,
-                    managed_deployed_transition=managed_transition,
-                )
-                # #496: a disposal RECORD owns the out-of-operation state. Leaving
-                # ``archived`` while an active record exists (an ordinary status
-                # edit, an import, an admin change) is a hidden reactivation — it
-                # must go through cancel_asset_disposal instead.
-                if (
-                    old_type == StatusTypeChoices.ARCHIVED
-                    and new_type != StatusTypeChoices.ARCHIVED
-                    # ``all_objects`` on purpose: a soft-deleted but uncancelled
-                    # record still owns the asset, so a tombstone must not release
-                    # the guard (the default related manager hides deleted rows).
-                    and self.disposals(manager="all_objects").filter(cancelled_at__isnull=True).exists()
-                ):
-                    raise ValidationError(
-                        _(
-                            "This asset has an active disposal record. Cancel the disposal "
-                            "before moving it out of the archived state."
-                        )
-                    )
+        self._validate_assignment_status()
+        self._validate_status_transition()
 
     def _prepare_asset_tag(self, update_fields):
         # A specification-only save must not reserve or change unrelated tags.

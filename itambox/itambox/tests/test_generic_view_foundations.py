@@ -35,7 +35,7 @@ from django.urls import reverse
 
 from assets.filters import StatusLabelFilterSet
 from assets.forms.filter_forms import AssetFilterForm
-from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from assets.services import checkout_asset
 from assets.tables import AssetTable
 from assets.views.asset_views import AssetListView

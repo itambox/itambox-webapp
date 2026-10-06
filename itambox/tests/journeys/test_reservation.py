@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-import pytest
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
@@ -30,7 +29,6 @@ class ReservationJourneyTests(JourneyMixin, TestCase):
             name="Journey Reservation Loc", slug="journey-reservation-loc", site=site, tenant=self.tenant
         )
 
-    @pytest.mark.xfail(strict=True, reason="reservation guard only covers holder checkouts (#609)")
     def test_checkout_to_location_during_another_holders_reservation_is_refused(self):
         with self.assertRaises(ValidationError):
             checkout_asset(asset=self.asset, location=self.location, request=None)
