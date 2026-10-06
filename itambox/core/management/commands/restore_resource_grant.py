@@ -2,14 +2,15 @@
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.utils.dateparse import parse_datetime
 
+from core.tasks.management import SystemTaskCommand
 from organization.models import Tenant
 from organization.services.resource_grants import restore_resource_grant
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Restore one revoked tenant resource grant with a corrected or cleared deadline."
 
     def add_arguments(self, parser):

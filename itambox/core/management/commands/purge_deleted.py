@@ -1,14 +1,14 @@
 from datetime import timedelta
 
-from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from core.purge_handlers import purge_object
 from core.tasks.context import TaskContext
+from core.tasks.management import SystemTaskCommand
 from itambox.registry import registry
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Permanently delete soft-deleted objects older than the specified number of days."
 
     def add_arguments(self, parser):

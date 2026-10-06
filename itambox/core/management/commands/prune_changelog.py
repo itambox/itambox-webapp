@@ -19,12 +19,13 @@ import os
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from django_q.models import Failure
 
 from core.models import Notification, ObjectChange
+from core.tasks.management import SystemTaskCommand
 from extras.models import AlertLog, Event
 from organization.models import (
     Tenant,
@@ -66,7 +67,7 @@ class _ArchiveWriter:
         self._fh.close()
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = (
         "Prune aged changelog/operational-data rows: ObjectChange, AlertLog, "
         "Notification, Event, and failed django-q2 tasks -- each against its own "

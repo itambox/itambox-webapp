@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.core.management import CommandError, call_command
+from django.core.management import CommandError, call_command, get_commands, load_command_class
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
@@ -34,8 +34,10 @@ from core.management.commands._seed.access import check_seed_access_invariants
 from core.management.commands._seed.consistency import check_seed_operational_invariants
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
-from core.models import Job, ObjectChange
+from core.models import ChangeLoggingMixin, Job, ObjectChange
+from core.tasks.management import SystemTaskCommand
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
+from extras.signals import _safe_dispatch
 from inventory.models import Accessory
 from licenses.models import License
 from organization.models import AssetHolder, Location, Membership, Site, Tenant
@@ -68,6 +70,47 @@ class ManagementCommandsTestCase(TransactionTestCase):
         Job.objects.create(name="Script: my_script.py", status=Job.STATUS_PENDING)
         call_command("run_jobs", stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Job processing complete", self.stdout.getvalue())
+
+    def test_every_mutating_management_command_uses_system_task_context(self):
+        """Every project command is classified: mutating commands run on the
+        SystemTaskCommand base, read-only commands stay plain."""
+        mutating_commands = {
+            "bind_oidc_identity",
+            "import_snipeit",
+            "prune_changelog",
+            "purge_deleted",
+            "restore_resource_grant",
+            "rotate_encryption_keys",
+            "run_jobs",
+            "seed_data",
+            "sync_intune",
+            "sync_tenant_ldap",
+            "reconcile_procurement_legacy",
+        }
+        read_only_commands = {
+            "capabilities",
+            "capture_recovery_evidence",
+            "capture_schema_evidence",
+            "compile_locales",
+            "eventrule_withdrawn_report",
+            "export_datamodel",
+            "integrity_report",
+            "list_failed_tasks",
+            "migration_baseline_preflight",
+            "plugins",
+            "validate_role_permissions",
+        }
+        available_commands = get_commands()
+        self.assertTrue((mutating_commands | read_only_commands).issubset(available_commands))
+
+        for name in sorted(mutating_commands):
+            with self.subTest(command=name):
+                command = load_command_class(available_commands[name], name)
+                self.assertIsInstance(command, SystemTaskCommand)
+        for name in sorted(read_only_commands):
+            with self.subTest(command=name):
+                command = load_command_class(available_commands[name], name)
+                self.assertNotIsInstance(command, SystemTaskCommand)
 
     def test_seed_data_command(self):
         call_command("seed_data", production=True, force=True, stdout=self.stdout, stderr=self.stderr)
@@ -942,3 +985,19 @@ class SyncTenantLDAPDependencyTest(SimpleTestCase):
             command._run_sync(SimpleNamespace(pk=1, slug="test", name="Test"))
         self.assertNotIn("Connecting to LDAP server", stdout.getvalue())
         mock_ldap_init.assert_not_called()
+
+
+class EventDispatchFailureTests(SimpleTestCase):
+    @patch("extras.signals._table_exists", return_value=True)
+    @patch("extras.signals.dispatch_event", side_effect=RuntimeError("sensitive backend detail"))
+    def test_dispatch_failure_logs_error_with_identifiers_only(self, dispatch, _table_exists):
+        with self.assertLogs("extras.signals", level="ERROR") as captured:
+            _safe_dispatch(ChangeLoggingMixin, SimpleNamespace(pk=123), "delete")
+
+        self.assertEqual(dispatch.call_count, 1)
+        log = captured.output[0]
+        self.assertIn("model=ChangeLoggingMixin", log)
+        self.assertIn("object_id=123", log)
+        self.assertIn("action=delete", log)
+        self.assertIn("error_class=RuntimeError", log)
+        self.assertNotIn("sensitive backend detail", log)

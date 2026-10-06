@@ -483,7 +483,8 @@ class ResolveStockAccessTests(TenantTestMixin, TestCase):
 
     def test_direct_grant_becomes_inert_when_grantee_is_deleted(self):
         self._use_grant()
-        self.grantee.delete()
+        with TaskContext(operation="test.resource_access.soft_delete_grantee"):
+            self.grantee.delete()
 
         decision = resolve_stock_access(
             self.tech,
@@ -503,7 +504,8 @@ class ResolveStockAccessTests(TenantTestMixin, TestCase):
             password="x",
             email="deleted-active@example.invalid",
         )
-        self.grantee.delete()
+        with TaskContext(operation="test.resource_access.soft_delete_grantee"):
+            self.grantee.delete()
 
         decision = resolve_stock_access(
             superuser,

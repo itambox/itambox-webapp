@@ -2,7 +2,6 @@
 
 from io import StringIO
 
-import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.test import TestCase
@@ -59,16 +58,19 @@ class ReconcileProcurementLegacyAuditJourneyTests(JourneyMixin, TestCase):
             tenant=self.tenant, asset_request=request, purchase_order_line=line, qty_allocated=10
         )
 
-    @pytest.mark.xfail(strict=True, reason="the command runs outside any change-logging context (#603)")
     def test_reconcile_procurement_legacy_apply_writes_object_changes(self):
-        call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
+        with self.assertLogs("core.tasks.context", level="INFO") as captured:
+            call_command("reconcile_procurement_legacy", "--apply", stdout=StringIO())
 
         closed = FulfillmentLink._base_manager.get(pk=self.link.pk)
         self.assertIsNotNone(closed.deleted_at, "precondition: the pledge was closed")
         content_type = ContentType.objects.get_for_model(FulfillmentLink)
-        self.assertTrue(
-            ObjectChange.objects.filter(
-                changed_object_type=content_type, changed_object_id=self.link.pk, action="delete"
-            ).exists(),
-            "closing a pledge left no audit trail",
+        audit = ObjectChange.objects.get(
+            changed_object_type=content_type,
+            changed_object_id=self.link.pk,
+            action="delete",
         )
+        self.assertIsNotNone(audit.request_id, "the system command must create its own request id")
+        self.assertIsNone(audit.user, "a CLI system command must not invent a human actor")
+        self.assertEqual(captured.records[0].operation, "management_command.reconcile_procurement_legacy")
+        self.assertIsNone(captured.records[0].actor_id)
