@@ -21,7 +21,14 @@ from .forms import (
     PurchaseOrderLineForm,
 )
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
-from .services import link_asset_request_to_purchase_order
+from .services import (
+    approve_purchase_order,
+    cancel_purchase_order,
+    link_asset_request_to_purchase_order,
+    order_purchase_order,
+    receive_purchase_order,
+    reopen_purchase_order,
+)
 from .tables import ContractTable, PurchaseOrderTable
 
 
@@ -300,8 +307,6 @@ class PurchaseOrderApproveView(PurchaseOrderTransitionView):
     permission_required = "procurement.approve_purchaseorder"
 
     def perform_action(self, obj, request):
-        from .services import approve_purchase_order
-
         return approve_purchase_order(obj, user=request.user, request=request)
 
 
@@ -310,8 +315,6 @@ class PurchaseOrderOrderView(PurchaseOrderTransitionView):
     permission_required = "procurement.change_purchaseorder"
 
     def perform_action(self, obj, request):
-        from .services import order_purchase_order
-
         return order_purchase_order(obj, user=request.user, request=request)
 
 
@@ -320,8 +323,6 @@ class PurchaseOrderCancelView(PurchaseOrderTransitionView):
     permission_required = "procurement.change_purchaseorder"
 
     def perform_action(self, obj, request):
-        from .services import cancel_purchase_order
-
         return cancel_purchase_order(obj, user=request.user, request=request)
 
 
@@ -330,8 +331,6 @@ class PurchaseOrderReopenView(PurchaseOrderTransitionView):
     permission_required = "procurement.change_purchaseorder"
 
     def perform_action(self, obj, request):
-        from .services import reopen_purchase_order
-
         return reopen_purchase_order(obj, user=request.user, request=request)
 
 
@@ -398,8 +397,6 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
             formset = DynamicAssetProvisionFormSet(request.POST)
 
             if formset.is_valid():
-                from .services import receive_purchase_order
-
                 try:
                     asset_details = formset.cleaned_data
                     receive_purchase_order(po, line_quantities, asset_details, expected_received=expected_received)
@@ -491,8 +488,6 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                     return render(request, "procurement/purchaseorder_receive_step2.html", context)
                 else:
                     # Call receiving service directly (only non-asset inventory items)
-                    from .services import receive_purchase_order
-
                     try:
                         receive_purchase_order(po, line_quantities, asset_details=None, expected_received=line_expected)
                         messages.success(request, _("Stock received successfully."))

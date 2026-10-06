@@ -333,7 +333,7 @@ Manager hierarchy for tenant-aware models:
 - `AllObjectsManager` â€” unfiltered; use only for admin/recycle-bin operations
 - `TenantScopingSoftDeleteManager` â€” combines both
 
-Soft-delete models must use `UniqueConstraint(..., condition=Q(deleted_at__isnull=True))` rather than `unique=True` on name/slug fields (active rows only must be unique).
+Soft-delete models must use `UniqueConstraint(..., condition=Q(deleted_at__isnull=True))` rather than `unique=True` on name/slug fields (active rows only must be unique). Documented exception: `Asset.asset_tag` stays unique across soft-deleted rows, so a printed tag is never reissued while the record can still be restored.
 
 ## Architecture: change logging
 
