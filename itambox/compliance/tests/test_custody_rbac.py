@@ -24,7 +24,7 @@ from django.utils import timezone
 from model_bakery import baker
 from rest_framework.test import APITestCase
 
-from assets.models import Asset
+from assets.models import Asset, AssetAssignment
 from compliance.models import CustodyHandoffDelivery, CustodyReceipt, CustodySigningSession, CustodyTemplate
 from compliance.services import _custody_handoff_email_content
 from compliance.views import CustodyReceiptPrepareView
@@ -147,8 +147,15 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
             tenant=self.tenant_b,
             eula_text=DUMMY_EULA,
         )
+        self.assignment_a = AssetAssignment.objects.create(
+            asset=self.asset_a, assigned_user=self.recipient_holder, is_active=True
+        )
+        self.assignment_b = AssetAssignment.objects.create(
+            asset=self.asset_b, assigned_user=self.cross_holder, is_active=True
+        )
         self.receipt_a = CustodyReceipt.objects.create(
             asset=self.asset_a,
+            assignment=self.assignment_a,
             holder=self.recipient_holder,
             custody_template=self.template_a,
             token=DUMMY_TOKEN_A,
@@ -156,6 +163,7 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
         )
         self.receipt_b = CustodyReceipt.objects.create(
             asset=self.asset_b,
+            assignment=self.assignment_b,
             holder=self.cross_holder,
             custody_template=self.template_b,
             token=DUMMY_TOKEN_B,

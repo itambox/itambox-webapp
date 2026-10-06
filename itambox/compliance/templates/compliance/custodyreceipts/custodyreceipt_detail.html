@@ -69,6 +69,8 @@
         <span class="badge bg-success text-success-fg">{% translate "Accepted" %}</span>
       {% elif object.acceptance_status == "declined" %}
         <span class="badge bg-danger text-danger-fg">{% translate "Declined" %}</span>
+      {% elif object.acceptance_status == "superseded" %}
+        <span class="badge bg-secondary text-secondary-fg">{% translate "Superseded" %}</span>
       {% else %}
         <span class="badge bg-warning text-warning-fg">{% translate "Pending" %}</span>
       {% endif %}
@@ -118,6 +120,10 @@
   {% elif object.acceptance_status == "declined" %}
     <div class="alert alert-danger mt-3 mb-0" role="alert">
       {% translate "The recipient declined this custody transfer." %}
+    </div>
+  {% elif object.acceptance_status == "superseded" %}
+    <div class="alert alert-secondary mt-3 mb-0" role="alert">
+      {% translate "This custody receipt was closed because the custody period it covers has ended." %}
     </div>
   {% else %}
     <div class="alert alert-info mt-3 mb-0" role="alert">

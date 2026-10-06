@@ -68,6 +68,7 @@ class CustodyReceiptTable(BaseTable):
             "pending": "bg-warning text-warning-invert",
             "accepted": "bg-success text-success-invert",
             "declined": "bg-danger text-danger-invert",
+            "superseded": "bg-secondary text-secondary-invert",
         }
         badge_class = badges.get(value, "bg-secondary")
         from django.utils.html import format_html

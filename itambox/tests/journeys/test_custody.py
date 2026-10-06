@@ -1,6 +1,5 @@
 """Custody journeys: a receipt is accepted only by the person currently holding the asset."""
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -40,7 +39,6 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
         checkout_asset(asset=self.asset, holder=holder, checkout_date=timezone.now(), request=None)
         return CustodyReceipt.objects.get(asset=self.asset, holder=holder)
 
-    @pytest.mark.xfail(strict=True, reason="custody receipt outlives its assignment (#607)")
     def test_former_holder_cannot_accept_after_checkin(self):
         user = self.make_member("former-holder", set())
         holder = self.make_holder(user=user)
@@ -53,7 +51,6 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
         receipt.refresh_from_db()
         self.assertNotEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
 
-    @pytest.mark.xfail(strict=True, reason="custody receipt outlives its assignment (#607)")
     def test_former_holder_cannot_accept_after_reassignment(self):
         first_user = self.make_member("first-holder", set())
         first = self.make_holder(user=first_user)
@@ -68,7 +65,6 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
         receipt.refresh_from_db()
         self.assertNotEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
 
-    @pytest.mark.xfail(strict=True, reason="holder without a tenant membership gets a 500 (#607)")
     def test_holder_without_membership_can_sign_their_receipt(self):
         outsider = User.objects.create_user(username="no-membership", password="x")
         holder = self.make_holder(user=outsider)
@@ -80,3 +76,45 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         receipt.refresh_from_db()
         self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+
+    def test_checkin_supersedes_pending_receipt_and_blocks_signing(self):
+        user = self.make_member("superseded-holder", set())
+        holder = self.make_holder(user=user)
+        receipt = self._checkout(holder)
+        self.assertIsNotNone(receipt.assignment_id)
+        checkin_asset(self.asset)
+
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_SUPERSEDED)
+
+        self.client_login_to_tenant(user, self.tenant)
+        response = self._sign(receipt)
+        self.assertEqual(response.status_code, 410)
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_SUPERSEDED)
+
+    def test_accepted_receipt_is_kept_on_checkin(self):
+        user = self.make_member("accepted-holder", set())
+        holder = self.make_holder(user=user)
+        receipt = self._checkout(holder)
+        self.client_login_to_tenant(user, self.tenant)
+        self._sign(receipt)
+        checkin_asset(self.asset)
+
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+
+    def test_same_holder_recheckout_gets_fresh_receipt_bound_to_new_period(self):
+        user = self.make_member("repeat-holder", set())
+        holder = self.make_holder(user=user)
+        first = self._checkout(holder)
+        checkin_asset(self.asset)
+        checkout_asset(asset=self.asset, holder=holder, checkout_date=timezone.now(), request=None)
+        second = CustodyReceipt.objects.filter(asset=self.asset, holder=holder).exclude(pk=first.pk).get()
+
+        self.assertNotEqual(first.assignment_id, second.assignment_id)
+        self.client_login_to_tenant(user, self.tenant)
+        self.assertEqual(self._sign(first).status_code, 410)
+        self.assertEqual(self._sign(second).status_code, 200)
+        second.refresh_from_db()
+        self.assertEqual(second.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)

@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
 
-from assets.models import Asset, AssetMaintenance, AssetTagSequence, Supplier
+from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetTagSequence, Supplier
 from organization.models import AssetHolder, Tenant
 
 from ..models import CustodyReceipt
@@ -127,9 +127,11 @@ class CustodyReceiptViewTests(TestCase):
             user=self.recipient,
             tenant=self.tenant,
         )
+        self.assignment = AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
         self.receipt = baker.make(
             CustodyReceipt,
             asset=self.asset,
+            assignment=self.assignment,
             holder=self.holder,
         )
         self.client.force_login(self.recipient)

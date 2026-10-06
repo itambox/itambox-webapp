@@ -26,6 +26,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from compliance.models import CustodyReceipt
+from compliance.services import supersede_pending_receipts
 from core.choices import ObjectChangeActionChoices
 from core.context import get_current_membership, get_current_tenant, override_current_tenant_scope
 from inventory.services import checkout_inventory_item, validate_checkout_targets
@@ -155,7 +156,7 @@ def checkout_asset(
         asset._changelog_message = f"Checked out to {target}"
         with _asset_status_operation(asset, "checkout"):
             asset.save(update_fields=update_fields)
-            AssetAssignment.objects.create(**assignment_kwargs)
+            assignment = AssetAssignment.objects.create(**assignment_kwargs)
 
         category = asset.asset_type.category if asset.asset_type else None
         if holder and category and not _suppress_custody_receipt:
@@ -188,6 +189,7 @@ def checkout_asset(
                 receipt_kwargs = {
                     "asset": asset,
                     "holder": holder,
+                    "assignment": assignment,
                     "custody_template": resolved_template,
                     "signature_provider": resolved_template.signature_provider,
                     "eula_text": resolved_template.eula_text,
@@ -345,6 +347,8 @@ def checkin_asset(
             if notes:
                 active.notes = (active.notes + "\n" + notes).strip()
             active.save()
+
+            supersede_pending_receipts(active)
 
             revert_status = status
             if not revert_status:
