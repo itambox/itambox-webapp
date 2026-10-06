@@ -1632,6 +1632,7 @@ export interface components {
      * @description * `pending` - Pending
      * * `accepted` - Accepted
      * * `declined` - Declined
+     * * `superseded` - Superseded
      * @enum {string}
      */
     AcceptanceStatusEnum: "pending" | "accepted" | "declined" | "superseded";
@@ -16059,6 +16060,7 @@ export interface operations {
          * * `pending` - Pending
          * * `accepted` - Accepted
          * * `declined` - Declined
+         * * `superseded` - Superseded
          */
         acceptance_status?: "accepted" | "declined" | "pending" | "superseded";
         /** @description Accepted */
