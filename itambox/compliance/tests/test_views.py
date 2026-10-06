@@ -242,6 +242,70 @@ class CustodyReceiptViewTests(TestCase):
         self.assertEqual(response.status_code, 410)
         self.assertEqual(response.context["error_code"], "custody_link_expired")
 
+    def test_unlinked_receipt_signs_while_its_holder_is_the_active_holder(self):
+        # A receipt without a bound period (a pre-migration row, or one created by an
+        # out-of-band tool) stays signable while its holder is the asset's active
+        # holder: the fallback match is by asset and holder (differential coverage).
+        receipt = CustodyReceipt.objects.create(asset=self.asset, holder=self.holder)
+        self.assertIsNone(receipt.assignment_id)
+
+        url = reverse("compliance:custody_eula_sign", kwargs={"token": receipt.token})
+        response = self.client.post(url, {"action": "accept", "signature_canvas": "data:image/png;base64,AAA"})
+
+        self.assertEqual(response.status_code, 200)
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+
+    def test_pending_receipt_whose_period_ended_is_refused(self):
+        # A period can end without the check-in hook (a data repair or another
+        # application path). A receipt that is still pending then must be refused
+        # as superseded instead of being signed (differential coverage).
+        from django.utils import timezone
+
+        AssetAssignment._base_manager.filter(pk=self.assignment.pk).update(
+            is_active=False, checked_in_at=timezone.now()
+        )
+
+        url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
+        response = self.client.post(url, {"action": "accept", "signature_canvas": "data:image/png;base64,AAA"})
+
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.context["error_code"], "custody_superseded")
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_PENDING)
+
+    def test_period_ending_before_the_locked_post_is_refused(self):
+        # The pre-lock check and the locked write are two different moments: a period
+        # that ends in between must still be refused by the re-check under the lock.
+        from unittest import mock
+
+        url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
+        with mock.patch("compliance.views._receipt_period_is_active", side_effect=[True, False]) as period_check:
+            response = self.client.post(url, {"action": "accept", "signature_canvas": "data:image/png;base64,AAA"})
+
+        self.assertEqual(period_check.call_count, 2)
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.context["error_code"], "custody_superseded")
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_PENDING)
+
+    def test_completed_receipt_requires_recipient_authentication_when_signin_is_optional(self):
+        # With REQUIRE_CUSTODY_SIGNIN off the view is reached unauthenticated; a
+        # receipt that is already terminal then demands authentication instead of
+        # rendering the recipient's outcome (differential coverage).
+        from django.utils import timezone
+
+        self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt.signed_at = timezone.now()
+        self.receipt.save()
+        self.client.logout()
+
+        url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.context["error_code"], "recipient_authentication_required")
+
     def test_sign_portal_redirect_when_signin_required_unauthenticated(self):
         from django.test import override_settings
 
