@@ -119,6 +119,11 @@ class SeedHistoryMixin:
         """
         repairable = asset.status in (sl_available, sl_in_use) and asset.status is not None
         open_assignments = list(asset.assignments.filter(is_active=True, assigned_user__isnull=False))
+        # A site or asset-targeted deployment is not closed by this episode, and an
+        # active assignment pins the asset to the deployed status, so such a unit
+        # never enters the workshop.
+        if asset.assignments.filter(is_active=True, assigned_user__isnull=True).exists():
+            repairable = False
         # A unit cannot enter the workshop while somebody still holds it, whatever
         # status it currently wears. Gating the check-in on the status being exactly
         # "in use" left a person assignment open straight through the repair whenever
