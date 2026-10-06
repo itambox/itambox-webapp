@@ -308,7 +308,12 @@ class T12PublicSpecificationHTTPTests(TenantTestMixin, APITestCase):
 
         invalid = self.client.post(
             url,
-            {"manufacturer_id": self.manufacturer.pk, "model": "T12 invalid", "unexpected": True},
+            {
+                "manufacturer_id": self.manufacturer.pk,
+                "model": "T12 invalid",
+                "slug": "t12-invalid",
+                "unexpected": True,
+            },
             format="json",
         )
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST, invalid.data)
