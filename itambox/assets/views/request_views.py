@@ -80,8 +80,8 @@ def approve_asset_request(request_instance, user, request=None, **kwargs):
     if asset:
         if not asset.is_requestable:
             raise ValidationError(_("Allocated asset '%(name)s' is not marked as requestable.") % {"name": asset.name})
-        if asset.status.type != "deployable":
-            raise ValidationError(_("Allocated asset must be in a deployable status."))
+        if not asset.is_issuable:
+            raise ValidationError(_("The selected asset is not available for issuance."))
         if request_instance.asset_type and asset.asset_type != request_instance.asset_type:
             raise ValidationError(_("Allocated asset does not match the requested asset type."))
         request_instance.asset = asset

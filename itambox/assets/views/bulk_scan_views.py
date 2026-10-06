@@ -66,14 +66,11 @@ def asset_action_payload(asset, mode):
         bv = compute_book_value(asset)
         book_value = str(bv) if bv is not None else None
     elif mode == "checkout":
-        status_type = asset.status.type if asset.status_id else None
-        if status_type in ("in_repair", "on_order", "archived"):
+        if not asset.is_issuable:
             eligible = False
             warning = str(_("Cannot check out this asset because its status is %(status)s.")) % {
-                "status": asset.status.get_type_display()
+                "status": asset.get_status_display()
             }
-        elif assigned is not None:
-            warning = str(_("Currently assigned to %(holder)s; this asset will be reassigned.")) % {"holder": assigned}
     else:  # checkin
         if active is None and not asset.location_id:
             eligible = False
@@ -249,7 +246,7 @@ def _submission_tenant(request, form_class, permission):
     return tenant, "ok", None
 
 
-def _submission_batch_error(target_tenant, object_pks):
+def _submission_batch_error(target_tenant, object_pks, *, issuable=False):
     """Return an error message unless every submitted PK is a live asset of ``target_tenant``.
 
     The batch boundary is enforced here, before a ``Job`` exists: a tampered,
@@ -265,9 +262,8 @@ def _submission_batch_error(target_tenant, object_pks):
     # through the same rejection path. ``isdigit`` alone would admit non-ASCII
     # digits ("²") that raise on int conversion.
     candidates = {pk for pk in submitted if pk.isascii() and pk.isdigit()}
-    known = {
-        str(pk) for pk in Asset.objects.filter(pk__in=candidates, tenant=target_tenant).values_list("pk", flat=True)
-    }
+    queryset = Asset.issuable() if issuable else Asset.objects.all()
+    known = {str(pk) for pk in queryset.filter(pk__in=candidates, tenant=target_tenant).values_list("pk", flat=True)}
     rejected = len(submitted - known)
     if not rejected:
         return None
@@ -413,7 +409,7 @@ def bulk_checkout_assets(request):
         messages.error(request, _("No assets selected for check-out."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))
 
-    batch_error = _submission_batch_error(target_tenant, object_pks)
+    batch_error = _submission_batch_error(target_tenant, object_pks, issuable=True)
     if batch_error:
         messages.error(request, batch_error)
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), fallback))

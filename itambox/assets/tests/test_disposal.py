@@ -6,22 +6,20 @@ Run with:
 
 from decimal import Decimal
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import (
     Asset,
-    AssetAssignment,
     AssetDisposal,
     DataSanitizationMethodChoices,
     DisposalMethodChoices,
     StatusLabel,
 )
-from assets.services import dispose_asset
+from assets.services import checkout_asset, dispose_asset
 from core.tests.mixins import TenantTestMixin
 
 User = get_user_model()
@@ -183,14 +181,8 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         from organization.models import AssetHolder
 
         holder = baker.make(AssetHolder, tenant=self.tenant)
-        deployed = baker.make(StatusLabel, type="deployed", name="Deployed")
-        self.asset.status = deployed
-        self.asset.save()
-        AssetAssignment.objects.create(
-            asset=self.asset,
-            assigned_user=holder,
-            is_active=True,
-        )
+        deployed = baker.make(StatusLabel, type="deployed", name="Disposal Deployed")
+        checkout_asset(self.asset, holder=holder, user=self.user, status=deployed)
         self.assertTrue(self.asset.active_assignment is not None)
 
         dispose_asset(

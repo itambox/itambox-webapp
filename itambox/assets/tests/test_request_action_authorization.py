@@ -49,6 +49,7 @@ class Issue497RequestActionAuthorizationTests(TenantTestMixin, TestCase):
             slug="issue-497-deployable",
             type=StatusLabel.TYPE_DEPLOYABLE,
         )
+        StatusLabel.objects.create(name="Issue 497 Deployed", slug="issue-497-deployed", type=StatusLabel.TYPE_DEPLOYED)
         self.site = Site.objects.create(name="Issue 497 Site", slug="issue-497-site", tenant=self.tenant)
         self.location = Location.objects.create(
             name="Issue 497 Location",

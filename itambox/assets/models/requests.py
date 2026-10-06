@@ -278,18 +278,22 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             if self.asset_type and not self.asset_type.requestable:
                 raise ValidationError(_("The asset type '%(type)s' is not requestable.") % {"type": self.asset_type})
 
-            if self.asset and self.asset.status and self.asset.status.type != "deployable":
+            if self.asset and not self.asset.is_issuable:
                 raise ValidationError(
                     _("The asset '%(asset)s' is currently not available (Status: %(status)s).")
-                    % {"asset": self.asset, "status": self.asset.status.name}
+                    % {"asset": self.asset, "status": self.asset.get_status_display()}
                 )
 
-            # Check for duplicate pending or approved requests by the same requester
+            # Check for duplicate pending, approved or procurement requests by the same requester
 
             if self.requester_id and not getattr(self, "_skip_duplicate_check", False):
                 duplicate_qs = AssetRequest.objects.filter(
                     requester_id=self.requester_id,
-                    status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED],
+                    status__in=[
+                        RequestStatusChoices.PENDING,
+                        RequestStatusChoices.APPROVED,
+                        RequestStatusChoices.PROCUREMENT,
+                    ],
                     assigned_user_id=self.assigned_user_id,
                     assigned_location_id=self.assigned_location_id,
                     assigned_asset_id=self.assigned_asset_id,
@@ -298,35 +302,34 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
                 if self.asset:
                     if duplicate_qs.filter(asset=self.asset).exists():
                         raise ValidationError(
-                            _("You already have a pending or approved request for the asset '%(asset)s'.")
-                            % {"asset": self.asset}
+                            _("You already have an open request for the asset '%(asset)s'.") % {"asset": self.asset}
                         )
 
                 elif self.asset_type:
                     if duplicate_qs.filter(asset_type=self.asset_type, asset__isnull=True).exists():
                         raise ValidationError(
-                            _("You already have a pending or approved request for the asset type '%(type)s'.")
+                            _("You already have an open request for the asset type '%(type)s'.")
                             % {"type": self.asset_type}
                         )
 
                 elif self.component:
                     if duplicate_qs.filter(component=self.component).exists():
                         raise ValidationError(
-                            _("You already have a pending or approved request for the component '%(component)s'.")
+                            _("You already have an open request for the component '%(component)s'.")
                             % {"component": self.component}
                         )
 
                 elif self.accessory:
                     if duplicate_qs.filter(accessory=self.accessory).exists():
                         raise ValidationError(
-                            _("You already have a pending or approved request for the accessory '%(accessory)s'.")
+                            _("You already have an open request for the accessory '%(accessory)s'.")
                             % {"accessory": self.accessory}
                         )
 
                 elif self.consumable:
                     if duplicate_qs.filter(consumable=self.consumable).exists():
                         raise ValidationError(
-                            _("You already have a pending or approved request for the consumable '%(consumable)s'.")
+                            _("You already have an open request for the consumable '%(consumable)s'.")
                             % {"consumable": self.consumable}
                         )
 

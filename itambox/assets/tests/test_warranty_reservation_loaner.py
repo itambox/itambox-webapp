@@ -30,6 +30,8 @@ from assets.services import checkin_asset, checkout_asset
 
 def _deployable_asset(**kwargs):
     status = baker.make(StatusLabel, type="deployable")
+    if not StatusLabel.objects.filter(type="deployed").exists():
+        baker.make(StatusLabel, type="deployed", name="Deployed")
     return baker.make(Asset, status=status, tenant=None, **kwargs)
 
 

@@ -21,7 +21,8 @@ from types import SimpleNamespace
 from django.test import TestCase
 from django.utils import timezone
 
-from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, Supplier
+from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel, Supplier
+from assets.services import checkout_asset
 from compliance.models import CustodyReceipt
 from core.integrity import (
     CLASS_AMBIGUOUS,
@@ -476,8 +477,15 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             upn="cross.tenant@managed.example.com",
             tenant=self.t.managed,
         )
-        asset = Asset.objects.create(name="AA Laptop", tenant=self.t.provider, asset_tag="AA-CROSS-1")
-        assignment = AssetAssignment.objects.create(asset=asset, assigned_user=holder_a)
+        deployable = StatusLabel.objects.create(
+            name="Integrity Deployable", slug="integrity-deployable", type="deployable"
+        )
+        deployed = StatusLabel.objects.create(name="Integrity Deployed", slug="integrity-deployed", type="deployed")
+        asset = Asset.objects.create(
+            name="AA Laptop", tenant=self.t.provider, asset_tag="AA-CROSS-1", status=deployable
+        )
+        checkout_asset(asset, holder=holder_a, status=deployed)
+        assignment = AssetAssignment.all_objects.get(asset=asset, is_active=True)
         # AssetAssignment.clean() enforces same-tenant targets; seed the
         # cross-tenant anomaly by flipping the target after the valid save.
         AssetAssignment._base_manager.filter(pk=assignment.pk).update(assigned_user=holder_b)

@@ -89,6 +89,25 @@ class ChangeLogEngine:
             .first()
         ) or 0
 
+    @staticmethod
+    def _save_object_change(obj, action):
+        """Permit only simulated checkout/check-in history to cross deployed."""
+        operation = action if action in ("checkout", "checkin") else None
+        if operation is None or obj._meta.label_lower != "assets.asset":
+            obj.save()
+            return
+
+        sentinel = object()
+        original = getattr(obj, "_asset_status_transition", sentinel)
+        obj._asset_status_transition = operation
+        try:
+            obj.save()
+        finally:
+            if original is sentinel:
+                del obj._asset_status_transition
+            else:
+                obj._asset_status_transition = original
+
     # ── public API ───────────────────────────────────────────────────
     def change(self, obj, *, when, user, action="update", **field_updates):
         """Apply ``field_updates`` through a real save so the resulting ObjectChange
@@ -123,7 +142,7 @@ class ChangeLogEngine:
                 obj._changelog_action = action
             saved = True
             try:
-                obj.save()
+                self._save_object_change(obj, action)
             except ValidationError:
                 # A model constraint (e.g. the Asset status state machine, or a
                 # custom validator fired via pre_save) rejected this change.

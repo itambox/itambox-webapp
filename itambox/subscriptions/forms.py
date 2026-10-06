@@ -393,7 +393,7 @@ class SubscriptionCheckoutForm(forms.Form):
         label=_("Asset Holder"),
     )
     asset = forms.ModelChoiceField(
-        queryset=Asset.objects.exclude(status__type="undeployable").order_by("name"),
+        queryset=Asset.issuable().order_by("name"),
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
         label=_("Hardware Asset"),
@@ -456,9 +456,7 @@ class SubscriptionCheckoutForm(forms.Form):
             self.fields["assigned_holder"].queryset = AssetHolder.objects.filter(tenant=subscription.tenant).order_by(
                 "last_name", "first_name"
             )
-            self.fields["asset"].queryset = (
-                Asset.objects.filter(tenant=subscription.tenant).exclude(status__type="undeployable").order_by("name")
-            )
+            self.fields["asset"].queryset = Asset.issuable().filter(tenant=subscription.tenant).order_by("name")
             self.fields["location"].queryset = Location.objects.filter(tenant=subscription.tenant).order_by("name")
 
         self.helper = FormHelper()

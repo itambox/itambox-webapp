@@ -690,7 +690,7 @@
     {
       "path": "itambox/core/management/commands/_seed/assets.py",
       "context": "ClassDef:SeedAssetsMixin/FunctionDef:_seed_assets",
-      "statement": "from assets.models import Asset, AssetAssignment, AssetTagSequence",
+      "statement": "from assets.models import Asset, AssetTagSequence",
       "count": 1
     },
     {

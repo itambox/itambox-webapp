@@ -360,6 +360,18 @@ class Issue493FulfillmentTests(TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(response["HX-Redirect"], obj.get_absolute_url())
 
+    def test_procurement_request_blocks_duplicate_request(self):
+        self.make_request(status=RequestStatusChoices.PROCUREMENT)
+        duplicate = AssetRequest(
+            requester=self.requester_user,
+            tenant=self.tenant,
+            asset_type=self.type_requestable,
+            status=RequestStatusChoices.PENDING,
+        )
+
+        with self.assertRaises(ValidationError):
+            duplicate.save()
+
     def setUp(self):
         test_requests.RequisitionSystemTestCase.setUp(self)
 

@@ -444,6 +444,7 @@ class DisposalCreatePathParityTests(TenantTestMixin, TestCase):
         self.deployable = baker.make(StatusLabel, type="deployable", name="Deployable")
         self.archived = baker.make(StatusLabel, type="archived", name="Archived")
         self.pending = baker.make(StatusLabel, type="pending", name="Pending")
+        self.deployed = baker.make(StatusLabel, type="deployed", name="Quick Deployed")
         self.asset = baker.make(Asset, name="Quick Laptop", status=self.deployable, tenant=self.tenant)
         self.asset_b = baker.make(Asset, name="Quick Laptop B", status=self.deployable, tenant=self.tenant)
         self.client_login_to_tenant(self.tenant_user, self.tenant, role_permissions=DISPOSAL_PERMS)
@@ -516,7 +517,7 @@ class DisposalCreatePathParityTests(TenantTestMixin, TestCase):
 
     def test_record_creation_auto_checks_in_an_active_assignment(self):
         holder = baker.make(AssetHolder, tenant=self.tenant)
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=holder, is_active=True)
+        checkout_asset(self.asset, holder=holder, user=self.tenant_user, status=self.deployed)
         response = self.client.post(self.create_url, self._payload(self.asset))
         self.assertEqual(response.status_code, 204)
         self.assertEqual(AssetDisposal.objects.filter(asset=self.asset).count(), 1)

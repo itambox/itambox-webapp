@@ -8,8 +8,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase
 from django.utils import translation
 
-from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from assets.models.lifecycle import Warranty
+from assets.services import checkout_asset
 from core.reports import (
     build_report_context,
     get_registered_report_types,
@@ -266,10 +267,18 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(name="Provider Tenant", slug="provider-tenant")
 
     def _build_asset(self, tag, status, asset_type, location, assignment_user=None, **kwargs):
+        has_target = bool(location or assignment_user)
+        initial_status = status
+        if status.type == "deployed":
+            initial_status = StatusLabel.objects.filter(type="deployable").first()
+            if initial_status is None:
+                initial_status = StatusLabel.objects.create(
+                    name="Provider Available", slug="provider-available", type="deployable"
+                )
         asset = Asset.objects.create(
             asset_tag=tag,
             name=f"Asset {tag}",
-            status=status,
+            status=initial_status,
             asset_type=asset_type,
             tenant=self.tenant,
             purchase_cost=Decimal("1200.00"),
@@ -277,20 +286,22 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
             purchase_date=datetime.date(2024, 1, 15),
             **kwargs,
         )
-        with self.tenant_context(self.tenant):
-            if location or assignment_user:
-                AssetAssignment.objects.create(
-                    asset=asset,
-                    assigned_location=location,
-                    assigned_user=assignment_user,
-                    is_active=True,
+        if has_target:
+            with self.tenant_context(self.tenant):
+                checkout_asset(
+                    asset,
+                    holder=assignment_user,
+                    location=location,
+                    status=status if status.type == "deployed" else None,
                 )
         return asset
 
     def test_asset_summary_provider_with_real_data_and_all_columns(self):
         manufacturer = Manufacturer.objects.create(name="Provider Maker")
         asset_type = AssetType.objects.create(manufacturer=manufacturer, model="PM-1", slug="provider-laptop")
-        deployed, _ = StatusLabel.objects.get_or_create(name="Deployed", defaults={"slug": "provider-deployed"})
+        deployed, _ = StatusLabel.objects.get_or_create(
+            name="Deployed", defaults={"slug": "provider-deployed", "type": "deployed"}
+        )
         site = Site.objects.create(name="Provider Site", slug="provider-site")
         location = Location.objects.create(name="Provider HQ", tenant=self.tenant, site=site)
         self._build_asset("PROV-001", deployed, asset_type, location)
@@ -338,7 +349,9 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
     def test_asset_summary_provider_groups_by_status_and_location(self):
         manufacturer = Manufacturer.objects.create(name="Group Maker")
         asset_type = AssetType.objects.create(manufacturer=manufacturer, model="Group Laptop", slug="group-laptop")
-        deployed, _ = StatusLabel.objects.get_or_create(name="Deployed", defaults={"slug": "group-deployed"})
+        deployed, _ = StatusLabel.objects.get_or_create(
+            name="Deployed", defaults={"slug": "group-deployed", "type": "deployed"}
+        )
         retired, _ = StatusLabel.objects.get_or_create(name="Retired", defaults={"slug": "group-retired"})
         site = Site.objects.create(name="Group Site", slug="group-site")
         location = Location.objects.create(name="Group HQ", tenant=self.tenant, site=site)
@@ -376,12 +389,15 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         other_tenant = Tenant.objects.create(name="Other Tenant", slug="other-tenant")
         manufacturer = Manufacturer.objects.create(name="Scope Maker")
         asset_type = AssetType.objects.create(manufacturer=manufacturer, model="Scope Laptop", slug="scope-laptop")
-        deployed, _ = StatusLabel.objects.get_or_create(name="Deployed", defaults={"slug": "scope-deployed"})
+        deployed, _ = StatusLabel.objects.get_or_create(
+            name="Deployed", defaults={"slug": "scope-deployed", "type": "deployed"}
+        )
         self._build_asset("SCOPE-001", deployed, asset_type, None)
+        available = StatusLabel.objects.create(name="Scope Available", slug="scope-available", type="deployable")
         Asset.objects.create(
             asset_tag="SCOPE-OTHER",
             name="Other Asset",
-            status=deployed,
+            status=available,
             asset_type=asset_type,
             tenant=other_tenant,
         )

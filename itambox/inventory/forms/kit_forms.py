@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.choices import StatusTypeChoices
-from assets.models import Asset, AssetAssignment, StatusLabel
+from assets.models import Asset, StatusLabel
 from core.forms import FilterForm, scope_tenant_field
 from core.managers import get_current_tenant
 from core.tenant_scope import accessible_tenant_ids, get_descendant_tenant_group_ids
@@ -341,16 +341,7 @@ class KitCheckoutForm(BaseCheckoutForm):
     def _eligible_devices(item, tenant):
         if tenant is None:
             return Asset.objects.none()
-        assigned_ids = AssetAssignment.objects.filter(is_active=True).values("asset_id")
-        return (
-            Asset.objects.filter(
-                asset_type=item.asset_type,
-                tenant=tenant,
-                status__type=StatusTypeChoices.DEPLOYABLE,
-            )
-            .exclude(pk__in=assigned_ids)
-            .order_by("asset_tag", "serial_number")
-        )
+        return Asset.issuable().filter(asset_type=item.asset_type, tenant=tenant).order_by("asset_tag", "serial_number")
 
     def _rescope_choice_fields(self):
         """Render every target choice strictly within the resolved tenant.

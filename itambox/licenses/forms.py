@@ -245,7 +245,7 @@ class LicenseCheckOutForm(forms.Form):
         label=_("Asset Holder"),
     )
     asset = forms.ModelChoiceField(
-        queryset=Asset.objects.exclude(status__type="undeployable").order_by("name"),
+        queryset=Asset.issuable().order_by("name"),
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
         label=_("Hardware Asset"),
@@ -277,9 +277,7 @@ class LicenseCheckOutForm(forms.Form):
             self.fields["assigned_holder"].queryset = AssetHolder.objects.filter(tenant=license_obj.tenant).order_by(
                 "last_name", "first_name"
             )
-            self.fields["asset"].queryset = (
-                Asset.objects.filter(tenant=license_obj.tenant).exclude(status__type="undeployable").order_by("name")
-            )
+            self.fields["asset"].queryset = Asset.issuable().filter(tenant=license_obj.tenant).order_by("name")
 
         self.helper = FormHelper()
         self.helper.form_tag = False

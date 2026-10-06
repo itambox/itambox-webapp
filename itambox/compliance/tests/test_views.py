@@ -465,6 +465,8 @@ class CustodyTemplateCheckoutTests(TestCase):
         self.tg = baker.make("organization.TenantGroup", name="TG1", slug="tg1")
         self.tenant = baker.make("organization.Tenant", name="Tenant1", slug="tenant1", group=self.tg)
         self.category = baker.make("assets.Category", name="Tenant Laptops", slug="tenant-laptops")
+        self.deployable = baker.make("assets.StatusLabel", type="deployable")
+        baker.make("assets.StatusLabel", type="deployed", name="Deployed")
         self.template = baker.make(
             CustodyTemplate,
             tenant=self.tenant,
@@ -479,7 +481,12 @@ class CustodyTemplateCheckoutTests(TestCase):
         )
         self.asset_type = baker.make("assets.AssetType", model="MBP16", slug="mbp16", category=self.category)
         self.asset = baker.make(
-            Asset, name="Laptop 01", asset_tag="TAG-LT-01", asset_type=self.asset_type, tenant=self.tenant
+            Asset,
+            name="Laptop 01",
+            asset_tag="TAG-LT-01",
+            asset_type=self.asset_type,
+            tenant=self.tenant,
+            status=self.deployable,
         )
         self.holder = baker.make(
             AssetHolder, first_name="John", last_name="Doe", email="john@tenant.com", tenant=self.tenant
@@ -520,6 +527,8 @@ class CustodyUXAndPreviewTests(TestCase):
 
         self.tenant = baker.make("organization.Tenant", name="Custody UX Tenant", slug="custody-ux")
         self.category = baker.make("assets.Category", name="Laptops", slug="custody-laptops")
+        self.deployable = baker.make("assets.StatusLabel", type="deployable")
+        baker.make("assets.StatusLabel", type="deployed", name="Deployed")
         self.template = baker.make(
             CustodyTemplate,
             tenant=self.tenant,
@@ -539,6 +548,7 @@ class CustodyUXAndPreviewTests(TestCase):
             name="Developer Laptop 01",
             asset_tag="TAG-DEV-01",
             asset_type=self.asset_type,
+            status=self.deployable,
         )
         self.holder = baker.make(
             AssetHolder,
@@ -620,6 +630,8 @@ class CustodyTemplateOverrideTests(TestCase):
 
         # Create Category
         self.category = baker.make("assets.Category", name="Custody Override Laptops", slug="custody-override-laptops")
+        self.deployable = baker.make("assets.StatusLabel", type="deployable")
+        baker.make("assets.StatusLabel", type="deployed", name="Deployed")
 
         # Create global default template (linked to Category via ForeignKey)
         self.global_template = baker.make(
@@ -651,10 +663,20 @@ class CustodyTemplateOverrideTests(TestCase):
         # Assets & Holders
         self.asset_type = baker.make("assets.AssetType", model="Latitude", slug="latitude", category=self.category)
         self.asset_a = baker.make(
-            Asset, name="Laptop A", asset_tag="TAG-LT-A", asset_type=self.asset_type, tenant=self.tenant_a
+            Asset,
+            name="Laptop A",
+            asset_tag="TAG-LT-A",
+            asset_type=self.asset_type,
+            tenant=self.tenant_a,
+            status=self.deployable,
         )
         self.asset_b = baker.make(
-            Asset, name="Laptop B", asset_tag="TAG-LT-B", asset_type=self.asset_type, tenant=self.tenant_b
+            Asset,
+            name="Laptop B",
+            asset_tag="TAG-LT-B",
+            asset_type=self.asset_type,
+            tenant=self.tenant_b,
+            status=self.deployable,
         )
 
         self.holder_a = baker.make(

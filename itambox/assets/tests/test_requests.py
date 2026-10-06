@@ -373,11 +373,12 @@ class RequisitionSystemTestCase(TestCase):
             AssetRequest.objects.create(requester=self.other_user, asset_type=self.type_requestable, tenant=self.tenant)
 
         # Requesting non-deployable asset should fail
+        in_repair = StatusLabel.objects.create(name="In Repair 009", slug="in-repair-009", type="in_repair")
         non_deployable_asset = Asset.objects.create(
             name="Broken ThinkPad",
             asset_tag="TAG-009",
             asset_type=self.type_requestable,
-            status=self.status_deployed,  # Deployed status type is 'deployed', not 'deployable'
+            status=in_repair,
             requestable=True,
             tenant=self.tenant,
         )

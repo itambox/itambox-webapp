@@ -9,7 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from model_bakery import baker
 
-from assets.models import Asset, Supplier
+from assets.models import Asset, StatusLabel, Supplier
 from extras.models import JournalEntry
 from licenses.models import License
 from organization.models import Location, Site, Tenant, TenantGroup
@@ -371,11 +371,15 @@ class SubscriptionLifecycleViewTests(TestCase):
         self.sub.save(update_fields=["tenant"])
         self.site = Site.objects.create(name="Dublin", slug="dublin", tenant=self.tenant)
         self.location = Location.objects.create(name="Rack A", slug="rack-a", site=self.site, tenant=self.tenant)
+        self.deployable_status = StatusLabel.objects.create(
+            name="Subscription Deployable", slug="subscription-deployable", type="deployable"
+        )
         self.asset = Asset.objects.create(
             name="Server Ireland",
             asset_tag="SRV-IRE-01",
             location=self.location,
             tenant=self.tenant,
+            status=self.deployable_status,
         )
         self.holder = AssetHolder.objects.create(
             first_name="John", last_name="Doe", email="john@example.com", tenant=self.tenant

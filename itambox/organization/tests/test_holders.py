@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, StatusLabel
+from assets.services import checkout_asset
 from organization.models import AssetHolder
 
 User = get_user_model()
@@ -74,10 +75,11 @@ class AssetHolderViewTests(TestCase):
         status = StatusLabel.objects.get_or_create(
             slug="available", defaults={"name": "Available", "type": "deployable"}
         )[0]
+        deployed = StatusLabel.objects.get_or_create(
+            slug="holders-in-use", defaults={"name": "Holders In Use", "type": "deployed"}
+        )[0]
         asset = Asset.objects.create(name="Laptop", asset_tag="LPT-88", serial_number="SN-88", status=status)
-        from assets.models import AssetAssignment
-
-        AssetAssignment.objects.create(asset=asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(asset, holder=self.holder, user=self.user, status=deployed)
         url = reverse("organization:assetholder_detail", kwargs={"pk": self.holder.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)

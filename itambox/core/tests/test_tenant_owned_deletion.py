@@ -12,6 +12,7 @@ from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetRequest, AssetType, StatusLabel
+from assets.services import checkin_asset, checkout_asset
 from compliance.models import CustodyReceipt
 from core import identity_provisioning
 from core.auth import ldap as ldap_module
@@ -43,6 +44,9 @@ class MitigationsPhase4Tests(TestCase):
         )
 
         self.status = StatusLabel.objects.create(name="Ready", slug="ready", type=StatusLabel.TYPE_DEPLOYABLE)
+        self.deployed_status = StatusLabel.objects.create(
+            name="Phase4 In Use", slug="phase4-in-use", type=StatusLabel.TYPE_DEPLOYED
+        )
 
         self.asset_type = baker.make(
             AssetType, manufacturer__name="Mfg", model="Model", slug="mfg-model", requestable=True
@@ -61,13 +65,15 @@ class MitigationsPhase4Tests(TestCase):
 
     def test_deletion_cascades_assets_and_requests(self):
         # 1. AssetAssignment SET_NULL check
-        assignment = AssetAssignment.objects.create(asset=self.asset, assigned_user=self.asset_holder, is_active=True)
+        checkout_asset(self.asset, holder=self.asset_holder, user=self.user, status=self.deployed_status)
+        assignment = AssetAssignment.objects.get(asset=self.asset, is_active=True)
         # Delete the asset holder using force_hard_delete to trigger DB cascade/SET_NULL
         self.asset_holder.delete(force_hard_delete=True)
         # Verify assignment is not deleted, but assigned_user is SET_NULL
         assignment.refresh_from_db()
         self.assertIsNone(assignment.assigned_user_id)
         self.assertEqual(assignment.asset, self.asset)
+        checkin_asset(self.asset, user=self.user)
 
         # Re-create asset holder for request test
         self.asset_holder = AssetHolder.objects.create(

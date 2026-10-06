@@ -14,7 +14,7 @@ from django.test import TestCase
 from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetDisposal, DisposalMethodChoices, StatusLabel
-from assets.services import cancel_asset_disposal, dispose_asset
+from assets.services import cancel_asset_disposal, checkout_asset, dispose_asset
 from core.tests.mixins import TenantTestMixin
 
 DISPOSAL_PERMS = [
@@ -32,6 +32,7 @@ class DisposalRequiredStatusTests(TenantTestMixin, TestCase):
         self.deployable = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE, name="Deployable")
         self.archived = baker.make(StatusLabel, type=StatusLabel.TYPE_ARCHIVED, name="Archived")
         self.pending = baker.make(StatusLabel, type=StatusLabel.TYPE_PENDING, name="Pending")
+        self.deployed = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYED, name="Deployed")
         self.holder = baker.make("organization.AssetHolder", tenant=self.tenant)
         self.asset = baker.make(Asset, name="Status laptop", status=self.deployable, tenant=self.tenant)
 
@@ -48,7 +49,8 @@ class DisposalRequiredStatusTests(TenantTestMixin, TestCase):
         )
 
     def _assignment(self):
-        return baker.make(AssetAssignment, asset=self.asset, assigned_user=self.holder)
+        checkout_asset(asset=self.asset, holder=self.holder, user=self.tenant_user)
+        return AssetAssignment.objects.get(asset=self.asset, is_active=True)
 
     def test_missing_archived_label_aborts_before_any_mutation(self):
         assignment = self._assignment()
@@ -59,7 +61,7 @@ class DisposalRequiredStatusTests(TenantTestMixin, TestCase):
 
         self.assertIn("archived", str(rejected.exception).lower())
         self.asset.refresh_from_db()
-        self.assertEqual(self.asset.status_id, self.deployable.pk)
+        self.assertEqual(self.asset.status_id, self.deployed.pk)
         self.assertIsNone(self.asset.disposed_at)
         self.assertIsNone(self.asset.disposal_value)
         self.assertFalse(AssetDisposal.all_objects.filter(asset_id=self.asset.pk).exists())

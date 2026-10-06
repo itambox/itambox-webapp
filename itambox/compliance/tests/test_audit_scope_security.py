@@ -1025,7 +1025,7 @@ class AuditScopeSecurityTests(TenantTestMixin, TestCase):
                 flag_cold,
                 flag_warm,
             ),
-            (4, 1, 6, 3, 13, 13, 17, 14, 17, 14),
+            (4, 1, 6, 3, 13, 13, 17, 14, 18, 15),
         )
 
 

@@ -39,7 +39,9 @@ class ReportExportIntegrationTests(TenantTestMixin, TestCase):
         from assets.models import Asset, AssetRole, StatusLabel
         from extras.models import ReportTemplate
 
-        status = StatusLabel.objects.create(name="Deployed Exp", slug="deployed-exp", type="deployed", color="28a745")
+        status = StatusLabel.objects.create(
+            name="Deployable Exp", slug="deployable-exp", type="deployable", color="28a745"
+        )
         role = AssetRole.objects.create(name="Laptop Exp", slug="laptop-exp")
         Asset.objects.create(
             name="Export Laptop",

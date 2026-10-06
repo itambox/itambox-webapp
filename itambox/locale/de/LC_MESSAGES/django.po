@@ -929,6 +929,15 @@ msgstr "Antwortnotizen"
 msgid "Invalid state transition from %(old)s to %(new)s."
 msgstr "Ungültiger Statusübergang von %(old)s zu %(new)s."
 
+msgid "The deployed status is managed by checkout and check-in."
+msgstr "Der Status „Im Einsatz“ wird durch Ausgabe und Rückgabe verwaltet."
+
+msgid "An active assignment requires the asset to have deployed status."
+msgstr "Eine aktive Zuweisung erfordert den Status „Im Einsatz“ für das Asset."
+
+msgid "The selected asset is not available for issuance."
+msgstr "Das ausgewählte Asset ist nicht zur Ausgabe verfügbar."
+
 #, python-format
 msgid "The asset '%(asset)s' is not requestable."
 msgstr "Das Asset '%(asset)s' ist nicht anforderbar."
@@ -943,43 +952,29 @@ msgstr ""
 "Das Asset '%(asset)s' ist derzeit nicht verfügbar (Status: %(status)s)."
 
 #, python-format
-msgid ""
-"You already have a pending or approved request for the asset '%(asset)s'."
+msgid "You already have an open request for the asset '%(asset)s'."
 msgstr ""
-"Sie haben bereits eine ausstehende oder genehmigte Anforderung für das Asset"
-" '%(asset)s'."
+"Sie haben bereits eine offene Anforderung für das Asset '%(asset)s'."
 
 #, python-format
-msgid ""
-"You already have a pending or approved request for the asset type "
-"'%(type)s'."
+msgid "You already have an open request for the asset type '%(type)s'."
 msgstr ""
-"Sie haben bereits eine ausstehende oder genehmigte Anforderung für den "
-"Asset-Typ '%(type)s'."
+"Sie haben bereits eine offene Anforderung für den Asset-Typ '%(type)s'."
 
 #, python-format
-msgid ""
-"You already have a pending or approved request for the component "
-"'%(component)s'."
+msgid "You already have an open request for the component '%(component)s'."
 msgstr ""
-"Sie haben bereits eine ausstehende oder genehmigte Anforderung für die "
-"Komponente '%(component)s'."
+"Sie haben bereits eine offene Anforderung für die Komponente '%(component)s'."
 
 #, python-format
-msgid ""
-"You already have a pending or approved request for the accessory "
-"'%(accessory)s'."
+msgid "You already have an open request for the accessory '%(accessory)s'."
 msgstr ""
-"Sie haben bereits eine ausstehende oder genehmigte Anforderung für das "
-"Zubehör '%(accessory)s'."
+"Sie haben bereits eine offene Anforderung für das Zubehör '%(accessory)s'."
 
 #, python-format
-msgid ""
-"You already have a pending or approved request for the consumable "
-"'%(consumable)s'."
+msgid "You already have an open request for the consumable '%(consumable)s'."
 msgstr ""
-"Sie haben bereits eine ausstehende oder genehmigte Anforderung für das "
-"Verbrauchsmaterial '%(consumable)s'."
+"Sie haben bereits eine offene Anforderung für das Verbrauchsmaterial '%(consumable)s'."
 
 msgid "The selected asset does not match the requested asset type."
 msgstr ""
@@ -1275,10 +1270,6 @@ msgstr "Nur ausstehende Anforderungen können genehmigt werden."
 #, python-format
 msgid "Allocated asset '%(name)s' is not marked as requestable."
 msgstr "Das zugewiesene Asset '%(name)s' ist nicht als anforderbar markiert."
-
-msgid "Allocated asset must be in a deployable status."
-msgstr ""
-"Das zugewiesene Asset muss sich in einem einsatzfähigen Status befinden."
 
 msgid "Allocated asset does not match the requested asset type."
 msgstr ""
@@ -10517,11 +10508,6 @@ msgstr "Persönliche API-Token für Integrationen, Skripte und Befehlszeilentool
 msgid "Currency used to display monetary values for this tenant. Amounts are not converted."
 msgstr "Währung für die Anzeige von Geldbeträgen dieses Mandanten. Beträge werden nicht umgerechnet."
 
-#: itambox/assets/views/bulk_scan_views.py:74
-#, python-format
-msgid "Currently assigned to %(holder)s; this asset will be reassigned."
-msgstr "Derzeit %(holder)s zugewiesen; dieses Asset wird neu zugewiesen."
-
 #: itambox/compliance/templates/compliance/custody/sign_error.html:10 itambox/compliance/templates/compliance/custody/sign_error.html:35
 msgid "Custody Link Unavailable"
 msgstr "Verwahrungslink nicht verfügbar"
@@ -15081,14 +15067,8 @@ msgstr "Das ausgewählte Asset gehört zu einem anderen Tenant als das Ziel der 
 msgid "The selected asset does not match hardware item '%(item)s'."
 msgstr "Das ausgewählte Asset passt nicht zur Hardware-Position '%(item)s'."
 
-msgid "The selected asset is already assigned and cannot be selected."
-msgstr "Das ausgewählte Asset ist bereits zugewiesen und kann nicht ausgewählt werden."
-
 msgid "The selected asset is no longer available."
 msgstr "Das ausgewählte Asset ist nicht mehr verfügbar."
-
-msgid "The selected asset is not in a deployable state."
-msgstr "Das ausgewählte Asset ist nicht in einem einsatzbereiten Zustand."
 
 msgid "A cancellation must record who cancelled it."
 msgstr "Bei einer Stornierung muss erfasst werden, wer sie durchgeführt hat."

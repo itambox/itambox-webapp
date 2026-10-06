@@ -17,6 +17,7 @@ class AssignmentSoftDeleteConstraintTests(TestCase):
 
     def setUp(self):
         self.deployable = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
+        baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYED)
 
     def test_checkout_after_soft_deleting_active_assignment(self):
         asset = baker.make(Asset, status=self.deployable, tenant=None)
@@ -25,9 +26,11 @@ class AssignmentSoftDeleteConstraintTests(TestCase):
         checkout_asset(asset=asset, holder=h1)
         assignment = AssetAssignment.objects.get(asset=asset, is_active=True)
         assignment.delete()  # soft delete: deleted_at set, is_active stays True
-        # Must NOT raise IntegrityError on unique_active_assignment_per_asset.
-        checkout_asset(asset=asset, holder=h2)
-        self.assertEqual(AssetAssignment.objects.filter(asset=asset, is_active=True).count(), 1)
+        # The tombstone still owns the asset: a second checkout is refused with a
+        # validation error, never an IntegrityError on unique_active_assignment_per_asset.
+        with self.assertRaises(ValidationError):
+            checkout_asset(asset=asset, holder=h2)
+        self.assertEqual(AssetAssignment.all_objects.filter(asset=asset, is_active=True).count(), 1)
 
 
 class LicenseSeatsGuardTests(TestCase):

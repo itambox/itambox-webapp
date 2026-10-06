@@ -171,11 +171,14 @@ class AssetStateMachineTransitionTests(TenantTestMixin, TestCase):
 
     # --- Valid transitions ---
 
-    def test_deployed_to_in_repair(self):
-        """A deployed asset can be sent for repair."""
-        asset = self._asset(self.deployed)
+    def test_deployed_to_in_repair_requires_checkin(self):
+        """Leaving the deployed status is owned by check-in, not by a status edit."""
+        asset = self._asset(self.deployable)
+        Asset.objects.filter(pk=asset.pk).update(status=self.deployed)
+        asset.refresh_from_db()
         asset.status = self.in_repair
-        asset.full_clean()  # must not raise
+        with self.assertRaises(ValidationError):
+            asset.full_clean()
 
     def test_deployable_to_in_repair(self):
         """A deployable asset can be sent for repair."""

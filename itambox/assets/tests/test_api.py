@@ -63,6 +63,9 @@ class ITAMBoxAPITestCase(APITestCase):
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
         self.role = AssetRole.objects.create(name="Workstation", slug="workstation")
         self.status = StatusLabel.objects.create(name="Ready", slug="ready", type=StatusLabel.TYPE_DEPLOYABLE)
+        self.deployed_status = StatusLabel.objects.create(
+            name="Deployed", slug="deployed", type=StatusLabel.TYPE_DEPLOYED
+        )
 
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer, model="Latitude 5520", slug="latitude-5520"

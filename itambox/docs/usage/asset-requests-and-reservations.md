@@ -16,6 +16,13 @@ handing it over are separate operations: receipt allocates stock to a request;
 claim or checkout records the assignment or inventory issue. A manual completion
 is an explicit exception and creates neither an assignment nor a stock booking.
 
+An asset is eligible for issuance only when it has Deployable status, no active
+assignment, and no active disposal record. Assets in service, under repair, lost,
+or disposed cannot be issued. Deployed status is lifecycle-managed: checkout
+creates an active assignment and sets the asset to Deployed; check-in closes the
+assignment and restores the prior eligible status. Do not set or clear Deployed
+through a manual status edit.
+
 ### Creating a Request
 
 Navigate to **Operations → Procurement → Requests** and click **Create Asset Request**. Fill in:
@@ -45,9 +52,10 @@ When creating a request, ITAMbox enforces several rules:
 
 - The requested item must be **marked as requestable** (assets must have
   `is_requestable=True`; asset types must have `requestable=True`).
-- The requested asset must be in **deployable** status.
-- **Duplicate detection**: you cannot create a second pending or approved
-  request for the same item with the same assignee.
+- The requested asset must satisfy the issuance rule above: **Deployable** status,
+  no active assignment, and no active disposal record.
+- **Duplicate detection**: a pending, approved, or procurement request for the
+  same item and assignee prevents another open request.
 - Quantity must be greater than zero.
 - If both a specific asset and an asset type are selected, the asset must
   belong to that type.
