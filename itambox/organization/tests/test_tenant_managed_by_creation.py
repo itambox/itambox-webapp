@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.context import set_current_tenant
+from core.tasks.context import TaskContext
 from core.tests.mixins import grant
 from organization.access import accessible_tenant_ids
 from organization.forms import TenantForm
@@ -52,7 +53,8 @@ class TenantManagedByCreationTests(TestCase):
         foreign_provider = self._create_provider("Foreign", "foreign")
         deleted_provider = self._create_provider("Deleted", "deleted")
         self._authorize(deleted_provider)
-        deleted_provider.delete()
+        with TaskContext(operation="test.tenant_managed_by_creation.soft_delete_provider"):
+            deleted_provider.delete()
         chained_provider = self._create_provider("Chained", "chained")
         Tenant._base_manager.filter(pk=chained_provider.pk).update(managed_by_id=self.provider.pk)
         self._authorize(chained_provider)
@@ -123,7 +125,8 @@ class TenantManagedByCreationTests(TestCase):
         non_provider = Tenant.objects.create(name="Ordinary tenant", slug="ordinary")
         deleted_provider = self._create_provider("Deleted", "deleted")
         self._authorize(deleted_provider)
-        deleted_provider.delete()
+        with TaskContext(operation="test.tenant_managed_by_creation.soft_delete_provider"):
+            deleted_provider.delete()
         chained_provider = self._create_provider("Chained", "chained")
         Tenant._base_manager.filter(pk=chained_provider.pk).update(managed_by_id=self.provider.pk)
         self._authorize(chained_provider)

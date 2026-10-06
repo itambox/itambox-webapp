@@ -365,14 +365,6 @@
     },
     {
       "path": "itambox/extras/signals.py",
-      "scope": "FunctionDef:_safe_dispatch",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "4915e03754be15563606911c8b7d7af3b8ef764a880cd57c470ee54c63e8acbe",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/signals.py",
       "scope": "FunctionDef:event_on_save",
       "handler_type": "Exception",
       "classification": "silent",

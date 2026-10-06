@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 
 from core.auth.ldap import (
     LDAPConfigurationError,
@@ -12,6 +12,7 @@ from core.auth.ldap import (
 from core.context import get_current_request_id
 from core.errors import IntegrationContext
 from core.tasks.context import TaskContext
+from core.tasks.management import SystemTaskCommand
 from itambox.middleware import get_current_user
 from organization.models import Tenant
 from organization.services import identity_provisioning
@@ -51,7 +52,7 @@ def _directory_text(value):
     return value.decode("utf-8") if isinstance(value, bytes) else value
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Sync users from LDAP directory into local Django users for a specific tenant scope"
 
     def add_arguments(self, parser):

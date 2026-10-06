@@ -1,10 +1,10 @@
-from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from core.models import Job
+from core.tasks.management import SystemTaskCommand
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Process pending background jobs from the database job queue."
 
     def handle(self, *args, **options):

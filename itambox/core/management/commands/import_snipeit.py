@@ -21,20 +21,21 @@ import os
 import sys
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.utils import timezone
 
 from assets.choices import StatusTypeChoices
 from assets.models.choices import WarrantyTypeChoices
 from assets.services import checkout_asset
 from core.errors import IntegrationContext
+from core.tasks.management import SystemTaskCommand
 from inventory.services import checkout_inventory_item, create_component_allocation
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = (
         "Import data from a Snipe-IT instance into ITAMbox.\n\n"
         "IMPORTANT: Run with --dry-run first to verify the mapping.\n\n"

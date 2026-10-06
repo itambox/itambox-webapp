@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextvars
+import logging
 from collections import Counter
 from functools import reduce
 from operator import attrgetter, or_
@@ -50,6 +51,8 @@ from core.validators import validate_file_attachment, validate_image_attachment
 
 # Local application
 from itambox.registry import registry
+
+logger = logging.getLogger(__name__)
 
 
 def _object_pks(objects):
@@ -324,6 +327,7 @@ class ChangeLoggingMixin:
         request_id = get_current_request_id()
 
         if not request_id:
+            self._handle_missing_change_context(action)
             return
 
         if user:
@@ -374,6 +378,29 @@ class ChangeLoggingMixin:
             change_tenant=change_tenant,
             prechange_data=prechange_data,
             postchange_data=postchange_data,
+        )
+
+    def _handle_missing_change_context(self, action):
+        """Refuse to silently drop an audit entry when no execution context is set.
+
+        Audited writes run inside a request or a ``TaskContext`` (state-changing
+        management commands enter one via ``SystemTaskCommand``); a missing
+        request id therefore means a code path forgot to establish its scope,
+        not a legitimate no-op. Dev and test runs raise so the gap fails loudly;
+        production keeps serving and logs at WARNING, because a broken execution
+        context must not take the instance down.
+        """
+        if settings.DEBUG or getattr(settings, "IS_TESTING", False):
+            raise RuntimeError(
+                "Change logging attempted without an execution context "
+                f"(model={self.__class__.__name__} object_id={self.pk} action={action}). "
+                "Enter a request or TaskContext instead of skipping the audit entry."
+            )
+        logger.warning(
+            "Change log entry skipped: no execution context model=%s object_id=%s action=%s",
+            self.__class__.__name__,
+            self.pk,
+            action,
         )
 
     def _write_audit_rows(self, *, action, user, request_id, change_tenant, prechange_data, postchange_data):

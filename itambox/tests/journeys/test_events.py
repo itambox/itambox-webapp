@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 
@@ -19,7 +18,6 @@ class CascadedSoftDeleteEventJourneyTests(JourneyMixin, TestCase):
         self.make_tenant("journey-events")
         self.actor = self.make_member("event-actor", set())
 
-    @pytest.mark.xfail(strict=True, reason="cascade children are logged but emit no Event (#603)")
     def test_cascaded_soft_delete_emits_a_delete_event_for_each_logged_child(self):
         asset = self.make_asset()
         reservation = AssetReservation.objects.create(
@@ -48,4 +46,10 @@ class CascadedSoftDeleteEventJourneyTests(JourneyMixin, TestCase):
         self.assertTrue(
             Event.objects.filter(model=reservation_type, object_id=reservation.pk, action="delete").exists(),
             "the cascaded child has an ObjectChange but no delete Event",
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            reservation.restore()
+        self.assertTrue(
+            Event.objects.filter(model=reservation_type, object_id=reservation.pk, action="restore").exists(),
+            "restoring the cascaded child must emit a restore Event",
         )

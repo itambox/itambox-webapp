@@ -28,7 +28,6 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from core.management.commands._seed.access import SeedAccessMixin, check_seed_access_invariants
@@ -47,6 +46,7 @@ from core.management.commands._seed.operations import SeedOperationsMixin
 from core.management.commands._seed.organizations import SeedOrganizationsMixin
 from core.management.commands._seed.procurement import SeedProcurementMixin
 from core.management.commands._seed.subscriptions import SeedSubscriptionsMixin
+from core.tasks.management import SystemTaskCommand
 
 User = get_user_model()
 
@@ -76,7 +76,7 @@ class Command(
     SeedLifecycleMixin,
     SeedComplianceMixin,
     SeedHistoryMixin,
-    BaseCommand,
+    SystemTaskCommand,
 ):
     help = "Seed the database with a presentation-ready MSP demo dataset."
 
