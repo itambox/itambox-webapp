@@ -16,6 +16,7 @@
   "itambox/assets/tests/test_specification_graphql_readers.py",
   "itambox/assets/tests/test_specification_history_boundaries.py",
   "itambox/assets/tests/test_specification_history_commands.py",
+  "itambox/assets/tests/test_specification_history_races.py",
   "itambox/assets/tests/test_specification_library_permissions.py",
   "itambox/assets/tests/test_specification_library_views.py",
   "itambox/assets/tests/test_specification_native_reference_races.py",
