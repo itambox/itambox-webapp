@@ -39,3 +39,25 @@ class ReservationJourneyTests(JourneyMixin, TestCase):
         other = self.make_holder()
         with self.assertRaises(ValidationError):
             checkout_asset(asset=self.asset, holder=other, request=None)
+
+    def test_checkout_to_asset_during_another_holders_reservation_is_refused(self):
+        with self.assertRaises(ValidationError):
+            checkout_asset(asset=self.asset, asset_target=self.make_asset(), request=None)
+
+    def test_reservation_without_a_holder_blocks_a_location_checkout(self):
+        """A reservation whose holder was removed still guards the asset."""
+        asset = self.make_asset()
+        AssetReservation.objects.create(
+            asset=asset,
+            reserved_for=None,
+            start_date=today() - timedelta(days=1),
+            end_date=today() + timedelta(days=3),
+            status=ReservationStatusChoices.ACTIVE,
+        )
+
+        with self.assertRaises(ValidationError):
+            checkout_asset(asset=asset, location=self.location, request=None)
+
+    def test_reserved_holder_can_still_check_out(self):
+        checkout_asset(asset=self.asset, holder=self.reserved_for, request=None)
+        self.assertTrue(AssetAssignment.objects.filter(asset=self.asset, is_active=True).exists())

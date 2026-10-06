@@ -362,8 +362,6 @@ def _receive_line(line, qty, details_by_line, po, deployable_status, stock_maps)
         )
     if line.asset_type:
         _receive_asset_line(line, qty, details_by_line.get(line.pk, []), po, deployable_status)
-    elif line.license:
-        _receive_license_line(line)
     else:
         _receive_stock_line(line, qty, stock_maps)
     line.qty_received += qty
@@ -383,20 +381,6 @@ def _receive_stock_line(line, qty, stock_maps):
     stock.qty += qty
     stock.save()
     _attribute_quantity_receipt(line, qty)
-
-
-def _receive_license_line(line):
-    """Approve the line's linked license requests without touching seat entitlements."""
-    linked_requests = list(
-        AssetRequest.objects.filter(
-            fulfillment_links__purchase_order_line=line, status=RequestStatusChoices.PROCUREMENT
-        )
-        .select_for_update()
-        .order_by("request_date")
-    )
-    for req in linked_requests:
-        req.status = RequestStatusChoices.APPROVED
-        req.save()
 
 
 def _assert_receipt_state(lines, line_quantities, expected_received):
