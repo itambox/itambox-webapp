@@ -27,7 +27,7 @@ from .models_assignment_write import authorized_assignment_hard_purge, authorize
 
 # Compatibility re-export: adjust_inventory_stock moved to the model-support
 # leaf inventory.models_stock so inventory.models can call it without importing
-# this module (issue #87, phase D). The published call path stays valid.
+# this module. The published call path stays valid.
 from .models_stock import adjust_inventory_stock  # noqa: F401  isort:skip
 
 # Audit operation names. An actorless caller must hold a TaskContext system
@@ -144,7 +144,7 @@ def checkout_inventory_item(
                 .first()
             )
 
-        # ADR-0001 phase 3/4: checking out from a pool owned by another
+        # Checkout from a pool owned by another
         # tenant requires a live TenantResourceGrant with 'use' — resolved
         # BEFORE any availability information is disclosed. The exact grant
         # used is recorded on the assignment (provenance).
@@ -610,7 +610,7 @@ def _asset_pools(items, tenant):
         return {}
     assigned_ids = AssetAssignment.objects.filter(is_active=True).values("asset_id")
     rows = (
-        # #496: reuse the canonical helper. A raw
+        # Reuse the canonical helper. A raw
         # ``.exclude(disposals__cancelled_at__isnull=True)`` renders as a LEFT OUTER JOIN
         # inside a NOT EXISTS subquery and would drop every device that has no disposal
         # record at all (the joined NULL row satisfies ``cancelled_at IS NULL``).

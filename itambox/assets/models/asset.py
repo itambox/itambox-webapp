@@ -93,7 +93,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     )
     purchase_date = models.DateField(blank=True, null=True, db_index=True, verbose_name=_("Purchase Date"))
 
-    # Procurement Metadata (Maturity Phase 1)
+    # Procurement metadata.
     purchase_cost = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Purchase Cost")
     )

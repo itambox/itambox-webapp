@@ -298,7 +298,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # Custom fields must exist before the layout pairs them into rows.
         self._configure_custom_fields(selected_asset_type)
 
-        # _configure_custom_fields builds the T15-aware layout after dynamic fields are known.
+        # Build the custom-field-aware layout after dynamic fields are known.
 
     def _resolve_asset_type_id(self, request, explicit_initial):
         """Return the raw asset-type ID the form should work from, or None.

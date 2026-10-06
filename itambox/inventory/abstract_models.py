@@ -104,7 +104,7 @@ class AbstractStock(ChangeLoggingMixin, BaseModel):
         verbose_name=_("Location"),
         db_index=True,
     )
-    # ADR-0001 phase 4: a pool is owned by its location's tenant — always
+    # Pool ownership follows its location's tenant; it is always
     # derived, never client-supplied (save()/clean() below). Tenant scoping
     # uses THIS field, not the catalogue item's tenant: a global item stays
     # visible everywhere, its stock does not become global.
@@ -209,9 +209,9 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
         "extras.Tag", related_name="%(class)s_assignments", verbose_name=_("Tags"), blank=True
     )
 
-    # --- ADR-0001 phase 4: historical ownership + grant provenance ---------
+    # --- Historical ownership and grant provenance -------------------------
     # Derived on save, nullable because pre-remediation history may not be
-    # reconstructable (see the phase-1 integrity report's ambiguous class).
+    # reconstructable (see the integrity report's ambiguous class).
     source_tenant = models.ForeignKey(
         "organization.Tenant",
         on_delete=models.PROTECT,
@@ -330,7 +330,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
             and self.source_tenant_id != self.target_tenant_id
         )
         if not cross_tenant:
-            # Same-tenant assignments carry no grant (ADR-0001 phase 4).
+            # Same-tenant assignments carry no grant.
             self.resource_grant = None
             return
         # A cross-tenant assignment must reference a grant that covers the

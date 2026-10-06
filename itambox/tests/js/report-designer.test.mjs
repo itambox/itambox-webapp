@@ -34,6 +34,12 @@ class FakeNode {
     this.type = '';
     this.className = '';
     this.innerHTML = '';
+    this.srcdoc = '';
+    this.attributes = new Map();
+    this.classList = {
+      add: () => {},
+      remove: () => {},
+    };
   }
 
   addEventListener(name, handler) {
@@ -42,6 +48,10 @@ class FakeNode {
 
   querySelector(selector) {
     return this.queryResults.get(selector) || null;
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) || null;
   }
 
   insertBefore(node, referenceNode) {
@@ -120,6 +130,59 @@ test('report preview remains available inside the report template editor', () =>
 
   assert.equal(submitParent.children.length, 2, 'report editor receives one preview button');
   assert.equal(submitParent.children[1].id, 'btn-preview-report');
+});
+
+test('report preview escapes error text before rendering it in the iframe', async () => {
+  const submitButton = new FakeNode('button', 'report-submit');
+  const submitParent = new FakeNode('div', 'report-actions');
+  submitParent.insertBefore(submitButton, null);
+  const reportEditor = new FakeNode('div', 'report-template-editor');
+  reportEditor.queryResults.set('input[name="submit"], button[type="submit"]', submitButton);
+  const reportModal = new FakeNode('div', 'previewModal');
+  reportModal.attributes.set('data-preview-url', '/extras/reports/templates/preview/');
+  const spinner = new FakeNode('div', 'previewSpinner');
+  const frame = new FakeNode('iframe', 'previewFrame');
+  const form = {};
+  const document = {
+    readyState: 'complete',
+    getElementById(id) {
+      return new Map([
+        ['report-template-editor', reportEditor],
+        ['previewModal', reportModal],
+        ['div_id_included_columns', null],
+        ['btn-preview-report', null],
+        ['previewSpinner', spinner],
+        ['previewFrame', frame],
+      ]).get(id) || null;
+    },
+    querySelector(selector) {
+      if (selector === '#report-template-editor form') return form;
+      if (selector === 'meta[name="csp-nonce"]') return null;
+      return null;
+    },
+    createElement(tagName) {
+      return new FakeNode(tagName);
+    },
+    addEventListener() {},
+  };
+  const errorPayload = '<img src=x onerror=alert(1)>';
+  const context = createContext({
+    console: { error() {} },
+    document,
+    gettext: (message) => message,
+    FormData: class {
+      constructor() {}
+    },
+    bootstrap: { Modal: { getOrCreateInstance: () => ({ show() {} }) } },
+    fetch: async () => ({ ok: false, text: async () => errorPayload }),
+  });
+
+  runInContext(compiled, context);
+  submitParent.children[1].listeners.get('click')({ preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.ok(frame.srcdoc.includes('&lt;img src=x onerror=alert(1)&gt;'));
+  assert.ok(!frame.srcdoc.includes(errorPayload));
 });
 
 test('report designer offers the agreement entitlement without license seat keys', () => {

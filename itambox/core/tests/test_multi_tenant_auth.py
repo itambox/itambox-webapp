@@ -94,6 +94,27 @@ class MultiTenantAuthTestCase(TestCase):
         self.open_patcher.start()
         self.addCleanup(self.open_patcher.stop)
 
+    def test_registered_external_mock_cleanups_restore_the_originals(self):
+        import builtins
+
+        import requests
+        from saml2 import sigver
+
+        originals = (
+            self.xmlsec_patcher.temp_original,
+            self.requests_patcher.temp_original,
+            self.open_patcher.temp_original,
+        )
+        self.assertIsNot(sigver.get_xmlsec_binary, originals[0])
+        self.assertIsNot(requests.request, originals[1])
+        self.assertIsNot(builtins.open, originals[2])
+
+        self.doCleanups()
+
+        self.assertIs(sigver.get_xmlsec_binary, originals[0])
+        self.assertIs(requests.request, originals[1])
+        self.assertIs(builtins.open, originals[2])
+
     def tearDown(self):
         set_current_tenant(None)
 

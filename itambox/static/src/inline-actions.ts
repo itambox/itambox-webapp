@@ -39,7 +39,7 @@
         // Stash the real label once: on repeated clicks within the feedback
         // window the current textContent is already the feedback text, and
         // using it as the new "original" would leave the button stuck on
-        // "Copied!" (hit live on demo.itambox.dev, #314).
+        // "Copied!"; during the feedback interval, current textContent is already feedback text,
         btn.setAttribute('data-copy-original', btn.textContent || '');
       }
       btn.textContent = feedback;
@@ -49,7 +49,7 @@
       }, 2000);
     }).catch(function () {
       // Clipboard access can be denied (InPrivate, unfocused window, headless
-      // context). Fail visibly instead of silently doing nothing (#314).
+      // context). Fail visibly instead of silently doing nothing.
       console.warn('ITAMbox: clipboard write denied — handoff link not copied.');
     });
   }

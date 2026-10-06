@@ -1,10 +1,12 @@
 import csv
-import inspect
 import io
-from pathlib import Path
+from html.parser import HTMLParser
 from types import SimpleNamespace
+from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.contrib.auth.models import AnonymousUser
+from django.template.loader import render_to_string
+from django.test import RequestFactory, TestCase
 from jinja2.exceptions import SecurityError
 
 from core.reports.rendering import render_report_csv, render_report_html
@@ -13,7 +15,7 @@ from extras.models import ReportTemplate
 from extras.views import ReportTemplatePreviewView
 
 
-class ReportCustomHTMLRemovalTests(SimpleTestCase):
+class ReportCustomHTMLRemovalTests(TestCase):
     def test_report_model_and_form_keep_custom_html_without_retired_shape_fields(self):
         fields = {field.name: field for field in ReportTemplate._meta.get_fields()}
 
@@ -50,17 +52,48 @@ class ReportCustomHTMLRemovalTests(SimpleTestCase):
                 SimpleNamespace(template_content="{{ report_name.__class__.mro }}"),
             )
 
-    def test_preview_srcdoc_is_sandboxed_and_error_text_is_escaped(self):
-        root = Path(__file__).resolve().parents[2]
-        designer = (root / "static" / "src" / "report-designer.ts").read_text(encoding="utf-8")
-        form = (root / "templates" / "core" / "reports" / "report_template_form.html").read_text(encoding="utf-8")
+    def test_rendered_preview_iframe_keeps_sandbox_attribute(self):
+        class FrameParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.frames = []
 
-        self.assertNotIn("frame.srcdoc = cleanErr", designer)
-        self.assertIn("escapeHtml(cleanErr)", designer)
-        self.assertIn('sandbox="allow-same-origin"', form)
+            def handle_starttag(self, tag, attrs):
+                if tag == "iframe":
+                    self.frames.append(dict(attrs))
 
-    def test_preview_scope_requires_superuser_for_posted_tenant_selection(self):
-        source = inspect.getsource(ReportTemplatePreviewView.post)
+        request = RequestFactory().get("/extras/reports/templates/1/edit/")
+        request.user = AnonymousUser()
+        html = render_to_string(
+            "core/reports/report_template_form.html",
+            {"form": ReportTemplateForm(), "object": SimpleNamespace(included_columns=[]), "title": "Preview"},
+            request=request,
+        )
 
-        self.assertIn("request.user.is_superuser", source)
-        self.assertIn("get_current_tenant()", source)
+        parser = FrameParser()
+        parser.feed(html)
+        self.assertEqual(len(parser.frames), 1)
+        self.assertEqual(parser.frames[0].get("sandbox"), "allow-same-origin")
+
+    def test_non_superuser_preview_uses_the_active_tenant(self):
+        active_tenant = SimpleNamespace(pk=7)
+        request = RequestFactory().post(
+            "/extras/reports/templates/preview/",
+            {"report_type": "asset_summary", "tenant": "999", "template_content": ""},
+        )
+        request.user = SimpleNamespace(is_superuser=False)
+        context_data = {}
+
+        with (
+            patch("core.managers.get_current_tenant", return_value=active_tenant) as get_active_tenant,
+            patch("extras.views._specification_inputs", return_value=([], [])),
+            patch.object(ReportTemplate, "full_clean"),
+            patch("core.reports.build_report_context", return_value=([], [], [], [], None, context_data)) as build,
+            patch("extras.views.render_report_html", return_value="<html></html>"),
+        ):
+            response = ReportTemplatePreviewView().post(request)
+
+        self.assertEqual(response.status_code, 200)
+        get_active_tenant.assert_called_once_with()
+        self.assertIs(build.call_args.kwargs["active_tenant"], active_tenant)
+        self.assertEqual(build.call_args.kwargs["filter_tenants"], [])

@@ -91,7 +91,7 @@ class TokenPermissions(BasePermission):
             # unbound — fail closed. All-accessible is a bound scope (not the
             # superuser global view): objectless mutation permissions stay
             # read-only under it in the membership backend, so recognising it
-            # here restores its reads without widening write access (issue #134).
+            # here restores its reads without widening write access.
             return False
 
         return request.user.has_perms(perms)
@@ -111,7 +111,7 @@ class TokenPermissions(BasePermission):
         # rather than relying on StrictTenantPermission to catch a tenant mismatch.
         if request.user.has_perms(perms, obj):
             return True
-        # ADR-0001 phase 4b: shared pools and recipient-side assignments are
+        # Shared pools and recipient-side assignments are
         # READABLE across the boundary — the view permission is then checked
         # in the ACTIVE tenant instead of the (foreign) object tenant.
         if request.method in SAFE_METHODS:
@@ -159,7 +159,7 @@ class StrictTenantPermission(BasePermission):
             # scopes (tenant group / All accessible tenants) the boundary is the
             # actor's authorized tenant SET, resolved by the same canonical model
             # the scoped managers use — never an AssetHolder profile, which is a
-            # domain profile, not an authorization source (issue #134). With no
+            # domain profile, not an authorization source. With no
             # authorized scope active, fail closed (hidden as 404 to avoid pk
             # enumeration).
             if get_current_tenant_group() is not None or get_current_all_accessible():
@@ -181,7 +181,7 @@ class StrictTenantPermission(BasePermission):
                 return True
             # Enforce boundary: Object's tenant must match user's tenant
             if obj_tenant != user_tenant:
-                # ADR-0001 phase 4b: two READ-ONLY cross-tenant exceptions —
+                # Two READ-ONLY cross-tenant exceptions —
                 # a stock pool shared to the active tenant by a live grant,
                 # and an assignment whose TARGET is the active tenant (the
                 # recipient side of a granted checkout). Never mutation.

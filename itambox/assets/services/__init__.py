@@ -382,7 +382,7 @@ def checkin_asset(
 
 
 #: Editable metadata of a disposal record. ``asset`` is deliberately absent: a
-#: record's asset identity is immutable (issue #496).
+#: record's asset identity is immutable.
 DISPOSAL_METADATA_FIELDS = (
     "disposal_method",
     "disposal_date",
@@ -548,7 +548,7 @@ def dispose_asset(
         # Lock the asset row to prevent concurrent mutations
         asset = Asset._base_manager.select_for_update().get(pk=asset.pk)
 
-        # Reject a second disposal while an ACTIVE record exists (#496) BEFORE any
+        # Reject a second disposal while an ACTIVE record exists BEFORE any
         # side effect: the predecessor implementation hard-deleted that record and
         # replaced it, which silently destroyed GDPR/WEEE/SOC2 evidence. Cancelled
         # records are history and do not block a new disposal.
@@ -556,7 +556,7 @@ def dispose_asset(
         if duplicate_error is not None:
             raise duplicate_error
 
-        # The archived transition is REQUIRED, not optional (#496 language review): abort
+        # The archived transition is REQUIRED, not optional: abort
         # atomically before the auto check-in, the record and the asset stamp when the
         # estate has no archived status. Status labels are never created automatically.
         archived_label = StatusLabel.objects.filter(type=StatusTypeChoices.ARCHIVED).first()
@@ -590,7 +590,7 @@ def dispose_asset(
             # above and this insert. The conditional unique constraint is the
             # authority for "one active record per asset", so a lost race becomes
             # the same clean rejection — never a database error surfaced to the
-            # operator and never a replaced record (#496).
+            # operator and never a replaced record.
             error = _active_disposal_error(asset)
             if error is None:
                 # Some other integrity failure: keep it visible as such.
@@ -663,7 +663,7 @@ def cancel_asset_disposal(
         if locked.cancelled_at is not None:
             raise ValidationError(_("This disposal has already been cancelled."))
 
-        # Leaving the archived state needs the pending label (#496 language review): abort
+        # Leaving the archived state needs the pending label: abort
         # before the record, the asset and the audit trail are touched. Never create it.
         pending_label = StatusLabel.objects.filter(type=StatusTypeChoices.PENDING).first()
         if pending_label is None:
@@ -679,7 +679,7 @@ def cancel_asset_disposal(
 
         # Order matters: the record is cancelled FIRST, because Asset.clean()
         # refuses to move an asset out of `archived` while an active record exists
-        # (#496).
+        # The cancellation order preserves this invariant.
         asset.disposed_at = None
         asset.disposal_value = None
         update_fields = ["disposed_at", "disposal_value", "updated_at"]

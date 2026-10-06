@@ -3740,30 +3740,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_mitigations_phase2.py",
-      "code": "F401",
-      "message": "'sys' imported but unused",
-      "source": "import sys",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_mitigations_phase4.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_mitigations_phase4.py",
-      "code": "F401",
-      "message": "'organization.models.Location' imported but unused",
-      "source": "from organization.models import AssetHolder, Location, Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_models.py",
       "code": "F401",
       "message": "'assets.models.AssetType' imported but unused",
@@ -3792,14 +3768,6 @@
       "code": "F401",
       "message": "'unittest.mock.MagicMock' imported but unused",
       "source": "from unittest.mock import MagicMock, patch",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_phase3_changelog_models.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import Location, Membership, Role, Site, Tenant",
       "context": "Module:body",
       "count": 1
     },
@@ -5948,14 +5916,6 @@
       "count": 1
     },
     {
-      "path": "itambox/licenses/tests/test_phase1_cross_tenant.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import AssetHolder, Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/licenses/views.py",
       "code": "F401",
       "message": "'assets.forms.import_forms.LicenseBulkImportForm' imported but unused",
@@ -6488,14 +6448,6 @@
       "code": "F401",
       "message": "'organization.models.Membership' imported but unused",
       "source": "from organization.models import Membership, Role, RoleGrantScope, Tenant, TenantGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/tests/test_phase1_cross_tenant.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import (",
       "context": "Module:body",
       "count": 1
     },
@@ -7625,14 +7577,6 @@
       "message": "'self.software.updated_at.isoformat()' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "etag = f'W/\"{self.software.updated_at.isoformat()}\"'",
       "context": "Module:body/ClassDef:SoftwareApiTenantRepinTests:body/FunctionDef:test_patch_tenant_null_does_not_globalize:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/tests/test_phase1_cross_tenant.py",
-      "code": "B907",
-      "message": "'self.software_global.updated_at.isoformat()' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "etag = f'W/\"{self.software_global.updated_at.isoformat()}\"'",
-      "context": "Module:body/ClassDef:SoftwareApiCrossTenantTestCase:body/FunctionDef:test_global_software_delete_allowed_for_superuser:body",
       "count": 1
     },
     {

@@ -38,7 +38,7 @@ class BaseCheckoutForm(forms.Form):
         stock_model = kwargs.pop("stock_model", None)
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        # ADR-0001 phase 4b: a checkout assigns INTO the acting tenant, so
+        # A checkout assigns into the acting tenant, so
         # targets scope to the ACTIVE tenant (falling back to the item's
         # tenant outside a request context — identical for the owner flow,
         # correct for a grantee consuming a shared pool).

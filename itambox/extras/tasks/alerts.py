@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # A claimed dispatch owns its alert until the claim lease expires: longer than
 # any plausible channel send, short enough that a crashed run is still recovered
-# by a later evaluation without ever racing an active attempt (issue #567, WP4).
+# by a later evaluation without ever racing an active attempt.
 _DISPATCH_CLAIM_LEASE = timezone.timedelta(minutes=15)
 
 
@@ -177,7 +177,7 @@ def _schedule_alert_dispatch(rule, match, alert_log, expected_prior_notified_at=
         try:
             # Fence the completion to this run's own delivery id: a run that no
             # longer owns the claim (superseded by a newer attempt) must not
-            # overwrite the newer result (issue #567, WP4).
+            # overwrite the newer result.
             completed = AlertLog.unscoped.filter(pk=alert_id, last_delivery_id=delivery_id).update(
                 delivery_status=delivery,
                 delivery_outcome=_delivery_outcome(delivery),
@@ -367,7 +367,7 @@ def _renotify_when_due(rule, match, existing, now, key, scheduled_dispatch_keys)
         # Mark the planned dispatch atomically against the notification state
         # this evaluation read: a parallel evaluation that already advanced the
         # alert wins the planning write and this run backs off without
-        # scheduling (issue #567, WP4).
+        # scheduling.
         prior_notified_at = existing.last_notified_at
         prior_condition = (
             Q(last_notified_at__isnull=True) if prior_notified_at is None else Q(last_notified_at=prior_notified_at)
@@ -394,7 +394,7 @@ def _dispatch_channels(rule, match, alert_log, delivery_id=None):
     delivery identifier, the attempt timestamp, and — for failures — the typed
     error class and a user-visible message when the boundary declared one.
     """
-    # Scope guard (issue #567): a rule delivers only through channels of its
+    # Scope guard: a rule delivers only through channels of its
     # own scope — a tenant rule through its own tenant's channels, a
     # platform-wide rule through platform-wide channels. The tenant-scoping
     # manager already excludes foreign rows in a tenant context; the explicit
@@ -408,7 +408,7 @@ def _dispatch_channels(rule, match, alert_log, delivery_id=None):
         return {"__no_channels__": "no channels attached to this rule"}
     # A disabled channel is never contacted; an alert whose attached channels
     # are all disabled records an explicit reason instead of silently
-    # reporting success (issue #567).
+    # reporting success.
     channels = channels.filter(enabled=True)
     if not channels.exists():
         return {"__no_enabled_channels__": "every attached channel is disabled"}

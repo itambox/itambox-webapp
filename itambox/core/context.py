@@ -34,7 +34,7 @@ _current_tenant_group = contextvars.ContextVar("current_tenant_group", default=N
 _current_membership = contextvars.ContextVar("current_membership", default=None)
 # "All accessible tenants" scope for a non-superuser: no single tenant/group is
 # active, yet the request is NOT global — it is scoped to exactly the tenants the
-# canonical resolver authorizes (issue #29). Distinct from the superuser global
+# canonical resolver authorizes. Distinct from the superuser global
 # scope (all three None + is_superuser) so it can never widen into it.
 _current_all_accessible = contextvars.ContextVar("current_all_accessible", default=False)
 _descendant_group_ids_cache = contextvars.ContextVar("descendant_group_ids_cache", default=None)

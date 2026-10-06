@@ -15,7 +15,7 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         # Monkey-patch ModelChoiceField.queryset to dynamically apply tenant scoping at request time
-        # Issue #445: replace the vendor Success/Failure resubmission action
+        # Register the all-or-nothing guarded vendor resubmission action.
         # with the all-or-nothing guarded variant. Importing the guard module
         # here runs no ORM queries.
         # inline import: app-registry: avoid AppRegistryNotReady at app-load time

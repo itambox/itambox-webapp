@@ -662,7 +662,7 @@ class AssetDisposalEolReportProvider(ReportDefinition):
 
     cells = {
         "disposal_asset": lambda disposal, request: str(disposal.asset) if disposal.asset else "-",
-        # #496: cancelled records stay in the evidence list, visibly distinct from
+        # Cancelled records stay in the evidence list, visibly distinct from
         # the disposals that still own their asset.
         "disposal_status": lambda disposal, request: _("Cancelled") if disposal.is_cancelled else _("Disposed"),
         "disposal_cancelled_at": lambda disposal, request: (
@@ -717,7 +717,7 @@ class AssetDisposalEolReportProvider(ReportDefinition):
     }
 
     def get_queryset(self, request: ReportRequest):
-        # #496 repair14: an uncancelled tombstone is still ACTIVE, so the effective cards and
+        # An uncancelled tombstone is still ACTIVE, so the effective cards and
         # the chart must see it. Tenant scoping stays in scope_to_tenants.
         queryset = AssetDisposal.all_objects.select_related("asset", "asset__tenant")
         return self.scope_to_tenants(queryset, request)
@@ -729,7 +729,7 @@ class AssetDisposalEolReportProvider(ReportDefinition):
         if not request.template.include_summary_cards:
             return []
 
-        # #496: historical rows (including cancelled ones) stay in the report, but the
+        # Historical rows (including cancelled ones) stay in the report, but the
         # effective cards may only reflect records that still own their asset. Cancelled
         # proceeds are not proceeds.
         active = queryset.filter(cancelled_at__isnull=True)
@@ -749,7 +749,7 @@ class AssetDisposalEolReportProvider(ReportDefinition):
         if not request.template.include_distribution_chart:
             return ""
         method_counts = {}
-        # #496: the distribution describes what is still disposed; cancelled records are
+        # The distribution describes what is still disposed; cancelled records are
         # history and stay in the rows, not in the chart inputs.
         for disposal in [record for record in records if not record.is_cancelled]:
             label = disposal.get_disposal_method_display()

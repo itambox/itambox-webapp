@@ -1118,7 +1118,7 @@ class LowStockWidget(DashboardWidget):
         # tenant column, so they are scoped the same way via each model's
         # tenant-scoping manager (`.objects`). An explicit per-widget /
         # tenant-bound-dashboard target additionally narrows both sides to that
-        # one tenant (issue #133: no more active-tenant/AssetHolder fallback).
+        # one tenant; there is no active-tenant or AssetHolder fallback.
         # The per-item-type work lives in helpers so this stays simple.
         requested, target = _request_target_scope(request, self.config)
         if requested and target is None:
@@ -1370,7 +1370,7 @@ class TenantSpendWidget(DashboardWidget):
     description = _lazy("Purchase cost grouped by tenant (top 8)")
     template_name = "extras/dashboard/widgets/tenant_spend.html"
     # Not admin-only: a standard user sees spend grouped across exactly the
-    # tenants they are authorized to access (issue #133). The scope is enforced
+    # tenants they are authorized to access. The scope is enforced
     # by the canonical manager in get_context, never a permission gate here.
 
     # NOTE: the former 'chart_type' and 'currency' symbol options were dropped.

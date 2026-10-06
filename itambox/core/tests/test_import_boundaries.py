@@ -1034,7 +1034,7 @@ class TenantResourceGrantBoundaryTests(SimpleTestCase):
         if (REPO_ROOT / ".git").exists():
             base = RESOURCE_GRANT_TEST_MANIFEST["base_commit"]
             diff = subprocess.run(
-                ["git", "diff", "--name-only", base, "--"],
+                ["git", "diff", "--name-only", "--find-renames=20%", base, "--"],
                 cwd=REPO_ROOT,
                 check=True,
                 capture_output=True,

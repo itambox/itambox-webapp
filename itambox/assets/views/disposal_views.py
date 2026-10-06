@@ -31,7 +31,7 @@ from itambox.views.generic.service_views import GenericTransactionView
 class AssetDisposalListView(ObjectListView):
     """Disposal history: active records and cancelled (preserved) records."""
 
-    # #496 repair14: the history includes tombstones (soft-deleted, uncancelled records are
+    # The history includes tombstones (soft-deleted, uncancelled records are
     # still active evidence), resolved through the tenant-safe manager that includes them.
     queryset = AssetDisposal.all_objects.select_related("asset", "asset__asset_type__manufacturer", "cancelled_by")
     filterset = AssetDisposalFilterSet
@@ -41,7 +41,7 @@ class AssetDisposalListView(ObjectListView):
 
 
 class AssetDisposalDetailView(ObjectDetailView):
-    # The visible "View" links of a tombstone must resolve (#496 repair14).
+    # The visible "View" links of a tombstone must resolve.
     queryset = AssetDisposal.all_objects.select_related(
         "asset", "asset__asset_type__manufacturer", "asset__tenant", "cancelled_by"
     )
@@ -118,7 +118,7 @@ class AssetDisposalCancelView(GenericTransactionView):
     """
 
     permission_required = ("assets.dispose_asset",)
-    # #496 repair12: the blocking record may be a tombstone (soft-deleted, not cancelled),
+    # The blocking record may be a tombstone (soft-deleted, not cancelled),
     # so the cancel view must resolve it through the tenant-safe manager that includes
     # them. Tenant narrowing still happens in SecuredObjectActionMixin.get_queryset
     # (a foreign record stays a 404).

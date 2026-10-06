@@ -17,7 +17,7 @@ from organization.models import AssetHolder, CostCenter, Location, Tenant
 from .filters import SubscriptionFilterSet
 from .models import Subscription, SubscriptionAssignment
 
-# The exclusive Contract/Subscription ownership mapping (issue #500): the same
+# Contract and Subscription forms share one exclusive ownership mapping: the same
 # text ships on the Contract type field, so one agreement is recorded in one
 # module only. Kept as one constant so both shipped surfaces cannot drift.
 AGREEMENT_OWNERSHIP_HELP = _(
