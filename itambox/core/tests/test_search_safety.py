@@ -74,7 +74,7 @@ class SearchLookupAllowlistTests(TestCase):
         request = RequestFactory().get("/search/?q=needle&lookup=regex&obj_type=Asset")
         request.user = SimpleNamespace(is_authenticated=True)
         with patch("itambox.views.utility.import_string", return_value=Backend):
-            response = SearchView().get(request)
+            response = SearchView.as_view()(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(calls, [("needle", request.user, ["Asset"], "icontains")])
