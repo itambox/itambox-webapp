@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 76,
-  "policy_sha256": "b55aae61246daa001ff2e677f27da1baf1c0c1225ff3a555fff94ea74ee80b83",
+  "policy_sha256": "dd1916654f738c65e7921bf26be7a27fc925aae31f7c7ac2729627cc3d1e911d",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -428,15 +428,6 @@
       ]
     },
     {
-      "sequence": 72,
-      "path": "itambox/inventory/models_kit_checkout.py",
-      "module": "inventory.models_kit_checkout",
-      "issue": "#446",
-      "note": "Issue #446 whole-module admission for the model-owned checkout port. The SingleProviderSlot lifecycle, exact callable contract, and app-ready provider registration are covered without admitting the concrete assets service implementation.",
-      "scope": "module",
-      "symbols": []
-    },
-    {
       "sequence": 73,
       "path": "itambox/inventory/models_stock.py",
       "module": "inventory.models_stock",
@@ -686,15 +677,6 @@
       ]
     },
     {
-      "sequence": 74,
-      "path": "itambox/software/models_reconciliation.py",
-      "module": "software.models_reconciliation",
-      "issue": "#446",
-      "note": "Issue #446 whole-module admission for the model-owned software reconciliation port. The port remains domain-blind, provider registration is composition-owned by LicensesConfig.ready(), and the concrete ORM implementation stays outside the projection.",
-      "scope": "module",
-      "symbols": []
-    },
-    {
       "sequence": 28,
       "path": "itambox/subscriptions/api/serializers.py",
       "module": "subscriptions.api.serializers",
@@ -716,15 +698,6 @@
       "symbols": [
         "SubscriptionStatusCompatibilitySerializer"
       ]
-    },
-    {
-      "sequence": 75,
-      "path": "itambox/subscriptions/models_seat_usage.py",
-      "module": "subscriptions.models_seat_usage",
-      "issue": "#446",
-      "note": "Issue #446 whole-module admission for the model-owned subscription seat-usage port. The SingleProviderSlot wrapper is checked independently from the concrete license query adapter and preserves zero-query lookup semantics.",
-      "scope": "module",
-      "symbols": []
     },
     {
       "sequence": 47,
@@ -942,6 +915,27 @@
       "module": "core.tasks.webhooks",
       "issue": "#93",
       "reason": "moved to extras.tasks.webhooks by issue #445 ownership cutover; admission continues under the new record"
+    },
+    {
+      "sequence": 72,
+      "path": "itambox/inventory/models_kit_checkout.py",
+      "module": "inventory.models_kit_checkout",
+      "issue": "#446",
+      "reason": "removed with the model-owned port; the concrete implementation is now called directly by its owning layer"
+    },
+    {
+      "sequence": 74,
+      "path": "itambox/software/models_reconciliation.py",
+      "module": "software.models_reconciliation",
+      "issue": "#446",
+      "reason": "removed with the model-owned port; the concrete implementation is now called directly by its owning layer"
+    },
+    {
+      "sequence": 75,
+      "path": "itambox/subscriptions/models_seat_usage.py",
+      "module": "subscriptions.models_seat_usage",
+      "issue": "#446",
+      "reason": "removed with the model-owned port; the concrete implementation is now called directly by its owning layer"
     }
   ]
 }
