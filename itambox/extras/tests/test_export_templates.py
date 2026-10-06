@@ -282,3 +282,50 @@ class ExportTemplateTenantIsolationTests(TestCase):
         body = resp.content.decode()
         self.assertIn("AlphaInTenantA", body)
         self.assertNotIn("BetaInTenantB", body)
+
+
+class DeniedTargetExportTemplateTests(TestCase):
+    """A model the export inventory denies is unreachable — including through a
+    persisted template that a superuser authored before the model was denied."""
+
+    def setUp(self):
+        from compliance.models import CustodyReceipt
+
+        self.denied_model = CustodyReceipt
+        self.denied_ct = ContentType.objects.get_for_model(CustodyReceipt)
+        self.superuser = User.objects.create_superuser(
+            username="denied-template-admin", password="pw", email="denied-template-admin@example.test"
+        )
+        self.client.force_login(self.superuser)
+        self.tmpl = ExportTemplate.objects.create(
+            name="Custody generic export",
+            content_type=self.denied_ct,
+            template_code="{% for obj in queryset %}{{ obj.token }}\n{% endfor %}",
+            file_extension="csv",
+            mime_type="text/csv",
+        )
+
+    def test_denied_content_type_is_absent_from_the_authoring_picker(self):
+        self.assertNotIn(self.denied_ct, exportable_content_types())
+        form = ExportTemplateForm()
+        self.assertNotIn(self.denied_ct, form.fields["content_type"].queryset)
+
+    def test_denied_target_template_renders_nothing_on_the_generic_route(self):
+        url = reverse(
+            "object_export",
+            kwargs={
+                "app_label": "compliance",
+                "model_name": "custodyreceipt",
+                "template_id": self.tmpl.pk,
+            },
+        )
+        for query in ("", "?format=csv&export_scope=all", "?format=yaml"):
+            with self.subTest(query=query):
+                response = self.client.get(url + query)
+                self.assertEqual(response.status_code, 404)
+
+    def test_template_detail_hides_the_export_affordance_for_a_denied_target(self):
+        response = self.client.get(reverse("extras:exporttemplate_detail", kwargs={"pk": self.tmpl.pk}))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertNotIn("/export/compliance/custodyreceipt/", body)

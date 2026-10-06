@@ -2073,3 +2073,53 @@ class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
         self.assertLess(response.status_code, 300)
         self.assertContains(response, "dummy-export-verification-hash")
         self.assertNotContains(response, DUMMY_TOKEN_A)
+
+
+class CustodyReceiptGenericExportContainmentTests(CustodyRBACFixtureMixin, TestCase):
+    """The generic CSV/YAML/template route stays closed for custody receipts.
+
+    ``CustodyReceipt`` keeps its deliberately unscoped default manager because the
+    public token sign flow must resolve a receipt regardless of the requester's
+    tenant context; its dedicated JSON/PDF exports (behind
+    ``compliance.export_custodyreceipt`` and asset-tenant scoping) are
+    authoritative. The generic route used to export every tenant's signature
+    evidence to any principal holding only ``compliance.view_custodyreceipt``.
+    """
+
+    def _generic_export_urls(self):
+        base = reverse(
+            "object_export",
+            kwargs={"app_label": "compliance", "model_name": "custodyreceipt", "template_id": 0},
+        )
+        return (
+            base + "?format=csv&export_scope=all",
+            base + "?format=yaml&export_scope=all",
+            base + "?format=csv&export_scope=filtered",
+            base + f"?format=csv&pk={self.receipt_a.pk},{self.receipt_b.pk}",
+        )
+
+    def _assert_generic_paths_fail_closed(self):
+        for url in self._generic_export_urls():
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 404)
+                content = response.content.decode("utf-8", "replace")
+                self.assertNotIn(DUMMY_TOKEN_A, content)
+                self.assertNotIn(DUMMY_TOKEN_B, content)
+
+    def test_view_only_holder_is_denied(self):
+        """The seeded technician persona holds view + prepare, never export."""
+        self._login_to_tenant(self.technician, self.tenant_a)
+        self._assert_generic_paths_fail_closed()
+
+    def test_cross_tenant_view_holder_is_denied(self):
+        self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
+        self._assert_generic_paths_fail_closed()
+
+    def test_holder_of_the_dedicated_export_permission_is_denied(self):
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+        self._assert_generic_paths_fail_closed()
+
+    def test_superuser_is_denied(self):
+        self.client.force_login(self.superadmin)
+        self._assert_generic_paths_fail_closed()

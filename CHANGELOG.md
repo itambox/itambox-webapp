@@ -8,6 +8,11 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+### Changed
+
+- Generic CSV/YAML/template export is now explicit opt-in and scope-safe (issue #585). Every installed model carries a reviewed data-transfer declaration; an undeclared or denied model answers 404 on every generic export path (CSV, YAML, template render, `all`, `filtered` and `pk=` scopes) instead of being exportable by default. Each exportable model declares the scoping the export must apply (tenant-scoped manager, shared reference data, container scoping via `visible_to_containers`, or owner-scoped personal rows), and the route requires the model's dedicated `export_<model>` permission in addition to `view_<model>` wherever one is declared, so the generic surface is never weaker than a dedicated export. `compliance.CustodyReceipt` and the other confirmed or same-pattern surfaces (custody signing sessions and handoff deliveries, `compliance.AssetAudit`, attachments, `core.Job`, `core.RecycleBin`, personal dashboards/bookmarks, saved filters, webhook endpoints and deliveries, sessions, tokens, permissions, OTP devices and background-task tables) fail closed; their dedicated surfaces remain authoritative. Export templates bound to a denied model are hidden from the content-type picker and answer 404 rather than downloading an empty or over-broad file. `export_scope=all` now documents and implements "every row the requester may see under their declared scope", never every row in the database.
+
+
 - `reconcile_procurement_legacy` reports pre-upgrade fulfilment pledges (requests that a partial receipt approved while delivered quantities were still untracked, with a blank `qty_received`); it classifies each pledge individually: candidates are pledges on partially received non-serialised lines whose own allocation exceeds the line's recorded received quantity, while completed records (assigned asset or fully received line) stay untouched and pledges the received units could cover in full, lines without receipt, and serialised lines without an asset require explicit operator review - `--apply` only softly closes the candidates without rewriting any recorded quantity, stock, or approval state; the affected units can be re-requested (issue #569).
 
 ### Changed
