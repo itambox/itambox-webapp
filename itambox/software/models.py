@@ -13,10 +13,6 @@ from core.managers import (
 from core.mixins import CustomFieldDataMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel
 from extras.models import Tag
-from software.models_reconciliation import reconcile_software
-
-# The concrete licenses reconciliation implementation is registered by
-# LicensesConfig.ready() into the software-owned model port.
 
 
 class SoftwareCategoryChoices(models.TextChoices):
@@ -134,28 +130,6 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         # same tenant-scoped manager.
         License = apps.get_model("licenses", "License")
         return License.objects.filter(software=self, deleted_at__isnull=True).count()
-
-    def reconcile(self) -> dict:
-        """Return the SAM compliance posture for this software in the active tenant.
-
-        Delegates to ``licenses.reconciliation.reconcile_software``.  The result
-        dict has the shape documented there::
-
-            {
-                'software_id': int,
-                'software_name': str,
-                'installed_count': int,
-                'entitled_seats': int,
-                'delta': int,
-                'compliant': bool,
-                'status': str,   # 'compliant' | 'over_deployed' | 'unlicensed'
-            }
-
-        Kept as a plain method (not a cached_property) so it can be called with
-        fresh data on each access without the risk of serving a stale cache in a
-        long-lived request or background task.
-        """
-        return reconcile_software(self)
 
 
 class InstalledSoftware(ChangeLoggingMixin, BaseModel):
