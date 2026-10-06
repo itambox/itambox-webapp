@@ -1,7 +1,7 @@
 import uuid
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 
 from assets.models import Asset, AssetRole, Manufacturer, StatusLabel
 from core.models import ObjectChange
@@ -164,3 +164,18 @@ class ChangeLoggingTestCase(TestCase):
         # Cleanup context vars
         _request_id.set(None)
         _current_user.set(None)
+
+    def test_log_change_without_context_is_rejected_under_tests(self):
+        """No request/TaskContext: the audit layer must fail loudly, not skip silently."""
+        manufacturer = Manufacturer.objects.create(name="No-Context Maker", slug="no-context-maker")
+        with self.assertRaisesRegex(RuntimeError, "without an execution context"):
+            manufacturer._log_change(action="update")
+        self.assertEqual(ObjectChange._base_manager.filter(changed_object_id=manufacturer.pk).count(), 0)
+
+    def test_log_change_without_context_warns_but_skips_in_production(self):
+        manufacturer = Manufacturer.objects.create(name="Prod-Context Maker", slug="prod-context-maker")
+        with override_settings(DEBUG=False, IS_TESTING=False):
+            with self.assertLogs("core.models", level="WARNING") as captured:
+                manufacturer._log_change(action="update")
+        self.assertIn("no execution context", captured.output[0])
+        self.assertEqual(ObjectChange._base_manager.filter(changed_object_id=manufacturer.pk).count(), 0)

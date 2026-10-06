@@ -19,9 +19,8 @@ recorded, and the affected units can simply be re-requested if they are still
 needed.
 """
 
-from django.core.management.base import BaseCommand
-
 from assets.choices import RequestStatusChoices
+from core.tasks.management import SystemTaskCommand
 from procurement.models import FulfillmentLink
 
 CANDIDATE = "candidate"
@@ -56,7 +55,7 @@ def _classify(link):
     return CANDIDATE
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = (
         "Report fulfilment links whose request was approved before any tracked receipt "
         "(pre-upgrade pledges). Only demonstrable candidates (pledges on partially received "
