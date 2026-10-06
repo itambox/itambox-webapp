@@ -187,7 +187,11 @@ class SCIMProvisioningTests(TestCase):
     def test_user_creation_linking_existing_assetholder(self):
         # Create unlinked AssetHolder
         unlinked_holder = AssetHolder.objects.create(
-            first_name="Jane", last_name="Smith", upn="jane@acme.com", email="jane@acme.com", tenant=self.tenant
+            first_name="Existing",
+            last_name="Holder",
+            upn="jane@acme.com",
+            email="contact@acme.com",
+            tenant=self.tenant,
         )
 
         url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant.slug})
@@ -195,7 +199,7 @@ class SCIMProvisioningTests(TestCase):
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
             "userName": "jane@acme.com",
             "name": {"familyName": "Smith", "givenName": "Jane"},
-            "emails": [{"value": "jane@acme.com", "primary": True}],
+            "emails": [{"value": "different-address@acme.com", "primary": True}],
             "active": True,
         }
 
@@ -205,6 +209,10 @@ class SCIMProvisioningTests(TestCase):
         user = User.objects.get(username="jane@acme.com")
         unlinked_holder.refresh_from_db()
         self.assertEqual(unlinked_holder.user, user)
+        self.assertEqual(unlinked_holder.upn, "jane@acme.com")
+        self.assertEqual(unlinked_holder.first_name, "Existing")
+        self.assertEqual(unlinked_holder.last_name, "Holder")
+        self.assertEqual(unlinked_holder.email, "contact@acme.com")
 
     def test_user_detail_put_patch_delete(self):
         # Create user with a role via the standard grant helper.
@@ -243,8 +251,10 @@ class SCIMProvisioningTests(TestCase):
         self.assertFalse(user.is_active)
 
         holder = AssetHolder.objects.get(user=user, tenant=self.tenant)
-        self.assertEqual(holder.first_name, "UpdatedFirstName")
-        self.assertEqual(holder.last_name, "UpdatedLastName")
+        self.assertEqual(holder.first_name, "Test")
+        self.assertEqual(holder.last_name, "User")
+        self.assertEqual(holder.upn, "test@acme.com")
+        self.assertEqual(holder.email, "test@acme.com")
 
         # 3. PATCH Update
         patch_payload = {
@@ -384,7 +394,8 @@ class SCIMProvisioningTests(TestCase):
         }
 
         with patch(
-            "organization.models.AssetHolder.objects.create", side_effect=IntegrityError("Mocked constraint violation")
+            "organization.models.AssetHolder._base_manager.create",
+            side_effect=IntegrityError("Mocked constraint violation"),
         ):
             response = self.client.post(url, data=payload, content_type="application/json", **self.auth_headers)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)

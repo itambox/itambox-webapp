@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import AssetHolder, Membership, Tenant
+from organization.services.identity_provisioning import link_or_create_holder
 from users.api.scim import schema as scim_schema
 from users.api.scim.authentication import SCIMBearerTokenAuthentication
 from users.api.scim.filters import SCIMFilterError, parse_scim_filter, parse_scim_membership_filter
@@ -25,7 +26,7 @@ from users.api.scim.provider_patch import (
     parse_user_resource,
     require_object_document,
 )
-from users.api.scim.provider_services import sync_user_global_active
+from users.api.scim.provider_services import create_scim_membership, sync_user_global_active
 from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
 from users.models import UserGroup
 
@@ -83,40 +84,18 @@ def _lock_tenant_scim_user(user, tenant, *, require_membership=True):
     return locked
 
 
-def link_or_create_assetholder(user, tenant):
-    email = user.email
-    upn = email or user.username
-    first_name = user.first_name or user.username
-    last_name = user.last_name or ""
-
-    # Check if user already has an AssetHolder profile in this tenant
-    holder = AssetHolder.objects.filter(user=user, tenant=tenant).first()
-    if not holder:
-        # Try to find existing AssetHolder by UPN or email but with no linked user
-        holder = AssetHolder.objects.filter(upn=upn, tenant=tenant, user__isnull=True).first()
-        if not holder and email:
-            holder = AssetHolder.objects.filter(email=email, tenant=tenant, user__isnull=True).first()
-
-    if holder:
-        try:
-            if not holder.user:
-                holder.user = user
-            holder.first_name = first_name
-            holder.last_name = last_name
-            if email:
-                holder.email = email
-            if not holder.tenant:
-                holder.tenant = tenant
-            holder.save()
-        except Exception as e:
-            logger.warning(f"Error linking/updating AssetHolder for user {user.username}: {e}")
-    else:
-        try:
-            holder = AssetHolder.objects.create(
-                user=user, first_name=first_name, last_name=last_name, upn=upn, email=email, tenant=tenant
-            )
-        except Exception as e:
-            logger.warning(f"Constraint or validation error creating AssetHolder for user {user.username}: {e}")
+def _link_scim_holder(user, tenant):
+    email = (user.email or "").strip()
+    upn = user.username
+    return link_or_create_holder(
+        user=user,
+        tenant_id=tenant.pk,
+        upn=upn,
+        email=email,
+        first_name=user.first_name or user.username,
+        last_name=user.last_name or "",
+        source="SCIM",
+    )
 
 
 class SCIMTenantMixin:
@@ -282,8 +261,8 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         email = patch.email
         first_name = patch.first_name
         last_name = patch.last_name
-        active = patch.active
-        external_id = patch.external_id
+        active = patch.active if isinstance(patch.active, bool) else True
+        external_id = patch.external_id if isinstance(patch.external_id, str) else None
         user = User.objects.filter(username=username).first()
         correlated_membership = (
             Membership.objects.select_related("user").filter(tenant=self.tenant, external_id=external_id).first()
@@ -328,13 +307,13 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                         user = _lock_tenant_scim_user(user, self.tenant, require_membership=False)
                         # SCIM provisions identity only: a bare membership with NO RoleGrant
                         # rows — permissions are granted in-app.
-                        Membership.objects.create(
+                        create_scim_membership(
                             user=user,
-                            tenant=self.tenant,
+                            tenant_id=self.tenant.pk,
                             is_active=active,
                             external_id=external_id,
                         )
-                        link_or_create_assetholder(user, self.tenant)
+                        _link_scim_holder(user, self.tenant)
                         # Reprovisioning reconciles the global account flag: an active
                         # re-provision restores the login a full de-provision correctly
                         # cleared, with no manual intervention.
@@ -359,13 +338,13 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                     user.save()
 
                     # See comment above: bare membership, assignments granted in-app.
-                    Membership.objects.create(
+                    create_scim_membership(
                         user=user,
-                        tenant=self.tenant,
+                        tenant_id=self.tenant.pk,
                         is_active=active,
                         external_id=external_id,
                     )
-                    link_or_create_assetholder(user, self.tenant)
+                    _link_scim_holder(user, self.tenant)
             except IntegrityError:
                 user = _retry_tenant_correlated_user(self.tenant, username, external_id)
                 response_status = status.HTTP_200_OK
@@ -431,7 +410,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
 
         if has_other:
             # Keep this tenant's AssetHolder linked, but leave the shared global identity alone.
-            link_or_create_assetholder(user, self.tenant)
+            _link_scim_holder(user, self.tenant)
             return user
 
         # Sole-tenant user: the global identity is safe to update.
@@ -449,7 +428,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                 conflict.status_code = status.HTTP_409_CONFLICT
                 conflict.scim_type = "uniqueness"
                 raise conflict from exc
-        link_or_create_assetholder(user, self.tenant)
+        _link_scim_holder(user, self.tenant)
         return user
 
     def put(self, request, pk, *args, **kwargs):
@@ -488,9 +467,11 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
             # ChangeLoggingMixin / SoftDeleteMixin entirely).
             for membership in Membership.objects.filter(user=user, tenant=self.tenant):
                 membership.delete()
-            # Soft-delete the associated AssetHolder for this tenant if one exists.
-            for holder in AssetHolder.objects.filter(user=user, tenant=self.tenant):
-                holder.delete()
+            # Revoke the login association but retain the holder as the durable
+            # owner of every outstanding assignment and offboarding obligation.
+            for holder in AssetHolder.objects.select_for_update().filter(user=user, tenant=self.tenant).order_by("pk"):
+                holder.user = None
+                holder.save(update_fields=["user", "updated_at"])
             # If user has no remaining memberships, deactivate instead of hard-deleting
             if not Membership.objects.filter(user=user).exists():
                 user.is_active = False

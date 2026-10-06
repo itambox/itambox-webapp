@@ -748,22 +748,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/api/scim/views.py",
-      "scope": "FunctionDef:link_or_create_assetholder",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "b30cb8b3fe10df79995a4adc014c07ceb4d6299e66020e3cb5896a271cf3e84b",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/views.py",
-      "scope": "FunctionDef:link_or_create_assetholder",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "e4eb554dbacb60bfa93df3ed502a297d84ae650943f60abf59d6c5c193dac05c",
-      "count": 1
-    },
-    {
       "path": "itambox/users/forms.py",
       "scope": "ClassDef:UserPreferencesForm/FunctionDef:__init__",
       "handler_type": "Exception",

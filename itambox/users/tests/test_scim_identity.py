@@ -578,7 +578,7 @@ class SCIMIdentityContractTests(TestCase):
         self.assertEqual(duplicate.status_code, status.HTTP_409_CONFLICT)
 
         orphan = User.objects.create_user(username="orphan-race")
-        with patch("users.api.scim.views.Membership.objects.create", side_effect=IntegrityError):
+        with patch.object(Membership, "save", side_effect=IntegrityError):
             raced_existing = self.client.post(
                 url,
                 data=json.dumps({"userName": orphan.username, "externalId": "race-existing"}),
@@ -587,7 +587,7 @@ class SCIMIdentityContractTests(TestCase):
             )
         self.assertEqual(raced_existing.status_code, status.HTTP_409_CONFLICT)
 
-        with patch("users.api.scim.views.Membership.objects.create", side_effect=IntegrityError):
+        with patch.object(Membership, "save", side_effect=IntegrityError):
             raced_new = self.client.post(
                 url,
                 data=json.dumps({"userName": "race-new", "externalId": "race-new-id"}),

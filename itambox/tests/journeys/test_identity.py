@@ -1,12 +1,12 @@
 """Identity journeys: SCIM deprovisioning keeps obligations visible and never guesses identity links."""
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
+from assets.models import StatusLabel
 from assets.services import checkout_asset
 from organization.models import AssetHolder
 from organization.services.offboarding import get_offboarding_report
@@ -34,32 +34,48 @@ class ScimJourneyTests(JourneyMixin, TestCase):
             return reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant.slug})
         return reverse("api:scim:user-detail", kwargs={"tenant_slug": self.tenant.slug, "pk": pk})
 
-    @pytest.mark.xfail(strict=True, reason="SCIM DELETE soft-deletes a holder with live custody (#608)")
     def test_scim_delete_of_asset_holder_keeps_holder_and_offboarding_report_reachable(self):
         person = self.make_member("leaving-person", set())
         holder = self.make_holder(user=person)
-        asset = self.make_asset()
-        checkout_asset(asset=asset, holder=holder, request=None)
+        profile = (holder.first_name, holder.last_name, holder.upn, holder.email, holder.tenant_id)
+        deployable = StatusLabel.objects.create(
+            name="Journey SCIM Deployable",
+            slug="journey-scim-deployable",
+            type=StatusLabel.TYPE_DEPLOYABLE,
+        )
+        deployed = StatusLabel.objects.create(
+            name="Journey SCIM Deployed",
+            slug="journey-scim-deployed",
+            type=StatusLabel.TYPE_DEPLOYED,
+        )
+        asset = self.make_asset(status=deployable)
+        checkout_asset(asset=asset, holder=holder, request=None, status=deployed)
 
         response = self.client.delete(self._user_url(person.pk), **self.auth)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
         # The person is deprovisioned, but what they still hold must stay visible.
         self.assertTrue(AssetHolder.objects.filter(pk=holder.pk).exists(), "holder vanished from the active set")
-        report = get_offboarding_report(AssetHolder.all_objects.get(pk=holder.pk))
+        holder.refresh_from_db()
+        self.assertIsNone(holder.user_id, "deprovisioning must revoke the holder-to-login link")
+        self.assertIsNone(holder.deleted_at, "deprovisioning must not soft-delete the holder")
+        self.assertEqual((holder.first_name, holder.last_name, holder.upn, holder.email, holder.tenant_id), profile)
+        report = get_offboarding_report(holder)
         self.assertTrue(report.items, "offboarding report lost the outstanding assignment")
+        self.assertEqual(len(report.for_kind("asset_assignment")), 1)
 
         reviewer = self.make_member("offboarding-reviewer", {"organization.view_assetholder", "assets.view_asset"})
         self.client_login_to_tenant(reviewer, self.tenant)
         detail = self.client.get(reverse("organization:assetholder_detail", kwargs={"pk": holder.pk}))
         self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, asset.asset_tag)
+        self.assertEqual(len(detail.context["offboarding_report"].for_kind("asset_assignment")), 1)
 
-    @pytest.mark.xfail(strict=True, reason="SCIM create links a holder by email alone (#608)")
     def test_scim_create_does_not_link_unlinked_holder_by_email_when_upn_differs(self):
         holder = AssetHolder.objects.create(
             first_name="Jane",
             last_name="Smith",
-            upn="jane.smith@corp.example.test",
+            upn="shared@example.test",
             email="shared@example.test",
             tenant=self.tenant,
         )
@@ -76,3 +92,34 @@ class ScimJourneyTests(JourneyMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         holder.refresh_from_db()
         self.assertIsNone(holder.user_id, "an unlinked holder was bound to a different login by email alone")
+        self.assertEqual(holder.upn, "shared@example.test")
+        self.assertEqual(holder.email, "shared@example.test")
+        self.assertEqual(holder.first_name, "Jane")
+        self.assertEqual(holder.last_name, "Smith")
+
+    def test_scim_update_does_not_link_unlinked_holder_by_email_when_upn_differs(self):
+        person = self.make_member("scim-update-person", set())
+        holder = self.make_holder(
+            first_name="Chief",
+            last_name="Executive",
+            upn="shared@example.test",
+            email="shared@example.test",
+        )
+        payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "emails.value", "value": "shared@example.test"}],
+        }
+
+        response = self.client.patch(
+            self._user_url(person.pk), data=payload, content_type="application/json", **self.auth
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        person.refresh_from_db()
+        self.assertEqual(person.email, "shared@example.test")
+        holder.refresh_from_db()
+        self.assertIsNone(holder.user_id, "an update bound a different login to the holder by email alone")
+        self.assertEqual(holder.upn, "shared@example.test")
+        self.assertEqual(holder.email, "shared@example.test")
+        self.assertEqual(holder.first_name, "Chief")
+        self.assertEqual(holder.last_name, "Executive")

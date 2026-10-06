@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from core.tests.mixins import grant
-from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from organization.models import AssetHolder, Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from users.api.scim.provider_patch import GroupMemberOperation, GroupPatch, SCIMPatchError, UserPatch
 from users.api.scim.provider_services import (
     _apply_group_member_operations,
@@ -303,6 +303,13 @@ class ProviderSCIMProvisioningTests(TestCase):
             "emails": [{"value": "newstaff@msp.com", "primary": True}],
             "active": True,
         }
+        holder = AssetHolder.objects.create(
+            first_name="Existing",
+            last_name="Provider Holder",
+            upn="different-login@msp.com",
+            email="newstaff@msp.com",
+            tenant=self.provider,
+        )
         response = self.client.post(url, data=payload, content_type="application/json", **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.json()["userName"], "newstaff@msp.com")
@@ -310,6 +317,9 @@ class ProviderSCIMProvisioningTests(TestCase):
         user = User.objects.get(username="newstaff@msp.com")
         self.assertTrue(user.is_active)
         self.assertTrue(Membership.objects.filter(user=user, tenant=self.provider, is_active=True).exists())
+        holder.refresh_from_db()
+        self.assertIsNone(holder.user_id)
+        self.assertFalse(AssetHolder.objects.filter(user=user, tenant=self.provider).exists())
         # SCIM provisions identity only: no RoleGrant is auto-created — permissions
         # and reach are granted in-app afterwards, never implied by provisioning.
         self.assertFalse(RoleGrant.objects.filter(membership__user=user).exists())
@@ -341,6 +351,14 @@ class ProviderSCIMProvisioningTests(TestCase):
         user = User.objects.get(scim_id=pk)
         self.assertEqual(user.username, "lifecycle_renamed")
         self.assertTrue(Membership.objects.get(user=user, tenant=self.provider).is_active)
+        holder = AssetHolder.objects.create(
+            user=user,
+            tenant=self.tenant,
+            first_name="Provider",
+            last_name="Holder",
+            upn="lifecycle@acme.com",
+            email="lifecycle@acme.com",
+        )
 
         collision_user = User.objects.create_user(username="already-used", email="already-used@msp.com")
         Membership.objects.create(user=collision_user, tenant=self.provider, is_active=True)
@@ -389,6 +407,9 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertFalse(Membership.objects.filter(user=user, tenant=self.provider).exists())
         # The User row survives.
         self.assertTrue(User.objects.filter(scim_id=pk).exists())
+        holder.refresh_from_db()
+        self.assertEqual(holder.user_id, user.pk)
+        self.assertIsNone(holder.deleted_at)
 
     def test_provision_deprovision_reprovision_restores_login(self):
         """The lifecycle round trip for a solely-provisioned provider identity: create,

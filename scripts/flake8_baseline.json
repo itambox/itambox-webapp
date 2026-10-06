@@ -7764,14 +7764,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/api/scim/views.py",
-      "code": "C901",
-      "message": "'link_or_create_assetholder' is too complex (11)",
-      "source": "def link_or_create_assetholder(user, tenant):",
-      "context": "Module:body/FunctionDef:link_or_create_assetholder:self",
-      "count": 1
-    },
-    {
       "path": "itambox/users/forms.py",
       "code": "B950",
       "message": "line too long (158 > 120 characters)",

@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from typing import cast
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -34,6 +35,7 @@ from users.api.scim.provider_services import (
     apply_provider_group_patch,
     apply_provider_user_patch,
     create_provider_group,
+    create_scim_membership,
     ensure_provider_group_external_id_available,
     ensure_provider_group_name_available,
     save_provider_group,
@@ -244,12 +246,12 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def post(self, request: Request, *args: object, **kwargs: object) -> Response:
         document = require_object_document(request.data)
         patch = parse_user_resource(document)
-        username = patch.username
+        username = cast(str, patch.username)
         email = patch.email
         first_name = patch.first_name
         last_name = patch.last_name
-        active = patch.active
-        external_id = patch.external_id
+        active = patch.active if isinstance(patch.active, bool) else True
+        external_id = patch.external_id if isinstance(patch.external_id, str) else None
 
         user = User.objects.filter(username=username).first()
         correlated_membership = (
@@ -296,9 +298,9 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                         # SCIM provisions identity only: a bare membership at the managing
                         # tenant with NO RoleGrant rows — zero permissions and zero reach
                         # until granted in-app.
-                        Membership.objects.create(
+                        create_scim_membership(
                             user=user,
-                            tenant=self.tenant,
+                            tenant_id=self.tenant.pk,
                             is_active=active,
                             external_id=external_id,
                         )
@@ -307,7 +309,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                         # cleared, with no manual intervention.
                         sync_user_global_active(user)
                 except IntegrityError:
-                    user = self._retry_correlated_user(username, external_id)
+                    user = self._retry_correlated_user(username, external_id or "")
                     with transaction.atomic():
                         user = _lock_provider_scim_user(user)
                         sync_user_global_active(user)
@@ -326,14 +328,14 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                     user.save()
 
                     # See comment above: bare membership, assignments granted in-app.
-                    Membership.objects.create(
+                    create_scim_membership(
                         user=user,
-                        tenant=self.tenant,
+                        tenant_id=self.tenant.pk,
                         is_active=active,
                         external_id=external_id,
                     )
             except IntegrityError:
-                user = self._retry_correlated_user(username, external_id)
+                user = self._retry_correlated_user(username, external_id or "")
                 response_status = status.HTTP_200_OK
 
         serializer = SCIMUserSerializer(

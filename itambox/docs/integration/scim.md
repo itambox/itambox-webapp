@@ -22,7 +22,7 @@ Authentication uses an HTTP Bearer token. Create a dedicated API token for an ac
 
 Read requests accept any valid token of the scoped owner; write requests additionally require the token's `write_enabled` flag. Expired tokens, inactive owners, and tokens scoped to a different tenant or provider are rejected with `401`, and no error response ever contains credential material.
 
-SCIM never grants permissions. Provisioning creates an identity plus a membership (and, on tenant mounts, the linked asset holder profile); roles and permissions are granted in-app, so a provisioned account has no product access until an administrator grants it.
+SCIM never grants permissions. Provisioning creates an identity plus a membership (and, on tenant mounts, links or creates an asset holder profile through the same exact-identity policy as interactive provisioning); roles and permissions are granted in-app, so a provisioned account has no product access until an administrator grants it. Tenant SCIM treats `userName` as the UPN for holder matching and keeps `emails.value` as a separate email hint: a different UPN is never linked by email alone, and updates do not overwrite an existing holder's profile fields.
 
 ## Supported operations
 
@@ -62,6 +62,7 @@ Unmanaged attributes (`displayName`, `nickName`, `title`, `userType`, `preferred
 - A resource stays addressable while inactive: `GET` and `PATCH` keep working, so an identity provider can inspect and re-enable it. Reactivating with `active=true` restores the membership immediately.
 - The global login flag mirrors "has any active membership anywhere": when the last active membership is suspended, the account can no longer authenticate; a reactivation restores login.
 - `DELETE` removes this mount's membership. The `User` row survives (deactivated when no membership remains anywhere); a later `POST` with the same `userName` and `externalId` re-provisions the membership and restores login without any manual account edit. De-provisioning in one tenant or provider never removes another scope's memberships.
+- Tenant `DELETE` unlinks the user's active AssetHolder from that login instead of soft-deleting the holder. Its detail page, offboarding report, active assignments, and other obligations remain available. Provider SCIM remains membership-only and does not mutate AssetHolder records.
 
 ## Filters
 
