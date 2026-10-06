@@ -19,6 +19,7 @@ returned an existence-revealing 403 instead of a 404.
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
@@ -118,6 +119,54 @@ class MembershipExportCrossTenantTestCase(TestCase):
             },
         )
         response = self.client.get(url + "?format=csv")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(self.user_a.username, content)
+        self.assertNotIn(self.user_b.username, content)
+
+    def test_export_scope_variants_and_template_exclude_other_tenant_membership(self):
+        """Membership is declared container-scoped (``visible_to_containers``);
+        every export path must apply that scope, not just the default one."""
+        from extras.models import ExportTemplate
+
+        self._login_tenant_a()
+        url = reverse(
+            "object_export",
+            kwargs={
+                "app_label": "organization",
+                "model_name": "membership",
+                "template_id": 0,
+            },
+        )
+        queries = (
+            "?format=csv&export_scope=all",
+            "?format=csv&export_scope=filtered",
+            f"?format=csv&pk={self.membership_a.pk},{self.membership_b.pk}",
+        )
+        for query in queries:
+            with self.subTest(query=query):
+                response = self.client.get(url + query)
+                self.assertEqual(response.status_code, 200)
+                content = response.content.decode()
+                self.assertNotIn(self.user_b.username, content)
+
+        template = ExportTemplate.objects.create(
+            name="Membership isolation template",
+            content_type=ContentType.objects.get_for_model(Membership),
+            template_code="{% for obj in queryset %}{{ obj.user.username }}\n{% endfor %}",
+            file_extension="csv",
+            mime_type="text/csv",
+        )
+        response = self.client.get(
+            reverse(
+                "object_export",
+                kwargs={
+                    "app_label": "organization",
+                    "model_name": "membership",
+                    "template_id": template.pk,
+                },
+            )
+        )
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn(self.user_a.username, content)

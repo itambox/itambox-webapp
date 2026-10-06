@@ -119,6 +119,17 @@ class AdvancedImportExportTestCase(TestCase):
         self.assertIn("TAG-001", tags)
         self.assertIn("TAG-002", tags)
 
+    def test_csv_is_the_default_export_format(self):
+        """``format`` omitted resolves to CSV (the documented default), and the
+        declared manager scope still bounds the rows."""
+        url = reverse("object_export", kwargs={"app_label": "assets", "model_name": "asset", "template_id": 0})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode("utf-8")
+        self.assertIn("TAG-001", content)
+        self.assertIn("TAG-002", content)
+
     def test_csv_export_filtered(self):
         url = reverse("object_export", kwargs={"app_label": "assets", "model_name": "asset", "template_id": 0})
         response = self.client.get(f"{url}?format=csv&export_scope=filtered&q=Alpha")

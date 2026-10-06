@@ -365,6 +365,39 @@ class CrossTenantAttackTestCase(TestCase):
         content = response.content.decode()
         self.assertNotIn("CT-A-001", content)
 
+    def _export_url(self):
+        return reverse("object_export", kwargs={"app_label": "assets", "model_name": "asset", "template_id": 0})
+
+    def test_export_all_scope_excludes_other_tenant_rows(self):
+        response = self.client.get(self._export_url() + "?format=csv&export_scope=all")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("CT-A-001", response.content.decode())
+
+    def test_export_filtered_scope_excludes_other_tenant_rows(self):
+        response = self.client.get(self._export_url() + "?format=csv&export_scope=filtered&q=CT-Asset-A")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("CT-A-001", response.content.decode())
+
+    def test_export_template_render_excludes_other_tenant_rows(self):
+        """The template path shares the scoped queryset — the sharpest regression
+        risk, because a rendered template is free-form and carries no header row."""
+        from extras.models import ExportTemplate
+
+        template = ExportTemplate.objects.create(
+            name="CT isolation template",
+            content_type=ContentType.objects.get_for_model(Asset),
+            template_code="{% for obj in queryset %}{{ obj.asset_tag }}\n{% endfor %}",
+            file_extension="csv",
+            mime_type="text/csv",
+        )
+        url = reverse(
+            "object_export",
+            kwargs={"app_label": "assets", "model_name": "asset", "template_id": template.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("CT-A-001", response.content.decode())
+
     # -------------------------------------------------------------------------
     # Family 4: Attachments and Journal entries (GenericFK endpoints)
     # -------------------------------------------------------------------------

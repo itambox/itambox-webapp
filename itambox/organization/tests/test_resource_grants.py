@@ -319,3 +319,42 @@ class TenantResourceGrantExportTests(TestCase):
             with self.subTest(query=query):
                 response = self.client.get(self.url + query)
                 self.assertEqual(response.status_code, 404)
+
+    def test_every_generic_export_scope_and_template_path_fails_closed(self):
+        """The deny is contract-wide: scope selection and a persisted template must
+        not open a second door to the same rows."""
+        from extras.models import ExportTemplate
+
+        queries = (
+            "?format=csv&export_scope=all",
+            "?format=yaml&export_scope=all",
+            "?format=csv&export_scope=filtered",
+            f"?format=yaml&pk={self.resource_grant.pk}",
+        )
+        for query in queries:
+            with self.subTest(query=query):
+                response = self.client.get(self.url + query)
+                self.assertEqual(response.status_code, 404)
+                # A 404 must never be a serialized data document: no CSV/YAML body.
+                content_type = response.get("Content-Type", "")
+                self.assertNotIn("text/csv", content_type)
+                self.assertNotIn("text/yaml", content_type)
+
+        template = ExportTemplate.objects.create(
+            name="TRG generic export",
+            content_type=ContentType.objects.get_for_model(TenantResourceGrant),
+            template_code="{% for obj in queryset %}{{ obj.pk }}\n{% endfor %}",
+            file_extension="csv",
+            mime_type="text/csv",
+        )
+        response = self.client.get(
+            reverse(
+                "object_export",
+                kwargs={
+                    "app_label": "organization",
+                    "model_name": "tenantresourcegrant",
+                    "template_id": template.pk,
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 404)

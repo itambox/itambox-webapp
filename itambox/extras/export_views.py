@@ -19,6 +19,7 @@ from django.views.generic import View
 
 from assets.tasks.labels import render_labels_pdf
 from core.csv_utils import csv_safe
+from core.data_transfer import SCOPE_CONTAINER, SCOPE_OWNER, policy_for, required_export_permissions
 from extras.forms import ExportTemplateForm, LabelTemplateForm
 from extras.models import ExportTemplate, LabelTemplate
 from extras.tables import ExportTemplateTable, LabelTemplateTable
@@ -26,7 +27,7 @@ from itambox.panels import Panel
 from itambox.registry import registry
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.utils import safe_return_url
-from organization.services import is_container_scoped_unfiltered, visible_to_containers
+from organization.services import visible_to_containers
 
 logger = logging.getLogger(__name__)
 
@@ -58,25 +59,31 @@ def _is_export_value_redacted(field_name, value):
     return isinstance(value, str) and value.startswith("enc$")
 
 
-def _get_export_queryset(request, model, app_label, model_name, export_scope):
+def _scoped_export_base(request, model, policy):
+    """Rows the requester may see under the model's declared export scope."""
+    meta = model._meta
+    queryset = model.objects.all()
+    if policy.scope == SCOPE_CONTAINER:
+        return visible_to_containers(request.user, queryset, f"{meta.app_label}.view_{meta.model_name}")
+    if policy.scope == SCOPE_OWNER:
+        return queryset.filter(**{policy.owner_field: request.user})
+    return queryset
+
+
+def _get_export_queryset(request, model, policy, export_scope):
+    queryset = _scoped_export_base(request, model, policy)
     pks = request.GET.get("pk", "")
     if pks:
         valid_pks = [int(pk) for pk in pks.split(",") if pk.strip().isdigit()]
         if not valid_pks:
             return None
-        queryset = model.objects.filter(pk__in=valid_pks)
-    elif export_scope == "filtered":
-        queryset = model.objects.all()
+        return queryset.filter(pk__in=valid_pks)
+    if export_scope == "filtered":
         filterset_class = get_filterset_for_model(model)
         if filterset_class:
             filterset = filterset_class(request.GET, queryset=queryset)
             if filterset.is_valid():
                 queryset = filterset.qs
-    else:
-        queryset = model.objects.all()
-
-    if is_container_scoped_unfiltered(model):
-        queryset = visible_to_containers(request.user, queryset, f"{app_label}.view_{model_name}")
     return queryset
 
 
@@ -151,16 +158,37 @@ def _render_template_export(request, model, queryset, template_id):
 
 
 class ObjectExportView(LoginRequiredMixin, View):
+    """The one generic CSV/YAML/template export route.
+
+    The gate is the model's declared ``core.data_transfer`` policy, not a
+    default: an undeclared or denied model answers 404 on every path (CSV, YAML,
+    template render, ``export_scope=all`` / ``filtered``, ``pk=`` list). The
+    required permission is ``view_<model>`` plus the model's dedicated
+    ``export_<model>`` permission where it declares one, so this surface is
+    never weaker than a model's dedicated export. Row selection is always the
+    policy's declared scope, never a bare ``Model.objects`` for a model whose
+    default manager is not authoritative.
+
+    ``export_scope=all`` means every row the requester may see under that scope,
+    never every row in the database; an authenticated non-superuser whose
+    context resolves no scope holds no permissions there, so the gate fails
+    closed (404) instead of exporting unfiltered rows.
+    """
+
     def get(self, request, app_label, model_name, template_id):
-        model = apps.get_model(app_label, model_name)
-        if not getattr(model, "generic_export_allowed", True):
+        try:
+            model = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404 from None
+        policy = policy_for(model)
+        if not policy.export:
             raise Http404
-        if not request.user.has_perm(f"{app_label}.view_{model_name}"):
+        if not all(request.user.has_perm(perm) for perm in required_export_permissions(model)):
             raise Http404
 
         export_format = request.GET.get("format", "csv").lower()
         export_scope = request.GET.get("export_scope", "all").lower()
-        queryset = _get_export_queryset(request, model, app_label, model_name, export_scope)
+        queryset = _get_export_queryset(request, model, policy, export_scope)
         if queryset is None:
             return HttpResponseBadRequest(_("One or more selected IDs are invalid."))
 
@@ -197,7 +225,10 @@ class ExportTemplateDetailView(ObjectDetailView):
         if target_model is not None:
             app_label = target_model._meta.app_label
             model_name = target_model._meta.model_name
-            if self.request.user.has_perm(f"{app_label}.view_{model_name}"):
+            policy = policy_for(target_model)
+            permitted = all(self.request.user.has_perm(perm) for perm in required_export_permissions(target_model))
+            # A link to a denied target would be a 404 dead end on this page.
+            if policy.export and permitted:
                 context["target_app_label"] = app_label
                 context["target_model_name"] = model_name
                 context["target_model_verbose"] = target_model._meta.verbose_name_plural

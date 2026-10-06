@@ -479,6 +479,46 @@ follows:
 > that match the active filters are included in the export. To export the
 > full dataset, clear all filters before clicking Export.
 
+### Which Models Can Be Exported
+
+Generic CSV/YAML/template export is **explicit opt-in**. A model is exportable
+only when it carries a reviewed data-transfer declaration (`core.data_transfer`);
+every other model — including framework tables, authorization metadata, personal
+records, generated logs and models whose export is owned by a dedicated surface
+— answers **404** on every generic path (CSV, YAML, template render, and the
+`all`, `filtered` and `pk=` scopes alike). There is no default-allow fallback:
+adding a model without a declaration makes it non-exportable, and the contract
+test fails the build until a decision is recorded.
+
+Each exportable model declares how its rows are restricted, and the export
+always applies that restriction:
+
+| Declared scope | Rows you receive |
+|----------------|------------------|
+| Tenant-scoped manager | The rows of your active tenant scope (single tenant, tenant group, or all accessible tenants) |
+| Shared reference data | The tenantless reference rows every tenant sees (for example manufacturers or asset types) |
+| Container-scoped | The rows of the tenants and providers you hold the view permission for |
+| Personal | Only your own rows — never another user's |
+
+`export_scope=all` means **every row you may see under your current scope**, not
+every row in the database; `export_scope=filtered` additionally applies the
+list filters, and a `pk=` list is intersected with the same scope. Superusers
+pass these gates by platform convention and see every tenant's rows.
+
+Dedicated export surfaces stay authoritative: custody receipts, for example, are
+exported only through their own JSON/PDF export, which requires the dedicated
+`export_custodyreceipt` permission and applies asset-tenant scoping. Where a
+model keeps a generic export *and* declares a dedicated export permission, the
+generic route requires both permissions, so it is never the weaker door.
+
+> [!NOTE]
+> If an export link you used before now returns 404, the model's export is no
+> longer part of the generic surface — the reviewed inventory removed it (for
+> example because it holds signature or credential material, is personal data,
+> or is a system log). Export templates that were authored for such a model are
+> hidden from the content-type picker and fail closed instead of downloading an
+> empty or over-broad file.
+
 ### Export File Naming
 
 Downloaded files are automatically named using the pattern
