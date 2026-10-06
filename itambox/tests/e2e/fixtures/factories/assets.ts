@@ -35,6 +35,9 @@ export async function createOwnedAsset(
   const assetType = assetTypes.find((row) => row.slug === 'dell-latitude-5550');
   if (!assetType) throw new Error('The E2E seed must expose dell-latitude-5550 with its required Boolean.');
   const assetTypeId = primaryKey(assetType, 'asset type');
+  const statuses = await getJsonRows(request, '/api/assets/status-labels/?limit=100', 'asset status prerequisites');
+  const deployable = statuses.find((row) => row.type === 'deployable');
+  if (!deployable) throw new Error('The E2E seed must expose a deployable asset status.');
   const scope = (options.tagScope || 'asset').replace(/[^a-z0-9-]+/gi, '-');
   const digest = createHash('sha256').update(runId).digest('hex').slice(0, 10);
   const tagPrefix = `E2E-${scope}`.slice(0, 35);
@@ -47,6 +50,7 @@ export async function createOwnedAsset(
       asset_tag: assetTag,
       asset_type_id: assetTypeId,
       tenant_id: tenant,
+      status_id: primaryKey(deployable, 'deployable status'),
       specification_patch: { set: { e2e_required_boolean: false }, clear: [] },
     },
   });
