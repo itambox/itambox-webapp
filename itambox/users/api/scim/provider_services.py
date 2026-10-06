@@ -1,4 +1,4 @@
-"""Atomic mutation services for provider SCIM PATCH operations."""
+"""Shared mutation services for tenant and provider SCIM."""
 
 import logging
 from collections.abc import Collection
@@ -13,6 +13,25 @@ from users.api.scim.provider_patch import UNSET, GroupPatch, SCIMPatchError, Use
 from users.models import GroupMembership, User, UserGroup
 
 logger = logging.getLogger("itambox.scim.provider_services")
+
+
+def create_scim_membership(
+    *,
+    user: User,
+    tenant_id: int,
+    is_active: bool,
+    external_id: str | None,
+) -> Membership:
+    """Create a SCIM membership without the generic email-only holder autolink."""
+    membership = Membership(
+        user=user,
+        tenant_id=tenant_id,
+        is_active=is_active,
+        external_id=external_id,
+    )
+    membership.__dict__["_skip_asset_holder_autolink"] = True
+    membership.save(force_insert=True)
+    return membership
 
 
 def _require_provider_actor(tenant, actor, *, permission: str) -> None:

@@ -26,7 +26,7 @@ from users.api.scim.provider_patch import (
     parse_user_resource,
     require_object_document,
 )
-from users.api.scim.provider_services import sync_user_global_active
+from users.api.scim.provider_services import create_scim_membership, sync_user_global_active
 from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
 from users.models import UserGroup
 
@@ -261,8 +261,8 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         email = patch.email
         first_name = patch.first_name
         last_name = patch.last_name
-        active = patch.active
-        external_id = patch.external_id
+        active = patch.active if isinstance(patch.active, bool) else True
+        external_id = patch.external_id if isinstance(patch.external_id, str) else None
         user = User.objects.filter(username=username).first()
         correlated_membership = (
             Membership.objects.select_related("user").filter(tenant=self.tenant, external_id=external_id).first()
@@ -307,9 +307,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                         user = _lock_tenant_scim_user(user, self.tenant, require_membership=False)
                         # SCIM provisions identity only: a bare membership with NO RoleGrant
                         # rows — permissions are granted in-app.
-                        Membership.objects.create(
+                        create_scim_membership(
                             user=user,
-                            tenant=self.tenant,
+                            tenant_id=self.tenant.pk,
                             is_active=active,
                             external_id=external_id,
                         )
@@ -338,9 +338,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                     user.save()
 
                     # See comment above: bare membership, assignments granted in-app.
-                    Membership.objects.create(
+                    create_scim_membership(
                         user=user,
-                        tenant=self.tenant,
+                        tenant_id=self.tenant.pk,
                         is_active=active,
                         external_id=external_id,
                     )

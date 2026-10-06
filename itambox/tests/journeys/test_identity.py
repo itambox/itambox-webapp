@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
+from assets.models import StatusLabel
 from assets.services import checkout_asset
 from organization.models import AssetHolder
 from organization.services.offboarding import get_offboarding_report
@@ -37,8 +38,18 @@ class ScimJourneyTests(JourneyMixin, TestCase):
         person = self.make_member("leaving-person", set())
         holder = self.make_holder(user=person)
         profile = (holder.first_name, holder.last_name, holder.upn, holder.email, holder.tenant_id)
-        asset = self.make_asset()
-        checkout_asset(asset=asset, holder=holder, request=None)
+        deployable = StatusLabel.objects.create(
+            name="Journey SCIM Deployable",
+            slug="journey-scim-deployable",
+            type=StatusLabel.TYPE_DEPLOYABLE,
+        )
+        deployed = StatusLabel.objects.create(
+            name="Journey SCIM Deployed",
+            slug="journey-scim-deployed",
+            type=StatusLabel.TYPE_DEPLOYED,
+        )
+        asset = self.make_asset(status=deployable)
+        checkout_asset(asset=asset, holder=holder, request=None, status=deployed)
 
         response = self.client.delete(self._user_url(person.pk), **self.auth)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

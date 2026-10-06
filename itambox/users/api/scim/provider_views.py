@@ -34,6 +34,7 @@ from users.api.scim.provider_services import (
     apply_provider_group_patch,
     apply_provider_user_patch,
     create_provider_group,
+    create_scim_membership,
     ensure_provider_group_external_id_available,
     ensure_provider_group_name_available,
     save_provider_group,
@@ -157,7 +158,7 @@ def _lock_provider_scim_user(user):
     post=scim_schema.SCIM_PROVIDER_USER_CREATE,
 )
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
-    def _retry_correlated_user(self, username: str, external_id: str) -> UserModel:
+    def _retry_correlated_user(self, username: str, external_id: str | None) -> UserModel:
         if not external_id:
             raise SCIMPatchError("User already exists", scim_type="uniqueness", status_code=409)
         correlated = (
@@ -248,8 +249,8 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         email = patch.email
         first_name = patch.first_name
         last_name = patch.last_name
-        active = patch.active
-        external_id = patch.external_id
+        active = patch.active if isinstance(patch.active, bool) else True
+        external_id = patch.external_id if isinstance(patch.external_id, str) else None
 
         user = User.objects.filter(username=username).first()
         correlated_membership = (
@@ -296,9 +297,9 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                         # SCIM provisions identity only: a bare membership at the managing
                         # tenant with NO RoleGrant rows — zero permissions and zero reach
                         # until granted in-app.
-                        Membership.objects.create(
+                        create_scim_membership(
                             user=user,
-                            tenant=self.tenant,
+                            tenant_id=self.tenant.pk,
                             is_active=active,
                             external_id=external_id,
                         )
@@ -326,9 +327,9 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                     user.save()
 
                     # See comment above: bare membership, assignments granted in-app.
-                    Membership.objects.create(
+                    create_scim_membership(
                         user=user,
-                        tenant=self.tenant,
+                        tenant_id=self.tenant.pk,
                         is_active=active,
                         external_id=external_id,
                     )

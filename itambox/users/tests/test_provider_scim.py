@@ -303,6 +303,13 @@ class ProviderSCIMProvisioningTests(TestCase):
             "emails": [{"value": "newstaff@msp.com", "primary": True}],
             "active": True,
         }
+        holder = AssetHolder.objects.create(
+            first_name="Existing",
+            last_name="Provider Holder",
+            upn="different-login@msp.com",
+            email="newstaff@msp.com",
+            tenant=self.provider,
+        )
         response = self.client.post(url, data=payload, content_type="application/json", **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.json()["userName"], "newstaff@msp.com")
@@ -310,6 +317,9 @@ class ProviderSCIMProvisioningTests(TestCase):
         user = User.objects.get(username="newstaff@msp.com")
         self.assertTrue(user.is_active)
         self.assertTrue(Membership.objects.filter(user=user, tenant=self.provider, is_active=True).exists())
+        holder.refresh_from_db()
+        self.assertIsNone(holder.user_id)
+        self.assertFalse(AssetHolder.objects.filter(user=user, tenant=self.provider).exists())
         # SCIM provisions identity only: no RoleGrant is auto-created — permissions
         # and reach are granted in-app afterwards, never implied by provisioning.
         self.assertFalse(RoleGrant.objects.filter(membership__user=user).exists())
