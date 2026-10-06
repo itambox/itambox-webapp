@@ -127,8 +127,8 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
             tenant=self.tenant_b,
         )
 
-        deployable = baker.make(StatusLabel, type="deployable", name="Custody Deployable")
-        deployed = baker.make(StatusLabel, type="deployed", name="Custody Deployed")
+        deployable = self._custody_status_label("Custody Deployable", "deployable")
+        deployed = self._custody_status_label("Custody Deployed", "deployed")
         self.asset_a = baker.make(
             Asset,
             name="Dummy Custody Asset A",
@@ -173,6 +173,19 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
             token=DUMMY_TOKEN_B,
             eula_text=DUMMY_EULA,
         )
+
+    @staticmethod
+    def _custody_status_label(name, label_type):
+        """Provision a custody status label with a currently free primary key.
+
+        ``CustodyConcurrentConsentTests`` resets the database sequences, and other
+        suites commit their own reference rows, so a sequence-assigned key can
+        collide with a row that is still present in this sparse table (#607).
+        """
+        from django.db.models import Max
+
+        highest = StatusLabel._base_manager.aggregate(highest=Max("id"))["highest"] or 0
+        return baker.make(StatusLabel, pk=highest + 1, type=label_type, name=name)
 
     @staticmethod
     def _make_member(username, tenant, permissions):
