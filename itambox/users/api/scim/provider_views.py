@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from typing import cast
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -245,9 +246,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def post(self, request: Request, *args: object, **kwargs: object) -> Response:
         document = require_object_document(request.data)
         patch = parse_user_resource(document)
-        username = patch.username
-        if not isinstance(username, str):
-            raise SCIMPatchError("userName is required")
+        username = cast(str, patch.username)
         email = patch.email
         first_name = patch.first_name
         last_name = patch.last_name
