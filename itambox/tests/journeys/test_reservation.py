@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from assets.models import AssetAssignment, AssetReservation, ReservationStatusChoices
+from assets.models import AssetAssignment, AssetReservation, ReservationStatusChoices, StatusLabel
 from assets.services import checkout_asset
 from organization.models import Location, Site
 
@@ -15,7 +15,11 @@ from .support import JourneyMixin, today
 class ReservationJourneyTests(JourneyMixin, TestCase):
     def setUp(self):
         self.make_tenant("journey-reservation")
-        self.asset = self.make_asset()
+        deployable = StatusLabel.objects.create(
+            name="Journey Ready", slug="journey-ready", type=StatusLabel.TYPE_DEPLOYABLE
+        )
+        StatusLabel.objects.create(name="Deployed", slug="deployed", type=StatusLabel.TYPE_DEPLOYED)
+        self.asset = self.make_asset(status=deployable)
         self.reserved_for = self.make_holder()
         AssetReservation.objects.create(
             asset=self.asset,
