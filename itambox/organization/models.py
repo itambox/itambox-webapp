@@ -1249,7 +1249,7 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
 
 
 # ---------------------------------------------------------------------------
-# Cross-tenant resource sharing (ADR-0001, remediation plan phase 2)
+# Cross-tenant resource sharing
 # ---------------------------------------------------------------------------
 
 

@@ -65,7 +65,7 @@ urlpatterns = [
     # Components live in the inventory app/namespace (inventory:component_*).
     # The duplicate routes that used to live here are gone — one canonical URL
     # per object, the NetBox way.
-    # Phase 4 Audits & Barcoding
+    # Audits and barcoding routes.
     path("<int:pk>/audit/", views.AssetAuditView.as_view(), name="asset_audit"),
     path("<int:pk>/print/", views.asset_label_print, name="asset_label_print"),
     path("<int:pk>/print/<int:template_id>/", views.asset_label_print, name="asset_label_print_template"),
@@ -139,7 +139,7 @@ urlpatterns += [
     path("disposals/<int:pk>/", views.AssetDisposalDetailView.as_view(), name="assetdisposal_detail"),
     path("disposals/<int:pk>/edit/", views.AssetDisposalEditView.as_view(), name="assetdisposal_update"),
     path("disposals/<int:pk>/delete/", views.AssetDisposalDeleteView.as_view(), name="assetdisposal_delete"),
-    # Cancel an erroneous disposal while preserving the record as evidence (#496)
+    # Cancel an erroneous disposal while preserving the record as evidence
     path("disposals/<int:pk>/cancel/", AssetDisposalCancelView.as_view(), name="assetdisposal_cancel"),
     # Asset-specific dispose action (pre-fills asset, calls dispose_asset service)
     path("assets/<int:pk>/dispose/", views.AssetDisposeActionView.as_view(), name="asset_dispose"),
@@ -164,7 +164,7 @@ urlpatterns += [
 ]
 
 urlpatterns += [
-    # Repair episode CRUD (#504)
+    # Repair episode CRUD
     path("episodes/", views.RepairEpisodeListView.as_view(), name="repairepisode_list"),
     path("episodes/add/", views.RepairEpisodeEditView.as_view(), name="repairepisode_create"),
     path("episodes/<int:pk>/", views.RepairEpisodeDetailView.as_view(), name="repairepisode_detail"),

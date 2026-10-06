@@ -52,7 +52,7 @@ def applicable_grants(user):
 
 def effective_permissions_with_expiry(user, tenant):
     """Return permissions plus the first expiry that can change that result."""
-    # Check the precomputed per-tenant permissions map first (fix #3 for issue #56).
+    # Check the precomputed per-tenant permissions map first.
     if hasattr(user, "__dict__"):
         perm_map = user.__dict__.get("_tenant_permissions_map")
         if perm_map is not None and tenant.pk in perm_map:

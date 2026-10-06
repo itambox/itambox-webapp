@@ -87,7 +87,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     )
     purchase_date = models.DateField(blank=True, null=True, db_index=True, verbose_name=_("Purchase Date"))
 
-    # Procurement Metadata (Maturity Phase 1)
+    # Procurement metadata.
     purchase_cost = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Purchase Cost")
     )
@@ -413,7 +413,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
                 AssetStateMachine.validate_transition(
                     old_asset.status.type, self.status.type, self.assignments.filter(is_active=True).exists()
                 )
-                # #496: a disposal RECORD owns the out-of-operation state. Leaving
+                # A disposal record owns the out-of-operation state. Leaving
                 # ``archived`` while an active record exists (an ordinary status
                 # edit, an import, an admin change) is a hidden reactivation — it
                 # must go through cancel_asset_disposal instead.

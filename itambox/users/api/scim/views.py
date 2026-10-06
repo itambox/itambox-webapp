@@ -170,7 +170,7 @@ class SCIMTenantMixin:
         if getattr(request, "user", None) and request.user.is_authenticated:
             set_current_user(request.user)
         # Ensure ObjectChange records are created for SCIM mutations by wiring
-        # a request-id contextvar (WP-18 — SCIM bypassed CurrentUserMiddleware).
+        # a request-id contextvar because SCIM bypasses CurrentUserMiddleware.
         # inline import: app-registry: avoid AppRegistryNotReady at module-load time
         from itambox.middleware import _request_id
 

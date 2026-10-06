@@ -1255,7 +1255,7 @@ class ScheduledReportForm(forms.ModelForm):
             # (single tenant, tenant group, or All accessible) resolved by the
             # tenant-scoping managers — never an arbitrary AssetHolder profile
             # tenant, which under a multi-tenant scope would hide records the
-            # actor can legitimately reach (issue #134).
+            # actor can legitimately reach.
             self.fields["report"].queryset = ReportTemplate.objects.all()
             self.fields["channels"].queryset = NotificationChannel.objects.all()
         else:
@@ -1378,7 +1378,7 @@ class AlertRuleForm(forms.ModelForm):
                 self.fields.pop("tenant")
             # Channel choices follow the active canonical read scope resolved by
             # the tenant-scoping manager — rebound per request so the dropdown
-            # never lists channels outside the actor's scope (issue #567).
+            # never lists channels outside the actor's scope.
             self.fields["channels"].queryset = NotificationChannel.objects.all()
 
         # Make the threshold label/help reflect what the number actually means

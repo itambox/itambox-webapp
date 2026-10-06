@@ -42,7 +42,7 @@ class AssetReservationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # #504: a linked (soft-deleted) episode stays selectable, so saving a
+        # A linked (soft-deleted) episode stays selectable, so saving a
         # reservation never silently drops the story link.
         self.fields["episode"].queryset = selectable_episodes(
             self.instance.episode_id if self.instance and self.instance.pk else None

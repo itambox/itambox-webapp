@@ -270,7 +270,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 REST_FRAMEWORK = {
     # drf-spectacular's AutoSchema plus the x-itambox-maturity extension, so a
-    # generated client can see which endpoints are still settling (issue #171).
+    # generated client can see which endpoints are still settling.
     "DEFAULT_SCHEMA_CLASS": "itambox.api.openapi.CapabilityAwareAutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "users.api.authentication.TokenAuthentication",

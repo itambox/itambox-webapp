@@ -260,7 +260,7 @@ class DashboardSerializer(serializers.ModelSerializer):
         # Dashboards are personal objects: the owner is always the
         # authenticated requester.  `user` is exposed read-only so a client
         # can never choose another owner, and without this the insert
-        # crashed with IntegrityError -> HTTP 500 (issue #342).  The
+        # crashed with IntegrityError -> HTTP 500. The
         # serializer is API-only (DashboardViewSet always provides a request
         # context).
         validated_data["user"] = self.context["request"].user
@@ -538,7 +538,7 @@ class AlertRuleSerializer(BaseModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        # Scope guard (issue #567): a rule notifies only through channels of
+        # Scope guard: a rule notifies only through channels of
         # its own scope. Fail the write instead of accepting a configuration
         # that can never deliver. ``tenant`` is not a writable API field, so
         # the target scope is the stored tenant on updates and the create-time
