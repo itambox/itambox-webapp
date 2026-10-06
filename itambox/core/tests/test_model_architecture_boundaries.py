@@ -1,4 +1,4 @@
-"""RED contracts for issue #446 domain-internal boundary removal."""
+"""Architecture regression tests for model-owned boundaries."""
 
 import ast
 import importlib.util
@@ -14,7 +14,7 @@ def _source(relative_path: str) -> str:
 
 
 def _has_import_from(source: str, module: str) -> bool:
-    tree = ast.parse(source)
+    tree = ast.parse(source)  # source-text: architecture policy enforces permitted model imports.
     return any(isinstance(node, ast.ImportFrom) and node.module == module for node in ast.walk(tree))
 
 
@@ -64,7 +64,7 @@ class _RawReportRowsVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-class Issue446ModuleBoundaryRedTests(unittest.TestCase):
+class ModelArchitectureBoundaryTests(unittest.TestCase):
     def test_classifier_native_support_and_port_modules_exist(self):
         expected = (
             "inventory.models_mixins",
@@ -80,7 +80,7 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
             with self.subTest(module=module):
                 self.assertIsNotNone(
                     importlib.util.find_spec(module),
-                    f"issue #446 requires classifier-native module {module}",
+                    f"model boundary requires classifier-native module {module}",
                 )
 
     def test_legacy_boundary_modules_are_removed(self):
@@ -124,7 +124,7 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
 
     def test_compliance_model_has_no_actorless_expected_assets_property(self):
         source = _source("compliance/models.py")
-        tree = ast.parse(source)
+        tree = ast.parse(source)  # source-text: architecture policy rejects actorless model query APIs.
         names = {node.name for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
         self.assertNotIn("expected_assets_queryset", names)
 
@@ -135,7 +135,7 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
                 continue
             source = path.read_text(encoding="utf-8")
             visitor = _RawReportRowsVisitor()
-            visitor.visit(ast.parse(source))
+            visitor.visit(ast.parse(source))  # source-text: architecture policy tests raw report-row access boundaries.
             for line, scopes in visitor.offenders:
                 parser_writer = path.relative_to(ITAMBOX_ROOT).as_posix() == "compliance/audit_services.py" and bool(
                     set(scopes)
@@ -153,7 +153,9 @@ class Issue446ModuleBoundaryRedTests(unittest.TestCase):
         ):
             with self.subTest(source=source):
                 visitor = _RawReportRowsVisitor()
-                visitor.visit(ast.parse(source))
+                visitor.visit(
+                    ast.parse(source)
+                )  # source-text: architecture policy tests raw report-row access boundaries.
                 self.assertTrue(visitor.offenders)
 
     def test_license_registration_is_owned_by_licenses_config(self):

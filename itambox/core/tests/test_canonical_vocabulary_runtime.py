@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import ast
-import inspect
 import io
 import json
-import textwrap
 from decimal import Decimal
 from pathlib import Path
 
@@ -15,8 +12,6 @@ import pytest
 from assets.customfields import validate_asset_type_custom_field_data
 from assets.models import AssetType, Category, CategoryDefaultFieldset, Manufacturer
 from assets.services.specifications.core_vocabulary import get_core_vocabulary
-from core.management.commands._seed import catalog as catalog_seed
-from core.management.commands._seed.catalog import SeedCatalogMixin
 from core.management.commands.seed_data import Command as SeedDataCommand
 from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
@@ -43,20 +38,8 @@ def _seed_catalog():
     return command
 
 
-def _demo_asset_type_source():
-    source = textwrap.dedent(inspect.getsource(SeedCatalogMixin._seed_catalog))
-    module = ast.parse(source)
-    assignment = next(
-        node
-        for node in ast.walk(module)
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "at_data" for target in node.targets)
-    )
-    return source, ast.literal_eval(assignment.value)
-
-
-def test_demo_asset_type_source_uses_only_current_canonical_keys():
-    source, rows = _demo_asset_type_source()
+def test_seeded_asset_types_use_only_current_canonical_keys():
+    command = _seed_catalog()
     vocabulary_keys = {row["key"] for row in get_core_vocabulary()["active_fields"]}
     retired_or_unsupported_demo_keys = {
         "cpu",
@@ -71,31 +54,17 @@ def test_demo_asset_type_source_uses_only_current_canonical_keys():
         "cpu_architecture",
     }
 
-    assert len(rows) == 23
-    assert all(len(row) == 9 for row in rows)
-    assert not hasattr(catalog_seed, "_translate_legacy_demo_specs")
-    assert not hasattr(catalog_seed, "_canonical_demo_specs")
-    assert not any(
-        marker in source
-        for marker in (
-            "_legacy_fs",
-            "_fs_laptop",
-            "_fs_mobile",
-            "_fs_server",
-            "_fs_switch",
-            "_fs_av",
-            "_translate_legacy_demo_specs",
-            "_canonical_demo_specs",
-        )
-    )
-    for row in rows:
-        assert not (set(row[-1]) & retired_or_unsupported_demo_keys), row[1]
-        assert set(row[-1]) <= vocabulary_keys, row[1]
-        assert "nvme_ssd" not in row[-1].values(), row[1]
-        if row[-1].get("storage_interface") == "nvme":
-            assert row[-1].get("storage_medium") == "ssd", row[1]
+    asset_types = list(command._asset_types.values())
+    assert len(asset_types) == 23
+    for asset_type in asset_types:
+        values = asset_type.custom_field_data
+        assert not (set(values) & retired_or_unsupported_demo_keys), asset_type.slug
+        assert set(values) <= vocabulary_keys, asset_type.slug
+        assert "nvme_ssd" not in values.values(), asset_type.slug
+        if values.get("storage_interface") == "nvme":
+            assert values.get("storage_medium") == "ssd", asset_type.slug
 
-    categories = {row[1]: row[6] for row in rows}
+    categories = {asset_type.slug: asset_type.category.slug for asset_type in asset_types}
     assert categories["cisco-catalyst-9300"] == "switches"
     assert categories["unifi-switch-pro-48"] == "switches"
     assert categories["meraki-mr46"] == "access-points"

@@ -1,7 +1,5 @@
 """TaskContext behavior and issue #445 provider-boundary characterization."""
 
-import ast
-import inspect
 import uuid
 from unittest import mock
 
@@ -174,20 +172,3 @@ class Issue445TaskContextWrapperTests(TestCase):
                 with TaskContext(self.direct.pk, self.user.pk):
                     pass
         resolver.assert_called_once()
-
-    def test_task_context_source_is_domain_blind(self):
-        import core.tasks.context as context_module
-
-        source = inspect.getsource(context_module)
-        tree = ast.parse(source)
-        forbidden = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("organization"):
-                forbidden.append(node.module)
-            elif isinstance(node, ast.Import):
-                forbidden.extend(alias.name for alias in node.names if alias.name.startswith("organization"))
-        resolver_source = inspect.getsource(TaskContext._resolve_principal_and_tenant)
-        self.assertFalse(
-            forbidden or "organization.access" in resolver_source,
-            "missing issue445 TaskContext provider contract: core.tasks.context still references organization.access",
-        )

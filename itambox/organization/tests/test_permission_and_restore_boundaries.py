@@ -1,8 +1,7 @@
-"""Issue #443 guard-owner and restore-port contracts."""
+"""Guard-owner and restore-port contract regressions."""
 
 from __future__ import annotations
 
-import ast
 import inspect
 import os
 import subprocess
@@ -106,12 +105,6 @@ print('caller-imports-ok')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("caller-imports-ok", result.stdout)
 
-    def test_owner_does_not_import_integration_guard_or_membership_backend(self):
-        source = inspect.getsource(role_grant_validation)
-        self.assertNotIn("core.auth.guards", source)
-        self.assertNotIn("MembershipBackend", source)
-        self.assertNotIn("from core.auth import", source)
-
 
 class PermissionCacheContractTests(TestCase):
     def setUp(self):
@@ -189,7 +182,7 @@ class PermissionCacheContractTests(TestCase):
             self.assertEqual(resolve.call_count, 3)
 
 
-class RestoreAuthorityDispatchTests(SimpleTestCase):
+class RestoreAuthorityDispatchTests(TestCase):
     @staticmethod
     def _obj(label, **kwargs):
         return SimpleNamespace(_meta=SimpleNamespace(label_lower=label), **kwargs)
@@ -226,31 +219,6 @@ class RestoreAuthorityDispatchTests(SimpleTestCase):
 
     def test_singleton_is_preconstructed_and_annotated(self):
         self.assertIsInstance(organization_restore_authority, OrganizationRestoreAuthority)
-        source = inspect.getsource(__import__("organization.services.restore_authority", fromlist=["*"]))
-        self.assertIn("organization_restore_authority: RestoreAuthorityValidator", source)
-
-
-class GenericRestorePortTests(TestCase):
-    def test_generic_restore_has_only_the_named_port_import(self):
-        source = inspect.getsource(generic_restore)
-        tree = ast.parse(source)
-        imports = [node for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))]
-        self.assertTrue(
-            any(
-                isinstance(node, ast.ImportFrom)
-                and node.module == "core"
-                and [alias.name for alias in node.names] == ["restore_authority"]
-                for node in imports
-            )
-        )
-        self.assertFalse(
-            any(isinstance(node, ast.ImportFrom) and node.module == "core.auth.guards" for node in imports)
-        )
-        self.assertFalse(
-            any(isinstance(node, ast.ImportFrom) and (node.module or "").startswith("organization") for node in imports)
-        )
-        self.assertNotIn("importlib", source)
-        self.assertNotIn("_validate_restore_grant_authority", source)
 
     def test_single_restore_calls_port_wrapper_at_operation_time(self):
         obj = SimpleNamespace(

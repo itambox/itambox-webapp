@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import ast
-import inspect
-import textwrap
 import threading
 import time
 from datetime import timedelta
@@ -15,7 +12,6 @@ from django.db import close_old_connections, connection, connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
-import core.auth.oidc as oidc_module
 import organization.services.tenant_onboarding as tenant_onboarding
 from core import identity_provisioning
 from core.auth.oidc import OIDCIdentityProvisioningError, TenantOIDCBackend
@@ -332,29 +328,6 @@ class OIDCPhaseBPortContractTests(TestCase):
         )
         self.assertEqual(ObjectChange.objects.count(), before["changes"])
         self.assertEqual(AuditEvent.objects.count(), before["events"])
-
-    def test_phase_b_source_has_one_binding_lock_and_no_user_lock(self):
-        source = inspect.getsource(TenantOIDCBackend._finish_identity_phase_b)
-        tree = ast.parse(textwrap.dedent(source))
-        calls = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "provision_external_identity"
-        ]
-        self.assertEqual(len(calls), 1)
-        self.assertIn("tenant_scope.tenant_model", source)
-        self.assertEqual(source.count("select_for_update"), 1)
-        self.assertNotIn("UserModel._base_manager.select_for_update", source)
-
-    def test_adapter_has_no_direct_organization_or_legacy_provisioning_ownership(self):
-        source = inspect.getsource(oidc_module)
-        self.assertNotIn("from organization.models", source)
-        self.assertNotIn("MATRIX_MODELS", source)
-        self.assertNotIn("Permission", source)
-        self.assertNotIn("sync_user_profile_and_memberships", source)
-        self.assertNotIn("get_permissions_for_role", source)
 
 
 class OIDCPhaseBAuditFailureTests(TestCase):

@@ -335,7 +335,7 @@ class AllAccessibleScopeTests(TestCase):
         """Phase 3 correction for issue #56: ``_all_accessible_permissions`` iterated
         every accessible tenant via ``_effective_perms_for_tenant`` without ever
         calling ``build_accessible_tenant_permissions_map`` — the corrected
-        single-pass map (see test_phase3_permissions_map.py) was defined but
+        single-pass map (see test_tenant_permissions_map.py) was defined but
         never wired into the production ambient-permission path, so it stayed
         dormant. Resolving an ambient permission under the all-accessible scope
         must now populate that map as a side effect, not just leave it callable.

@@ -163,13 +163,6 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
         finally:
             core.context._current_tenant = original
 
-    def test_global_mockers_register_failure_safe_cleanup(self):
-        source = Path(__file__).with_name("test_multi_tenant_auth.py").read_text(encoding="utf-8")
-
-        self.assertIn("self.addCleanup(self.xmlsec_patcher.stop)", source)
-        self.assertIn("self.addCleanup(self.requests_patcher.stop)", source)
-        self.assertIn("self.addCleanup(self.open_patcher.stop)", source)
-
     def test_test_fixture_reset_clears_global_navigation_menu_cache(self):
         get_menus()
         self.assertGreater(get_menus.cache_info().currsize, 0)

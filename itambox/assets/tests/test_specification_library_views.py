@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from assets.api.tests.test_type_library_http import _snapshot_rows
 from assets.models import AssetType, Manufacturer
-from assets.tests.test_t17_type_library_validation import _release_document
+from assets.tests.test_type_library_validation import _release_document
 from extras.models import CustomField, SpecificationLibrary
 
 

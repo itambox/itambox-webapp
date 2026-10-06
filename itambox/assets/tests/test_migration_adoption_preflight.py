@@ -1,4 +1,4 @@
-"""assets/tests/test_issue479_foundation_migrations.py (migration rehearsals live under scripts/qualification/migrations/)."""
+"""assets/tests/test_migration_adoption_preflight.py (migration rehearsals live under scripts/qualification/migrations/)."""
 
 import importlib
 from types import SimpleNamespace

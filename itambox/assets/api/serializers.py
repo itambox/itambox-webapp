@@ -710,7 +710,7 @@ class AssetDisposalSerializer(BaseModelSerializer):
     data_sanitization_method_display = serializers.CharField(
         source="get_data_sanitization_method_display", read_only=True
     )
-    # Cancellation is owned by the service: read-only over the API (#496).
+    # Cancellation is owned by the service: read-only over the API.
     is_active = serializers.BooleanField(read_only=True)
     cancelled_at = serializers.DateTimeField(read_only=True)
     cancelled_by_name = serializers.SerializerMethodField()

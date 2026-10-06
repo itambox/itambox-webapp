@@ -16,7 +16,7 @@ from assets.services.type_library.commands import (
     export_library,
     preview_library,
 )
-from assets.tests.test_t17_type_library_validation import _release_document
+from assets.tests.test_type_library_validation import _release_document
 from core.models import ObjectChange
 from extras.models import SpecificationLibrary, SpecificationLibraryRelease
 from organization.services.access_scope import authentication_revision_for_actor

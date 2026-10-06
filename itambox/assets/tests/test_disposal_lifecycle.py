@@ -6,7 +6,7 @@ compute_book_value short-circuits on disposed_at and the residual is lost
 (disposal_value would default to 0.00 instead of the depreciated value).
 
 Run with:
-    pytest assets/tests/test_phase0_disposal.py
+    pytest assets/tests/test_disposal_lifecycle.py
 """
 
 import datetime

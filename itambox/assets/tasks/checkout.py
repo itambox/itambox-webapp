@@ -240,7 +240,7 @@ def bulk_checkout_task(
     try:
         with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="assets.bulk_checkout") as ctx:
             log_extra = {**ctx.log_context, "job_id": job_id}
-            # Execution-time RBAC recheck (issue #445): enqueue-time authorization
+            # Execution-time RBAC recheck: enqueue-time authorization
             # is not enough — a permission revoked between submission and worker
             # execution must fail closed before any asset state is resolved
             # or mutated. No Notification is created on denial.

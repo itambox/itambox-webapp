@@ -1,4 +1,4 @@
-"extras/tests/test_issue185_alert_delivery.py (migration rehearsals live under scripts/qualification/migrations/)."
+"extras/tests/test_alert_delivery_outcomes.py (migration rehearsals live under scripts/qualification/migrations/)."
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType

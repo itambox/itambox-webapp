@@ -6,12 +6,11 @@ Covers:
   'iregex'/'regex' lookups.
 """
 
-import ast
-import inspect
-import textwrap
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from assets.models import Manufacturer
 from core.forms.import_forms import MAX_IMPORT_ROWS, BulkImportForm
@@ -60,20 +59,22 @@ class ImportRowCapTests(TestCase):
 
 
 class SearchLookupAllowlistTests(TestCase):
-    """G5: the regex lookups are no longer reachable from the search view."""
+    """G5: unsafe regex lookups fall back before reaching the search backend."""
 
-    def test_iregex_and_regex_not_allowed(self):
+    def test_regex_lookup_is_replaced_before_backend_invocation(self):
         from itambox.views.utility import SearchView
 
-        source = inspect.getsource(SearchView.get)
-        string_literals = {
-            node.value
-            for node in ast.walk(ast.parse(textwrap.dedent(source)))
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        # The allowlist is a local literal in SearchView.get; the ReDoS-prone
-        # regex lookups must not appear in it.
-        self.assertNotIn("iregex", string_literals)
-        self.assertNotIn("regex", string_literals)
-        # Sanity: the safe lookups are still present.
-        self.assertIn("icontains", string_literals)
+        calls = []
+
+        class Backend:
+            def search(self, query, *, user, obj_types, lookup):
+                calls.append((query, user, obj_types, lookup))
+                return {}
+
+        request = RequestFactory().get("/search/?q=needle&lookup=regex&obj_type=Asset")
+        request.user = SimpleNamespace(is_authenticated=True)
+        with patch("itambox.views.utility.import_string", return_value=Backend):
+            response = SearchView().get(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls, [("needle", request.user, ["Asset"], "icontains")])

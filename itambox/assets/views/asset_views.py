@@ -278,9 +278,9 @@ class AssetDetailView(ObjectDetailView):
         # `logger = ...`, which is pre-existing E402 debt. Hoist it with that cleanup.
         from assets.models import AssetDisposal
 
-        # #496: disposal is a history, not a single one-to-one record. The active
+        # Disposal is a history, not a single one-to-one record. The active
         # record owns the life cycle state; cancelled records stay visible.
-        # #496 repair12: a soft-deleted record that was never cancelled still owns the
+        # A soft-deleted record that was never cancelled still owns the
         # lifecycle, so the history must include tombstones through the tenant-safe
         # manager (``all_objects``) - otherwise the UI claims "no record" and offers a
         # disposal the service then rejects.
@@ -292,7 +292,7 @@ class AssetDetailView(ObjectDetailView):
         context["disposal_history"] = disposal_history
         context["disposal_obj"] = next((disposal for disposal in disposal_history if disposal.is_active), None)
 
-        # #504: the repair/replacement timeline groups lifecycle records by episode
+        # The repair/replacement timeline groups lifecycle records by episode
         # when links exist and falls back to chronological order otherwise.
         context["asset_timeline"] = build_asset_timeline(asset)
 

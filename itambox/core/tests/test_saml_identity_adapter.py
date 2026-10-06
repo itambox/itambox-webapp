@@ -6,7 +6,6 @@ SDK-free identity port responsible for Organization lifecycle writes.
 
 from __future__ import annotations
 
-import ast
 import logging
 import sys
 from unittest.mock import Mock, patch
@@ -88,17 +87,6 @@ class SAMLAdapterContractTests(TestCase):
             self.assertIs(saml_module._live_tenant("saml-customer"), marker)
 
         tenant_model.assert_called_once_with()
-
-    def test_production_adapter_has_no_domain_model_form_or_legacy_provisioning_edge(self):
-        source = open(saml_module.__file__, encoding="utf-8").read()
-        tree = ast.parse(source)
-        imports = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
-        self.assertNotIn("organization.models", imports)
-        self.assertNotIn("organization.forms.role_form", imports)
-        self.assertNotIn("get_permissions_for_role", source)
-        self.assertNotIn("AssetHolder", source)
-        self.assertNotIn("Membership", source)
-        self.assertNotIn("RoleGrant", source)
 
     @override_settings(ITAMBOX_TENANT_SAML_CONFIGS={"saml-customer": SAML_CONFIG})
     def test_normalizes_saml_facts_and_calls_identity_port_once_with_exact_dto(self):

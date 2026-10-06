@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import ast
 import json
 import threading
 import time
 from datetime import timedelta
-from pathlib import Path
 from threading import Barrier, BrokenBarrierError, Event
 from unittest import mock
 
@@ -135,43 +133,61 @@ class IdentityServiceConcurrencyTests(TransactionTestCase):
             thread.join(timeout=15)
             self.assertFalse(thread.is_alive(), f"worker {thread.name} exceeded the bounded join")
 
-    def test_required_contention_pollers_have_no_positive_duration_waits(self):
-        helper_sources = (
-            (Path(__file__), "_wait_for_user_lock_wait"),
-            (Path(__file__).resolve().parents[2] / "core/tests/test_oidc_phase_b.py", "_wait_for_real_tenant_wait"),
+    def test_required_contention_pollers_use_bounded_database_observations(self):
+        from core.tests.test_oidc_identity_binding import OIDCB2LockCompositionTests
+
+        nonmatching_lock_row = (
+            101,
+            "Lock",
+            "transactionid",
+            "tuple",
+            "organization_tenant",
+            1,
+            1,
+            999,
+            "SELECT ... FOR SHARE",
+            "SELECT ... FOR UPDATE",
+            "itambox-concurrency-poller-test",
         )
-        for path, function_name in helper_sources:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            function = next(
-                (
-                    node
-                    for node in ast.walk(tree)
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name
+        cursor = mock.Mock()
+        cursor.fetchall.return_value = [nonmatching_lock_row]
+        cursor_context = mock.MagicMock()
+        cursor_context.__enter__.return_value = cursor
+
+        pollers = (
+            (
+                lambda waiting_pid, blocking_pid, user_id: self._wait_for_user_lock_wait(
+                    waiting_pid=waiting_pid,
+                    blocking_pid=blocking_pid,
+                    user_id=user_id,
                 ),
-                None,
-            )
-            self.assertIsNotNone(function, f"missing required contention helper {path}:{function_name}")
-            violations = []
-            for node in ast.walk(function):
-                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-                    continue
-                if node.func.attr not in {"wait", "sleep"}:
-                    continue
-                if (
-                    node.func.attr == "sleep"
-                    and isinstance(node.func.value, ast.Name)
-                    and node.func.value.id == "asyncio"
-                    and node.args
-                    and isinstance(node.args[0], ast.Constant)
-                    and node.args[0].value == 0
+                (101, 202, 7),
+                "never waited on User row",
+            ),
+            (
+                lambda waiting_pid, blocking_pid, _user_id: OIDCB2LockCompositionTests._wait_for_real_tenant_wait(
+                    self, waiting_pid, blocking_pid
+                ),
+                (101, 202, 7),
+                "OIDC Tenant FOR SHARE wait was not observed",
+            ),
+        )
+        for poller, args, expected_failure in pollers:
+            with self.subTest(poller=poller):
+                cursor_context.__enter__.reset_mock()
+                cursor.execute.reset_mock()
+                cursor.fetchall.reset_mock()
+                cursor.fetchall.return_value = [nonmatching_lock_row]
+                with (
+                    mock.patch.object(connection, "cursor", return_value=cursor_context),
+                    mock.patch.object(time, "monotonic", side_effect=(0.0, 0.0, 9.0)),
+                    mock.patch.object(time, "sleep", side_effect=AssertionError("poller slept")),
+                    mock.patch.object(Event, "wait", side_effect=AssertionError("poller blocked")),
+                    self.assertRaisesRegex(AssertionError, expected_failure),
                 ):
-                    continue
-                violations.append(f"{node.func.attr}@{node.lineno}")
-            self.assertEqual(
-                violations,
-                [],
-                f"{path}:{function_name} must use PostgreSQL observations, not sleep/wait polling",
-            )
+                    poller(*args)
+                self.assertEqual(cursor.execute.call_count, 1)
+                self.assertEqual(cursor.fetchall.call_count, 1)
 
     def _wait_for_user_lock_wait(self, *, waiting_pid, blocking_pid, user_id):
         deadline = time.monotonic() + 8

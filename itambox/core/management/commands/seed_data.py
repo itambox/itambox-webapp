@@ -296,8 +296,8 @@ class Command(
             self._simulate_history()  # real 2-year change history (last)
             # Maintenance runs after the history simulation because out-of-service
             # records must document the repair windows that simulation produced
-            # (#506): a "repair" on an asset that never left service is the exact
-            # contradiction the issue reports. It consumes no random draws of its
+            # A repair on an asset that never left service is the exact
+            # contradiction the seed must avoid. It consumes no random draws of its
             # own for those records, so the stream order of earlier phases is
             # unaffected.
             self._seed_maintenance()

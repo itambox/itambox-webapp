@@ -12,7 +12,7 @@ Note: bulk QuerySet.update() bypasses both clean() and the pre_save signal, so
 mass status flips are NOT validated — a pre-existing gap, not covered here.
 
 Run with:
-    pytest assets/tests/test_phase3_state_machine.py
+    pytest assets/tests/test_asset_state_transitions.py
 """
 
 import pytest

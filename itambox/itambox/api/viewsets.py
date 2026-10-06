@@ -220,7 +220,7 @@ class ITAMBoxModelViewSet(
         if active_tenant is None:
             # No single active tenant (tenant-group / All-accessible / unbound
             # context): deriving one from a membership/AssetHolder would cross
-            # the authorization boundary — fail closed (issue #134).
+            # the authorization boundary — fail closed.
             raise PermissionDenied()
 
         if not bulk_create:
@@ -261,7 +261,7 @@ class ITAMBoxModelViewSet(
         except ObjectDoesNotExist:
             # The update may legitimately move the object out of the
             # request-scoped queryset (e.g. a superuser transferring a token
-            # to another user, issue #353). The instance was validated and
+            # to another user. The instance was validated and
             # committed by perform_update() above; serve it directly rather
             # than failing with a 500 after the commit. Mirrors
             # get_created_response_instance().

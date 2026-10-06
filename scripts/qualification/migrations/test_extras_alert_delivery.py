@@ -1,4 +1,4 @@
-"Migration rehearsal from itambox/extras/tests/test_issue185_alert_delivery.py — run explicitly:\n\n    PYTHONPATH=itambox pytest scripts/qualification/migrations/\n"
+"Migration rehearsal from itambox/extras/tests/test_alert_delivery_outcomes.py — run explicitly:\n\n    PYTHONPATH=itambox pytest scripts/qualification/migrations/\n"
 
 import pytest
 from django.contrib.auth import get_user_model

@@ -20,7 +20,7 @@ from assets.services.request_fulfillment import (
     request_fulfillment_labels,
 )
 from assets.tests import test_requests
-from assets.tests.test_issue492_fulfillment import _all_accessible_scope
+from assets.tests.test_request_auto_fulfillment import _all_accessible_scope
 from core.managers import set_current_tenant, set_current_tenant_group
 from core.models import ObjectChange
 from organization.models import Tenant, TenantGroup

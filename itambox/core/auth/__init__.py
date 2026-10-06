@@ -8,7 +8,7 @@ from django.utils import timezone
 from core.authorization_cache import synchronize_authorization_cache
 
 # Read the request context from the leaf module rather than from
-# ``core.managers`` (issue #87 phase D): the managers import this package for
+# ``core.managers``: the managers import this package for
 # its authorization cache, so importing them back here closed an import loop.
 from core.context import (
     get_current_all_accessible,

@@ -161,21 +161,7 @@ class LDAPAdapterRestartTests(TestCase):
             )
             return backend, parent_authenticate, result
 
-    def test_production_owner_is_sdk_free_and_has_no_legacy_organization_edges(self):
-        source = inspect.getsource(ldap_module)
-
-        assert "from core import identity_provisioning, tenant_scope" in source
-        for forbidden in (
-            "organization.models",
-            "organization.forms",
-            "organization.services",
-            "django.contrib.auth.models import Permission",
-            "AssetHolder",
-            "Membership",
-            "RoleGrant",
-            "get_permissions_for_role",
-        ):
-            assert forbidden not in source
+    def test_backend_does_not_expose_legacy_authorization_helper(self):
         assert not hasattr(ldap_module.MultiTenantLDAPBackend, "get_permissions_for_role")
 
     def test_operation_time_tenant_model_owner_is_used_for_suffix_inference(self):

@@ -2317,7 +2317,7 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
         (STATUS_RESOLVED, _("Resolved")),
     ]
 
-    # Denormalized single-attempt delivery outcome (WP-13, Path B). ``delivery_status``
+    # Denormalized single-attempt delivery outcome. ``delivery_status``
     # keeps the full per-channel typed payload; this field makes delivery queryable/
     # filterable without JSON lookups and stays truthful under the no-retry policy.
     DELIVERY_OUTCOME_NONE = "none"

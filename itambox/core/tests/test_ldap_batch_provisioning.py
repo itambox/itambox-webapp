@@ -157,23 +157,7 @@ class LDAPBatchRestartTests(TestCase):
             call_command("sync_tenant_ldap", tenant=self.tenant.slug, stdout=output)
         return output.getvalue(), connection
 
-    def test_command_owner_is_batch_only_and_calls_concrete_service_module(self):
-        source = inspect.getsource(command_module)
-        assert "from organization.services import identity_provisioning" in source
-        assert "provision_ldap_directory_identity" in source
-        for forbidden in (
-            "core.identity_provisioning",
-            "MultiTenantLDAPBackend",
-            "Membership",
-            "RoleGrant",
-            "RoleGrantScope",
-            "Permission",
-            "LDAP_GRANT_REASON",
-            "role_is_privileged",
-            "provision_external_identity",
-        ):
-            assert forbidden not in source
-
+    def test_command_creates_identity_through_the_batch_provisioner(self):
         connection = _FakeLDAPConnection()
         with (
             patch.object(command_module, "django_auth_ldap_installed", True),

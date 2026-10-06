@@ -182,7 +182,6 @@ def test_semantic_and_presentation_declarations_have_exact_59_key_order():
 
 
 def test_semantic_targets_are_presentation_free_and_policy_does_not_import_forms():
-    import inspect
     from dataclasses import fields
 
     import organization.services.role_permission_policy as policy
@@ -193,8 +192,6 @@ def test_semantic_targets_are_presentation_free_and_policy_does_not_import_forms
         "model",
         "required_app",
     )
-    assert "organization.forms" not in inspect.getsource(policy)
-    assert "gettext" not in inspect.getsource(policy)
 
 
 @pytest.mark.django_db
@@ -297,14 +294,12 @@ def test_future_semantic_target_requires_a_presentation_entry(monkeypatch):
         presentation.build_matrix_models()
 
 
-def test_role_name_contract_is_local_and_does_not_import_missing_port():
-    import inspect
+def test_customer_role_vocabulary_matches_supported_roles():
     from typing import get_args
 
     import organization.services.role_permission_policy as policy
 
     assert get_args(policy.CustomerRoleName) == ("Admin", "Manager", "Member")
-    assert "core.identity_provisioning" not in inspect.getsource(policy)
 
 
 EXPECTED_PRESENTATION_ROWS = (

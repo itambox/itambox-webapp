@@ -6,7 +6,7 @@ from django.db.models import QuerySet
 from core.authorization_cache import synchronize_authorization_cache
 
 # The request-context contextvars and their accessors live in the leaf module
-# ``core.context`` (issue #87 phase D): the middleware that populates them and
+# ``core.context``: the middleware that populates them and
 # the auth backends that read them need the same objects, and hosting them here
 # forced both halves into a circular import. They are re-exported unchanged so
 # the established ``from core.managers import set_current_tenant`` import sites

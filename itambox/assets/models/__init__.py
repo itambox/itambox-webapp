@@ -52,7 +52,7 @@ from assets.models.assignment import AssetAssignment
 # ── 6. Requests ──────────────────────────────────────────────────────────────
 from assets.models.requests import AssetRequest
 
-# ── 7. Repair episodes (#504) ────────────────────────────────────────────────
+# ── 7. Repair episodes ────────────────────────────────────────────────
 from assets.models.episode import RepairEpisode
 
 # ── 8. Lifecycle (disposal / warranty / reservation) ────────────────────────

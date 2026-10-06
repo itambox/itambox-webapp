@@ -34,7 +34,7 @@ from .base import (
 # who needs DEBUG=True should run core.settings.dev instead.
 DEBUG = False
 
-# ---- Production configuration contract (issue #439) ------------------------
+# ---- Production configuration contract ------------------------------------
 # Each check below runs during settings import — the earliest guaranteed point
 # before Gunicorn, qcluster, or a management command can serve or process work.
 # All diagnostics are secret-free.

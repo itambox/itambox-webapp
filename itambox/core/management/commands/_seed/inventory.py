@@ -293,8 +293,8 @@ class SeedInventoryStockMixin:
 
     def _seed_inventory_assignments(self):
         # Accessory/consumable issues to holders, drawn from each tenant's own
-        # first-location pool. ADR-0001 phase 4 keeps this grant-free: the pool
-        # at the customer location belongs to the customer even though the
+        # first-location pool. Stock is owned by its location's tenant,
+        # even when the catalogue item is MSP-owned.
         # catalogue item is MSP-owned.
         assign_count = 0
         for tenant_slug, holders in self._tenant_holders.items():

@@ -33,7 +33,7 @@ class AssetCheckOutForm(forms.Form):
         label=_("Location"),
     )
     asset_target = forms.ModelChoiceField(
-        # #496: an active disposal record disqualifies a candidate regardless of
+        # An active disposal record disqualifies a candidate regardless of
         # its current status label.
         queryset=Asset.exclude_disposed(
             Asset.objects.exclude(status__type__in=["undeployable", "in_repair", "on_order", "archived"])

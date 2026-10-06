@@ -170,7 +170,7 @@
       "reason": "Intermediate revision of the t07 hard-delete protection regression fixture on the retained issue-479 branches; not a credential or authentication token. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "path": "itambox/extras/tests/test_t07_provenance.py",
+        "path": "itambox/extras/tests/test_specification_provenance.py",
         "rule": "generic-api-key",
         "line": 236
       },
@@ -188,7 +188,7 @@
       "reason": "Literal library definition identifier in a PostgreSQL hard-delete protection regression fixture; not a credential or authentication token. The scope is the exact file/rule/line identity and is independent of the introducing commit.",
       "owner": "@itambox",
       "scope": {
-        "path": "itambox/extras/tests/test_t07_provenance.py",
+        "path": "itambox/extras/tests/test_specification_provenance.py",
         "rule": "generic-api-key",
         "line": 239
       },

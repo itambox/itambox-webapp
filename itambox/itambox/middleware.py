@@ -12,7 +12,7 @@ from django.utils.translation import gettext as _
 from core.authorization_cache import begin_authorization_request, end_authorization_request
 
 # The user/request-id contextvars and their accessors live in the leaf module
-# ``core.context`` (issue #87 phase D). This middleware is what *populates*
+# ``core.context``. This middleware is what *populates*
 # them, while the tenant-scoping managers and the auth backends *read* them —
 # owning them here forced those readers into a circular import back onto this
 # module. They are re-exported unchanged so the established

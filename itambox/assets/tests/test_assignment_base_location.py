@@ -8,7 +8,7 @@ from model_bakery import baker
 from assets.filters import AssetFilterSet
 from assets.models import Asset, StatusLabel
 from assets.services import checkin_asset, checkout_asset, checkout_kit
-from assets.tests.test_issue492_fulfillment import _all_accessible_scope
+from assets.tests.test_request_auto_fulfillment import _all_accessible_scope
 from compliance.audit_services import expected_assets_queryset
 from compliance.models import AuditSession
 from core.tests.mixins import TenantTestMixin

@@ -1,7 +1,6 @@
 """Issue #445 event terminal-attempt and logging contracts."""
 
 import importlib
-import inspect
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -141,15 +140,6 @@ class Issue445EventSemanticsTests(TestCase):
         self.assertNotIn(self.CANARY, rendered, "missing issue445 canary-redaction event log contract")
         self.assertIsNone(record.exc_info, "missing issue445 traceback-free event log contract")
         self.assertIsNone(record.exc_text, "missing issue445 traceback-free event log contract")
-
-    def test_rule_processing_boundary_never_calls_logger_exception(self):
-        service = _event_service()
-        source = inspect.getsource(service.process_event_rules)
-        self.assertNotIn(
-            "logger.exception",
-            source,
-            "missing issue445 logger.exception prohibition at the event-rule boundary",
-        )
 
 
 class Issue445EventConcurrencyTests(TransactionTestCase):

@@ -68,7 +68,7 @@ CUTOVER_PATHS = frozenset(
         "assets.tasks.labels.generate_label_pdf_batch_task",
     }
 )
-# Path prefixes owned by the #445 move; any executable under them that is not
+# Task-path prefixes covered by this check; any executable under them that is not
 # one of the exact mapped identities is a noncanonical alias and fails.
 NEIGHBORHOOD_PREFIXES = (
     "core.tasks.alerts.",

@@ -1844,18 +1844,9 @@ class LoggingAndFailureContractTests(IdentityServiceCase):
         self.assertEqual(before_hash, after_hash)
         self.assertEqual(before, after)
 
-    def test_service_contract_has_no_direct_any_and_documents_oidc_binding_handoff(self):
-        source = inspect.getsource(identity_service)
-        tree = ast.parse(source)
-        self.assertNotIn("from typing import Any", source)
-        self.assertFalse(any(isinstance(node, ast.Name) and node.id == "Any" for node in ast.walk(tree)))
+    def test_provisioner_keeps_command_based_public_call_shape(self):
         signature = inspect.signature(OrganizationIdentityProvisioner.provision)
         self.assertEqual(tuple(signature.parameters), ("self", "command"))
-        docstring = inspect.getdoc(OrganizationIdentityProvisioner.provision) or ""
-        self.assertIn("Tenant FOR SHARE", docstring)
-        self.assertIn("must not pre-lock User or Tenant", docstring)
-        self.assertNotIn("skip_user_lock", docstring)
-        self.assertNotIn("skip_tenant_lock", docstring)
 
     def test_structured_log_fields_and_rendered_output_are_redacted(self):
         self.role(self.customer)

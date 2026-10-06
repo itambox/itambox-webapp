@@ -12,7 +12,7 @@ from assets.services.type_library.application import LibraryApplyRequest
 from assets.services.type_library.commands import apply_library, export_library, preview_library
 from assets.services.type_library.writing import effective_definitions_from_library
 from assets.services.type_library_validation import validate_library_document
-from assets.tests.test_t17_type_library_validation import _release_document
+from assets.tests.test_type_library_validation import _release_document
 from extras.models import CustomFieldChoice, SpecificationLibrary, SpecificationLibraryRelease
 from organization.services.access_scope import authentication_revision_for_actor
 

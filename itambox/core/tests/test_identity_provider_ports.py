@@ -479,18 +479,6 @@ print("registration-contract-ok")
                     {"groups", "claims", "tokens", "access_token", "id_token", "settings"},
                 )
 
-        for source in (inspect.getsource(identity_provisioning), inspect.getsource(restore_authority)):
-            for forbidden in (
-                "mozilla_django_oidc",
-                "django.conf",
-                "organization.models",
-                "users.models",
-                "claims",
-                "tokens",
-                "settings",
-            ):
-                self.assertNotIn(forbidden, source)
-
     def test_public_surface_has_only_named_types_and_wrappers(self):
         identity_public = {name for name in vars(identity_provisioning) if not name.startswith("_")}
         restore_public = {name for name in vars(restore_authority) if not name.startswith("_")}

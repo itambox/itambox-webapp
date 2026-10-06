@@ -249,7 +249,7 @@ def live_managed_grants(membership: Membership) -> QuerySet[RoleGrant]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1 — validation. Read-only, and the ONLY place decisions are taken.
+# Validation is read-only and is the only place grant decisions are taken.
 # ---------------------------------------------------------------------------
 class _Rejections:
     """Accumulates typed rejections so an admin sees every failure at once.
@@ -584,7 +584,7 @@ def validate_grant_plan(
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 — the write. Never re-reads authorization.
+# The write phase never re-reads authorization.
 # ---------------------------------------------------------------------------
 def _desired_scope_keys(spec: ManagedGrantSpec):
     """The ``(scope_type, tenant_id, tenant_group_id)`` children a row wants."""

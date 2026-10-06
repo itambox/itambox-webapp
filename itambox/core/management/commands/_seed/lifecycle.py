@@ -72,7 +72,7 @@ class SeedLifecycleMixin:
 
         # Supplemental coverage types we add on top of the basic HARDWARE warranty
         # that _seed_assets already creates on every asset. The warranty vendor is
-        # the Supplier link (issue #500), so each record keeps the asset's
+        # the Supplier link, so each record keeps the asset's
         # procurement supplier instead of a free-text vendor name.
         SUPPLEMENTAL_TYPES = [
             (WarrantyTypeChoices.ACCIDENTAL, 0.35),
@@ -180,7 +180,7 @@ class SeedLifecycleMixin:
 
         # A unit already handed to an open request must stay unreserved: a reservation
         # for a *different* holder covering today blocks the requester's checkout in
-        # ``assets.services`` and turns the approved request into a dead end (#506).
+        # ``assets.services`` and turns the approved request into a dead end.
         # ``_seed_operations`` runs first and publishes those assets; the
         # claim-blocker invariant is the fail-closed net behind this exclusion.
         request_allocated = getattr(self, "_request_allocated_asset_ids", set())

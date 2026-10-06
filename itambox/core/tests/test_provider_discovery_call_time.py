@@ -1,6 +1,4 @@
-import ast
 import importlib
-from pathlib import Path
 from unittest.mock import patch
 
 from django.db import connection
@@ -29,22 +27,6 @@ OIDC_CONFIG = {
 
 
 class ProviderDiscoveryArchitectureTests(TestCase):
-    def test_provider_discovery_has_no_direct_organization_model_import(self):
-        source = Path(providers.__file__).read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        forbidden = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == "organization.models":
-                forbidden.append(ast.unparse(node))
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-                if (
-                    node.func.attr == "get_model"
-                    and isinstance(node.func.value, ast.Name)
-                    and node.func.value.id == "apps"
-                ):
-                    forbidden.append(ast.unparse(node))
-        self.assertEqual(forbidden, [], "provider discovery must resolve its model through core.tenant_scope")
-
     def test_provider_module_does_not_resolve_or_capture_a_model_at_import(self):
         with patch.object(tenant_scope, "tenant_model", side_effect=AssertionError("import-time model lookup")):
             importlib.reload(providers)

@@ -417,7 +417,7 @@ class Consumable(AbstractInventoryItem):
 class ComponentStock(AbstractStock):
     # tenant is a REAL field derived from location.tenant (AbstractStock);
     # scoping runs on it directly — the catalogue item's tenant is irrelevant
-    # to pool ownership (ADR-0001 phase 4).
+    # to pool ownership.
     objects = TenantScopingManager()
 
     component = models.ForeignKey(

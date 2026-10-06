@@ -118,7 +118,7 @@ class SeedProcurementMixin:
                 # Every received unit becomes an asset: a line received with qty 10 must
                 # show 10 assets, or the PO's receipt claim and the asset ledger
                 # contradict each other and total-cost reports sum units that do not
-                # exist (#506). The serial number is drawn collision-free because
+                # exist. The serial number is drawn collision-free because
                 # (tenant, serial_number) is unique among active rows and the received
                 # volume per tenant is far larger than before.
                 if kind == "asset_type" and received:

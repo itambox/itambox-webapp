@@ -99,7 +99,7 @@ class MigrationHarnessContractTests(SimpleTestCase):
             connection.settings_dict["NAME"] = old_connection_name
 
     def test_child_environment_preserves_coverage_and_records_node(self):
-        nodeid = "assets/tests/test_issue479_foundation_migrations.py::AssetTypeFoundationMigrationTests::test_case"
+        nodeid = "assets/tests/test_migration_adoption_preflight.py::AssetTypeFoundationMigrationTests::test_case"
         with patch.dict(
             os.environ,
             {
