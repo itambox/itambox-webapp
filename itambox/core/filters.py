@@ -36,7 +36,7 @@ class BaseFilterSet(django_filters.FilterSet):
                     # 2. Supplier is tenant-scoped with allow_global_tenant: the scoping
                     #    manager already limits choices to the active scope plus global
                     #    suppliers, so the generic tenant-field narrowing below must not
-                    #    apply (issue #508).
+                    # apply.
                     elif model.__name__ == "Supplier":
                         filtered_qs = queryset
 

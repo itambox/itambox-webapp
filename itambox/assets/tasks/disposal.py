@@ -59,7 +59,7 @@ def _dispose_item(
     try:
         asset = Asset.objects.get(pk=pk)
 
-        # #496: an ACTIVE record is what makes an asset disposed; an archived asset
+        # An ACTIVE record is what makes an asset disposed; an archived asset
         # without a record is not (its stamp is the archival freeze) and stays eligible.
         already_disposed = AssetDisposal.all_objects.filter(asset=asset, cancelled_at__isnull=True).exists()
         if already_disposed:
@@ -239,7 +239,7 @@ def bulk_dispose_task(
     try:
         with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="assets.bulk_disposal") as ctx:
             log_extra = {**ctx.log_context, "job_id": job_id}
-            # Execution-time RBAC recheck (issue #445): enqueue-time authorization
+            # Execution-time RBAC recheck: enqueue-time authorization
             # is not enough — a permission revoked between submission and worker
             # execution must fail closed before any asset/disposal state is
             # resolved or mutated. No Notification is created on denial.

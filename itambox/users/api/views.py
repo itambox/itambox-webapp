@@ -107,8 +107,8 @@ class TokenViewSet(ITAMBoxModelViewSet):
         # Token.tenant is non-nullable, so the shared _tenant_create_kwargs
         # fail-closed guard (which only covers nullable tenant fields) never
         # fires for this viewset. Without an active tenant, Token.save()
-        # silently falls back to the first tenant in the database (fail-open,
-        # issue #353) — e.g. under a tenant-group scope, where permission
+        # silently falls back to the first tenant in the database (fail-open).
+        # This occurs under a tenant-group scope, where permission
         # checks aggregate over the group subtree but no single tenant anchors
         # the request. There is no "global" token, so fail closed instead.
         if get_current_tenant() is None:

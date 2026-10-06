@@ -93,7 +93,7 @@ class AssetDisposalAdmin(admin.ModelAdmin):
     )
     date_hierarchy = "disposal_date"
     raw_id_fields = ("asset",)
-    # Owned by cancel_asset_disposal; never editable in the admin (#496).
+    # Owned by cancel_asset_disposal; never editable in the admin.
     readonly_fields = ("cancelled_at", "cancelled_by", "cancellation_reason")
 
     def get_readonly_fields(self, request, obj=None):
@@ -104,7 +104,7 @@ class AssetDisposalAdmin(admin.ModelAdmin):
         return tuple(fields)
 
     def has_delete_permission(self, request, obj=None):
-        # Evidence (#496): the admin never deletes a disposal record; cancel it.
+        # Evidence: the admin never deletes a disposal record; cancel it.
         return False
 
     def save_model(self, request, obj, form, change):

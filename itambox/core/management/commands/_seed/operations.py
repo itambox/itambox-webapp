@@ -120,7 +120,7 @@ class SeedOperationsMixin:
         # Assets handed to an open request. Published so the later reservation phase
         # leaves them alone: a reservation for a *different* holder covering today
         # blocks the requester's checkout in ``assets.services`` and would dead-end
-        # the approved request (#506).
+        # the approved request.
         self._request_allocated_asset_ids = set()
 
         # Notification channels
@@ -303,7 +303,7 @@ class SeedOperationsMixin:
             # the claim view can resolve an assignee for it — the customer-admin logins
             # this seed creates are technical accounts that deliberately carry no
             # holder profile. Seeding "approved" without either produced demo stories
-            # that dead-end on a validation error the prospect cannot clear (#506). So
+            # that dead-end on a validation error the prospect cannot clear. So
             # both the allocation and the delegated target are decided *before* the row
             # exists: an approved request always carries them, and a tenant without a
             # spare unit is seeded as pending — which is the state that still has a
@@ -330,7 +330,7 @@ class SeedOperationsMixin:
             req_count += 1
 
         # Assets already handed to an open request must stay unreserved in the later
-        # reservation phase (#506): a reservation for a *different* holder covering
+        # reservation phase: a reservation for a *different* holder covering
         # today blocks the claim's checkout and dead-ends the approved request. Read
         # back from the persisted rows so the set matches what the invariant later
         # verifies.

@@ -149,7 +149,7 @@ class HardwareImporter:
                         "order_number",
                         "notes",
                         "supplier",
-                        # #496: Asset.save() derives the archival-freeze fields on a
+                        # Asset.save derives the archival-freeze fields on a
                         # status transition; a narrowed update_fields write must carry
                         # them, or an imported status change would silently drop the
                         # freeze (same contract as

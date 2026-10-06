@@ -10,7 +10,7 @@ from core.forms import FilterForm, scope_tenant_field
 from .filters import ContractFilterSet, PurchaseOrderFilterSet
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
 
-# The exclusive Contract/Subscription ownership mapping (issue #500): the same
+# Contract and Subscription forms share one exclusive ownership mapping: the same
 # text ships on the Subscription type field, so one agreement is recorded in one
 # module only. Kept as one constant so the Contract form cannot drift.
 AGREEMENT_OWNERSHIP_HELP = _(

@@ -29,7 +29,7 @@ from .role_matrix import MATRIX_MODELS
 # Custom (non-CRUD) permissions exposed as named checkboxes alongside the matrix.
 # Derived dynamically from the live permission table (everything declared via
 # ``Meta.permissions``) so newly added custom codenames are never invisible to
-# the role editor again (gap hit on #296 with prepare/export custody receipts).
+# the role editor. This keeps newly declared prepare/export permissions visible.
 def get_custom_permissions():
     """All non-CRUD permissions as ``(field_key, label, full_codename)`` tuples.
 

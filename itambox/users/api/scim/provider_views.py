@@ -106,7 +106,7 @@ class SCIMProviderMixin:
         set_current_tenant(self.tenant)
         if getattr(request, "user", None) and request.user.is_authenticated:
             set_current_user(request.user)
-        # Wire request-id so SCIM mutations create ObjectChange records (WP-18).
+        # Wire request-id so SCIM mutations create ObjectChange records.
         # inline import: app-registry: avoid AppRegistryNotReady at module-load time
         from itambox.middleware import _request_id
 

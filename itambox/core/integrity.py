@@ -255,7 +255,7 @@ def check_stock_tenant_conflicts(topology=None):
             loc_tenant = row["location__tenant_id"]
             item_tenant = row[f"{item_attr}__tenant_id"]
             if loc_tenant is not None and row["tenant_id"] != loc_tenant:
-                # Phase-4 invariant: stock.tenant is derived from and must
+                # Stock ownership invariant: stock.tenant is derived from and must
                 # match location.tenant — drift means someone bypassed save().
                 # (A tenant-less location is the AMBIGUOUS case below, not
                 # drift — one finding per row, not two.)
@@ -367,7 +367,7 @@ def _inventory_assignment_finding(topo, label, item_attr, row):
     if source_tenant is None and source_kind == "item":
         # No from-location recorded and the catalogue item is global: the
         # source pool (and its owner) cannot be derived at all — these rows
-        # block the phase-4 stock-ownership backfill.
+        # block the stock-ownership backfill.
         summary = (
             f"{label} #{row['pk']}: no source pool derivable "
             f"(from_location empty, item is global); target tenant "

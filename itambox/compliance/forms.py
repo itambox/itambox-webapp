@@ -77,7 +77,7 @@ class AssetMaintenanceForm(forms.ModelForm):
         # unscoped at import, so a maintenance record could otherwise reference (and
         # expose in the dropdown) another tenant's asset.
         self.fields["asset"].queryset = Asset.objects.all()
-        # #504: a linked (soft-deleted) episode stays selectable, so editing the
+        # A linked (soft-deleted) episode stays selectable, so editing the
         # record never silently drops the story link.
         self.fields["episode"].queryset = selectable_episodes(
             self.instance.episode_id if self.instance and self.instance.pk else None

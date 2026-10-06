@@ -4656,7 +4656,7 @@
       "identity": "form_factor",
       "namespace": "local",
       "current_behavior": "rejected_by_global_CustomField.name_identity",
-      "evidence": "itambox/assets/tests/test_issue479_foundation_migrations.py::test_core_seed_refuses_local_field_identity",
+      "evidence": "itambox/assets/tests/test_migration_adoption_preflight.py::test_core_seed_refuses_local_field_identity",
       "target_rule": "Field key is globally unique; do not overwrite or alias"
     },
     {

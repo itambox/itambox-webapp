@@ -65,7 +65,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     # that: with a bound non-superuser principal and no active tenant it fails
     # closed to an empty queryset, and under an inherited request scope
     # (Q_CLUSTER sync) it narrows to a single tenant — either way past-due
-    # subscriptions stay active and no reminder is ever sent (issue #145).
+    # subscriptions stay active and no reminder is ever sent.
     # SoftDeleteManager, not AllObjectsManager: this widens the TENANT boundary
     # only, so soft-deleted rows stay excluded. NOT named ``all_objects`` — that
     # name carries a tenant-scoped contract here (the Recycle Bin relies on it).

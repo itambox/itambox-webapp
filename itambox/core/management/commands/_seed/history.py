@@ -173,7 +173,7 @@ class SeedHistoryMixin:
             )
         # Publish the window so the maintenance phase can create the
         # paperwork of *this* repair instead of inventing unrelated
-        # "repair" records on assets that never left service (#506).
+        # "repair" records on assets that never left service.
         if repaired:
             self._repair_windows.append(
                 {
@@ -366,7 +366,7 @@ class SeedHistoryMixin:
                 # deployable pool), so a seeded repair on an assigned asset must
                 # log that checkin and, once the repair completes, re-check the
                 # asset back out to the same holder. Leaving the assignment
-                # untouched produced the contradiction #506 reports: history said
+                # untouched produced a contradiction: history said
                 # "in repair" / "available" while the same person held the device
                 # the whole time.
                 if random.random() < 0.20 and sl_pending_repair:

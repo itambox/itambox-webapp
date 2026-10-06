@@ -372,7 +372,7 @@ OPERATIONS_MENU = Menu(
                 # Explicit MenuItem, not get_model_item: custody receipts have
                 # no create route (receipts are system-generated), and the
                 # helper's full CRUD link family would emit a NoReverseMatch
-                # for custodyreceipt_create on every page render (#318).
+                # for custodyreceipt_create on every page render.
                 MenuItem(
                     link="compliance:custodyreceipt_list",
                     link_text=_("Custody Receipts"),

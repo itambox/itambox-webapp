@@ -64,13 +64,13 @@ class AssetDisposalForm(forms.ModelForm):
         # before disposing as defence-in-depth.
         self.fields["asset"].queryset = Asset.objects.all()
 
-        # #504: a linked (soft-deleted) episode stays selectable, so amending the
+        # A linked (soft-deleted) episode stays selectable, so amending the
         # record never silently drops the story link.
         self.fields["episode"].queryset = selectable_episodes(
             self.instance.episode_id if self.instance and self.instance.pk else None
         )
 
-        # #496: a record's asset identity cannot be re-pointed after the fact.
+        # A record's asset identity cannot be re-pointed after the fact.
         if self.instance and self.instance.pk:
             self.fields["asset"].disabled = True
             self.fields["asset"].help_text = _("The asset of a disposal record cannot be changed.")

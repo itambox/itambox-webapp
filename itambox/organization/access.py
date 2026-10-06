@@ -538,7 +538,7 @@ def accessible_tenant_ids_with_expiry(user: object | None) -> tuple[frozenset[in
     # Request-local memoization keyed to the user instance. filter_by_tenant()
     # calls this for EVERY tenant-scoped model rendered on a page; under a
     # tenant-group scope that recomputed the full grant walk dozens of times per
-    # request, turning a query-heavy page into a ~20s wait (issue #29). The
+    # request, turning a query-heavy page into a ~20s wait. The
     # shared authorization-cache generation — bumped by every Membership /
     # RoleGrant / RoleGrantScope / GroupMembership / UserGroup / Role write and
     # by Tenant / TenantGroup topology changes (organization.signals) — is

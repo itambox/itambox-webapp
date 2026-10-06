@@ -1,6 +1,5 @@
 """Unit contract for the deterministic generic-presentation registry."""
 
-import ast
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -13,7 +12,6 @@ from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ImproperlyConfigured
 from django.http import QueryDict
 
-import itambox.registry as registry_module
 from itambox.registry import (
     GENERIC_PRESENTATION_DETAIL_FEATURES,
     DetailContextInput,
@@ -782,15 +780,6 @@ class TestLifecycleAndSnapshots:
             "assert not domains.intersection(name.partition('.')[0] for name in sys.modules)"
         )
         subprocess.run([sys.executable, "-c", probe], cwd=project_root, check=True)
-
-        tree = ast.parse(Path(registry_module.__file__).read_text(encoding="utf-8"))
-        top_level_imports = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
-        imported_roots = {
-            alias.name.partition(".")[0]
-            for node in top_level_imports
-            for alias in (node.names if isinstance(node, ast.Import) else [SimpleNamespace(name=node.module or "")])
-        }
-        assert imported_roots.isdisjoint({"extras", "subscriptions", "organization", "users", "assets"})
 
     def test_clear_resets_all_generic_presentation_state(self):
         target = Registry()

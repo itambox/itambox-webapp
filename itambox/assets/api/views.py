@@ -754,7 +754,7 @@ class AssetDisposalViewSet(ITAMBoxModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ["asset_id", "disposal_method", "data_sanitization_method", "weee_compliant"]
 
-    # #496: creating a record IS the lifecycle operation, amending it is a
+    # Creating a record is the lifecycle operation, amending it is a
     # controlled update, and deleting evidence is never allowed. Cancellation is
     # the only way to retire a disposal.
 

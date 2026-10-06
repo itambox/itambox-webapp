@@ -17,7 +17,7 @@ class ITAMBoxRouter(DefaultRouter):
         # queryset. DRF's APIRootView defines no permission_classes, so without
         # this override the view inherits the global defaults and
         # TokenPermissions asserts on the missing queryset for every
-        # authenticated request (issue #363). Match the explicit pattern of
+        # authenticated request. Match the explicit pattern of
         # the /api/ and /api/users/ root views: login required, no
         # model-bound permission check.
         permission_classes = [IsAuthenticated]

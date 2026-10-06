@@ -139,7 +139,7 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
         help_text=_("Optional: the repair/replacement episode this record belongs to."),
     )
 
-    # Cancellation (issue #496): an erroneous disposal is CORRECTED, never erased.
+    # Cancellation: an erroneous disposal is CORRECTED, never erased.
     # The record keeps its identity and stays in the disposal history; these
     # fields are owned exclusively by ``cancel_asset_disposal`` (non-editable, so
     # no ordinary form, serializer or admin field can set them).
