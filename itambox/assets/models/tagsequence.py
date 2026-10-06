@@ -105,7 +105,7 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         from django.db import IntegrityError
 
         try:
-            seq, _ = cls.all_objects.get_or_create(
+            seq, _ = cls._base_manager.get_or_create(
                 tenant__isnull=True,
                 category__isnull=True,
                 prefix="ASSET-",
@@ -122,11 +122,11 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         """Re-select the global default row the winner of the race committed."""
         for _attempt in range(5):
             try:
-                return cls.all_objects.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
+                return cls._base_manager.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
             except cls.DoesNotExist:
                 time.sleep(0.05)
         # No row after the retry bound: surface the real DoesNotExist.
-        return cls.all_objects.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
+        return cls._base_manager.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
 
     @classmethod
     def get_next_tag_for_asset(cls, asset):
@@ -138,20 +138,20 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         4. Global default sequence (prefix='ASSET-', created if missing)
         """
         # 1. Tenant + Category specific
-        if asset.tenant and asset.category:
-            seq = cls.all_objects.filter(tenant=asset.tenant, category=asset.category, is_active=True).first()
+        if asset.tenant_id and asset.category:
+            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category=asset.category, is_active=True).first()
             if seq:
                 return seq.next_tag()
 
         # 2. Tenant default (no category)
-        if asset.tenant:
-            seq = cls.all_objects.filter(tenant=asset.tenant, category__isnull=True, is_active=True).first()
+        if asset.tenant_id:
+            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category__isnull=True, is_active=True).first()
             if seq:
                 return seq.next_tag()
 
         # 3. Global + Category specific
         if asset.category:
-            seq = cls.all_objects.filter(tenant__isnull=True, category=asset.category, is_active=True).first()
+            seq = cls._base_manager.filter(tenant__isnull=True, category=asset.category, is_active=True).first()
             if seq:
                 return seq.next_tag()
 
@@ -165,20 +165,20 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         Does not increment or modify the sequence.
         """
         # 1. Tenant + Category specific
-        if asset.tenant and asset.category:
-            seq = cls.all_objects.filter(tenant=asset.tenant, category=asset.category, is_active=True).first()
+        if asset.tenant_id and asset.category:
+            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category=asset.category, is_active=True).first()
             if seq:
                 return seq
 
         # 2. Tenant default (no category)
-        if asset.tenant:
-            seq = cls.all_objects.filter(tenant=asset.tenant, category__isnull=True, is_active=True).first()
+        if asset.tenant_id:
+            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category__isnull=True, is_active=True).first()
             if seq:
                 return seq
 
         # 3. Global + Category specific
         if asset.category:
-            seq = cls.all_objects.filter(tenant__isnull=True, category=asset.category, is_active=True).first()
+            seq = cls._base_manager.filter(tenant__isnull=True, category=asset.category, is_active=True).first()
             if seq:
                 return seq
 

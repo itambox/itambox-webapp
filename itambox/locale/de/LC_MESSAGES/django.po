@@ -1519,6 +1519,12 @@ msgstr "Verwahrungsvorlagen"
 msgid "Declined"
 msgstr "Abgelehnt"
 
+msgid "Superseded"
+msgstr "Abgelöst"
+
+msgid "This custody receipt was closed because the custody period it covers has ended."
+msgstr "Diese Verwahrungsquittung wurde geschlossen, weil der Verwahrungszeitraum, den sie abdeckt, beendet ist."
+
 #| msgid "Accepted"
 msgid "Accepted Date"
 msgstr "Akzeptanzdatum"

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -373,3 +374,31 @@ def scope_custody_receipts(queryset, *, user, permission=None):
         tenant_ids = candidate_tenants.values_list("pk", flat=True)
 
     return queryset.filter(asset__tenant_id__in=tenant_ids)
+
+
+def supersede_pending_receipts(assignment):
+    """Close the pending receipts of a custody period that is ending.
+
+    Called from the check-in path (reassignment auto-checks-in first), inside its
+    transaction. Accepted and declined receipts are signer-authored evidence and
+    are never rewritten; open signing sessions of the closed receipts are canceled
+    so a prepared handoff cannot be consumed afterwards.
+    """
+    period = Q(assignment=assignment)
+    if assignment.assigned_user_id is not None:
+        period |= Q(assignment__isnull=True, asset_id=assignment.asset_id, holder_id=assignment.assigned_user_id)
+    pending = list(
+        CustodyReceipt.objects.select_for_update()
+        .filter(period, acceptance_status=CustodyReceipt.STATUS_PENDING)
+        .only("pk")
+    )
+    if not pending:
+        return 0
+    ids = [receipt.pk for receipt in pending]
+    now = timezone.now()
+    # unscoped: sessions of receipts already locked above; check-in may run without a tenant scope
+    CustodySigningSession._base_manager.filter(
+        receipt_id__in=ids, consumed_at__isnull=True, canceled_at__isnull=True
+    ).update(canceled_at=now, updated_at=now)
+    CustodyReceipt.objects.filter(pk__in=ids).update(acceptance_status=CustodyReceipt.STATUS_SUPERSEDED, updated_at=now)
+    return len(ids)

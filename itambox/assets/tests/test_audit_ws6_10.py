@@ -27,6 +27,7 @@ def test_first_ever_global_tag_generation_is_race_safe():
 
     class _StubAsset:
         tenant = None
+        tenant_id = None
         category = None
 
     tag1 = AssetTagSequence.get_next_tag_for_asset(_StubAsset())
@@ -103,8 +104,8 @@ def test_global_default_fallback_retries_when_winner_row_not_yet_visible():
         return real_get(*args, **kwargs)
 
     with (
-        mock.patch.object(AssetTagSequence.all_objects, "get_or_create", side_effect=racy_get_or_create),
-        mock.patch.object(AssetTagSequence.all_objects, "get", side_effect=delayed_get),
+        mock.patch.object(AssetTagSequence._base_manager, "get_or_create", side_effect=racy_get_or_create),
+        mock.patch.object(AssetTagSequence._base_manager, "get", side_effect=delayed_get),
         mock.patch("time.sleep"),
     ):
         seq = AssetTagSequence._get_or_create_global_default()
@@ -131,8 +132,8 @@ def test_global_default_surfaces_does_not_exist_after_retry_bound():
         raise AssetTagSequence.DoesNotExist
 
     with (
-        mock.patch.object(AssetTagSequence.all_objects, "get_or_create", side_effect=racy_get_or_create),
-        mock.patch.object(AssetTagSequence.all_objects, "get", side_effect=never_visible),
+        mock.patch.object(AssetTagSequence._base_manager, "get_or_create", side_effect=racy_get_or_create),
+        mock.patch.object(AssetTagSequence._base_manager, "get", side_effect=never_visible),
         mock.patch("time.sleep"),
     ):
         with pytest.raises(AssetTagSequence.DoesNotExist):

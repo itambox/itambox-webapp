@@ -1632,9 +1632,10 @@ export interface components {
      * @description * `pending` - Pending
      * * `accepted` - Accepted
      * * `declined` - Declined
+     * * `superseded` - Superseded
      * @enum {string}
      */
-    AcceptanceStatusEnum: "pending" | "accepted" | "declined";
+    AcceptanceStatusEnum: "pending" | "accepted" | "declined" | "superseded";
     /**
      * @description * `view` - View
      * * `use` - View + allocate/consume
@@ -16059,8 +16060,9 @@ export interface operations {
          * * `pending` - Pending
          * * `accepted` - Accepted
          * * `declined` - Declined
+         * * `superseded` - Superseded
          */
-        acceptance_status?: "accepted" | "declined" | "pending";
+        acceptance_status?: "accepted" | "declined" | "pending" | "superseded";
         /** @description Accepted */
         accepted?: boolean;
         /** @description Asset */

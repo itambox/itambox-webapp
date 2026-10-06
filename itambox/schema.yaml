@@ -10904,12 +10904,14 @@ paths:
           - accepted
           - declined
           - pending
+          - superseded
         description: |-
           Acceptance Status
 
           * `pending` - Pending
           * `accepted` - Accepted
           * `declined` - Declined
+          * `superseded` - Superseded
       - in: query
         name: accepted
         schema:
@@ -38654,11 +38656,13 @@ components:
       - pending
       - accepted
       - declined
+      - superseded
       type: string
       description: |-
         * `pending` - Pending
         * `accepted` - Accepted
         * `declined` - Declined
+        * `superseded` - Superseded
     AccessLevelEnum:
       enum:
       - view

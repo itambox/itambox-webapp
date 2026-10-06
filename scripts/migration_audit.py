@@ -34,6 +34,7 @@ POST_TRANSITION_MIGRATIONS = {
     "compliance.0104_custodysigningsession",
     "compliance.0105_custodyhandoffdelivery",
     "compliance.0106_remove_custodyreceipt_accepted",
+    "compliance.0107_custodyreceipt_assignment_superseded",
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
@@ -186,6 +187,16 @@ SEMANTIC_DISPOSITIONS = {
         ("Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay unsigned."),
         {
             "compliance.0102_clear_unsigned_receipt_timestamps",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Links existing custody receipts to their custody period where unambiguous and marks pending "
+            "receipts whose period already ended as superseded; fresh installs have no receipts."
+        ),
+        {
+            "compliance.0107_custodyreceipt_assignment_superseded",
         },
     ),
     **_dispositions(
