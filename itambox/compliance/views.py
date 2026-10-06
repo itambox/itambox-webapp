@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
+from assets.models import AssetAssignment
 from core.context import get_current_request_id
 from core.reports.exporters import PDF_MIME, report_pdf_bytes
 from extras.services.events import dispatch_event
@@ -123,6 +124,39 @@ def _completed_receipt_response(request, receipt):
             error="This custody transfer has been declined.",
             status=200,
         )
+    if receipt.acceptance_status == CustodyReceipt.STATUS_SUPERSEDED:
+        return _custody_superseded_response(request)
+    return None
+
+
+def _custody_superseded_response(request):
+    return _custody_error_response(
+        request,
+        error_code="custody_superseded",
+        title="Custody Receipt Superseded",
+        error="This custody receipt is no longer valid because the asset is no longer assigned to you.",
+        status=410,
+    )
+
+
+def _receipt_period_is_active(receipt):
+    """True while the custody period the receipt evidences is the asset's active one."""
+    # Read through the base manager: the signing holder need not be a member of
+    # the asset's tenant, and the tenant-scoped manager would hide the assignment.
+    if receipt.assignment_id is not None:
+        # unscoped: the signing holder may not be a tenant member; the receipt token is the authority
+        return AssetAssignment._base_manager.filter(
+            pk=receipt.assignment_id, asset_id=receipt.asset_id, is_active=True, deleted_at__isnull=True
+        ).exists()
+    # unscoped: legacy receipt without a bound period; same token-authority reasoning as above
+    return AssetAssignment._base_manager.filter(
+        asset_id=receipt.asset_id, assigned_user_id=receipt.holder_id, is_active=True, deleted_at__isnull=True
+    ).exists()
+
+
+def _superseded_pending_response(request, receipt):
+    if receipt.acceptance_status == CustodyReceipt.STATUS_PENDING and not _receipt_period_is_active(receipt):
+        return _custody_superseded_response(request)
     return None
 
 
@@ -353,6 +387,10 @@ def _process_custody_post(request, token, receipt, signing_session=None):
         if completed_response is not None:
             return completed_response
 
+        superseded_response = _superseded_pending_response(request, receipt)
+        if superseded_response is not None:
+            return superseded_response
+
         action = request.POST.get("action", "accept")
         signature_data = request.POST.get("signature_canvas")
         if action == "decline":
@@ -413,14 +451,32 @@ def _process_custody_post(request, token, receipt, signing_session=None):
                 tenant_id=asset.tenant_id,
             )
         )
-        asset._changelog_action = "audit"
-        asset._changelog_message = f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
-        asset.save()
+        # Journal-style audit write: no asset save, so tag allocation and model
+        # validation never re-run and a stale in-request copy of the asset row can
+        # never overwrite concurrent edits.
+        asset_state = asset._serialize_for_change(asset)
+        asset._log_change(
+            action="audit",
+            prechange_data=asset_state,
+            postchange_data=asset_state,
+            message=f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}...",
+        )
         return render(
             request,
             "compliance/custody/receipt_success.html",
             {"receipt": receipt, "asset": asset, "holder": holder},
         )
+
+
+def _pre_sign_response(request, receipt, holder):
+    if receipt.acceptance_status != CustodyReceipt.STATUS_PENDING:
+        if not request.user.is_authenticated:
+            return _signer_error_response(request, holder, require_authenticated=True)
+        return _completed_receipt_response(request, receipt)
+    superseded_response = _superseded_pending_response(request, receipt)
+    if superseded_response is not None:
+        return superseded_response
+    return _external_provider_response(request, receipt, holder)
 
 
 def custody_eula_sign(request, token):
@@ -449,14 +505,9 @@ def custody_eula_sign(request, token):
 
         return redirect_to_login(request.get_full_path())
 
-    if receipt.acceptance_status in {CustodyReceipt.STATUS_ACCEPTED, CustodyReceipt.STATUS_DECLINED}:
-        if not request.user.is_authenticated:
-            return _signer_error_response(request, holder, require_authenticated=True)
-        return _completed_receipt_response(request, receipt)
-
-    external_response = _external_provider_response(request, receipt, holder)
-    if external_response is not None:
-        return external_response
+    pre_sign_response = _pre_sign_response(request, receipt, holder)
+    if pre_sign_response is not None:
+        return pre_sign_response
 
     if request.method == "POST":
         signer_error = _signer_error_response(request, holder, require_authenticated=True)

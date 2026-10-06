@@ -11,6 +11,7 @@ When an asset is checked out with **Require Acceptance** active, a Custody Recei
 - **Pending**: Awaiting user signature. The asset's assignment status is held in check.
 - **Accepted**: The user has successfully signed the receipt. The asset is now officially in their custody.
 - **Declined**: The user rejected the terms. Custody is returned, and administrative action is flagged.
+- **Superseded**: The custody period the receipt covers ended (check-in or reassignment) before the holder decided. The receipt can no longer be signed. Accepted and declined receipts are never changed by a check-in.
 
 ---
 
@@ -19,7 +20,8 @@ When an asset is checked out with **Require Acceptance** active, a Custody Recei
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
 | **Acceptance Method** | The acceptance method of the custody receipt. | String | Yes |
-| **Acceptance Status** | The signature status (`pending`, `accepted`, or `declined`). | Selection | Yes |
+| **Acceptance Status** | The signature status (`pending`, `accepted`, `declined`, or `superseded`). | Selection | Yes |
+| **Assignment** | The custody period (asset assignment) the receipt evidences. Set when the receipt is created. | Reference | No |
 | **Accepted** | Read-only; true exactly when the Acceptance Status is `accepted`. Derived, not stored. | Boolean | No |
 | **Accepted Date** | The accepted date of the custody receipt. | Date Time | No |
 | **Asset** | The physical hardware checked out. | Foreign Key | Yes |

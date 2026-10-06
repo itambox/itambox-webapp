@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 53)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 54)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -569,6 +569,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "compliance.0104_custodysigningsession",
                 "compliance.0105_custodyhandoffdelivery",
                 "compliance.0106_remove_custodyreceipt_accepted",
+                "compliance.0107_custodyreceipt_assignment_superseded",
                 "extras.0101_issue88_drop_legacy_webhook_name_like",
                 "extras.0102_alter_event_action",
                 "extras.0103_remove_reporttemplate_advanced_mode_and_more",

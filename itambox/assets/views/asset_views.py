@@ -225,8 +225,15 @@ class AssetDetailView(ObjectDetailView):
         context["resolved_depreciation_rung"] = rung
 
         if can_view_receipts and active_assignment and isinstance(active_assignment.assigned_target, AssetHolder):
-            current_receipt = (
-                receipt_qs.filter(holder=active_assignment.assigned_target).order_by("-created_date", "-pk").first()
+            current_receipt = next(
+                (
+                    receipt
+                    for receipt in receipt_qs.filter(holder=active_assignment.assigned_target).order_by(
+                        "-created_date", "-pk"
+                    )
+                    if receipt.assignment_id in (None, active_assignment.pk)
+                ),
+                None,
             )
             if current_receipt is not None:
                 context["custody_receipt_summary"] = {

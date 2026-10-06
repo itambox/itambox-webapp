@@ -156,10 +156,14 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     STATUS_PENDING = "pending"
     STATUS_ACCEPTED = "accepted"
     STATUS_DECLINED = "declined"
+    # Administrative terminal state: the custody period the receipt evidences ended
+    # (check-in or reassignment) before the holder decided. Not signer-authored.
+    STATUS_SUPERSEDED = "superseded"
     ACCEPTANCE_STATUS_CHOICES = [
         (STATUS_PENDING, _("Pending")),
         (STATUS_ACCEPTED, _("Accepted")),
         (STATUS_DECLINED, _("Declined")),
+        (STATUS_SUPERSEDED, _("Superseded")),
     ]
 
     asset = models.ForeignKey(
@@ -171,6 +175,15 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     )
     holder = models.ForeignKey(
         "organization.AssetHolder", on_delete=models.PROTECT, related_name="custody_receipts", verbose_name=_("Holder")
+    )
+    assignment = models.ForeignKey(
+        "assets.AssetAssignment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="custody_receipts",
+        verbose_name=_("Assignment"),
     )
     token = models.CharField(max_length=64, unique=True, default=generate_token)
     custody_template = models.ForeignKey(
