@@ -158,7 +158,7 @@ def _lock_provider_scim_user(user):
     post=scim_schema.SCIM_PROVIDER_USER_CREATE,
 )
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
-    def _retry_correlated_user(self, username: str, external_id: str | None) -> UserModel:
+    def _retry_correlated_user(self, username: str, external_id: str) -> UserModel:
         if not external_id:
             raise SCIMPatchError("User already exists", scim_type="uniqueness", status_code=409)
         correlated = (
@@ -246,6 +246,8 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         document = require_object_document(request.data)
         patch = parse_user_resource(document)
         username = patch.username
+        if not isinstance(username, str):
+            raise SCIMPatchError("userName is required")
         email = patch.email
         first_name = patch.first_name
         last_name = patch.last_name
@@ -308,7 +310,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                         # cleared, with no manual intervention.
                         sync_user_global_active(user)
                 except IntegrityError:
-                    user = self._retry_correlated_user(username, external_id)
+                    user = self._retry_correlated_user(username, external_id or "")
                     with transaction.atomic():
                         user = _lock_provider_scim_user(user)
                         sync_user_global_active(user)
@@ -334,7 +336,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                         external_id=external_id,
                     )
             except IntegrityError:
-                user = self._retry_correlated_user(username, external_id)
+                user = self._retry_correlated_user(username, external_id or "")
                 response_status = status.HTTP_200_OK
 
         serializer = SCIMUserSerializer(
