@@ -45,7 +45,7 @@ the separately authorised purge described in [AssetDisposal](assetdisposal.md).
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
 | **Asset Role** | The functional category of the asset (e.g. `Developer Laptop`). | Foreign Key | No |
-| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated from the tag sequence if left blank. | String | No |
+| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated from the tag sequence if left blank. Uniqueness deliberately includes soft-deleted assets: a deleted asset keeps its tag until it is purged, so a physical label is never reissued to a different device. | String | No |
 | **Asset Type** | The model template from the Catalog (Manufacturer + Model details). May be blank for assets created before the type catalog is ready. | Foreign Key | No |
 | **Cost Center** | The cost center of the asset. | Foreign Key | No |
 | **Currency** | ISO 4217 code. Leave blank to use the tenant default currency. | Choice | No |

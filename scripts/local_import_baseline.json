@@ -582,12 +582,6 @@
     {
       "path": "itambox/compliance/views.py",
       "context": "FunctionDef:custody_eula_sign",
-      "statement": "from django.conf import settings",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
-      "context": "FunctionDef:custody_eula_sign",
       "statement": "from django.contrib.auth.views import redirect_to_login",
       "count": 1
     },
@@ -2123,18 +2117,6 @@
     },
     {
       "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderApproveView/FunctionDef:perform_action",
-      "statement": "from .services import approve_purchase_order",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderCancelView/FunctionDef:perform_action",
-      "statement": "from .services import cancel_purchase_order",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
       "context": "ClassDef:PurchaseOrderDetailView/FunctionDef:get_context_data",
       "statement": "from procurement.models import FulfillmentLink",
       "count": 1
@@ -2143,12 +2125,6 @@
       "path": "itambox/procurement/views.py",
       "context": "ClassDef:PurchaseOrderEditView/FunctionDef:get_initial",
       "statement": "from assets.models import AssetRequest",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderOrderView/FunctionDef:perform_action",
-      "statement": "from .services import order_purchase_order",
       "count": 1
     },
     {
@@ -2166,12 +2142,6 @@
     {
       "path": "itambox/procurement/views.py",
       "context": "ClassDef:PurchaseOrderReceiveFormView/FunctionDef:post",
-      "statement": "from .services import receive_purchase_order",
-      "count": 2
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderReceiveFormView/FunctionDef:post",
       "statement": "from assets.models import Asset, AssetTagSequence",
       "count": 1
     },
@@ -2179,12 +2149,6 @@
       "path": "itambox/procurement/views.py",
       "context": "ClassDef:PurchaseOrderReceiveFormView/FunctionDef:post",
       "statement": "from django.forms import formset_factory",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderReopenView/FunctionDef:perform_action",
-      "statement": "from .services import reopen_purchase_order",
       "count": 1
     },
     {
