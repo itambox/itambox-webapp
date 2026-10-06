@@ -3684,14 +3684,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_security_boundaries.py",
-      "code": "B907",
-      "message": "'self.asset_b.pk' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "query = f\"\"\"\n        mutation {{\n            updateAsset(id: \"{self.asset_b.pk}\", name: \"Hacked Name\") {{\n                asset {{\n                    id\n                    name\n                }}\n            }}\n        }}\n        \"\"\"",
-      "context": "Module:body/ClassDef:SecurityBoundariesTestCase:body/FunctionDef:test_graphql_cross_tenant_mutation_denied:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_security_finish.py",
       "code": "B007",
       "message": "Loop control variable 'model' not used within the loop body. If this is intended, start the name with an underscore.",
