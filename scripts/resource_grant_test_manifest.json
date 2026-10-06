@@ -28,7 +28,6 @@
     "itambox/assets/tests/test_integrity_constraints.py",
     "itambox/assets/tests/test_migration_adoption_preflight.py",
     "itambox/assets/tests/test_nested_serializers.py",
-    "itambox/assets/tests/test_phase3_state_machine.py",
     "itambox/assets/tests/test_repair_episode.py",
     "itambox/assets/tests/test_request_action_authorization.py",
     "itambox/assets/tests/test_request_action_scopes.py",
