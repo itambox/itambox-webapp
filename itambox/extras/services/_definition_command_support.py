@@ -12,7 +12,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import DEFAULT_DB_ALIAS, IntegrityError
+from django.db import DEFAULT_DB_ALIAS, IntegrityError, models
 
 from assets.services.specifications._command_support import actor_change_context
 from assets.services.specifications.contracts import DomainIssueDTO
@@ -73,9 +73,9 @@ def reload_actor(actor: ActorContextDTO, *, using: str = DEFAULT_DB_ALIAS):
     return candidate
 
 
-def authorize_locked(actor: ActorContextDTO, model: type[object], codename: str, *, using: str):
+def authorize_locked(actor: ActorContextDTO, model: type[models.Model], codename: str, *, using: str):
     principal = reload_actor(actor, using=using)
-    permission = f"{getattr(model, '_meta').app_label}.{codename}"
+    permission = f"{model._meta.app_label}.{codename}"
     if principal is None or not has_provider_catalogue_permission(principal, permission):
         raise DefinitionCommandError(issue("OBJECT_UNAVAILABLE", message_key="specifications.object_unavailable"))
     return principal

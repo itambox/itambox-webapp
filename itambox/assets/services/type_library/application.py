@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import models, transaction
 
 from assets.models.catalog import AssetType, Category, Manufacturer
 from assets.services.specifications._command_support import actor_change_context
@@ -37,6 +37,8 @@ from extras.models import (
 )
 from organization.services.access_scope import authentication_revision_for_actor
 from organization.services.catalogue_authorization import has_provider_catalogue_permission
+
+ModelType = type[models.Model]
 
 
 class LibraryApplyError(RuntimeError):
@@ -275,7 +277,7 @@ def _has_library_plan_permissions(
     if not has_provider_catalogue_permission(actor, "extras.manage_specification_library"):
         return False
     return all(
-        has_provider_catalogue_permission(actor, f"{getattr(model, '_meta').app_label}.{codename}")
+        has_provider_catalogue_permission(actor, f"{model._meta.app_label}.{codename}")
         for model, codename in _required_library_permissions(library, incoming, plan, using=using)
     )
 
@@ -286,7 +288,7 @@ def _required_library_permissions(
     plan: LibraryPlan,
     *,
     using: str,
-) -> tuple[tuple[type, str], ...]:
+) -> tuple[tuple[ModelType, str], ...]:
     """Return concrete global add/change grants for the plan.
 
     A plan with no adopted upstream action is a true no-op from the
@@ -295,7 +297,7 @@ def _required_library_permissions(
     actions = _planned_definition_actions(plan)
     if not actions:
         return ()
-    required: set[tuple[type, str]] = set()
+    required: set[tuple[ModelType, str]] = set()
     _collect_definition_permissions(
         required,
         _incoming_definitions(incoming),
@@ -350,7 +352,7 @@ def _incoming_definitions(incoming: ValidatedLibraryDocument) -> dict[str, list[
 
 
 def _collect_definition_permissions(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     definitions: dict[str, list[dict[str, object]]],
     actions: dict[str, dict[str, set[str]]],
     library: object | None,
@@ -386,7 +388,7 @@ def _collect_definition_permissions(
 
 
 def _require_retirement_permissions(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     actions: dict[str, dict[str, set[str]]],
 ) -> None:
     models = {
@@ -402,7 +404,7 @@ def _require_retirement_permissions(
 
 
 def _require_definition_item(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     section: str,
     model: type,
     item: dict[str, object],
@@ -422,7 +424,7 @@ def _require_definition_item(
 
 
 def _require_choice_set_item(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     item: dict[str, object],
     *,
     using: str,
@@ -431,7 +433,7 @@ def _require_choice_set_item(
 
 
 def _require_field_item(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     item: dict[str, object],
     *,
     using: str,
@@ -440,7 +442,7 @@ def _require_field_item(
 
 
 def _require_fieldset_item(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     item: dict[str, object],
     *,
     using: str,
@@ -450,7 +452,7 @@ def _require_fieldset_item(
 
 
 def _require_asset_type_item(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     item: dict[str, object],
     *,
     using: str,
@@ -493,13 +495,13 @@ def _definition_exists(section: str, item: dict[str, object], library: object | 
     return False
 
 
-def _require_add_or_change(required: set[tuple[type, str]], model: type, exists: bool) -> None:
+def _require_add_or_change(required: set[tuple[ModelType, str]], model: ModelType, exists: bool) -> None:
     action = "change" if exists else "add"
     required.add((model, f"{action}_{model._meta.model_name}"))
 
 
 def _require_reference_permission(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     model: type,
     reference: object,
     *,
@@ -524,7 +526,7 @@ def _require_reference_permission(
 
 
 def _require_choice_permissions(
-    required: set[tuple[type, str]],
+    required: set[tuple[ModelType, str]],
     item: dict[str, object],
     *,
     using: str,

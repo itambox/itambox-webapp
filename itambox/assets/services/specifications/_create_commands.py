@@ -28,7 +28,7 @@ from typing import Any, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import DEFAULT_DB_ALIAS, IntegrityError, transaction
+from django.db import DEFAULT_DB_ALIAS, IntegrityError, models, transaction
 
 from assets.models.catalog import (
     AssetRole,
@@ -286,12 +286,12 @@ def _validate_apply_shared_inputs(
 
 def _reloaded_authorized_actor(
     actor: ActorContextDTO,
-    model: type[object],
+    model: type[models.Model],
     codename: str,
 ):
     """Reload the active actor and require provider-scoped catalogue authority."""
     actor_model = reload_actor(actor)
-    permission = f"{getattr(model, '_meta').app_label}.{codename}"
+    permission = f"{model._meta.app_label}.{codename}"
     if actor_model is None or not has_provider_catalogue_permission(actor_model, permission):
         return None
     return actor_model
