@@ -1924,20 +1924,6 @@
     {
       "rule": "unscoped",
       "path": "itambox/procurement/services.py",
-      "context": "FunctionDef:_lock_purchase_order_for_asset_request",
-      "statement": "PurchaseOrder._base_manager",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
-      "path": "itambox/procurement/services.py",
-      "context": "FunctionDef:approve_purchase_order",
-      "statement": "PurchaseOrder._base_manager",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
-      "path": "itambox/procurement/services.py",
       "context": "FunctionDef:lock_unit_fulfillment_links",
       "statement": "FulfillmentLink._base_manager",
       "count": 1
